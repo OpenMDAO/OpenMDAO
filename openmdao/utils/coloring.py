@@ -626,14 +626,58 @@ def _write_sparsity(sparsity, stream):
     stream.write("}")
 
 
-def _write_coloring(modes, color_info, stream):
+def _write_coloring(color_info, stream, format='json'):
     """
     Write the coloring and sparsity structures to the given stream.
 
     Parameters
     ----------
-    modes : list of str
-        Derivative direction.
+    color_info : dict
+        dict['fwd'] = (col_lists, row_maps)
+            col_lists is a list of column lists, the first being a list of uncolored columns.
+            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+        dict['rev'] = (row_lists, col_maps)
+            row_lists is a list of row lists, the first being a list of uncolored rows.
+            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
+    stream : file-like
+        Output stream.
+    format : str
+        Output stream format.  Options are ['json'].  Default is 'json'.
+    """
+    try:
+        writer = _writers[format]
+    except KeyError:
+        raise RuntimeError("No writer available for format '%s'", format)
+    writer(color_info, stream)
+
+
+def _write_coloring_pickle(modes, color_info, stream):
+    """
+    Write the coloring and sparsity structures to the given stream in pickle format.
+
+    Parameters
+    ----------
+    color_info : dict
+        dict['fwd'] = (col_lists, row_maps)
+            col_lists is a list of column lists, the first being a list of uncolored columns.
+            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
+        dict['rev'] = (row_lists, col_maps)
+            row_lists is a list of row lists, the first being a list of uncolored rows.
+            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
+    stream : file-like
+        Output stream.
+    """
+    pickle.dump(color_info, stream)
+
+
+def _write_coloring_json(color_info, stream):
+    """
+    Write the coloring and sparsity structures to the given stream in json format.
+
+    Parameters
+    ----------
     color_info : dict
         dict['fwd'] = (col_lists, row_maps)
             col_lists is a list of column lists, the first being a list of uncolored columns.
@@ -646,8 +690,9 @@ def _write_coloring(modes, color_info, stream):
         Output stream.
     """
     tty = stream.isatty()
-    none = 'None' if tty else 'null'
+    none = 'null'
     sparsity = color_info.get('sparsity')
+    modes = [m for m in ('fwd', 'rev') if m in color_info]
 
     stream.write("{\n")
     for m, mode in enumerate(modes):
@@ -698,6 +743,13 @@ def _write_coloring(modes, color_info, stream):
         stream.write(',\n"sparsity": %s' % none)
 
     stream.write("\n}")
+
+
+_writers = {
+    'json': _write_coloring_json,
+    'pickle': _write_coloring_pickle,
+    'pkl': _write_coloring_pickle,
+}
 
 
 def _json2coloring(coloring):
@@ -910,12 +962,11 @@ def _compute_coloring(J, mode):
                 row_lists is a list of row lists, the first being a list of uncolored rows.
                 col_maps is a list of nonzero cols for each row, or None for uncolored rows.
     """
-    bidirectional = mode == 'auto'
+    if mode == 'auto':  # use bidirectional coloring
+        return MNCO_bidir(J)
+
     rev = mode == 'rev'
     nrows, ncols = J.shape
-
-    if bidirectional:
-        return MNCO_bidir(J)
 
     if rev:
         J = J.T
@@ -943,6 +994,11 @@ def color_iterator(coloring, direction):
         Dict may contain either 'fwd' subdict, 'rev' subdict, or both.
     direction : str
         Indicates which coloring subdict ('fwd' or 'rev') to use.
+
+    Yields
+    ------
+    (columns, nz_row_list)
+        Yields a list of columns and their associated nonzero rows associated with a color.
     """
     col_lists = coloring[direction][0]
     nz_rows = coloring[direction][1]
@@ -1036,18 +1092,16 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
     coloring['time_coloring'] = time.time() - start_time
     coloring['time_sparsity'] = time_sparsity
 
-    modes = [m for m in ('fwd', 'rev') if m in coloring]
-
-    if driver is not None and include_sparsity:
+    if sparsity is not None:
         coloring['sparsity'] = sparsity
 
     if stream is not None:
         if stream.isatty():
             stream.write("\n########### BEGIN COLORING DATA ################\n")
-            _write_coloring(modes, coloring, stream)
+            _write_coloring(coloring, stream)
             stream.write("\n########### END COLORING DATA ############\n")
         else:
-            _write_coloring(modes, coloring, stream)
+            _write_coloring(coloring, stream)
 
         if show_jac:
             s = stream if stream.isatty() else sys.stdout

@@ -9,6 +9,7 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 import numpy as np
+from scipy.sparse import coo_matrix
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
     ExplicitComponent, NonlinearBlockGS
@@ -147,6 +148,26 @@ def _check_total_matrix(system, jac, expected):
     np.testing.assert_almost_equal(fullJ, expected)
 
 
+def _check_semitotal_matrix(system, jac, expected):
+    blocks = []
+    for of in system._var_allprocs_abs_names['output']:
+        cblocks = []
+        for wrt in itertools.chain(system._var_allprocs_abs_names['output'], system._var_allprocs_abs_names['input']):
+            key = (of, wrt)
+            if key in jac:
+                rows = jac[key]['rows']
+                if rows is not None:
+                    cols = jac[key]['cols']
+                    val = coo_matrix((jac[key]['value'], (rows, cols)), shape=jac[key]['shape']).toarray()
+                else:
+                    val = jac[key]['value']
+                cblocks.append(val)
+        if cblocks:
+            blocks.append(np.hstack(cblocks))
+    fullJ = np.vstack(blocks)
+    np.testing.assert_almost_equal(fullJ, expected)
+
+
 class TestCSColoring(unittest.TestCase):
     FD_METHOD = 'cs'
 
@@ -183,6 +204,41 @@ class TestCSColoring(unittest.TestCase):
         derivs = prob.driver._compute_totals()
         derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
         _check_total_matrix(model, derivs, sparsity)
+
+    def test_simple_semitotals(self):
+        prob = Problem()
+        model = prob.model = Group(dynamic_derivs_repeats=1)
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 0]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        sub = model.add_subsystem('sub', Group())
+        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        sub.set_approx_coloring('*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'sub.comp.x0')
+        model.connect('indeps.x1', 'sub.comp.x1')
+
+        model.sub.comp.add_constraint('y0')
+        model.sub.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        derivs = prob.driver._compute_totals()
+        derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
+        _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity)
 
     def test_totals_over_implicit_comp(self):
         prob = Problem()
@@ -352,8 +408,13 @@ class TestCSColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
+        start_nruns = comp._nruns
         comp._linearize()
+        # add 5 to number of runs to cover the 5 uncolored output columns
+        self.assertEqual(comp._nruns - start_nruns, np.sum(sparsity.shape))
+        start_nruns = comp._nruns
         comp._linearize()
+        self.assertEqual(comp._nruns - start_nruns, sparsity.shape[0] + 5)
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
 
@@ -383,8 +444,12 @@ class TestCSColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
+        start_nruns = comp._nruns
         comp._linearize()
+        self.assertEqual(comp._nruns - start_nruns, 7)
+        start_nruns = comp._nruns
         comp._linearize()
+        self.assertEqual(comp._nruns - start_nruns, 5)
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
 
@@ -442,7 +507,7 @@ class TestColoringParallelCS(unittest.TestCase):
         nruns = comp._nruns - start_nruns
         if model._full_comm:
             nruns = model._full_comm.allreduce(nruns)
-        self.assertEqual(nruns, model._approx_schemes[self.FD_METHOD].ncolors())
+        self.assertEqual(nruns, 5)
         _check_total_matrix(model, derivs, sparsity)
 
     def test_simple_partials_implicit(self):
@@ -488,7 +553,7 @@ class TestColoringParallelCS(unittest.TestCase):
         nruns = comp._nruns - start_nruns
         if comp._full_comm:
             nruns = comp._full_comm.allreduce(nruns)
-        self.assertEqual(nruns, comp._approx_schemes[self.FD_METHOD].ncolors() + sparsity.shape[0])
+        self.assertEqual(nruns, 5 + sparsity.shape[0])
 
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)

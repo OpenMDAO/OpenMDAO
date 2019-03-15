@@ -995,6 +995,8 @@ class Driver(object):
     def _setup_simul_coloring(self):
         """
         Set up metadata for simultaneous derivative solution.
+
+        If set_simul_deriv_color was called with a filename, load the coloring file.
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
         if not coloring_mod._use_sparsity:

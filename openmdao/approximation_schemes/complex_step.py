@@ -16,11 +16,6 @@ from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, v
 from openmdao.utils.name_maps import rel_name2abs_name
 
 
-DEFAULT_CS_OPTIONS = {
-    'step': 1e-40,
-    'directional': False,
-}
-
 _full_slice = slice(None)
 
 
@@ -39,11 +34,16 @@ class ComplexStep(ApproximationScheme):
     ----------
     _exec_list : list
         A list of which derivatives (in execution order) to compute.
-        The entries are of the form (of, wrt, options), where of and wrt are absolute names
-        and options is a dictionary.
+        The entries are of the form (key, options), where key is (of, wrt) where of and wrt
+        are absolute names and options is a dictionary.
     _fd : <FiniteDifference>
         When nested complex step is detected, we swtich to Finite Difference.
     """
+
+    DEFAULT_OPTIONS = {
+        'step': 1e-40,
+        'directional': False,
+    }
 
     def __init__(self):
         """
@@ -66,10 +66,9 @@ class ComplexStep(ApproximationScheme):
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
-        of, wrt = abs_key
-        options = DEFAULT_CS_OPTIONS.copy()
+        options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)
-        self._exec_list.append((of, wrt, options))
+        self._exec_list.append((abs_key, options))
         self._approx_groups = None
 
     @staticmethod
@@ -88,12 +87,12 @@ class ComplexStep(ApproximationScheme):
             Sorting key (wrt, step_size, directional)
 
         """
-        options = approx_tuple[2]
+        options = approx_tuple[1]
         if 'coloring' in options and options['coloring'] is not None:
             # this will only happen after the coloring has been computed
             return ('@color', options['step'], options['directional'])
         else:
-            return (approx_tuple[1], options['step'], options['directional'])
+            return (approx_tuple[0][1], options['step'], options['directional'])
 
     def _get_approx_data(self, system, data):
         """
@@ -141,8 +140,9 @@ class ComplexStep(ApproximationScheme):
                 simple_warning(msg % system.pathname)
 
                 fd = self._fd = FiniteDifference()
+                empty = {}
                 for item in self._exec_list:
-                    fd.add_approximation(item[0:2], {})
+                    fd.add_approximation(item[0], empty)
 
             self._fd.compute_approximations(system, jac, total=total)
             return

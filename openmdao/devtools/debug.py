@@ -16,8 +16,8 @@ from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.mpi import MPI
-from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
-from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
 
 # an object used to detect when a named value isn't found

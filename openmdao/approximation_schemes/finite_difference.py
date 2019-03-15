@@ -16,14 +16,6 @@ from openmdao.utils.name_maps import rel_name2abs_name
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
-DEFAULT_FD_OPTIONS = {
-    'step': 1e-6,
-    'form': 'forward',
-    'order': None,
-    'step_calc': 'abs',
-    'directional': False,
-}
-
 DEFAULT_ORDER = {
     'forward': 1,
     'backward': 1,
@@ -86,8 +78,8 @@ class FiniteDifference(ApproximationScheme):
     ----------
     _exec_list : list
         A list of which derivatives (in execution order) to compute.
-        The entries are of the form (of, wrt, fd_options), where of and wrt are absolute names
-        and fd_options is a dictionary.
+        The entries are of the form (key, fd_options), where key is (of, wrt) where of and wrt are
+        absolute names and fd_options is a dictionary.
     _starting_outs : ndarray
         A copy of the starting outputs array used to restore the outputs to original values.
     _starting_ins : ndarray
@@ -95,6 +87,14 @@ class FiniteDifference(ApproximationScheme):
     _results_tmp : ndarray
         An array the same size as the system outputs. Used to store the results temporarily.
     """
+
+    DEFAULT_OPTIONS = {
+        'step': 1e-6,
+        'form': 'forward',
+        'order': None,
+        'step_calc': 'abs',
+        'directional': False,
+    }
 
     def __init__(self):
         """
@@ -115,8 +115,7 @@ class FiniteDifference(ApproximationScheme):
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
-        of, wrt = abs_key
-        fd_options = DEFAULT_FD_OPTIONS.copy()
+        fd_options = self.DEFAULT_OPTIONS.copy()
         fd_options.update(kwargs)
 
         if fd_options['order'] is None:
@@ -127,7 +126,7 @@ class FiniteDifference(ApproximationScheme):
                 msg = "'{}' is not a valid form of finite difference; must be one of {}"
                 raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
 
-        self._exec_list.append((of, wrt, fd_options))
+        self._exec_list.append((abs_key, fd_options))
         self._approx_groups = None
 
     @staticmethod
@@ -146,13 +145,13 @@ class FiniteDifference(ApproximationScheme):
             Sorting key (wrt, form, step_size, order, step_calc, directional)
 
         """
-        options = approx_tuple[2]
+        options = approx_tuple[1]
         if 'coloring' in options and options['coloring'] is not None:
             # this will only happen after the coloring has been computed
             return ('@color', options['form'], options['order'],
                     options['step'], options['step_calc'], options['directional'])
         else:
-            return (approx_tuple[1], options['form'], options['order'],
+            return (approx_tuple[0][1], options['form'], options['order'],
                     options['step'], options['step_calc'], options['directional'])
 
     def _get_approx_data(self, system, data):

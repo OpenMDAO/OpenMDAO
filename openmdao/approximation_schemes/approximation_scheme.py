@@ -78,18 +78,17 @@ class ApproximationScheme(object):
         new_entry = None
         colored = set()
         for tup in self._exec_list:
-            key = tuple(tup[:2])
-            if 'coloring' in tup[2]:
+            key, options = tup
+            if 'coloring' in options:
                 colored.add(key)
-                _, _, options = tup
                 if new_entry is None:
                     options = options.copy()
                     options['coloring'] = coloring
                     options['approxs'] = [tup]
-                    new_entry = (None, None, options)
+                    new_entry = ((None, None), options)
                     new_list.append(new_entry)
                 else:
-                    new_entry[2]['approxs'].append(tup)
+                    new_entry[1]['approxs'].append(tup)
             elif key not in colored:
                 new_list.append(tup)
 
@@ -170,8 +169,7 @@ class ApproximationScheme(object):
 
             if wrt == '@color':   # use coloring (there should be only 1 of these)
                 wrt_matches = system._approx_coloring_info[0]
-                options = approx[0][2]
-                colored_wrts = options['coloring_wrts']
+                options = approx[0][1]
                 if is_total:
                     of_names = [n for n in system._var_allprocs_abs_names['output']
                                 if n in system._owns_approx_of]
@@ -217,9 +215,9 @@ class ApproximationScheme(object):
                 tmpJ['@jac_slices'] = _get_jac_slice_dict(of_names, reduced_of_sizes,
                                                           wrt_names, reduced_wrt_sizes)
 
-                if len(full_wrts) != len(colored_wrts) or approx_wrt_idx:
+                if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
                     # need mapping from coloring jac columns (subset) to full jac columns
-                    col_map = sub2full_indices(full_wrts, colored_wrts, full_sizes, approx_wrt_idx)
+                    col_map = sub2full_indices(full_wrts, wrt_matches, full_sizes, approx_wrt_idx)
                 else:
                     col_map = None
 
@@ -403,11 +401,20 @@ class ApproximationScheme(object):
                         jac[(of, wrt)] = oview
 
     def ncolors(self):
+        """
+        Return number of colors used in simultaneous derivative coloring, or 0 if not used.
+
+        Returns
+        -------
+        int
+            Number of colors used in simultaneous derivative coloring, or 0 if not used.
+        """
         color_count = 0
         for approx in self._approx_groups:
             if approx[0] is None:
                 color_count += 1
         return color_count
+
 
 def _gather_jac_results(comm, results):
     new_results = defaultdict(list)
@@ -441,7 +448,8 @@ def _get_wrt_subjacs(system, approxs):
     ofdict = {}
 
     # in the non-colored case, all wrts will be the same for all entries in approxs
-    for of, wrt, options in approxs:
+    for key, options in approxs:
+        of, wrt = key
         if wrt not in J:
             J[wrt] = {'ofs': [], 'tot_rows': 0, 'directional': options['directional']}
 

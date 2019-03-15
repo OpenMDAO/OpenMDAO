@@ -10,8 +10,8 @@ import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse
 
-from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
-from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, _supported_approx_methods
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.units import valid_units
@@ -268,6 +268,8 @@ class Component(System):
                 abs_name = prefix + prom_name
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
                 self._var_allprocs_discrete[type_][abs_name] = val
+
+        self._var_allprocs_abs2prom = self._var_abs2prom
 
         self._var_abs_names = self._var_allprocs_abs_names
         if self._var_discrete['input'] or self._var_discrete['output']:
@@ -739,7 +741,8 @@ class Component(System):
                 info[abs_key] = meta
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
-                         method='exact', step=None, form=None, step_calc=None):
+                         method='exact', step=None, form=None, step_calc=None,
+                         has_diag_jac=False):
         """
         Declare information about this component's subjacobians.
 
@@ -782,9 +785,11 @@ class Component(System):
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. Defaults to None, in which case the approximation method provides
             its default value.
+        has_diag_jac : bool
+            If True, subjacs corresponding to matching (of, wrt) pairs are diagonal.
         """
         try:
-            method_func, default_opts = _supported_approx_methods[method]
+            method_func = _supported_approx_methods[method]
         except KeyError:
             msg = 'Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(method, _supported_approx_methods.keys()))
@@ -796,6 +801,8 @@ class Component(System):
 
         meta = self._declared_partials[of, wrt]
         meta['dependent'] = dependent
+        if has_diag_jac:
+            meta['has_diag_jac'] = has_diag_jac
         if dependent:
             if rows is not None:
                 meta['rows'] = rows
@@ -820,9 +827,13 @@ class Component(System):
             if method not in self._approx_schemes:
                 self._approx_schemes[method] = method_func()
 
+            default_opts = method_func.DEFAULT_OPTIONS
+
             # If rows/cols is specified
             if rows is not None or cols is not None:
                 raise ValueError('Sparse FD specification not supported yet.')
+        else:
+            default_opts = ()
 
         if step:
             if 'step' in default_opts:
@@ -1103,10 +1114,10 @@ class Component(System):
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         outs = list(self._var_allprocs_prom2abs_list['output'])
-        ins = list(self._var_allprocs_prom2abs_list['input'])
+        all_wrts = outs + list(self._var_allprocs_prom2abs_list['input'])
 
         of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]
+        wrt_pattern_matches = [(pattern, find_matches(pattern, all_wrts)) for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
     def _check_partials_meta(self, abs_key, val, shape):
@@ -1211,18 +1222,19 @@ class Component(System):
                 method = 'fd'
 
             fd_options = {'order': None, 'method': method}
+            approx_scheme = approximations[method]
 
             if method == 'cs':
                 fd_options['form'] = None
                 fd_options['step_calc'] = None
                 if not step:
-                    step = DEFAULT_CS_OPTIONS['step']
+                    step = approx_scheme.DEFAULT_OPTIONS['step']
 
             elif method == 'fd':
                 fd_options['form'] = form
                 fd_options['step_calc'] = step_calc
                 if not step:
-                    step = DEFAULT_FD_OPTIONS['step']
+                    step = approx_scheme.DEFAULT_OPTIONS['step']
 
             fd_options['step'] = step
 
@@ -1233,7 +1245,7 @@ class Component(System):
                     if value is not None:
                         fd_options[name] = value
 
-            approximations[fd_options['method']].add_approximation(abs_key, fd_options)
+            approx_scheme.add_approximation(abs_key, fd_options)
 
         approx_jac = {}
         for approximation in itervalues(approximations):

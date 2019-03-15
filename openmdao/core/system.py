@@ -7,6 +7,7 @@ from fnmatch import fnmatchcase
 import sys
 import time
 from numbers import Integral
+import itertools
 
 from six import iteritems, itervalues, string_types
 
@@ -28,8 +29,8 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring
-from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
-from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -42,9 +43,11 @@ _asm_jac_types = {
 }
 
 # Suppored methods for derivatives
-_supported_approx_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
-                             'cs': (ComplexStep, DEFAULT_CS_OPTIONS),
-                             'exact': (None, {})}
+_supported_approx_methods = {
+    'fd': FiniteDifference,
+    'cs': ComplexStep,
+    'exact': None
+}
 
 
 class System(object):
@@ -107,6 +110,8 @@ class System(object):
         For outputs, the list will have length one since promoted output names are unique.
     _var_abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names, on current proc.
+    _var_allprocs_abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names, on all procs.
     _var_allprocs_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
@@ -324,6 +329,7 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
         self._var_discrete = {'input': {}, 'output': {}}
@@ -716,8 +722,7 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def set_approx_coloring(self, wrt, method='fd', form='forward', step=None, has_diag_jac=False,
-                            directory=None):
+    def set_approx_coloring(self, wrt, method='fd', form='forward', step=None, directory=None):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -734,15 +739,13 @@ class System(object):
         step : float
             Step size for finite difference. Leave undeclared to keep unchanged from previous
             or default value.
-        has_diag_jac : bool
-            If True, jacobian is diagonal and can be computed with a single color.
         directory : str or None
             If not None, the coloring for this system will be saved to the given directory.
             The file will be named as the system's pathname with dots replaced by underscores.
         """
-        _, default_opts = _supported_approx_methods[method]
+        approx_class = _supported_approx_methods[method]
         if step is None:
-            step = default_opts['step']
+            step = approx_class.DEFAULT_OPTIONS['step']
 
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
 
@@ -750,8 +753,7 @@ class System(object):
             simple_warning("%s: set_approx_coloring() was called multiple times. The "
                            "last call will be used." % self.pathname)
 
-        # TODO: handle issues with 'has_diag_jac' if wrt doesn't cover every column of the jac
-        self._approx_coloring_info = (wrt_list, method, form, step, has_diag_jac, directory)
+        self._approx_coloring_info = [None, wrt_list, method, form, step, directory]
 
     def _setup_approx_coloring(self):
         from openmdao.core.group import Group
@@ -760,26 +762,31 @@ class System(object):
         if self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
-        wrt_list, method, form, step, has_diag_jac, directory = self._approx_coloring_info
+        matches = set()
+        _, wrt_list, method, form, step, directory = self._approx_coloring_info
         if is_total:
-            ofs = self.get_responses(recurse=True, get_sizes=False)
-            allwrt = self.get_design_vars(recurse=True, get_sizes=False)
+            # if self.pathname:  # sub-group, so we're computing semi-totals
+            ofs = self._owns_approx_of
+            allwrt = self._owns_approx_wrt
+            # else:   # top level group, so we're computing totals
+            #     ofs = self.get_responses(recurse=True, get_sizes=False)
+            #     allwrt = self.get_design_vars(recurse=True, get_sizes=False)
+            for w in wrt_list:
+                matches.update(find_matches(w, allwrt))
         else:
             ofs, allwrt = self._get_partials_varlists()
-
-        matches = set()
-        for w in wrt_list:
-            matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
+            for w in wrt_list:
+                matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
 
         # error if nothing matched
         if not matches:
             raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
                              "options on Component '{}': {}.".format(self.pathname, wrt_list))
 
-        self._approx_coloring_info = (matches, method, form, step, has_diag_jac, directory)
+        self._approx_coloring_info = [matches, wrt_list, method, form, step, directory]
 
         try:
-            method_func, default_opts = _supported_approx_methods[method]
+            method_func = _supported_approx_methods[method]
             if method == 'exact':
                 raise KeyError('exact')
         except KeyError:
@@ -790,23 +797,28 @@ class System(object):
         if method not in self._approx_schemes:
             self._approx_schemes[method] = method_func()
 
-        meta = default_opts.copy()
+        approx_scheme = self._approx_schemes[method]
+
+        meta = approx_scheme.DEFAULT_OPTIONS.copy()
         meta['coloring'] = None  # set a placeholder for later replacement of approximations
-        meta['coloring_wrts'] = matches
         if form:
             meta['form'] = form
         if step:
             meta['step'] = step
 
-        abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
+        if is_total and self.pathname:
+            abs_ofs = list(ofs)
+        else:
+            abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
+
         # if coloring is not initially activated (because it must be computed dynamically)
         # then we need to specify active subjacs that will be approximated using normal
         # FD or CS.  These will be computed normally until enough jacobians have been
         # computed to calculate the coloring.  Once the coloring exists, the approximations
         # will be re-initialized to use the coloring info.
-        for wrt in matches:
-            for of in abs_ofs:
-                self._approx_schemes[method].add_approximation((of, wrt), meta)
+        if not is_total:
+            for key in itertools.product(abs_ofs, matches):
+                approx_scheme.add_approximation(key, meta)
 
     def _check_coloring_update(self):
         """
@@ -823,12 +835,8 @@ class System(object):
                 # array_viz(sparsity)
                 self._jacobian._jac_summ = None  # reclaim the memory
 
-                has_diag_jac = self._approx_coloring_info[4]
                 start_time = time.time()
-                if has_diag_jac:
-                    raise NotImplementedError("has_diag_jac not supported yet.")
-                else:
-                    coloring = _compute_coloring(sparsity, 'fwd')
+                coloring = _compute_coloring(sparsity, 'fwd')
 
                 coloring['time_coloring'] = time.time() - start_time
 
@@ -837,7 +845,7 @@ class System(object):
                     name = self.pathname.replace('.', '_') if self.pathname else 'top'
                     fname = os.path.join(directory, name)
                     with open(fname, 'w') as f:
-                        _write_coloring(['fwd'], coloring, f)
+                        _write_coloring(coloring, f)
 
                 for approx in itervalues(self._approx_schemes):
                     approx._update_coloring(self, coloring)
@@ -1219,7 +1227,7 @@ class System(object):
 
     def _setup_connections(self, recurse=True):
         """
-        Compute dict of all implicit and explicit connections owned by this system.
+        Compute dict of all connections owned by this system.
 
         Parameters
         ----------

@@ -14,8 +14,8 @@ from six.moves import range, cStringIO
 import numpy as np
 import scipy.sparse as sparse
 
-from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
-from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
 from openmdao.solvers.solver import SolverInfo
@@ -1171,13 +1171,13 @@ class Problem(object):
                               'method': method}
 
                 if method == 'cs':
-                    defaults = DEFAULT_CS_OPTIONS
+                    defaults = ComplexStep.DEFAULT_OPTIONS
 
                     fd_options['form'] = None
                     fd_options['step_calc'] = None
 
                 elif method == 'fd':
-                    defaults = DEFAULT_FD_OPTIONS
+                    defaults = FiniteDifference.DEFAULT_OPTIONS
 
                     fd_options['form'] = form
                     fd_options['step_calc'] = step_calc
@@ -1309,9 +1309,9 @@ class Problem(object):
 
             if step is None:
                 if method == 'cs':
-                    step = DEFAULT_CS_OPTIONS['step']
+                    step = ComplexStep.DEFAULT_OPTIONS['step']
                 else:
-                    step = DEFAULT_FD_OPTIONS['step']
+                    step = FiniteDifference.DEFAULT_OPTIONS['step']
 
             # Approximate FD
             fd_args = {

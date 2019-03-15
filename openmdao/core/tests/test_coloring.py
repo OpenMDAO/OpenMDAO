@@ -21,7 +21,7 @@ from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
     SqliteRecorder, CaseReader
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.coloring import get_simul_meta, _solves_info
+from openmdao.utils.coloring import _solves_info, _compute_coloring
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
 
@@ -1001,26 +1001,20 @@ class BidirectionalTestCase(unittest.TestCase):
         # uses matrix can_715 from the sparse matrix collection website
         mat = load_npz(os.path.join(matdir, 'can_715.npz')).toarray()
         mat = np.asarray(mat, dtype=bool)
-        coloring = get_simul_meta(None, 'auto', include_sparsity=False, setup=False,
-                                  run_model=False, bool_jac=mat,
-                                  stream=None)
+        coloring = _compute_coloring(mat, 'auto')
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
 
         self.assertEqual(tot_colors, 21)
 
         # verify that unidirectional colorings are much worse (105 vs 21 for bidirectional)
-        coloring = get_simul_meta(None, 'fwd', include_sparsity=False, setup=False,
-                                  run_model=False, bool_jac=mat,
-                                  stream=None)
+        coloring = _compute_coloring(mat, 'fwd')
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
 
         self.assertEqual(tot_colors, 105)
 
-        coloring = get_simul_meta(None, 'rev', include_sparsity=False, setup=False,
-                                  run_model=False, bool_jac=mat,
-                                  stream=None)
+        coloring = _compute_coloring(mat, 'rev')
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
 

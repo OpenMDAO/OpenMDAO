@@ -5,6 +5,7 @@ from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
 from numbers import Number
 import inspect
+from fnmatch import fnmatchcase
 
 from six import iteritems, string_types, itervalues
 from six.moves import range
@@ -13,9 +14,9 @@ import numpy as np
 import networkx as nx
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
-from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
-from openmdao.core.system import System, INT_DTYPE, get_relevant_vars
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.core.system import System, INT_DTYPE, get_relevant_vars, _supported_approx_methods
 from openmdao.core.component import Component, _DictValues
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
@@ -554,6 +555,7 @@ class Group(System):
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
         abs2prom = self._var_abs2prom
         allprocs_abs2meta = self._var_allprocs_abs2meta
+        allprocs_abs2prom = self._var_allprocs_abs2prom
         abs2meta = self._var_abs2meta
 
         # Recursion
@@ -587,6 +589,8 @@ class Group(System):
                     sub_prom_name = subsys._var_abs2prom[type_][abs_name]
                     abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
 
+                allprocs_abs2prom[type_] = abs2prom[type_]
+
                 # Assemble allprocs_prom2abs_list
                 for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
                     prom_name = var_maps[type_][sub_prom]
@@ -605,7 +609,7 @@ class Group(System):
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
-                raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list,
+                raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list, abs2prom,
                        allprocs_abs2meta, self._has_output_scaling, self._has_resid_scaling)
             else:
                 raw = (
@@ -613,6 +617,7 @@ class Group(System):
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
+                    {},
                     False,
                     False
                 )
@@ -620,10 +625,11 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 allprocs_abs_names[type_] = []
+                allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
-            for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, myproc_abs2meta,
-                 oscale, rscale) in gathered:
+            for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, myproc_abs2prom,
+                 myproc_abs2meta, oscale, rscale) in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
 
@@ -635,6 +641,7 @@ class Group(System):
                     # Assemble in parallel allprocs_abs_names
                     allprocs_abs_names[type_].extend(myproc_abs_names[type_])
                     allprocs_discrete[type_].update(myproc_discrete[type_])
+                    allprocs_abs2prom[type_].update(myproc_abs2prom[type_])
 
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
@@ -924,6 +931,7 @@ class Group(System):
                     self._local_system_set.add(s.pathname)
 
         path_len = len(pathname) + 1 if pathname else 0
+        path_dot = pathname + '.' if pathname else ''
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
 
@@ -935,7 +943,7 @@ class Group(System):
         for abs_in, abs_out in iteritems(global_abs_in2out):
 
             # First, check that this system owns both the input and output.
-            if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
+            if abs_in[:path_len] == path_dot and abs_out[:path_len] == path_dot:
                 # Second, check that they are in different subsystems of this system.
                 out_subsys = abs_out[path_len:].split('.', 1)[0]
                 in_subsys = abs_in[path_len:].split('.', 1)[0]
@@ -1118,6 +1126,37 @@ class Group(System):
                                            "'%d' is out of range for source "
                                            "dimension of size %d.")
                                     raise ValueError(msg % (abs_out, abs_in, i, d_size))
+
+    # def _setup_border_vars(self):
+    #     """
+    #     Set list of inputs and outputs in this system connected to variables outside this system.
+    #     """
+    #     # this is only reconfigurable from the top level
+    #     self._border_vars = border_vars = (set(), set())
+    #     if not self.pathname:
+    #         return  # top level has no border vars
+
+    #     pathdot = self.pathname + '.'
+    #     pathlen = len(pathdot)
+
+    #     for abs_in, abs_out in iteritems(self._all_conn_abs_in2out):
+    #         in_match = abs_in[:pathlen] == pathdot
+    #         out_match = abs_out[:pathlen] == pathdot
+    #         if in_match or out_match:
+    #             in_parts = abs_in.split('.')
+    #             out_parts = abs_out.split('.')
+    #             for i, (igrp, ogrp) in enumerate(zip(in_parts, out_parts)):
+    #                 if igrp != ogrp:
+    #                     if in_match:
+    #                         for j in range(i, len(in_parts) - 2):
+    #                             if '.'.join(in_parts[:j + 1]) == self.pathname:
+    #                                 border_vars[0].add(abs_in)
+    #                                 break
+    #                     if out_match:
+    #                         for j in range(i, len(out_parts) - 2):
+    #                             if '.'.join(out_parts[:j + 1]) == self.pathname:
+    #                                 border_vars[1].add(abs_out)
+    #                                 break
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -1683,8 +1722,7 @@ class Group(System):
                     if subsys._linear_solver is not None:
                         subsys._linear_solver._linearize()
 
-    def set_approx_coloring(self, wrt, method='fd', form=None, step=None, has_diag_jac=False,
-                            directory=None):
+    def set_approx_coloring(self, wrt, method='fd', form=None, step=None, directory=None):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1701,14 +1739,12 @@ class Group(System):
         step : float
             Step size for finite difference. Leave undeclared to keep unchanged from previous
             or default value.
-        has_diag_jac : bool
-            If True, jacobian is diagonal and can be computed with a single color.
         directory : str or None
             If not None, the coloring for this system will be saved to the given directory.
             The file will be named as the system's pathname with dots replaced by underscores.
         """
         self.approx_totals(method, step, form)
-        super(Group, self).set_approx_coloring(wrt, method, form, step, has_diag_jac, directory)
+        super(Group, self).set_approx_coloring(wrt, method, form, step, directory)
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
@@ -1731,17 +1767,16 @@ class Group(System):
             provides its default value.
         """
         self._approx_schemes = OrderedDict()
-        supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
-                             'cs': (ComplexStep, DEFAULT_CS_OPTIONS)}
+        supported_methods = {'fd': FiniteDifference, 'cs': ComplexStep}
 
         if method not in supported_methods:
             msg = 'Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(method, supported_methods.keys()))
 
         if method not in self._approx_schemes:
-            self._approx_schemes[method] = supported_methods[method][0]()
+            self._approx_schemes[method] = supported_methods[method]()
 
-        default_opts = supported_methods[method][1]
+        default_opts = self._approx_schemes[method].DEFAULT_OPTIONS
 
         kwargs = {}
         if step:
@@ -1797,86 +1832,154 @@ class Group(System):
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
         if self._owns_approx_jac:
-            self._jacobian = DictionaryJacobian(system=self)
-
-            if self._approx_coloring_info is not None:
-                self._setup_approx_coloring()
-                self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
-            else:
-                self._jac_saves_remaining = 0
-
-            method = list(self._approx_schemes.keys())[0]
-            approx = self._approx_schemes[method]
-            pro2abs = self._var_allprocs_prom2abs_list
-            abs2meta = self._var_allprocs_abs2meta
-
-            if self._owns_approx_of:
-                of = self._owns_approx_of
-            else:
-                of = set(var[0] for var in pro2abs['output'].values())
-
-            if self._owns_approx_wrt:
-                candidate_wrt = self._owns_approx_wrt
-            else:
-                candidate_wrt = list(var[0] for var in pro2abs['input'].values())
-
-            from openmdao.core.indepvarcomp import IndepVarComp
-            wrt = set()
-            ivc = set()
-            for var in candidate_wrt:
-
-                # Weed out inputs connected to anything inside our system unless the source is an
-                # indepvarcomp.
-                if var in self._conn_abs_in2out:
-                    src = self._conn_abs_in2out[var]
-                    compname = src.rsplit('.', 1)[0]
-                    comp = self._get_subsystem(compname)
-                    if isinstance(comp, IndepVarComp):
-                        wrt.add(src)
-                        ivc.add(src)
-                else:
-                    wrt.add(var)
-
-            for key in product(of, wrt.union(of)):
-                # Create approximations for the ones we need.
-                # Skip indepvarcomp res wrt other srcs
-                if key[0] in ivc:
-                    continue
-
-                # Skip explicit res wrt outputs
-                if key[1] in of and key[1] not in ivc:
-
-                    # Support for specifying a desvar as an obj/con.
-                    if key[1] not in wrt or key[0] == key[1]:
-                        continue
-
-                if key in self._subjacs_info:
-                    meta = self._subjacs_info[key]
-                else:
-                    meta = SUBJAC_META_DEFAULTS.copy()
-                    if key[0] == key[1]:
-                        size = self._var_allprocs_abs2meta[key[0]]['size']
-                        meta['rows'] = meta['cols'] = np.arange(size)
-                        # All group approximations are treated as explicit components, so we
-                        # have a -1 on the diagonal.
-                        meta['value'] = np.full(size, -1.0)
-
-                meta['method'] = method
-
-                # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
-
-                meta.update(self._owns_approx_jac_meta)
-
-                approx.add_approximation(key, meta)
-
-                if meta['value'] is None:
-                    shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
-                    meta['shape'] = shape
-                    meta['value'] = np.zeros(shape)
-
-                self._subjacs_info[key] = meta
+            self._setup_approx_partials()
 
         super(Group, self)._setup_jacobians(recurse=recurse)
+
+    def _setup_approx_partials(self):
+        self._jacobian = DictionaryJacobian(system=self)
+
+        method = list(self._approx_schemes.keys())[0]
+        approx = self._approx_schemes[method]
+        pro2abs = self._var_allprocs_prom2abs_list
+        abs2prom = self._var_allprocs_abs2prom
+        abs2meta = self._var_allprocs_abs2meta
+
+        if self._owns_approx_wrt and not self.pathname:
+            candidate_wrt = self._owns_approx_wrt
+        else:
+            candidate_wrt = list(var[0] for var in pro2abs['input'].values())
+
+        from openmdao.core.indepvarcomp import IndepVarComp
+        wrt = set()
+        ivc = set()
+        if self.pathname:  # get rid of any old stuff in here
+            self._owns_approx_of = self._owns_approx_wrt = None
+
+        for var in candidate_wrt:
+
+            # Weed out inputs connected to anything inside our system unless the source is an
+            # indepvarcomp.
+            if var in self._conn_abs_in2out:
+                src = self._conn_abs_in2out[var]
+                compname = src.rsplit('.', 1)[0]
+                comp = self._get_subsystem(compname)
+                if isinstance(comp, IndepVarComp):
+                    wrt.add(src)
+                    ivc.add(src)
+            else:
+                wrt.add(var)
+
+        if self._owns_approx_of:
+            of = self._owns_approx_of
+        else:
+            of = set(var[0] for var in pro2abs['output'].values())
+            # Skip indepvarcomp res wrt other srcs
+            of -= ivc
+
+        ofset = set()
+        wrtset = set()
+        wrt_colors_matched = set()
+        if self._approx_coloring_info is not None and (self._owns_approx_of or self.pathname):
+            wrt_color_patterns = self._approx_coloring_info[1]
+        else:
+            wrt_color_patterns = ()
+
+        for key in product(of, wrt.union(of)):
+            # Create approximations for the ones we need.
+
+            # Skip explicit res wrt outputs
+            if key[1] in of and key[1] not in ivc:
+
+                # Support for specifying a desvar as an obj/con.
+                if key[1] not in wrt or key[0] == key[1]:
+                    continue
+
+            if key in self._subjacs_info:
+                meta = self._subjacs_info[key]
+            else:
+                meta = SUBJAC_META_DEFAULTS.copy()
+                if key[0] == key[1]:
+                    size = self._var_allprocs_abs2meta[key[0]]['size']
+                    meta['rows'] = meta['cols'] = np.arange(size)
+                    # All group approximations are treated as explicit components, so we
+                    # have a -1 on the diagonal.
+                    meta['value'] = np.full(size, -1.0)
+
+            meta['method'] = method
+
+            # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
+
+            meta.update(self._owns_approx_jac_meta)
+
+            if self.pathname:
+                ofset.add(key[0])
+                wrtset.add(key[1])
+
+            if wrt_color_patterns:
+                if key[1] in abs2prom['output']:
+                    wrtprom = abs2prom['output'][key[1]]
+                else:
+                    wrtprom = abs2prom['input'][key[1]]
+
+                for patt in wrt_color_patterns:
+                    if patt == '*' or fnmatchcase(wrtprom, patt):
+                        meta['coloring'] = None  # placeholder for later replacement by coloring
+                        wrt_colors_matched.add(key[1])
+                        break
+
+            if meta['value'] is None:
+                shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
+                meta['shape'] = shape
+                meta['value'] = np.zeros(shape)
+
+            approx.add_approximation(key, meta)
+            self._subjacs_info[key] = meta
+
+        if self.pathname:
+            # we're taking semi-total derivs for this group. Update _owns_approx_of
+            # and _owns_approx_wrt so we can use the same approx code for totals and
+            # semi-totals.
+            self._owns_approx_of = frozenset(ofset)
+            self._owns_approx_wrt = frozenset(wrtset)
+
+        if self._approx_coloring_info is not None:
+            if self._owns_approx_of:
+                if not wrt_colors_matched:
+                    raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
+                                     "partial options on Group "
+                                     "'{}': {}.".format(self.pathname, wrt_color_patterns))
+                self._setup_approx_coloring(wrt_colors_matched)
+                self._approx_coloring_info[0] = wrt_colors_matched
+            self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
+        else:
+            self._jac_saves_remaining = 0
+
+    def _setup_approx_coloring(self, wrt_colors_matched):
+
+        _, wrt_list, method, form, step, directory = self._approx_coloring_info
+        self._approx_coloring_info[0] = wrt_colors_matched
+
+        try:
+            method_func = _supported_approx_methods[method]
+            if method == 'exact':
+                raise KeyError('exact')
+        except KeyError:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method,
+                                        [k for k in _supported_methods if k != 'exact']))
+
+        if method not in self._approx_schemes:
+            self._approx_schemes[method] = method_func()
+
+        approx_scheme = self._approx_schemes[method]
+
+        meta = approx_scheme.DEFAULT_OPTIONS.copy()
+        meta['coloring'] = None  # set a placeholder for later replacement of approximations
+        if form:
+            meta['form'] = form
+        if step:
+            meta['step'] = step
 
     def compute_sys_graph(self, comps_only=False):
         """
