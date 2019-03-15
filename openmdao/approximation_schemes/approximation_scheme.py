@@ -93,10 +93,7 @@ class ApproximationScheme(object):
                 new_list.append(tup)
 
         self._exec_list = new_list
-        self._approx_groups = None
-
-        # rebuid the approx_groups
-        self._get_approx_groups(system)
+        self._approx_groups = None  # will force approx_groups to be rebuilt later
 
     def add_approximation(self, abs_key, kwargs):
         """

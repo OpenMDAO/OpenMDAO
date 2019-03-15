@@ -300,8 +300,12 @@ class Jacobian(object):
             # we're computing totals
             ofs = [n for n in system._var_allprocs_abs_names['output']
                    if n in system._owns_approx_of]
-            wrts = [n for n in system._var_allprocs_abs_names['output']
-                    if n in system._owns_approx_wrt]
+            if system.pathname:  # doing semitotals
+                wrts = [n for n in system._var_allprocs_abs_names['input']
+                        if n in system._owns_approx_wrt]
+            else:
+                wrts = [n for n in system._var_allprocs_abs_names['output']
+                        if n in system._owns_approx_wrt]
             wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
         else:
             from openmdao.core.implicitcomponent import ImplicitComponent

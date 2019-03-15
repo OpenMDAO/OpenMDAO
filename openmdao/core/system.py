@@ -747,36 +747,23 @@ class System(object):
         if step is None:
             step = approx_class.DEFAULT_OPTIONS['step']
 
-        wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
+        wrt_patterns = [wrt] if isinstance(wrt, string_types) else wrt
 
         if self._approx_coloring_info is not None:
             simple_warning("%s: set_approx_coloring() was called multiple times. The "
                            "last call will be used." % self.pathname)
 
-        self._approx_coloring_info = [None, wrt_list, method, form, step, directory]
+        self._approx_coloring_info = [None, wrt_patterns, method, form, step, directory]
 
     def _setup_approx_coloring(self):
-        from openmdao.core.group import Group
-        is_total = isinstance(self, Group)
-
         if self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
         matches = set()
         _, wrt_list, method, form, step, directory = self._approx_coloring_info
-        if is_total:
-            # if self.pathname:  # sub-group, so we're computing semi-totals
-            ofs = self._owns_approx_of
-            allwrt = self._owns_approx_wrt
-            # else:   # top level group, so we're computing totals
-            #     ofs = self.get_responses(recurse=True, get_sizes=False)
-            #     allwrt = self.get_design_vars(recurse=True, get_sizes=False)
-            for w in wrt_list:
-                matches.update(find_matches(w, allwrt))
-        else:
-            ofs, allwrt = self._get_partials_varlists()
-            for w in wrt_list:
-                matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
+        ofs, allwrt = self._get_partials_varlists()
+        for w in wrt_list:
+            matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
 
         # error if nothing matched
         if not matches:
@@ -806,19 +793,15 @@ class System(object):
         if step:
             meta['step'] = step
 
-        if is_total and self.pathname:
-            abs_ofs = list(ofs)
-        else:
-            abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
+        abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
 
         # if coloring is not initially activated (because it must be computed dynamically)
         # then we need to specify active subjacs that will be approximated using normal
         # FD or CS.  These will be computed normally until enough jacobians have been
         # computed to calculate the coloring.  Once the coloring exists, the approximations
         # will be re-initialized to use the coloring info.
-        if not is_total:
-            for key in itertools.product(abs_ofs, matches):
-                approx_scheme.add_approximation(key, meta)
+        for key in itertools.product(abs_ofs, matches):
+            approx_scheme.add_approximation(key, meta)
 
     def _check_coloring_update(self):
         """

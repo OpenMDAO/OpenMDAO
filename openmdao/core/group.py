@@ -1722,6 +1722,8 @@ class Group(System):
                     if subsys._linear_solver is not None:
                         subsys._linear_solver._linearize()
 
+        self._check_coloring_update()
+
     def set_approx_coloring(self, wrt, method='fd', form=None, step=None, directory=None):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
@@ -1882,6 +1884,7 @@ class Group(System):
         wrt_colors_matched = set()
         if self._approx_coloring_info is not None and (self._owns_approx_of or self.pathname):
             wrt_color_patterns = self._approx_coloring_info[1]
+            color_meta = self._setup_approx_coloring()
         else:
             wrt_color_patterns = ()
 
@@ -1924,7 +1927,7 @@ class Group(System):
 
                 for patt in wrt_color_patterns:
                     if patt == '*' or fnmatchcase(wrtprom, patt):
-                        meta['coloring'] = None  # placeholder for later replacement by coloring
+                        meta.update(color_meta)
                         wrt_colors_matched.add(key[1])
                         break
 
@@ -1949,16 +1952,15 @@ class Group(System):
                     raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
                                      "partial options on Group "
                                      "'{}': {}.".format(self.pathname, wrt_color_patterns))
-                self._setup_approx_coloring(wrt_colors_matched)
+                self._setup_approx_coloring()
                 self._approx_coloring_info[0] = wrt_colors_matched
             self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
         else:
             self._jac_saves_remaining = 0
 
-    def _setup_approx_coloring(self, wrt_colors_matched):
+    def _setup_approx_coloring(self):
 
         _, wrt_list, method, form, step, directory = self._approx_coloring_info
-        self._approx_coloring_info[0] = wrt_colors_matched
 
         try:
             method_func = _supported_approx_methods[method]
@@ -1980,6 +1982,8 @@ class Group(System):
             meta['form'] = form
         if step:
             meta['step'] = step
+
+        return meta
 
     def compute_sys_graph(self, comps_only=False):
         """

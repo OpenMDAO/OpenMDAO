@@ -1374,8 +1374,6 @@ class _TotalJacInfo(object):
         if return_format == 'array':
             totals = self.J  # change back to array version
 
-        model._check_coloring_update()
-
         return totals
 
     def _restore_linear_solution(self, vec_names, key, mode):

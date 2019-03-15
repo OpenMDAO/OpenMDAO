@@ -201,13 +201,22 @@ class TestCSColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        derivs = prob.driver._compute_totals()
-        derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
+        # one run per column of jac
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, sparsity.shape[1])
+
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3)
         _check_total_matrix(model, derivs, sparsity)
 
     def test_simple_semitotals(self):
         prob = Problem()
-        model = prob.model = Group(dynamic_derivs_repeats=1)
+        model = prob.model = Group()
 
         sparsity = np.array(
             [[1, 0, 0, 1, 1],
@@ -222,7 +231,7 @@ class TestCSColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        sub = model.add_subsystem('sub', Group())
+        sub = model.add_subsystem('sub', Group(dynamic_derivs_repeats=1))
         comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
         sub.set_approx_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'sub.comp.x0')
@@ -236,8 +245,17 @@ class TestCSColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        derivs = prob.driver._compute_totals()
-        derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
+        # one run per column of jac
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, sparsity.shape[1])
+    
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+    
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3)
         _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity)
 
     def test_totals_over_implicit_comp(self):
@@ -267,12 +285,23 @@ class TestCSColoring(unittest.TestCase):
         model.comp.add_constraint('y1')
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
+
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        derivs = prob.driver._compute_totals()
-        derivs = prob.driver._compute_totals()  # do twice, first time used to compute sparsity
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
+        # one run per column of jac
+        nruns = comp._nruns - start_nruns
+        # wrts of size 5, 2 runs of the implicit comp per approx point run (1 for solver init and 1 for 1 solver iter)
+        self.assertEqual(nruns, 5 * 2)
+    
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+    
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3 * 2)
         _check_total_matrix(model, derivs, sparsity)
 
     def test_totals_of_indices(self):
@@ -305,8 +334,17 @@ class TestCSColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        derivs = prob.compute_totals()
-        derivs = prob.compute_totals()
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
+        # one run per column of jac
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, sparsity.shape[1])
+    
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+    
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3)
         rows = [0,2,3,4]
         _check_total_matrix(model, derivs, sparsity[rows, :])
 
@@ -341,8 +379,18 @@ class TestCSColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        derivs = prob.driver._compute_totals()
-        derivs = prob.driver._compute_totals()
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
+        # one run per column of jac
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, sparsity.shape[1] - 1)
+    
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+    
+        nruns = comp._nruns - start_nruns
+        # only 4 cols to solve for, but we get coloring of [[2],[3],[0,1]] so only 1 better
+        self.assertEqual(nruns, 3)  
         cols = [0,2,3,4]
         _check_total_matrix(model, derivs, sparsity[:, cols])
 
@@ -377,8 +425,17 @@ class TestCSColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        derivs = prob.driver._compute_totals()
-        derivs = prob.driver._compute_totals()
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
+        # one run per column of jac
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, sparsity.shape[1] - 1)
+    
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+    
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3)
         cols = rows = [0,2,3,4]
         _check_total_matrix(model, derivs, sparsity[rows, :][:, cols])
 
