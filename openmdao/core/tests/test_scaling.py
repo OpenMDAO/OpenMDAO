@@ -1052,33 +1052,11 @@ class MyDriver(Driver):
         self.obj_vals = deepcopy(self.get_objective_values())
 
 
-class MySolver(NonlinearSolver):
-
-    def __init__(self, **kwargs):
-        super(MySolver, self).__init__(**kwargs)
-        self.linear_solver = DirectSolver()
-
-    def _setup_solvers(self, system, depth):
-        super(MySolver, self)._setup_solvers(system, depth)
-        self.linear_solver._setup_solvers(self._system, self._depth + 1)
-
-    def _linearize(self):
-        self.linear_solver._linearize()
-
-    def solve(self):
-        system = self._system
-        self._gs_iter()
-
-        system._vectors['output']['linear']._data = 1.0 * np.arange(12)
-        self._linearize()
-        self.linear_solver.solve(['linear'], 'fwd')
-
-        print(system._vectors['residual']['linear']._data)
-
-
 class TestScalingOverhaul(unittest.TestCase):
 
     def test_in_driver(self):
+        # This test assures that the driver is correctly seeing unscaled (physical) data.
+
         prob = Problem()
         model = prob.model
 
@@ -1181,32 +1159,6 @@ class TestScalingOverhaul(unittest.TestCase):
         for (of, wrt) in totals:
             assert_rel_error(self, totals[of, wrt]['abs error'][0], 0.0, 1e-7)
 
-    def test_in_solver(self):
-        prob = Problem()
-        model = prob.model
-
-        inputs_comp = IndepVarComp()
-        inputs_comp.add_output('x1_u_u', val=1.0)
-        inputs_comp.add_output('x1_u_s', val=1.0)
-        inputs_comp.add_output('x1_s_u', val=1.0, ref=3.0)
-        inputs_comp.add_output('x1_s_s', val=1.0, ref=3.0)
-        inputs_comp.add_output('ox1_u_u', val=1.0)
-        inputs_comp.add_output('ox1_u_s', val=1.0)
-        inputs_comp.add_output('ox1_s_u', val=1.0, ref=3.0)
-        inputs_comp.add_output('ox1_s_s', val=1.0, ref=3.0)
-
-        model.add_subsystem('p', inputs_comp)
-        mycomp = model.add_subsystem('comp', MyComp())
-
-        model.connect('p.x1_u_u', 'comp.x2_u_u')
-        model.connect('p.x1_u_s', 'comp.x2_u_s')
-        model.connect('p.x1_s_u', 'comp.x2_s_u')
-        model.connect('p.x1_s_s', 'comp.x2_s_s')
-
-        model.nonlinear_solver = MySolver()
-        prob.setup()
-
-        prob.run_model()
 
 if __name__ == '__main__':
     unittest.main()
