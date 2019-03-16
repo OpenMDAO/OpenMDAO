@@ -22,8 +22,10 @@ except ImportError:
 
 # Set DEBUG to True if you want to view the generated HTML and PDF output files.
 DEBUG = False
-# Suppress pyXDSM console output
+# Suppress pyXDSM console output. Not suppressed in debug mode.
 QUIET = not DEBUG
+# If not in debug mode, tests will generate only the TeX files and not the PDFs, except for the
+# PDF creation test, which is independent of this setting.
 PYXDSM_OUT = 'pdf' if DEBUG else 'tex'
 
 
@@ -44,9 +46,8 @@ class TestPyXDSMViewer(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_pyxdsm_sellar(self):
+    def test_pyxdsm_output_sides(self):
         """Makes XDSM for the Sellar problem"""
-        filename = 'xdsm0'
         prob = Problem()
         prob.model = model = SellarNoDerivatives()
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
@@ -59,8 +60,26 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
-        # Write output
-        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET)
+        # Write output (outputs on the left)
+        filename = 'xdsm_outputs_on_the_left'
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
+                   output_side='left')
+
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
+
+        filename = 'xdsm_outputs_on_the_right'
+        # Write output (all outputs on the right)
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
+                   output_side='right')
+
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
+
+        filename = 'xdsm_outputs_side_mixed'
+        # Write output (outputs mixed)
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
+                   output_side={'optimization': 'left', 'default': 'right'})
 
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
@@ -88,7 +107,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
-    def test_pyxdsm_sphere(self):
+    def test_pyxdsm_pdf(self):
         """
         Makes an XDSM of the Sphere test case. It also adds a design variable, constraint and
         objective.
@@ -126,11 +145,16 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
+        # requesting 'pdf', but if 'pdflatex' is not found we will only get 'tex'
+        pdflatex = find_executable('pdflatex')
+
         # Write output
-        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False)
+        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=False, quiet=QUIET)
 
         # Check if file was created
-        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
+        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+        # Check if PDF was created (only if pdflatex is installed)
+        self.assertTrue(not pdflatex or os.path.isfile('.'.join([filename, 'pdf'])))
 
     def test_pyxdsm_identical_relative_names(self):
         class TimeComp(ExplicitComponent):
@@ -182,41 +206,41 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         p.run_model()
 
-        # requesting 'pdf', but if 'pdflatex' is not found we will only get 'tex'
-        pdflatex = find_executable('pdflatex')
-
         # Test non unique local names
-        write_xdsm(p, 'xdsm3', out_format='pdf', quiet=QUIET, show_browser=False)
-        self.assertTrue(os.path.isfile('.'.join(['xdsm3', 'tex'])))
-        self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm3', 'pdf'])))
+        filename = 'pyxdsm_identical_rel_names'
+        write_xdsm(p, filename, out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False)
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
         # Check formatting
 
         # Max character box formatting
-        write_xdsm(p, 'xdsm4', out_format='pdf', quiet=QUIET, show_browser=False,
+        filename = 'pyxdsm_cut_char'
+        write_xdsm(p, filename, out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
                    box_stacking='cut_chars', box_width=15)
-        self.assertTrue(os.path.isfile('.'.join(['xdsm4', 'tex'])))
-        self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm4', 'pdf'])))
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
         # Cut characters box formatting
-        write_xdsm(p, 'xdsm5', out_format='pdf', quiet=True, show_browser=False,
+        filename = 'pyxdsm_max_chars'
+        write_xdsm(p, filename, out_format=PYXDSM_OUT, quiet=True, show_browser=False,
                    box_stacking='max_chars', box_width=15)
-        self.assertTrue(os.path.isfile('.'.join(['xdsm5', 'tex'])))
-        self.assertTrue(not pdflatex or os.path.isfile('.'.join(['xdsm5', 'pdf'])))
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
-    def test_circuit_no_recurse(self):
+    def test_model_path_and_recursion(self):
 
         from openmdao.api import Problem, IndepVarComp
 
         p = Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-        model.add_subsystem('circuit', Circuit())
+        group = model.add_subsystem('G1', Group(), promotes=['*'])
+        group2 = model.add_subsystem('G2', Group())
+        group.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        group.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        group2.add_subsystem('source2', IndepVarComp('I', 0.1, units='A'))
+        group.add_subsystem('circuit', Circuit())
 
-        model.connect('source.I', 'circuit.I_in')
-        model.connect('ground.V', 'circuit.Vg')
+        group.connect('source.I', 'circuit.I_in')
+        group.connect('ground.V', 'circuit.Vg')
 
         model.add_design_var('ground.V')
         model.add_design_var('source.I')
@@ -230,107 +254,24 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         p.run_model()
 
+        # No model path, no recursion
         write_xdsm(p, 'xdsm_circuit', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
                    recurse=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit', PYXDSM_OUT])))
 
-    def test_circuit_model_path_recurse(self):
-
-        from openmdao.api import Problem, IndepVarComp
-
-        p = Problem()
-        model = p.model
-
-        group = model.add_subsystem('G1', Group(), promotes=['*'])
-        group2 = model.add_subsystem('G2', Group())
-        group.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        group.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-        group2.add_subsystem('source2', IndepVarComp('I', 0.1, units='A'))
-        group.add_subsystem('circuit', Circuit())
-
-        group.connect('source.I', 'circuit.I_in')
-        group.connect('ground.V', 'circuit.Vg')
-
-        model.add_design_var('ground.V')
-        model.add_design_var('source.I')
-        model.add_objective('circuit.D1.I')
-
-        p.setup(check=False)
-
-        # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
-
-        p.run_model()
-
+        # Model path given + recursion
         write_xdsm(p, 'xdsm_circuit2', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
                    recurse=True, model_path='G2', include_external_outputs=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit2', PYXDSM_OUT])))
 
-    def test_circuit_model_path_no_recurse(self):
-
-        from openmdao.api import Problem, IndepVarComp
-
-        p = Problem()
-        model = p.model
-
-        group = model.add_subsystem('G1', Group(), promotes=['*'])
-        group2 = model.add_subsystem('G2', Group())
-        group.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        group.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-        group2.add_subsystem('source2', IndepVarComp('I', 0.1, units='A'))
-        group.add_subsystem('circuit', Circuit())
-
-        group.connect('source.I', 'circuit.I_in')
-        group.connect('ground.V', 'circuit.Vg')
-
-        model.add_design_var('ground.V')
-        model.add_design_var('source.I')
-        model.add_objective('circuit.D1.I')
-
-        p.setup(check=False)
-
-        # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
-
-        p.run_model()
-
+        # Model path given + no recursion
         write_xdsm(p, 'xdsm_circuit3', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
                    recurse=False, model_path='G1')
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit3', PYXDSM_OUT])))
 
-    def test_invalid_model_path(self):
-
-        from openmdao.api import Problem, IndepVarComp
-
-        p = Problem()
-        model = p.model
-
-        group = model.add_subsystem('G1', Group(), promotes=['*'])
-        group2 = model.add_subsystem('G2', Group())
-        group.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        group.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-        group2.add_subsystem('source2', IndepVarComp('I', 0.1, units='A'))
-        group.add_subsystem('circuit', Circuit())
-
-        group.connect('source.I', 'circuit.I_in')
-        group.connect('ground.V', 'circuit.Vg')
-
-        model.add_design_var('ground.V')
-        model.add_design_var('source.I')
-        model.add_objective('circuit.D1.I')
-
-        p.setup(check=False)
-
-        # set some initial guesses
-        p['circuit.n1.V'] = 10.
-        p['circuit.n2.V'] = 1.
-
-        p.run_model()
-
+        # Invalid model path, should raise error
         with self.assertRaises(ValueError):
-            write_xdsm(p, 'xdsm_circuit3', out_format='tex', quiet=QUIET, show_browser=False,
+            write_xdsm(p, 'xdsm_circuit4', out_format='tex', quiet=QUIET, show_browser=False,
                        recurse=False, model_path='G3')
 
     def test_pyxdsm_solver(self):
@@ -517,36 +458,6 @@ class TestPyXDSMViewer(unittest.TestCase):
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
-
-    def test_pyxdsm_right_outputs(self):
-        """Makes XDSM for the Sellar problem"""
-        filename = 'xdsm_outputs_on_the_right'
-        prob = Problem()
-        prob.model = model = SellarNoDerivatives()
-        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
-                             upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
-        model.add_design_var('x', lower=0.0, upper=10.0)
-        model.add_objective('obj')
-        model.add_constraint('con1', equals=np.zeros(1))
-        model.add_constraint('con2', upper=0.0)
-
-        prob.setup(check=False)
-        prob.final_setup()
-
-        # Write output
-        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
-                   output_side='right')
-
-        # Check if file was created
-        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
-
-        filename = 'xdsm_outputs_side_mixed'
-        # Write output
-        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
-                   output_side={'optimization': 'left', 'default': 'right'})
-
-        # Check if file was created
-        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
 
 class TestXDSMjsViewer(unittest.TestCase):
