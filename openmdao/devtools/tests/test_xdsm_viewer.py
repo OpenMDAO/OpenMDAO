@@ -24,6 +24,7 @@ except ImportError:
 DEBUG = False
 # Suppress pyXDSM console output
 QUIET = not DEBUG
+PYXDSM_OUT = 'pdf' if DEBUG else 'tex'
 
 
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
@@ -59,10 +60,10 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=False, quiet=QUIET)
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET)
 
         # Check if file was created
-        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
     def test_pyxdsm_sellar_no_recurse(self):
         """Makes XDSM for the Sellar problem, with no recursion."""
@@ -81,11 +82,11 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False, recurse=False,
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, recurse=False,
                    quiet=QUIET)
 
         # Check if file was created
-        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
     def test_pyxdsm_sphere(self):
         """
@@ -126,10 +127,10 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='tex', show_browser=False)
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False)
 
         # Check if file was created
-        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
     def test_pyxdsm_identical_relative_names(self):
         class TimeComp(ExplicitComponent):
@@ -229,9 +230,9 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         p.run_model()
 
-        write_xdsm(p, 'xdsm_circuit', out_format='pdf', quiet=QUIET, show_browser=False,
+        write_xdsm(p, 'xdsm_circuit', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
                    recurse=False)
-        self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit', 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit', PYXDSM_OUT])))
 
     def test_circuit_model_path_recurse(self):
 
@@ -262,9 +263,9 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         p.run_model()
 
-        write_xdsm(p, 'xdsm_circuit2', out_format='pdf', quiet=QUIET, show_browser=False,
+        write_xdsm(p, 'xdsm_circuit2', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
                    recurse=True, model_path='G2', include_external_outputs=False)
-        self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit2', 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit2', PYXDSM_OUT])))
 
     def test_circuit_model_path_no_recurse(self):
 
@@ -295,9 +296,9 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         p.run_model()
 
-        write_xdsm(p, 'xdsm_circuit3', out_format='pdf', quiet=QUIET, show_browser=False,
+        write_xdsm(p, 'xdsm_circuit3', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
                    recurse=False, model_path='G1')
-        self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit3', 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit3', PYXDSM_OUT])))
 
     def test_invalid_model_path(self):
 
@@ -329,14 +330,14 @@ class TestPyXDSMViewer(unittest.TestCase):
         p.run_model()
 
         with self.assertRaises(ValueError):
-            write_xdsm(p, 'xdsm_circuit3', out_format='pdf', quiet=QUIET, show_browser=False,
+            write_xdsm(p, 'xdsm_circuit3', out_format='tex', quiet=QUIET, show_browser=False,
                        recurse=False, model_path='G3')
 
     def test_pyxdsm_solver(self):
         from openmdao.api import NonlinearBlockGS
 
         filename = 'pyxdsm_solver'
-        out_format = 'pdf'
+        out_format = PYXDSM_OUT
         prob = Problem()
         prob.model = model = SellarNoDerivatives()
         model.nonlinear_solver = NonlinearBlockGS()
@@ -353,7 +354,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
     def test_pyxdsm_mda(self):
         filename = 'pyxdsm_mda'
-        out_format = 'pdf'
+        out_format = PYXDSM_OUT
         prob = Problem(model=SellarMDA())
         prob.setup(check=False)
         prob.final_setup()
@@ -366,7 +367,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
     def test_pyxdsm_mdf(self):
         filename = 'pyxdsm_mdf'
-        out_format = 'pdf'
+        out_format = PYXDSM_OUT
         prob = Problem(model=SellarMDA())
         model = prob.model
         prob.driver = ScipyOptimizeDriver()
@@ -417,7 +418,7 @@ class TestPyXDSMViewer(unittest.TestCase):
                                    promotes=['con2', 'y2'])
 
         filename = 'pyxdsm_parallel'
-        out_format = 'pdf'
+        out_format = PYXDSM_OUT
         prob = Problem(model=SellarMDA())
         model = prob.model
         prob.driver = ScipyOptimizeDriver()
@@ -440,7 +441,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
     def test_execcomp(self):
         filename = 'pyxdsm_execcomp'
-        out_format = 'pdf'
+        out_format = PYXDSM_OUT
         prob = Problem(model=Group())
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x')
@@ -460,7 +461,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
     def test_doe(self):
         filename = 'pyxdsm_doe'
-        out_format = 'pdf'
+        out_format = PYXDSM_OUT
         prob = Problem(model=Group())
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x')
@@ -483,7 +484,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 
         filename = 'pyxdsm_meta_model'
-        out_format = 'pdf'
+        out_format = PYXDSM_OUT
         model = Group()
         ivc = IndepVarComp()
 
@@ -533,19 +534,19 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=False, quiet=QUIET,
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
                    output_side='right')
 
         # Check if file was created
-        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
         filename = 'xdsm_outputs_side_mixed'
         # Write output
-        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=False, quiet=QUIET,
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
                    output_side={'optimization': 'left', 'default': 'right'})
 
         # Check if file was created
-        self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+        self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
 
 class TestXDSMjsViewer(unittest.TestCase):

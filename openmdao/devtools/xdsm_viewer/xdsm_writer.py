@@ -1074,7 +1074,7 @@ def _format_name(name):
     return name
 
 
-def _prune_connections(conns, model_path=None, sep='.'):
+def _prune_connections(conns, model_path=None):
     """
     Remove connections that don't involve components within model.
 
