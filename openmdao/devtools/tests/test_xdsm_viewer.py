@@ -264,7 +264,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         p.run_model()
 
         write_xdsm(p, 'xdsm_circuit2', out_format='pdf', quiet=QUIET, show_browser=False,
-                   recurse=True, model_path='G1', include_external_outputs=False)
+                   recurse=True, model_path='G2', include_external_outputs=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit2', 'tex'])))
 
     def test_circuit_model_path_no_recurse(self):
