@@ -233,7 +233,6 @@ class TestPyXDSMViewer(unittest.TestCase):
                    recurse=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit', 'tex'])))
 
-    @unittest.expectedFailure
     def test_circuit_model_path_recurse(self):
 
         from openmdao.api import Problem, IndepVarComp

@@ -856,8 +856,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             driver_label = number_label(index_str, driver_label, number_alignment)
         x.add_driver(name=driver_name, label=driver_label, driver_type=driver_type.lower())
 
-        design_vars2 = _collect_connections(design_vars, recurse=recurse)
-        responses2 = _collect_connections(responses, recurse=recurse)
+        design_vars2 = _collect_connections(design_vars, recurse=recurse, model_path=model_path)
+        responses2 = _collect_connections(responses, recurse=recurse, model_path=model_path)
 
         # Design variables
         for comp, conn_vars in iteritems(design_vars2):
@@ -993,17 +993,31 @@ def _accumulate_connections(conns):
     return conns_new
 
 
-def _collect_connections(variables, recurse):
+def _collect_connections(variables, recurse, model_path=None):
     conv_vars = [_convert_name(v, recurse) for v in variables]
     connections = dict()
     for conv_var in conv_vars:
-        connections.setdefault(conv_var['path'], []).append(conv_var['var'])
+        path = _make_rel_path(conv_var['path'], model_path=model_path)
+        connections.setdefault(path, []).append(conv_var['var'])
     return connections
 
 
 def _get_path(name, sep='.'):
     # Returns path until the last separator in the name
     return name.rsplit(sep, 1)[0]
+
+
+def _make_rel_path(full_path, model_path):
+    # Path will be cut from this character. Length of model path + separator after it.
+    # If path does not contain the model path, the full path will be returned.
+    if model_path is not None:
+        first_char = len(model_path) + 1
+        if full_path.startswith(model_path):
+            return full_path[first_char:]
+        else:
+            return full_path
+    else:
+        return full_path  # No model path, so return the original
 
 
 def _convert_name(name, recurse=True, subs=None):
@@ -1090,15 +1104,11 @@ def _prune_connections(conns, model_path=None, sep='.'):
     if model_path is None:
         return conns, external_inputs, external_outputs
     else:
-        # path will be cut from this character. Length of model path + separator after it.
-        first_char = len(model_path)+len(sep)
         for conn in conns:
-            src_path = src = conn['src']
-            if src_path.startswith(model_path):
-                src_path = src_path[first_char:]
-            tgt_path = tgt = conn['tgt']
-            if tgt_path.startswith(model_path):
-                tgt_path = tgt_path[first_char:]
+            src = conn['src']
+            src_path = _make_rel_path(src, model_path=model_path)
+            tgt = conn['tgt']
+            tgt_path = _make_rel_path(tgt, model_path=model_path)
 
             if src.startswith(model_path) and tgt.startswith(model_path):
                 # Internal connections
