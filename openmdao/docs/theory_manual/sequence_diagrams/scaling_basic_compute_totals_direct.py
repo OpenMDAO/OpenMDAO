@@ -8,7 +8,7 @@ import subprocess
 
 from svgwrite import Drawing
 
-filename = 'scaling_run_model.svg'
+filename = 'scaling_compute_totals_direct.svg'
 color_phys = '#85C1E9'
 color_scaled = '#EC7063'
 main_font_size = 20
@@ -19,11 +19,15 @@ top_text = dwg.add(dwg.g(font_size=main_font_size, style="font-family: arial;"))
 
 locs = ['NL Inputs',
         'NL Outputs',
-        'NL Residuals']
+        'NL Residuals',
+        'LN Inputs',
+        'LN Outputs',
+        'LN Residuals',
+        'Jacobian']
 
-x = 900
+x = 650
 y = 50
-delta_x = 400
+delta_x = 180
 vertical_locs = []
 for loc in locs:
     top_text.add(dwg.text(loc, (x - len(loc)*4, y)))
@@ -31,8 +35,8 @@ for loc in locs:
     x += delta_x
 
 legend_text = dwg.add(dwg.g(font_size=main_font_size, style="font-family: arial;"))
-legend_text.add(dwg.text('Phys', (x-300, y-10), fill=color_phys))
-legend_text.add(dwg.text('Scaled', (x-300, y+20), fill=color_scaled))
+legend_text.add(dwg.text('Phys', (x-1500, y-10), fill=color_phys))
+legend_text.add(dwg.text('Scaled', (x-1500, y+20), fill=color_scaled))
 
 v_lines = dwg.add(dwg.g(stroke_width=7.0, stroke=color_phys, fill='none'))
 v_lines_scaled = dwg.add(dwg.g(stroke_width=7.0, stroke=color_scaled, fill='none'))
@@ -44,29 +48,47 @@ extra_text = dwg.add(dwg.g(font_size=main_font_size - 3, style="font-family: ari
 extra_text.add(dwg.text('Unit Conversion', (vertical_locs[0] + 10, 650)))
 
 locs = [('Problem.run_model()', None, []),
-        ('Model.run_solve_nonlinear()', None, []),
-        ('System.scaled_context_all()', ((0, 2), (0, 3)), []),
-        ('System.solve_nonlinear()', None, []),
-        ('NonlinearRunOnce.solve()', None, []),
-        ('NonlinearRunOnce.gs_iter()', None, []),
-        ('  Group._transfer()', None, []),
-        ("  DefaultVector.scale('norm')", ((0, 1), ), []),
-        ('  DefaultTransfer.transfer()', ((2, 1), ), []),
-        ("  DefaultVector.scale('phys')", ((0, 1), ), []),
-        ('  ExplicitComponent.solve_nonlinear()', None, []),
-        ('  ExplicitComponent._unscaled_context()', ((0, 2), (0, 3)), []),
-        ('  Paraboloid.compute()', ((1, 2), ), []),
-        ('  ExplicitComponent._unscaled_context()', ((0, 2), (0, 3)), ['italic']),
-        ('System.scaled_context_all()', ((0, 2), (0, 3)), ['italic']),
-        ('Problem.run_model()', None, ['italic']),
-        ]
+        ('_TotalJacInfo.compute_totals()', None, []),
+        ('System.scaled_context_all()', ((0, 2), (0, 3), (0, 5), (0, 6)), []),
+        ('Group._linearize()', None, []),
+        ('  ExplicitComponent._linearize()', None, []),
+        ('  ExplicitComponent._unscaled_context()', ((0, 2), (0, 3), (0, 5), (0, 6)), []),
+        ('  Parabaloid.compute_partials()', ((4, 7), ), []),
+        ('  ExplicitComponent._unscaled_context()', ((0, 2), (0, 3), (0, 5), (0, 6)), ['italic']),
+        ('System.scaled_context_all()', ((0, 2), (0, 3), (0, 5), (0, 6)), ['italic']),
+        ('for mode in self.idx_iter_dict', None, ['italic']),
+        ('  System.scaled_context_all()', ((0, 2), (0, 3), (0, 5), (0, 6)), []),
+        ('  Group._solve_linear()', None, []),
+        ('  DirectSolver.solve()', None, []),
+        ('  Group._unscaled_context()', ((0, 2), (0, 3), (0, 5), (0, 6)), []),
+        ('  scipy.lu.solve', None, []),
+        ('  Group._unscaled_context()', ((0, 2), (0, 3), (0, 5), (0, 6)), ['italic']),
+        ('  System.scaled_context_all()', ((0, 2), (0, 3), (0, 5), (0, 6)), ['italic']),
+]
+#locs = [('Problem.run_model()', None, []),
+        #('Model.run_solve_nonlinear()', None, []),
+        #('System.scaled_context_all()', ((0, 2), (0, 3)), []),
+        #('System.solve_nonlinear()', None, []),
+        #('NonlinearRunOnce.solve()', None, []),
+        #('NonlinearRunOnce.gs_iter()', None, []),
+        #('  Group._transfer()', None, []),
+        #("  DefaultVector.scale('norm')", ((0, 1), ), []),
+        #('  DefaultTransfer.transfer()', ((2, 1), ), []),
+        #("  DefaultVector.scale('phys')", ((0, 1), ), []),
+        #('  ExplicitComponent.solve_nonlinear()', None, []),
+        #('  ExplicitComponent._unscaled_context()', ((0, 2), (0, 3)), []),
+        #('  Paraboloid.compute()', ((1, 2), ), []),
+        #('  ExplicitComponent._unscaled_context()', ((0, 2), (0, 3)), ['italic']),
+        #('System.scaled_context_all()', ((0, 2), (0, 3)), ['italic']),
+        #('Problem.run_model()', None, ['italic']),
+        #]
 
 left_text = dwg.add(dwg.g(font_size=main_font_size, style="font-family: arial;"))
 h_lines = dwg.add(dwg.g(stroke_width=0.7, stroke='black', fill='none'))
 
 x = base_x = 40
 y = base_y = 120
-delta_y = 60
+delta_y = 40
 y_mids = []
 for loc_tup in locs:
 
@@ -107,11 +129,11 @@ for loc_tup in locs:
 
 
 # Phys vs scaling indicator
-scaled_regions = [(0, (7, 9)),
-                  (1, (2, 11)),
-                  (1, (13, 14)),
-                  (2, (2, 11)),
-                  (2, (13, 14)),
+scaled_regions = [
+                  (1, (2, 5)),
+                  (1, (7, 8)),
+                  (1, (10, 13)),
+                  (1, (15, 16)),
                   ]
 
 for region in scaled_regions:
