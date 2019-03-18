@@ -26,6 +26,7 @@ import warnings
 
 from six import iteritems
 
+from openmdao.core.problem import Problem
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.devtools.webview import webview
 from openmdao.devtools.xdsm_viewer.html_writer import write_html
@@ -626,27 +627,33 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
                 build_pdf = True
 
     viewer_data = _get_viewer_data(problem)
-    driver = problem.driver
-    if model_path is None:
-        _model = problem.model
-    else:
-        _model = problem.model._get_subsystem(model_path)
-        if _model is None:
-            msg = 'Model path "{}" does not exist in problem "{}".'
-            raise ValueError(msg.format(model_path, problem))
 
-    # Name is None if the driver is not specified
-    driver_name = _get_cls_name(driver) if driver else None
+    if isinstance(problem, Problem):
+        driver = problem.driver
+        if model_path is None:
+            _model = problem.model
+        else:
+            _model = problem.model._get_subsystem(model_path)
+            if _model is None:
+                msg = 'Model path "{}" does not exist in problem "{}".'
+                raise ValueError(msg.format(model_path, problem))
+        design_vars = _model.get_design_vars()
+        responses = _model.get_responses()
+    elif isinstance(problem, str):  # SQL file
+        driver = None
+        design_vars = None
+        responses = None
+    else:
+        msg = 'write_xdsm() only accepts Problems, Groups or filenames, not "{}"'
+        raise TypeError(msg.format(type(problem)))
 
     try:
         from openmdao.drivers.doe_driver import DOEDriver
         driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
     except ImportError:
         driver_type = 'optimization'
-
-    design_vars = _model.get_design_vars()
-    responses = _model.get_responses()
-
+    # Name is None if the driver is not specified
+    driver_name = _get_cls_name(driver) if driver else None
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
     try:
@@ -1038,7 +1045,7 @@ def _convert_name(name, recurse=True, subs=None):
 def _format_name(name):
     # Replaces illegal characters in names for pyXDSM component and connection names
     # This does not effect the labels, only reference names TikZ
-    if isinstance(name, str):
+    if isinstance(name, (str, unicode)):  # from an SQL reader the name will be in unicode
         for char in ('.', ' ', '-', '_', ':'):
             name = name.replace(char, '@')
     return name
