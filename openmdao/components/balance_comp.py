@@ -110,7 +110,7 @@ class BalanceComp(ImplicitComponent):
             Default value for the RHS of the given state.  Must be compatible
             with the shape (optionally) given by the val or shape option in kwargs.
         guess_func : callable or None
-            A callable function in the form f(inputs, outputs, residuals) that returns an
+            A callable function in the form f(inputs, outputs, residuals) that can provide an
             initial "guess" value of the state variable based on the inputs, outputs and residuals.
             Note that you may have to add additional inputs to the BalanceComp in order to evaluate
             this function.
@@ -265,7 +265,7 @@ class BalanceComp(ImplicitComponent):
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         """
-        Provide an "guess" for each output based on the values of the inputs and resids.
+        Compute initial value for each state variable for which a guess function has been provided.
 
         Parameters
         ----------
@@ -306,8 +306,8 @@ class BalanceComp(ImplicitComponent):
             Default value for the RHS.  Must be compatible with the shape (optionally)
             given by the val or shape option in kwargs.
         guess_func : callable or None
-            A callable function in the form f(inputs, resids) that returns an initial "guess" value
-            of the state variable based on the inputs to the BalanceComp.  Note you may have to
+            A callable function in the form f(inputs, outputs, residuals) that can provide an
+            initial "guess" value of the state variable based on the inputs, outputs and residuals.
             add additional inputs to the BalanceComp in order to evaluate this function.
         use_mult : bool
             Specifies whether the LHS multiplier is to be used.  If True, then an additional
