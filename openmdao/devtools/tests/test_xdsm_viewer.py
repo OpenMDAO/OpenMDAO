@@ -65,7 +65,10 @@ class TestPyXDSMViewer(unittest.TestCase):
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
     def test_pyxdsm_case_reading(self):
-        """Makes XDSM for the Sellar problem"""
+        """
+        Writes a recorder file, and the XDSM writer makes the diagram based on the SQL file
+        and not the Problem instance.
+        """
         from openmdao.recorders.sqlite_recorder import SqliteRecorder
 
         filename = 'xdsm_from_sql'
@@ -87,10 +90,15 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(case_recording_filename, filename=filename, out_format='pdf', show_browser=False,
-                   quiet=QUIET)
+        msg = ('For SQL input the XDSM writer shows only the model hierarchy, '
+               'and the driver, design variables and responses are not part of the '
+               'diagram.')
+        with assert_warning(Warning, msg):
+            write_xdsm(case_recording_filename, filename=filename, out_format='tex',
+                       show_browser=False, quiet=QUIET)
 
         # Check if file was created
+        self.assertTrue(os.path.isfile(case_recording_filename))
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
 
     def test_pyxdsm_sellar_no_recurse(self):
