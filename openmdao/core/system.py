@@ -1438,11 +1438,10 @@ class System(object):
     @contextmanager
     def _unscaled_context(self, outputs=[], residuals=[]):
         """
-        Context manager for units and scaling for vectors and Jacobians.
+        Context manager for units and scaling for vectors.
 
         Temporarily puts vectors in a physical and unscaled state, because
         internally, vectors are nominally in a dimensionless and scaled state.
-        The same applies (optionally) for Jacobians.
 
         Parameters
         ----------
@@ -1471,7 +1470,7 @@ class System(object):
     @contextmanager
     def _unscaled_context_all(self):
         """
-        Context manager that temporarily puts all vectors and Jacobians in an unscaled state.
+        Context manager that temporarily puts all vectors in an unscaled state.
         """
         if self._has_output_scaling:
             for vec in self._vectors['output'].values():
@@ -1492,7 +1491,7 @@ class System(object):
     @contextmanager
     def _scaled_context_all(self):
         """
-        Context manager that temporarily puts all vectors and Jacobians in a scaled state.
+        Context manager that temporarily puts all vectors in a scaled state.
         """
         if self._has_output_scaling:
             for vec in self._vectors['output'].values():
