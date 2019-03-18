@@ -24,6 +24,7 @@ import json
 import os
 import warnings
 
+import six
 from six import iteritems
 
 from openmdao.core.problem import Problem
@@ -1051,7 +1052,7 @@ def _convert_name(name, recurse=True, subs=None):
 def _format_name(name):
     # Replaces illegal characters in names for pyXDSM component and connection names
     # This does not effect the labels, only reference names TikZ
-    if isinstance(name, (str, unicode)):  # from an SQL reader the name will be in unicode
+    if isinstance(name, six.string_types):  # from an SQL reader the name will be in unicode
         for char in ('.', ' ', '-', '_', ':'):
             name = name.replace(char, '@')
     return name
