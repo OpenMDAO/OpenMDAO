@@ -575,8 +575,8 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     Parameters
     ----------
-    problem : Problem
-        Problem
+    problem : Problem or str
+        The Problem or case recorder database containing the model or model data.
     filename : str
         Name of the output files (do not provide file extension)
     model_path : str or None
@@ -640,9 +640,15 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         design_vars = _model.get_design_vars()
         responses = _model.get_responses()
     elif isinstance(problem, str):  # SQL file
+        # from openmdao.recorders.sqlite_reader import SqliteCaseReader
+        # reader = SqliteCaseReader(problem)
         driver = None
         design_vars = None
         responses = None
+        # TODO get design variables, responses and the driver name from the SQL file
+        warnings.warn('For SQL input the XDSM writer shows only the model hierarchy, '
+                      'and the driver, design variables and responses are not part of the '
+                      'diagram.')
     else:
         msg = 'write_xdsm() only accepts Problems, Groups or filenames, not "{}"'
         raise TypeError(msg.format(type(problem)))
