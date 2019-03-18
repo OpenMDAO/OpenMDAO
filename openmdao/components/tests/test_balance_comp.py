@@ -452,31 +452,37 @@ class TestBalanceComp(unittest.TestCase):
                 assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_scalar_guess_func_using_outputs(self):
-        # Implicitly solve -(ax^2 + bx) = c using a BalanceComp.
-        # For a=1, b=-4 and c=3, there are solutions at x=1 and x=3.
 
-        # Verify that we can set the guess value (and target a solution) based on outputs.
+        class BalanceModel(Group):
+            """
+            Implicitly solve -(ax^2 + bx) = c using a BalanceComp.
+            For a=1, b=-4 and c=3, there are solutions at x=1 and x=3.
+            """
 
-        ind = IndepVarComp()
-        ind.add_output('a', 1)
-        ind.add_output('b', -4)
-        ind.add_output('c', 3)
+            def initialize(self):
+                self.options.declare('guess_func')
 
-        lhs = ExecComp('lhs=-(a*x**2+b*x)')
-        bal = BalanceComp(name='x', rhs_name='c')
+            def setup(self):
+                ind = IndepVarComp()
+                ind.add_output('a', 1)
+                ind.add_output('b', -4)
+                ind.add_output('c', 3)
 
-        model = Group()
+                lhs = ExecComp('lhs=-(a*x**2+b*x)')
+                bal = BalanceComp(name='x', rhs_name='c', guess_func=self.options['guess_func'])
 
-        model.add_subsystem('ind_comp', ind, promotes_outputs=['a', 'b', 'c'])
-        model.add_subsystem('lhs_comp', lhs, promotes_inputs=['a', 'b', 'x'])
-        model.add_subsystem('bal_comp', bal, promotes_inputs=['c'], promotes_outputs=['x'])
+                self.add_subsystem('ind_comp', ind, promotes_outputs=['a', 'b', 'c'])
+                self.add_subsystem('lhs_comp', lhs, promotes_inputs=['a', 'b', 'x'])
+                self.add_subsystem('bal_comp', bal, promotes_inputs=['c'], promotes_outputs=['x'])
 
-        model.connect('lhs_comp.lhs', 'bal_comp.lhs:x')
+                self.connect('lhs_comp.lhs', 'bal_comp.lhs:x')
 
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
+                self.linear_solver = DirectSolver()
+                self.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
-        prob = Problem(model)
+        # first verify behavior of the balance comp without the guess function
+        # at initial conditions x=5, x=0 and x=-1
+        prob = Problem(BalanceModel(guess_func=None))
         prob.setup()
 
         # default solution with initial value of 5 is x=3.
@@ -494,26 +500,13 @@ class TestBalanceComp(unittest.TestCase):
         prob.run_model()
         assert_almost_equal(prob['x'], 1.0, decimal=7)
 
-        # now use a balance comp with a guess function that steers us to the
-        # x=3 solution only if the initial value of x is less than zero
+        # now use a guess function that steers us to the x=3 solution only
+        # if the initial value of x is less than zero
         def guess_function(inputs, outputs, residuals):
             if outputs['x'] < 0:
                 outputs['x'] = 3.
 
-        bal = BalanceComp(name='x', rhs_name='c', guess_func=guess_function)
-
-        model = Group()
-
-        model.add_subsystem('ind_comp', ind, promotes_outputs=['a', 'b', 'c'])
-        model.add_subsystem('lhs_comp', lhs, promotes_inputs=['a', 'b', 'x'])
-        model.add_subsystem('bal_comp', bal, promotes_inputs=['c'], promotes_outputs=['x'])
-
-        model.connect('lhs_comp.lhs', 'bal_comp.lhs:x')
-
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
-
-        prob = Problem(model)
+        prob = Problem(BalanceModel(guess_func=guess_function))
         prob.setup()
 
         # solution with initial value of 5 is still x=3.
