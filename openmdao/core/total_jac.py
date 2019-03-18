@@ -1275,12 +1275,13 @@ class _TotalJacInfo(object):
 
                     # restore old linear solution if cache_linear_solution was set by the user for
                     # any input variables involved in this linear solution.
-                    if cache_key is not None and not has_lin_cons:
-                        self._restore_linear_solution(vec_names, cache_key, self.mode)
-                        model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
-                        self._save_linear_solution(vec_names, cache_key, self.mode)
-                    else:
-                        model._solve_linear(model._lin_vec_names, mode, rel_systems)
+                    with model._scaled_context_all():
+                        if cache_key is not None and not has_lin_cons:
+                            self._restore_linear_solution(vec_names, cache_key, self.mode)
+                            model._solve_linear(model._lin_vec_names, self.mode, rel_systems)
+                            self._save_linear_solution(vec_names, cache_key, self.mode)
+                        else:
+                            model._solve_linear(model._lin_vec_names, mode, rel_systems)
 
                     if debug_print:
                         print('Elapsed Time:', time.time() - t0, '\n')
@@ -1343,7 +1344,8 @@ class _TotalJacInfo(object):
         model._setup_jacobians(recurse=False)
 
         # Linearize Model
-        model._linearize(model._assembled_jac, sub_do_ln=model._linear_solver._linearize_children())
+        model._linearize(model._assembled_jac,
+                         sub_do_ln=model._linear_solver._linearize_children())
 
         approx_jac = model._jacobian._subjacs_info
 
