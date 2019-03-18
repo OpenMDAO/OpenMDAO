@@ -278,7 +278,7 @@ class BalanceComp(ImplicitComponent):
         """
         for name, options in iteritems(self._state_vars):
             if options['guess_func'] is not None:
-                outputs[name] = options['guess_func'](inputs, outputs, residuals)
+                options['guess_func'](inputs, outputs, residuals)
 
     def add_balance(self, name, eq_units=None, lhs_name=None,
                     rhs_name=None, rhs_val=0.0, guess_func=None,

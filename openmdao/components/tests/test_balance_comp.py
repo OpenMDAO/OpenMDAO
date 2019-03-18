@@ -13,7 +13,6 @@ from openmdao.utils.general_utils import printoptions
 
 class TestBalanceComp(unittest.TestCase):
 
-
     def test_scalar_example(self):
 
         prob = Problem(model=Group())
@@ -464,16 +463,7 @@ class TestBalanceComp(unittest.TestCase):
         ind.add_output('c', 3)
 
         lhs = ExecComp('lhs=-(a*x**2+b*x)')
-
-        bal = BalanceComp()
-
-        def guess_function(inputs, outputs, residuals):
-            if outputs['x'] < 0:
-                return 5.
-            else:
-                return 0.
-
-        bal.add_balance(name='x', rhs_name='c', guess_func=guess_function)
+        bal = BalanceComp(name='x', rhs_name='c')
 
         model = Group()
 
@@ -484,20 +474,62 @@ class TestBalanceComp(unittest.TestCase):
         model.connect('lhs_comp.lhs', 'bal_comp.lhs:x')
 
         model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver(maxiter=1000, iprint=0)
+        model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob = Problem(model)
         prob.setup()
 
-        # initial value of 'x' less than zero, guess should steer us to solution of 3.
-        prob['bal_comp.x'] = -1
+        # default solution with initial value of 5 is x=3.
+        prob['x'] = 5
         prob.run_model()
-        assert_almost_equal(prob['bal_comp.x'], 3.0, decimal=7)
+        assert_almost_equal(prob['x'], 3.0, decimal=7)
 
-        # initial value of 'x' greater than zero, guess should steer us to solution of 1.
-        prob['bal_comp.x'] = 99
+        # default solution with initial value of 0 is x=1.
+        prob['x'] = 0
         prob.run_model()
-        assert_almost_equal(prob['bal_comp.x'], 1.0, decimal=7)
+        assert_almost_equal(prob['x'], 1.0, decimal=7)
+
+        # default solution with initial value of -1 is x=1.
+        prob['x'] = -1
+        prob.run_model()
+        assert_almost_equal(prob['x'], 1.0, decimal=7)
+
+        # now use a balance comp with a guess function that steers us to the
+        # x=3 solution only if the initial value of x is less than zero
+        def guess_function(inputs, outputs, residuals):
+            if outputs['x'] < 0:
+                outputs['x'] = 3.
+
+        bal = BalanceComp(name='x', rhs_name='c', guess_func=guess_function)
+
+        model = Group()
+
+        model.add_subsystem('ind_comp', ind, promotes_outputs=['a', 'b', 'c'])
+        model.add_subsystem('lhs_comp', lhs, promotes_inputs=['a', 'b', 'x'])
+        model.add_subsystem('bal_comp', bal, promotes_inputs=['c'], promotes_outputs=['x'])
+
+        model.connect('lhs_comp.lhs', 'bal_comp.lhs:x')
+
+        model.linear_solver = DirectSolver()
+        model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
+
+        prob = Problem(model)
+        prob.setup()
+
+        # solution with initial value of 5 is still x=3.
+        prob['x'] = 5
+        prob.run_model()
+        assert_almost_equal(prob['x'], 3.0, decimal=7)
+
+        # solution with initial value of 0 is still x=1.
+        prob['x'] = 0
+        prob.run_model()
+        assert_almost_equal(prob['x'], 1.0, decimal=7)
+
+        # solution with initial value of -1 is now x=3.
+        prob['x'] = -1
+        prob.run_model()
+        assert_almost_equal(prob['x'], 3.0, decimal=7)
 
     def test_rhs_val(self):
         """ Test solution with a default RHS value and no connected RHS variable. """
