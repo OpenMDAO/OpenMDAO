@@ -1890,7 +1890,7 @@ class Group(System):
         wrtset = set()
         wrt_colors_matched = set()
         if self._approx_coloring_info is not None and (self._owns_approx_of or self.pathname):
-            wrt_color_patterns = self._approx_coloring_info[1]
+            wrt_color_patterns = self._approx_coloring_info['wrt_patterns']
             color_meta = self._setup_approx_coloring()
         else:
             wrt_color_patterns = ()
@@ -1960,31 +1960,26 @@ class Group(System):
                                      "partial options on Group "
                                      "'{}': {}.".format(self.pathname, wrt_color_patterns))
                 self._setup_approx_coloring()
-                self._approx_coloring_info[0] = wrt_colors_matched
+                self._approx_coloring_info['wrt_matches'] = wrt_colors_matched
             self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
         else:
             self._jac_saves_remaining = 0
 
     def _setup_approx_coloring(self):
-
-        _, wrt_list, method, form, step, directory = self._approx_coloring_info
-
-        try:
-            method_func = _supported_approx_methods[method]
-            if method == 'exact':
-                raise KeyError('exact')
-        except KeyError:
-            msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method,
-                                        [k for k in _supported_methods if k != 'exact']))
+        info = self._approx_coloring_info
+        method = info['method']
 
         if method not in self._approx_schemes:
+            method_func = _supported_approx_methods[method]
             self._approx_schemes[method] = method_func()
 
         approx_scheme = self._approx_schemes[method]
 
         meta = approx_scheme.DEFAULT_OPTIONS.copy()
         meta['coloring'] = None  # set a placeholder for later replacement of approximations
+        form = info['form']
+        step = info['step']
+
         if form:
             meta['form'] = form
         if step:

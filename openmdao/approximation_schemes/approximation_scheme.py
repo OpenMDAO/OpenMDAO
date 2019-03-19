@@ -164,7 +164,7 @@ class ApproximationScheme(object):
             data = self._get_approx_data(system, key)
 
             if wrt == '@color':   # use coloring (there should be only 1 of these)
-                wrt_matches = system._approx_coloring_info[0]
+                wrt_matches = system._approx_coloring_info['wrt_matches']
                 options = approx[0][1]
                 if is_total:
                     of_names = [n for n in system._var_allprocs_abs_names['output']

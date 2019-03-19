@@ -753,41 +753,49 @@ class System(object):
             simple_warning("%s: set_approx_coloring() was called multiple times. The "
                            "last call will be used." % self.pathname)
 
-        self._approx_coloring_info = [None, wrt_patterns, method, form, step, directory]
+        if method not in ('fd', 'cs'):
+            raise RuntimeError("method must be one of ['fd', 'cs'].")
+
+        self._approx_coloring_info = {
+            'wrt_matches': None,
+            'wrt_patterns': wrt_patterns,
+            'method': method,
+            'form': form,
+            'step': step,
+            'directory': directory,
+            'coloring': None,
+        }
 
     def _setup_approx_coloring(self):
         if self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
-        matches = set()
-        _, wrt_list, method, form, step, directory = self._approx_coloring_info
+        info = self._approx_coloring_info
         ofs, allwrt = self._get_partials_varlists()
-        for w in wrt_list:
+        matches = set()
+        wrt_patterns = info['wrt_patterns']
+        for w in wrt_patterns:
             matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
 
         # error if nothing matched
         if not matches:
             raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
-                             "options on Component '{}': {}.".format(self.pathname, wrt_list))
+                             "options on Component '{}': {}.".format(self.pathname, wrt_patterns))
 
-        self._approx_coloring_info = [matches, wrt_list, method, form, step, directory]
-
-        try:
-            method_func = _supported_approx_methods[method]
-            if method == 'exact':
-                raise KeyError('exact')
-        except KeyError:
-            msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method,
-                                        [k for k in _supported_methods if k != 'exact']))
+        info['wrt_matches'] = matches
+        method = info['method']
 
         if method not in self._approx_schemes:
+            method_func = _supported_approx_methods[method]
             self._approx_schemes[method] = method_func()
 
         approx_scheme = self._approx_schemes[method]
 
         meta = approx_scheme.DEFAULT_OPTIONS.copy()
         meta['coloring'] = None  # set a placeholder for later replacement of approximations
+
+        form = info['form']
+        step = info['step']
         if form:
             meta['form'] = form
         if step:
@@ -811,24 +819,30 @@ class System(object):
             self._jacobian._save_sparsity(self)
             self._jac_saves_remaining -= 1
             if self._jac_saves_remaining == 0:
+                info = self._approx_coloring_info
                 sparsity, ordered_ofs, ordered_wrts = \
-                    self._jacobian._compute_sparsity(self, self._approx_coloring_info[0])
+                    self._jacobian._compute_sparsity(self, info['wrt_matches'])
                 self._jacobian._jac_summ = None  # reclaim the memory
 
-                coloring = _compute_coloring(sparsity, 'fwd')
+                info['coloring'] = coloring = _compute_coloring(sparsity, 'fwd')
                 coloring._row_vars = list(ordered_ofs)
                 coloring._col_vars = list(ordered_wrts)
                 coloring._row_var_sizes = list(ordered_ofs.values())
                 coloring._col_var_sizes = list(ordered_wrts.values())
-                directory = self._approx_coloring_info[5]
+                directory = info['directory']
                 if directory is not None:
                     name = self.pathname.replace('.', '_') if self.pathname else 'top'
-                    fname = os.path.join(directory, name)
-                    with open(fname, 'w') as f:
-                        write_coloring(coloring, f)
+                    fname = os.path.join(directory, name + '.pkl')
+                    coloring.save(fname)
 
                 for approx in itervalues(self._approx_schemes):
                     approx._update_coloring(self, coloring)
+
+    def set_coloring_spec(self, coloring):
+        if isinstance(coloring, string_types):  # it's a filename
+            # load the coloring from the file
+            coloring = Coloring.load(coloring)
+        self._approx_coloring_info['coloring'] = coloring
 
     def _setup_par_fd_procs(self, comm):
         """
