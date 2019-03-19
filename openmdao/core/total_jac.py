@@ -209,7 +209,7 @@ class _TotalJacInfo(object):
             if self.simul_coloring is None:
                 modes = [self.mode]
             else:
-                modes = [m for m in ('fwd', 'rev') if m in self.simul_coloring]
+                modes = self.simul_coloring.modes()
 
             self.in_idx_map = {}
             self.in_loc_idxs = {}
@@ -425,6 +425,8 @@ class _TotalJacInfo(object):
         idx_iter_dict = OrderedDict()  # a dict of index iterators
 
         simul_coloring = self.simul_coloring
+        if simul_coloring:
+            simul_color_modes = {'fwd': simul_coloring._fwd, 'rev': simul_coloring._rev}
 
         vois = self.input_meta[mode]
         input_list = self.input_list[mode]
@@ -557,14 +559,14 @@ class _TotalJacInfo(object):
 
         loc_idxs = np.hstack(loc_idxs)
 
-        if simul_coloring and mode in simul_coloring:
+        if simul_coloring and simul_color_modes[mode] is not None:
             imeta = defaultdict(bool)
             imeta['coloring'] = simul_coloring
             all_rel_systems = set()
             cache = False
             imeta['itermeta'] = itermeta = []
             locs = None
-            for color, ilist in enumerate(simul_coloring[mode][0]):
+            for ilist in simul_coloring.color_iter(mode):
                 for i in ilist:
                     _, rel_systems, cache_lin_sol = idx_map[i]
                     _update_rel_systems(all_rel_systems, rel_systems)
@@ -572,7 +574,7 @@ class _TotalJacInfo(object):
 
                 iterdict = defaultdict(bool)
 
-                if color != 0:
+                if len(ilist) > 1:
                     locs = loc_idxs[ilist]
                     iterdict['local_in_idxs'] = locs[locs != -1.0]
 
@@ -762,20 +764,16 @@ class _TotalJacInfo(object):
             Jac setter method.
         """
         coloring_info = imeta['coloring']
-        both = 'fwd' in coloring_info and 'rev' in coloring_info
+        both = coloring_info._fwd and coloring_info._rev
         input_setter = self.simul_coloring_input_setter
         jac_setter = self.simul_coloring_jac_setter
 
-        # for mode in modes:
-        for color, ilist in enumerate(coloring_info[mode][0]):
-            if color == 0:
-                # do all uncolored indices individually (one linear solve per index)
+        for color, ilist in enumerate(coloring_info.color_iter(mode)):
+            if len(ilist) == 1:
                 if both:
-                    for i in ilist:
-                        yield [i], input_setter, jac_setter, None
+                    yield ilist, input_setter, jac_setter, None
                 else:
-                    for i in ilist:
-                        yield i, self.single_input_setter, self.single_jac_setter, None
+                    yield ilist[0], self.single_input_setter, self.single_jac_setter, None
             else:
                 # yield all indices for a color at once
                 yield ilist, input_setter, jac_setter, imeta['itermeta'][color]
@@ -1138,7 +1136,7 @@ class _TotalJacInfo(object):
         mode : str
             Direction of derivative solution.
         """
-        row_col_map = self.simul_coloring[mode][1]
+        row_col_map = self.simul_coloring.get_row_col_map(mode)
         fwd = mode == 'fwd'
 
         J = self.J

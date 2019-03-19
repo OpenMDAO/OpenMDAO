@@ -21,7 +21,7 @@ from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
     SqliteRecorder, CaseReader
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.coloring import _solves_info, _compute_coloring
+from openmdao.utils.coloring import Coloring, _compute_coloring
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
 
@@ -142,8 +142,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
     def test_simul_coloring_snopt_fwd(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
-
-        color_info = {"fwd": [[
+        color_info = Coloring()
+        color_info._fwd = [[
            [20],   # uncolored columns
            [0, 2, 4, 6, 8],   # color 1
            [1, 3, 5, 7, 9],   # color 2
@@ -172,8 +172,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
            [9, 16, 21],   # column 18
            [10, 21],   # column 19
            None   # column 20
-        ]],
-        "sparsity": {
+        ]]
+        color_info._subjac_sparsity = {
             "circle.area": {
                "indeps.x": [[], [], [1, 10]],
                "indeps.y": [[], [], [1, 10]],
@@ -199,7 +199,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
                "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
                "indeps.r": [[], [], [5, 1]]
             }
-        }}
+        }
         p_color = run_opt(pyOptSparseDriver, 'fwd', color_info=color_info, optimizer='SNOPT', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -258,7 +258,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
-        color_info = {"fwd": [[
+        color_info = Coloring()
+        color_info._fwd = [[
            [20],   # uncolored columns
            [0, 2, 4, 6, 8],   # color 1
            [1, 3, 5, 7, 9],   # color 2
@@ -287,8 +288,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
            [9, 16, 21],   # column 18
            [10, 21],   # column 19
            None   # column 20
-        ]],
-            "sparsity": {
+        ]]
+        color_info._subjac_sparsity = {
             "circle.area": {
                "indeps.x": [[], [], [1, 10]],
                "indeps.y": [[], [], [1, 10]],
@@ -314,7 +315,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
                "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
                "indeps.r": [[], [], [5, 1]]
             }
-        }}
+        }
 
         p_color = run_opt(pyOptSparseDriver, 'fwd', color_info=color_info, optimizer='SLSQP', print_results=False)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -396,7 +397,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
 
-        color_info = {"rev": [[
+        color_info = Coloring()
+        color_info._rev = [[
             [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
             [1, 18, 19, 20, 21],   # color 1
             [0, 17, 13, 14, 15, 16],   # color 2
@@ -426,8 +428,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
             [4, 5, 14, 15],   # row 19
             [6, 7, 16, 17],   # row 20
             [8, 9, 18, 19]   # row 21
-            ]],
-        "sparsity": {
+            ]]
+        color_info._subjac_sparsity = {
             "circle.area": {
                "indeps.x": [[], [], [1, 10]],
                "indeps.y": [[], [], [1, 10]],
@@ -453,7 +455,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
                "indeps.y": [[], [], [1, 10]],
                "indeps.r": [[], [], [1, 1]]
             }
-        }}
+        }
         p_color = run_opt(pyOptSparseDriver, 'rev', color_info=color_info, optimizer='SNOPT', print_results=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -494,7 +496,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         except:
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
-        color_info = {"rev": [[
+        color_info = Coloring()
+        color_info._rev = [[
            [1, 4, 5, 6, 7, 8, 9, 10],
            [3, 17],
            [0, 11, 13, 14, 15, 16],
@@ -523,8 +526,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
            [4, 5, 14, 15],
            [6, 7, 16, 17],
            [8, 9, 18, 19]
-        ]],
-        "sparsity": {
+        ]]
+        color_info._subjac_sparsity = {
             "circle.area": {
                "indeps.x": [[], [], [1, 10]],
                "indeps.y": [[], [], [1, 10]],
@@ -550,7 +553,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
                "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
                "indeps.r": [[], [], [5, 1]]
             }
-        }}
+        }
 
         p_color = run_opt(pyOptSparseDriver, 'rev', color_info=color_info, optimizer='SLSQP', print_results=False)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -596,7 +599,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 class SimulColoringScipyTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.color_info = {"fwd": [[
+        self.color_info = Coloring()
+        self.color_info._fwd = [[
                [20],   # uncolored columns
                [0, 2, 4, 6, 8],   # color 1
                [1, 3, 5, 7, 9],   # color 2
@@ -625,9 +629,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                [9, 15, 20],   # column 18
                [10, 20],   # column 19
                None   # column 20
-            ]],
-            "sparsity": None
-        }
+            ]]
 
     def test_simul_coloring_fwd(self):
 
@@ -749,7 +751,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model.add_objective('circle.area', ref=-1)
 
         # setup coloring
-        color_info = {"fwd": [[
+        color_info = Coloring()
+        color_info._fwd = [[
            [20],   # uncolored column list
            [0, 2, 4, 6, 8],   # color 1
            [1, 3, 5, 7, 9],   # color 2
@@ -778,9 +781,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
            [9, 15, 20],   # column 18
            [10, 20],   # column 19
            None,   # column 20
-        ]],
-        "sparsity": None
-        }
+        ]]
 
         p.driver.set_simul_deriv_color(color_info)
 
@@ -794,7 +795,8 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
     """Rev mode coloring tests."""
 
     def setUp(self):
-        self.color_info = {"rev": [[
+        self.color_info = Coloring()
+        self.color_info._rev = [[
                [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
                [2, 21],   # color 1
                [3, 16],   # color 2
@@ -824,8 +826,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
                [6, 7, 16, 17],   # row 19
                [8, 9, 18, 19],   # row 20
                [0]   # row 21
-            ]],
-            "sparsity": None}
+            ]]
 
     def test_simul_coloring(self):
 
@@ -964,7 +965,7 @@ class BidirectionalTestCase(unittest.TestCase):
         for n in range(6, 20, 2):
             builder = TotJacBuilder.eisenstat(n)
             builder.color('auto', stream=None)
-            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
             if tot_colors == n // 2 + 3:
                 raise unittest.SkipTest("Current bicoloring algorithm requires n/2 + 3 solves, so skipping for now.")
             self.assertLessEqual(tot_colors, n // 2 + 2,
@@ -973,7 +974,7 @@ class BidirectionalTestCase(unittest.TestCase):
 
             builder_fwd = TotJacBuilder.eisenstat(n)
             builder_fwd.color('fwd', stream=None)
-            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder_fwd.coloring)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = builder_fwd.coloring._solves_info()
             # The columns of Eisenstat's example are pairwise nonorthogonal, so fwd coloring
             # should require n colors.
             self.assertEqual(n, tot_colors,
@@ -988,7 +989,7 @@ class BidirectionalTestCase(unittest.TestCase):
             builder.add_col(0)
             builder.add_block_diag([(1,1)] * (n-1), 1, 1)
             builder.color('auto', stream=None)
-            tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(builder.coloring)
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
             self.assertEqual(tot_colors, 3)
 
     @unittest.skipIf(LooseVersion(scipy.__version__) < LooseVersion("0.19.1"), "scipy version too old")
@@ -1003,20 +1004,20 @@ class BidirectionalTestCase(unittest.TestCase):
         mat = np.asarray(mat, dtype=bool)
         coloring = _compute_coloring(mat, 'auto')
 
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
 
         self.assertEqual(tot_colors, 21)
 
         # verify that unidirectional colorings are much worse (105 vs 21 for bidirectional)
         coloring = _compute_coloring(mat, 'fwd')
 
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
 
         self.assertEqual(tot_colors, 105)
 
         coloring = _compute_coloring(mat, 'rev')
 
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(coloring)
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
 
         self.assertEqual(tot_colors, 105)
 

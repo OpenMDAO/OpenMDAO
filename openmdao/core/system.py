@@ -811,24 +811,21 @@ class System(object):
             self._jacobian._save_sparsity(self)
             self._jac_saves_remaining -= 1
             if self._jac_saves_remaining == 0:
-                sparsity = self._jacobian._compute_sparsity(self, self._approx_coloring_info[0])
-
-                # print(self.pathname, "SPARSITY")
-                # from openmdao.utils.array_utils import array_viz
-                # array_viz(sparsity)
+                sparsity, ordered_ofs, ordered_wrts = \
+                    self._jacobian._compute_sparsity(self, self._approx_coloring_info[0])
                 self._jacobian._jac_summ = None  # reclaim the memory
 
-                start_time = time.time()
                 coloring = _compute_coloring(sparsity, 'fwd')
-
-                coloring['time_coloring'] = time.time() - start_time
-
+                coloring._row_vars = list(ordered_ofs)
+                coloring._col_vars = list(ordered_wrts)
+                coloring._row_var_sizes = list(ordered_ofs.values())
+                coloring._col_var_sizes = list(ordered_wrts.values())
                 directory = self._approx_coloring_info[5]
                 if directory is not None:
                     name = self.pathname.replace('.', '_') if self.pathname else 'top'
                     fname = os.path.join(directory, name)
                     with open(fname, 'w') as f:
-                        _write_coloring(coloring, f)
+                        write_coloring(coloring, f)
 
                 for approx in itervalues(self._approx_schemes):
                     approx._update_coloring(self, coloring)

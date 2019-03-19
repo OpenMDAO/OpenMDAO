@@ -8,7 +8,7 @@ import numpy as np
 
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary
+from openmdao.utils.coloring import get_simul_meta
 
 class TotJacBuilder(object):
     def __init__(self, rows, cols):
@@ -77,7 +77,7 @@ class TotJacBuilder(object):
         print("Density:", np.count_nonzero(self.J) / self.J.size)
         print("Max degree (fwd, rev):", maxdeg_fwd, maxdeg_rev)
 
-        simul_coloring_summary(self.J, self.coloring, stream=stream)
+        self.coloring.summary(stream=stream)
 
     def shuffle_rows(self):
         np.random.shuffle(self.J)
@@ -190,12 +190,12 @@ if __name__ == '__main__':
                         help="Build an Eisenstat's example matrix of size n+1 x n.",
                         action="store", type=int, default=-1, dest="eisenstat")
     parser.add_argument("-m", "--mode", type=str, dest="mode",
-                        help="Direction of coloring (default is auto). Only used with -e.", 
+                        help="Direction of coloring (default is auto). Only used with -e.",
                         default="auto")
-    parser.add_argument('-s', '--save', dest="save", default=None, 
+    parser.add_argument('-s', '--save', dest="save", default=None,
                         help="Output file for jacobian so it can be reloaded and colored using"
                         " various methods for comparison.")
-    parser.add_argument('-l', '--load', dest="load", default=None, 
+    parser.add_argument('-l', '--load', dest="load", default=None,
                         help="Input file for jacobian so it can be reloaded and colored using"
                         " various methods for comparison.")
 
@@ -208,7 +208,7 @@ if __name__ == '__main__':
         builder = TotJacBuilder.eisenstat(options.eisenstat)
     else:  # just do a random matrix
         builder = rand_jac()
- 
+
     builder.color(options.mode)
     builder.show()
 

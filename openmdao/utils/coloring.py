@@ -7,6 +7,8 @@ import os
 import sys
 import time
 import warnings
+import json
+import pickle
 from collections import OrderedDict, defaultdict
 from itertools import combinations
 from distutils.version import LooseVersion
@@ -64,6 +66,580 @@ else:
             return np.count_nonzero(arr)
 
         return count
+
+
+class Coloring(object):
+    """
+    Container for all information relevant to a coloring.
+
+    Attributes
+    ----------
+    _shape : tuple of int (nrows, ncols) or None
+        Tuple describing the shape of the sparsity matrix.
+    _nzrows : ndarray of int or None
+        Row indices of nonzero entries in the full jac sparsity matrix.
+    _nzcols : ndarray of int or None
+        Column indices of nonzero entries in the full jac sparsity matrix.
+    _subjac_sparsity : dict or None
+        Mapping of (of, wrt) keys to corresponding (nzrows, nzcols, shape) for that subjac.
+    _coloring_time : float or None
+        If known, the time it took to compute the coloring.
+    _fwd : tuple (col_lists, row_maps)
+        Contains lists of grouped columns and nonzero rows for each column for forward coloring.
+    _rev : tuple (col_lists, row_maps)
+        Contains lists of grouped columns and nonzero rows for each column for reverse coloring.
+    _col_vars : list of str or None
+        Names of variables corresponding to columns.
+    _col_var_sizes : ndarray or None
+        Sizes of column variables.
+    _row_vars : list of str or None
+        Names of variables corresponding to rows.
+    _row_var_sizes : ndarray or None
+        Sizes of row variables.
+    _writers : dict
+        Mapping of file extension to a tuple (func, open_str), where func writes
+        the coloring in a specific format, and open_str is the string indicating
+        if the file should be ascii ('w') or binary ('wb').
+    """
+
+    def __init__(self, sparsity=None):
+        """
+        Initialize data structures.
+
+        Parameters
+        ----------
+        sparsity : ndarray or None
+            Full jacobian sparsity matrix (dense bool form).
+        """
+        # store the nonzero row and column indices if jac sparsity is provided
+        if sparsity is not None:
+            self._nzrows, self._nzcols = np.nonzero(sparsity)
+            self._shape = sparsity.shape
+        else:
+            self._nzrows = self._nzcols = self._shape = None
+        self._subjac_sparsity = None
+        self._coloring_time = None
+        self._fwd = None
+        self._rev = None
+        self._col_vars = None
+        self._col_var_sizes = None
+        self._row_vars = None
+        self._row_var_sizes = None
+        self._writers = {
+            'json': (self._write_json, 'w'),
+            'pkl': (self._write_pickle, 'wb'),
+        }
+
+    def color_iter(self, direction):
+        """
+        Based on the given direction, yield an iterator over column (or row) groups.
+
+        Parameters
+        ----------
+        direction : str
+            Derivative direction ('fwd' or 'rev').
+
+        Yields
+        ------
+        list of int
+            Lists of column indices (in fwd mode) or row indices (in rev mode).
+        """
+        if direction == 'fwd':
+            colors = self._fwd[0]
+        elif direction == 'rev':
+            colors = self._rev[0]
+        else:
+            raise RuntimeError("Invalid direction '%s' in color_iter" % direction)
+
+        for i in colors[0]:
+            yield [i]
+
+        for i in range(1, len(colors)):
+            yield colors[i]
+
+    def get_row_col_map(self, direction):
+        """
+        Return mapping of nonzero rows to each column (fwd) or nonzeros columns to each row (rev).
+
+        Parameters
+        ----------
+        direction : str
+            Indicator of forward mode ('fwd') or reverse mode ('rev').
+
+        Returns
+        -------
+        list of lists of int
+            List where each entry contains list of nonzero rows/cols for the index corresponding
+            to each column/row.
+        """
+        if direction == 'fwd':
+            return self._fwd[1]
+        elif direction == 'rev':
+            return self._rev[1]
+        else:
+            raise RuntimeError("Invalid direction '%s' in get_row_col_map" % direction)
+
+    def color_nonzero_iter(self, direction):
+        """
+        Given a direction, iterate over column groups (fwd) or row groups (rev).
+
+        Parameters
+        ----------
+        direction : str
+            Indicates which coloring subdict ('fwd' or 'rev') to use.
+
+        Yields
+        ------
+        (column or row groups, nonzero row or column lists)
+            Yields a list of columns/rows and their associated nonzero rows/columns associated
+            with a color.
+        """
+        nz_rows = self.get_row_col_map(direction)
+        for col_chunk in self.color_iter(direction):
+            yield col_chunk, [nz_rows[c] for c in col_chunk]
+
+    def modes(self):
+        """
+        Return a tuple containing the modes included in this coloring.
+
+        Returns
+        -------
+        tuple
+            Tuple containing some subset of ('fwd', 'rev').
+        """
+        if self._fwd and self._rev:
+            return ('fwd', 'rev')
+        elif self._fwd:
+            return ('fwd',)
+        elif self._rev:
+            return ('rev',)
+        return ()
+
+    def _solves_info(self):
+        """
+        Return info about the number of colors given the current coloring scheme.
+
+        Returns
+        -------
+        float
+            Total size (minimum chosen based on which mode is better).
+        float
+            Total solves.
+        float
+            Number of forward solves.
+        float
+            Number of reverse solves.
+        float
+            Percent improvment.
+        """
+        rev_size = self._shape[0] if self._shape else -1  # nrows
+        fwd_size = self._shape[1] if self._shape else -1  # ncols
+
+        tot_colors = self.total_solves()
+
+        fwd_solves = rev_solves = 0
+        if tot_colors == 0:  # no coloring found
+            tot_colors = tot_size = min([rev_size, fwd_size])
+            pct = 0.
+        else:
+            fwd_lists = self._fwd[0] if self._fwd else []
+            rev_lists = self._rev[0] if self._rev else []
+
+            if fwd_lists and not rev_lists:
+                tot_size = fwd_size
+            elif rev_lists and not fwd_lists:
+                tot_size = rev_size
+            else:
+                tot_size = min(fwd_size, rev_size)
+
+            if fwd_lists:
+                fwd_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
+
+            if rev_lists:
+                rev_solves = len(rev_lists[0]) + len(rev_lists) - 1
+
+            if tot_size <= 0:
+                pct = 0.
+            else:
+                pct = ((tot_size - tot_colors) / tot_size * 100)
+
+        if tot_size < 0:
+            tot_size = '?'
+
+        return tot_size, tot_colors, fwd_solves, rev_solves, pct
+
+    def total_solves(self, do_fwd=True, do_rev=True):
+        """
+        Return total number of solves required based on the given coloring info.
+
+        Parameters
+        ----------
+        do_fwd : bool
+            If True, add fwd colors to total.
+        do_rev : bool
+            If True, add rev colors to total.
+
+        Returns
+        -------
+        int
+            Total number of solves required to compute the jacobian.
+        """
+        total = 0
+
+        # lists[0] are the uncolored columns or rows, which are solved individually so
+        # we add all of them, along with the number of remaining lists, where each
+        # sublist is a bunch of columns or rows that are solved together, to get the total colors
+        # (which equals the total number of linear solves).
+        if do_fwd and self._fwd:
+            row_lists, _ = self._fwd
+            total += len(row_lists[0]) + len(row_lists) - 1
+        if do_rev and self._rev:
+            col_lists, _ = self._rev
+            total += len(col_lists[0]) + len(col_lists) - 1
+
+        return total
+
+    @staticmethod
+    def load(self, fname):
+        """
+        Read the coloring object from the given file.
+
+        The format is determined by the file extension.
+
+        Parameters
+        ----------
+        fname : str
+            Name of file to read from.
+
+        Returns
+        -------
+        Coloring
+            See docstring for Coloring class.
+        """
+        name, ext = fname.rsplit('.', 1)
+        try:
+            loader = self._loaders[ext]
+        except KeyError:
+            raise RuntimeError("Can't find a coloring loader for extension '%s'." % ext)
+
+        return loader(fname)
+
+    @staticmethod
+    def _load_pickle(fname):
+        """
+        Read the coloring object from the given pickle file.
+
+        Parameters
+        ----------
+        fname : str
+            Name of file to read from.
+
+        Returns
+        -------
+        Coloring
+            See docstring for Coloring class.
+        """
+        with open(fname, 'rb') as f:
+            return pickle.load(f)
+
+    @staticmethod
+    def _load_json(fname):
+        """
+        Read the coloring object from the given json file.
+
+        Parameters
+        ----------
+        fname : str
+            Name of file to read from.
+
+        Returns
+        -------
+        Coloring
+            See docstring for Coloring class.
+        """
+        with open(fname, 'r') as f:
+            return _json2coloring(json.load(f))
+
+    def save(self, fname):
+        """
+        Write the coloring object to the given stream.
+
+        Parameters
+        ----------
+        fname : str
+            Name of file to save to, or 'stdout' or 'stderr'.
+        """
+        if fname in ('stdout', 'stderr'):
+            fmt = fname
+            stream = getattr(sys, fname)
+        else:
+            name, fmt = fname.rsplit('.', 1)
+            stream = None
+        try:
+            writer, otype = self._writers[fmt]
+        except KeyError:
+            raise RuntimeError("No writer available for format '%s'", fmt)
+
+        if stream:
+            writer(stream)
+        else:
+            with open(fname, otype) as f:
+                writer(f)
+
+    def _write_pickle(self, stream):
+        """
+        Write the coloring to the given stream in pickle format.
+
+        Parameters
+        ----------
+        stream : file-like
+            Output stream.
+        """
+        pickle.dump(self, stream)
+
+    def _write_json(self, stream):
+        """
+        Write the coloring to the given stream in json format.
+
+        Parameters
+        ----------
+        stream : file-like
+            Output stream.
+        """
+        tty = stream.isatty()
+        none = 'null'
+        sparsity = self._subjac_sparsity
+        modes = [self._fwd, self._rev]
+
+        stream.write("{\n")
+        for m, mode in enumerate(modes):
+            if mode is None:
+                continue
+
+            name = 'column' if mode is self._fwd else 'row'
+            mode_name = 'fwd' if mode is self._fwd else 'rev'
+            lists, nonzero_entries = mode
+
+            if m > 0:
+                stream.write(",\n")
+
+            stream.write('"%s": [[\n' % mode_name)
+            last_idx = len(lists) - 1
+            for i, lst in enumerate(lists):
+                stream.write("   %s" % lst)
+                if i < last_idx:
+                    stream.write(",")
+
+                if tty:
+                    if i == 0:
+                        stream.write("   # uncolored %ss" % name)
+                    else:
+                        stream.write("   # color %d" % i)
+
+                stream.write("\n")
+
+            stream.write("],\n[\n")
+            last_idx = len(nonzero_entries) - 1
+            for i, nonzeros in enumerate(nonzero_entries):
+                if isinstance(nonzeros, np.ndarray):
+                    # convert to list to make json serializable
+                    stream.write("   %s" % list(nonzeros))
+                else:  # a full slice
+                    stream.write("   %s" % none)
+
+                if i < last_idx:
+                    stream.write(",")
+
+                if tty:
+                    stream.write("   # %s %d" % (name, i))
+
+                stream.write("\n")
+
+            stream.write("]]")
+
+        if sparsity:
+            stream.write(',\n"sparsity": ')
+            _write_sparsity(sparsity, stream)
+        else:
+            stream.write(',\n"sparsity": %s' % none)
+
+        stream.write("\n}")
+
+    def __repr__(self):
+        """
+        Return a short summary representation of this coloring.
+
+        Returns
+        -------
+        str
+            Brief summary.
+        """
+        if self._shape:
+            shape = self._shape
+        else:
+            shape = '?'
+        if self._fwd and self._rev:
+            direction = 'bidirectional'
+        elif self._fwd:
+            direction = 'fwd'
+        else:
+            direction = 'rev'
+        return 'Coloring (direction: %s, ncolors: %d, shape: %s' % (direction, self.total_solves(),
+                                                                    shape)
+
+    def summary(self, stream=sys.stdout):
+        """
+        Print a summary of this coloring.
+
+        Parameters
+        ----------
+        stream : file-like
+            Where the output will go.
+        """
+        stream.write('\n')
+        if self._coloring_time is not None:
+            stream.write("Time to compute coloring: %f\n" % self._coloring_time)
+
+        nrows = self._shape[0] if self._shape else -1
+        ncols = self._shape[1] if self._shape else -1
+
+        if self._fwd is None and self._rev is None:
+            tot_size = min(nrows, ncols)
+            if tot_size < 0:
+                tot_size = '?'
+            stream.write("\nSimultaneous derivatives can't improve on the total number of solves "
+                         "required (%s) for this configuration\n" % tot_size)
+        else:
+            tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
+
+            stream.write("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
+            stream.write("\n\nTotal colors vs. total size: %d vs %s  (%.1f%% improvement)\n" %
+                         (tot_colors, tot_size, pct))
+
+    def display(self, stream=sys.stdout):
+        """
+        Display the structure of a boolean array with coloring info for each nonzero value.
+
+        Forward mode colored nonzeros are denoted by 'f', reverse mode nonzeros by 'r',
+        overlapping nonzeros by 'O' and uncolored nonzeros by 'x'.  Zeros are denoted by '.'.
+
+        If names and sizes of row and column vars are known, print the name of the row var
+        alongside each row and print the names of the column vars, aligned with each column,
+        at the bottom.
+
+        Parameters
+        ----------
+        stream : file-like
+            Stream where output will be written.
+        """
+        shape = self._shape
+        nrows, ncols = shape
+
+        # array of chars the same size as dense jacobian
+        charr = np.full(shape, '.', dtype=str)
+
+        # mark all nonzero entries as 'x' initially, so the 'x' will be left
+        # if not covered with an 'f' or an 'r'
+        charr[self._nzrows, self._nzcols] = 'x'
+
+        if self._fwd:
+            full_rows = np.arange(nrows, dtype=int)
+            col2row = self._fwd[1]
+            for grp in self._fwd[0]:
+                for c in grp:
+                    rows = col2row[c]
+                    if rows is None:
+                        rows = full_rows
+                    charr[rows, c] = 'f'
+
+        if self._rev:
+            full_cols = np.arange(ncols, dtype=int)
+            row2col = self._rev[1]
+            for grp in self._rev[0]:
+                for r in grp:
+                    cols = row2col[r]
+                    if cols is None:
+                        cols = full_cols
+                    for c in cols:
+                        # check for any overlapping entries (ones having both a fwd and rev color)
+                        # NOTE: this should never happen unless there's a bug in the coloring!
+                        charr[r, c] = 'O' if charr[r, c] == 'f' else 'r'
+
+        if (self._row_vars is None or self._row_var_sizes is None or self._col_vars is None or
+                self._col_var_sizes is None):
+            # we don't have var name/size info, so just show the unadorned matrix
+            for r in range(nrows):
+                for c in range(ncols):
+                    stream.write(charr[r, c])
+                stream.write(' %d\n' % r)
+        else:
+            # we have var name/size info, so mark rows/cols with their respective variable names
+            rowstart = rowend = 0
+            for rv, rvsize in zip(self._row_vars, self._row_var_sizes):
+                rowend += rvsize
+                for r in range(rowstart, rowend):
+                    colstart = colend = 0
+                    for cv, cvsize in zip(self._col_vars, self._col_var_sizes):
+                        colend += cvsize
+                        for c in range(colstart, colend):
+                            stream.write(charr[r, c])
+                        colstart = colend
+                    stream.write(' %d  %s\n' % (r, rv))  # include row variable with each row
+                rowstart = rowend
+
+            # now print the column vars below the matrix, with each one spaced over to line up
+            # with the appropriate starting column of the matrix ('|' marks the start of each var)
+            start = 0
+            for name, size in zip(self._col_vars, self._col_var_sizes):
+                tab = ' ' * start
+                stream.write('%s|%s\n' % (tab, name))
+                start += size
+
+    def get_subjac_sparsity(self):
+        """
+        Compute the sparsity structure of each subjacobian based on the full jac sparsity.
+
+        Returns
+        -------
+        dict
+            Mapping of (of, wrt) keys to thier corresponding (nzrows, nzcols, shape).
+        """
+        if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
+            J = np.zeros(self._shape, dtype=bool)
+            J[self._nzrows, self._nzcols] = True
+            self._subjac_sparsity = _jac2subjac_sparsity(J, self._row_vars, self._col_vars,
+                                                         self._row_var_sizes, self._col_var_sizes)
+            return self._subjac_sparsity
+
+    def get_declare_partials_calls(self):
+        """
+        Return a string containing declare_partials() calls based on the subjac sparsity.
+
+        Returns
+        -------
+        str
+            A string containing a declare_partials() call for each nonzero subjac. This
+            string may be cut and pasted into a component's setup() method.
+        """
+        if self._subjac_sparsity is None:
+            self.get_subjac_sparsity()
+
+        if self._subjac_sparsity is None:
+            raise RuntimeError("Coloring doesn't have enough info to compute subjac sparsity.")
+
+        lines = []
+        for of, sub in iteritems(self._subjac_sparsity):
+            for wrt, tup in iteritems(sub):
+                nzrows, nzcols, shape = tup
+                if nzrows.size > 0:
+                    lines.append("    self.declare_partials(of='%s', wrt='%s', rows=%s, cols=%s)" %
+                                 (of, wrt, list(nzrows), list(nzcols)))
+        return '\n'.join(lines)
+
+    _loaders = {
+        'json': _load_json,
+        'pkl': _load_pickle,
+    }
 
 
 def _order_by_ID(col_matrix):
@@ -285,28 +861,23 @@ def MNCO_bidir(J):
     Parameters
     ----------
     J : ndarray
-        Dense Jacobian sparsity matrix
+        Dense Jacobian sparsity matrix (boolean)
 
     Returns
     -------
-    coloring_info
-        dict
-            dict['fwd'] = (col_lists, row_maps)
-                col_lists is a list of column lists, the first being a list of uncolored columns.
-                row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-            dict['rev'] = (row_lists, col_maps)
-                row_lists is a list of row lists, the first being a list of uncolored rows.
-                col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+    Coloring
+        See docstring for Coloring class.
     """
+    start_time = time.time()
+
     nrows, ncols = J.shape
+
+    coloring = Coloring(sparsity=J)
 
     M_col_nonzeros = _count_nonzeros(J, axis=0)
     M_row_nonzeros = _count_nonzeros(J, axis=1)
 
-    M = coo_matrix(J)
-    M_rows = M.row
-    M_cols = M.col
-    M = None  # we don't need sparse matrix data array, so clean up memory
+    M_rows, M_cols = coloring._nzrows, coloring._nzcols
 
     Jc_rows = [None] * nrows
     Jr_cols = [None] * ncols
@@ -356,8 +927,6 @@ def MNCO_bidir(J):
 
             col_i += 1
 
-    coloring = {'nrows': nrows, 'ncols': ncols}
-
     nnz_Jc = nnz_Jr = 0
     jac = np.zeros(J.shape, dtype=bool)
 
@@ -369,8 +938,8 @@ def MNCO_bidir(J):
                 Jc[i][cols] = True
                 nnz_Jc += len(cols)
 
-        coloring['fwd'] = _color_partition(J, Jc)
-        jac[:] = False
+        coloring._fwd = _color_partition(J, Jc)
+        jac[:] = False  # reset for use with Jr
 
     if col_i > 0:
         Jr = jac
@@ -380,12 +949,14 @@ def MNCO_bidir(J):
                 Jr[rows, i] = True
                 nnz_Jr += len(rows)
 
-        coloring['rev'] = _color_partition(J.T, Jr.T)
+        coloring._rev = _color_partition(J.T, Jr.T)
 
     if np.count_nonzero(J) != nnz_Jc + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jc and Jr")
 
     # _check_coloring(J, coloring)
+
+    coloring._coloring_time = time.time() - start_time
 
     return coloring
 
@@ -536,47 +1107,49 @@ def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_m
     return boolJ
 
 
-def _sparsity_from_jac(J, of, wrt, driver):
+def _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes, cvt2json=False):
     """
-    Given a boolean total jacobian and a driver, compute subjac sparsity.
+    Given a boolean jacobian and variable names and sizes, compute subjac sparsity.
 
     Parameters
     ----------
     J : ndarray
-        Boolean total jacobian.
-    of : list of str
-        List of responses.
-    wrt : list of str
-        List of design vars.
-    driver : <Driver>
-        Driver containing responses and design variables.
+        Boolean jacobian.
+    ofs : list of str
+        List of variables corresponding to rows.
+    wrts : list of str
+        List of variables corresponding to columns.
+    of_sizes : ndarray of int
+        Sizes of ofs variables.
+    wrt_sizes : ndarray of int
+        Sizes of wrts variables.
+    cvt2json : bool
+        If True, perform some data conversions to make data serializable to json.
 
     Returns
     -------
     OrderedDict
-        Nested OrderedDict of form sparsity[response][desvar] = (rows, cols, shape)
+        Nested OrderedDict of form sparsity[of][wrt] = (rows, cols, shape)
     """
     sparsity = OrderedDict()
     row_start = row_end = 0
-    res_meta = driver._responses
-    dv_meta = driver._designvars
 
-    for res in of:
-        sparsity[res] = OrderedDict()
-        res_size = int(res_meta[res]['size'])
-        row_end += res_size
+    for of, of_size in zip(ofs, of_sizes):
+        sparsity[of] = OrderedDict()
+        row_end += of_size
         col_start = col_end = 0
-        for dv in wrt:
-            dv_size = int(dv_meta[dv]['size'])
-            col_end += dv_size
+        for wrt, wrt_size in zip(wrts, wrt_sizes):
+            col_end += wrt_size
 
             # save sparsity structure as  (rows, cols, shape)
             irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
 
-            # convert to make JSON serializable
-            irows = [int(i) for i in irows]
-            icols = [int(i) for i in icols]
-            sparsity[res][dv] = (irows, icols, (res_size, dv_size))
+            if cvt2json:
+                # convert to make JSON serializable
+                irows = [int(i) for i in irows]
+                icols = [int(i) for i in icols]
+
+            sparsity[of][wrt] = (irows, icols, (of_size, wrt_size))
 
             col_start = col_end
 
@@ -626,132 +1199,6 @@ def _write_sparsity(sparsity, stream):
     stream.write("}")
 
 
-def _write_coloring(color_info, stream, format='json'):
-    """
-    Write the coloring and sparsity structures to the given stream.
-
-    Parameters
-    ----------
-    color_info : dict
-        dict['fwd'] = (col_lists, row_maps)
-            col_lists is a list of column lists, the first being a list of uncolored columns.
-            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-        dict['rev'] = (row_lists, col_maps)
-            row_lists is a list of row lists, the first being a list of uncolored rows.
-            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-    stream : file-like
-        Output stream.
-    format : str
-        Output stream format.  Options are ['json'].  Default is 'json'.
-    """
-    try:
-        writer = _writers[format]
-    except KeyError:
-        raise RuntimeError("No writer available for format '%s'", format)
-    writer(color_info, stream)
-
-
-def _write_coloring_pickle(modes, color_info, stream):
-    """
-    Write the coloring and sparsity structures to the given stream in pickle format.
-
-    Parameters
-    ----------
-    color_info : dict
-        dict['fwd'] = (col_lists, row_maps)
-            col_lists is a list of column lists, the first being a list of uncolored columns.
-            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-        dict['rev'] = (row_lists, col_maps)
-            row_lists is a list of row lists, the first being a list of uncolored rows.
-            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-    stream : file-like
-        Output stream.
-    """
-    pickle.dump(color_info, stream)
-
-
-def _write_coloring_json(color_info, stream):
-    """
-    Write the coloring and sparsity structures to the given stream in json format.
-
-    Parameters
-    ----------
-    color_info : dict
-        dict['fwd'] = (col_lists, row_maps)
-            col_lists is a list of column lists, the first being a list of uncolored columns.
-            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-        dict['rev'] = (row_lists, col_maps)
-            row_lists is a list of row lists, the first being a list of uncolored rows.
-            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-    stream : file-like
-        Output stream.
-    """
-    tty = stream.isatty()
-    none = 'null'
-    sparsity = color_info.get('sparsity')
-    modes = [m for m in ('fwd', 'rev') if m in color_info]
-
-    stream.write("{\n")
-    for m, mode in enumerate(modes):
-        name = 'column' if mode == 'fwd' else 'row'
-        lists, nonzero_entries = color_info[mode]
-
-        if m > 0:
-            stream.write(",\n")
-
-        stream.write('"%s": [[\n' % mode)
-        last_idx = len(lists) - 1
-        for i, lst in enumerate(lists):
-            stream.write("   %s" % lst)
-            if i < last_idx:
-                stream.write(",")
-
-            if tty:
-                if i == 0:
-                    stream.write("   # uncolored %ss" % name)
-                else:
-                    stream.write("   # color %d" % i)
-
-            stream.write("\n")
-
-        stream.write("],\n[\n")
-        last_idx = len(nonzero_entries) - 1
-        for i, nonzeros in enumerate(nonzero_entries):
-            if isinstance(nonzeros, np.ndarray):
-                # convert to list to make json serializable
-                stream.write("   %s" % list(nonzeros))
-            else:  # a full slice
-                stream.write("   %s" % none)
-
-            if i < last_idx:
-                stream.write(",")
-
-            if tty:
-                stream.write("   # %s %d" % (name, i))
-
-            stream.write("\n")
-
-        stream.write("]]")
-
-    if sparsity:
-        stream.write(',\n"sparsity": ')
-        _write_sparsity(sparsity, stream)
-    else:
-        stream.write(',\n"sparsity": %s' % none)
-
-    stream.write("\n}")
-
-
-_writers = {
-    'json': _write_coloring_json,
-    'pickle': _write_coloring_pickle,
-    'pkl': _write_coloring_pickle,
-}
-
-
 def _json2coloring(coloring):
     """
     Convert all of the None entries in rowcol_map to full slices.
@@ -775,6 +1222,16 @@ def _json2coloring(coloring):
                     rcmap[i] = full_slice
 
     return coloring
+
+
+def _get_desvar_sizes(driver, names):
+    desvars = driver._designvars
+    return [desvars[n]['size'] for n in names]
+
+
+def _get_response_sizes(driver, names):
+    responses = driver._responses
+    return [responses[n]['size'] for n in names]
 
 
 def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
@@ -810,10 +1267,12 @@ def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=Fa
 
     J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup, run_model=run_model)
 
-    of = driver._get_ordered_nl_responses()
-    wrt = list(driver._designvars)
+    ofs = driver._get_ordered_nl_responses()
+    wrts = list(driver._designvars)
+    of_sizes = _get_response_sizes(driver, ofs)
+    wrt_sizes = _get_desvar_sizes(driver, wrts)
 
-    sparsity = _sparsity_from_jac(J, of, wrt, driver)
+    sparsity = _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes)
 
     driver._total_jac = None
 
@@ -823,108 +1282,9 @@ def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=Fa
 
         if show_jac and stream is not None:
             stream.write("\n\n")
-            array_viz(J, problem, of, wrt, stream)
+            array_viz(J, problem, ofs, wrts, stream)
 
     return sparsity
-
-
-def _total_solves(color_info, do_fwd=True, do_rev=True):
-    """
-    Return total number of linear solves required based on the given coloring info.
-
-    Parameters
-    ----------
-    color_info : dict
-        dict['fwd'] = (col_lists, row_maps)
-            col_lists is a list of column lists, the first being a list of uncolored columns.
-            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-        dict['rev'] = (row_lists, col_maps)
-            row_lists is a list of row lists, the first being a list of uncolored rows.
-            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-    do_fwd : bool
-        If True, add fwd colors to total.
-    do_rev : bool
-        If True, add rev colors to total.
-
-    Returns
-    -------
-    int
-        Total number of linear solves required to compute the total Jacobian.
-    """
-    total_solves = 0
-
-    # lists[0] are the uncolored columns or rows, which are solved individually so
-    # we add all of them, along with the number of remaining lists, where each
-    # sublist is a bunch of columns or rows that are solved together, to get the total colors
-    # (which equals the total number of linear solves).
-    if do_fwd and 'fwd' in color_info:
-        row_lists, _ = color_info['fwd']
-        total_solves += len(row_lists[0]) + len(row_lists) - 1
-    if do_rev and 'rev' in color_info:
-        col_lists, _ = color_info['rev']
-        total_solves += len(col_lists[0]) + len(col_lists) - 1
-
-    return total_solves
-
-
-def _solves_info(color_info):
-    """
-    Return info about the number of colors given the current coloring scheme.
-
-    Parameters
-    ----------
-    color_info : dict
-        dict['fwd'] = (col_lists, row_maps)
-            col_lists is a list of column lists, the first being a list of uncolored columns.
-            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-        dict['rev'] = (row_lists, col_maps)
-            row_lists is a list of row lists, the first being a list of uncolored rows.
-            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-
-    Returns
-    -------
-    float
-        Total size (minimum chosen based on which mode is better).
-    float
-        Total solves.
-    """
-    rev_size = color_info.get('nrows', -1)
-    fwd_size = color_info.get('ncols', -1)
-
-    tot_colors = _total_solves(color_info)
-
-    fwd_solves = rev_solves = 0
-    if tot_colors == 0:  # no coloring found
-        tot_colors = tot_size = min([rev_size, fwd_size])
-        pct = 0.
-    else:
-        fwd_lists = color_info['fwd'][0] if 'fwd' in color_info else []
-        rev_lists = color_info['rev'][0] if 'rev' in color_info else []
-
-        if fwd_lists and not rev_lists:
-            tot_size = fwd_size
-        elif rev_lists and not fwd_lists:
-            tot_size = rev_size
-        else:
-            tot_size = min(fwd_size, rev_size)
-
-        if fwd_lists:
-            fwd_solves = len(fwd_lists[0]) + len(fwd_lists) - 1
-
-        if rev_lists:
-            rev_solves = len(rev_lists[0]) + len(rev_lists) - 1
-
-        if tot_size <= 0:
-            pct = 0.
-        else:
-            pct = ((tot_size - tot_colors) / tot_size * 100)
-
-    if tot_size < 0:
-        tot_size = '?'
-
-    return tot_size, tot_colors, fwd_solves, rev_solves, pct
 
 
 def _split_groups(groups):
@@ -953,20 +1313,18 @@ def _compute_coloring(J, mode):
 
     Returns
     -------
-    coloring_info
-        dict
-            dict['fwd'] = (col_lists, row_maps)
-                col_lists is a list of column lists, the first being a list of uncolored columns.
-                row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-            dict['rev'] = (row_lists, col_maps)
-                row_lists is a list of row lists, the first being a list of uncolored rows.
-                col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+    Coloring
+        See Coloring class docstring.
     """
+    start_time = time.time()
+
     if mode == 'auto':  # use bidirectional coloring
         return MNCO_bidir(J)
 
     rev = mode == 'rev'
     nrows, ncols = J.shape
+
+    coloring = Coloring(sparsity=J)
 
     if rev:
         J = J.T
@@ -978,45 +1336,21 @@ def _compute_coloring(J, mode):
         for col in lst:
             col2rows[col] = np.nonzero(J[:, col])[0]
 
-    return {mode: [col_groups, col2rows], 'nrows': nrows, 'ncols': ncols}
+    if mode == 'fwd':
+        coloring._fwd = (col_groups, col2rows)
+    else:
+        coloring._rev = (col_groups, col2rows)
 
+    coloring._coloring_time = time.time() - start_time
 
-def color_iterator(coloring, direction):
-    """
-    Given a list of column groupings and a mapping of nonzero rows per column, iterate over colors.
-
-    Parameters
-    ----------
-    coloring : dict
-        dict[direction] = (col_lists, row_maps)
-            col_lists is a list of column lists, the first being a list of uncolored columns.
-            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-        Dict may contain either 'fwd' subdict, 'rev' subdict, or both.
-    direction : str
-        Indicates which coloring subdict ('fwd' or 'rev') to use.
-
-    Yields
-    ------
-    (columns, nz_row_list)
-        Yields a list of columns and their associated nonzero rows associated with a color.
-    """
-    col_lists = coloring[direction][0]
-    nz_rows = coloring[direction][1]
-
-    for i, col_chunk in enumerate(col_lists):
-        if i == 0:
-            # first chunk is a list of uncolored columns
-            for c in col_chunk:
-                yield [c], [nz_rows[c]]
-        else:
-            yield col_chunk, [nz_rows[c] for c in col_chunk]
+    return coloring
 
 
 def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
                    include_sparsity=True, setup=False, run_model=False, bool_jac=None,
                    stream=sys.stdout):
     """
-    Compute simultaneous derivative colorings for the given problem.
+    Compute simultaneous derivative colorings for the total jacobian of the given problem.
 
     Parameters
     ----------
@@ -1044,16 +1378,8 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
 
     Returns
     -------
-    dict
-        dict['fwd'] = (col_lists, row_maps)
-            col_lists is a list of column lists, the first being a list of uncolored columns.
-            row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-        dict['rev'] = (row_lists, col_maps)
-            row_lists is a list of row lists, the first being a list of uncolored rows.
-            col_maps is a list of nonzero cols for each row, or None for uncolored rows.
-        dict['sparsity'] = a nested dict specifying subjac sparsity for each total derivative.
-        dict['time_sparsity'] = float, the time to compute the sparsity matrix.
-        dict['time_coloring'] = float, the time to compute the coloring, given the sparsity matrix.
+    Coloring
+        See docstring for Coloring class.
     """
     sparsity = None
 
@@ -1064,17 +1390,16 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
         if mode != problem._orig_mode:
             raise RuntimeError("given mode (%s) does not agree with Problem mode (%s)" %
                                (mode, problem._mode))
-        start_time = time.time()
         J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup,
                                 run_model=run_model)
-        time_sparsity = time.time() - start_time
 
-        if include_sparsity or (show_jac and stream is not None):
-            of = driver._get_ordered_nl_responses()
-            wrt = list(driver._designvars)
+        ofs = driver._get_ordered_nl_responses()
+        wrts = list(driver._designvars)
+        of_sizes = _get_response_sizes(driver, ofs)
+        wrt_sizes = _get_desvar_sizes(driver, wrts)
 
         if include_sparsity:
-            sparsity = _sparsity_from_jac(J, of, wrt, driver)
+            sparsity = _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes)
 
         driver._total_jac = None
     elif bool_jac is not None:
@@ -1086,60 +1411,31 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
     else:
         raise RuntimeError("You must supply either problem or bool_jac to get_simul_meta().")
 
-    start_time = time.time()
     coloring = _compute_coloring(J, mode)
 
-    coloring['time_coloring'] = time.time() - start_time
-    coloring['time_sparsity'] = time_sparsity
+    if problem is not None:
+        coloring._row_vars = ofs
+        coloring._row_var_sizes = of_sizes
+        coloring._col_vars = wrts
+        coloring._col_var_sizes = wrt_sizes
 
-    if sparsity is not None:
-        coloring['sparsity'] = sparsity
+    if include_sparsity:
+        coloring._subjac_sparsity = sparsity
 
     if stream is not None:
         if stream.isatty():
             stream.write("\n########### BEGIN COLORING DATA ################\n")
-            _write_coloring(coloring, stream)
+            coloring._write_json(stream)
             stream.write("\n########### END COLORING DATA ############\n")
         else:
-            _write_coloring(coloring, stream)
+            coloring._write_pickle(stream)
 
         if show_jac:
             s = stream if stream.isatty() else sys.stdout
             s.write("\n\n")
-            colored_array_viz(J, coloring, prob=problem, of=of, wrt=wrt, stream=s)
+            colored_array_viz(J, coloring, prob=problem, of=ofs, wrt=wrts, stream=s)
 
     return coloring
-
-
-def simul_coloring_summary(color_info, stream=sys.stdout):
-    """
-    Print a summary of simultaneous coloring info for the given problem and coloring metadata.
-
-    Parameters
-    ----------
-    color_info : dict
-        Coloring metadata.
-    stream : file-like
-        Where the output will go.
-    """
-    stream.write("\nTime to compute sparsity: %f\n" % color_info.get('time_sparsity', 0.))
-    stream.write("Time to compute coloring: %f\n" % color_info.get('time_coloring', 0.))
-
-    nrows = color_info.get('nrows', -1)
-    ncols = color_info.get('ncols', -1)
-
-    if 'fwd' not in color_info and 'rev' not in color_info:
-        tot_size = min(nrows, ncols)
-        if tot_size < 0:
-            tot_size = '?'
-        stream.write("\nSimultaneous derivatives can't improve on the total number of solves "
-                     "required (%s) for this configuration\n" % tot_size)
-    else:
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = _solves_info(color_info)
-
-        stream.write("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
-        stream.write("\n\nTotal colors vs. total size: %d vs %s  (%.1f%% improvement)\n" %
-                     (tot_colors, tot_size, pct))
 
 
 def dynamic_sparsity(driver):
@@ -1189,8 +1485,8 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=F
 
     driver._total_jac = None
 
-    # save the coloring.json file for later inspection
-    with open("coloring.json", "w") as f:
+    # save the coloring.pkl file for later inspection
+    with open("coloring.pkl", "wb") as f:
         coloring = get_simul_meta(problem,
                                   repeats=driver.options['dynamic_derivs_repeats'],
                                   tol=1.e-15, include_sparsity=do_sparsity,
@@ -1200,7 +1496,7 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=F
     if do_sparsity:
         driver._setup_tot_jac_sparsity()
 
-    simul_coloring_summary(coloring, stream=sys.stdout)
+    coloring.summary(stream=sys.stdout)
 
 
 def _simul_coloring_setup_parser(parser):
@@ -1399,89 +1695,3 @@ def _check_coloring(J, coloring):
         nzs = np.count_nonzero(J)
         if computed_nzs != nzs:
             raise RuntimeError("Colored nonzeros (%d) != nonzeros in J (%d)" % (computed_nzs, nzs))
-
-
-def colored_array_viz(arr, coloring, prob=None, of=None, wrt=None, stream=sys.stdout):
-    """
-    Display the structure of a boolean array with coloring info for each nonzero value.
-
-    Forward mode colored nonzeros are denoted by 'f', reverse mode nonzeros by 'r',
-    overlapping nonzeros by 'O' and uncolored nonzeros by 'x'.  Zeros are denoted by '.'.
-
-    If prob, of, and wrt are supplied, print the name of the response alongside
-    each row and print the names of the design vars, aligned with each column, at
-    the bottom.
-
-    Parameters
-    ----------
-    arr : ndarray
-        Array being visualized.
-    coloring : dict
-        Metadata needed for coloring.
-    prob : Problem or None
-        Problem object.
-    of : list of str or None
-        Names of response variables used in derivative calculation.
-    wrt : list of str or None
-        Names of design variables used in derivative calculation.
-    stream : file-like
-        Stream where output will be written.
-    """
-    if len(arr.shape) != 2:
-        raise RuntimeError("array_viz only works for 2d arrays.")
-
-    charr = np.full(arr.shape, '.', dtype=str)
-
-    full_rows = np.arange(arr.shape[0], dtype=int)
-    full_cols = np.arange(arr.shape[0], dtype=int)
-
-    if 'fwd' in coloring:
-        col2row = coloring['fwd'][1]
-        for grp in coloring['fwd'][0]:
-            for c in grp:
-                rows = col2row[c]
-                if rows is None:
-                    rows = full_rows
-                charr[rows, c] = 'f'
-
-    if 'rev' in coloring:
-        row2col = coloring['rev'][1]
-        for grp in coloring['rev'][0]:
-            for r in grp:
-                cols = row2col[r]
-                if cols is None:
-                    cols = full_cols
-                for c in cols:
-                    if charr[r, c] == 'f':
-                        # overlap!
-                        charr[r, c] = 'O'
-                    else:
-                        charr[r, c] = 'r'
-
-    for r in range(arr.shape[0]):
-        for c in range(arr.shape[1]):
-            if arr[r, c] and charr[r, c] == '.':
-                charr[r, c] = 'x'  # mark nonzero as uncolored
-
-    if prob is None or of is None or wrt is None:
-        for r in range(arr.shape[0]):
-            for c in range(arr.shape[1]):
-                stream.write(charr[r, c])
-            stream.write(' %d\n' % r)
-    else:
-        row = 0
-        for res in of:
-            for r in range(row, row + prob.driver._responses[res]['size']):
-                col = 0
-                for dv in wrt:
-                    for c in range(col, col + prob.driver._designvars[dv]['size']):
-                        stream.write(charr[r, c])
-                    col = c + 1
-                stream.write(' %d  %s\n' % (r, res))
-            row = r + 1
-
-        start = 0
-        for name in wrt:
-            tab = ' ' * start
-            stream.write('%s|%s\n' % (tab, name))
-            start += prob.driver._designvars[name]['size']

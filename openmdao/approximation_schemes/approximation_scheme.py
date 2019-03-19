@@ -9,7 +9,6 @@ import numpy as np
 from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, \
     update_sizes, get_input_idx_split, _get_jac_slice_dict
 from openmdao.utils.name_maps import rel_name2abs_name
-from openmdao.utils.coloring import color_iterator
 
 _full_slice = slice(None)
 
@@ -199,8 +198,8 @@ class ApproximationScheme(object):
 
                 coloring = options['coloring']
                 tmpJ = {
-                    '@nrows': coloring['nrows'],
-                    '@ncols': coloring['ncols'],
+                    '@nrows': coloring._shape[0],
+                    '@ncols': coloring._shape[1],
                     '@out_slices': out_slices,
                 }
 
@@ -222,7 +221,7 @@ class ApproximationScheme(object):
                     tmpJ['@row_idx_map'] = sub2full_indices(full_ofs, system._owns_approx_of,
                                                             total_sizes, approx_of_idx)
 
-                for cols, nzrows in color_iterator(coloring, 'fwd'):
+                for cols, nzrows in coloring.color_nonzero_iter('fwd'):
                     ccols = cols if col_map is None else col_map[cols]
                     idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit, is_total)
                     self._approx_groups.append((None, data, cols, tmpJ, idx_info, nzrows))

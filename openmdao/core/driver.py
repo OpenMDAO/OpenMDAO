@@ -907,7 +907,7 @@ class Driver(object):
 
                 # Information about simultaneous coloring for design vars and responses.  If a
                 # string, then simul_info is assumed to be the name of a file that contains the
-                # coloring information in JSON format.  If a dict, the structure looks like this:
+                # coloring information in pickle format.  If a dict, the structure looks like this:
 
                 {
                 "fwd": [
@@ -1008,32 +1008,28 @@ class Driver(object):
             return
 
         if isinstance(self._simul_coloring_info, string_types):
-            with open(self._simul_coloring_info, 'r') as f:
-                self._simul_coloring_info = coloring_mod._json2coloring(json.load(f))
+            self._simul_coloring_info = coloring_mod.Coloring.load(self._simul_coloring_info)
 
-        if 'rev' in self._simul_coloring_info and problem._orig_mode not in ('rev', 'auto'):
-            revcol = self._simul_coloring_info['rev'][0][0]
+        if self._simul_coloring_info._rev and problem._orig_mode not in ('rev', 'auto'):
+            revcol = self._simul_coloring_info._rev[0][0]
             if revcol:
                 raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
-        if 'fwd' in self._simul_coloring_info and problem._orig_mode not in ('fwd', 'auto'):
-            fwdcol = self._simul_coloring_info['fwd'][0][0]
+        if self._simul_coloring_info._fwd and problem._orig_mode not in ('fwd', 'auto'):
+            fwdcol = self._simul_coloring_info._fwd[0][0]
             if fwdcol:
                 raise RuntimeError("Simultaneous coloring does forward solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
 
         # simul_coloring_info can contain data for either fwd, rev, or both, along with optional
         # sparsity patterns
-        if 'sparsity' in self._simul_coloring_info:
-            sparsity = self._simul_coloring_info['sparsity']
-            del self._simul_coloring_info['sparsity']
-        else:
-            sparsity = None
+        sparsity = self._simul_coloring_info._subjac_sparsity
 
-        if sparsity is not None and self._total_jac_sparsity is not None:
-            raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
-                               " and _total_jac_sparsity.")
-        self._total_jac_sparsity = sparsity
+        if sparsity is not None:
+            if self._total_jac_sparsity is not None:
+                raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                                   " and _total_jac_sparsity.")
+            self._total_jac_sparsity = sparsity
 
     def _pre_run_model_debug_print(self):
         """

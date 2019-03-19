@@ -296,6 +296,9 @@ class Jacobian(object):
         approx_wrt_idx = system._owns_approx_wrt_idx
         ofsizes = system._var_sizes['linear']['output'][iproc]
 
+        subjac_ofs = set(key[0] for key in subjacs)
+        subjac_wrts = set(key[1] for key in subjacs)
+
         if system._owns_approx_of or system._owns_approx_wrt:
             # we're computing totals
             ofs = [n for n in system._var_allprocs_abs_names['output']
@@ -312,7 +315,7 @@ class Jacobian(object):
             ofs = system._var_allprocs_abs_names['output']
             wrts = system._var_allprocs_abs_names['input']
             isizes = system._var_sizes['linear']['input'][iproc]
-            wrt_info = [(ofs, ofsizes, ())]
+            wrt_info = []
             if isinstance(system, ImplicitComponent):
                 wrt_info.append(((ofs, ofsizes, ())))
             wrt_info.append((wrts, isizes, ()))
@@ -320,23 +323,33 @@ class Jacobian(object):
         ncols = nrows = 0
         locs = {}
         roffset = rend = 0
+        ordered_ofs = OrderedDict()
+        ordered_wrts = OrderedDict()
         for of in ofs:
             if of in approx_of_idx:
                 sub_of_idx = approx_of_idx[of]
-                rend += len(sub_of_idx)
+                size = len(sub_of_idx)
             else:
-                rend += ofsizes[abs2idx[of]]
+                size = ofsizes[abs2idx[of]]
                 sub_of_idx = _full_slice
+            rend += size
+            if of in subjac_ofs and of not in ordered_ofs:
+                ordered_ofs[of] = size
+
             coffset = cend = 0
             for wrts, sizes, approx_idx in wrt_info:
                 for wrt in wrts:
-                    if wrt in wrt_matches:
+                    if wrt in wrt_matches and wrt in subjac_wrts:
                         if wrt in approx_idx:
                             sub_wrt_idx = approx_idx[wrt]
-                            cend += len(sub_wrt_idx)
+                            size = len(sub_wrt_idx)
                         else:
-                            cend += sizes[abs2idx[wrt]]
+                            size = sizes[abs2idx[wrt]]
                             sub_wrt_idx = _full_slice
+                        cend += size
+                        if wrt not in ordered_wrts:
+                            ordered_wrts[wrt] = size
+
                         key = (of, wrt)
                         if key in subjacs:
                             locs[key] = ((slice(roffset, rend), slice(coffset, cend)),
@@ -347,15 +360,11 @@ class Jacobian(object):
         J = np.zeros((rend, cend))
 
         for key in locs:
-            jslice, sub_of_idx, sub_wrt_idx = locs[key]
+            jslice, _, _ = locs[key]
             meta = subjacs[key]
             if meta['rows'] is not None:
                 rows = meta['rows'] + jslice[0].start
-                # if sub_of_idx is not _full_slice:
-                #     rows = rows[sub_of_idx]
                 cols = meta['cols'] + jslice[1].start
-                # if sub_wrt_idx is not _full_slice:
-                #     cols = cols[sub_wrt_idx]
                 J[rows, cols] = summ[key]
             elif issparse(summ[key]):
                 raise NotImplementedError("don't support scipy sparse arrays yet")
@@ -370,7 +379,7 @@ class Jacobian(object):
         boolJ = np.zeros(J.shape, dtype=bool)
         boolJ[J > good_tol] = True
 
-        return boolJ
+        return boolJ, ordered_ofs, ordered_wrts
 
     def set_complex_step_mode(self, active):
         """

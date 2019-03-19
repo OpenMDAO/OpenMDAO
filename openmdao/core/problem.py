@@ -822,17 +822,12 @@ class Problem(object):
         if coloring_info and coloring._use_sparsity:
             # if we're using simultaneous derivatives then our effective size is less
             # than the full size
-            if 'fwd' in coloring_info and 'rev' in coloring_info:
+            if coloring_info._fwd and coloring_info._rev:
                 pass  # we're doing both!
-            elif mode in coloring_info:
-                lists = coloring_info[mode][0]
-                if lists:
-                    size = len(lists[0])  # lists[0] is the uncolored row/col indices
-                    size += len(lists) - 1
-                if mode == 'fwd':
-                    desvar_size = size
-                else:  # rev
-                    response_size = size
+            elif mode == 'fwd' and coloring_info._fwd:
+                desvar_size = coloring_info.total_solves()
+            elif mode == 'rev' and coloring_info._rev:
+                response_size = coloring_info.total_solves()
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
