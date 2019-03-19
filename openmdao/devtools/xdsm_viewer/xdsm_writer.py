@@ -779,7 +779,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             # Gets the specified key, or the default in the dictionary, or the global default
             # if both of them are missing from the dictionary.
             side = output_side.get(component_name, output_side.get('default', _DEFAULT_OUTPUT_SIDE))
-            print('side:', component_name, side, output_side)
             return side
         else:
             msg = 'Output side argument should be string or dictionary, instead it is a {}.'
@@ -857,8 +856,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             driver_label = number_label(index_str, driver_label, number_alignment)
         x.add_driver(name=driver_name, label=driver_label, driver_type=driver_type.lower())
 
-        design_vars2 = _collect_connections(design_vars, recurse=recurse)
-        responses2 = _collect_connections(responses, recurse=recurse)
+        design_vars2 = _collect_connections(design_vars, recurse=recurse, model_path=model_path)
+        responses2 = _collect_connections(responses, recurse=recurse, model_path=model_path)
 
         # Design variables
         for comp, conn_vars in iteritems(design_vars2):
@@ -906,15 +905,23 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     # Add the connections
     for src, dct in iteritems(conns3):
         for tgt, conn_vars in iteritems(dct):
-            stack = (comps_dct[src]['is_parallel'] or comps_dct[tgt]['is_parallel']) and show_parallel
-            x.connect(src, tgt, label=format_block(conn_vars), stack=stack)
+            if src and tgt:
+                stack = (comps_dct[src]['is_parallel'] or comps_dct[tgt]['is_parallel']) and show_parallel
+                x.connect(src, tgt, label=format_block(conn_vars), stack=stack)
+            else:  # Source or target missing
+                msg = 'Connection "{conn}" from "{src}" to "{tgt}" ignored.'
+                warnings.warn(msg.format(src=src, tgt=tgt, conn=conn_vars))
 
     # Add the externally sourced inputs
     for src, tgts in iteritems(external_inputs3):
         for tgt, conn_vars in iteritems(tgts):
             formatted_conn_vars = [_replace_chars(o, substitutes=subs) for o in conn_vars]
-            stack = comps_dct[tgt]['is_parallel'] and show_parallel
-            x.add_input(tgt, format_block(formatted_conn_vars), stack=stack)
+            if tgt:
+                stack = comps_dct[tgt]['is_parallel'] and show_parallel
+                x.add_input(tgt, format_block(formatted_conn_vars), stack=stack)
+            else:  # Target missing
+                msg = 'External input to "{tgt}" ignored.'
+                warnings.warn(msg.format(tgt=tgt, conn=conn_vars))
 
     # Add the externally connected outputs
     if include_external_outputs:
@@ -923,8 +930,12 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             for tgt, conn_vars in iteritems(tgts):
                 output_vars |= set(conn_vars)
             formatted_outputs = [_replace_chars(o, subs) for o in output_vars]
-            stack = comps_dct[src]['is_parallel'] and show_parallel
-            x.add_output(src, formatted_outputs, side='right', stack=stack)
+            if src:
+                stack = comps_dct[src]['is_parallel'] and show_parallel
+                x.add_output(src, formatted_outputs, side='right', stack=stack)
+            else:  # Source or target missing
+                msg = 'External output "{conn}" from "{src}" ignored.'
+                warnings.warn(msg.format(src=src, conn=output_vars))
 
     if add_process_conns:
         x.add_workflow()
@@ -982,12 +993,32 @@ def _accumulate_connections(conns):
     return conns_new
 
 
-def _collect_connections(variables, recurse):
+def _collect_connections(variables, recurse, model_path=None):
     conv_vars = [_convert_name(v, recurse) for v in variables]
     connections = dict()
     for conv_var in conv_vars:
-        connections.setdefault(conv_var['path'], []).append(conv_var['var'])
+        path = _make_rel_path(conv_var['path'], model_path=model_path)
+        connections.setdefault(path, []).append(conv_var['var'])
     return connections
+
+
+def _get_path(name, sep='.'):
+    # Returns path until the last separator in the name
+    return name.rsplit(sep, 1)[0]
+
+
+def _make_rel_path(full_path, model_path, sep='.'):
+    # Path will be cut from this character. Length of model path + separator after it.
+    # If path does not contain the model path, the full path will be returned.
+    if model_path is not None:
+        path = model_path + sep  # Add separator character
+        first_char = len(path)
+        if full_path.startswith(path):
+            return full_path[first_char:]
+        else:
+            return full_path
+    else:
+        return full_path  # No model path, so return the original
 
 
 def _convert_name(name, recurse=True, subs=None):
@@ -1052,8 +1083,12 @@ def _prune_connections(conns, model_path=None, sep='.'):
     ----------
     conns : list
         A list of connections from viewer_data
-    model_path : str or None
+    model_path : str or None, optional
         The path in model to the system to be transcribed to XDSM.
+        Defaults to None.
+    sep : str, optional
+        Separator character.
+        Defaults to '.'.
 
     Returns
     -------
@@ -1074,23 +1109,20 @@ def _prune_connections(conns, model_path=None, sep='.'):
     if model_path is None:
         return conns, external_inputs, external_outputs
     else:
+        path = model_path + sep  # Add separator character
         for conn in conns:
-            src = src0 = conn['src']
-            if src.startswith(model_path):
-                src = src[len(model_path):]
-            src_path = _format_name(src.rsplit(sep, 1)[0])
-            tgt = tgt0 = conn['tgt']
-            if tgt.startswith(model_path):
-                tgt = tgt[len(model_path):]
-            tgt_path = _format_name(tgt.rsplit(sep, 1)[0])
+            src = conn['src']
+            src_path = _make_rel_path(src, model_path=model_path)
+            tgt = conn['tgt']
+            tgt_path = _make_rel_path(tgt, model_path=model_path)
 
-            if src0.startswith(model_path) and tgt0.startswith(model_path):
+            if src.startswith(path) and tgt.startswith(path):
                 # Internal connections
                 internal_conns.append({'src': src_path, 'tgt': tgt_path})
-            elif not src0.startswith(model_path) and tgt0.startswith(model_path):
+            elif not src.startswith(path) and tgt.startswith(path):
                 # Externally connected input
                 external_inputs.append({'src': src_path, 'tgt': tgt_path})
-            elif src0.startswith(model_path) and not tgt0.startswith(model_path):
+            elif src.startswith(path) and not tgt.startswith(path):
                 # Externally connected output
                 external_outputs.append({'src': src_path, 'tgt': tgt_path})
         return internal_conns, external_inputs, external_outputs
