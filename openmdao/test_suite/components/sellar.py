@@ -205,13 +205,13 @@ class SellarNoDerivatives(Group):
     """
 
     def initialize(self):
-        self.options.declare('nonlinear_solver', default=NonlinearBlockGS(),
+        self.options.declare('nonlinear_solver', default=NonlinearBlockGS,
                              desc='Nonlinear solver for Sellar MDA')
         self.options.declare('nl_atol', default=None,
                              desc='User-specified atol for nonlinear solver.')
         self.options.declare('nl_maxiter', default=None,
                              desc='Iteration limit for nonlinear solver.')
-        self.options.declare('linear_solver', default=ScipyKrylov(),
+        self.options.declare('linear_solver', default=ScipyKrylov,
                              desc='Linear solver')
         self.options.declare('ln_atol', default=None,
                              desc='User-specified atol for linear solver.')
@@ -233,13 +233,19 @@ class SellarNoDerivatives(Group):
         self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        self.nonlinear_solver = NonlinearBlockGS()
-
-        self.nonlinear_solver = self.options['nonlinear_solver']
+        nl = self.options['nonlinear_solver']
+        self.nonlinear_solver = nl() if inspect.isclass(nl) else nl
         if self.options['nl_atol']:
             self.nonlinear_solver.options['atol'] = self.options['nl_atol']
         if self.options['nl_maxiter']:
             self.nonlinear_solver.options['maxiter'] = self.options['nl_maxiter']
+
+        ln = self.options['linear_solver']
+        self.linear_solver = ln() if inspect.isclass(ln) else ln
+        if self.options['ln_atol']:
+            self.linear_solver.options['atol'] = self.options['ln_atol']
+        if self.options['ln_maxiter']:
+            self.linear_solver.options['maxiter'] = self.options['ln_maxiter']
 
     def configure(self):
         self.cycle.linear_solver = self.options['linear_solver']
