@@ -191,7 +191,7 @@ class DOEDriver(Driver):
 
         with RecordingDebugging(self._name, self.iter_count, self) as rec:
             try:
-                self._problem.model._solve_nonlinear()
+                self.run_solve_nonlinear()
                 metadata['success'] = 1
                 metadata['msg'] = ''
             except AnalysisError:
