@@ -1007,12 +1007,13 @@ def _get_path(name, sep='.'):
     return name.rsplit(sep, 1)[0]
 
 
-def _make_rel_path(full_path, model_path):
+def _make_rel_path(full_path, model_path, sep='.'):
     # Path will be cut from this character. Length of model path + separator after it.
     # If path does not contain the model path, the full path will be returned.
     if model_path is not None:
-        first_char = len(model_path) + 1
-        if full_path.startswith(model_path):
+        path = model_path + sep  # Add separator character
+        first_char = len(path)
+        if full_path.startswith(path):
             return full_path[first_char:]
         else:
             return full_path
@@ -1074,7 +1075,7 @@ def _format_name(name):
     return name
 
 
-def _prune_connections(conns, model_path=None):
+def _prune_connections(conns, model_path=None, sep='.'):
     """
     Remove connections that don't involve components within model.
 
@@ -1082,8 +1083,12 @@ def _prune_connections(conns, model_path=None):
     ----------
     conns : list
         A list of connections from viewer_data
-    model_path : str or None
+    model_path : str or None, optional
         The path in model to the system to be transcribed to XDSM.
+        Defaults to None.
+    sep : str, optional
+        Separator character.
+        Defaults to '.'.
 
     Returns
     -------
@@ -1104,19 +1109,20 @@ def _prune_connections(conns, model_path=None):
     if model_path is None:
         return conns, external_inputs, external_outputs
     else:
+        path = model_path + sep  # Add separator character
         for conn in conns:
             src = conn['src']
             src_path = _make_rel_path(src, model_path=model_path)
             tgt = conn['tgt']
             tgt_path = _make_rel_path(tgt, model_path=model_path)
 
-            if src.startswith(model_path) and tgt.startswith(model_path):
+            if src.startswith(path) and tgt.startswith(path):
                 # Internal connections
                 internal_conns.append({'src': src_path, 'tgt': tgt_path})
-            elif not src.startswith(model_path) and tgt.startswith(model_path):
+            elif not src.startswith(path) and tgt.startswith(path):
                 # Externally connected input
                 external_inputs.append({'src': src_path, 'tgt': tgt_path})
-            elif src.startswith(model_path) and not tgt.startswith(model_path):
+            elif src.startswith(path) and not tgt.startswith(path):
                 # Externally connected output
                 external_outputs.append({'src': src_path, 'tgt': tgt_path})
         return internal_conns, external_inputs, external_outputs
