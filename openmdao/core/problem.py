@@ -562,8 +562,7 @@ class Problem(object):
 
         self.final_setup()
         self.model._clear_iprint()
-        with self.model._scaled_context_all():
-            return self.driver.run()
+        return self.driver.run()
 
     def run_once(self):
         """
@@ -1300,38 +1299,36 @@ class Problem(object):
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
-        with self.model._scaled_context_all():
+        # Calculate Total Derivatives
+        total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
+                                   driver_scaling=driver_scaling)
+        Jcalc = total_info.compute_totals()
 
-            # Calculate Total Derivatives
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict',
-                                       driver_scaling=driver_scaling)
-            Jcalc = total_info.compute_totals()
+        if step is None:
+            if method == 'cs':
+                step = DEFAULT_CS_OPTIONS['step']
+            else:
+                step = DEFAULT_FD_OPTIONS['step']
 
-            if step is None:
-                if method == 'cs':
-                    step = DEFAULT_CS_OPTIONS['step']
-                else:
-                    step = DEFAULT_FD_OPTIONS['step']
+        # Approximate FD
+        fd_args = {
+            'step': step,
+            'form': form,
+            'step_calc': step_calc,
+        }
+        approx = model._owns_approx_jac
+        old_jac = model._jacobian
 
-            # Approximate FD
-            fd_args = {
-                'step': step,
-                'form': form,
-                'step_calc': step_calc,
-            }
-            approx = model._owns_approx_jac
-            old_jac = model._jacobian
+        model.approx_totals(method=method, step=step, form=form,
+                            step_calc=step_calc if method is 'fd' else None)
+        total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
+                                   driver_scaling=driver_scaling)
+        Jfd = total_info.compute_totals_approx(initialize=True)
 
-            model.approx_totals(method=method, step=step, form=form,
-                                step_calc=step_calc if method is 'fd' else None)
-            total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
-                                       driver_scaling=driver_scaling)
-            Jfd = total_info.compute_totals_approx(initialize=True)
-
-            # reset the _owns_approx_jac flag after approximation is complete.
-            if not approx:
-                model._jacobian = old_jac
-                model._owns_approx_jac = False
+        # reset the _owns_approx_jac flag after approximation is complete.
+        if not approx:
+            model._jacobian = old_jac
+            model._owns_approx_jac = False
 
         # Assemble and Return all metrics.
         data = {}
@@ -1380,15 +1377,14 @@ class Problem(object):
         if self._setup_status < 2:
             self.final_setup()
 
-        with self.model._scaled_context_all():
-            if self.model._owns_approx_jac:
-                total_info = _TotalJacInfo(self, of, wrt, False, return_format,
-                                           approx=True, driver_scaling=driver_scaling)
-                return total_info.compute_totals_approx(initialize=True)
-            else:
-                total_info = _TotalJacInfo(self, of, wrt, False, return_format,
-                                           debug_print=debug_print, driver_scaling=driver_scaling)
-                return total_info.compute_totals()
+        if self.model._owns_approx_jac:
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+                                       approx=True, driver_scaling=driver_scaling)
+            return total_info.compute_totals_approx(initialize=True)
+        else:
+            total_info = _TotalJacInfo(self, of, wrt, False, return_format,
+                                       debug_print=debug_print, driver_scaling=driver_scaling)
+            return total_info.compute_totals()
 
     def set_solver_print(self, level=2, depth=1e99, type_='all'):
         """

@@ -241,7 +241,7 @@ class ScipyOptimizeDriver(Driver):
 
         # Initial Run
         with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
-            model._solve_nonlinear()
+            self.run_solve_nonlinear()
             self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
@@ -557,7 +557,7 @@ class ScipyOptimizeDriver(Driver):
 
             with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
                 self.iter_count += 1
-                model._solve_nonlinear()
+                self.run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in itervalues(self.get_objective_values()):
