@@ -240,13 +240,6 @@ class SellarNoDerivatives(Group):
         if self.options['nl_maxiter']:
             self.nonlinear_solver.options['maxiter'] = self.options['nl_maxiter']
 
-        ln = self.options['linear_solver']
-        self.linear_solver = ln() if inspect.isclass(ln) else ln
-        if self.options['ln_atol']:
-            self.linear_solver.options['atol'] = self.options['ln_atol']
-        if self.options['ln_maxiter']:
-            self.linear_solver.options['maxiter'] = self.options['ln_maxiter']
-
     def configure(self):
         ln = self.options['linear_solver']
         self.cycle.linear_solver = ln() if inspect.isclass(ln) else ln
