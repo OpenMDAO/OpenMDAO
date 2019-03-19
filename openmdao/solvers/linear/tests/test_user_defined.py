@@ -142,7 +142,8 @@ class TestUserDefinedSolver(unittest.TestCase):
         # Make sure values are unscaled/dimensional.
 
         def custom_method(d_outputs, d_residuals, mode):
-            if d_outputs['out_var'][0] != -12.0:
+            # This should be -1 because the jac setter pokes a -1.0 in phys state.
+            if d_outputs['out_var'][0] != -1.0:
                 raise ValueError('This value should be unscaled.')
 
 

@@ -252,12 +252,11 @@ class SimpleGADriver(Driver):
                 # to pad additional values above the upper range, and adjust accordingly. Design
                 # points with values above the upper bound will be discarded by the GA.
                 log_range = np.log2(upper_bound[i:j] - lower_bound[i:j] + 1)
-                if log_range % 2 > 0:
-                    val = np.ceil(log_range)
-                    outer_bound[i:j] = upper_bound[i:j]
-                    upper_bound[i:j] = 2**np.ceil(log_range) - 1 + lower_bound[i:j]
-                else:
-                    val = log_range
+                val = log_range  # default case -- no padding required
+                mask = log_range % 2 > 0  # mask for vars requiring padding
+                val[mask] = np.ceil(log_range[mask])
+                outer_bound[i:j][mask] = upper_bound[i:j][mask]
+                upper_bound[i:j][mask] = 2**np.ceil(log_range[mask]) - 1 + lower_bound[i:j][mask]
 
             bits[i:j] = val
 
@@ -277,7 +276,7 @@ class SimpleGADriver(Driver):
             self.set_design_var(name, val)
 
         with RecordingDebugging('SimpleGA', self.iter_count, self) as rec:
-            model._solve_nonlinear()
+            self.run_solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
@@ -382,7 +381,7 @@ class SimpleGADriver(Driver):
         with RecordingDebugging('SimpleGA', self.iter_count, self) as rec:
             self.iter_count += 1
             try:
-                model._solve_nonlinear()
+                self.run_solve_nonlinear()
 
             # Tell the optimizer that this is a bad point.
             except AnalysisError:
