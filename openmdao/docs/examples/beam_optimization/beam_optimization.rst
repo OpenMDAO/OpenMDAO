@@ -34,7 +34,7 @@ Since our model contains a system of equations, we use the adjoint method to com
 The model is shown below.
 
 .. embed-n2::
-    ../test_suite/scripts/multipoint_beam_opt.py
+    ../test_suite/scripts/beam_opt.py
 
 
 Implementation: group
