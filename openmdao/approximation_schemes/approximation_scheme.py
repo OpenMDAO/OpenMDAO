@@ -65,20 +65,16 @@ class ApproximationScheme(object):
         ----------
         system : System
             The System whose approximation schemes are being updated.
-        coloring : dict
-            dict['fwd'] = (col_lists, row_maps)
-                col_lists is a list of column lists, the first being a list of uncolored columns.
-                row_maps is a list of nonzero rows for each column, or None for uncolored columns.
-            dict['rev'] = (row_lists, col_maps)
-                row_lists is a list of row lists, the first being a list of uncolored rows.
-                col_maps is a list of nonzero cols for each row, or None for uncolored rows.
+        coloring : Coloring
+            See docstring for Coloring class.
         """
         new_list = []
         new_entry = None
         colored = set()
         for tup in self._exec_list:
             key, options = tup
-            if 'coloring' in options:
+            # if key[0] is None, we've already updated the coloring
+            if key[0] is not None and 'coloring' in options:
                 colored.add(key)
                 if new_entry is None:
                     options = options.copy()
@@ -150,6 +146,7 @@ class ApproximationScheme(object):
         outputs = system._outputs
         inputs = system._inputs
         iproc = system.comm.rank
+        pro2abs = system._var_allprocs_prom2abs_list
 
         out_slices = outputs.get_slice_dict()
         in_slices = inputs.get_slice_dict()
@@ -177,6 +174,8 @@ class ApproximationScheme(object):
                 else:
                     of_names, wrt_names = system._get_partials_varlists()
                     ofsizes, wrtsizes = system._get_partials_sizes()
+                    # this is always at Component level, so the promoted name is
+                    # always just the relative name.
                     wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
                     of_names = [rel_name2abs_name(system, n) for n in of_names]
                     full_wrts = wrt_names

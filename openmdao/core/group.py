@@ -16,7 +16,7 @@ import networkx as nx
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System, INT_DTYPE, get_relevant_vars, _supported_approx_methods
+from openmdao.core.system import System, INT_DTYPE, get_relevant_vars
 from openmdao.core.component import Component, _DictValues
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
@@ -1776,33 +1776,17 @@ class Group(System):
             provides its default value.
         """
         self._approx_schemes = OrderedDict()
-        supported_methods = {'fd': FiniteDifference, 'cs': ComplexStep}
+        approx_scheme = self._get_approx_scheme(method)
 
-        if method not in supported_methods:
-            msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method, supported_methods.keys()))
-
-        if method not in self._approx_schemes:
-            self._approx_schemes[method] = supported_methods[method]()
-
-        default_opts = self._approx_schemes[method].DEFAULT_OPTIONS
+        default_opts = approx_scheme.DEFAULT_OPTIONS
 
         kwargs = {}
-        if step:
-            if 'step' in default_opts:
-                kwargs['step'] = step
-            else:
-                raise RuntimeError("'step' is not a valid option for '%s'" % method)
-        if form:
-            if 'form' in default_opts:
-                kwargs['form'] = form
-            else:
-                raise RuntimeError("'form' is not a valid option for '%s'" % method)
-        if step_calc:
-            if 'step_calc' in default_opts:
-                kwargs['step_calc'] = step_calc
-            else:
-                raise RuntimeError("'step_calc' is not a valid option for '%s'" % method)
+        for name, attr in (('step', step), ('form', form), ('step_calc', step_calc)):
+            if attr is not None:
+                if name in default_opts:
+                    kwargs[name] = attr
+                else:
+                    raise RuntimeError("'%s' is not a valid option for '%s'" % (name, method))
 
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs
@@ -1848,11 +1832,15 @@ class Group(System):
     def _setup_approx_partials(self):
         self._jacobian = DictionaryJacobian(system=self)
 
-        method = list(self._approx_schemes.keys())[0]
-        approx = self._approx_schemes[method]
         pro2abs = self._var_allprocs_prom2abs_list
         abs2prom = self._var_allprocs_abs2prom
         abs2meta = self._var_allprocs_abs2meta
+        info = self._approx_coloring_info
+        if info is not None:
+            method = info['method']
+        else:
+            method = list(self._approx_schemes)[0]
+        approx = self._approx_schemes[method]
 
         if self._owns_approx_wrt and not self.pathname:
             candidate_wrt = self._owns_approx_wrt
@@ -1889,8 +1877,8 @@ class Group(System):
         ofset = set()
         wrtset = set()
         wrt_colors_matched = set()
-        if self._approx_coloring_info is not None and (self._owns_approx_of or self.pathname):
-            wrt_color_patterns = self._approx_coloring_info['wrt_patterns']
+        if info is not None and (self._owns_approx_of or self.pathname):
+            wrt_color_patterns = info['wrt_patterns']
             color_meta = self._setup_approx_coloring()
         else:
             wrt_color_patterns = ()
@@ -1950,30 +1938,29 @@ class Group(System):
             # we're taking semi-total derivs for this group. Update _owns_approx_of
             # and _owns_approx_wrt so we can use the same approx code for totals and
             # semi-totals.
-            self._owns_approx_of = frozenset(ofset)
-            self._owns_approx_wrt = frozenset(wrtset)
+            self._owns_approx_of = ofset
+            self._owns_approx_wrt = wrtset
 
-        if self._approx_coloring_info is not None:
-            if self._owns_approx_of:
-                if not wrt_colors_matched:
-                    raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
-                                     "partial options on Group "
-                                     "'{}': {}.".format(self.pathname, wrt_color_patterns))
-                self._setup_approx_coloring()
-                self._approx_coloring_info['wrt_matches'] = wrt_colors_matched
-            self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
+        if info is not None:
+            if info['coloring'] is not None:
+                # static coloring was already defined
+                approx = self._get_approx_scheme(info['method'])
+                approx._update_coloring(self, info['coloring'])
+            else:
+                if self._owns_approx_of:
+                    if not wrt_colors_matched:
+                        raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
+                                         "partial options on Group "
+                                         "'{}': {}.".format(self.pathname, wrt_color_patterns))
+                    info['wrt_matches'] = wrt_colors_matched
+                self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
         else:
             self._jac_saves_remaining = 0
 
     def _setup_approx_coloring(self):
         info = self._approx_coloring_info
         method = info['method']
-
-        if method not in self._approx_schemes:
-            method_func = _supported_approx_methods[method]
-            self._approx_schemes[method] = method_func()
-
-        approx_scheme = self._approx_schemes[method]
+        approx_scheme = self._get_approx_scheme(method)
 
         meta = approx_scheme.DEFAULT_OPTIONS.copy()
         meta['coloring'] = None  # set a placeholder for later replacement of approximations

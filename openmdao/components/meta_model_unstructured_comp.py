@@ -6,7 +6,6 @@ from itertools import chain, product
 
 import numpy as np
 
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
@@ -312,8 +311,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     self._approx_partials(of=out_name,
                                           wrt=[name[0] for name in self._surrogate_input_names],
                                           method='fd')
-                    if "fd" not in self._approx_schemes:
-                        self._approx_schemes['fd'] = FiniteDifference()
+                    self._get_approx_scheme('fd')
 
     def check_config(self, logger):
         """

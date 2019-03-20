@@ -12,7 +12,7 @@ from scipy.sparse import issparse
 
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System, _supported_approx_methods
+from openmdao.core.system import System, _supported_methods
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
@@ -356,6 +356,53 @@ class Component(System):
             self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
         else:
             self._jac_saves_remaining = 0
+
+    def _setup_approx_coloring(self):
+        if self._jacobian is None:
+            self._jacobian = DictionaryJacobian(self)
+
+        info = self._approx_coloring_info
+        ofs, allwrt = self._get_partials_varlists()
+        matches = set()
+        wrt_patterns = info['wrt_patterns']
+        for w in wrt_patterns:
+            matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
+
+        # error if nothing matched
+        if not matches:
+            raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
+                             "options on Component '{}': {}.".format(self.pathname, wrt_patterns))
+
+        info['wrt_matches'] = matches
+        approx_scheme = self._get_approx_scheme(info['method'])
+
+        meta = {}
+
+        form = info['form']
+        step = info['step']
+        if form:
+            meta['form'] = form
+        if step:
+            meta['step'] = step
+
+        abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
+
+        if info['coloring'] is None:
+            # set a coloring placeholder for later replacement of approximations
+            meta['coloring'] = None
+
+            # if coloring is not initially activated (because it must be computed dynamically)
+            # then we need to specify active subjacs that will be approximated using normal
+            # FD or CS.  These will be computed normally until enough jacobians have been
+            # computed to calculate the coloring.  Once the coloring exists, the approximations
+            # will be re-initialized to use the coloring info.
+            for key in product(abs_ofs, matches):
+                approx_scheme.add_approximation(key, meta)
+        else:  # a static coloring has already been specified
+            colmeta = meta.copy()
+            meta['coloring'] = info['coloring']
+            meta['approxs'] = list((k, meta) for k in product(abs_ofs, matches))
+            approx.add_approximation((None, None), meta)
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):
@@ -789,10 +836,10 @@ class Component(System):
             If True, subjacs corresponding to matching (of, wrt) pairs are diagonal.
         """
         try:
-            method_func = _supported_approx_methods[method]
+            method_func = _supported_methods[method]
         except KeyError:
             msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method, _supported_approx_methods.keys()))
+            raise ValueError(msg.format(method, list(_supported_methods)))
 
         if isinstance(of, list):
             of = tuple(of)
@@ -824,8 +871,7 @@ class Component(System):
 
         if method_func is not None:
             meta['method'] = method
-            if method not in self._approx_schemes:
-                self._approx_schemes[method] = method_func()
+            self._get_approx_scheme(method)
 
             default_opts = method_func.DEFAULT_OPTIONS
 

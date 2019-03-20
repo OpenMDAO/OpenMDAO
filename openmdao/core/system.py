@@ -43,7 +43,7 @@ _asm_jac_types = {
 }
 
 # Suppored methods for derivatives
-_supported_approx_methods = {
+_supported_methods = {
     'fd': FiniteDifference,
     'cs': ComplexStep,
     'exact': None
@@ -613,6 +613,27 @@ class System(object):
 
         return root_vectors
 
+    def _get_approx_scheme(self, method):
+        """
+        Return the approximation scheme associated with the given method, creating one if needed.
+
+        Parameters
+        ----------
+        method : str
+            Name of the type of approxmation scheme.
+
+        Returns
+        -------
+        ApproximationScheme
+            The ApproximationScheme associated with the given method.
+        """
+        if method not in _supported_methods or method == 'exact':
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, [m for m in _supported_methods if m != 'exact']))
+        if method not in self._approx_schemes:
+            self._approx_schemes[method] = _supported_methods[method]()
+        return self._approx_schemes[method]
+
     def _get_bounds_root_vectors(self, vector_class, initial):
         """
         Get the root vectors for the lower and upper bounds vectors.
@@ -743,7 +764,7 @@ class System(object):
             If not None, the coloring for this system will be saved to the given directory.
             The file will be named as the system's pathname with dots replaced by underscores.
         """
-        approx_class = _supported_approx_methods[method]
+        approx_class = _supported_methods[method]
         if step is None:
             step = approx_class.DEFAULT_OPTIONS['step']
 
@@ -767,49 +788,7 @@ class System(object):
         }
 
     def _setup_approx_coloring(self):
-        if self._jacobian is None:
-            self._jacobian = DictionaryJacobian(self)
-
-        info = self._approx_coloring_info
-        ofs, allwrt = self._get_partials_varlists()
-        matches = set()
-        wrt_patterns = info['wrt_patterns']
-        for w in wrt_patterns:
-            matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
-
-        # error if nothing matched
-        if not matches:
-            raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
-                             "options on Component '{}': {}.".format(self.pathname, wrt_patterns))
-
-        info['wrt_matches'] = matches
-        method = info['method']
-
-        if method not in self._approx_schemes:
-            method_func = _supported_approx_methods[method]
-            self._approx_schemes[method] = method_func()
-
-        approx_scheme = self._approx_schemes[method]
-
-        meta = approx_scheme.DEFAULT_OPTIONS.copy()
-        meta['coloring'] = None  # set a placeholder for later replacement of approximations
-
-        form = info['form']
-        step = info['step']
-        if form:
-            meta['form'] = form
-        if step:
-            meta['step'] = step
-
-        abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
-
-        # if coloring is not initially activated (because it must be computed dynamically)
-        # then we need to specify active subjacs that will be approximated using normal
-        # FD or CS.  These will be computed normally until enough jacobians have been
-        # computed to calculate the coloring.  Once the coloring exists, the approximations
-        # will be re-initialized to use the coloring info.
-        for key in itertools.product(abs_ofs, matches):
-            approx_scheme.add_approximation(key, meta)
+        pass
 
     def _check_coloring_update(self):
         """
@@ -839,6 +818,15 @@ class System(object):
                     approx._update_coloring(self, coloring)
 
     def set_coloring_spec(self, coloring):
+        """
+        Specify a static coloring to use for this System.
+
+        Parameters
+        ----------
+        coloring : str or Coloring
+            If a str, assume a filename and load the coloring from that file, else just
+            use the Coloring object provided.
+        """
         if isinstance(coloring, string_types):  # it's a filename
             # load the coloring from the file
             coloring = Coloring.load(coloring)

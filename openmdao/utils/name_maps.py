@@ -17,7 +17,7 @@ def rel_name2abs_name(system, rel_name):
     str
         Absolute variable name.
     """
-    return rel_name if system.pathname is '' else system.pathname + '.' + rel_name
+    return rel_name if system.pathname is '' else '.'.join([system.pathname, rel_name])
 
 
 def abs_name2rel_name(system, abs_name):
