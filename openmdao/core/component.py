@@ -351,11 +351,8 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
-        if self._approx_coloring_info is not None:
-            self._setup_approx_coloring()
-            self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
-        else:
-            self._jac_saves_remaining = 0
+    def _setup_static_approx_coloring(self):
+        self._setup_approx_coloring()
 
     def _setup_approx_coloring(self):
         if self._jacobian is None:
@@ -363,19 +360,6 @@ class Component(System):
 
         info = self._approx_coloring_info
         ofs, allwrt = self._get_partials_varlists()
-        matches = set()
-        wrt_patterns = info['wrt_patterns']
-        for w in wrt_patterns:
-            matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
-
-        # error if nothing matched
-        if not matches:
-            raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
-                             "options on Component '{}': {}.".format(self.pathname, wrt_patterns))
-
-        info['wrt_matches'] = matches
-        approx_scheme = self._get_approx_scheme(info['method'])
-
         meta = {}
 
         form = info['form']
@@ -388,6 +372,20 @@ class Component(System):
         abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
 
         if info['coloring'] is None:
+            wrt_patterns = info['wrt_patterns']
+            matches = set()
+            for w in wrt_patterns:
+                matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
+
+            # error if nothing matched
+            if not matches:
+                raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
+                                 "options on Component '{}': {}.".format(self.pathname,
+                                                                         wrt_patterns))
+
+            info['wrt_matches'] = matches
+            approx_scheme = self._get_approx_scheme(info['method'])
+
             # set a coloring placeholder for later replacement of approximations
             meta['coloring'] = None
 
@@ -400,9 +398,15 @@ class Component(System):
                 approx_scheme.add_approximation(key, meta)
         else:  # a static coloring has already been specified
             colmeta = meta.copy()
-            meta['coloring'] = info['coloring']
-            meta['approxs'] = list((k, meta) for k in product(abs_ofs, matches))
-            approx.add_approximation((None, None), meta)
+            colmeta['coloring'] = info['coloring']
+            wrt_matches = info['wrt_matches']
+            colmeta['approxs'] = list((k, meta) for k in product(abs_ofs, wrt_matches))
+            approx = self._get_approx_scheme(info['method'])
+            # remove any uncolored matching approximations
+            new_list = [tup for tup in approx._exec_list if tup[0][1] in wrt_matches]
+            approx._exec_list = new_list
+            approx.add_approximation((None, None), colmeta)
+            approx._approx_groups = None  # force a re-init of approximations
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):
@@ -1195,17 +1199,6 @@ class Component(System):
                 msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
                 raise ValueError(msg.format(self.pathname, of, wrt, out_size, in_size,
                                             val_out, val_in))
-
-    def _set_partials_meta(self):
-        """
-        Set subjacobian info into our jacobian.
-        """
-        for key, meta in iteritems(self._subjacs_info):
-
-            if 'method' in meta:
-                method = meta['method']
-                if method is not None and method in self._approx_schemes:
-                    self._approx_schemes[method].add_approximation(key, meta)
 
     def _guess_nonlinear(self):
         """

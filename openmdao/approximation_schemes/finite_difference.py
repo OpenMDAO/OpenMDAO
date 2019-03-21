@@ -296,18 +296,16 @@ class FiniteDifference(ApproximationScheme):
         outputs = system._outputs
         resids = system._residuals
 
-        if total:
-            run_model = system.run_solve_nonlinear
-            results_vec = outputs
-        else:
-            run_model = system.run_apply_nonlinear
-            results_vec = resids
-
         for arr, idxs in idx_info:
             if arr is not None:
                 arr._data[idxs] += delta
 
-        run_model()
+        if total:
+            system.run_solve_nonlinear()
+            results_vec = outputs
+        else:
+            system.run_apply_nonlinear()
+            results_vec = resids
 
         # save results and restore starting inputs/outputs
         self._results_tmp[:] = results_vec._data

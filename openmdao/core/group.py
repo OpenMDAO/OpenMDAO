@@ -1731,7 +1731,7 @@ class Group(System):
 
         self._check_coloring_update()
 
-    def set_approx_coloring(self, wrt, method='fd', form=None, step=None, directory=None):
+    def set_approx_coloring_meta(self, wrt, method='fd', form=None, step=None, directory=None):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1753,7 +1753,7 @@ class Group(System):
             The file will be named as the system's pathname with dots replaced by underscores.
         """
         self.approx_totals(method, step, form)
-        super(Group, self).set_approx_coloring(wrt, method, form, step, directory)
+        super(Group, self).set_approx_coloring_meta(wrt, method, form, step, directory)
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
@@ -1956,6 +1956,9 @@ class Group(System):
                 self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
         else:
             self._jac_saves_remaining = 0
+
+    def _setup_static_approx_coloring(self):
+        self._setup_approx_partials()
 
     def _setup_approx_coloring(self):
         info = self._approx_coloring_info

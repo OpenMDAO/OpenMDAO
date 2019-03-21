@@ -1,3 +1,6 @@
+import os
+import tempfile
+import shutil
 from six.moves import range
 import unittest
 import itertools
@@ -171,6 +174,18 @@ def _check_semitotal_matrix(system, jac, expected):
 class TestCSColoring(unittest.TestCase):
     FD_METHOD = 'cs'
 
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
     def test_simple_totals(self):
         prob = Problem()
         model = prob.model = Group(dynamic_derivs_repeats=1)
@@ -189,7 +204,7 @@ class TestCSColoring(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
-        model.set_approx_coloring('*', method=self.FD_METHOD)
+        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -233,7 +248,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', Group(dynamic_derivs_repeats=1))
         comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
-        sub.set_approx_coloring('*', method=self.FD_METHOD)
+        sub.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'sub.comp.x0')
         model.connect('indeps.x1', 'sub.comp.x1')
 
@@ -250,10 +265,10 @@ class TestCSColoring(unittest.TestCase):
         # one run per column of jac
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, sparsity.shape[1])
-    
+
         start_nruns = comp._nruns
         derivs = prob.driver._compute_totals()  # colored
-    
+
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, 3)
         _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity)
@@ -277,7 +292,7 @@ class TestCSColoring(unittest.TestCase):
         model.nonlinear_solver = NonlinearBlockGS()
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
-        model.set_approx_coloring('*', method=self.FD_METHOD)
+        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -296,10 +311,10 @@ class TestCSColoring(unittest.TestCase):
         nruns = comp._nruns - start_nruns
         # wrts of size 5, 2 runs of the implicit comp per approx point run (1 for solver init and 1 for 1 solver iter)
         self.assertEqual(nruns, 5 * 2)
-    
+
         start_nruns = comp._nruns
         derivs = prob.driver._compute_totals()  # colored
-    
+
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, 3 * 2)
         _check_total_matrix(model, derivs, sparsity)
@@ -322,7 +337,7 @@ class TestCSColoring(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
-        model.set_approx_coloring('*', method=self.FD_METHOD)
+        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -339,10 +354,10 @@ class TestCSColoring(unittest.TestCase):
         # one run per column of jac
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, sparsity.shape[1])
-    
+
         start_nruns = comp._nruns
         derivs = prob.driver._compute_totals()  # colored
-    
+
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, 3)
         rows = [0,2,3,4]
@@ -367,7 +382,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        model.set_approx_coloring('*', method=self.FD_METHOD)
+        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -384,13 +399,13 @@ class TestCSColoring(unittest.TestCase):
         # one run per column of jac
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, sparsity.shape[1] - 1)
-    
+
         start_nruns = comp._nruns
         derivs = prob.driver._compute_totals()  # colored
-    
+
         nruns = comp._nruns - start_nruns
         # only 4 cols to solve for, but we get coloring of [[2],[3],[0,1]] so only 1 better
-        self.assertEqual(nruns, 3)  
+        self.assertEqual(nruns, 3)
         cols = [0,2,3,4]
         _check_total_matrix(model, derivs, sparsity[:, cols])
 
@@ -413,7 +428,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        model.set_approx_coloring('*', method=self.FD_METHOD)
+        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -430,10 +445,10 @@ class TestCSColoring(unittest.TestCase):
         # one run per column of jac
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, sparsity.shape[1] - 1)
-    
+
         start_nruns = comp._nruns
         derivs = prob.driver._compute_totals()  # colored
-    
+
         nruns = comp._nruns - start_nruns
         self.assertEqual(nruns, 3)
         cols = rows = [0,2,3,4]
@@ -458,7 +473,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2, dynamic_derivs_repeats=1))
-        comp.set_approx_coloring('x*', method=self.FD_METHOD)
+        comp.set_approx_coloring_meta('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -494,7 +509,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2, dynamic_derivs_repeats=1))
-        comp.set_approx_coloring('x*', method=self.FD_METHOD)
+        comp.set_approx_coloring_meta('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -507,6 +522,113 @@ class TestCSColoring(unittest.TestCase):
         start_nruns = comp._nruns
         comp._linearize()
         self.assertEqual(comp._nruns - start_nruns, 5)
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity)
+
+    def test_simple_partials_explicit_static(self):
+        prob = Problem()
+        model = prob.model
+
+        sparsity = np.array(
+                [[1, 0, 0, 1, 1, 1, 0],
+                 [0, 1, 0, 1, 0, 1, 1],
+                 [0, 1, 0, 1, 1, 1, 0],
+                 [1, 0, 0, 0, 0, 1, 0],
+                 [0, 1, 1, 0, 1, 1, 1]], dtype=float
+            )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.random.random(4))
+        indeps.add_output('x1', np.random.random(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        # comp.set_approx_coloring_meta('x*', method=self.FD_METHOD, directory=self.tempdir)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        coloring = comp.compute_approx_coloring(wrt='x*', method=self.FD_METHOD, directory=self.tempdir)
+
+        # now make a second problem to use the coloring
+        prob = Problem()
+        model = prob.model
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        comp.set_coloring_spec(os.path.join(self.tempdir, comp.__class__.__name__ + '.pkl'))
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        start_nruns = comp._nruns
+        comp._linearize()
+        self.assertEqual(comp._nruns - start_nruns, 5)
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity)
+
+    def test_simple_partials_implicit_static(self):
+        prob = Problem()
+        model = prob.model
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1, 1, 0],
+             [0, 1, 0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1, 1, 0],
+             [1, 0, 0, 0, 0, 1, 0],
+             [0, 1, 1, 0, 1, 1, 1]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        comp.set_approx_coloring_meta('x*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        coloring = comp.compute_approx_coloring(wrt='x*', method=self.FD_METHOD, directory=self.tempdir)
+
+        # now create a new problem and set the static coloring
+        prob = Problem()
+        model = prob.model
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        comp.set_approx_coloring_meta('x*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        comp.set_coloring_spec(os.path.join(self.tempdir, comp.__class__.__name__ + '.pkl'))
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        start_nruns = comp._nruns
+        comp._linearize()
+        # add 5 to number of runs to cover the 5 uncolored output columns
+        self.assertEqual(comp._nruns - start_nruns, sparsity.shape[0] + 5)
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
 
@@ -538,7 +660,7 @@ class TestColoringParallelCS(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
-        model.set_approx_coloring('*', method=self.FD_METHOD)
+        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -588,7 +710,7 @@ class TestColoringParallelCS(unittest.TestCase):
                                                               isplit=2, osplit=2,
                                                               dynamic_derivs_repeats=1,
                                                               num_par_fd=self.N_PROCS))
-        comp.set_approx_coloring('x*', method=self.FD_METHOD)
+        comp.set_approx_coloring_meta('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -636,7 +758,7 @@ class TestColoringParallelCS(unittest.TestCase):
                                                               isplit=2, osplit=2,
                                                               dynamic_derivs_repeats=1,
                                                               num_par_fd=self.N_PROCS))
-        comp.set_approx_coloring('x*', method=self.FD_METHOD)
+        comp.set_approx_coloring_meta('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 

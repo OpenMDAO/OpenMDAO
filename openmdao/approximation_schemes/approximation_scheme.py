@@ -9,7 +9,7 @@ import numpy as np
 from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, \
     update_sizes, get_input_idx_split, _get_jac_slice_dict
 from openmdao.utils.name_maps import rel_name2abs_name
-
+from openmdao.utils.general_utils import printoptions
 _full_slice = slice(None)
 
 
@@ -84,7 +84,10 @@ class ApproximationScheme(object):
                     new_list.append(new_entry)
                 else:
                     new_entry[1]['approxs'].append(tup)
-            elif key not in colored:
+
+        for tup in self._exec_list:
+            key, _ = tup
+            if key not in colored:
                 new_list.append(tup)
 
         self._exec_list = new_list
@@ -101,7 +104,7 @@ class ApproximationScheme(object):
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
-        raise NotImplementedError()
+        raise NotImplementedError("add_approximation has not been implemented")
 
     def compute_approximations(self, system, jac=None, total=False):
         """
@@ -353,7 +356,7 @@ class ApproximationScheme(object):
                                       shape=colored_shape)
 
             elif is_parallel:
-                pass
+                raise NotImplementedError("colored FD/CS over parallel groups not supported yet")
             else:  # serial colored
                 Jcolored = coo_matrix((jdata, (jrows, jcols)))
 

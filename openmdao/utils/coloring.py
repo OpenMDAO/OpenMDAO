@@ -96,6 +96,8 @@ class Coloring(object):
         Names of variables corresponding to rows.
     _row_var_sizes : ndarray or None
         Sizes of row variables.
+    _meta : dict
+        Dictionary of metadata used to create the coloring.
     _writers : dict
         Mapping of file extension to a tuple (func, open_str), where func writes
         the coloring in a specific format, and open_str is the string indicating
@@ -125,6 +127,7 @@ class Coloring(object):
         self._col_var_sizes = None
         self._row_vars = None
         self._row_var_sizes = None
+        self._meta = {}
         self._writers = {
             'json': (self._write_json, 'w'),
             'pkl': (self._write_pickle, 'wb'),
@@ -300,7 +303,7 @@ class Coloring(object):
         return total
 
     @staticmethod
-    def load(self, fname):
+    def load(fname):
         """
         Read the coloring object from the given file.
 
@@ -318,7 +321,7 @@ class Coloring(object):
         """
         name, ext = fname.rsplit('.', 1)
         try:
-            loader = self._loaders[ext]
+            loader = _loaders[ext]
         except KeyError:
             raise RuntimeError("Can't find a coloring loader for extension '%s'." % ext)
 
@@ -636,10 +639,11 @@ class Coloring(object):
                                  (of, wrt, list(nzrows), list(nzcols)))
         return '\n'.join(lines)
 
-    _loaders = {
-        'json': _load_json,
-        'pkl': _load_pickle,
-    }
+
+_loaders = {
+    'json': Coloring._load_json,
+    'pkl': Coloring._load_pickle,
+}
 
 
 def _order_by_ID(col_matrix):

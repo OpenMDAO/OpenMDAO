@@ -181,18 +181,16 @@ class ComplexStep(ApproximationScheme):
         Vector
             Copy of the results from running the perturbed system.
         """
-        if total:
-            run_model = system.run_solve_nonlinear
-            results_vec = system._outputs
-        else:
-            run_model = system.run_apply_nonlinear
-            results_vec = system._residuals
-
         for arr, idxs in idx_info:
             if arr is not None:
                 arr._data[idxs] += delta
 
-        run_model()
+        if total:
+            system.run_solve_nonlinear()
+            results_vec = system._outputs
+        else:
+            system.run_apply_nonlinear()
+            results_vec = system._residuals
 
         result_array[:] = results_vec._data
 

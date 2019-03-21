@@ -3,7 +3,7 @@
 from __future__ import division
 
 import numpy as np
-from six import itervalues
+from six import itervalues, iteritems
 from six.moves import range
 
 from openmdao.core.component import Component
@@ -240,6 +240,44 @@ class ImplicitComponent(Component):
                             self.solve_linear(d_outputs, d_residuals, mode)
                     finally:
                         d_outputs.read_only = d_residuals.read_only = False
+
+    def _set_partials_meta(self):
+        """
+        Set subjacobian info into our jacobian.
+        """
+        info = self._approx_coloring_info
+        # if coloring has been specified, we don't want to have multiple
+        # approximations for the same subjac, so don't register any new
+        # approximations when the wrt matches those used in the coloring.
+        if info is not None and info['coloring'] is not None:
+            # static coloring has been specified
+            wrt_matches = info['wrt_matches']
+        else:
+            wrt_matches = ()
+
+        for key, meta in iteritems(self._subjacs_info):
+            if 'method' in meta and key[1] not in wrt_matches:
+                method = meta['method']
+                if method is not None and method in self._approx_schemes:
+                    self._approx_schemes[method].add_approximation(key, meta)
+
+    def _setup_jacobians(self, recurse=True):
+        """
+        Set and populate jacobians down through the system tree.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, setup jacobians in all descendants.
+        """
+        if self._use_derivatives:
+            if self._approx_coloring_info is not None:
+                self._setup_approx_coloring()
+                self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
+            else:
+                self._jac_saves_remaining = 0
+
+        super(ImplicitComponent, self)._setup_jacobians(recurse)
 
     def _linearize(self, jac=None, sub_do_ln=True):
         """

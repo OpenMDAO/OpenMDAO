@@ -104,6 +104,12 @@ class ExplicitComponent(Component):
             If True, setup jacobians in all descendants. (ignored)
         """
         if self._use_derivatives:
+            if self._approx_coloring_info is not None:
+                self._setup_approx_coloring()
+                self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
+            else:
+                self._jac_saves_remaining = 0
+
             self._set_partials_meta()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
@@ -169,13 +175,26 @@ class ExplicitComponent(Component):
         """
         Set subjacobian info into our jacobian.
         """
+        info = self._approx_coloring_info
+        # if coloring has been specified, we don't want to have multiple
+        # approximations for the same subjac, so don't register any new
+        # approximations when the wrt matches those used in the coloring.
+        if info is not None and info['coloring'] is not None:
+            # static coloring has been specified
+            wrt_matches = info['wrt_matches']
+        else:
+            wrt_matches = ()
+
+        # TODO: check to see if this entire loop can be skipped if no approximations
+        # are being done.  ImplicitComponent doesn't set value in it's _set_partials_meta,
+        # so either there's a bug there or the code here is doing something unnecessary
         for abs_key, meta in iteritems(self._subjacs_info):
 
             # if there isn't a declared partial value, set it to a dense matrix
             if meta['value'] is None:
                 meta['value'] = np.zeros(meta['shape'])
 
-            if 'method' in meta:
+            if 'method' in meta and abs_key[1] not in wrt_matches:
                 method = meta['method']
                 # Don't approximate output wrt output.``
                 if (method is not None and method in self._approx_schemes and abs_key[1]

@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
 import sys
+import os
 import time
 from numbers import Integral
 import itertools
@@ -28,7 +29,8 @@ from openmdao.utils.write_outputs import write_outputs
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
-from openmdao.utils.coloring import _compute_coloring
+from openmdao.utils.coloring import _compute_coloring, Coloring
+from openmdao.utils.general_utils import simple_warning
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -743,7 +745,8 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def set_approx_coloring(self, wrt, method='fd', form='forward', step=None, directory=None):
+    def set_approx_coloring_meta(self, wrt, method='fd', form='forward', step=None, directory=None,
+                                 fname=None):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -763,6 +766,10 @@ class System(object):
         directory : str or None
             If not None, the coloring for this system will be saved to the given directory.
             The file will be named as the system's pathname with dots replaced by underscores.
+        fname : str or None
+            If not None, use this as the name of the coloring file.  If a relative path, make
+            it relative to the specified directory if there is one, else the current working
+            directory.  If None, set the filename to the object's classname + '.pkl'.
         """
         approx_class = _supported_methods[method]
         if step is None:
@@ -771,7 +778,7 @@ class System(object):
         wrt_patterns = [wrt] if isinstance(wrt, string_types) else wrt
 
         if self._approx_coloring_info is not None:
-            simple_warning("%s: set_approx_coloring() was called multiple times. The "
+            simple_warning("%s: set_approx_coloring_meta() was called multiple times. The "
                            "last call will be used." % self.pathname)
 
         if method not in ('fd', 'cs'):
@@ -784,6 +791,7 @@ class System(object):
             'form': form,
             'step': step,
             'directory': directory,
+            'fname': fname,
             'coloring': None,
         }
 
@@ -803,19 +811,129 @@ class System(object):
                     self._jacobian._compute_sparsity(self, info['wrt_matches'])
                 self._jacobian._jac_summ = None  # reclaim the memory
 
-                info['coloring'] = coloring = _compute_coloring(sparsity, 'fwd')
+                coloring = _compute_coloring(sparsity, 'fwd')
                 coloring._row_vars = list(ordered_ofs)
                 coloring._col_vars = list(ordered_wrts)
                 coloring._row_var_sizes = list(ordered_ofs.values())
                 coloring._col_var_sizes = list(ordered_wrts.values())
-                directory = info['directory']
-                if directory is not None:
-                    name = self.pathname.replace('.', '_') if self.pathname else 'top'
-                    fname = os.path.join(directory, name + '.pkl')
-                    coloring.save(fname)
+                coloring._meta = {}  # save metadata we used to create the coloring
+                for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step'):
+                    coloring._meta[name] = info[name]
+                info['coloring'] = coloring
+
+                if info['directory'] is not None or info['fname'] is not None:
+                    self._save_coloring(coloring, info['directory'], info['fname'])
 
                 for approx in itervalues(self._approx_schemes):
                     approx._update_coloring(self, coloring)
+
+    def compute_approx_coloring(self, wrt=('*',), method='fd', form='forward', step=None,
+                                repeats=2, rel_perturbation_size=1e-3,
+                                directory=None, fname=None):
+        """
+        Compute a coloring of the approximated derivatives.
+
+        This assumes that the current System is in a proper state for computing approximated
+        derivatives.
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain input names, output names, or glob patterns.
+        method : str
+            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference. Leave undeclared to keep unchanged from previous
+            or default value.
+        repeats : int
+            Number of times to randomly perturb the inputs while computing the sparsity.
+        rel_perturbation_size : float
+            Size of relative random perturbations that will be applied to the inputs during
+            computation of jacobian sparsity.
+        directory : str or None
+            If not None, the coloring for this system will be saved to the given directory.
+            The file will be named as the system's pathname with dots replaced by underscores.
+        fname : str or None
+            If not None, use this as the name of the coloring file.  If a relative path, make
+            it relative to the specified directory if there is one, else the current working
+            directory.  If None, set the filename to the object's classname + '.pkl'.
+
+        Returns
+        -------
+        Coloring
+            The computed coloring.
+        """
+        if directory is None:
+            directory = os.path.join(os.getcwd(), 'coloring_files')
+        self.set_approx_coloring_meta(wrt, method, form, step, directory, fname)
+
+        starting_inputs = self._inputs._data.copy()
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= rel_perturbation_size
+
+        starting_outputs = self._outputs._data.copy()
+        out_offsets = starting_outputs.copy()
+        out_offsets[out_offsets == 0.0] = 1.0
+        out_offsets *= rel_perturbation_size
+
+        # compute absolute perturbations
+        self._jac_saves_remaining = repeats
+        self._setup_static_approx_coloring()
+        for i in range(repeats):
+            # randomize inputs (and outputs if implicit)
+            if i > 0:
+                self._inputs._data[:] = \
+                    starting_inputs + in_offsets * np.random.random(in_offsets.size)
+                self._outputs._data[:] = \
+                    starting_outputs + out_offsets * np.random.random(out_offsets.size)
+
+            # TODO: investigate whether this call to solve_nonlinear is necessary for
+            # complex step.  The tests were passing without it, but finite difference
+            # needs it, so for now, do it for both.
+            self._solve_nonlinear()
+
+            # when run_linearize is called after the appropriate number of repeats,
+            # the coloring will be computed and saved.
+            self.run_linearize()
+
+        # restore original inputs/outputs
+        self._inputs._data[:] = starting_inputs
+        self._outputs._data[:] = starting_outputs
+
+        return self._approx_coloring_info['coloring']
+
+    def _save_coloring(self, coloring, directory=None, fname=None):
+        """
+        Save the coloring to a file based on the supplied directory, fname, and our classname.
+
+        Parameters
+        ----------
+        coloring : Coloring
+            See Coloring class docstring.
+        directory : str or None
+            Specified directory where file should be written.
+        fname : str or None
+            Specific file name.  If None, the class + '.pkl' will be used.
+        """
+        if fname is not None:
+            abs_path = os.path.abspath(fname)
+            if abs_path != fname and directory is not None:
+                final_name = os.path.join(directory, fname)
+            else:
+                final_name = fname
+        elif directory is not None:
+            final_name = os.path.join(directory, self.__class__.__name__ + '.pkl')
+
+        name, ext = os.path.splitext(final_name)
+        if not ext:
+            final_name += '.pkl'
+
+        coloring.save(final_name)
 
     def set_coloring_spec(self, coloring):
         """
@@ -830,7 +948,10 @@ class System(object):
         if isinstance(coloring, string_types):  # it's a filename
             # load the coloring from the file
             coloring = Coloring.load(coloring)
+        if self._approx_coloring_info is None:
+            self._approx_coloring_info = {}
         self._approx_coloring_info['coloring'] = coloring
+        self._approx_coloring_info.update(coloring._meta)
 
     def _setup_par_fd_procs(self, comm):
         """
@@ -1595,12 +1716,12 @@ class System(object):
 
         yield
 
-        for vec in outputs:
-            if self._has_output_scaling:
+        if self._has_output_scaling:
+            for vec in outputs:
                 vec.scale('norm')
 
-        for vec in residuals:
-            if self._has_resid_scaling:
+        if self._has_resid_scaling:
+            for vec in residuals:
                 vec.scale('norm')
 
     @contextmanager
@@ -1876,8 +1997,6 @@ class System(object):
     def _set_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
-
-        Overridden in <Component>.
         """
         pass
 
