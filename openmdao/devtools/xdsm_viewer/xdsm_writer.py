@@ -14,8 +14,7 @@ The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
-# TODO solvers: also include solvers of groups, not just for the root. Include connections between
-#  component inputs & outputs and the solver.
+# TODO solvers: also include solvers of groups, not just for the root.
 # TODO numbering of data blocks. Logic: index of the receiving block
 
 from __future__ import print_function
@@ -789,7 +788,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse)
-    comps_dct = {comp['abs_name']: comp for comp in comps}
+    comps_dct = {comp['abs_name']: comp for comp in comps if comp['type'] != 'solver'}
+    print(comps_dct, comps)
     solvers = []
 
     conns1, external_inputs1, external_outputs1 = _prune_connections(connections,
@@ -803,11 +803,11 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    def add_solver(comps, first=0):
+    def add_solver(solver_dct, first=0):
         # Adds a solver.
         # Uses some vars from the outer scope.
-        comp_names = [_format_name(c['abs_name']) for c in comps]
-        solver_label = _format_solver_str(tree,
+        comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
+        solver_label = _format_solver_str(solver_dct,
                                           stacking=box_stacking,
                                           add_indices=add_component_indices)
         solver_label = _replace_chars(solver_label, subs)
@@ -822,19 +822,19 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 solver_label = number_label(solver_index, solver_label, number_alignment)
             solvers.append(solver_label)
             x.add_solver(name=solver_name, label=solver_label)
-            if add_process_conns:
-                x.add_workflow([solver_name] + comp_names)
-
-            # Add the connections
-            for src, dct in iteritems(conns3):
-                for tgt, conn_vars in iteritems(dct):
-                    formatted_cons = format_block(conn_vars)
-                    if (src in comp_names) and (tgt in comp_names):
-                        formatted_targets = [format_var_str(c, 'target') for c in formatted_cons]
-                        # From solver to components (targets)
-                        x.connect(solver_name, tgt, formatted_targets)
-                        # From components to solver
-                        x.connect(src, solver_name, formatted_cons)
+            # if add_process_conns:
+            #     x.add_workflow([solver_name] + comp_names)
+            #
+            # # Add the connections
+            # for src, dct in iteritems(conns3):
+            #     for tgt, conn_vars in iteritems(dct):
+            #         formatted_cons = format_block(conn_vars)
+            #         if (src in comp_names) and (tgt in comp_names):
+            #             formatted_targets = [format_var_str(c, 'target') for c in formatted_cons]
+            #             # From solver to components (targets)
+            #             x.connect(solver_name, tgt, formatted_targets)
+            #             # From components to solver
+            #             x.connect(src, solver_name, formatted_cons)
 
     if writer_name == 'pyxdsm':  # pyXDSM
         x = XDSMWriter()
@@ -891,7 +891,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
         warnings.warn(msg)
 
-        add_solver(comps=comps, first=1)
+        tree2 = dict(tree)
+        tree2['comps'] = comps
+        add_solver(tree2, first=1)
 
     # Add components
     for comp in comps:  # Driver is 1, so starting from 2
@@ -900,7 +902,12 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         if add_component_indices:
             label = number_label(i, label, number_alignment)
         stack = comp['is_parallel'] and show_parallel
-        x.add_comp(name=comp['abs_name'], label=label, stack=stack, comp_type=comp['component_type'])
+        if comp['type'] == 'solver':  # solver
+            if include_solver:
+                add_solver(comp)
+        else:  # component or group
+            x.add_comp(name=comp['abs_name'], label=label, stack=stack,
+                       comp_type=comp['component_type'])
 
     # Add the connections
     for src, dct in iteritems(conns3):
@@ -1156,6 +1163,8 @@ def _get_comps(tree, model_path=None, recurse=True):
     sep = '.'
 
     def get_children(tree_branch, path=''):
+        local_comps = []
+
         for ch in tree_branch['children']:
             ch['path'] = path
             name = ch['name']
@@ -1172,15 +1181,33 @@ def _get_comps(tree, model_path=None, recurse=True):
                             comp['name'] = sep.join([comp['path'], name])
                 components.append(ch)
                 comp_names.add(ch['rel_name'])
-            elif recurse:
-                if path:
-                    new_path = sep.join([path, ch['name']])
-                else:
-                    new_path = ch['name']
-                get_children(ch, new_path)
             else:
-                components.append(ch)
-                comp_names.add(ch['rel_name'])
+                solver_names = []
+                solver_dct = {}
+                for solver_typ, default_solver in iteritems(_DEFAULT_SOLVER_NAMES):
+                    k = '{}_solver'.format(solver_typ)
+                    if ch[k] != default_solver:
+                        solver_names.append(ch[k])
+                    solver_dct[k] = ch[k]
+                if solver_names:
+                    name_str = ch['abs_name'] + '@solver'
+                    solver = {'abs_name': _format_name(name_str), 'rel_name': solver_names,
+                              'type': 'solver', 'name': name_str, 'is_parallel': False,
+                              'component_type': 'MDA', 'comps': []}
+                    solver.update(solver_dct)
+                    components.append(solver)
+                    comp_names.add(name_str)
+                if recurse:  # it is not a component and recurse is True
+                    if path:
+                        new_path = sep.join([path, ch['name']])
+                    else:
+                        new_path = ch['name']
+                    local_comps = get_children(ch, new_path)
+                else:
+                    components.append(ch)
+                    comp_names.add(ch['rel_name'])
+                    local_comps = ch
+        return local_comps
 
     top_level_tree = tree
     if model_path is not None:
