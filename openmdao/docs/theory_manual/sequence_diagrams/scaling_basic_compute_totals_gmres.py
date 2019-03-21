@@ -45,7 +45,8 @@ for loc in vertical_locs:
     v_lines.add(dwg.line(start=(loc, y+15), end=(loc, 1300)))
 
 extra_text = dwg.add(dwg.g(font_size=main_font_size - 3, style="font-family: arial;"))
-extra_text.add(dwg.text('fwd', (vertical_locs[5] + 55, 820)))
+extra_text.add(dwg.text('fwd mode', (150, 50)))
+extra_text.add(dwg.text('unit conversion', (vertical_locs[3] + 15, 870)))
 
 locs = [('Problem.compute_totals()', None, []),
         ('_TotalJacInfo.compute_totals()', None, []),
@@ -68,7 +69,7 @@ locs = [('Problem.compute_totals()', None, []),
         ('    DefaultTransfer.transfer()', ((5, 4), ), []),
         ("    DefaultVector.scale('phys')", ((0, 4), ), []),
         ('    ExplicitComponent._apply_linear()', None, []),
-        ('    DictionaryJacobian._apply()', None, []),
+        ('    DictionaryJacobian._apply()', ((4, 6), ), []),
         ('    ExplicitComponent._unscaled_context()', ((0, 2), (0, 3), (0, 5), (0, 6)), ['stagger']),
         ('    (Multiply jac keys))', ((7, 6), (5, 6)), ['stagger']),
         ('    ScipyKrylov.matvec()', ((6, 0), ), ['italic']),
