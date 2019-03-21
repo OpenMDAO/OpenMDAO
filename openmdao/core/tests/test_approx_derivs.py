@@ -41,7 +41,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.linear_solver = DirectSolver()
+        model.linear_solver = ScipyKrylov()
         model.approx_totals()
 
         prob.setup(check=False, mode='fwd')
