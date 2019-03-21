@@ -191,6 +191,17 @@ class SimpleGADriver(Driver):
         self._concurrent_color = 0
         return comm
 
+    def _get_name(self):
+        """
+        Get name of current Driver.
+
+        Returns
+        -------
+        str
+            Name of current Driver.
+        """
+        return "SimpleGA"
+
     def run(self):
         """
         Execute the genetic algorithm.
@@ -275,8 +286,8 @@ class SimpleGADriver(Driver):
             val = desvar_new[i:j]
             self.set_design_var(name, val)
 
-        with RecordingDebugging('SimpleGA', self.iter_count, self) as rec:
-            self.run_solve_nonlinear()
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+            model.run_solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
@@ -378,7 +389,7 @@ class SimpleGADriver(Driver):
         almost_inf = openmdao.INF_BOUND
 
         # Execute the model
-        with RecordingDebugging('SimpleGA', self.iter_count, self) as rec:
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             self.iter_count += 1
             try:
                 self.run_solve_nonlinear()
