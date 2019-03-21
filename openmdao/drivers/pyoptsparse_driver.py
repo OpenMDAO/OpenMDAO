@@ -547,7 +547,7 @@ class pyOptSparseDriver(Driver):
         str
             The name of the current optimizer.
         """
-        return self.options['optimizer']
+        return "pyOptSparse_" + self.options['optimizer']
 
     def _get_ordered_nl_responses(self):
         """

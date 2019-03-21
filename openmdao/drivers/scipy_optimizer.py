@@ -178,7 +178,7 @@ class ScipyOptimizeDriver(Driver):
         str
             The name of the current optimizer.
         """
-        return self.options['optimizer']
+        return "ScipyOptimize_" + self.options['optimizer']
 
     def _setup_driver(self, problem):
         """
