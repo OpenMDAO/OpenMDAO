@@ -112,7 +112,6 @@ class TestParallelGroups(unittest.TestCase):
         model.connect("p2.x", "parallel.c2.x")
 
         prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
         prob.run_model()
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
