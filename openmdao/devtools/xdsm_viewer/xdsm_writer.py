@@ -830,7 +830,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 for tgt, conn_vars in iteritems(dct):
                     formatted_cons = format_block(conn_vars)
                     if (src in comp_names) and (tgt in comp_names):
-                        formatted_targets = [format_var_str(c, 'target') for c in formatted_cons]
+                        formatted_targets = format_block([format_var_str(c, 'target') for c in conn_vars])
                         # From solver to components (targets)
                         x.connect(solver_name, tgt, formatted_targets)
                         # From components to solver
