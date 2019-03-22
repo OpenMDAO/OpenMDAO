@@ -1055,7 +1055,6 @@ class MyImplicitComp(ImplicitComponent):
         jacobian['x3_s', 'x3_s'] = 2.0 * self.J[1, 2] * outputs['x3_s']
 
 
-
 class MyDriver(Driver):
 
     def run(self):
@@ -1184,7 +1183,6 @@ class TestScalingOverhaul(unittest.TestCase):
 
         for (of, wrt) in totals:
             assert_rel_error(self, totals[of, wrt]['abs error'][0], 0.0, 1e-7)
-
 
     def test_iimplicit(self):
         # Testing that our scale/unscale contexts leave the output vector in the correct state when
