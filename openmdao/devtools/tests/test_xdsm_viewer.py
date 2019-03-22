@@ -27,6 +27,8 @@ QUIET = not DEBUG
 # If not in debug mode, tests will generate only the TeX files and not the PDFs, except for the
 # PDF creation test, which is independent of this setting.
 PYXDSM_OUT = 'pdf' if DEBUG else 'tex'
+# Show in browser
+SHOW = False
 
 
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
@@ -62,7 +64,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         # Write output (outputs on the left)
         filename = 'xdsm_outputs_on_the_left'
-        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=SHOW, quiet=QUIET,
                    output_side='left')
 
         # Check if file was created
@@ -70,7 +72,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         filename = 'xdsm_outputs_on_the_right'
         # Write output (all outputs on the right)
-        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=SHOW, quiet=QUIET,
                    output_side='right')
 
         # Check if file was created
@@ -78,7 +80,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         filename = 'xdsm_outputs_side_mixed'
         # Write output (outputs mixed)
-        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, quiet=QUIET,
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=SHOW, quiet=QUIET,
                    output_side={'optimization': 'left', 'default': 'right'})
 
         # Check if file was created
@@ -101,7 +103,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=False, recurse=False,
+        write_xdsm(prob, filename=filename, out_format=PYXDSM_OUT, show_browser=SHOW, recurse=False,
                    quiet=QUIET)
 
         # Check if file was created
@@ -149,7 +151,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         pdflatex = find_executable('pdflatex')
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=False, quiet=QUIET)
+        write_xdsm(prob, filename=filename, out_format='pdf', show_browser=SHOW, quiet=QUIET)
 
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
@@ -208,20 +210,20 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         # Test non unique local names
         filename = 'pyxdsm_identical_rel_names'
-        write_xdsm(p, filename, out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False)
+        write_xdsm(p, filename, out_format=PYXDSM_OUT, quiet=QUIET, show_browser=SHOW)
         self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
         # Check formatting
 
         # Max character box formatting
         filename = 'pyxdsm_cut_char'
-        write_xdsm(p, filename, out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
+        write_xdsm(p, filename, out_format=PYXDSM_OUT, quiet=QUIET, show_browser=SHOW,
                    box_stacking='cut_chars', box_width=15)
         self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
         # Cut characters box formatting
         filename = 'pyxdsm_max_chars'
-        write_xdsm(p, filename, out_format=PYXDSM_OUT, quiet=True, show_browser=False,
+        write_xdsm(p, filename, out_format=PYXDSM_OUT, quiet=True, show_browser=SHOW,
                    box_stacking='max_chars', box_width=15)
         self.assertTrue(os.path.isfile('.'.join([filename, PYXDSM_OUT])))
 
@@ -255,23 +257,23 @@ class TestPyXDSMViewer(unittest.TestCase):
         p.run_model()
 
         # No model path, no recursion
-        write_xdsm(p, 'xdsm_circuit', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
+        write_xdsm(p, 'xdsm_circuit', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=SHOW,
                    recurse=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit', PYXDSM_OUT])))
 
         # Model path given + recursion
-        write_xdsm(p, 'xdsm_circuit2', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
+        write_xdsm(p, 'xdsm_circuit2', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=SHOW,
                    recurse=True, model_path='G2', include_external_outputs=False)
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit2', PYXDSM_OUT])))
 
         # Model path given + no recursion
-        write_xdsm(p, 'xdsm_circuit3', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=False,
+        write_xdsm(p, 'xdsm_circuit3', out_format=PYXDSM_OUT, quiet=QUIET, show_browser=SHOW,
                    recurse=False, model_path='G1')
         self.assertTrue(os.path.isfile('.'.join(['xdsm_circuit3', PYXDSM_OUT])))
 
         # Invalid model path, should raise error
         with self.assertRaises(ValueError):
-            write_xdsm(p, 'xdsm_circuit4', out_format='tex', quiet=QUIET, show_browser=False,
+            write_xdsm(p, 'xdsm_circuit4', out_format='tex', quiet=QUIET, show_browser=SHOW,
                        recurse=False, model_path='G3')
 
     def test_pyxdsm_solver(self):
@@ -289,7 +291,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET,
-                   show_browser=False, include_solver=True)
+                   show_browser=SHOW, include_solver=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
@@ -302,7 +304,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET,
-                   show_browser=False, include_solver=True)
+                   show_browser=SHOW, include_solver=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
@@ -324,7 +326,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET,
-                   show_browser=False, include_solver=True)
+                   show_browser=SHOW, include_solver=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
@@ -375,7 +377,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
@@ -395,7 +397,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Conclude setup but don't run model.
         prob.final_setup()
 
-        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
@@ -415,7 +417,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Conclude setup but don't run model.
         prob.final_setup()
 
-        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
@@ -454,7 +456,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
-        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
@@ -497,7 +499,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=SHOW,
                    embed_data=False)
 
         # Check if file was created
@@ -525,7 +527,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=SHOW,
                    embed_data=True)
 
         # Check if file was created
@@ -552,7 +554,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=False,
+        write_xdsm(prob, filename=filename, out_format='html', subs=(), show_browser=SHOW,
                    embed_data=True, embeddable=True)
 
         # Check if file was created
@@ -668,7 +670,7 @@ class TestXDSMjsViewer(unittest.TestCase):
 
         p.run_model()
 
-        write_xdsm(p, 'xdsmjs_orbit', out_format='html', show_browser=False)
+        write_xdsm(p, 'xdsmjs_orbit', out_format='html', show_browser=SHOW)
         self.assertTrue(os.path.isfile('.'.join(['xdsmjs_orbit', 'html'])))
 
     def test_xdsmjs_mda(self):
@@ -680,7 +682,7 @@ class TestXDSMjsViewer(unittest.TestCase):
 
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET,
-                   show_browser=False, embed_data=True, embeddable=True, include_solver=True)
+                   show_browser=SHOW, embed_data=True, embeddable=True, include_solver=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
@@ -702,7 +704,7 @@ class TestXDSMjsViewer(unittest.TestCase):
 
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format,
-                   show_browser=False, include_solver=True)
+                   show_browser=SHOW, include_solver=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
@@ -720,7 +722,7 @@ class TestXDSMjsViewer(unittest.TestCase):
 
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format,
-                   show_browser=False, include_solver=True)
+                   show_browser=SHOW, include_solver=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
@@ -771,7 +773,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
@@ -791,7 +793,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         # Conclude setup but don't run model.
         prob.final_setup()
 
-        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
@@ -811,7 +813,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         # Conclude setup but don't run model.
         prob.final_setup()
 
-        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
@@ -850,7 +852,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
-        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=False,
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
                    show_parallel=True)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
@@ -882,7 +884,7 @@ class TestXDSMjsViewer(unittest.TestCase):
 
         p.run_model()
 
-        write_xdsm(p, 'xdsmjs_circuit', out_format='html', quiet=QUIET, show_browser=False,
+        write_xdsm(p, 'xdsmjs_circuit', out_format='html', quiet=QUIET, show_browser=SHOW,
                    recurse=True)
         self.assertTrue(os.path.isfile('.'.join(['xdsmjs_circuit', 'html'])))
 
@@ -905,7 +907,7 @@ class TestXDSMjsViewer(unittest.TestCase):
 
         # Write output
         with assert_warning(Warning, msg):
-            write_xdsm(prob, filename=filename, out_format='html', show_browser=False, quiet=QUIET,
+            write_xdsm(prob, filename=filename, out_format='html', show_browser=SHOW, quiet=QUIET,
                        output_side='right')
 
         # Check if file was created
@@ -914,7 +916,7 @@ class TestXDSMjsViewer(unittest.TestCase):
     def test_wrong_out_format(self):
         """Incorrect output format error."""
 
-        filename = 'xdsm'  # this name is needed for XDSMjs
+        filename = 'xdsm_wrong_format'  # this name is needed for XDSMjs
         prob = Problem()
         prob.model = SellarNoDerivatives()
 
@@ -923,7 +925,30 @@ class TestXDSMjsViewer(unittest.TestCase):
 
         # no output checking, just make sure no exceptions raised
         with self.assertRaises(ValueError):
-            write_xdsm(prob, filename=filename, out_format='jpg', subs=(), show_browser=False)
+            write_xdsm(prob, filename=filename, out_format='jpg', subs=(), show_browser=SHOW)
+
+    def test_custom_writer(self):
+        from openmdao.devtools.xdsm_viewer.xdsm_writer import XDSMjsWriter
+
+        class CustomWriter(XDSMjsWriter):
+            """Customized XDSM writer"""
+
+            @staticmethod
+            def format_block(names, **kwargs):
+                return [name.upper() for name in names]
+
+        filename = 'xdsm_custom_writer'  # this name is needed for XDSMjs
+        prob = Problem()
+        prob.model = SellarNoDerivatives()
+
+        prob.setup(check=False)
+        prob.final_setup()
+
+        # Write output
+        write_xdsm(prob, filename=filename, writer=CustomWriter(), show_browser=SHOW)
+
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
 
 
 if __name__ == "__main__":

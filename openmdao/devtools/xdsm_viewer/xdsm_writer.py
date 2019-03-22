@@ -726,14 +726,24 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
-    try:
-        writer = _OUT_FORMATS[out_format]
-    except KeyError:
-        msg = 'Invalid output format "{}", choose from: {}'
-        raise ValueError(msg.format(out_format, _OUT_FORMATS.keys()))
-    writer_name = writer.lower()  # making it case insensitive
-    if isinstance(subs, dict):
-        subs = subs[writer_name]  # Getting the character substitutes of the chosen writer
+    writer = kwargs.pop('writer', None)
+    # If the "writer" argument not provided, the output format is used to choose the writer
+    if writer is None:
+        try:
+            writer = _OUT_FORMATS[out_format]
+        except KeyError:
+            msg = 'Invalid output format "{}", choose from: {}'
+            raise ValueError(msg.format(out_format, _OUT_FORMATS.keys()))
+        writer_name = writer.lower()  # making it case insensitive
+        if isinstance(subs, dict):
+            subs = subs[writer_name]  # Getting the character substitutes of the chosen writer
+    else:
+        try:
+            subs = subs[writer.name]
+        except KeyError:
+            msg = 'Writer name "{}" not found in "{}", there will be no character substitutes used'
+            warnings.warn(msg.format(writer.name, subs))
+            subs = ()
     return _write_xdsm(filename, viewer_data=viewer_data,
                        driver=driver_name, include_solver=include_solver, model_path=model_path,
                        design_vars=design_vars, responses=responses, writer=writer,
@@ -867,7 +877,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     tree = viewer_data['tree']
 
     # Get the top level system to be transcripted to XDSM
-    comps = _get_comps(tree, model_path=model_path, recurse=recurse)
+    comps = _get_comps(tree, model_path=model_path, recurse=recurse, include_solver=include_solver)
     comps_dct = {comp['abs_name']: comp for comp in comps if comp['type'] != 'solver'}
     print(comps_dct, comps)
     solvers = []
@@ -1212,9 +1222,11 @@ def _prune_connections(conns, model_path=None, sep='.'):
         return internal_conns, external_inputs, external_outputs
 
 
-def _get_comps(tree, model_path=None, recurse=True):
+def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
     """
     Return the components in the tree, optionally only those within the given model_path.
+    It also includes the solvers of the subsystems, if "include_solver" is True and not the
+    default solvers are assigned to the subsystems.
 
     Parameters
     ----------
@@ -1226,12 +1238,14 @@ def _get_comps(tree, model_path=None, recurse=True):
     recurse : bool
         If True, return individual components within the model_path.  If False, treat
         Groups as black-box components and don't show their internal components.
+    include_solver : bool, optional
+        Defaults to False.
 
     Returns
     -------
     components : list
         A list of the components within the model_path in tree.  If recurse is False, this
-        list may contain groups.
+        list may contain groups. If "include_solver" is True, it may include solvers.
 
     """
     # Components are ordered in the tree, so they can be collected by walking through the tree.
@@ -1260,24 +1274,27 @@ def _get_comps(tree, model_path=None, recurse=True):
                 comp_names.add(ch['rel_name'])
                 local_comps.append(ch)
             else:  # Group
-                solver_names = []
-                solver_dct = {}
-                for solver_typ, default_solver in iteritems(_DEFAULT_SOLVER_NAMES):
-                    k = '{}_solver'.format(solver_typ)
-                    if ch[k] != default_solver:
-                        solver_names.append(ch[k])
-                    solver_dct[k] = ch[k]
-                if solver_names:
-                    i_solver = len(components)
-                    print("i solver", i_solver)
-                    name_str = ch['abs_name'] + '@solver'
-                    # "comps" will be filled later
-                    solver = {'abs_name': _format_name(name_str), 'rel_name': solver_names,
-                              'type': 'solver', 'name': name_str, 'is_parallel': False,
-                              'component_type': 'MDA', 'comps': [], 'index': i_solver}
-                    solver.update(solver_dct)
-                    components.append(solver)
-                    comp_names.add(name_str)
+                if include_solver:
+                    has_solver = False
+                    solver_names = []
+                    solver_dct = {}
+                    for solver_typ, default_solver in iteritems(_DEFAULT_SOLVER_NAMES):
+                        k = '{}_solver'.format(solver_typ)
+                        if ch[k] != default_solver:
+                            solver_names.append(ch[k])
+                            has_solver = True
+                        solver_dct[k] = ch[k]
+                    if has_solver:
+                        i_solver = len(components)
+                        print("i solver", i_solver)
+                        name_str = ch['abs_name'] + '@solver'
+                        # "comps" will be filled later
+                        solver = {'abs_name': _format_name(name_str), 'rel_name': solver_names,
+                                  'type': 'solver', 'name': name_str, 'is_parallel': False,
+                                  'component_type': 'MDA', 'comps': [], 'index': i_solver}
+                        solver.update(solver_dct)
+                        components.append(solver)
+                        comp_names.add(name_str)
                 if recurse:  # it is not a component and recurse is True
                     if path:
                         new_path = sep.join([path, ch['name']])
@@ -1288,7 +1305,7 @@ def _get_comps(tree, model_path=None, recurse=True):
                     components.append(ch)
                     comp_names.add(ch['rel_name'])
                     local_comps = ch
-                if solver_names:
+                if include_solver and has_solver:
                     components[i_solver]['comps'] = local_comps
                     local_comps = []
         return local_comps
