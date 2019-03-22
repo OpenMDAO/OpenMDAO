@@ -23,6 +23,7 @@ import json
 import os
 import warnings
 
+import six
 from six import iteritems
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
@@ -104,9 +105,14 @@ _DEFAULT_BOX_STACKING = 'max_chars'
 _PROCESS_ARROWS = False
 # Maximum number of lines in a box. No limit, if None.
 _MAX_BOX_LINES = None
+_START_INDEX = 1
 
 
-class AbstractXDSMWriter(object):
+class BaseXDSMWriter(object):
+    pass
+
+
+class AbstractXDSMWriter(BaseXDSMWriter):
     """
     Abstract class to define methods for XDSM writers.
 
@@ -120,6 +126,8 @@ class AbstractXDSMWriter(object):
         self.ins = {}
         self.processes = []
         self.process_arrows = []
+        self.extension = None  # Implement in child class as string file extension
+        self.name = 'abstract_xdsm_writer'
 
     def add_solver(self, label, name='solver', **kwargs):
         pass  # Implement in child class
@@ -142,6 +150,17 @@ class AbstractXDSMWriter(object):
     def add_process(self, systems, arrow=True):
         pass  # Implement in child class
 
+    @staticmethod
+    def format_block(names, **kwargs):
+        return names
+
+    @staticmethod
+    def format_var_str(name, var_type, superscripts=None):
+        if superscripts is None:
+            superscripts = _SUPERSCRIPTS
+        sup = superscripts[var_type]
+        return '{}^{}'.format(name, sup)
+
 
 class XDSMjsWriter(AbstractXDSMWriter):
     """
@@ -156,7 +175,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.comp_names = []  # Component names
         self.comps = []  # List of systems
         self.reserved_words = '_U_', '_E_'  # Ignored at text formatting
-        self._writer_name = 'xdsmjs'
+        self.name = 'xdsmjs'
+        self.extension = 'html'
 
     def _format_id(self, name, subs=(('_', ''),)):
         if name not in self.reserved_words:
@@ -198,7 +218,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         self.comp_names.append(self._format_id(name))
-        style = _COMPONENT_TYPE_MAP[self._writer_name]['solver']
+        style = _COMPONENT_TYPE_MAP[self.name]['solver']
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
@@ -220,7 +240,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         comp_type_map = _COMPONENT_TYPE_MAP
-        style = comp_type_map[self._writer_name].get(comp_type, 'analysis')
+        style = comp_type_map[self.name].get(comp_type, 'analysis')
         self.comp_names.append(self._format_id(name))
         self.add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
 
@@ -258,7 +278,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         self.driver = self._format_id(name)
-        style = _COMPONENT_TYPE_MAP[self._writer_name].get(driver_type, 'optimization')
+        style = _COMPONENT_TYPE_MAP[self.name].get(driver_type, 'optimization')
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_system(self, node_name, style, label=None, stack=False, **kwargs):
@@ -369,7 +389,7 @@ except ImportError:
     XDSM = None
 else:
 
-    class XDSMWriter(XDSM):
+    class XDSMWriter(XDSM, BaseXDSMWriter):
         """
         XDSM with some additional semantics.
         Creates a TeX file and TiKZ file, and converts it to PDF.
@@ -386,7 +406,8 @@ else:
 
         def __init__(self):
             super(XDSMWriter, self).__init__()
-            self._writer_name = 'pyxdsm'
+            self.name = 'pyxdsm'
+            self.extension = 'pdf'
 
         def write(self, filename=None, **kwargs):
             """
@@ -441,7 +462,7 @@ else:
             kwargs : dict
                 Keyword args
             """
-            style = _COMPONENT_TYPE_MAP[self._writer_name]['solver']
+            style = _COMPONENT_TYPE_MAP[self.name]['solver']
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
 
         def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
@@ -463,7 +484,7 @@ else:
                 Keyword args
             """
             comp_type_map = _COMPONENT_TYPE_MAP
-            style = comp_type_map[self._writer_name].get(comp_type, 'Analysis')
+            style = comp_type_map[self.name].get(comp_type, 'Analysis')
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label,
                             stack=stack, **kwargs)
 
@@ -502,7 +523,7 @@ else:
             kwargs : dict
                 Keyword args
             """
-            style = _COMPONENT_TYPE_MAP[self._writer_name].get(driver_type, 'Optimization')
+            style = _COMPONENT_TYPE_MAP[self.name].get(driver_type, 'Optimization')
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
 
         def add_workflow(self, comp_names=None):
@@ -519,6 +540,63 @@ else:
                 comp_names = [c[0] for c in self.comps]
             comps = comp_names + [comp_names[0]]  # close the loop
             self.add_process(comps, arrow=_PROCESS_ARROWS)
+
+        @staticmethod
+        def format_block(names, stacking='vertical', **kwargs):
+            end_str = ', ...'
+            max_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
+            if stacking == 'vertical':
+                if (max_lines is None) or (max_lines >= len(names)):
+                    return names
+                else:
+                    names = names[0:max_lines]
+                    names[-1] = names[-1] + end_str
+                    return names
+            elif stacking == 'horizontal':
+                return ', '.join(names)
+            elif stacking in ('max_chars', 'cut_chars'):
+                max_chars = kwargs.pop('box_width', _DEFAULT_BOX_CHAR_LIMIT)
+                if len(names) < 2:
+                    return names
+                else:
+                    lengths = 0
+                    lines = list()
+                    line = ''
+                    for name in names:
+                        lengths += len(name)
+                        if lengths <= max_chars:
+                            if line:  # there are already var names on the line
+                                line += ', ' + name
+                            else:  # it will be the first var name on the line
+                                line = name
+                        else:  # make new line
+                            if stacking == 'max_chars':
+                                if line:
+                                    lines.append(line)
+                                line = name
+                                lengths = len(name)
+                            else:  # 'cut_chars'
+                                lines.append(line + end_str)
+                                line = ''  # No new line
+                                break
+                    if line:  # it will be the last line, if var_names was not empty
+                        lines.append(line)
+                    if len(lines) > 1:
+                        return lines
+                    else:
+                        return lines[0]  # return the string instead of a list
+            elif stacking == 'empty':  # No variable names in the data block, good for big diagrams
+                return ''
+            else:
+                msg = 'Invalid block stacking option "{}".'
+                raise ValueError(msg.format(stacking))
+
+        @staticmethod
+        def format_var_str(name, var_type, superscripts=None):
+            if superscripts is None:
+                superscripts = _SUPERSCRIPTS
+            sup = superscripts[var_type]
+            return '{}^{{{}}}'.format(name, sup)
 
 
 def write_xdsm(problem, filename, model_path=None, recurse=True,
@@ -700,9 +778,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         Defaults to True.
     subs : tuple, optional
        Character pairs to be substituted. Forbidden characters or just for the sake of nicer names.
-    writer: str, optional
-        Writer is pyXDSM or XDSMjs.
-        Defaults to pyXDSM.
+    writer: str or BaseXDSMWriter, optional
+        Writer is either a string ("pyXDSM" or "XDSMjs") or a custom writer.
+        Defaults to "pyXDSM".
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to False.
@@ -732,30 +810,32 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     """
     # TODO implement residuals
 
-    writer_name = writer.lower()  # making it case insensitive
+    error_msg = ('Undefined XDSM writer "{}". '
+                 'Provide  a valid name or a BaseXDSMWriter instance.')
+    if isinstance(writer, six.string_types):
+        if writer.lower() == 'pyxdsm':  # pyXDSM
+            x = XDSMWriter()
+        elif writer.lower() == 'xdsmjs':  # XDSMjs
+            x = XDSMjsWriter()
+        else:
+            raise ValueError(error_msg.format(writer))
+    elif isinstance(writer, BaseXDSMWriter):  # Custom writer
+        x = writer
+    else:
+        raise ValueError(error_msg.format(writer))
 
     # Box appearance
     box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
     box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
     box_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
     # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
-    add_component_indices = kwargs.pop('numbered_comps', True) and (writer_name == 'pyxdsm')
+    add_component_indices = kwargs.pop('numbered_comps', True) and (x.name == 'pyxdsm')
     number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
 
     def format_block(names, **kwargs):
         # Sets the width, number of lines and other string formatting for a block.
-        if writer_name == 'pyxdsm':
-            return _format_block_string(var_names=names, stacking=box_stacking,
-                                        box_width=box_width, box_lines=box_lines, **kwargs)
-        else:
-            return names
-
-    def format_var_str(name, var_type):
-        sup = _SUPERSCRIPTS[var_type]
-        if writer_name == 'pyxdsm':
-            return '{}^{{{}}}'.format(name, sup)
-        else:
-            return '{}^{}'.format(name, sup)
+        return x.format_block(names=names, box_width=box_width, box_lines=box_lines,
+                              box_stacking=box_stacking, **kwargs)
 
     def number_label(number, text, alignment):
         # Adds an index to the label either above or on the left side.
@@ -772,7 +852,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             return text  # In case of a wrong setting
 
     def get_output_side(component_name):
-        if isinstance(output_side, str):
+        if isinstance(output_side, six.string_types):
             return output_side
         elif isinstance(output_side, dict):
             # Gets the specified key, or the default in the dictionary, or the global default
@@ -803,11 +883,11 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    def add_solver(solver_dct, first=0):
+    def add_solver(solver_dct):
         # Adds a solver.
         # Uses some vars from the outer scope.
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
-        print('comp names', comp_names)
+        first = solver_dct['index'] + _START_INDEX
         solver_label = _format_solver_str(solver_dct,
                                           stacking=box_stacking,
                                           add_indices=add_component_indices)
@@ -830,19 +910,11 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 for tgt, conn_vars in iteritems(dct):
                     formatted_conns = format_block(conn_vars)
                     if (src in comp_names) and (tgt in comp_names):
-                        formatted_targets = format_block([format_var_str(c, 'target') for c in conn_vars])
+                        formatted_targets = format_block([x.format_var_str(c, 'target') for c in conn_vars])
                         # From solver to components (targets)
                         x.connect(solver_name, tgt, formatted_targets)
                         # From components to solver
                         x.connect(src, solver_name, formatted_conns)
-
-    if writer_name == 'pyxdsm':  # pyXDSM
-        x = XDSMWriter()
-    elif writer_name == 'xdsmjs':  # XDSMjs
-        x = XDSMjsWriter()
-    else:
-        msg = 'Undefined XDSM writer "{}"'
-        raise ValueError(msg.format(writer_name))
 
     if driver is not None:
         driver_label = driver
@@ -864,9 +936,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             # Format var names
             conn_vars = [_replace_chars(var, subs) for var in conn_vars]
             # Optimal var names
-            opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
+            opt_con_vars = [x.format_var_str(var, 'optimal') for var in conn_vars]
             # Initial var names
-            init_con_vars = [format_var_str(var, 'initial') for var in conn_vars]
+            init_con_vars = [x.format_var_str(var, 'initial') for var in conn_vars]
             # Connection from optimizer
             x.connect(driver_name, comp, format_block(conn_vars))
             # Optimal design variables
@@ -879,7 +951,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         for comp, conn_vars in iteritems(responses2):
             # Optimal var names
             conn_vars = [_replace_chars(var, subs) for var in conn_vars]
-            opt_con_vars = [format_var_str(var, 'optimal') for var in conn_vars]
+            opt_con_vars = [x.format_var_str(var, 'optimal') for var in conn_vars]
             # Connection to optimizer
             x.connect(comp, driver_name, conn_vars)
             # Optimal output
@@ -894,7 +966,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         tree2 = dict(tree)
         tree2['comps'] = comps
         tree2['abs_name'] = 'root.solver'
-        add_solver(tree2, first=1)
+        tree2['index'] = _START_INDEX
+        add_solver(tree2)
 
     # Add components
     for comp in comps:  # Driver is 1, so starting from 2
@@ -950,15 +1023,12 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     x.write(filename, cleanup=cleanup, quiet=quiet, build=build_pdf, **kwargs)
 
-    if show_browser and (build_pdf or writer_name == 'xdsmjs'):
+    if show_browser and (build_pdf or x.name == 'xdsmjs'):
         # path will be specified based on the "out_format", if all required inputs where
         # provided for showing the results.
-        if writer_name == 'pyxdsm':  # pyXDSM
-            ext = 'pdf'
-        elif writer_name == 'xdsmjs':  # XDSMjs
-            ext = 'html'
-        else:
-            err_msg = '"{}" is an invalid writer name.'
+        ext = x.extension
+        if not isinstance(ext, six.string_types):
+            err_msg = '"{}" is an invalid extension.'
             raise ValueError(err_msg.format(writer))
         path = '.'.join([filename, ext])
         webview(path)  # Can open also PDFs
@@ -1196,7 +1266,7 @@ def _get_comps(tree, model_path=None, recurse=True):
                     name_str = ch['abs_name'] + '@solver'
                     solver = {'abs_name': _format_name(name_str), 'rel_name': solver_names,
                               'type': 'solver', 'name': name_str, 'is_parallel': False,
-                              'component_type': 'MDA', 'comps': []}
+                              'component_type': 'MDA', 'comps': [], 'index': i_solver}
                     solver.update(solver_dct)
                     components.append(solver)
                     comp_names.add(name_str)
