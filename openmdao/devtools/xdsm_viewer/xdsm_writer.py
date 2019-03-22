@@ -883,11 +883,11 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    def add_solver(solver_dct):
+    def add_solver(solver_dct, index_shift=0):
         # Adds a solver.
         # Uses some vars from the outer scope.
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
-        first = solver_dct['index'] + _START_INDEX
+        first = solver_dct['index']
         solver_label = _format_solver_str(solver_dct,
                                           stacking=box_stacking,
                                           add_indices=add_component_indices)
@@ -895,10 +895,12 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         solver_name = _format_name(solver_dct['abs_name'])
 
         if solver_label:  # At least one non-default solver (default solvers are ignored)
+            start_index = _START_INDEX + int(bool(driver)) + index_shift
             nr_components = len(comp_names)
             if add_component_indices:
                 solver_index = _make_loop_str(first=first,
-                                              last=nr_components, start_index=1)
+                                              last=first+nr_components,
+                                              start_index=start_index)
                 solver_label = number_label(solver_index, solver_label, number_alignment)
             solvers.append(solver_label)
             x.add_solver(name=solver_name, label=solver_label)
@@ -915,6 +917,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                         x.connect(solver_name, tgt, formatted_targets)
                         # From components to solver
                         x.connect(src, solver_name, formatted_conns)
+            return True
+        else:
+            return False
 
     if driver is not None:
         driver_label = driver
@@ -966,8 +971,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         tree2 = dict(tree)
         tree2['comps'] = comps
         tree2['abs_name'] = 'root.solver'
-        tree2['index'] = _START_INDEX
-        add_solver(tree2)
+        tree2['index'] = 0
+        # Add top level solver (solver of the whole model)
+        has_top_level_solver = add_solver(tree2)
 
     # Add components
     for comp in comps:  # Driver is 1, so starting from 2
@@ -978,7 +984,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         stack = comp['is_parallel'] and show_parallel
         if comp['type'] == 'solver':  # solver
             if include_solver:
-                add_solver(comp)
+                add_solver(comp, index_shift=int(has_top_level_solver))
         else:  # component or group
             x.add_comp(name=comp['abs_name'], label=label, stack=stack,
                        comp_type=comp['component_type'])
@@ -1263,7 +1269,9 @@ def _get_comps(tree, model_path=None, recurse=True):
                     solver_dct[k] = ch[k]
                 if solver_names:
                     i_solver = len(components)
+                    print("i solver", i_solver)
                     name_str = ch['abs_name'] + '@solver'
+                    # "comps" will be filled later
                     solver = {'abs_name': _format_name(name_str), 'rel_name': solver_names,
                               'type': 'solver', 'name': name_str, 'is_parallel': False,
                               'component_type': 'MDA', 'comps': [], 'index': i_solver}
@@ -1295,56 +1303,6 @@ def _get_comps(tree, model_path=None, recurse=True):
 
     get_children(top_level_tree)
     return components
-
-
-def _format_block_string(var_names, stacking='vertical', **kwargs):
-    end_str = ', ...'
-    max_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
-    if stacking == 'vertical':
-        if (max_lines is None) or (max_lines >= len(var_names)):
-            return var_names
-        else:
-            names = var_names[0:max_lines]
-            names[-1] = names[-1] + end_str
-            return names
-    elif stacking == 'horizontal':
-        return ', '.join(var_names)
-    elif stacking in ('max_chars', 'cut_chars'):
-        max_chars = kwargs.pop('box_width', _DEFAULT_BOX_CHAR_LIMIT)
-        if len(var_names) < 2:
-            return var_names
-        else:
-            lengths = 0
-            lines = list()
-            line = ''
-            for name in var_names:
-                lengths += len(name)
-                if lengths <= max_chars:
-                    if line:  # there are already var names on the line
-                        line += ', ' + name
-                    else:  # it will be the first var name on the line
-                        line = name
-                else:  # make new line
-                    if stacking == 'max_chars':
-                        if line:
-                            lines.append(line)
-                        line = name
-                        lengths = len(name)
-                    else:  # 'cut_chars'
-                        lines.append(line + end_str)
-                        line = ''  # No new line
-                        break
-            if line:  # it will be the last line, if var_names was not empty
-                lines.append(line)
-            if len(lines) > 1:
-                return lines
-            else:
-                return lines[0]  # return the string instead of a list
-    elif stacking == 'empty':  # No variable names in the data block, good for big diagrams
-        return ''
-    else:
-        msg = 'Invalid block stacking option "{}".'
-        raise ValueError(msg.format(stacking))
 
 
 def _replace_chars(name, substitutes):
