@@ -1274,6 +1274,8 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                 comp_names.add(ch['rel_name'])
                 local_comps.append(ch)
             else:  # Group
+                # Add a solver to the component list, if this group has a linear or nonlinear
+                # solver.
                 if include_solver:
                     has_solver = False
                     solver_names = []
@@ -1295,6 +1297,7 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                         solver.update(solver_dct)
                         components.append(solver)
                         comp_names.add(name_str)
+                # Add the group or components in the group
                 if recurse:  # it is not a component and recurse is True
                     if path:
                         new_path = sep.join([path, ch['name']])
@@ -1305,6 +1308,7 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                     components.append(ch)
                     comp_names.add(ch['rel_name'])
                     local_comps.append(ch)
+                # Add to the solver, which components are in its loop.
                 if include_solver and has_solver:
                     components[i_solver]['comps'] = local_comps
                     local_comps = []
@@ -1370,14 +1374,14 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
     stacking = stacking.lower()
 
     solvers = []
-    for solver_type in solver_types:
+    for solver_type in solver_types:  # loop through all solver types
         solver_name = dct['{}_solver'.format(solver_type)]
-        if solver_name != _DEFAULT_SOLVER_NAMES[solver_type]:
+        if solver_name != _DEFAULT_SOLVER_NAMES[solver_type]:  # Not default solver found
             solvers.append(solver_name)
     if stacking == 'vertical':
         # Make multiline comp if not numbered
         if add_indices:  # array is already created for the numbering
-            return '} \\\\ \\text{'.join(solvers)
+            return '} \\\\ \\text{'.join(solvers)  # With a TeX array this is a line separator
         else:  # Goes into an array environment
             return _multiline_block(*solvers)
     elif stacking in ('horizontal', 'max_chars', 'cut_chars'):
@@ -1409,6 +1413,7 @@ def _multiline_block(*texts, **kwargs):
 
 
 def _make_loop_str(first, last, start_index=0):
+    # Start index shifts all numbers
     i = start_index
     txt = '{}, {}$ \\rightarrow $ {}'
     return txt.format(first+i, last+i, first+i+1)
