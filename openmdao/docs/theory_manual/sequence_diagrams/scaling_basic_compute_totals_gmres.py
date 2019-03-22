@@ -130,7 +130,6 @@ for loc_tup in locs:
 
     y += delta_y
 
-
 # Phys vs scaling indicator
 scaled_regions = [
                   (1, (2, 5)),
