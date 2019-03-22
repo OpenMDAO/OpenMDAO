@@ -1209,7 +1209,6 @@ class TestScalingOverhaul(unittest.TestCase):
         model.add_objective('comp.x3_s')
 
         prob.setup()
-        prob.set_solver_print(2)
         prob.run_model()
 
         totals = prob.check_totals(compact_print=True, out_stream=None)
