@@ -822,9 +822,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 solver_label = number_label(solver_index, solver_label, number_alignment)
             solvers.append(solver_label)
             x.add_solver(name=solver_name, label=solver_label)
-            # if add_process_conns:
-            #     x.add_workflow([solver_name] + comp_names)
-            #
+            if add_process_conns:
+                x.add_workflow([solver_name] + comp_names)
+
             # Add the connections
             for src, dct in iteritems(conns3):
                 for tgt, conn_vars in iteritems(dct):
@@ -1205,12 +1205,11 @@ def _get_comps(tree, model_path=None, recurse=True):
                         new_path = sep.join([path, ch['name']])
                     else:
                         new_path = ch['name']
-                    local2 = get_children(ch, new_path)
+                    local_comps = get_children(ch, new_path)
                 else:
                     components.append(ch)
                     comp_names.add(ch['rel_name'])
-                    local2 = ch
-                local_comps += local2
+                    local_comps = ch
                 if solver_names:
                     components[i_solver]['comps'] = local_comps
                     local_comps = []
