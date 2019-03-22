@@ -828,13 +828,13 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             # Add the connections
             for src, dct in iteritems(conns3):
                 for tgt, conn_vars in iteritems(dct):
-                    formatted_cons = format_block(conn_vars)
+                    formatted_conns = format_block(conn_vars)
                     if (src in comp_names) and (tgt in comp_names):
                         formatted_targets = format_block([format_var_str(c, 'target') for c in conn_vars])
                         # From solver to components (targets)
                         x.connect(solver_name, tgt, formatted_targets)
                         # From components to solver
-                        x.connect(src, solver_name, formatted_cons)
+                        x.connect(src, solver_name, formatted_conns)
 
     if writer_name == 'pyxdsm':  # pyXDSM
         x = XDSMWriter()
@@ -1182,7 +1182,8 @@ def _get_comps(tree, model_path=None, recurse=True):
                             comp['name'] = sep.join([comp['path'], name])
                 components.append(ch)
                 comp_names.add(ch['rel_name'])
-            else:
+                local_comps.append(ch)
+            else:  # Group
                 solver_names = []
                 solver_dct = {}
                 for solver_typ, default_solver in iteritems(_DEFAULT_SOLVER_NAMES):
@@ -1191,6 +1192,7 @@ def _get_comps(tree, model_path=None, recurse=True):
                         solver_names.append(ch[k])
                     solver_dct[k] = ch[k]
                 if solver_names:
+                    i_solver = len(components)
                     name_str = ch['abs_name'] + '@solver'
                     solver = {'abs_name': _format_name(name_str), 'rel_name': solver_names,
                               'type': 'solver', 'name': name_str, 'is_parallel': False,
@@ -1198,19 +1200,20 @@ def _get_comps(tree, model_path=None, recurse=True):
                     solver.update(solver_dct)
                     components.append(solver)
                     comp_names.add(name_str)
-                    i_solver = len(components)
                 if recurse:  # it is not a component and recurse is True
                     if path:
                         new_path = sep.join([path, ch['name']])
                     else:
                         new_path = ch['name']
-                    local_comps += get_children(ch, new_path)
+                    local2 = get_children(ch, new_path)
                 else:
                     components.append(ch)
                     comp_names.add(ch['rel_name'])
-                    local_comps += ch
+                    local2 = ch
+                local_comps += local2
                 if solver_names:
                     components[i_solver]['comps'] = local_comps
+                    local_comps = []
         return local_comps
 
     top_level_tree = tree
