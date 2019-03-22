@@ -1304,7 +1304,7 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                 else:
                     components.append(ch)
                     comp_names.add(ch['rel_name'])
-                    local_comps = ch
+                    local_comps.append(ch)
                 if include_solver and has_solver:
                     components[i_solver]['comps'] = local_comps
                     local_comps = []
