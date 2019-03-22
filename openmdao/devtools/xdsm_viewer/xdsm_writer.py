@@ -807,15 +807,15 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # Adds a solver.
         # Uses some vars from the outer scope.
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
+        print('comp names', comp_names)
         solver_label = _format_solver_str(solver_dct,
                                           stacking=box_stacking,
                                           add_indices=add_component_indices)
         solver_label = _replace_chars(solver_label, subs)
-        solver_name = _format_solver_str(tree, stacking='horizontal', add_indices=False)
-        solver_name = _format_name(solver_name)
+        solver_name = _format_name(solver_dct['abs_name'])
 
         if solver_label:  # At least one non-default solver (default solvers are ignored)
-            nr_components = len(comps)
+            nr_components = len(comp_names)
             if add_component_indices:
                 solver_index = _make_loop_str(first=first,
                                               last=nr_components, start_index=1)
@@ -893,6 +893,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
         tree2 = dict(tree)
         tree2['comps'] = comps
+        tree2['abs_name'] = 'root.solver'
         add_solver(tree2, first=1)
 
     # Add components
@@ -1203,11 +1204,11 @@ def _get_comps(tree, model_path=None, recurse=True):
                         new_path = sep.join([path, ch['name']])
                     else:
                         new_path = ch['name']
-                    local_comps = get_children(ch, new_path)
+                    local_comps += get_children(ch, new_path)
                 else:
                     components.append(ch)
                     comp_names.add(ch['rel_name'])
-                    local_comps = ch
+                    local_comps += ch
                 if solver_names:
                     components[i_solver]['comps'] = local_comps
         return local_comps
