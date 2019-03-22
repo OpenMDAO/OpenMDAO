@@ -100,6 +100,7 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         system = self._system
         outputs = system._outputs
+        residuals = system._residuals
         use_aitken = self.options['use_aitken']
 
         if use_aitken:
@@ -157,7 +158,8 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if not self.options['use_apply_nonlinear']:
             # Residual is the change in the outputs vector.
-            system._residuals._data[:] = outputs._data - outputs_n
+            with system._unscaled_context(residuals=[residuals]):
+                residuals._data[:] = outputs._data - outputs_n
 
     def _run_apply(self):
         """
@@ -183,6 +185,7 @@ class NonlinearBlockGS(NonlinearSolver):
             # further increments the iteration counter.
             itercount += 1
             outputs = system._outputs
+            residuals = system._residuals
 
             outputs_n = outputs._data.copy()
 
@@ -193,7 +196,8 @@ class NonlinearBlockGS(NonlinearSolver):
                 system._check_reconf_update()
 
             self._solver_info.pop()
-            system._residuals._data[:] = outputs._data - outputs_n
+            with system._unscaled_context(residuals=[residuals]):
+                residuals._data[:] = outputs._data - outputs_n
 
     def _mpi_print_header(self):
         """
