@@ -683,7 +683,6 @@ class TestGroupMPI(unittest.TestCase):
         p.model.add_subsystem('C1', MyComp(),
                               promotes_inputs=['x'])
 
-        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
 

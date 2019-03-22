@@ -248,7 +248,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
             expected_outputs.update(expected_includes)
 
-            coordinate = [0, 'SLSQP', (driver.iter_count-1,)]
+            coordinate = [0, 'ScipyOptimize_SLSQP', (driver.iter_count-1,)]
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
             assertDriverIterDataRecorded(self, expected_data, self.eps)

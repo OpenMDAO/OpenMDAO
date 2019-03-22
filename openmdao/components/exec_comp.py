@@ -252,7 +252,7 @@ class ExecComp(ExplicitComponent):
                 val = init_vals[var]
             else:
                 init_vals[var] = val = 1.0
-            meta = kwargs2.get(var, {})
+            meta = kwargs2.get(var, {'units': units})
 
             if var in outs:
                 self.add_output(var, val, **meta)

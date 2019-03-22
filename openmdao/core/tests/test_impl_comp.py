@@ -445,11 +445,15 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, ScipyKrylov
 
         class ImpWithInitial(ImplicitComponent):
-
+            """
+            An implicit component to solve the quadratic equation: x^2 - 4x + 3
+            (solutions at x=1 and x=3)
+            """
             def setup(self):
                 self.add_input('a', val=1.)
-                self.add_input('b', val=1.)
-                self.add_input('c', val=1.)
+                self.add_input('b', val=-4.)
+                self.add_input('c', val=3.)
+
                 self.add_output('x', val=0.)
 
                 self.declare_partials(of='*', wrt='*')
@@ -460,12 +464,6 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 c = inputs['c']
                 x = outputs['x']
                 residuals['x'] = a * x ** 2 + b * x + c
-
-            def solve_nonlinear(self, inputs, outputs):
-                a = inputs['a']
-                b = inputs['b']
-                c = inputs['c']
-                outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / 2 / a
 
             def linearize(self, inputs, outputs, partials):
                 a = inputs['a']
@@ -478,38 +476,23 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 partials['x', 'c'] = 1.0
                 partials['x', 'x'] = 2 * a * x + b
 
-                self.inv_jac = 1.0 / (2 * a * x + b)
-
             def guess_nonlinear(self, inputs, outputs, resids):
-                # Solution at 1 and 3. Default value takes us to -1 solution. Here
-                # we set it to a value that will tke us to the 3 solution.
+                # Default initial state of zero for x takes us to x=1 solution.
+                # Here we set it to a value that will take us to the x=3 solution.
                 outputs['x'] = 5.0
 
         prob = Problem()
         model = prob.model = Group()
 
-        model.add_subsystem('pa', IndepVarComp('a', 1.0))
-        model.add_subsystem('pb', IndepVarComp('b', 1.0))
-        model.add_subsystem('pc', IndepVarComp('c', 1.0))
-        model.add_subsystem('comp2', ImpWithInitial())
-        model.connect('pa.a', 'comp2.a')
-        model.connect('pb.b', 'comp2.b')
-        model.connect('pc.c', 'comp2.c')
+        model.add_subsystem('comp', ImpWithInitial())
 
         model.nonlinear_solver = NewtonSolver()
-        model.nonlinear_solver.options['solve_subsystems'] = True
-        model.nonlinear_solver.options['max_sub_solves'] = 1
         model.linear_solver = ScipyKrylov()
 
-        prob.setup(check=False)
-
-        prob['pa.a'] = 1.
-        prob['pb.b'] = -4.
-        prob['pc.c'] = 3.
-
+        prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob['comp2.x'], 3.)
+        assert_rel_error(self, prob['comp.x'], 3.)
 
     def test_guess_nonlinear_inputs_read_only(self):
         class ImpWithInitial(ImplicitComponent):

@@ -178,7 +178,7 @@ class ScipyOptimizeDriver(Driver):
         str
             The name of the current optimizer.
         """
-        return self.options['optimizer']
+        return "ScipyOptimize_" + self.options['optimizer']
 
     def _setup_driver(self, problem):
         """
@@ -240,7 +240,7 @@ class ScipyOptimizeDriver(Driver):
         self._total_jac = None
 
         # Initial Run
-        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             model.run_solve_nonlinear()
             self.iter_count += 1
 
@@ -555,7 +555,7 @@ class ScipyOptimizeDriver(Driver):
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
 
-            with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
+            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
                 model.run_solve_nonlinear()
 
