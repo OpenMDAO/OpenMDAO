@@ -1029,6 +1029,33 @@ class MyComp(ExplicitComponent):
         outputs['x3_s_s'] = self.J[3, 0] * inputs['x2_u_u'] + self.J[3, 1] * inputs['x2_u_s'] + self.J[3, 2] * inputs['x2_s_u'] + self.J[3, 3] * inputs['x2_s_s']
 
 
+class MyImplicitComp(ImplicitComponent):
+
+    def setup(self):
+
+        self.add_input('x2_u')
+
+        self.add_output('x3_u', val=1.0)
+        self.add_output('x3_s', val=1.0, ref=5.0)
+
+        self.declare_partials('*', '*')
+
+        self.J = np.array([[.3, -.7, .5], [1.1, 1.3, -1.7]])
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals['x3_u'] = self.J[0, 0]*inputs['x2_u']**2 + self.J[0, 1]*outputs['x3_u']**2 + self.J[0, 2]*outputs['x3_s']**2
+        residuals['x3_s'] = self.J[1, 0]*inputs['x2_u']**2 + self.J[1, 1]*outputs['x3_u'] **2+ self.J[1, 2]*outputs['x3_s']**2
+
+    def linearize(self, inputs, outputs, jacobian):
+        jacobian['x3_u', 'x2_u'] = 2.0 * self.J[0, 0] * inputs['x2_u']
+        jacobian['x3_u', 'x3_u'] = 2.0 * self.J[0, 1] * outputs['x3_u']
+        jacobian['x3_u', 'x3_s'] = 2.0 * self.J[0, 2] * outputs['x3_s']
+        jacobian['x3_s', 'x2_u'] = 2.0 * self.J[1, 0] * inputs['x2_u']
+        jacobian['x3_s', 'x3_u'] = 2.0 * self.J[1, 1] * outputs['x3_u']
+        jacobian['x3_s', 'x3_s'] = 2.0 * self.J[1, 2] * outputs['x3_s']
+
+
+
 class MyDriver(Driver):
 
     def run(self):
@@ -1152,6 +1179,40 @@ class TestScalingOverhaul(unittest.TestCase):
         assert_rel_error(self, driver.sens_dict['comp.x3_u_s']['p.x1_s_s'][0][0], J[1, 3] / 17.0* 7.0)
         assert_rel_error(self, driver.sens_dict['comp.x3_s_u']['p.x1_s_s'][0][0], J[2, 3] * 7.0)
         assert_rel_error(self, driver.sens_dict['comp.x3_s_s']['p.x1_s_s'][0][0], J[3, 3] / 17.0 * 7.0)
+
+        totals = prob.check_totals(compact_print=True, out_stream=None)
+
+        for (of, wrt) in totals:
+            assert_rel_error(self, totals[of, wrt]['abs error'][0], 0.0, 1e-7)
+
+
+    def test_iimplicit(self):
+        # Testing that our scale/unscale contexts leave the output vector in the correct state when
+        # linearize is called on implicit components.
+        prob = Problem()
+        model = prob.model
+
+        inputs_comp = IndepVarComp()
+        inputs_comp.add_output('x1_u', val=1.0)
+
+        model.add_subsystem('p', inputs_comp)
+        mycomp = model.add_subsystem('comp', MyImplicitComp())
+
+        model.connect('p.x1_u', 'comp.x2_u')
+
+        model.linear_solver = DirectSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['atol'] = 1e-12
+        model.nonlinear_solver.options['rtol'] = 1e-12
+
+        model.add_design_var('p.x1_u', lower=-11, upper=11)
+        model.add_constraint('p.x1_u', upper=3.3)
+        model.add_objective('comp.x3_u')
+        model.add_objective('comp.x3_s')
+
+        prob.setup()
+        prob.set_solver_print(2)
+        prob.run_model()
 
         totals = prob.check_totals(compact_print=True, out_stream=None)
 
