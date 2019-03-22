@@ -704,17 +704,10 @@ class Driver(object):
             Failure flag; True if failed to converge, False is successful.
         """
         with RecordingDebugging(self._get_name(), self.iter_count, self):
-            self.run_solve_nonlinear()
+            self._problem.model.run_solve_nonlinear()
 
         self.iter_count += 1
         return False
-
-    def run_solve_nonlinear(self):
-        """
-        Run the model.
-        """
-        with self._problem.model._scaled_context_all():
-            self._problem.model._solve_nonlinear()
 
     def _compute_totals(self, of=None, wrt=None, return_format='flat_dict', global_names=True):
         """

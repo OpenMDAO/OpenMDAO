@@ -1065,7 +1065,7 @@ class MyDriver(Driver):
 
         # Run model
         model = self._problem.model
-        self.run_solve_nonlinear()
+        model.run_solve_nonlinear()
 
         # Con vals and derivs
         self.con_vals = deepcopy(self.get_constraint_values())
