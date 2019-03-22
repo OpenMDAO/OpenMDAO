@@ -31,7 +31,7 @@ from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 
 # check that pyoptsparse is installed
-OPT, OPTIMIZER = set_pyoptsparse_opt('')
+OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
