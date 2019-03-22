@@ -189,7 +189,7 @@ class DOEDriver(Driver):
                 if msg:
                     raise(ValueError(msg))
 
-        with RecordingDebugging(self._name, self.iter_count, self) as rec:
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
                 self.run_solve_nonlinear()
                 metadata['success'] = 1
