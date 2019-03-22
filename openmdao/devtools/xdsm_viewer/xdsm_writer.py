@@ -1253,7 +1253,8 @@ def _format_block_string(var_names, stacking='vertical', **kwargs):
                         line = name
                 else:  # make new line
                     if stacking == 'max_chars':
-                        lines.append(line)
+                        if line:
+                            lines.append(line)
                         line = name
                         lengths = len(name)
                     else:  # 'cut_chars'
