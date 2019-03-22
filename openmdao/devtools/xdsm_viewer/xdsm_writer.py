@@ -23,8 +23,7 @@ import json
 import os
 import warnings
 
-import six
-from six import iteritems
+from six import iteritems, string_types
 
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.devtools.webview import webview
@@ -822,7 +821,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     error_msg = ('Undefined XDSM writer "{}". '
                  'Provide  a valid name or a BaseXDSMWriter instance.')
-    if isinstance(writer, six.string_types):
+    if isinstance(writer, string_types):
         if writer.lower() == 'pyxdsm':  # pyXDSM
             x = XDSMWriter()
         elif writer.lower() == 'xdsmjs':  # XDSMjs
@@ -862,7 +861,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             return text  # In case of a wrong setting
 
     def get_output_side(component_name):
-        if isinstance(output_side, six.string_types):
+        if isinstance(output_side, string_types):
             return output_side
         elif isinstance(output_side, dict):
             # Gets the specified key, or the default in the dictionary, or the global default
