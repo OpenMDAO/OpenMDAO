@@ -128,6 +128,9 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         self.process_arrows = []
         self.extension = None  # Implement in child class as string file extension
         self.name = name
+        # This should be a dictionary mapping OpenMDAO system types to XDSM component types.
+        # See for example any value in _COMPONENT_TYPE_MAP
+        self.type_map = None
 
     def add_solver(self, label, name='solver', **kwargs):
         pass  # Implement in child class
