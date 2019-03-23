@@ -1,12 +1,17 @@
 from __future__ import print_function
 import unittest
 import numpy as np
-from mpi4py import MPI
+from openmdao.utils.mpi import MPI
 
 from openmdao.api import Problem
 from openmdao.api import ExplicitComponent, IndepVarComp
 from openmdao.api import NonlinearRunOnce, LinearRunOnce
 
+if MPI:
+    try:
+        from openmdao.vectors.petsc_vector import PETScVector
+    except ImportError:
+        PETScVector = None
 
 
 class Comp(ExplicitComponent):
@@ -31,6 +36,7 @@ class Comp(ExplicitComponent):
         outputs['y'] = inputs['x'] + 1.0
 
 
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class TestCSColoring(unittest.TestCase):
     NUM_PROCS = 4
 
