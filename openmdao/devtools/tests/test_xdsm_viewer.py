@@ -279,7 +279,6 @@ class TestPyXDSMViewer(unittest.TestCase):
     def test_pyxdsm_solver(self):
         from openmdao.api import NonlinearBlockGS
 
-        filename = 'pyxdsm_solver'
         out_format = PYXDSM_OUT
         prob = Problem()
         prob.model = model = SellarNoDerivatives()
@@ -289,9 +288,17 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.run_model()
 
+        filename = 'pyxdsm_solver'
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET,
                    show_browser=SHOW, include_solver=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
+        filename = 'pyxdsm_solver2'
+        # Write output
+        write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET,
+                   show_browser=SHOW, include_solver=True, recurse=False)
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
@@ -944,11 +951,26 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.setup(check=False)
         prob.final_setup()
 
+        my_writer = CustomWriter()
         # Write output
-        write_xdsm(prob, filename=filename, writer=CustomWriter(), show_browser=SHOW)
+        write_xdsm(prob, filename=filename, writer=my_writer, show_browser=SHOW)
 
         # Check if file was created
-        self.assertTrue(os.path.isfile('.'.join([filename, 'html'])))
+        self.assertTrue(os.path.isfile('.'.join([filename, my_writer.extension])))
+
+        with self.assertRaises(TypeError):  # Wrong type passed for writer
+            write_xdsm(prob, filename=filename, writer=1, subs=(), show_browser=SHOW)
+
+        my_writer2 = CustomWriter(name='my_writer')
+        filename = 'xdsm_custom_writer2'
+
+        msg = 'Writer name "my_writer" not found, there will be no character ' \
+              'substitutes used. Add "my_writer" to your settings, or provide a tuple for' \
+              'character substitutes.'
+
+        # Write output
+        with assert_warning(Warning, msg):
+            write_xdsm(prob, filename=filename, writer=my_writer2, show_browser=SHOW)
 
 
 if __name__ == "__main__":

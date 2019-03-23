@@ -55,6 +55,8 @@ _TEXT_CONSTANTS = {'no_data': '(no data)'}
 _DEFAULT_SOLVER_NAMES = {'linear': 'LN: RUNONCE', 'nonlinear': 'NL: RUNONCE'}
 # On which side to place outputs? One of "left", "right"
 _DEFAULT_OUTPUT_SIDE = 'left'
+# Default writer, this will be used if settings are not found for a custom writer
+_DEFAULT_WRITER = 'pyxdsm'
 
 # Maps OpenMDAO component types with the available block styling options in the writer.
 # For pyXDSM check the "diagram_styles" file for style definitions.
@@ -117,7 +119,7 @@ class AbstractXDSMWriter(BaseXDSMWriter):
 
     All methods should be implemented in child classes.
     """
-    def __init__(self):
+    def __init__(self, name='abstract_xdsm_writer'):
         self.comps = []
         self.connections = []
         self.left_outs = {}
@@ -126,7 +128,7 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         self.processes = []
         self.process_arrows = []
         self.extension = None  # Implement in child class as string file extension
-        self.name = 'abstract_xdsm_writer'
+        self.name = name
 
     def add_solver(self, label, name='solver', **kwargs):
         pass  # Implement in child class
@@ -168,14 +170,20 @@ class XDSMjsWriter(AbstractXDSMWriter):
     XDSMjs was created by Remi Lafage. The code and documentation is available at
     https://github.com/OneraHub/XDSMjs
     """
-    def __init__(self):
+    def __init__(self, name='xdsmjs'):
         super(XDSMjsWriter, self).__init__()
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
         self.comps = []  # List of systems
         self.reserved_words = '_U_', '_E_'  # Ignored at text formatting
-        self.name = 'xdsmjs'
+        self.name = name
         self.extension = 'html'
+        if self.name in _COMPONENT_TYPE_MAP:
+            self.type_map = _COMPONENT_TYPE_MAP[self.name]
+        else:
+            self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
+            msg = 'Name not "{}" found in component type mapping, will default to "{}"'
+            warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
 
     def _format_id(self, name, subs=(('_', ''),)):
         if name not in self.reserved_words:
@@ -217,7 +225,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         self.comp_names.append(self._format_id(name))
-        style = _COMPONENT_TYPE_MAP[self.name]['solver']
+        style = self.type_map['solver']
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
@@ -238,8 +246,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         kwargs : dict
             Keyword args
         """
-        comp_type_map = _COMPONENT_TYPE_MAP
-        style = comp_type_map[self.name].get(comp_type, 'analysis')
+        style = self.type_map.get(comp_type, 'analysis')
         self.comp_names.append(self._format_id(name))
         self.add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
 
@@ -277,7 +284,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Keyword args
         """
         self.driver = self._format_id(name)
-        style = _COMPONENT_TYPE_MAP[self.name].get(driver_type, 'optimization')
+        style = self.type_map.get(driver_type, 'optimization')
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
     def add_system(self, node_name, style, label=None, stack=False, **kwargs):
@@ -403,10 +410,16 @@ else:
 
         """
 
-        def __init__(self):
+        def __init__(self, name='pyxdsm'):
             super(XDSMWriter, self).__init__()
-            self.name = 'pyxdsm'
+            self.name = name
             self.extension = 'pdf'
+            if self.name in _COMPONENT_TYPE_MAP:
+                self.type_map = _COMPONENT_TYPE_MAP[self.name]
+            else:
+                self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
+                msg = 'Name not "{}" found in component type mapping, will default to "{}"'
+                warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
 
         def write(self, filename=None, **kwargs):
             """
@@ -461,7 +474,7 @@ else:
             kwargs : dict
                 Keyword args
             """
-            style = _COMPONENT_TYPE_MAP[self.name]['solver']
+            style = self.type_map['solver']
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
 
         def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
@@ -482,8 +495,7 @@ else:
             kwargs : dict
                 Keyword args
             """
-            comp_type_map = _COMPONENT_TYPE_MAP
-            style = comp_type_map[self.name].get(comp_type, 'Analysis')
+            style = self.type_map.get(comp_type, 'Analysis')
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label,
                             stack=stack, **kwargs)
 
@@ -522,7 +534,7 @@ else:
             kwargs : dict
                 Keyword args
             """
-            style = _COMPONENT_TYPE_MAP[self.name].get(driver_type, 'Optimization')
+            style = self.type_map.get(driver_type, 'Optimization')
             self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
 
         def add_workflow(self, comp_names=None):
@@ -737,12 +749,18 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         if isinstance(subs, dict):
             subs = subs[writer_name]  # Getting the character substitutes of the chosen writer
     else:
-        try:
-            subs = subs[writer.name]
-        except KeyError:
-            msg = 'Writer name "{}" not found in "{}", there will be no character substitutes used'
-            warnings.warn(msg.format(writer.name, subs))
-            subs = ()
+        if isinstance(writer, BaseXDSMWriter):
+            try:
+                subs = subs[writer.name]
+            except KeyError:
+                msg = 'Writer name "{0}" not found, there will be no character ' \
+                      'substitutes used. Add "{0}" to your settings, or provide a tuple for' \
+                      'character substitutes.'
+                warnings.warn(msg.format(writer.name, subs))
+                subs = ()
+        else:
+            msg = 'Custom XDSM writer should be an instance of BaseXDSMWriter, now it is a "{}".'
+            raise TypeError(msg.format(type(writer)))
     return _write_xdsm(filename, viewer_data=viewer_data,
                        driver=driver_name, include_solver=include_solver, model_path=model_path,
                        design_vars=design_vars, responses=responses, writer=writer,
@@ -831,7 +849,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     elif isinstance(writer, BaseXDSMWriter):  # Custom writer
         x = writer
     else:
-        raise ValueError(error_msg.format(writer))
+        raise TypeError(error_msg.format(writer))
 
     # Box appearance
     box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
@@ -878,7 +896,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse, include_solver=include_solver)
     comps_dct = {comp['abs_name']: comp for comp in comps if comp['type'] != 'solver'}
-    print(comps_dct, comps)
     solvers = []
 
     conns1, external_inputs1, external_outputs1 = _prune_connections(connections,
@@ -1042,7 +1059,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # path will be specified based on the "out_format", if all required inputs where
         # provided for showing the results.
         ext = x.extension
-        if not isinstance(ext, six.string_types):
+        if not isinstance(ext, string_types):
             err_msg = '"{}" is an invalid extension.'
             raise ValueError(err_msg.format(writer))
         path = '.'.join([filename, ext])
@@ -1287,7 +1304,6 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                         solver_dct[k] = ch[k]
                     if has_solver:
                         i_solver = len(components)
-                        print("i solver", i_solver)
                         name_str = ch['abs_name'] + '@solver'
                         # "comps" will be filled later
                         solver = {'abs_name': _format_name(name_str), 'rel_name': solver_names,
