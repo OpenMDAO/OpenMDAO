@@ -958,11 +958,12 @@ class TestXDSMjsViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, my_writer.extension])))
 
+        filename = 'xdsm_custom_writer2'  # this name is needed for XDSMjs
         with self.assertRaises(TypeError):  # Wrong type passed for writer
             write_xdsm(prob, filename=filename, writer=1, subs=(), show_browser=SHOW)
 
         my_writer2 = CustomWriter(name='my_writer')
-        filename = 'xdsm_custom_writer2'
+        filename = 'xdsm_custom_writer3'
 
         msg = 'Writer name "my_writer" not found, there will be no character ' \
               'substitutes used. Add "my_writer" to your settings, or provide a tuple for' \
