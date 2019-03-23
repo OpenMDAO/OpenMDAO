@@ -14,7 +14,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import simple_warning, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -902,62 +902,17 @@ class Driver(object):
         """
         return "Driver"
 
-    def set_simul_deriv_color(self, simul_info):
+    def set_coloring_spec(self, simul_info):
         """
         Set the coloring (and possibly the sub-jac sparsity) for simultaneous total derivatives.
 
         Parameters
         ----------
-        simul_info : str or dict
-
-            ::
-
-                # Information about simultaneous coloring for design vars and responses.  If a
-                # string, then simul_info is assumed to be the name of a file that contains the
-                # coloring information in pickle format.  If a dict, the structure looks like this:
-
-                {
-                "fwd": [
-                    # First, a list of column index lists, each index list representing columns
-                    # having the same color, except for the very first index list, which contains
-                    # indices of all columns that are not colored.
-                    [
-                        [i1, i2, i3, ...]    # list of non-colored columns
-                        [ia, ib, ...]    # list of columns in first color
-                        [ic, id, ...]    # list of columns in second color
-                           ...           # remaining color lists, one list of columns per color
-                    ],
-
-                    # Next is a list of lists, one for each column, containing the nonzero rows for
-                    # that column.  If a column is not colored, then it will have a None entry
-                    # instead of a list.
-                    [
-                        [r1, rn, ...]   # list of nonzero rows for column 0
-                        None,           # column 1 is not colored
-                        [ra, rb, ...]   # list of nonzero rows for column 2
-                            ...
-                    ],
-                ],
-                # This example is not a bidirectional coloring, so the opposite direction, "rev"
-                # in this case, has an empty row index list.  It could also be removed entirely.
-                "rev": [[[]], []],
-                "sparsity":
-                    # The sparsity entry can be absent, indicating that no sparsity structure is
-                    # specified, or it can be a nested dictionary where the outer keys are response
-                    # names, the inner keys are design variable names, and the value is a tuple of
-                    # the form (row_list, col_list, shape).
-                    {
-                        resp1_name: {
-                            dv1_name: (rows, cols, shape),  # for sub-jac d_resp1/d_dv1
-                            dv2_name: (rows, cols, shape),
-                              ...
-                        },
-                        resp2_name: {
-                            ...
-                        }
-                        ...
-                    }
-                }
+        simul_info : str or Coloring
+            Information about simultaneous coloring for design vars and responses.  If a
+            string, then simul_info is assumed to be the name of a file that contains the
+            coloring information in pickle format. Otherwise it must be a Coloring object.
+            See the docstring for Coloring for details.
 
         """
         if self.supports['simultaneous_derivatives']:
@@ -965,6 +920,22 @@ class Driver(object):
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
+
+    def set_coloring_spec(self, simul_info):
+        """
+        See set_coloring_spec. This method is deprecated.
+
+        Parameters
+        ----------
+        simul_info : str or Coloring
+            Information about simultaneous coloring for design vars and responses.  If a
+            string, then simul_info is assumed to be the name of a file that contains the
+            coloring information in pickle format. Otherwise it must be a Coloring object.
+            See the docstring for Coloring for details.
+
+        """
+        warn_deprecation("set_coloring_spec is deprecated.  Use set_coloring_spec instead.")
+        self.set_coloring_spec(simul_info)
 
     def set_total_jac_sparsity(self, sparsity):
         """
@@ -1003,7 +974,7 @@ class Driver(object):
         """
         Set up metadata for simultaneous derivative solution.
 
-        If set_simul_deriv_color was called with a filename, load the coloring file.
+        If set_coloring_spec was called with a filename, load the coloring file.
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
         if not coloring_mod._use_sparsity:

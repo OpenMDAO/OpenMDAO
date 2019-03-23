@@ -827,7 +827,7 @@ class System(object):
                 for approx in itervalues(self._approx_schemes):
                     approx._update_coloring(self, coloring)
 
-    def compute_approx_coloring(self, wrt=('*',), method='fd', form='forward', step=None,
+    def compute_approx_coloring(self, wrt=('*',), method='fd', form=None, step=None,
                                 repeats=2, rel_perturbation_size=1e-3,
                                 directory=None, fname=None):
         """
@@ -870,6 +870,9 @@ class System(object):
         if directory is None:
             directory = os.path.join(os.getcwd(), 'coloring_files')
         self.set_approx_coloring_meta(wrt, method, form, step, directory, fname)
+        # set a flag to say we're generating a coloring
+        self._approx_coloring_info['generate'] = True
+        approx_scheme = self._get_approx_scheme(method)
 
         starting_inputs = self._inputs._data.copy()
         in_offsets = starting_inputs.copy()
@@ -882,8 +885,8 @@ class System(object):
         out_offsets *= rel_perturbation_size
 
         # compute absolute perturbations
-        self._jac_saves_remaining = repeats
         self._setup_static_approx_coloring()
+        self._jac_saves_remaining = repeats
         for i in range(repeats):
             # randomize inputs (and outputs if implicit)
             if i > 0:
@@ -892,10 +895,7 @@ class System(object):
                 self._outputs._data[:] = \
                     starting_outputs + out_offsets * np.random.random(out_offsets.size)
 
-            # TODO: investigate whether this call to solve_nonlinear is necessary for
-            # complex step.  The tests were passing without it, but finite difference
-            # needs it, so for now, do it for both.
-            self._solve_nonlinear()
+                self._apply_nonlinear()
 
             # when run_linearize is called after the appropriate number of repeats,
             # the coloring will be computed and saved.
@@ -944,6 +944,11 @@ class System(object):
         coloring : str or Coloring
             If a str, assume a filename and load the coloring from that file, else just
             use the Coloring object provided.
+
+        Returns
+        -------
+        Coloring
+            The give coloring or the coloring loaded from the given file.
         """
         if isinstance(coloring, string_types):  # it's a filename
             # load the coloring from the file
@@ -952,6 +957,7 @@ class System(object):
             self._approx_coloring_info = {}
         self._approx_coloring_info['coloring'] = coloring
         self._approx_coloring_info.update(coloring._meta)
+        return coloring
 
     def _setup_par_fd_procs(self, comm):
         """
@@ -3217,7 +3223,9 @@ class System(object):
         """
         of = list(self._var_allprocs_prom2abs_list['output'])
         wrt = list(self._var_allprocs_prom2abs_list['input'])
-        return of, wrt
+
+        # wrt should include implicit states
+        return of, of + wrt
 
     def _get_partials_sizes(self):
         """
@@ -3225,13 +3233,13 @@ class System(object):
 
         Returns
         -------
-        tuple(ndarray, ndarray)
+        tuple(ndarray, ndarray, is_implicit)
             'of' and 'wrt' variable sizes.
         """
         iproc = self.comm.rank
         out_sizes = self._var_sizes['nonlinear']['output'][iproc]
         in_sizes = self._var_sizes['nonlinear']['input'][iproc]
-        return out_sizes, in_sizes
+        return out_sizes, np.hstack((out_sizes, in_sizes))
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

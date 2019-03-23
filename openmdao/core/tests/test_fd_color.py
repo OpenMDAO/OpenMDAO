@@ -525,6 +525,22 @@ class TestCSColoring(unittest.TestCase):
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
 
+
+class TestCSStaticColoring(unittest.TestCase):
+    FD_METHOD = 'cs'
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
     def test_simple_partials_explicit_static(self):
         prob = Problem()
         model = prob.model
@@ -596,7 +612,6 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        comp.set_approx_coloring_meta('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -616,7 +631,6 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        comp.set_approx_coloring_meta('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -632,8 +646,76 @@ class TestCSColoring(unittest.TestCase):
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
 
+    def test_simple_semitotals_static(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 0]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        sub = model.add_subsystem('sub', Group(dynamic_derivs_repeats=1))
+        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.connect('indeps.x0', 'sub.comp.x0')
+        model.connect('indeps.x1', 'sub.comp.x1')
+
+        model.sub.comp.add_constraint('y0')
+        model.sub.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        coloring = sub.compute_approx_coloring(wrt='*', method=self.FD_METHOD, directory=self.tempdir)
+
+
+        # now create a second problem and use the static coloring
+        prob = Problem()
+        model = prob.model = Group()
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        sub = model.add_subsystem('sub', Group())
+        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.connect('indeps.x0', 'sub.comp.x0')
+        model.connect('indeps.x1', 'sub.comp.x1')
+
+        model.sub.comp.add_constraint('y0')
+        model.sub.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+
+        sub.set_coloring_spec(os.path.join(self.tempdir, sub.__class__.__name__ + '.pkl'))
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()
+
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3)
+        _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity)
+
 
 class TestFDColoring(TestCSColoring):
+    FD_METHOD = 'fd'
+
+
+class TestFDStaticColoring(TestCSStaticColoring):
     FD_METHOD = 'fd'
 
 

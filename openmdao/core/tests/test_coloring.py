@@ -123,7 +123,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
 
     # # setup coloring
     if color_info is not None:
-        p.driver.set_simul_deriv_color(color_info)
+        p.driver.set_coloring_spec(color_info)
     elif sparsity is not None:
         p.driver.set_total_jac_sparsity(sparsity)
 
@@ -786,7 +786,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
            None,   # column 20
         ]]
 
-        p.driver.set_simul_deriv_color(color_info)
+        p.driver.set_coloring_spec(color_info)
 
         p.setup(mode='fwd')
         p.run_driver()

@@ -1731,7 +1731,8 @@ class Group(System):
 
         self._check_coloring_update()
 
-    def set_approx_coloring_meta(self, wrt, method='fd', form=None, step=None, directory=None):
+    def set_approx_coloring_meta(self, wrt, method='fd', form=None, step=None, directory=None,
+                                 fname=None):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1751,9 +1752,13 @@ class Group(System):
         directory : str or None
             If not None, the coloring for this system will be saved to the given directory.
             The file will be named as the system's pathname with dots replaced by underscores.
+        fname : str or None
+            If not None, use this as the name of the coloring file.  If a relative path, make
+            it relative to the specified directory if there is one, else the current working
+            directory.  If None, set the filename to the object's classname + '.pkl'.
         """
         self.approx_totals(method, step, form)
-        super(Group, self).set_approx_coloring_meta(wrt, method, form, step, directory)
+        super(Group, self).set_approx_coloring_meta(wrt, method, form, step, directory, fname)
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
@@ -1824,10 +1829,31 @@ class Group(System):
 
         # Group finite difference or complex step.
         # TODO: Does this work under or over an AssembledJacobian (and does that make sense)
-        if self._owns_approx_jac:
+        info = self._approx_coloring_info
+        if self._owns_approx_jac or (info is not None and info['coloring'] is not None):
             self._setup_approx_partials()
 
         super(Group, self)._setup_jacobians(recurse=recurse)
+
+    def set_coloring_spec(self, coloring):
+        """
+        Specify a static coloring to use for this System.
+
+        Parameters
+        ----------
+        coloring : str or Coloring
+            If a str, assume a filename and load the coloring from that file, else just
+            use the Coloring object provided.
+
+        Returns
+        -------
+        Coloring
+            The give coloring or the coloring loaded from the given file.
+        """
+        coloring = super(Group, self).set_coloring_spec(coloring)
+        meta = coloring._meta
+        self.approx_totals(meta['method'], meta['step'], meta['form'])
+        return coloring
 
     def _setup_approx_partials(self):
         self._jacobian = DictionaryJacobian(system=self)
@@ -1840,7 +1866,7 @@ class Group(System):
             method = info['method']
         else:
             method = list(self._approx_schemes)[0]
-        approx = self._approx_schemes[method]
+        approx = self._get_approx_scheme(method)
 
         if self._owns_approx_wrt and not self.pathname:
             candidate_wrt = self._owns_approx_wrt
@@ -1877,7 +1903,7 @@ class Group(System):
         ofset = set()
         wrtset = set()
         wrt_colors_matched = set()
-        if info is not None and (self._owns_approx_of or self.pathname):
+        if info is not None and (self._owns_approx_of or self.pathname or info.get('generate')):
             wrt_color_patterns = info['wrt_patterns']
             color_meta = self._setup_approx_coloring()
         else:
@@ -1903,6 +1929,7 @@ class Group(System):
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
                     meta['value'] = np.full(size, -1.0)
+                self._subjacs_info[key] = meta
 
             meta['method'] = method
 
@@ -1914,6 +1941,11 @@ class Group(System):
                 ofset.add(key[0])
                 wrtset.add(key[1])
 
+            if meta['value'] is None:
+                shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
+                meta['shape'] = shape
+                meta['value'] = np.zeros(shape)
+
             if wrt_color_patterns:
                 if key[1] in abs2prom['output']:
                     wrtprom = abs2prom['output'][key[1]]
@@ -1922,17 +1954,14 @@ class Group(System):
 
                 for patt in wrt_color_patterns:
                     if patt == '*' or fnmatchcase(wrtprom, patt):
+                        # subjac meta is shared among systems. We don't want to pollute it
+                        # with coloring info
+                        meta = meta.copy()
                         meta.update(color_meta)
                         wrt_colors_matched.add(key[1])
                         break
 
-            if meta['value'] is None:
-                shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
-                meta['shape'] = shape
-                meta['value'] = np.zeros(shape)
-
             approx.add_approximation(key, meta)
-            self._subjacs_info[key] = meta
 
         if self.pathname:
             # we're taking semi-total derivs for this group. Update _owns_approx_of
@@ -1966,7 +1995,7 @@ class Group(System):
         approx_scheme = self._get_approx_scheme(method)
 
         meta = approx_scheme.DEFAULT_OPTIONS.copy()
-        meta['coloring'] = None  # set a placeholder for later replacement of approximations
+        meta['coloring'] = info['coloring']
         form = info['form']
         step = info['step']
 

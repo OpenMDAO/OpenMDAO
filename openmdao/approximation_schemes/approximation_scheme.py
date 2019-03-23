@@ -133,7 +133,11 @@ class ApproximationScheme(object):
         """
         global _full_slice
         from openmdao.core.group import Group
+        from openmdao.core.implicitcomponent import ImplicitComponent
+
         is_total = isinstance(system, Group)
+        is_semi = is_total and system.pathname
+        is_implicit = isinstance(system, ImplicitComponent)
 
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
@@ -150,6 +154,7 @@ class ApproximationScheme(object):
         inputs = system._inputs
         iproc = system.comm.rank
         pro2abs = system._var_allprocs_prom2abs_list
+        abs2meta = system._var_allprocs_abs2meta
 
         out_slices = outputs.get_slice_dict()
         in_slices = inputs.get_slice_dict()
@@ -158,6 +163,7 @@ class ApproximationScheme(object):
         approx_wrt_idx = system._owns_approx_wrt_idx
 
         self._approx_groups = []
+        all_wrt_names = system._var_allprocs_abs_names['output'] + system._var_allprocs_abs_names['input']
         for key, approx in approx_groups:
             wrt = key[0]
             directional = key[-1]
@@ -166,13 +172,13 @@ class ApproximationScheme(object):
             if wrt == '@color':   # use coloring (there should be only 1 of these)
                 wrt_matches = system._approx_coloring_info['wrt_matches']
                 options = approx[0][1]
-                if is_total:
+                if is_total and system.pathname == '':
                     of_names = [n for n in system._var_allprocs_abs_names['output']
                                 if n in system._owns_approx_of]
-                    wrt_names = full_wrts = [n for n in system._var_allprocs_abs_names['output']
-                                             if n in system._owns_approx_wrt]
-                    ofsizes = [outputs._views_flat[of].size for of in of_names]
-                    wrtsizes = [outputs._views_flat[wrt].size for wrt in wrt_names]
+                    full_wrts = all_wrt_names
+                    wrt_names = [n for n in all_wrt_names if n in system._owns_approx_wrt]
+                    ofsizes = [abs2meta[of]['size'] for of in of_names]
+                    wrtsizes = [abs2meta[wrt]['size'] for wrt in wrt_names]
                     total_sizes = system._var_sizes['nonlinear']['output'][iproc]
                 else:
                     of_names, wrt_names = system._get_partials_varlists()
@@ -184,8 +190,6 @@ class ApproximationScheme(object):
                     full_wrts = wrt_names
 
                 full_sizes = wrtsizes
-                is_implicit = not is_total and \
-                    system._var_sizes['nonlinear']['input'][iproc].size < wrtsizes.size
                 full_ofs = list(system._outputs._views)
 
                 if len(wrt_names) != len(wrt_matches):
@@ -225,7 +229,7 @@ class ApproximationScheme(object):
 
                 for cols, nzrows in coloring.color_nonzero_iter('fwd'):
                     ccols = cols if col_map is None else col_map[cols]
-                    idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit, is_total)
+                    idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit, is_total, is_semi)
                     self._approx_groups.append((None, data, cols, tmpJ, idx_info, nzrows))
             else:
                 if wrt in inputs._views_flat:

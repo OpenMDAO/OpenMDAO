@@ -1495,7 +1495,7 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=F
                                   repeats=driver.options['dynamic_derivs_repeats'],
                                   tol=1.e-15, include_sparsity=do_sparsity,
                                   setup=False, run_model=run_model, show_jac=show_jac, stream=f)
-    driver.set_simul_deriv_color(coloring)
+    driver.set_coloring_spec(coloring)
     driver._setup_simul_coloring()
     if do_sparsity:
         driver._setup_tot_jac_sparsity()

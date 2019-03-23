@@ -295,6 +295,7 @@ class Jacobian(object):
         approx_of_idx = system._owns_approx_of_idx
         approx_wrt_idx = system._owns_approx_wrt_idx
         ofsizes = system._var_sizes['linear']['output'][iproc]
+        isizes = system._var_sizes['linear']['input'][iproc]
 
         subjac_ofs = set(key[0] for key in subjacs)
         subjac_wrts = set(key[1] for key in subjacs)
@@ -306,15 +307,15 @@ class Jacobian(object):
             if system.pathname:  # doing semitotals
                 wrts = [n for n in system._var_allprocs_abs_names['input']
                         if n in system._owns_approx_wrt]
+                wrt_info = [(ofs, ofsizes, (approx_of_idx)), (wrts, isizes, approx_wrt_idx)]
             else:
                 wrts = [n for n in system._var_allprocs_abs_names['output']
                         if n in system._owns_approx_wrt]
-            wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
+                wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
         else:
             from openmdao.core.implicitcomponent import ImplicitComponent
             ofs = system._var_allprocs_abs_names['output']
             wrts = system._var_allprocs_abs_names['input']
-            isizes = system._var_sizes['linear']['input'][iproc]
             wrt_info = []
             if isinstance(system, ImplicitComponent):
                 wrt_info.append(((ofs, ofsizes, ())))

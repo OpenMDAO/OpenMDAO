@@ -357,7 +357,7 @@ def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
         return np.hstack(global_idxs)
 
 
-def get_input_idx_split(full_idxs, inputs, outputs, is_implicit, is_total):
+def get_input_idx_split(full_idxs, inputs, outputs, is_implicit, is_total, is_semi):
     """
     Split an array of indices into vec outs + ins into two arrays of indices into outs and ins.
 
@@ -380,7 +380,8 @@ def get_input_idx_split(full_idxs, inputs, outputs, is_implicit, is_total):
         Each tuple is of the form (array, idxs).
     """
     assert len(full_idxs) > 0, "Empty index array passed to get_input_idx_split."
-    if is_implicit:
+    full_idxs = np.asarray(full_idxs)
+    if is_implicit or is_semi:
         full_size = inputs._data.size
         out_size = outputs._data.size
         full_size += out_size

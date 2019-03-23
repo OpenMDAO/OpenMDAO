@@ -57,6 +57,33 @@ class ExplicitComponent(Component):
             (new_jacvec_prod is not None and
              new_jacvec_prod != self._inst_functs['compute_jacvec_product']))
 
+    def _get_partials_varlists(self):
+        """
+        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(list, list)
+            'of' and 'wrt' variable lists.
+        """
+        of = list(self._var_allprocs_prom2abs_list['output'])
+        wrt = list(self._var_allprocs_prom2abs_list['input'])
+        return of, wrt
+
+    def _get_partials_sizes(self):
+        """
+        Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(ndarray, ndarray)
+            'of' and 'wrt' variable sizes.
+        """
+        iproc = self.comm.rank
+        out_sizes = self._var_sizes['nonlinear']['output'][iproc]
+        in_sizes = self._var_sizes['nonlinear']['input'][iproc]
+        return out_sizes, in_sizes
+
     def _setup_partials(self, recurse=True):
         """
         Call setup_partials in components.

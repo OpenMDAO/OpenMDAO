@@ -11,7 +11,7 @@ from openmdao.approximation_schemes.approximation_scheme import ApproximationSch
     _gather_jac_results, _get_wrt_subjacs
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, \
-    update_sizes, get_input_idx_split, _get_jac_slice_dict
+    update_sizes, _get_jac_slice_dict
 
 
 _full_slice = slice(None)
@@ -108,7 +108,7 @@ class ComplexStep(ApproximationScheme):
         float
             Delta needed for complex step perturbation.
         """
-        wrt, delta, directional = data
+        _, delta, _ = data
         delta *= 1j
         return delta
 
