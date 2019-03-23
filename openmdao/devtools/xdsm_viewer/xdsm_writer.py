@@ -14,7 +14,6 @@ The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
-# TODO solvers: also include solvers of groups, not just for the root.
 # TODO numbering of data blocks. Logic: index of the receiving block
 
 from __future__ import print_function
@@ -323,13 +322,11 @@ class XDSMjsWriter(AbstractXDSMWriter):
         if comp_names is None:
             comp_names = self.comp_names
 
-        # FIXME now it does not work as expected, because second process might be inserted
-        #  into another process (like optimizer and MDA)
-        if len(self.processes) < 2:
+        # TODO implement solver processes
+        if not self.processes:  # If no process was added yet, add the process of the driver
             self.processes.append([self.driver, comp_names])
         else:
-            new_proc = [comp_names[0], comp_names[1:]]
-            self.processes[1].insert(1, new_proc)
+            warnings.warn('Solver process connections are not implemented yet for XDSMjs writer.')
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
         self.connect(src='_U_', target=name, label=label)
@@ -474,7 +471,7 @@ else:
                 Keyword args
             """
             style = self.type_map['solver']
-            self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
+            self.add_system(node_name=name, style=style, label=self._textify(label), **kwargs)
 
         def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
             """
@@ -495,7 +492,7 @@ else:
                 Keyword args
             """
             style = self.type_map.get(comp_type, 'Analysis')
-            self.add_system(node_name=name, style=style, label='\\text{%s}' % label,
+            self.add_system(node_name=name, style=style, label=self._textify(label),
                             stack=stack, **kwargs)
 
         def add_func(self, name, label=None, stack=False, **kwargs):
@@ -514,8 +511,13 @@ else:
             kwargs : dict
                 Keyword args
             """
-            self.add_system(node_name=name, style='Function', label='\\text{%s}' % label,
+            self.add_system(node_name=name, style='Function', label=self._textify(label),
                             stack=stack, **kwargs)
+
+        @staticmethod
+        def _textify(name):
+            # Uses the LaTeX \text{} command to insert plain text in math mode
+            return '\\text{%s}' % name
 
         def add_driver(self, name, label=None, driver_type='Optimization', **kwargs):
             """
@@ -534,7 +536,7 @@ else:
                 Keyword args
             """
             style = self.type_map.get(driver_type, 'Optimization')
-            self.add_system(node_name=name, style=style, label='\\text{%s}' % label, **kwargs)
+            self.add_system(node_name=name, style=style, label=self._textify(label), **kwargs)
 
         def add_workflow(self, comp_names=None):
             """
