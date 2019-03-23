@@ -174,10 +174,9 @@ class XDSMjsWriter(AbstractXDSMWriter):
         super(XDSMjsWriter, self).__init__()
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
-        self.comps = []  # List of systems
         self.reserved_words = '_U_', '_E_'  # Ignored at text formatting
-        self.name = name
         self.extension = 'html'
+        self.name = name
         if self.name in _COMPONENT_TYPE_MAP:
             self.type_map = _COMPONENT_TYPE_MAP[self.name]
         else:
