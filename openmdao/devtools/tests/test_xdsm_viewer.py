@@ -944,7 +944,6 @@ class TestXDSMjsViewer(unittest.TestCase):
             def format_block(names, **kwargs):
                 return [name.upper() for name in names]
 
-        filename = 'xdsm_custom_writer'  # this name is needed for XDSMjs
         prob = Problem()
         prob.model = SellarNoDerivatives()
 
@@ -952,16 +951,19 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.final_setup()
 
         my_writer = CustomWriter()
+        filename = 'xdsm_custom_writer'  # this name is needed for XDSMjs
         # Write output
         write_xdsm(prob, filename=filename, writer=my_writer, show_browser=SHOW)
 
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, my_writer.extension])))
 
+        # Check that error is raised in case of wrong writer type
         filename = 'xdsm_custom_writer2'  # this name is needed for XDSMjs
         with self.assertRaises(TypeError):  # Wrong type passed for writer
             write_xdsm(prob, filename=filename, writer=1, subs=(), show_browser=SHOW)
 
+        # Check warning, if settings for custom writer are not found
         my_writer2 = CustomWriter(name='my_writer')
         filename = 'xdsm_custom_writer3'
 
