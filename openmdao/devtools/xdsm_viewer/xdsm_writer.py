@@ -14,8 +14,7 @@ The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
-# TODO numbering of data blocks. Logic: index of the receiving block
-
+# FIXME numbering in pyXDSM, when multiple solvers are used
 from __future__ import print_function
 
 import json
@@ -43,7 +42,7 @@ _OUT_FORMATS = {'tex': 'pyxdsm', 'pdf': 'pyxdsm', 'json': 'xdsmjs', 'html': 'xds
 # Round parenthesis is replaced with subscript syntax, e.g. x(1) --> x_{1}
 _CHAR_SUBS = {
     'pyxdsm': (('_', '\_'), ('(', '_{'), (')', '}'),),
-    'xdsmjs': ((' ', ''), (':', '')),
+    'xdsmjs': ((' ', '-'), (':', '')),
 }
 # Variable formatting settings
 _SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't', 'consistency': 'c'}
@@ -105,6 +104,7 @@ _DEFAULT_BOX_STACKING = 'max_chars'
 _PROCESS_ARROWS = False
 # Maximum number of lines in a box. No limit, if None.
 _MAX_BOX_LINES = None
+# If components are indexed, this will be the first index. 0 or 1
 _START_INDEX = 0
 
 
@@ -205,6 +205,10 @@ class XDSMjsWriter(AbstractXDSMWriter):
         super(XDSMjsWriter, self).__init__()
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
+        self._ul = '_U_'  # Name of the virtual first element
+        self._br = '_E_'  # Name of the virtual last component
+        # If component ends with this string, it will be treated as a parallel component
+        self._multi_suffix = '_multi'
         self.reserved_words = '_U_', '_E_'  # Ignored at text formatting
         self.extension = 'html'
         self.name = name
@@ -216,6 +220,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
 
     def _format_id(self, name, subs=(('_', ''),)):
+        # Changes forbidden characters in the "id" of a component
         if name not in self.reserved_words:
             return _replace_chars(name, subs)
         else:
@@ -338,7 +343,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         if label is None:
             label = node_name
         if stack:  # Parallel block
-            style += '_multi'  # Block will be stacked in XDSMjs, if ends with this string
+            style += self._multi_suffix  # Block will be stacked in XDSMjs, if ends with this string
         dct = {"type": style, "id": self._format_id(node_name), "name": label}
         self.comps.append(dct)
 
@@ -373,14 +378,14 @@ class XDSMjsWriter(AbstractXDSMWriter):
         recurse(solver_name, nr_comps, self.processes)  # Mutates self.processes
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
-        self.connect(src='_U_', target=name, label=label)
+        self.connect(src=self._ul, target=name, label=label)
 
     def add_output(self, name, label=None, style='DataIO', stack=False, side=_DEFAULT_OUTPUT_SIDE):
         if side == "left":
-            self.connect(src=name, target='_U_', label=label)
+            self.connect(src=name, target=self._ul, label=label)
         else:
             warnings.warn('Right side outputs not implemented for XDSMjs.')
-            self.connect(src=name, target='_U_', label=label)
+            self.connect(src=name, target=self._ul, label=label)
 
     def collect_data(self):
         """
@@ -599,6 +604,9 @@ else:
                 comp_names = [c['abs_name'] for c in solver['comps']]
                 nr = len(comp_names)
                 comp_names = [solver_name] + comp_names
+                # Loop through all processes added so far
+                # Assumes, that processes are added in the right order, first the higher level
+                # processes
                 for proc in self.processes:
                     for i, item in enumerate(proc):
                         if solver_name == item:
@@ -919,19 +927,19 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         return x.format_block(names=names, box_width=box_width, box_lines=box_lines,
                               box_stacking=box_stacking, **kwargs)
 
-    def number_label(number, text, alignment):
+    def number_label(number, txt, alignment):
         # Adds an index to the label either above or on the left side.
         number_str = '{}: '.format(number)
         if alignment == 'horizontal':
-            txt = '{}{}'.format(number_str, text)
+            txt = '{}{}'.format(number_str, txt)
             if box_stacking == 'vertical':
                 return _multiline_block(txt)
             else:
                 return txt
         elif alignment == 'vertical':
-            return _multiline_block(number_str, text)
+            return _multiline_block(number_str, txt)
         else:
-            return text  # In case of a wrong setting
+            return txt  # In case of a wrong setting
 
     def get_output_side(component_name):
         if isinstance(output_side, string_types):
@@ -990,6 +998,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             solvers.append(solver_label)
             nr_components = len(comp_names)
             if add_component_indices:
+                # start, end --> next
                 solver_index = _make_loop_str(first=first,
                                               last=first+nr_components,
                                               start_index=start_index)
