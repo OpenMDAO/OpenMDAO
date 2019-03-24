@@ -193,6 +193,10 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         sup = superscripts[var_type]
         return '{}^{}'.format(name, sup)
 
+    @staticmethod
+    def _make_loop_str(first, last, start_index=0):
+        return ''
+
 
 class XDSMjsWriter(AbstractXDSMWriter):
     """
@@ -209,7 +213,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self._br = '_E_'  # Name of the virtual last component
         # If component ends with this string, it will be treated as a parallel component
         self._multi_suffix = '_multi'
-        self.reserved_words = '_U_', '_E_'  # Ignored at text formatting
+        self.reserved_words = self._ul, self._br  # Ignored at text formatting
         self.extension = 'html'
         self.name = name
         if self.name in _COMPONENT_TYPE_MAP:
@@ -241,9 +245,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         kwargs : dict
             Keyword args
         """
-        edge = {'to': self._format_id(target),
-                'from': self._format_id(src),
-                'name': label}
+        edge = {'to': self._format_id(target), 'from': self._format_id(src), 'name': label}
         self.connections.append(edge)
 
     def add_solver(self, name, label=None, **kwargs):
@@ -672,6 +674,13 @@ else:
             sup = superscripts[var_type]
             return '{}^{{{}}}'.format(name, sup)
 
+        @staticmethod
+        def _make_loop_str(first, last, start_index=0):
+            # Start index shifts all numbers
+            i = start_index
+            txt = '{}, {}$ \\rightarrow $ {}'
+            return txt.format(first + i, last + i, first + i + 1)
+
 
 def write_xdsm(problem, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
@@ -929,17 +938,20 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     def number_label(number, txt, alignment):
         # Adds an index to the label either above or on the left side.
-        number_str = '{}: '.format(number)
-        if alignment == 'horizontal':
-            txt = '{}{}'.format(number_str, txt)
-            if box_stacking == 'vertical':
-                return _multiline_block(txt)
+        if number:
+            number_str = '{}: '.format(number)
+            if alignment == 'horizontal':
+                txt = '{}{}'.format(number_str, txt)
+                if box_stacking == 'vertical':
+                    return _multiline_block(txt)
+                else:
+                    return txt
+            elif alignment == 'vertical':
+                return _multiline_block(number_str, txt)
             else:
-                return txt
-        elif alignment == 'vertical':
-            return _multiline_block(number_str, txt)
+                return txt  # In case of a wrong setting
         else:
-            return txt  # In case of a wrong setting
+            return txt
 
     def get_output_side(component_name):
         if isinstance(output_side, string_types):
@@ -963,11 +975,13 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         warnings.warn(msg)
 
         # Add the top level solver
-        tree2 = dict(tree)
-        tree2.update({'comps': list(comps), 'abs_name': 'root@solver', 'index': 0, 'type': 'solver'})
-        comps.insert(0, tree2)
+        top_level_solver = dict(tree)
+        top_level_solver.update({'comps': list(comps), 'abs_name': 'root@solver', 'index': 0,
+                                 'type': 'solver'})
+        comps.insert(0, top_level_solver)
     comps_dct = {comp['abs_name']: comp for comp in comps if comp['type'] != 'solver'}
-    solvers = []
+
+    solvers = []  # Solver labels
 
     conns1, external_inputs1, external_outputs1 = _prune_connections(connections,
                                                                      model_path=model_path)
@@ -975,10 +989,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     conns2 = _process_connections(conns1, recurse=recurse, subs=subs)
     external_inputs2 = _process_connections(external_inputs1, recurse=recurse, subs=subs)
     external_outputs2 = _process_connections(external_outputs1, recurse=recurse, subs=subs)
-
-    conns3 = _accumulate_connections(conns2)
-    external_inputs3 = _accumulate_connections(external_inputs2)
-    external_outputs3 = _accumulate_connections(external_outputs2)
 
     def add_solver(solver_dct):
         # Adds a solver.
@@ -999,14 +1009,14 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             nr_components = len(comp_names)
             if add_component_indices:
                 # start, end --> next
-                solver_index = _make_loop_str(first=first,
-                                              last=first+nr_components,
-                                              start_index=start_index)
+                solver_index = x._make_loop_str(first=first,
+                                                last=first+nr_components,
+                                                start_index=start_index)
                 solver_label = number_label(solver_index, solver_label, number_alignment)
             x.add_solver(name=solver_name, label=solver_label)
 
             # Add the connections
-            for src, dct in iteritems(conns3):
+            for src, dct in iteritems(conns2):
                 for tgt, conn_vars in iteritems(dct):
                     formatted_conns = format_block(conn_vars)
                     if (src in comp_names) and (tgt in comp_names):
@@ -1023,11 +1033,11 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         driver_label = driver
         driver_name = _format_name(driver)
         if add_component_indices:
-            opt_index = len(comps) + 1  # index of last block + 1
+            opt_index = len(comps) + _START_INDEX
             if include_solver:
                 opt_index += len(solvers)
             nr_comps = len(x.comps)
-            index_str = _make_loop_str(first=nr_comps, last=opt_index, start_index=_START_INDEX)
+            index_str = x._make_loop_str(first=nr_comps, last=opt_index, start_index=_START_INDEX)
             driver_label = number_label(index_str, driver_label, number_alignment)
         x.add_driver(name=driver_name, label=driver_label, driver_type=driver_type.lower())
 
@@ -1069,30 +1079,32 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             label = number_label(i, label, number_alignment)
         stack = comp['is_parallel'] and show_parallel
         if include_solver and comp['type'] == 'solver':  # solver
-            solver_dcts.append(comp)
-            add_solver(comp)
+            if add_solver(comp):  # Return value is true, if solver is not the default
+                # If not default solver, add to the solver dictionary
+                solver_dcts.append(comp)
         else:  # component or group
             x.add_comp(name=comp['abs_name'], label=label, stack=stack,
                        comp_type=comp['component_type'])
 
     # Add process connections
-    x.add_workflow()  # Driver workflow
     if add_process_conns:
+        if driver is not None:
+            x.add_workflow()  # Driver workflow
         for s in solver_dcts:
             x.add_workflow(s)  # Solver workflows
 
     # Add the connections
-    for src, dct in iteritems(conns3):
+    for src, dct in iteritems(conns2):
         for tgt, conn_vars in iteritems(dct):
             if src and tgt:
-                stack = (comps_dct[src]['is_parallel'] or comps_dct[tgt]['is_parallel']) and show_parallel
+                stack = show_parallel and (comps_dct[src]['is_parallel'] or comps_dct[tgt]['is_parallel'])
                 x.connect(src, tgt, label=format_block(conn_vars), stack=stack)
             else:  # Source or target missing
                 msg = 'Connection "{conn}" from "{src}" to "{tgt}" ignored.'
                 warnings.warn(msg.format(src=src, tgt=tgt, conn=conn_vars))
 
     # Add the externally sourced inputs
-    for src, tgts in iteritems(external_inputs3):
+    for src, tgts in iteritems(external_inputs2):
         for tgt, conn_vars in iteritems(tgts):
             formatted_conn_vars = [_replace_chars(o, substitutes=subs) for o in conn_vars]
             if tgt:
@@ -1104,7 +1116,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     # Add the externally connected outputs
     if include_external_outputs:
-        for src, tgts in iteritems(external_outputs3):
+        for src, tgts in iteritems(external_outputs2):
             output_vars = set()
             for tgt, conn_vars in iteritems(tgts):
                 output_vars |= set(conn_vars)
@@ -1146,7 +1158,7 @@ def _process_connections(conns, recurse=True, subs=None):
         return _convert_name(x, recurse=recurse, subs=subs)
 
     conns_new = [{k: convert(v) for k, v in iteritems(conn)} for conn in conns]
-    return conns_new
+    return _accumulate_connections(conns_new)
 
 
 def _accumulate_connections(conns):
@@ -1355,8 +1367,8 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
             else:  # Group
                 # Add a solver to the component list, if this group has a linear or nonlinear
                 # solver.
+                has_solver = False
                 if include_solver:
-                    has_solver = False
                     solver_names = []
                     solver_dct = {}
                     for solver_typ, default_solver in iteritems(_DEFAULT_SOLVER_NAMES):
@@ -1488,13 +1500,6 @@ def _multiline_block(*texts, **kwargs):
     template = '$\\begin{{array}}{{{pos}}} {text} \\end{{array}}$'
     new_line = ' \\\\ '
     return template.format(text=new_line.join(texts), pos='c'*len(texts))
-
-
-def _make_loop_str(first, last, start_index=0):
-    # Start index shifts all numbers
-    i = start_index
-    txt = '{}, {}$ \\rightarrow $ {}'
-    return txt.format(first+i, last+i, first+i+1)
 
 
 ##### openmdao command line setup
