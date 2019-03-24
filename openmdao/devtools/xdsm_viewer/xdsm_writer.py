@@ -322,16 +322,16 @@ class XDSMjsWriter(AbstractXDSMWriter):
         solver : dict or None, optional
             Solver info.
         """
-        def recurse(solv, nr_comps, process):
+        def recurse(solv, nr, process):
             for i, cmp in enumerate(process):
-                print('CMP, ', cmp, nr_comps, solv)
+                print('CMP, ', cmp, nr, solv, process)
                 if cmp == solv:
-                    print(process)
-                    process[i+1:i+1+nr_comps] = [process[i+1:i+1+nr_comps]]
+                    print(process, )
+                    process[i+1:i+1+nr] = [process[i+1:i+1+nr]]
                     print(process)
                     return
                 elif isinstance(cmp, list):
-                    recurse(solv, nr_comps, cmp)
+                    recurse(solv, nr, cmp)
                     break
 
         if solver is None:
@@ -345,10 +345,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         # TODO implement solver processes
         if not self.processes:  # If no process was added yet, add the process of the driver
             self.processes.append([self.driver, comp_names])
-        else:
-            warnings.warn('Solver process connections are not implemented yet for XDSMjs writer.')
-            # TODO implement iteration
-            recurse(solver_name, nr_comps, self.processes)
+        recurse(solver_name, nr_comps, self.processes)
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
         self.connect(src='_U_', target=name, label=label)
@@ -920,6 +917,11 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse, include_solver=include_solver)
+    if include_solver:
+        tree2 = dict(tree)
+        tree2.update({'comps': comps, 'abs_name': 'root@solver', 'index': 0, 'type': 'solver'})
+        comps.insert(0, tree2)
+    print('COMPS', comps)
     comps_dct = {comp['abs_name']: comp for comp in comps if comp['type'] != 'solver'}
     solvers = []
 
@@ -956,7 +958,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             solvers.append(solver_label)
             x.add_solver(name=solver_name, label=solver_label)
             if add_process_conns:
-                print('top level called', solver_dct['abs_name'])
                 x.add_workflow(solver_dct)
 
             # Add the connections
@@ -1014,20 +1015,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             # Optimal output
             x.add_output(comp, format_block(opt_con_vars), side=get_output_side('default'))
 
-    if include_solver:
-        # Default "run once" solvers are ignored
-        # Nonlinear solver has precedence
-        msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
-        warnings.warn(msg)
-
-        tree2 = dict(tree)
-        tree2['comps'] = comps
-        tree2['abs_name'] = 'root@solver'
-        tree2['index'] = 0
-        tree2['type'] = 'solver'
-        # Add top level solver (solver of the whole model)
-        has_top_level_solver = add_solver(tree2)
-
     # Add components
     for comp in comps:  # Driver is 1, so starting from 2
         i = len(x.comps) + 1
@@ -1037,7 +1024,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         stack = comp['is_parallel'] and show_parallel
         if comp['type'] == 'solver':  # solver
             if include_solver:
-                add_solver(comp, index_shift=int(has_top_level_solver))
+                add_solver(comp, index_shift=0)
         else:  # component or group
             x.add_comp(name=comp['abs_name'], label=label, stack=stack,
                        comp_type=comp['component_type'])
