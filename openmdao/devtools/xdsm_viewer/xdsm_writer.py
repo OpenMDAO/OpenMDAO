@@ -313,17 +313,19 @@ class XDSMjsWriter(AbstractXDSMWriter):
         dct = {"type": style, "id": self._format_id(node_name), "name": label}
         self.comps.append(dct)
 
-    def add_workflow(self, comp_names=None):
+    def add_workflow(self, solver=None):
         """
         Add a workflow. If "comp_names" is None, all components will be included.
 
         Parameters
         ----------
-        comp_names : list(str) or None, optional
-            List of component names.
+        solver : dict or None, optional
+            Solver info.
         """
-        if comp_names is None:
+        if solver is None:
             comp_names = self.comp_names
+        else:
+            comp_names = [c['abs_name'] for c in solver['comps']]
 
         # TODO implement solver processes
         if not self.processes:  # If no process was added yet, add the process of the driver
@@ -541,18 +543,20 @@ else:
             style = self.type_map.get(driver_type, 'Optimization')
             self.add_system(node_name=name, style=style, label=self._textify(label), **kwargs)
 
-        def add_workflow(self, comp_names=None):
+        def add_workflow(self, solver=None):
             """
             Add a workflow. If "comp_names" is None, all components will be included.
 
             Parameters
             ----------
-            comp_names : list(str) or None, optional
+            solver : dict or None, optional
                 List of component names.
                 Defaults to None.
             """
-            if comp_names is None:
+            if solver is None:
                 comp_names = [c[0] for c in self.comps]
+            else:
+                comp_names = [c['abs_name'] for c in solver['comps']]
             comps = comp_names + [comp_names[0]]  # close the loop
             self.add_process(comps, arrow=_PROCESS_ARROWS)
 
@@ -935,7 +939,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             solvers.append(solver_label)
             x.add_solver(name=solver_name, label=solver_label)
             if add_process_conns:
-                x.add_workflow([solver_name] + comp_names)
+                x.add_workflow(solver_dct)
 
             # Add the connections
             for src, dct in iteritems(conns3):
