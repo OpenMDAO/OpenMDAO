@@ -324,14 +324,20 @@ class XDSMjsWriter(AbstractXDSMWriter):
         """
         if solver is None:
             comp_names = self.comp_names
+            solver_name = None
         else:
             comp_names = [c['abs_name'] for c in solver['comps']]
+            solver_name = solver['abs_name']
 
         # TODO implement solver processes
         if not self.processes:  # If no process was added yet, add the process of the driver
             self.processes.append([self.driver, comp_names])
         else:
             warnings.warn('Solver process connections are not implemented yet for XDSMjs writer.')
+            # TODO implement iteration
+            for comp in self.processes:
+                if comp == solver_name:
+                    print('Solver found', solver_name)
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
         self.connect(src='_U_', target=name, label=label)
