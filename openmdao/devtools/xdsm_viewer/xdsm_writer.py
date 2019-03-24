@@ -109,6 +109,7 @@ _START_INDEX = 0
 
 
 class BaseXDSMWriter(object):
+    """All XDSM writers have to inherit from this base class."""
     pass
 
 
@@ -155,10 +156,38 @@ class AbstractXDSMWriter(BaseXDSMWriter):
 
     @staticmethod
     def format_block(names, **kwargs):
+        """
+        Reimplement this method to format the names in a data block.
+
+        Parameters
+        ----------
+        names : list
+            List of items in the block
+        kwargs : dict
+            Keyword arguments.
+        Returns
+        -------
+            list(str)
+        """
         return names
 
     @staticmethod
     def format_var_str(name, var_type, superscripts=None):
+        """
+        Formats a variable name to include a superscript for the variable type.
+
+        Parameters
+        ----------
+        name : str
+            Name (label in the block) of the variable.
+        var_type : str
+            Variable type.
+        superscripts : dict or None, optional
+            A dictionary mapping variable types to their superscript notation
+        Returns
+        -------
+
+        """
         if superscripts is None:
             superscripts = _SUPERSCRIPTS
         sup = superscripts[var_type]
@@ -337,11 +366,12 @@ class XDSMjsWriter(AbstractXDSMWriter):
         else:
             solver_name = solver['abs_name']
             comp_names = [c['abs_name'] for c in solver['comps']]
+            print('COMPS', comp_names, self.comp_names)
         nr_comps = len(comp_names)
 
         # TODO implement solver processes
         if not self.processes:  # If no process was added yet, add the process of the driver
-            self.processes.append([self.driver, comp_names])
+            self.processes.append([self.driver, list(self.comp_names)])
         recurse(solver_name, nr_comps, self.processes)  # Mutates self.processes
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
@@ -565,12 +595,11 @@ else:
                 Defaults to None.
             """
             if solver is None:
-                comp_names = [c[0] for c in self.comps]
+                comp_names = [c[0] for c in self.comps]  # Driver process
             else:
                 solver_name = solver['abs_name']
                 comp_names = [solver_name] + [c['abs_name'] for c in solver['comps']]
             comps = comp_names + [comp_names[0]]  # close the loop
-            print('COMPS', comps)
             self.add_process(comps, arrow=_PROCESS_ARROWS)
 
         @staticmethod
@@ -854,13 +883,13 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     Returns
     -------
-        XDSM or AbstractXDSMWriter
+        BaseXDSMWriter
     """
     # TODO implement residuals
 
     error_msg = ('Undefined XDSM writer "{}". '
                  'Provide  a valid name or a BaseXDSMWriter instance.')
-    if isinstance(writer, string_types):
+    if isinstance(writer, string_types):  # Standard writers (XDSMjs or pyXXDSM)
         if writer.lower() == 'pyxdsm':  # pyXDSM
             x = XDSMWriter()
         elif writer.lower() == 'xdsmjs':  # XDSMjs
@@ -941,6 +970,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     def add_solver(solver_dct):
         # Adds a solver.
         # Uses some vars from the outer scope.
+        # Returns True, if it is a non-default linear or nonlinear solver
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
         first = solver_dct['index']
         solver_label = _format_solver_str(solver_dct,
@@ -950,6 +980,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         solver_name = _format_name(solver_dct['abs_name'])
 
         if solver_label:  # At least one non-default solver (default solvers are ignored)
+            # If there is a driver, the start index is increased by one.
             start_index = _START_INDEX + int(bool(driver))
             nr_components = len(comp_names)
             if add_component_indices:
@@ -959,8 +990,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 solver_label = number_label(solver_index, solver_label, number_alignment)
             solvers.append(solver_label)
             x.add_solver(name=solver_name, label=solver_label)
-            if add_process_conns:
-                x.add_workflow(solver_dct)
 
             # Add the connections
             for src, dct in iteritems(conns3):
@@ -1018,18 +1047,24 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             x.add_output(comp, format_block(opt_con_vars), side=get_output_side('default'))
 
     # Add components
+    solver_dcts = []
     for comp in comps:  # Driver is 1, so starting from 2
         i = len(x.comps) + 1
         label = _replace_chars(comp['name'], substitutes=subs)
         if add_component_indices:
             label = number_label(i, label, number_alignment)
         stack = comp['is_parallel'] and show_parallel
-        if comp['type'] == 'solver':  # solver
-            if include_solver:
-                add_solver(comp)
+        if include_solver and comp['type'] == 'solver':  # solver
+            solver_dcts.append(comp)
+            add_solver(comp)
         else:  # component or group
             x.add_comp(name=comp['abs_name'], label=label, stack=stack,
                        comp_type=comp['component_type'])
+
+    for s in solver_dcts:
+        if add_process_conns:
+            print('solver', s, len(solver_dcts))
+            x.add_workflow(s)
 
     # Add the connections
     for src, dct in iteritems(conns3):
@@ -1081,7 +1116,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         path = '.'.join([filename, ext])
         webview(path)  # Can open also PDFs
 
-    return x
+    return x  # Returns the writer instance
 
 
 def _get_cls_name(obj):

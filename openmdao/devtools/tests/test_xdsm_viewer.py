@@ -938,10 +938,11 @@ class TestXDSMjsViewer(unittest.TestCase):
         from openmdao.devtools.xdsm_viewer.xdsm_writer import XDSMjsWriter
 
         class CustomWriter(XDSMjsWriter):
-            """Customized XDSM writer"""
+            """Customized XDSM writer, based on the XDSMjs writer."""
 
             @staticmethod
             def format_block(names, **kwargs):
+                """This method is overwritten, to implement some different formatting."""
                 return [name.upper() for name in names]
 
         prob = Problem()
