@@ -915,6 +915,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse, include_solver=include_solver)
     if include_solver:
+        msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
+        warnings.warn(msg)
+
         # Add the top level solver
         tree2 = dict(tree)
         tree2.update({'comps': comps, 'abs_name': 'root@solver', 'index': 0, 'type': 'solver'})
