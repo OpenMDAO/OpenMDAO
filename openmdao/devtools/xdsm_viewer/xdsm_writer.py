@@ -335,14 +335,14 @@ class XDSMjsWriter(AbstractXDSMWriter):
             comp_names = self.comp_names
             solver_name = None
         else:
-            comp_names = [c['abs_name'] for c in solver['comps']]
             solver_name = solver['abs_name']
+            comp_names = [c['abs_name'] for c in solver['comps']]
         nr_comps = len(comp_names)
 
         # TODO implement solver processes
         if not self.processes:  # If no process was added yet, add the process of the driver
             self.processes.append([self.driver, comp_names])
-        recurse(solver_name, nr_comps, self.processes)
+        recurse(solver_name, nr_comps, self.processes)  # Mutates self.processes
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
         self.connect(src='_U_', target=name, label=label)
@@ -567,8 +567,10 @@ else:
             if solver is None:
                 comp_names = [c[0] for c in self.comps]
             else:
-                comp_names = [c['abs_name'] for c in solver['comps']]
+                solver_name = solver['abs_name']
+                comp_names = [solver_name] + [c['abs_name'] for c in solver['comps']]
             comps = comp_names + [comp_names[0]]  # close the loop
+            print('COMPS', comps)
             self.add_process(comps, arrow=_PROCESS_ARROWS)
 
         @staticmethod
@@ -920,7 +922,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
         # Add the top level solver
         tree2 = dict(tree)
-        tree2.update({'comps': comps, 'abs_name': 'root@solver', 'index': 0, 'type': 'solver'})
+        tree2.update({'comps': list(comps), 'abs_name': 'root@solver', 'index': 0, 'type': 'solver'})
         comps.insert(0, tree2)
     comps_dct = {comp['abs_name']: comp for comp in comps if comp['type'] != 'solver'}
     solvers = []
