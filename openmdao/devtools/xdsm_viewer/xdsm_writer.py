@@ -43,7 +43,7 @@ _OUT_FORMATS = {'tex': 'pyxdsm', 'pdf': 'pyxdsm', 'json': 'xdsmjs', 'html': 'xds
 # Round parenthesis is replaced with subscript syntax, e.g. x(1) --> x_{1}
 _CHAR_SUBS = {
     'pyxdsm': (('_', '\_'), ('(', '_{'), (')', '}'),),
-    'xdsmjs': (),
+    'xdsmjs': ((' ', ''), (':', '')),
 }
 # Variable formatting settings
 _SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't', 'consistency': 'c'}
@@ -322,12 +322,25 @@ class XDSMjsWriter(AbstractXDSMWriter):
         solver : dict or None, optional
             Solver info.
         """
+        def recurse(solv, nr_comps, process):
+            for i, cmp in enumerate(process):
+                print('CMP, ', cmp, nr_comps, solv)
+                if cmp == solv:
+                    print(process)
+                    process[i+1:i+1+nr_comps] = [process[i+1:i+1+nr_comps]]
+                    print(process)
+                    return
+                elif isinstance(cmp, list):
+                    recurse(solv, nr_comps, cmp)
+                    break
+
         if solver is None:
             comp_names = self.comp_names
             solver_name = None
         else:
             comp_names = [c['abs_name'] for c in solver['comps']]
             solver_name = solver['abs_name']
+        nr_comps = len(comp_names)
 
         # TODO implement solver processes
         if not self.processes:  # If no process was added yet, add the process of the driver
@@ -335,9 +348,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         else:
             warnings.warn('Solver process connections are not implemented yet for XDSMjs writer.')
             # TODO implement iteration
-            for comp in self.processes:
-                if comp == solver_name:
-                    print('Solver found', solver_name)
+            recurse(solver_name, nr_comps, self.processes)
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
         self.connect(src='_U_', target=name, label=label)
@@ -945,6 +956,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             solvers.append(solver_label)
             x.add_solver(name=solver_name, label=solver_label)
             if add_process_conns:
+                print('top level called', solver_dct['abs_name'])
                 x.add_workflow(solver_dct)
 
             # Add the connections
@@ -1010,8 +1022,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
         tree2 = dict(tree)
         tree2['comps'] = comps
-        tree2['abs_name'] = 'root.solver'
+        tree2['abs_name'] = 'root@solver'
         tree2['index'] = 0
+        tree2['type'] = 'solver'
         # Add top level solver (solver of the whole model)
         has_top_level_solver = add_solver(tree2)
 
