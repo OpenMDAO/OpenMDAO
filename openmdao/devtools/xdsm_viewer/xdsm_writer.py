@@ -105,7 +105,7 @@ _DEFAULT_BOX_STACKING = 'max_chars'
 _PROCESS_ARROWS = False
 # Maximum number of lines in a box. No limit, if None.
 _MAX_BOX_LINES = None
-_START_INDEX = 1
+_START_INDEX = 0
 
 
 class BaseXDSMWriter(object):
@@ -324,11 +324,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
         """
         def recurse(solv, nr, process):
             for i, cmp in enumerate(process):
-                print('CMP, ', cmp, nr, solv, process)
                 if cmp == solv:
-                    print(process, )
                     process[i+1:i+1+nr] = [process[i+1:i+1+nr]]
-                    print(process)
                     return
                 elif isinstance(cmp, list):
                     recurse(solv, nr, cmp)
@@ -918,10 +915,10 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse, include_solver=include_solver)
     if include_solver:
+        # Add the top level solver
         tree2 = dict(tree)
         tree2.update({'comps': comps, 'abs_name': 'root@solver', 'index': 0, 'type': 'solver'})
         comps.insert(0, tree2)
-    print('COMPS', comps)
     comps_dct = {comp['abs_name']: comp for comp in comps if comp['type'] != 'solver'}
     solvers = []
 
@@ -936,7 +933,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     external_inputs3 = _accumulate_connections(external_inputs2)
     external_outputs3 = _accumulate_connections(external_outputs2)
 
-    def add_solver(solver_dct, index_shift=0):
+    def add_solver(solver_dct):
         # Adds a solver.
         # Uses some vars from the outer scope.
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
@@ -948,7 +945,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         solver_name = _format_name(solver_dct['abs_name'])
 
         if solver_label:  # At least one non-default solver (default solvers are ignored)
-            start_index = _START_INDEX + int(bool(driver)) + index_shift
+            start_index = _START_INDEX + int(bool(driver))
             nr_components = len(comp_names)
             if add_component_indices:
                 solver_index = _make_loop_str(first=first,
@@ -982,7 +979,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             if include_solver:
                 opt_index += len(solvers)
             nr_comps = len(x.comps)
-            index_str = _make_loop_str(first=nr_comps, last=opt_index, start_index=1)
+            index_str = _make_loop_str(first=nr_comps, last=opt_index, start_index=_START_INDEX)
             driver_label = number_label(index_str, driver_label, number_alignment)
         x.add_driver(name=driver_name, label=driver_label, driver_type=driver_type.lower())
 
@@ -1024,7 +1021,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         stack = comp['is_parallel'] and show_parallel
         if comp['type'] == 'solver':  # solver
             if include_solver:
-                add_solver(comp, index_shift=0)
+                add_solver(comp)
         else:  # component or group
             x.add_comp(name=comp['abs_name'], label=label, stack=stack,
                        comp_type=comp['component_type'])
