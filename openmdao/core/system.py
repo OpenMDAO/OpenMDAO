@@ -1626,12 +1626,12 @@ class System(object):
                 for type_ in ['input', 'output']:
                     vsizes = self._var_sizes[vec_name][type_]
                     if vsizes.size > 0:
-                        csum = np.empty(vsizes.size, dtype=INT_DTYPE)
+                        csum = np.empty(vsizes.size, dtype=int)
                         csum[0] = 0
                         csum[1:] = np.cumsum(vsizes)[:-1]
                         off_vn[type_] = csum.reshape(vsizes.shape)
                     else:
-                        off_vn[type_] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
+                        off_vn[type_] = np.zeros(0, dtype=int).reshape((1, 0))
 
             if self._use_derivatives:
                 offsets['nonlinear'] = offsets['linear']

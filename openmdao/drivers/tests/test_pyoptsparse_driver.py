@@ -1828,7 +1828,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_rel_error(self, prob['z'][0], 1.9780247, 1e-3)
+        assert_rel_error(self, prob['z'][0], 1.9780247, 2e-3)
 
     def test_snopt_fd_solution(self):
 
