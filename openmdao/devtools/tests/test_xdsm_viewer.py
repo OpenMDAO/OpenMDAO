@@ -934,6 +934,9 @@ class TestXDSMjsViewer(unittest.TestCase):
         with self.assertRaises(ValueError):
             write_xdsm(prob, filename=filename, out_format='jpg', subs=(), show_browser=SHOW)
 
+
+@unittest.skipUnless(XDSM, "The pyXDSM package is required.")
+class TestCustomXDSMViewer(unittest.TestCase):
     def test_custom_writer(self):
         from openmdao.devtools.xdsm_viewer.xdsm_writer import XDSMjsWriter
 

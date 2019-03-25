@@ -773,7 +773,9 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
        XDSM or AbstractXDSMWriter
     """
     build_pdf = False
-    if out_format in ('tex', 'pdf'):
+    writer = kwargs.pop('writer', None)
+
+    if out_format in ('tex', 'pdf') and (writer is None):
         if XDSM is None:
             print('\nThe "tex" and "pdf" formats require the pyxdsm package. You can download the '
                   'package from https://github.com/mdolab/pyXDSM, or install it directly from '
@@ -809,7 +811,6 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
-    writer = kwargs.pop('writer', None)
     # If the "writer" argument not provided, the output format is used to choose the writer
     if writer is None:
         try:
