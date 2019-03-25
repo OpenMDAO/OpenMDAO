@@ -58,7 +58,17 @@ class DefaultTransfer(Transfer):
 
         transfers = group._transfers
         vectors = group._vectors
+
         offsets = _global2local_offsets(group._get_var_offsets())
+
+        from openmdao.utils.general_utils import printoptions
+
+        if group.pathname == 'thruster.inlet.real_flow':
+            with printoptions(linewidth=9999):
+                print('*' * 25)
+                print(group.pathname, 'rank', group.comm.rank)
+                print('global offsets:', group._get_var_offsets()['nonlinear']['input'])
+                print('local offsets:', offsets['nonlinear']['input'])
 
         vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
 
@@ -66,6 +76,8 @@ class DefaultTransfer(Transfer):
             relvars, _ = group._relevant[vec_name]['@all']
             relvars_in = relvars['input']
             relvars_out = relvars['output']
+            out_vec = vectors['output'][vec_name]
+            in_vec = vectors['output'][vec_name]
 
             # Initialize empty lists for the transfer indices
             nsub_allprocs = len(group._subsystems_allprocs)
@@ -136,11 +148,11 @@ class DefaultTransfer(Transfer):
                     xfer_in.append(input_inds)
                     xfer_out.append(output_inds)
 
-                    print("*" * 25)
-                    print("Transfer from %s to %s on rank %d" % (abs_out, abs_in, group.comm.rank))
-                    print("*" * 25)
-                    print("out idxs:", output_inds)
-                    print("in idxs:", input_inds)
+                    # print("*" * 25)
+                    # print("Transfer from %s to %s on rank %d" % (abs_out, abs_in, group.comm.rank))
+                    # print("*" * 25)
+                    # print("out idxs:", output_inds)
+                    # print("in idxs:", input_inds)
 
                     isub = abs2isub[abs_in]
                     fwd_xfer_in[isub].append(input_inds)
@@ -158,8 +170,6 @@ class DefaultTransfer(Transfer):
                 if rev:
                     rev_xfer_in[isub] = merge(rev_xfer_in[isub])
                     rev_xfer_out[isub] = merge(rev_xfer_out[isub])
-
-            out_vec = vectors['output'][vec_name]
 
             transfers[vec_name] = {}
             xfer_all = DefaultTransfer(vectors['input'][vec_name], out_vec,
