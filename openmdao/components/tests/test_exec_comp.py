@@ -486,7 +486,7 @@ class TestExecComp(unittest.TestCase):
 
         model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5',
                                              x={'shape': (5,), 'value': 5},
-                                             y={'shape': (5,), 'value': 5}))
+                                             y={'shape': (5,)}))
 
         model.connect('indep.x', 'comp.x')
 
