@@ -677,7 +677,6 @@ class TestCSStaticColoring(unittest.TestCase):
         prob.run_model()
         coloring = sub.compute_approx_coloring(wrt='*', method=self.FD_METHOD, directory=self.tempdir)
 
-
         # now create a second problem and use the static coloring
         prob = Problem()
         model = prob.model = Group()
