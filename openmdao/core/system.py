@@ -884,6 +884,9 @@ class System(object):
         out_offsets[out_offsets == 0.0] = 1.0
         out_offsets *= rel_perturbation_size
 
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
+
         # compute absolute perturbations
         self._setup_static_approx_coloring()
         self._jac_saves_remaining = repeats
@@ -895,7 +898,10 @@ class System(object):
                 self._outputs._data[:] = \
                     starting_outputs + out_offsets * np.random.random(out_offsets.size)
 
-                self._apply_nonlinear()
+                if is_total:
+                    self._solve_nonlinear()
+                else:
+                    self._apply_nonlinear()
 
             # when run_linearize is called after the appropriate number of repeats,
             # the coloring will be computed and saved.

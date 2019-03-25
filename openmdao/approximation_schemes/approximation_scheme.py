@@ -230,7 +230,8 @@ class ApproximationScheme(object):
 
                 for cols, nzrows in coloring.color_nonzero_iter('fwd'):
                     ccols = cols if col_map is None else col_map[cols]
-                    idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit, is_total, is_semi)
+                    idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit or is_semi,
+                                                   is_total)
                     self._approx_groups.append((None, data, cols, tmpJ, idx_info, nzrows))
             else:
                 if wrt in inputs._views_flat:

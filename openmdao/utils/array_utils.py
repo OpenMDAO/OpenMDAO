@@ -357,7 +357,7 @@ def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
         return np.hstack(global_idxs)
 
 
-def get_input_idx_split(full_idxs, inputs, outputs, is_implicit, is_total, is_semi):
+def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
     """
     Split an array of indices into vec outs + ins into two arrays of indices into outs and ins.
 
@@ -369,8 +369,8 @@ def get_input_idx_split(full_idxs, inputs, outputs, is_implicit, is_total, is_se
         Inputs vector.
     outputs : Vector
         Outputs vector.
-    is_implicit : bool
-        If True, current system is implicit and full idxs are into the full outs + ins vector.
+    use_full_cols : bool
+        If True,  full idxs are into the full outs + ins vector.
     is_total : bool
         If True, total derivatives are being computed and wrt vector is the outputs vector.
 
@@ -381,7 +381,7 @@ def get_input_idx_split(full_idxs, inputs, outputs, is_implicit, is_total, is_se
     """
     assert len(full_idxs) > 0, "Empty index array passed to get_input_idx_split."
     full_idxs = np.asarray(full_idxs)
-    if is_implicit or is_semi:
+    if use_full_cols:
         full_size = inputs._data.size
         out_size = outputs._data.size
         full_size += out_size
