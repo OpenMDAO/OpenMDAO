@@ -111,7 +111,13 @@ _START_INDEX = 0
 
 class BaseXDSMWriter(object):
     """All XDSM writers have to inherit from this base class."""
-    pass
+
+    def __init__(self, name):
+        self.name = name
+        # This should be a dictionary mapping OpenMDAO system types to XDSM component types.
+        # See for example any value in _COMPONENT_TYPE_MAP
+        self.type_map = None
+        self.extension = None  # Implement in child class as string file extension
 
 
 class AbstractXDSMWriter(BaseXDSMWriter):
@@ -121,6 +127,7 @@ class AbstractXDSMWriter(BaseXDSMWriter):
     All methods should be implemented in child classes.
     """
     def __init__(self, name='abstract_xdsm_writer'):
+        super(AbstractXDSMWriter, self).__init__(name=name)
         self.comps = []
         self.connections = []
         self.left_outs = {}
@@ -128,11 +135,6 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         self.ins = {}
         self.processes = []
         self.process_arrows = []
-        self.extension = None  # Implement in child class as string file extension
-        self.name = name
-        # This should be a dictionary mapping OpenMDAO system types to XDSM component types.
-        # See for example any value in _COMPONENT_TYPE_MAP
-        self.type_map = None
 
     def add_solver(self, label, name='solver', **kwargs):
         pass  # Implement in child class
@@ -207,7 +209,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
     https://github.com/OneraHub/XDSMjs
     """
     def __init__(self, name='xdsmjs'):
-        super(XDSMjsWriter, self).__init__()
+        super(XDSMjsWriter, self).__init__(name=name)
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
         self._ul = '_U_'  # Name of the virtual first element
@@ -216,7 +218,6 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self._multi_suffix = '_multi'
         self.reserved_words = self._ul, self._br  # Ignored at text formatting
         self.extension = 'html'
-        self.name = name
         if self.name in _COMPONENT_TYPE_MAP:
             self.type_map = _COMPONENT_TYPE_MAP[self.name]
         else:
@@ -359,6 +360,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         solver : dict or None, optional
             Solver info.
         """
+
         def recurse(solv, nr, process):
             for i, cmp in enumerate(process):
                 if cmp == solv:
@@ -468,6 +470,8 @@ else:
                 self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
                 msg = 'Name not "{}" found in component type mapping, will default to "{}"'
                 warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
+            self._nr_comps = 0
+            self._comp_meta = {}
 
         def write(self, filename=None, **kwargs):
             """
@@ -506,6 +510,8 @@ else:
             """
             if label is None:
                 label = node_name
+            self._comp_meta[node_name] = {'index': self._nr_comps, 'steps': None}
+            self._nr_comps += 1
             super(XDSMWriter, self).add_system(node_name=node_name, style=style, label=label,
                                                stack=stack, faded=faded)
 
@@ -600,6 +606,8 @@ else:
                 List of component names.
                 Defaults to None.
             """
+            meta = self._comp_meta
+
             if solver is None:
                 comp_names = [c[0] for c in self.comps]  # Driver process
             else:
@@ -611,11 +619,17 @@ else:
                 # Assumes, that processes are added in the right order, first the higher level
                 # processes
                 for proc in self.processes:
+                    process_name = proc[0]
                     for i, item in enumerate(proc):
                         if solver_name == item:
                             # delete items belonging to the new process from the others
                             proc[i+1:i+1+nr] = []
+                            process_index = meta[process_name]['index']
+                            meta[process_name]['steps'] += 1
+                            self.comps[process_index][2] = 'Changed label!'
             process_steps = comp_names + [comp_names[0]]  # close the loop
+            meta[process_steps[0]]['steps'] = len(process_steps) - 2
+            print('META:::', meta)
             self.add_process(process_steps, arrow=_PROCESS_ARROWS)
 
         @staticmethod
@@ -952,7 +966,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     def number_label(number, txt, alignment):
         # Adds an index to the label either above or on the left side.
-        if number:
+        if number:  # If number is None or empty string, it won't be inserted
             number_str = '{}: '.format(number)
             if alignment == 'horizontal':
                 txt = '{}{}'.format(number_str, txt)
@@ -992,7 +1006,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         top_level_solver = dict(tree)
         top_level_solver.update({'comps': list(comps), 'abs_name': 'root@solver', 'index': 0,
                                  'type': 'solver'})
-        comps.insert(0, top_level_solver)
+        comps.insert(0, top_level_solver)  # Add top level solver
     comps_dct = {comp['abs_name']: comp for comp in comps if comp['type'] != 'solver'}
 
     solvers = []  # Solver labels
@@ -1397,7 +1411,7 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                         # "comps" will be filled later
                         solver = {'abs_name': _format_name(name_str), 'rel_name': solver_names,
                                   'type': 'solver', 'name': name_str, 'is_parallel': False,
-                                  'component_type': 'MDA', 'comps': [], 'index': i_solver}
+                                  'component_type': 'MDA', 'index': i_solver}
                         solver.update(solver_dct)
                         components.append(solver)
                         comp_names.add(name_str)
@@ -1415,6 +1429,7 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                 # Add to the solver, which components are in its loop.
                 if include_solver and has_solver:
                     components[i_solver]['comps'] = local_comps
+                    components[i_solver]['steps'] = len(local_comps)
                     local_comps = []
         return local_comps
 
