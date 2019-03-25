@@ -6,19 +6,19 @@ branches:
 
 environment:
   matrix:
-    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+    - APPVEYOR_BUILD_WORKER_IMAGE: Previous Ubuntu
       PYTHON: 3.7
       NUMPY: 1.15
       SCIPY: 1.0.1
       PETSc: 3.9.1
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+    - APPVEYOR_BUILD_WORKER_IMAGE: Previous Ubuntu
       PYTHON: 3.6
       NUMPY: 1.15
       SCIPY: 1.0.1
       PETSc: 3.9.1
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+    - APPVEYOR_BUILD_WORKER_IMAGE: Previous Ubuntu
       PYTHON: 2.7
       NUMPY: 1.15
       SCIPY: 1.0.1
