@@ -225,13 +225,13 @@ class TestJacobianFeatures(unittest.TestCase):
          'If one of rows/cols is specified, then both must be specified'),
         ({'of': 'f', 'wrt': 'z', 'cols': [0, 10]},
          'If one of rows/cols is specified, then both must be specified'),
-        ({'of': 'f', 'wrt': 'z', 'rows': [0], 'cols': [0, 3]},
-         'rows and cols must have the same shape, rows: \(1L?,\), cols: \(2L?,\)'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val': [0, 1]},
          'If rows and cols are specified, val must be a scalar or have the same shape, '
          'val: \(2L?,\), rows/cols: \(3L?,\)'),
     ])
     def test_bad_sizes(self, partials_kwargs, error_msg):
+        # This tests various shape mismatches. Basic size mismatch is now tested earlier in the
+        # declare_partials call.
         comp = SimpleCompKwarg(partials_kwargs)
         problem = self.problem
         model = problem.model

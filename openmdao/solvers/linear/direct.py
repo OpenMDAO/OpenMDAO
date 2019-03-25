@@ -93,8 +93,9 @@ def format_singular_csc_error(system, matrix):
 
         if zero_rows.size == 0:
             # Underdetermined: duplicate columns or rows.
-            msg = "Identical rows or columns found in jacobian. Problem is underdetermined."
-            return msg
+            msg = "Identical rows or columns found in jacobian in '{}'. Problem is " + \
+                  "underdetermined."
+            return msg.format(system.pathname)
 
         loc_txt = "row"
         loc = zero_rows[0]
