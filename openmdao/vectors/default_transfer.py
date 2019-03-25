@@ -136,6 +136,12 @@ class DefaultTransfer(Transfer):
                     xfer_in.append(input_inds)
                     xfer_out.append(output_inds)
 
+                    print("*" * 25)
+                    print("Transfer from %s to %s on rank %d" % (abs_out, abs_in, group.comm.rank))
+                    print("*" * 25)
+                    print("out idxs:", output_inds)
+                    print("in idxs:", input_inds)
+
                     isub = abs2isub[abs_in]
                     fwd_xfer_in[isub].append(input_inds)
                     fwd_xfer_out[isub].append(output_inds)
