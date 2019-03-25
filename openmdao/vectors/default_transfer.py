@@ -63,13 +63,6 @@ class DefaultTransfer(Transfer):
 
         from openmdao.utils.general_utils import printoptions
 
-        if group.pathname == 'thruster.inlet.real_flow':
-            with printoptions(linewidth=9999):
-                print('*' * 25)
-                print(group.pathname, 'rank', group.comm.rank)
-                print('global offsets:', group._get_var_offsets()['nonlinear']['input'])
-                print('local offsets:', offsets['nonlinear']['input'])
-
         vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
 
         for vec_name in vec_names:
@@ -147,12 +140,6 @@ class DefaultTransfer(Transfer):
                     # Now the indices are ready - input_inds, output_inds
                     xfer_in.append(input_inds)
                     xfer_out.append(output_inds)
-
-                    # print("*" * 25)
-                    # print("Transfer from %s to %s on rank %d" % (abs_out, abs_in, group.comm.rank))
-                    # print("*" * 25)
-                    # print("out idxs:", output_inds)
-                    # print("in idxs:", input_inds)
 
                     isub = abs2isub[abs_in]
                     fwd_xfer_in[isub].append(input_inds)
