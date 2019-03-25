@@ -493,7 +493,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
 
-        self.assertEqual(str(context.exception),
+        self.assertEqual(str(context.exception).replace('1L,', '1,'),  # 1L on Windows
                          "comp: shape of (5,) has been specified for variable 'x', "
                          "but a value of shape (1,) has been provided.")
 
