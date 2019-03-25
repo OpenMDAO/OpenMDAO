@@ -58,10 +58,7 @@ class DefaultTransfer(Transfer):
 
         transfers = group._transfers
         vectors = group._vectors
-
         offsets = _global2local_offsets(group._get_var_offsets())
-
-        from openmdao.utils.general_utils import printoptions
 
         vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
 
@@ -69,8 +66,6 @@ class DefaultTransfer(Transfer):
             relvars, _ = group._relevant[vec_name]['@all']
             relvars_in = relvars['input']
             relvars_out = relvars['output']
-            out_vec = vectors['output'][vec_name]
-            in_vec = vectors['output'][vec_name]
 
             # Initialize empty lists for the transfer indices
             nsub_allprocs = len(group._subsystems_allprocs)
@@ -157,6 +152,8 @@ class DefaultTransfer(Transfer):
                 if rev:
                     rev_xfer_in[isub] = merge(rev_xfer_in[isub])
                     rev_xfer_out[isub] = merge(rev_xfer_out[isub])
+
+            out_vec = vectors['output'][vec_name]
 
             transfers[vec_name] = {}
             xfer_all = DefaultTransfer(vectors['input'][vec_name], out_vec,
