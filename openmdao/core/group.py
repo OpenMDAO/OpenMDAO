@@ -1110,14 +1110,15 @@ class Group(System):
                         for d in range(source_dimensions):
                             # when running under MPI, there is a value for each proc
                             d_size = out_shape[d] * self.comm.size
-                            for i in src_indices[..., d].flat:
-                                if abs(i) >= d_size:
-                                    msg = ("The source indices do not specify "
-                                           "a valid index for the connection "
-                                           "'%s' to '%s'. Index "
-                                           "'%d' is out of range for source "
-                                           "dimension of size %d.")
-                                    raise ValueError(msg % (abs_out, abs_in, i, d_size))
+                            if src_indices.size > 0:
+                                for i in src_indices[..., d].flat:
+                                    if abs(i) >= d_size:
+                                        msg = ("The source indices do not specify "
+                                               "a valid index for the connection "
+                                               "'%s' to '%s'. Index "
+                                               "'%d' is out of range for source "
+                                               "dimension of size %d.")
+                                        raise ValueError(msg % (abs_out, abs_in, i, d_size))
 
     def _transfer(self, vec_name, mode, isub=None):
         """
