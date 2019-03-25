@@ -626,9 +626,9 @@ else:
                             proc[i+1:i+1+nr] = []
                             process_index = meta[process_name]['index']
                             meta[process_name]['steps'] += 1
-                            self.comps[process_index][2] = 'Changed label!'
+                            self.comps[process_index][2] = meta[process_name]['steps']
             process_steps = comp_names + [comp_names[0]]  # close the loop
-            meta[process_steps[0]]['steps'] = len(process_steps) - 2
+            meta[process_steps[0]]['steps'] = len(process_steps)
             print('META:::', meta)
             self.add_process(process_steps, arrow=_PROCESS_ARROWS)
 
