@@ -921,7 +921,7 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
 
-    def set_coloring_spec(self, simul_info):
+    def set_simul_deriv_color(self, simul_info):
         """
         See set_coloring_spec. This method is deprecated.
 
@@ -934,7 +934,7 @@ class Driver(object):
             See the docstring for Coloring for details.
 
         """
-        warn_deprecation("set_coloring_spec is deprecated.  Use set_coloring_spec instead.")
+        warn_deprecation("set_simul_deriv_color is deprecated.  Use set_coloring_spec instead.")
         self.set_coloring_spec(simul_info)
 
     def set_total_jac_sparsity(self, sparsity):

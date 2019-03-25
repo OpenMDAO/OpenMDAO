@@ -163,7 +163,8 @@ class ApproximationScheme(object):
         approx_wrt_idx = system._owns_approx_wrt_idx
 
         self._approx_groups = []
-        all_wrt_names = system._var_allprocs_abs_names['output'] + system._var_allprocs_abs_names['input']
+        all_wrt_names = system._var_allprocs_abs_names['output'] + \
+            system._var_allprocs_abs_names['input']
         for key, approx in approx_groups:
             wrt = key[0]
             directional = key[-1]
