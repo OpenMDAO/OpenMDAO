@@ -243,6 +243,17 @@ class ExecComp(ExplicitComponent):
                 if 'value' in val:
                     init_vals[arg] = val['value']
                     del kwargs2[arg]['value']
+
+                if 'shape' in val:
+                    shape = val['shape']
+                    if arg not in init_vals:
+                        init_vals[arg] = np.ones(shape)
+                    elif shape != np.atleast_1d(init_vals[arg]).shape:
+                        raise RuntimeError("%s: shape of %s has been specified for "
+                                           "variable '%s', but a value of shape %s has "
+                                           "been provided." % (self.pathname, str(shape),
+                                            arg, str(np.atleast_1d(init_vals[arg]).shape)))
+                    del kwargs2[arg]['shape']
             else:
                 init_vals[arg] = val
 
