@@ -1465,7 +1465,7 @@ class TestProblem(unittest.TestCase):
                 self.add_subsystem('comp', ImplSimple())
 
             def configure(self):
-                # This solver won't solve the sytem. We want
+                # This solver won't solve the system. We want
                 # to override it in the parent.
                 self.nonlinear_solver = NonlinearBlockGS()
 

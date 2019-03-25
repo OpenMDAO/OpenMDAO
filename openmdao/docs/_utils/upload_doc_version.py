@@ -26,9 +26,11 @@ def get_tag_info():
 
     cmd = subprocess.Popen(['git', 'rev-list', '-1', latest_tag, '-s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     cmd_out, cmd_err = cmd.communicate()
+
+    cmd_out = cmd_out.decode('utf8')
     commit_id = cmd_out.strip()
 
-    return latest_tag, str(commit_id)
+    return latest_tag, commit_id
 
 
 def get_commit_info():
@@ -36,9 +38,12 @@ def get_commit_info():
     Return the commit number of the most recent git commit as a string.
     """
     git_commit = subprocess.Popen(['git', 'show', '--pretty=oneline', '-s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    commit_cmd_out, commit_cmd_err = git_commit.communicate()
-    commit_id = commit_cmd_out.split()[0]
-    return str(commit_id)
+    cmd_out, cmd_err = git_commit.communicate()
+
+    cmd_out = cmd_out.decode('utf8')
+    commit_id = cmd_out.split()[0]
+
+    return commit_id
 
 
 def get_doc_version():
