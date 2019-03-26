@@ -392,7 +392,7 @@ class SimpleGADriver(Driver):
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             self.iter_count += 1
             try:
-                self.run_solve_nonlinear()
+                model.run_solve_nonlinear()
 
             # Tell the optimizer that this is a bad point.
             except AnalysisError:
