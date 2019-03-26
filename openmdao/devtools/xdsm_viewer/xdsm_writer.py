@@ -497,16 +497,24 @@ else:
 
             for comp in self._comps:
                 label = comp['label']
+                # If the process steps are included in the labels
                 if self.add_component_indices:
                     i = i0 = comp.pop('index', None)
                     step = comp.pop('step', None)
+                    # For each closed loop inrement the process index by one
                     for loop in self._loop_ends:
                         if loop < i0:
                             i += 1
+                    # Step is not None for the driver and solvers, for these a different label
+                    # will be made showing the starting end and step and the index of the next step.
                     if step is not None:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
+                    # Add the number
                     label = self.number_label(i, label, self.number_alignment)
+                # Convert from math mode to regular text
                 comp['label'] = self._textify(label)
+                # Now the label is finished.
+                # Now really add the system with the XDSM class' method
                 self.add_system(**comp)
 
             super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
