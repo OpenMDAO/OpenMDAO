@@ -33,12 +33,13 @@ class TestKeplersEquation(unittest.TestCase):
 
         bal = BalanceComp()
 
-        def guess_function(inputs, outputs, residuals):
-            # Use M (mean anomaly) as the initial guess for E (eccentric anomaly)
-            return inputs['M']
+        bal.add_balance(name='E', val=0.0, units='rad', eq_units='rad', rhs_name='M')
 
-        bal.add_balance(name='E', val=0.0, units='rad', eq_units='rad', rhs_name='M',
-                        guess_func=guess_function)
+        # Use M (mean anomaly) as the initial guess for E (eccentric anomaly)
+        def guess_function(inputs, outputs, residuals):
+            outputs['E'] = inputs['M']
+
+        bal.options['guess_func'] = guess_function
 
         # ExecComp used to compute the LHS of Kepler's equation.
         lhs_comp = ExecComp('lhs=E - ecc * sin(E)',
@@ -71,9 +72,7 @@ class TestKeplersEquation(unittest.TestCase):
 
         prob.run_model()
 
-        assert_almost_equal(np.degrees(prob['E']), 115.9, decimal=1)
-
-        print('E (deg) = ', np.degrees(prob['E'][0]))
+        assert_almost_equal(np.degrees(prob['E'][0]), 115.9, decimal=1)
 
 
 if __name__ == "__main__":

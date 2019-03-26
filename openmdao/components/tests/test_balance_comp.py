@@ -380,7 +380,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        # should converge without iterating due to the guess function
+        # should converge with no iteration due to the guess function
         self.assertEqual(model.nonlinear_solver._iter_count, 1)
 
         cpd = prob.check_partials(out_stream=None)
