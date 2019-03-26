@@ -117,7 +117,11 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if use_aitken or not self.options['use_apply_nonlinear']:
             # store a copy of the outputs
-            outputs_n = outputs._data.copy()
+            if not self.options['use_apply_nonlinear']:
+                with system._unscaled_context(outputs=[outputs]):
+                    outputs_n = outputs._data.copy()
+            else:
+                outputs_n = outputs._data.copy()
 
         self._solver_info.append_subsolver()
         self._gs_iter()
@@ -148,7 +152,11 @@ class NonlinearBlockGS(NonlinearSolver):
             else:
                 theta_n = 1.
 
-            outputs._data[:] = outputs_n
+            if not self.options['use_apply_nonlinear']:
+                with system._unscaled_context(outputs=[outputs]):
+                    outputs._data[:] = outputs_n
+            else:
+                outputs._data[:] = outputs_n
 
             # compute relaxed outputs
             outputs._data += theta_n * delta_outputs_n
@@ -158,7 +166,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if not self.options['use_apply_nonlinear']:
             # Residual is the change in the outputs vector.
-            with system._unscaled_context(residuals=[residuals]):
+            with system._unscaled_context(outputs=[outputs], residuals=[residuals]):
                 residuals._data[:] = outputs._data - outputs_n
 
     def _run_apply(self):
@@ -187,7 +195,8 @@ class NonlinearBlockGS(NonlinearSolver):
             outputs = system._outputs
             residuals = system._residuals
 
-            outputs_n = outputs._data.copy()
+            with system._unscaled_context(outputs=[outputs]):
+                outputs_n = outputs._data.copy()
 
             self._solver_info.append_subsolver()
             for isub, subsys in enumerate(system._subsystems_myproc):
