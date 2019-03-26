@@ -420,18 +420,31 @@ class TestExecComp(unittest.TestCase):
     def test_common_units(self):
         # all variables in the ExecComp have the same units
         prob = Problem(model=Group())
+
         prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.', units='m',
-                                                     x={'value': 2.0},
-                                                     z=2.0))
-        prob.model.connect('indep.x', 'C1.x')
+        prob.model.add_subsystem('comp', ExecComp('y=x+z+1.', units='m',
+                                                  x={'value': 2.0},
+                                                  z=2.0))
+        prob.model.connect('indep.x', 'comp.x')
 
-        prob.setup(check=False)
-
-        prob.set_solver_print(level=0)
+        prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
+        assert_rel_error(self, prob['comp.y'], 4.0, 0.00001)
+
+    def test_common_units_no_meta(self):
+        # make sure common units are assigned when no metadata is provided
+        prob = Problem()
+
+        prob.model.add_subsystem('indep', IndepVarComp('x', 2.0, units='km'))
+        prob.model.add_subsystem('comp', ExecComp('y = x+1', units='m'))
+
+        prob.model.connect('indep.x', 'comp.x')
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], 2001., 0.00001)
 
     def test_conflicting_units(self):
         prob = Problem(model=Group())
@@ -517,7 +530,7 @@ class TestExecComp(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(out_stream=None)
 
         assert_rel_error(self, data['comp'][('y', 'x')]['abs error'][0], 0.0, 1e-5)
         assert_rel_error(self, data['comp'][('y', 'x')]['abs error'][1], 0.0, 1e-5)
@@ -540,7 +553,7 @@ class TestExecComp(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        data = prob.check_partials()
+        data = prob.check_partials(out_stream=None)
 
         assert_rel_error(self, data['comp'][('y', 'x')]['abs error'][0], 0.0, 1e-5)
         assert_rel_error(self, data['comp'][('y', 'x')]['abs error'][1], 0.0, 1e-5)
@@ -843,7 +856,7 @@ class TestExecCompParameterized(unittest.TestCase):
 
         if 'check_val' not in test_data:
             try:
-                prob.check_partials(compact_print=True)
+                prob.check_partials(out_stream=None)
             except TypeError as e:
                 print(f, 'does not support complex-step differentiation')
 
@@ -872,7 +885,7 @@ class TestExecCompParameterized(unittest.TestCase):
         prob.run_model()
 
         if 'check_val' not in test_data:
-            cpd = prob.check_partials(compact_print=True)
+            cpd = prob.check_partials(out_stream=None)
 
             for comp in cpd:
                 for (var, wrt) in cpd[comp]:

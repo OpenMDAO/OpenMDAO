@@ -15,7 +15,7 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
-    NonlinearRunOnce, NonLinearRunOnce
+    NonlinearRunOnce, NonLinearRunOnce, BalanceComp, NewtonSolver, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.sellar import SellarDis2
 
@@ -452,17 +452,24 @@ class TestGroup(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp
 
         p = Problem()
-        indep = p.model.add_subsystem('indep', IndepVarComp())
-        indep.add_output('x', np.ones(5), units='ft')
-        p.model.add_subsystem('C1', ExecComp('y=sum(x)', x={'value': np.zeros(5), 'units': 'inch'},
-                                             y={'units': 'inch'}))
-        p.model.connect('indep.x', 'C1.x')
-        p.set_solver_print(level=0)
+
+        indep_comp = IndepVarComp()
+        indep_comp.add_output('x', np.ones(5), units='ft')
+
+        exec_comp = ExecComp('y=sum(x)',
+                             x={'value': np.zeros(5), 'units': 'inch'},
+                             y={'units': 'inch'})
+
+        p.model.add_subsystem('indep', indep_comp)
+        p.model.add_subsystem('comp1', exec_comp)
+        p.model.connect('indep.x', 'comp1.x')
+
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['indep.x'], np.ones(5))
-        assert_rel_error(self, p['C1.x'], np.ones(5)*12.)
-        assert_rel_error(self, p['C1.y'], 60.)
+        assert_rel_error(self, p['comp1.x'], np.ones(5)*12.)
+        assert_rel_error(self, p['comp1.y'], 60.)
 
     def test_connect_1_to_many(self):
         import numpy as np
@@ -470,14 +477,17 @@ class TestGroup(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp
 
         p = Problem()
+
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
         p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros(5)))
         p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(5)))
         p.model.add_subsystem('C3', ExecComp('y=sum(x)*6.0', x=np.zeros(5)))
+
         p.model.connect('indep.x', ['C1.x', 'C2.x', 'C3.x'])
-        p.set_solver_print(level=0)
+
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['C1.y'], 10.)
         assert_rel_error(self, p['C2.y'], 20.)
         assert_rel_error(self, p['C3.y'], 30.)
@@ -509,6 +519,7 @@ class TestGroup(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp
 
         p = Problem()
+
         p.model.add_subsystem('indep', IndepVarComp('x', np.ones(5)))
         p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros(3)))
         p.model.add_subsystem('C2', ExecComp('y=sum(x)*4.0', x=np.zeros(2)))
@@ -520,7 +531,6 @@ class TestGroup(unittest.TestCase):
         # use -2 (same as 3 in this case) to show that negative indices work.
         p.model.connect('indep.x', 'C2.x', src_indices=[-2, 4])
 
-        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
 
@@ -535,6 +545,7 @@ class TestGroup(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp
 
         p = Problem()
+
         p.model.add_subsystem('indep', IndepVarComp('x', np.arange(12).reshape((4, 3))))
         p.model.add_subsystem('C1', ExecComp('y=sum(x)*2.0', x=np.zeros((2, 2))))
 
@@ -543,9 +554,9 @@ class TestGroup(unittest.TestCase):
                         src_indices=[[(0, 0), (-1, 1)],
                                      [(2, 1), (1, 1)]], flat_src_indices=False)
 
-        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
+
         assert_rel_error(self, p['C1.x'], np.array([[0., 10.],
                                                     [7., 4.]]))
         assert_rel_error(self, p['C1.y'], 42.)
@@ -651,7 +662,6 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C1', MyComp1(), promotes_inputs=['x'])
         p.model.add_subsystem('C2', MyComp2(), promotes_inputs=['x'])
 
-        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
 
@@ -693,7 +703,6 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C1', MyComp(),
                               promotes_inputs=['x'])
 
-        p.set_solver_print(level=0)
         p.setup()
         p.run_model()
 
@@ -818,9 +827,7 @@ class TestGroup(unittest.TestCase):
         model.add_subsystem('C2', ReportOrderComp(order_list))
         model.add_subsystem('C3', ReportOrderComp(order_list))
 
-        prob.set_solver_print(level=0)
-
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         self.assertEqual(order_list, ['C1', 'C2', 'C3'])
@@ -832,8 +839,9 @@ class TestGroup(unittest.TestCase):
         model.set_order(['indeps', 'C2', 'C1', 'C3'])
 
         # after changing the order, we must call setup again
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
+
         self.assertEqual(order_list, ['C2', 'C1', 'C3'])
 
     def test_set_order(self):
@@ -907,6 +915,51 @@ class TestGroup(unittest.TestCase):
         prob.run_model()
 
         # this test passes if it doesn't raise an exception
+
+    def test_guess_nonlinear_feature(self):
+        from openmdao.api import Problem, Group, ExecComp, IndepVarComp, BalanceComp, NewtonSolver, DirectSolver
+
+        class Discipline(Group):
+
+            def setup(self):
+                self.add_subsystem('comp0', ExecComp('y=x**2'))
+                self.add_subsystem('comp1', ExecComp('z=2*external_input'),
+                                   promotes_inputs=['external_input'])
+
+                self.add_subsystem('balance', BalanceComp('x', lhs_name='y', rhs_name='z'),
+                                   promotes_outputs=['x'])
+
+                self.connect('comp0.y', 'balance.y')
+                self.connect('comp1.z', 'balance.z')
+
+                self.connect('x', 'comp0.x')
+
+                self.nonlinear_solver = NewtonSolver(iprint=2, solve_subsystems=True)
+                self.linear_solver = DirectSolver()
+
+            def guess_nonlinear(self, inputs, outputs, residuals):
+                # inputs are addressed using full path name, regardless of promotion
+                external_input = inputs['comp1.external_input']
+
+                # balance drives x**2 = 2*external_input
+                x_guess = (2*external_input)**.5
+
+                # outputs are addressed by the their promoted names
+                outputs['x'] = x_guess # perfect guess should converge in 0 iterations
+
+        p = Problem()
+
+        p.model.add_subsystem('parameters', IndepVarComp('input_value', 1.))
+        p.model.add_subsystem('discipline', Discipline())
+
+        p.model.connect('parameters.input_value', 'discipline.external_input')
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
+
+        assert_rel_error(self, p['discipline.x'], 1.41421356, 1e-6)
 
 
 class MyComp(ExplicitComponent):

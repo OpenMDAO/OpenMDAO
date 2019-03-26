@@ -2,12 +2,14 @@
 from __future__ import division, print_function
 
 import unittest
+from copy import deepcopy
 from six import assertRaisesRegex
 
 import numpy as np
 
 from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
 from openmdao.api import NewtonSolver, ScipyKrylov, NonlinearBlockGS, DirectSolver
+from openmdao.core.driver import Driver
 
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
@@ -974,6 +976,246 @@ class TestScaling(unittest.TestCase):
             val = model.comp._outputs['y']
             assert_rel_error(self, val[0], 2.0)
             assert_rel_error(self, val[1], 6.0)
+
+
+class MyComp(ExplicitComponent):
+
+    def setup(self):
+
+        self.add_input('x2_u_u')
+        self.add_input('x2_u_s')
+        self.add_input('x2_s_u')
+        self.add_input('x2_s_s')
+
+        self.add_output('x3_u_u', val=1.0)
+        self.add_output('x3_u_s', val=1.0)
+        self.add_output('x3_s_u', val=1.0, ref=5.0)
+        self.add_output('x3_s_s', val=1.0, ref=5.0)
+
+        self.J = np.array([[2.0, 3.0, -5.0, 1.5],
+                           [1.0, 6.0, -2.3, 1.0],
+                           [7.0, 5.0, 1.1, 2.2],
+                           [-3.0, 2.0, 6.8, -1.5]
+                           ])
+        rows = np.repeat(np.arange(4), 4)
+        cols = np.tile(np.arange(4), 4)
+
+        self.declare_partials(of='x3_u_u', wrt='x2_u_u', val=self.J[0, 0])
+        self.declare_partials(of='x3_u_u', wrt='x2_u_s', val=self.J[0, 1])
+        self.declare_partials(of='x3_u_u', wrt='x2_s_u', val=self.J[0, 2])
+        self.declare_partials(of='x3_u_u', wrt='x2_s_s', val=self.J[0, 3])
+
+        self.declare_partials(of='x3_u_s', wrt='x2_u_u', val=self.J[1, 0])
+        self.declare_partials(of='x3_u_s', wrt='x2_u_s', val=self.J[1, 1])
+        self.declare_partials(of='x3_u_s', wrt='x2_s_u', val=self.J[1, 2])
+        self.declare_partials(of='x3_u_s', wrt='x2_s_s', val=self.J[1, 3])
+
+        self.declare_partials(of='x3_s_u', wrt='x2_u_u', val=self.J[2, 0])
+        self.declare_partials(of='x3_s_u', wrt='x2_u_s', val=self.J[2, 1])
+        self.declare_partials(of='x3_s_u', wrt='x2_s_u', val=self.J[2, 2])
+        self.declare_partials(of='x3_s_u', wrt='x2_s_s', val=self.J[2, 3])
+
+        self.declare_partials(of='x3_s_s', wrt='x2_u_u', val=self.J[3, 0])
+        self.declare_partials(of='x3_s_s', wrt='x2_u_s', val=self.J[3, 1])
+        self.declare_partials(of='x3_s_s', wrt='x2_s_u', val=self.J[3, 2])
+        self.declare_partials(of='x3_s_s', wrt='x2_s_s', val=self.J[3, 3])
+
+    def compute(self, inputs, outputs, discrete_inputs=None,
+                discrete_outputs=None):
+
+        outputs['x3_u_u'] = self.J[0, 0] * inputs['x2_u_u'] + self.J[0, 1] * inputs['x2_u_s'] + self.J[0, 2] * inputs['x2_s_u'] + self.J[0, 3] * inputs['x2_s_s']
+        outputs['x3_u_s'] = self.J[1, 0] * inputs['x2_u_u'] + self.J[1, 1] * inputs['x2_u_s'] + self.J[1, 2] * inputs['x2_s_u'] + self.J[1, 3] * inputs['x2_s_s']
+        outputs['x3_s_u'] = self.J[2, 0] * inputs['x2_u_u'] + self.J[2, 1] * inputs['x2_u_s'] + self.J[2, 2] * inputs['x2_s_u'] + self.J[2, 3] * inputs['x2_s_s']
+        outputs['x3_s_s'] = self.J[3, 0] * inputs['x2_u_u'] + self.J[3, 1] * inputs['x2_u_s'] + self.J[3, 2] * inputs['x2_s_u'] + self.J[3, 3] * inputs['x2_s_s']
+
+
+class MyImplicitComp(ImplicitComponent):
+
+    def setup(self):
+
+        self.add_input('x2_u')
+
+        self.add_output('x3_u', val=1.0)
+        self.add_output('x3_s', val=1.0, ref=5.0)
+
+        self.declare_partials('*', '*')
+
+        self.J = np.array([[.3, -.7, .5], [1.1, 1.3, -1.7]])
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals['x3_u'] = self.J[0, 0]*inputs['x2_u']**2 + self.J[0, 1]*outputs['x3_u']**2 + self.J[0, 2]*outputs['x3_s']**2
+        residuals['x3_s'] = self.J[1, 0]*inputs['x2_u']**2 + self.J[1, 1]*outputs['x3_u'] **2+ self.J[1, 2]*outputs['x3_s']**2
+
+    def linearize(self, inputs, outputs, jacobian):
+        jacobian['x3_u', 'x2_u'] = 2.0 * self.J[0, 0] * inputs['x2_u']
+        jacobian['x3_u', 'x3_u'] = 2.0 * self.J[0, 1] * outputs['x3_u']
+        jacobian['x3_u', 'x3_s'] = 2.0 * self.J[0, 2] * outputs['x3_s']
+        jacobian['x3_s', 'x2_u'] = 2.0 * self.J[1, 0] * inputs['x2_u']
+        jacobian['x3_s', 'x3_u'] = 2.0 * self.J[1, 1] * outputs['x3_u']
+        jacobian['x3_s', 'x3_s'] = 2.0 * self.J[1, 2] * outputs['x3_s']
+
+
+class MyDriver(Driver):
+
+    def run(self):
+
+        self.param_meta = deepcopy(self._designvars)
+        self.param_vals = self.get_design_var_values()
+        self.con_meta = deepcopy(self._cons)
+
+        # Run model
+        model = self._problem.model
+        model.run_solve_nonlinear()
+
+        # Con vals and derivs
+        self.con_vals = deepcopy(self.get_constraint_values())
+        self.sens_dict = self._compute_totals(of=list(self.con_meta.keys()),
+                                              wrt=list(self.param_meta.keys()),
+                                              return_format='dict')
+
+        # Obj vals
+        self.obj_vals = deepcopy(self.get_objective_values())
+
+
+class TestScalingOverhaul(unittest.TestCase):
+
+    def test_in_driver(self):
+        # This test assures that the driver is correctly seeing unscaled (physical) data.
+
+        prob = Problem()
+        model = prob.model
+
+        inputs_comp = IndepVarComp()
+        inputs_comp.add_output('x1_u_u', val=1.0)
+        inputs_comp.add_output('x1_u_s', val=1.0)
+        inputs_comp.add_output('x1_s_u', val=1.0, ref=3.0)
+        inputs_comp.add_output('x1_s_s', val=1.0, ref=3.0)
+        inputs_comp.add_output('ox1_u_u', val=1.0)
+        inputs_comp.add_output('ox1_u_s', val=1.0)
+        inputs_comp.add_output('ox1_s_u', val=1.0, ref=3.0)
+        inputs_comp.add_output('ox1_s_s', val=1.0, ref=3.0)
+
+        model.add_subsystem('p', inputs_comp)
+        mycomp = model.add_subsystem('comp', MyComp())
+
+        model.connect('p.x1_u_u', 'comp.x2_u_u')
+        model.connect('p.x1_u_s', 'comp.x2_u_s')
+        model.connect('p.x1_s_u', 'comp.x2_s_u')
+        model.connect('p.x1_s_s', 'comp.x2_s_s')
+
+        driver = prob.driver = MyDriver()
+
+        model.add_design_var('p.x1_u_u', lower=-11, upper=11)
+        model.add_design_var('p.x1_u_s', ref=7.0, lower=-11, upper=11)
+        model.add_design_var('p.x1_s_u', lower=-11, upper=11)
+        model.add_design_var('p.x1_s_s', ref=7.0, lower=-11, upper=11)
+
+        # easy constraints for basic check
+        model.add_constraint('p.x1_u_u', upper=3.3)
+        model.add_constraint('p.x1_u_s', upper=3.3, ref=13.0)
+        model.add_constraint('p.x1_s_u', upper=3.3)
+        model.add_constraint('p.x1_s_s', upper=3.3, ref=13.0)
+
+        # harder to calculate constraints
+        model.add_constraint('comp.x3_u_u', upper=3.3)
+        model.add_constraint('comp.x3_u_s', upper=3.3, ref=17.0)
+        model.add_constraint('comp.x3_s_u', upper=3.3)
+        model.add_constraint('comp.x3_s_s', upper=3.3, ref=17.0)
+
+        model.add_objective('p.ox1_u_u')
+        model.add_objective('p.ox1_u_s', ref=15.0)
+        model.add_objective('p.ox1_s_u')
+        model.add_objective('p.ox1_s_s', ref=15.0)
+
+        prob.setup()
+
+        prob.run_driver()
+
+        # Parameter values
+        assert_rel_error(self, driver.param_vals['p.x1_u_u'], 1.0)
+        assert_rel_error(self, driver.param_vals['p.x1_u_s'], 1.0/7.0)
+        assert_rel_error(self, driver.param_vals['p.x1_s_u'], 1.0)
+        assert_rel_error(self, driver.param_vals['p.x1_s_s'], 1.0/7.0)
+
+        assert_rel_error(self, driver.param_meta['p.x1_u_u']['upper'], 11.0)
+        assert_rel_error(self, driver.param_meta['p.x1_u_s']['upper'], 11.0/7.0)
+        assert_rel_error(self, driver.param_meta['p.x1_s_u']['upper'], 11.0)
+        assert_rel_error(self, driver.param_meta['p.x1_s_s']['upper'], 11.0/7.0)
+
+        assert_rel_error(self, driver.con_meta['p.x1_u_u']['upper'], 3.3)
+        assert_rel_error(self, driver.con_meta['p.x1_u_s']['upper'], 3.3/13.0)
+        assert_rel_error(self, driver.con_meta['p.x1_s_u']['upper'], 3.3)
+        assert_rel_error(self, driver.con_meta['p.x1_s_s']['upper'], 3.3/13.0)
+
+        assert_rel_error(self, driver.con_vals['p.x1_u_u'], 1.0)
+        assert_rel_error(self, driver.con_vals['p.x1_u_s'], 1.0/13.0)
+        assert_rel_error(self, driver.con_vals['p.x1_s_u'], 1.0)
+        assert_rel_error(self, driver.con_vals['p.x1_s_s'], 1.0/13.0)
+
+        assert_rel_error(self, driver.obj_vals['p.ox1_u_u'], 1.0)
+        assert_rel_error(self, driver.obj_vals['p.ox1_u_s'], 1.0/15.0)
+        assert_rel_error(self, driver.obj_vals['p.ox1_s_u'], 1.0)
+        assert_rel_error(self, driver.obj_vals['p.ox1_s_s'], 1.0/15.0)
+
+        J = model.comp.J
+
+        assert_rel_error(self, driver.sens_dict['comp.x3_u_u']['p.x1_u_u'][0][0], J[0, 0])
+        assert_rel_error(self, driver.sens_dict['comp.x3_u_s']['p.x1_u_u'][0][0], J[1, 0] / 17.0)
+        assert_rel_error(self, driver.sens_dict['comp.x3_s_u']['p.x1_u_u'][0][0], J[2, 0])
+        assert_rel_error(self, driver.sens_dict['comp.x3_s_s']['p.x1_u_u'][0][0], J[3, 0] / 17.0)
+
+        assert_rel_error(self, driver.sens_dict['comp.x3_u_u']['p.x1_u_s'][0][0], J[0, 1] * 7.0)
+        assert_rel_error(self, driver.sens_dict['comp.x3_u_s']['p.x1_u_s'][0][0], J[1, 1] / 17.0 * 7.0)
+        assert_rel_error(self, driver.sens_dict['comp.x3_s_u']['p.x1_u_s'][0][0], J[2, 1] * 7.0)
+        assert_rel_error(self, driver.sens_dict['comp.x3_s_s']['p.x1_u_s'][0][0], J[3, 1] / 17.0 * 7.0)
+
+        assert_rel_error(self, driver.sens_dict['comp.x3_u_u']['p.x1_s_u'][0][0], J[0, 2])
+        assert_rel_error(self, driver.sens_dict['comp.x3_u_s']['p.x1_s_u'][0][0], J[1, 2] / 17.0)
+        assert_rel_error(self, driver.sens_dict['comp.x3_s_u']['p.x1_s_u'][0][0], J[2, 2])
+        assert_rel_error(self, driver.sens_dict['comp.x3_s_s']['p.x1_s_u'][0][0], J[3, 2] / 17.0)
+
+        assert_rel_error(self, driver.sens_dict['comp.x3_u_u']['p.x1_s_s'][0][0], J[0, 3] * 7.0)
+        assert_rel_error(self, driver.sens_dict['comp.x3_u_s']['p.x1_s_s'][0][0], J[1, 3] / 17.0* 7.0)
+        assert_rel_error(self, driver.sens_dict['comp.x3_s_u']['p.x1_s_s'][0][0], J[2, 3] * 7.0)
+        assert_rel_error(self, driver.sens_dict['comp.x3_s_s']['p.x1_s_s'][0][0], J[3, 3] / 17.0 * 7.0)
+
+        totals = prob.check_totals(compact_print=True, out_stream=None)
+
+        for (of, wrt) in totals:
+            assert_rel_error(self, totals[of, wrt]['abs error'][0], 0.0, 1e-7)
+
+    def test_iimplicit(self):
+        # Testing that our scale/unscale contexts leave the output vector in the correct state when
+        # linearize is called on implicit components.
+        prob = Problem()
+        model = prob.model
+
+        inputs_comp = IndepVarComp()
+        inputs_comp.add_output('x1_u', val=1.0)
+
+        model.add_subsystem('p', inputs_comp)
+        mycomp = model.add_subsystem('comp', MyImplicitComp())
+
+        model.connect('p.x1_u', 'comp.x2_u')
+
+        model.linear_solver = DirectSolver()
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['atol'] = 1e-12
+        model.nonlinear_solver.options['rtol'] = 1e-12
+
+        model.add_design_var('p.x1_u', lower=-11, upper=11)
+        model.add_constraint('p.x1_u', upper=3.3)
+        model.add_objective('comp.x3_u')
+        model.add_objective('comp.x3_s')
+
+        prob.setup()
+        prob.run_model()
+
+        totals = prob.check_totals(compact_print=True, out_stream=None)
+
+        for (of, wrt) in totals:
+            assert_rel_error(self, totals[of, wrt]['abs error'][0], 0.0, 1e-7)
+
 
 if __name__ == '__main__':
     unittest.main()
