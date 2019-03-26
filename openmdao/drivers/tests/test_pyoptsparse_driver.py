@@ -1659,6 +1659,9 @@ class TestPyoptSparse(unittest.TestCase):
 class TestPyoptSparseFeature(unittest.TestCase):
 
     def setUp(self):
+        from openmdao.utils.general_utils import set_pyoptsparse_opt
+        import unittest
+
         OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
         if OPT is None:
             raise unittest.SkipTest("pyoptsparse is not installed")
@@ -1773,6 +1776,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
     # all of these tests require SNOPT
 
     def setUp(self):
+        from openmdao.utils.general_utils import set_pyoptsparse_opt
+
         OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT', fallback=False)
 
     def test_snopt_atol(self):

@@ -795,7 +795,7 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['C1.y'], 21.)
 
     def test_set_order_feature(self):
-        from openmdao.api import Problem, IndepVarComp
+        from openmdao.api import Problem, IndepVarComp, ExplicitComponent
 
         class ReportOrderComp(ExplicitComponent):
             """Adds name to list."""

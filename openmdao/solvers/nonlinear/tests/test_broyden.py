@@ -693,7 +693,7 @@ class TestBryodenFeature(unittest.TestCase):
         assert_rel_error(self, prob['state_eq.y2_command'], 12.05848819, .00001)
 
     def test_circuit(self):
-        from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp
+        from openmdao.api import Group, BroydenSolver, DirectSolver, Problem, IndepVarComp, LinearBlockGS
 
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
 

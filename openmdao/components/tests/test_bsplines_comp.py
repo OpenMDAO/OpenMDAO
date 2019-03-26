@@ -81,10 +81,8 @@ class TestBsplinesComp(unittest.TestCase):
 @unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestBsplinesCompFeature(unittest.TestCase):
 
-    def setUp(self):
-        matplotlib.use('Agg')
-
     def test_basic(self):
+        import numpy as np
         from openmdao.api import Problem, IndepVarComp
         from openmdao.components.bsplines_comp import BsplinesComp
         from openmdao.utils.general_utils import printoptions
@@ -123,6 +121,7 @@ class TestBsplinesCompFeature(unittest.TestCase):
             ]), 1e-5)
 
     def test_vectorized(self):
+        import numpy as np
         from openmdao.api import Problem, IndepVarComp
         from openmdao.components.bsplines_comp import BsplinesComp
         from openmdao.utils.general_utils import printoptions
@@ -169,6 +168,12 @@ class TestBsplinesCompFeature(unittest.TestCase):
                 0., 0.06687281, 0.23486869, 0.43286622, 0.6062628,
                 0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
             ]), 1e-5)
+
+@unittest.skipUnless(matplotlib, "Matplotlib is required.")
+class TestBsplinesCompFeatureWithPlotting(unittest.TestCase):
+
+    def setUp(self):
+        matplotlib.use('Agg')
 
     def test_distribution_uniform(self):
         from openmdao.api import Problem, IndepVarComp
@@ -248,7 +253,6 @@ class TestBsplinesCompFeature(unittest.TestCase):
         plt.legend(['Variable', 'Control Points'], loc=4)
         plt.grid(True)
         plt.show()
-
 
 if __name__ == "__main__":
     unittest.main()

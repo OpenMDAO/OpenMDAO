@@ -1670,11 +1670,16 @@ class TestSqliteRecorder(unittest.TestCase):
 
 class TestFeatureSqliteRecorder(unittest.TestCase):
     def setUp(self):
+        import os
+        from tempfile import mkdtemp
         self.dir = mkdtemp()
         self.original_path = os.getcwd()
         os.chdir(self.dir)
 
     def tearDown(self):
+        import os
+        import errno
+        from shutil import rmtree
         os.chdir(self.original_path)
         try:
             rmtree(self.dir)
@@ -1764,7 +1769,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                          ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp', 'px', 'pz'])
 
     def test_feature_solver_metadata(self):
-        from openmdao.api import Problem, SqliteRecorder, CaseReader
+        from openmdao.api import Problem, SqliteRecorder, CaseReader, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
         prob = Problem(model=SellarDerivatives())
@@ -2231,6 +2236,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
 class TestFeatureBasicRecording(unittest.TestCase):
     def setUp(self):
+        import os
+        from tempfile import mkdtemp
+
         self.dir = mkdtemp()
         self.original_path = os.getcwd()
         os.chdir(self.dir)
@@ -2238,6 +2246,10 @@ class TestFeatureBasicRecording(unittest.TestCase):
         self.record_cases()
 
     def tearDown(self):
+        import os
+        import errno
+        from shutil import rmtree
+
         os.chdir(self.original_path)
         try:
             rmtree(self.dir)

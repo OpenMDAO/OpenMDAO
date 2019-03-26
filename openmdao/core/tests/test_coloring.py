@@ -688,6 +688,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver
         import numpy as np
 
+        SIZE = 10
+
         p = Problem()
 
         indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])

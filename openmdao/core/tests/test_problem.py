@@ -710,7 +710,7 @@ class TestProblem(unittest.TestCase):
                          msg="The under_complex_step flag should be reset.")
 
     def test_feature_check_totals_user_detect_forced(self):
-        from openmdao.api import Problem, ExplicitComponent
+        from openmdao.api import Problem, ExplicitComponent, IndepVarComp
 
         class SimpleComp(ExplicitComponent):
 
@@ -987,6 +987,7 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob.get_val('comp.x', 'm'), 1.0e-2, 1e-6)
 
     def test_feature_get_set_array_with_units(self):
+        import numpy as np
         from openmdao.api import Problem, ExecComp
 
         prob = Problem()

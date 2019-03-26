@@ -661,6 +661,9 @@ class TestExecComp(unittest.TestCase):
                          "comp: vectorize is True but partial(y, A) is not square (shape=(3, 15)).")
 
     def test_feature_vectorize(self):
+        import numpy as np
+        from openmdao.api import IndepVarComp, Problem, ExecComp
+
         p = Problem()
         model = p.model
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))

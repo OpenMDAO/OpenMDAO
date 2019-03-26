@@ -76,7 +76,7 @@ using a solver.  The two new equality constraints are implemented in this exampl
 an `EQConstraintComp`.
 
 .. embed-code::
-    openmdao.components.tests.test_eq_constraint_comp.SellarIDF
+    openmdao.test_suite.components.sellar_feature.SellarIDF
     :layout: code
 
 .. embed-code::

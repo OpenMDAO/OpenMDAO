@@ -394,6 +394,7 @@ class DiscretePromTestCase(unittest.TestCase):
 
 class DiscreteFeatureTestCase(unittest.TestCase):
     def test_feature_discrete(self):
+        import numpy as np
         from openmdao.api import Problem, IndepVarComp, ExplicitComponent
 
         class BladeSolidity(ExplicitComponent):
