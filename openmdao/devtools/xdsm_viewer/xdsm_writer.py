@@ -460,9 +460,13 @@ else:
 
         """
 
-        def __init__(self, name='pyxdsm'):
+        def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
+                     number_alignment='horizontal', add_component_indices=True):
             super(XDSMWriter, self).__init__()
             self.name = name
+            self.box_stacking = box_stacking
+            self.number_alignment = number_alignment
+            self.add_component_indices = add_component_indices
             self.extension = 'pdf'
             if self.name in _COMPONENT_TYPE_MAP:
                 self.type_map = _COMPONENT_TYPE_MAP[self.name]
@@ -471,7 +475,7 @@ else:
                 msg = 'Name not "{}" found in component type mapping, will default to "{}"'
                 warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
             self._nr_comps = 0
-            self._comp_meta = {}
+            self._comp_indices = {}
             self._comps = []
 
         def write(self, filename=None, **kwargs):
@@ -491,6 +495,14 @@ else:
             cleanup = kwargs.pop('cleanup', True)
 
             for comp in self._comps:
+                label = comp['label']
+                if self.add_component_indices:
+                    i = comp.pop('index', None)
+                    step = comp.pop('step', None)
+                    if step is not None:
+                        i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
+                    label = self.number_label(i, label, self.number_alignment)
+                comp['label'] = self._textify(label)
                 self.add_system(**comp)
 
             super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
@@ -518,11 +530,10 @@ else:
         def _add_system(self, node_name, style, label, stack=False, faded=False):
             if label is None:
                 label = node_name
-            label = self._textify(label)
-            self._comp_meta[node_name] = {'index': self._nr_comps, 'steps': None}
-            self._nr_comps += 1
+            self._comp_indices[node_name] = self._nr_comps
             sys_dct = {'node_name': node_name, 'style': style, 'label': label, 'stack': stack,
-                       'faded': faded}
+                       'faded': faded, 'index': self._nr_comps}
+            self._nr_comps += 1
             self._comps.append(sys_dct)
 
         def add_solver(self, name, label=None, **kwargs):
@@ -560,8 +571,7 @@ else:
                 Keyword args
             """
             style = self.type_map.get(comp_type, 'Analysis')
-            self._add_system(node_name=name, style=style, label=label,
-                            stack=stack, **kwargs)
+            self._add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
 
         def add_func(self, name, label=None, stack=False, **kwargs):
             """
@@ -579,8 +589,7 @@ else:
             kwargs : dict
                 Keyword args
             """
-            self._add_system(node_name=name, style='Function', label=label,
-                            stack=stack, **kwargs)
+            self._add_system(node_name=name, style='Function', label=label, stack=stack, **kwargs)
 
         def add_driver(self, name, label=None, driver_type='Optimization', **kwargs):
             """
@@ -611,14 +620,18 @@ else:
                 List of component names.
                 Defaults to None.
             """
-            meta = self._comp_meta
+            index_dct = self._comp_indices
 
             if solver is None:
+                # Add driver
                 comp_names = [c['node_name'] for c in self._comps]  # Driver process
+                self._comps[0]['step'] = len(self._comps)
             else:
                 solver_name = solver['abs_name']
                 comp_names = [c['abs_name'] for c in solver['comps']]
                 nr = len(comp_names)
+                solver_index = index_dct[solver_name]
+                self._comps[solver_index]['step'] = nr
                 comp_names = [solver_name] + comp_names
                 # Loop through all processes added so far
                 # Assumes, that processes are added in the right order, first the higher level
@@ -629,12 +642,9 @@ else:
                         if solver_name == item:
                             # delete items belonging to the new process from the others
                             proc[i+1:i+1+nr] = []
-                            process_index = meta[process_name]['index']
-                            meta[process_name]['steps'] += 1
-                            self._comps[process_index]['label'] = meta[process_name]['steps']
+                            process_index = index_dct[process_name]
+                            self._comps[process_index]['step'] += 1
             process_steps = comp_names + [comp_names[0]]  # close the loop
-            meta[process_steps[0]]['steps'] = len(process_steps)
-            print('META:::', meta)
             self.add_process(process_steps, arrow=_PROCESS_ARROWS)
 
         @staticmethod
@@ -705,6 +715,23 @@ else:
             i = start_index
             txt = '{}, {}$ \\rightarrow $ {}'
             return txt.format(first + i, last + i, first + i + 1)
+
+        def number_label(self, number, txt, alignment):
+            # Adds an index to the label either above or on the left side.
+            if number:  # If number is None or empty string, it won't be inserted
+                number_str = '{}: '.format(number)
+                if alignment == 'horizontal':
+                    txt = '{}{}'.format(number_str, txt)
+                    if self.box_stacking == 'vertical':
+                        return _multiline_block(txt)
+                    else:
+                        return txt
+                elif alignment == 'vertical':
+                    return _multiline_block(number_str, txt)
+                else:
+                    return txt  # In case of a wrong setting
+            else:
+                return txt
 
 
 def write_xdsm(problem, filename, model_path=None, recurse=True,
@@ -946,12 +973,21 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         BaseXDSMWriter
     """
     # TODO implement residuals
+    # Box appearance
+    box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
+    box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
+    box_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
+    # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
+    add_component_indices = kwargs.pop('numbered_comps', True)
+    number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
 
     error_msg = ('Undefined XDSM writer "{}". '
                  'Provide  a valid name or a BaseXDSMWriter instance.')
     if isinstance(writer, string_types):  # Standard writers (XDSMjs or pyXDSM)
         if writer.lower() == 'pyxdsm':  # pyXDSM
-            x = XDSMWriter()
+            x = XDSMWriter(box_stacking=box_stacking,
+                           number_alignment=number_alignment,
+                           add_component_indices=add_component_indices)
         elif writer.lower() == 'xdsmjs':  # XDSMjs
             x = XDSMjsWriter()
         else:
@@ -961,35 +997,10 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     else:
         raise TypeError(error_msg.format(writer))
 
-    # Box appearance
-    box_stacking = kwargs.pop('box_stacking', _DEFAULT_BOX_STACKING)
-    box_width = kwargs.pop('box_width', _DEFAULT_BOX_WIDTH)
-    box_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
-    # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
-    add_component_indices = kwargs.pop('numbered_comps', True) and (x.name == 'pyxdsm')
-    number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
-
     def format_block(names, **kwargs):
         # Sets the width, number of lines and other string formatting for a block.
         return x.format_block(names=names, box_width=box_width, box_lines=box_lines,
                               box_stacking=box_stacking, **kwargs)
-
-    def number_label(number, txt, alignment):
-        # Adds an index to the label either above or on the left side.
-        if number:  # If number is None or empty string, it won't be inserted
-            number_str = '{}: '.format(number)
-            if alignment == 'horizontal':
-                txt = '{}{}'.format(number_str, txt)
-                if box_stacking == 'vertical':
-                    return _multiline_block(txt)
-                else:
-                    return txt
-            elif alignment == 'vertical':
-                return _multiline_block(number_str, txt)
-            else:
-                return txt  # In case of a wrong setting
-        else:
-            return txt
 
     def get_output_side(component_name):
         if isinstance(output_side, string_types):
@@ -1050,7 +1061,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 solver_index = x._make_loop_str(first=first,
                                                 last=first+nr_components,
                                                 start_index=start_index)
-                solver_label = number_label(solver_index, solver_label, number_alignment)
             x.add_solver(name=solver_name, label=solver_label)
 
             # Add the connections
@@ -1076,7 +1086,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 opt_index += len(solvers)
             nr_comps = len(x.comps)
             index_str = x._make_loop_str(first=nr_comps, last=opt_index, start_index=_START_INDEX)
-            driver_label = number_label(index_str, driver_label, number_alignment)
         x.add_driver(name=driver_name, label=driver_label, driver_type=driver_type.lower())
 
         design_vars2 = _collect_connections(design_vars, recurse=recurse, model_path=model_path)
@@ -1113,8 +1122,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     for comp in comps:  # Driver is 1, so starting from 2
         i = len(x.comps) + _START_INDEX
         label = _replace_chars(comp['name'], substitutes=subs)
-        if add_component_indices:
-            label = number_label(i, label, number_alignment)
         stack = comp['is_parallel'] and show_parallel
         if include_solver and comp['type'] == 'solver':  # solver
             if add_solver(comp):  # Return value is true, if solver is not the default
