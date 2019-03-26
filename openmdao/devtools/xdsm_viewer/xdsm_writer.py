@@ -472,6 +472,7 @@ else:
                 warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
             self._nr_comps = 0
             self._comp_meta = {}
+            self._comps = []
 
         def write(self, filename=None, **kwargs):
             """
@@ -488,6 +489,9 @@ else:
             """
             build = kwargs.pop('build', False)
             cleanup = kwargs.pop('cleanup', True)
+
+            for comp in self._comps:
+                self.add_system(**comp)
 
             super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
 
@@ -508,12 +512,18 @@ else:
             faded : bool
                 Defaults to False.
             """
-            if label is None:
-                label = node_name
-            self._comp_meta[node_name] = {'index': self._nr_comps, 'steps': None}
-            self._nr_comps += 1
             super(XDSMWriter, self).add_system(node_name=node_name, style=style, label=label,
                                                stack=stack, faded=faded)
+
+        def _add_system(self, node_name, style, label, stack=False, faded=False):
+            if label is None:
+                label = node_name
+            label = self._textify(label)
+            self._comp_meta[node_name] = {'index': self._nr_comps, 'steps': None}
+            self._nr_comps += 1
+            sys_dct = {'node_name': node_name, 'style': style, 'label': label, 'stack': stack,
+                       'faded': faded}
+            self._comps.append(sys_dct)
 
         def add_solver(self, name, label=None, **kwargs):
             """
@@ -529,7 +539,7 @@ else:
                 Keyword args
             """
             style = self.type_map['solver']
-            self.add_system(node_name=name, style=style, label=self._textify(label), **kwargs)
+            self._add_system(node_name=name, style=style, label=label, **kwargs)
 
         def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
             """
@@ -550,7 +560,7 @@ else:
                 Keyword args
             """
             style = self.type_map.get(comp_type, 'Analysis')
-            self.add_system(node_name=name, style=style, label=self._textify(label),
+            self._add_system(node_name=name, style=style, label=label,
                             stack=stack, **kwargs)
 
         def add_func(self, name, label=None, stack=False, **kwargs):
@@ -569,13 +579,8 @@ else:
             kwargs : dict
                 Keyword args
             """
-            self.add_system(node_name=name, style='Function', label=self._textify(label),
+            self._add_system(node_name=name, style='Function', label=label,
                             stack=stack, **kwargs)
-
-        @staticmethod
-        def _textify(name):
-            # Uses the LaTeX \text{} command to insert plain text in math mode
-            return '\\text{%s}' % name
 
         def add_driver(self, name, label=None, driver_type='Optimization', **kwargs):
             """
@@ -594,7 +599,7 @@ else:
                 Keyword args
             """
             style = self.type_map.get(driver_type, 'Optimization')
-            self.add_system(node_name=name, style=style, label=self._textify(label), **kwargs)
+            self._add_system(node_name=name, style=style, label=label, **kwargs)
 
         def add_workflow(self, solver=None):
             """
@@ -609,7 +614,7 @@ else:
             meta = self._comp_meta
 
             if solver is None:
-                comp_names = [c[0] for c in self.comps]  # Driver process
+                comp_names = [c['node_name'] for c in self._comps]  # Driver process
             else:
                 solver_name = solver['abs_name']
                 comp_names = [c['abs_name'] for c in solver['comps']]
@@ -626,11 +631,16 @@ else:
                             proc[i+1:i+1+nr] = []
                             process_index = meta[process_name]['index']
                             meta[process_name]['steps'] += 1
-                            self.comps[process_index][2] = meta[process_name]['steps']
+                            self._comps[process_index]['label'] = meta[process_name]['steps']
             process_steps = comp_names + [comp_names[0]]  # close the loop
             meta[process_steps[0]]['steps'] = len(process_steps)
             print('META:::', meta)
             self.add_process(process_steps, arrow=_PROCESS_ARROWS)
+
+        @staticmethod
+        def _textify(name):
+            # Uses the LaTeX \text{} command to insert plain text in math mode
+            return '\\text{%s}' % name
 
         @staticmethod
         def format_block(names, stacking='vertical', **kwargs):
@@ -1061,7 +1071,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         driver_label = driver
         driver_name = _format_name(driver)
         if add_component_indices:
-            opt_index = len(comps) + _START_INDEX
+            opt_index = len(comps)
             if include_solver:
                 opt_index += len(solvers)
             nr_comps = len(x.comps)
