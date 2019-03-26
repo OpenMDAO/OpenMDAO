@@ -1,6 +1,10 @@
 
 .. _crossproductcomp_feature:
 
+.. meta::
+   :description: OpenMDAO Feature doc for CrossProductComp, which performs a cross product on two inputs
+   :keywords: cross product, CrossProductComp
+
 ================
 CrossProductComp
 ================

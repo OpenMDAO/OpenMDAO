@@ -1,6 +1,10 @@
 
 .. _dotproductcomp_feature:
 
+.. meta::
+   :description: OpenMDAO Feature doc for DotProductComp, which performs a dot product on two inputs
+   :keywords: dot product, DotProductComp
+
 **************
 DotProductComp
 **************
