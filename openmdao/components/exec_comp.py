@@ -89,7 +89,7 @@ class ExecComp(ExplicitComponent):
         atan(x)                    Inverse tangent of x
         cos(x)                     Cosine of x
         cosh(x)                    Hyperbolic cosine of x
-        dot(x, y)                  Dot-product of x and y
+        dot(x, y)                  Dot product of x and y
         e                          Euler's number
         erf(x)                     Error function
         erfc(x)                    Complementary error function

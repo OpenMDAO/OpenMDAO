@@ -5,7 +5,7 @@
 CrossProductComp
 ================
 
-`CrossProductComp` performs a cross-product between two 3-vector inputs.  It may be vectorized to provide the result at one or more points simultaneously.
+`CrossProductComp` performs a cross product between two 3-vector inputs.  It may be vectorized to provide the result at one or more points simultaneously.
 
 .. math::
 
@@ -34,7 +34,7 @@ and the output :math:`c`, as well as specifying their units.
 CrossProductComp Example
 ------------------------
 
-In the following example DotProductComp is used to compute torque as the
+In the following example CrossProductComp is used to compute torque as the
 cross product of force (:math:`F`) and radius (:math:`r`) at 100 points simultaneously.
 Note the use of `a_name`, `b_name`, and `c_name` to assign names to the inputs and outputs.
 Units are assigned using `a_units`, `b_units`, and `c_units`.
