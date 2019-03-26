@@ -48,6 +48,7 @@ class EmbedCodeDirective(Directive):
         'layout': unchanged,
         'scale': unchanged,
         'align': unchanged,
+        'imports-not-required': unchanged,
     }
 
     def run(self):
@@ -136,6 +137,8 @@ class EmbedCodeDirective(Directive):
         # Run the source (if necessary)
         skipped = failed = False
         if do_run:
+            imports_not_required = 'imports-not-required' in self.options
+
             if shows_plot:
                 # import matplotlib AFTER __future__ (if it's there)
                 mpl_import = "\nimport matplotlib\nmatplotlib.use('Agg')\n"
@@ -148,10 +151,11 @@ class EmbedCodeDirective(Directive):
 
                 skipped, failed, run_outputs = \
                     run_code(code_to_run, path, module=module, cls=class_,
-                             shows_plot=True)
+                             shows_plot=True, imports_not_required=imports_not_required)
             else:
                 skipped, failed, run_outputs = \
-                    run_code(code_to_run, path, module=module, cls=class_)
+                    run_code(code_to_run, path, module=module, cls=class_,
+                             imports_not_required=imports_not_required)
 
         if failed:
             # Failed cases raised as a Directive warning (level 2 in docutils).

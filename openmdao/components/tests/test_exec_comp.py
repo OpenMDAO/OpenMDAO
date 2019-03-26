@@ -726,6 +726,9 @@ class TestExecComp(unittest.TestCase):
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_feature_vectorize(self):
+        import numpy as np
+        from openmdao.api import IndepVarComp, Problem, ExecComp
+
         p = Problem()
         model = p.model
         model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))

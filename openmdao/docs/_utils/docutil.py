@@ -629,7 +629,7 @@ def sync_multi_output_blocks(blocks):
         return []
 
 
-def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
+def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports_not_required=False):
     """
     Run the given code chunk and collect the output.
     """
@@ -730,7 +730,12 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False):
                         '__cached__': None,
                     }
                 else:
-                    globals_dict = module.__dict__
+                    if imports_not_required:
+                        # code does not need to include all imports
+                        # Get from module
+                        globals_dict = module.__dict__
+                    else:
+                        globals_dict = {}
 
                 try:
                     exec(code_to_run, globals_dict)
