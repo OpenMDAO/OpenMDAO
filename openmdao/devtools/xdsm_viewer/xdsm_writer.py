@@ -477,6 +477,7 @@ else:
             self._nr_comps = 0
             self._comp_indices = {}
             self._comps = []
+            self._loop_ends = []
 
         def write(self, filename=None, **kwargs):
             """
@@ -497,8 +498,11 @@ else:
             for comp in self._comps:
                 label = comp['label']
                 if self.add_component_indices:
-                    i = comp.pop('index', None)
+                    i = i0 = comp.pop('index', None)
                     step = comp.pop('step', None)
+                    for loop in self._loop_ends:
+                        if loop < i0:
+                            i += 1
                     if step is not None:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
                     label = self.number_label(i, label, self.number_alignment)
@@ -624,14 +628,16 @@ else:
 
             if solver is None:
                 # Add driver
+                idx = 0
                 comp_names = [c['node_name'] for c in self._comps]  # Driver process
-                self._comps[0]['step'] = len(self._comps)
+                step = len(self._comps) + 1
+                self._comps[idx]['step'] = step
             else:
                 solver_name = solver['abs_name']
                 comp_names = [c['abs_name'] for c in solver['comps']]
                 nr = len(comp_names)
-                solver_index = index_dct[solver_name]
-                self._comps[solver_index]['step'] = nr
+                idx = index_dct[solver_name]
+                self._comps[idx]['step'] = nr + idx + 1
                 comp_names = [solver_name] + comp_names
                 # Loop through all processes added so far
                 # Assumes, that processes are added in the right order, first the higher level
@@ -639,13 +645,16 @@ else:
                 for proc in self.processes:
                     process_name = proc[0]
                     for i, item in enumerate(proc):
-                        if solver_name == item:
-                            # delete items belonging to the new process from the others
+                        if solver_name == item:  # solver found in an already added process
+                            # Delete items belonging to the new process from the others
                             proc[i+1:i+1+nr] = []
                             process_index = index_dct[process_name]
+                            # There is a process loop inside, this adds plus one step
                             self._comps[process_index]['step'] += 1
-            process_steps = comp_names + [comp_names[0]]  # close the loop
-            self.add_process(process_steps, arrow=_PROCESS_ARROWS)
+            self._loop_ends.append(self._comp_indices[comp_names[-1]])
+            # Close the loop by
+            comp_names.append(comp_names[0])
+            self.add_process(comp_names, arrow=_PROCESS_ARROWS)
 
         @staticmethod
         def _textify(name):
@@ -1043,6 +1052,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # Adds a solver.
         # Uses some vars from the outer scope.
         # Returns True, if it is a non-default linear or nonlinear solver
+        print('solverdct', solver_dct['abs_name'], len(solver_dct['comps']), [c['name'] for c in solver_dct['comps']])
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
         first = solver_dct['index']
         solver_label = _format_solver_str(solver_dct,
@@ -1442,13 +1452,12 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                 else:
                     components.append(ch)
                     comp_names.add(ch['rel_name'])
-                    local_comps.append(ch)
+                    local_comps = [ch]
                 # Add to the solver, which components are in its loop.
                 if include_solver and has_solver:
                     components[i_solver]['comps'] = local_comps
-                    components[i_solver]['steps'] = len(local_comps)
                     local_comps = []
-        return local_comps
+        return list(local_comps)
 
     top_level_tree = tree
     if model_path is not None:
