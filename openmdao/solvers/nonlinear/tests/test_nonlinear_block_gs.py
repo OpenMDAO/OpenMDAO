@@ -9,8 +9,8 @@ from openmdao.api import Problem, NonlinearBlockGS, Group, ScipyKrylov, IndepVar
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
-    SellarDis1withDerivatives, SellarDis2withDerivatives
-
+    SellarDis1withDerivatives, SellarDis2withDerivatives, \
+    SellarDis1, SellarDis2
 
 class TestNLBGaussSeidel(unittest.TestCase):
 
@@ -370,6 +370,36 @@ class TestNLBGaussSeidel(unittest.TestCase):
         J = prob.compute_totals(of=['y1'], wrt=['x'])
         assert_rel_error(self, J['y1', 'x'][0][0], 0.98061448, 1e-6)
 
+    def test_res_ref(self):
+
+        class ContrivedSellarDis1(SellarDis1):
+
+            def setup(self):
+                super(ContrivedSellarDis1, self).setup()
+                self.add_output('highly_nonlinear', val=1.0, res_ref=1e-4)
+            def compute(self, inputs, outputs):
+                super(ContrivedSellarDis1, self).compute(inputs, outputs)
+                outputs['highly_nonlinear'] = 10*np.sin(10*inputs['y2'])
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        model.add_subsystem('d1', ContrivedSellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
+        model.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
+
+        nlbgs = model.nonlinear_solver = NonlinearBlockGS()
+
+        nlbgs.options['maxiter'] = 20
+        nlbgs.options['atol'] = 1e-6
+        nlbgs.options['rtol'] = 1e-100
+
+        p.setup()
+        p.run_model()
+
+        self.assertEqual(nlbgs._iter_count, 9, 'res_ref should make this take more iters.')
 
 if __name__ == "__main__":
     unittest.main()

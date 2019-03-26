@@ -315,8 +315,7 @@ class ImplicitComponent(Component):
         """
         pass
 
-    def apply_linear(self, inputs, outputs,
-                     d_inputs, d_outputs, d_residuals, mode):
+    def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
         r"""
         Compute jac-vector product. The model is assumed to be in an unscaled state.
 

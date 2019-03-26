@@ -209,7 +209,7 @@ class pyOptSparseDriver(Driver):
         if optimizer in run_required or np.any([con['linear'] for con in itervalues(self._cons)]):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 # Initial Run
-                self.run_solve_nonlinear()
+                model.run_solve_nonlinear()
                 rec.abs = 0.0
                 rec.rel = 0.0
                 model_ran = True
@@ -428,7 +428,7 @@ class pyOptSparseDriver(Driver):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
                 try:
-                    self.run_solve_nonlinear()
+                    model.run_solve_nonlinear()
 
                 # Let the optimizer try to handle the error
                 except AnalysisError:
