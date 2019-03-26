@@ -135,16 +135,17 @@ class BalanceComp(ImplicitComponent):
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
         """
-        super(BalanceComp, self).__init__()
-        self._state_vars = {}
+        if 'guess_func' in kwargs:
+            super(BalanceComp, self).__init__(guess_func=kwargs['guess_func'])
+            kwargs.pop('guess_func', None)
+        else:
+            super(BalanceComp, self).__init__()
 
-        # if guess_func option was passed as an kwarg, remove it from kwargs passed to add balance
-        balance_kwargs = kwargs.copy()
-        balance_kwargs.pop('guess_func', None)
+        self._state_vars = {}
 
         if name is not None:
             self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
-                             use_mult, mult_name, mult_val, normalize, **balance_kwargs)
+                             use_mult, mult_name, mult_val, normalize, **kwargs)
 
     def setup(self):
         """

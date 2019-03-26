@@ -348,6 +348,8 @@ class TestBalanceComp(unittest.TestCase):
 
     def test_scalar_with_guess_func(self):
 
+        n = 1
+
         model=Group(assembled_jac_type='dense')
 
         def guess_function(inputs, outputs, residuals):
@@ -373,30 +375,17 @@ class TestBalanceComp(unittest.TestCase):
         prob = Problem(model)
         prob.setup()
 
-        # run problem with the guess function
-        prob['balance.x'] = .5
+        prob['balance.x'] = np.random.rand(n)
         prob.run_model()
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        iters_guess = model.nonlinear_solver._iter_count
+        # should converge without iterating due to the guess function
+        self.assertEqual(model.nonlinear_solver._iter_count, 1)
 
         cpd = prob.check_partials(out_stream=None)
         for (of, wrt) in cpd['balance']:
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
-
-        # run problem with same initial value but without the guess function
-        bal.options['guess_func'] = None
-
-        prob['balance.x'] = .5
-        prob.run_model()
-
-        assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
-
-        iters_no_guess = model.nonlinear_solver._iter_count
-
-        # verify it converges faster with the guess function
-        self.assertTrue(iters_with_guess < iters_no_guess)
 
     def test_scalar_with_guess_func_additional_input(self):
 
