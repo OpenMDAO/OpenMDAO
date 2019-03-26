@@ -2,6 +2,7 @@
 
 from __future__ import print_function, division, absolute_import
 
+from types import FunctionType
 from numbers import Number
 from six import iteritems
 
@@ -21,8 +22,16 @@ class BalanceComp(ImplicitComponent):
         so everything can be saved until setup is called.
     """
 
-    def __init__(self, name=None, eq_units=None, lhs_name=None,
-                 rhs_name=None, rhs_val=0.0, guess_func=None,
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('guess_func', types=(FunctionType), allow_none=True, default=None,
+                             desc='A callable function in the form f(inputs, outputs, residuals) '
+                                  'that can provide an initial "guess" value of the state '
+                                  'variable(s) based on the inputs, outputs and residuals.')
+
+    def __init__(self, name=None, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
                  use_mult=False, mult_name=None, mult_val=1.0, normalize=True, **kwargs):
         r"""
         Initialize a BalanceComp, optionally creating a new implicit state variable.
@@ -109,11 +118,6 @@ class BalanceComp(ImplicitComponent):
         rhs_val : int, float, or np.array
             Default value for the RHS of the given state.  Must be compatible
             with the shape (optionally) given by the val or shape option in kwargs.
-        guess_func : callable or None
-            A callable function in the form f(inputs, outputs, residuals) that can provide an
-            initial "guess" value of the state variable based on the inputs, outputs and residuals.
-            Note that you may have to add additional inputs to the BalanceComp in order to evaluate
-            this function.
         use_mult : bool
             Specifies whether the LHS multiplier is to be used.  If True, then an additional
             input `mult_name` is created, with the default value given by `mult_val`, that
@@ -133,9 +137,14 @@ class BalanceComp(ImplicitComponent):
         """
         super(BalanceComp, self).__init__()
         self._state_vars = {}
+
+        # if guess_func option was passed as an kwarg, remove it from kwargs passed to add balance
+        balance_kwargs = kwargs.copy()
+        balance_kwargs.pop('guess_func', None)
+
         if name is not None:
-            self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val, guess_func,
-                             use_mult, mult_name, mult_val, normalize, **kwargs)
+            self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
+                             use_mult, mult_name, mult_val, normalize, **balance_kwargs)
 
     def setup(self):
         """
@@ -265,7 +274,9 @@ class BalanceComp(ImplicitComponent):
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         """
-        Compute initial value for each state variable for which a guess function has been provided.
+        Provide initial guess for states.
+
+        Override this method to set the initial guess for states.
 
         Parameters
         ----------
@@ -276,12 +287,10 @@ class BalanceComp(ImplicitComponent):
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
-        for name, options in iteritems(self._state_vars):
-            if options['guess_func'] is not None:
-                options['guess_func'](inputs, outputs, residuals)
+        if self.options['guess_func'] is not None:
+            self.options['guess_func'](inputs, outputs, residuals)
 
-    def add_balance(self, name, eq_units=None, lhs_name=None,
-                    rhs_name=None, rhs_val=0.0, guess_func=None,
+    def add_balance(self, name, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
                     use_mult=False, mult_name=None, mult_val=1.0, normalize=True, **kwargs):
         """
         Add a new state variable and associated equation to be balanced.
@@ -305,10 +314,6 @@ class BalanceComp(ImplicitComponent):
         rhs_val : int, float, or np.array
             Default value for the RHS.  Must be compatible with the shape (optionally)
             given by the val or shape option in kwargs.
-        guess_func : callable or None
-            A callable function in the form f(inputs, outputs, residuals) that can provide an
-            initial "guess" value of the state variable based on the inputs, outputs and residuals.
-            add additional inputs to the BalanceComp in order to evaluate this function.
         use_mult : bool
             Specifies whether the LHS multiplier is to be used.  If True, then an additional
             input `mult_name` is created, with the default value given by `mult_val`, that
@@ -326,15 +331,11 @@ class BalanceComp(ImplicitComponent):
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
         """
-        if guess_func is not None and not callable(guess_func):
-            raise ValueError("Argument 'guess_func' must be a callable if specified")
-
         self._state_vars[name] = {'kwargs': kwargs,
                                   'eq_units': eq_units,
                                   'lhs_name': lhs_name,
                                   'rhs_name': rhs_name,
                                   'rhs_val': rhs_val,
-                                  'guess_func': guess_func,
                                   'use_mult': use_mult,
                                   'mult_name': mult_name,
                                   'mult_val': mult_val,
