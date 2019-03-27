@@ -20,7 +20,7 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'flat_src_indices'}
 
 # Names that are not allowed for input or output variables
-_disallowed_names = {'units'}
+_disallowed_names = {'units', 'shape'}
 
 
 def array_idx_iter(shape):
@@ -59,7 +59,7 @@ class ExecComp(ExplicitComponent):
 
     """
 
-    def __init__(self, exprs, vectorize=False, units=None, **kwargs):
+    def __init__(self, exprs, vectorize=False, units=None, shape=None, **kwargs):
         r"""
         Create a <Component> using only an expression string.
 
@@ -140,6 +140,10 @@ class ExecComp(ExplicitComponent):
             Units to be assigned to all variables in this component.
             Default is None, which means units are provided for variables individually.
 
+        shape : int or tuple or list or None
+            Shape of this variable, only required if val is not an array.
+            Default is None.
+
         **kwargs : dict of named args
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
@@ -195,6 +199,7 @@ class ExecComp(ExplicitComponent):
         self._kwargs = kwargs
         self._vectorize = vectorize
         self._units = units
+        self._shape = shape
 
     def setup(self):
         """
@@ -205,6 +210,7 @@ class ExecComp(ExplicitComponent):
         exprs = self._exprs
         kwargs = self._kwargs
         units = self._units
+        shape = self._shape
 
         # find all of the variables and which ones are outputs
         for expr in exprs:
@@ -240,6 +246,21 @@ class ExecComp(ExplicitComponent):
                     else:
                         kwargs2[arg]['units'] = units
 
+                if shape is not None:
+                    if 'shape' in val and val['shape'] != shape:
+                        raise RuntimeError("%s: shape of %s has been specified for "
+                                           "variable '%s', but shape of %s has been "
+                                           "specified for the entire component." %
+                                           (self.pathname, val['shape'], arg, shape))
+                    elif 'value' in val and np.atleast_1d(val['value']).shape != shape:
+                        raise RuntimeError("%s: value of shape %s has been specified for "
+                                           "variable '%s', but shape of %s has been "
+                                           "specified for the entire component." %
+                                           (self.pathname, np.atleast_1d(val['value']).shape,
+                                            arg, shape))
+                    else:
+                        init_vals[arg] = np.ones(shape)
+
                 if 'value' in val:
                     init_vals[arg] = val['value']
                     del kwargs2[arg]['value']
@@ -263,7 +284,8 @@ class ExecComp(ExplicitComponent):
                 val = init_vals[var]
             else:
                 init_vals[var] = val = 1.0
-            meta = kwargs2.get(var, {'units': units})
+
+            meta = kwargs2.get(var, {'units': units, 'shape': shape})
 
             if var in outs:
                 self.add_output(var, val, **meta)

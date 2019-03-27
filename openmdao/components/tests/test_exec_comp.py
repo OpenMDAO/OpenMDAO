@@ -497,6 +497,74 @@ class TestExecComp(unittest.TestCase):
                          "comp: shape of (5,) has been specified for variable 'x', "
                          "but a value of shape (1,) has been provided.")
 
+    def test_common_shape(self):
+        p = Problem()
+        model = p.model
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+
+        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', shape=(5,)))
+
+        model.connect('indep.x', 'comp.x')
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+
+        assert_almost_equal(J, np.eye(5)*3., decimal=6)
+
+    def test_common_shape_with_values(self):
+        p = Problem()
+        model = p.model
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+
+        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', shape=(5,),
+                                             x={'value': np.zeros(5)},
+                                             y={'value': np.zeros(5)}))
+
+        model.connect('indep.x', 'comp.x')
+
+        p.setup()
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['indep.x'], return_format='array')
+
+        assert_almost_equal(J, np.eye(5)*3., decimal=6)
+
+    def test_common_shape_conflicting_shape(self):
+        p = Problem()
+        model = p.model
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+
+        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', shape=(5,),
+                                             y={'shape': (10,)}))
+
+        model.connect('indep.x', 'comp.x')
+
+        with self.assertRaises(Exception) as context:
+            p.setup()
+
+        self.assertEqual(str(context.exception).replace('1L,', '1,'),  # 1L on Windows
+                         "comp: shape of (10,) has been specified for variable 'y', "
+                         "but shape of (5,) has been specified for the entire component.")
+
+    def test_common_shape_conflicting_value(self):
+        p = Problem()
+        model = p.model
+        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+
+        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', shape=(5,),
+                                             x={'value': 5}))
+
+        model.connect('indep.x', 'comp.x')
+
+        with self.assertRaises(Exception) as context:
+            p.setup()
+
+        self.assertEqual(str(context.exception).replace('1L,', '1,'),  # 1L on Windows
+                         "comp: value of shape (1,) has been specified for variable 'x', "
+                         "but shape of (5,) has been specified for the entire component.")
+
     def test_math(self):
         prob = Problem(model=Group())
         C1 = prob.model.add_subsystem('C1', ExecComp('y=sin(x)', x=2.0))
