@@ -133,9 +133,6 @@ class ExplicitComponent(Component):
         if self._use_derivatives:
             if self._approx_coloring_info is not None:
                 self._setup_approx_coloring()
-                self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
-            else:
-                self._jac_saves_remaining = 0
 
             self._set_partials_meta()
 
@@ -418,8 +415,6 @@ class ExplicitComponent(Component):
                     self.compute_partials(self._inputs, self._jacobian)
                 finally:
                     self._inputs.read_only = False
-
-        self._check_coloring_update()
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """

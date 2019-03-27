@@ -149,15 +149,11 @@ class LinearSystemComp(ImplicitComponent):
         J : Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
-        x = outputs['x']
-        size = self.options['size']
-        vec_size = self.options['vec_size']
-
-        J['x', 'A'] = np.tile(x, size).flat
+        J['x', 'A'] = np.tile(outputs['x'], self.options['size']).flat
         if self.vec_size_A > 1:
             J['x', 'x'] = inputs['A'].flat
         else:
-            J['x', 'x'] = np.tile(inputs['A'].flat, vec_size)
+            J['x', 'x'] = np.tile(inputs['A'].flat, self.options['vec_size'])
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         r"""

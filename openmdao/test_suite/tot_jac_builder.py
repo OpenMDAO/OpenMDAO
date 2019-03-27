@@ -6,7 +6,6 @@ from __future__ import print_function
 import sys
 import numpy as np
 
-from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.coloring import get_simul_meta
 
@@ -68,7 +67,7 @@ class TotJacBuilder(object):
         return self.coloring
 
     def show(self, stream=sys.stdout):
-        array_viz(self.J)
+        self.coloring.display()
 
         maxdeg_fwd = np.max(np.count_nonzero(self.J, axis=1))
         maxdeg_rev = np.max(np.count_nonzero(self.J, axis=0))

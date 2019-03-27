@@ -1729,37 +1729,6 @@ class Group(System):
                     if subsys._linear_solver is not None:
                         subsys._linear_solver._linearize()
 
-        self._check_coloring_update()
-
-    def set_approx_coloring_meta(self, wrt, method='fd', form=None, step=None, directory=None,
-                                 fname=None):
-        """
-        Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
-
-        Parameters
-        ----------
-        wrt : str or list of str
-            The name or names of the variables that derivatives are taken with respect to.
-            This can contain input names, output names, or glob patterns.
-        method : str
-            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
-        form : str
-            Finite difference form, can be "forward", "central", or "backward". Leave
-            undeclared to keep unchanged from previous or default value.
-        step : float
-            Step size for finite difference. Leave undeclared to keep unchanged from previous
-            or default value.
-        directory : str or None
-            If not None, the coloring for this system will be saved to the given directory.
-            The file will be named as the system's pathname with dots replaced by underscores.
-        fname : str or None
-            If not None, use this as the name of the coloring file.  If a relative path, make
-            it relative to the specified directory if there is one, else the current working
-            directory.  If None, set the filename to the object's classname + '.pkl'.
-        """
-        self.approx_totals(method, step, form)
-        super(Group, self).set_approx_coloring_meta(wrt, method, form, step, directory, fname)
-
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
         Approximate derivatives for a Group using the specified approximation method.
@@ -1852,7 +1821,7 @@ class Group(System):
         """
         coloring = super(Group, self).set_coloring_spec(coloring)
         meta = coloring._meta
-        self.approx_totals(meta['method'], meta['step'], meta['form'])
+        self.approx_totals(meta['method'], meta['step'], meta.get('form'))
         return coloring
 
     def _setup_approx_partials(self):
@@ -1903,7 +1872,7 @@ class Group(System):
         ofset = set()
         wrtset = set()
         wrt_colors_matched = set()
-        if info is not None and (self._owns_approx_of or self.pathname or info.get('generate')):
+        if info is not None and (self._owns_approx_of or self.pathname):
             wrt_color_patterns = info['wrt_patterns']
             color_meta = self._setup_approx_coloring()
         else:
@@ -1982,9 +1951,6 @@ class Group(System):
                                          "partial options on Group "
                                          "'{}': {}.".format(self.pathname, wrt_color_patterns))
                     info['wrt_matches'] = wrt_colors_matched
-                self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
-        else:
-            self._jac_saves_remaining = 0
 
     def _setup_static_approx_coloring(self):
         self._setup_approx_partials()
@@ -1996,13 +1962,11 @@ class Group(System):
 
         meta = approx_scheme.DEFAULT_OPTIONS.copy()
         meta['coloring'] = info['coloring']
-        form = info['form']
-        step = info['step']
 
-        if form:
-            meta['form'] = form
-        if step:
-            meta['step'] = step
+        if 'form' in info:
+            meta['form'] = info['form']
+        if 'step' in info:
+            meta['step'] = info['step']
 
         return meta
 

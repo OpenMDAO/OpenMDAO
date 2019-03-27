@@ -362,12 +362,10 @@ class Component(System):
         ofs, allwrt = self._get_partials_varlists()
         meta = {}
 
-        form = info['form']
-        step = info['step']
-        if form:
-            meta['form'] = form
-        if step:
-            meta['step'] = step
+        if 'form' in info:
+            meta['form'] = info['form']
+        if 'step' in info:
+            meta['step'] = info['step']
 
         abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
 
@@ -395,12 +393,14 @@ class Component(System):
             # computed to calculate the coloring.  Once the coloring exists, the approximations
             # will be re-initialized to use the coloring info.
             for key in product(abs_ofs, matches):
-                approx_scheme.add_approximation(key, meta)
+                if key in self._subjacs_info:
+                    approx_scheme.add_approximation(key, meta)
         else:  # a static coloring has already been specified
             colmeta = meta.copy()
             colmeta['coloring'] = info['coloring']
             wrt_matches = info['wrt_matches']
-            colmeta['approxs'] = list((k, meta) for k in product(abs_ofs, wrt_matches))
+            colmeta['approxs'] = list((k, meta) for k in product(abs_ofs, wrt_matches)
+                                      if k in self._subjacs_info)
             approx = self._get_approx_scheme(info['method'])
             # remove any uncolored matching approximations
             new_list = [tup for tup in approx._exec_list if tup[0][1] in wrt_matches]

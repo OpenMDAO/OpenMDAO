@@ -372,6 +372,9 @@ class Coloring(object):
         fname : str
             Name of file to save to, or 'stdout' or 'stderr'.
         """
+        if fname is None:
+            return   # don't try to save
+
         if fname in ('stdout', 'stderr'):
             fmt = fname
             stream = getattr(sys, fname)
@@ -555,6 +558,7 @@ class Coloring(object):
                         rows = full_rows
                     charr[rows, c] = 'f'
 
+        has_overlap = False
         if self._rev:
             full_cols = np.arange(ncols, dtype=int)
             row2col = self._rev[1]
@@ -566,7 +570,11 @@ class Coloring(object):
                     for c in cols:
                         # check for any overlapping entries (ones having both a fwd and rev color)
                         # NOTE: this should never happen unless there's a bug in the coloring!
-                        charr[r, c] = 'O' if charr[r, c] == 'f' else 'r'
+                        if charr[r, c] == 'f':
+                            charr[r, c] = 'O'  # mark entry as overlapping
+                            has_overlap = True
+                        else:
+                            charr[r, c] = 'r'
 
         if (self._row_vars is None or self._row_var_sizes is None or self._col_vars is None or
                 self._col_var_sizes is None):
@@ -597,6 +605,10 @@ class Coloring(object):
                 tab = ' ' * start
                 stream.write('%s|%s\n' % (tab, name))
                 start += size
+
+        if has_overlap:
+            raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
+                               "colorings overlap!")
 
     def get_subjac_sparsity(self):
         """
@@ -1011,7 +1023,7 @@ def _tol_sweep(arr, tol=1e-15, orders=5):
 
 
 @contextmanager
-def _computing_coloring_context(top):
+def _compute_total_coloring_context(top):
     """
     Context manager for computing total jac sparsity for simultaneous coloring.
 
@@ -1084,7 +1096,7 @@ def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_m
     if run_model:
         prob.run_model(reset_iter_counts=False)
 
-    with _computing_coloring_context(prob.model):
+    with _compute_total_coloring_context(prob.model):
         start_time = time.time()
         fullJ = None
         for i in range(repeats):
@@ -1313,7 +1325,8 @@ def _compute_coloring(J, mode):
     J : ndarray
         The boolean total jacobian.
     mode : str
-        The direction for solving for total derivatives.  If 'auto', use bidirectional coloring.
+        The direction for solving for total derivatives.  Must be 'fwd', 'rev' or 'auto'.
+        If 'auto', use bidirectional coloring.
 
     Returns
     -------
@@ -1437,7 +1450,7 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
         if show_jac:
             s = stream if stream.isatty() else sys.stdout
             s.write("\n\n")
-            colored_array_viz(J, coloring, prob=problem, of=ofs, wrt=wrts, stream=s)
+            coloring.display(stream=s)
 
     return coloring
 
@@ -1513,17 +1526,18 @@ def _simul_coloring_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', action='store', dest='outfile', help='output file (json format)')
+    parser.add_argument('-o', action='store', dest='outfile', help='output file (pickle format)')
     parser.add_argument('-n', action='store', dest='num_jacs', default=3, type=int,
-                        help='number of times to repeat total derivative computation')
-    parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
-                        help='tolerance used to determine if a total jacobian entry is nonzero')
+                        help='number of times to repeat derivative computation when '
+                        'computing sparsity')
+    parser.add_argument('--tol', action='store', dest='tolerance', default=1.e-15, type=float,
+                        help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
-                        help="Display a visualization of the final total jacobian used to "
+                        help="Display a visualization of the final jacobian used to "
                         "compute the coloring.")
     parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
                         help="Exclude the sparsity structure from the coloring data structure.")
-    parser.add_argument('-p', '--profile', action='store_true', dest='profile',
+    parser.add_argument('--profile', action='store_true', dest='profile',
                         help="Do profiling on the coloring process.")
 
 
@@ -1558,19 +1572,194 @@ def _simul_coloring_cmd(options):
             Problem._post_setup_func = None  # avoid recursive loop
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
-                color_info = get_simul_meta(prob,
-                                            repeats=options.num_jacs, tol=options.tolerance,
-                                            show_jac=options.show_jac,
-                                            include_sparsity=not options.no_sparsity,
-                                            setup=False, run_model=True,
-                                            stream=outfile)
+                coloring = get_simul_meta(prob,
+                                          repeats=options.num_jacs, tol=options.tolerance,
+                                          show_jac=options.show_jac,
+                                          include_sparsity=not options.no_sparsity,
+                                          setup=False, run_model=True,
+                                          stream=outfile)
 
             if sys.stdout.isatty():
-                simul_coloring_summary(color_info, stream=sys.stdout)
+                coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
-    return _simul_coloring
+    return coloring
+
+
+def get_coloring_fname(system, directory=None, fname=None):
+    """
+    Return the full pathname to a coloring file, generating a default name if necessary.
+
+    Parameters
+    ----------
+    system : System
+        The System having its coloring saved or loaded.
+    directory : str or None
+        Pathname of the directory where the coloring file will be saved
+    fname : str or None
+        Name of the coloring file.
+
+    Returns
+    -------
+    str
+        Full pathname of the coloring file.
+    """
+    if fname is not None:
+        abs_path = os.path.abspath(fname)
+        if abs_path != fname and directory is not None:
+            final_name = os.path.join(directory, fname)
+        else:
+            final_name = fname
+    elif directory is not None:
+        fn = '_'.join([system.__class__.__module__.replace('.', '_'), system.__class__.__name__])
+        final_name = os.path.join(directory, fn + '.pkl')
+    else:
+        return None
+
+    name, ext = os.path.splitext(final_name)
+    if not ext:
+        final_name += '.pkl'
+
+    return final_name
+
+
+def _partial_coloring_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao partial_color' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-o', action='store', dest='fname',
+                        help="output file (pickle format). Can't be used with --recurse option.")
+    parser.add_argument('--dir', action='store', dest='directory',
+                        help='Directory where coloring files are saved.')
+    parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
+                        help='Recurse from the provided system down.')
+    parser.add_argument('--system', action='store', dest='system', default='',
+                        help='pathname of system to color or to start recursing from if --recurse'
+                        ' is set.')
+    parser.add_argument('-c', '--class', action='append', dest='classes', default=[],
+                        help='compute a coloring for the first occurrence of the given class. '
+                        'This option may be be used multiple times to specify multiple classes. '
+                        'Class name can optionally contain the full module path. '
+                        'Not compatible with the --recurse option.')
+    parser.add_argument('--method', action='store', dest='method',
+                        help='approximation method ("fd" or "cs").')
+    parser.add_argument('--step', action='store', dest='step',
+                        help='approximation step size.')
+    parser.add_argument('--form', action='store', dest='form',
+                        help='approximation form ("forward", "backward", "central"). Only applies '
+                        'to "fd" method.')
+    parser.add_argument('--perturbation', action='store', dest='perturb_size', default=1e-3,
+                        type=float, help='random perturbation size used when computing sparsity.')
+    parser.add_argument('--sparsity_tol', action='store', dest='tol', default=1e-15, type=float,
+                        help='tolerance used to determine nonzero entries when computing sparsity.')
+    parser.add_argument('--orders', action='store', dest='orders', default=5, type=int,
+                        help='tolerance used to determine nonzero entries when computing sparsity.')
+    parser.add_argument('-n', action='store', dest='repeats', default=3, type=int,
+                        help='number of times to repeat derivative computation when '
+                        'computing sparsity')
+    parser.add_argument('--tol', action='store', dest='tolerance', default=1.e-15, type=float,
+                        help='tolerance used to determine if a jacobian entry is nonzero')
+    parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
+                        help="Display a visualization of the final jacobian used to "
+                        "compute the coloring.")
+    parser.add_argument('--profile', action='store_true', dest='profile',
+                        help="Do profiling on the coloring process.")
+
+
+def _get_partial_coloring_kwargs(options):
+    if options.system != '' and options.classes:
+        raise RuntimeError("Can't specify --system and --class together.")
+    if options.fname is not None and options.recurse:
+        raise RuntimeError("Can't specify output file if --recurse option is set.")
+    if options.classes:
+        if options.recurse:
+            raise RuntimeError("Can't specify --class if --recurse option is set.")
+        if len(options.classes) > 1 and options.fname:
+            raise RuntimeError("Can't specify output file if multiple classes are "
+                               "specified.")
+
+    kwargs = {}
+    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol', 'orders', 'directory',
+             'fname', 'recurse')
+    for name in names:
+        if getattr(options, name):
+            kwargs[name] = getattr(options, name)
+
+    return kwargs
+
+
+def _partial_coloring_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao partial_color'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    from openmdao.core.problem import Problem
+    from openmdao.devtools.debug import profiling
+    from openmdao.utils.general_utils import do_nothing_context
+
+    global _use_sparsity
+
+    _use_sparsity = False
+
+    def _partial_coloring(prob):
+        if prob.model._use_derivatives:
+            Problem._post_setup_func = None  # avoid recursive loop
+
+            prob.run_model()  # get a consistent starting values for inputs and outputs
+
+            with profiling('coloring_profile.out') if options.profile else do_nothing_context():
+                if options.system == '':
+                    system = prob.model
+                else:
+                    system = prob.model.get_subsystem(options.system)
+                if system is None:
+                    raise RuntimeError("Can't find system with pathname '%s'." % options.system)
+
+                kwargs = _get_partial_coloring_kwargs(options)
+
+                to_find = set(options.classes)
+                if options.classes:
+                    for s in system.system_iter(include_self=True, recurse=True):
+                        for c in options.classes:
+                            klass = s.__class__.__name__
+                            mod = s.__class__.__module__
+                            if c == klass or c == '.'.join([mod, klass]):
+                                to_find.remove(c)
+                                coloring = s.compute_approx_coloring(**kwargs)
+                                break
+                        if not to_find:
+                            break
+                    else:
+                        raise RuntimeError("Failed to find any instance of classes %s" %
+                                           sorted(to_find))
+                else:
+                    coloring = system.compute_approx_coloring(**kwargs)
+
+            if options.show_jac:
+                coloring.display()
+
+            if sys.stdout.isatty():
+                coloring.summary()
+        else:
+            print("Derivatives are turned off.  Cannot compute simul coloring.")
+        exit()
+    return _partial_coloring
 
 
 def _sparsity_setup_parser(parser):

@@ -10,6 +10,8 @@ from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, v
     update_sizes, get_input_idx_split, _get_jac_slice_dict
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.general_utils import printoptions
+from openmdao.jacobians.jacobian import Jacobian
+
 _full_slice = slice(None)
 
 
@@ -285,6 +287,7 @@ class ApproximationScheme(object):
         iproc = system.comm.rank
         owns = system._owning_rank
         mycomm = system._full_comm if use_parallel_fd else system.comm
+        jacobian = jac if isinstance(jac, Jacobian) else None
 
         fd_count = 0
         colored_shape = None
@@ -382,27 +385,28 @@ class ApproximationScheme(object):
                 for key, slc in iteritems(tmpJ['@jac_slices']):
                     if uses_voi_indices:
                         jac._override_checks = True
-                        jac[key] = Jcolored[slc]
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
                         jac._override_checks = False
                     else:
-                        jac[key] = Jcolored[slc]
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
 
                 tmpJ['matrix'] = None  # reclaim memory
             else:
                 ofs = tmpJ[wrt]['ofs']
                 for of in ofs:
+                    key = (of, wrt)
                     oview, _ = ofs[of]
                     if is_parallel:
-                        for i, result in results[(of, wrt)]:
+                        for i, result in results[key]:
                             oview[:, i] = result
 
                     oview *= mult
                     if uses_voi_indices:
                         jac._override_checks = True
-                        jac[(of, wrt)] = oview
+                        jac[key] = _from_dense(jacobian, key, oview)
                         jac._override_checks = False
                     else:
-                        jac[(of, wrt)] = oview
+                        jac[key] = _from_dense(jacobian, key, oview)
 
     def ncolors(self):
         """
@@ -418,6 +422,41 @@ class ApproximationScheme(object):
             if approx[0] is None:
                 color_count += 1
         return color_count
+
+
+def _from_dense(jac, key, subjac):
+    """
+    Convert given subjac from a dense array to whatever form matches our internal subjac.
+
+    Parameters
+    ----------
+    jac : Jacobian or None
+        Jacobian object.
+    key : (str, str)
+        Tuple of absulute names of of and wrt variables.
+    subjac : ndarray
+        Dense sub-jacobian to be assigned to the subjac corresponding to key.
+    """
+    if jac is None:  # we're saving deriv to a dict.  Do no conversion.
+        return subjac
+
+    meta = jac._subjacs_info[key]
+    val = meta['value']
+    if meta['rows'] is not None:   # internal format is our home grown COO
+        return subjac[meta['rows'], meta['cols']]
+    elif isinstance(val, np.ndarray):
+        return subjac
+    elif isinstance(val, coo_matrix):
+        return coo_matrix(((val.row, val.col), subjac[val.row, val.col]))
+    elif isinstance(val, csc_matrix):
+        coo = val.tocoo()
+        return coo_matrix(((coo.row, coo.col), subjac[coo.row, coo.col])).tocsc()
+    elif isinstance(val, csr_matrix):
+        coo = val.tocoo()
+        return coo_matrix(((coo.row, coo.col), subjac[coo.row, coo.col])).tocsr()
+    else:
+        raise TypeError("Don't know how to convert dense ndarray to type '%s'" %
+                        val.__class__.__name__)
 
 
 def _gather_jac_results(comm, results):

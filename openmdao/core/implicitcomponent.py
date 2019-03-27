@@ -273,9 +273,6 @@ class ImplicitComponent(Component):
         if self._use_derivatives:
             if self._approx_coloring_info is not None:
                 self._setup_approx_coloring()
-                self._jac_saves_remaining = self.options['dynamic_derivs_repeats']
-            else:
-                self._jac_saves_remaining = 0
 
         super(ImplicitComponent, self)._setup_jacobians(recurse)
 
@@ -305,8 +302,6 @@ class ImplicitComponent(Component):
 
         if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
             self._assembled_jac._update(self)
-
-        self._check_coloring_update()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

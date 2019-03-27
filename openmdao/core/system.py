@@ -29,7 +29,7 @@ from openmdao.utils.write_outputs import write_outputs
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
-from openmdao.utils.coloring import _compute_coloring, Coloring
+from openmdao.utils.coloring import _compute_coloring, Coloring, get_coloring_fname
 from openmdao.utils.general_utils import simple_warning
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -266,8 +266,6 @@ class System(object):
         If True, perform any memory allocations necessary for derivative computation.
     _approx_coloring_info : tuple
         Metadata that defines how to perform coloring of this System's approx jacobian.
-    _jac_saves_remaining : int
-        Counter that determines when jacobian sparsity collection ends and the coloring is computed.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -419,7 +417,6 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         self._lin_vec_names = []
-        self._jac_saves_remaining = 0
         self._approx_coloring_info = None
 
     def _declare_options(self):
@@ -745,8 +742,8 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def set_approx_coloring_meta(self, wrt, method='fd', form='forward', step=None, directory=None,
-                                 fname=None):
+    def set_approx_coloring_meta(self, wrt=None, method=None, form=None, step=None,
+                                 directory=None, fname=None):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -771,65 +768,56 @@ class System(object):
             it relative to the specified directory if there is one, else the current working
             directory.  If None, set the filename to the object's classname + '.pkl'.
         """
-        approx_class = _supported_methods[method]
-        if step is None:
-            step = approx_class.DEFAULT_OPTIONS['step']
-
-        wrt_patterns = [wrt] if isinstance(wrt, string_types) else wrt
-
-        if self._approx_coloring_info is not None:
-            simple_warning("%s: set_approx_coloring_meta() was called multiple times. The "
-                           "last call will be used." % self.pathname)
+        if method is None:
+            if self._approx_coloring_info is None:
+                method = 'fd'
+            else:
+                method = self._approx_coloring_info['method']
 
         if method not in ('fd', 'cs'):
             raise RuntimeError("method must be one of ['fd', 'cs'].")
 
-        self._approx_coloring_info = {
-            'wrt_matches': None,
+        approx_class = _supported_methods[method]
+
+        # start with defaults
+        options = approx_class.DEFAULT_OPTIONS.copy()
+        options['wrt_matches'] = None
+        options['wrt_patterns'] = ('*',)
+        options['method'] = method
+        options['coloring'] = None
+        options['directory'] = None
+        options['fname'] = None
+
+        # overwrite with any old values
+        if self._approx_coloring_info is not None:
+            options.update({
+                k: v for k, v in iteritems(self._approx_coloring_info) if v is not None
+            })
+
+        if wrt is not None:
+            wrt_patterns = [wrt] if isinstance(wrt, string_types) else wrt
+        else:
+            wrt_patterns = None
+
+        # finally, overwrite with any new values
+        new_opts = {
             'wrt_patterns': wrt_patterns,
-            'method': method,
             'form': form,
             'step': step,
             'directory': directory,
             'fname': fname,
-            'coloring': None,
         }
+
+        options.update({k: v for k, v in iteritems(new_opts) if v is not None})
+        self._approx_coloring_info = options
 
     def _setup_approx_coloring(self):
         pass
 
-    def _check_coloring_update(self):
-        """
-        Save jacobians and/or compute coloring and update approximation schemes.
-        """
-        if self._jac_saves_remaining > 0:
-            self._jacobian._save_sparsity(self)
-            self._jac_saves_remaining -= 1
-            if self._jac_saves_remaining == 0:
-                info = self._approx_coloring_info
-                sparsity, ordered_ofs, ordered_wrts = \
-                    self._jacobian._compute_sparsity(self, info['wrt_matches'])
-                self._jacobian._jac_summ = None  # reclaim the memory
-
-                coloring = _compute_coloring(sparsity, 'fwd')
-                coloring._row_vars = list(ordered_ofs)
-                coloring._col_vars = list(ordered_wrts)
-                coloring._row_var_sizes = list(ordered_ofs.values())
-                coloring._col_var_sizes = list(ordered_wrts.values())
-                coloring._meta = {}  # save metadata we used to create the coloring
-                for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step'):
-                    coloring._meta[name] = info[name]
-                info['coloring'] = coloring
-
-                if info['directory'] is not None or info['fname'] is not None:
-                    self._save_coloring(coloring, info['directory'], info['fname'])
-
-                for approx in itervalues(self._approx_schemes):
-                    approx._update_coloring(self, coloring)
-
-    def compute_approx_coloring(self, wrt=('*',), method='fd', form=None, step=None,
-                                repeats=2, rel_perturbation_size=1e-3,
-                                directory=None, fname=None):
+    def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
+                                repeats=2, perturb_size=1e-3,
+                                tol=1e-15, orders=5,
+                                directory=None, fname=None, recurse=False):
         """
         Compute a coloring of the approximated derivatives.
 
@@ -838,22 +826,27 @@ class System(object):
 
         Parameters
         ----------
-        wrt : str or list of str
+        wrt : str or list of str or None
             The name or names of the variables that derivatives are taken with respect to.
             This can contain input names, output names, or glob patterns.
-        method : str
+        method : str or None
             Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
-        form : str
+        form : str or None
             Finite difference form, can be "forward", "central", or "backward". Leave
             undeclared to keep unchanged from previous or default value.
-        step : float
+        step : float or None
             Step size for finite difference. Leave undeclared to keep unchanged from previous
             or default value.
         repeats : int
             Number of times to randomly perturb the inputs while computing the sparsity.
-        rel_perturbation_size : float
+        perturb_size : float
             Size of relative random perturbations that will be applied to the inputs during
             computation of jacobian sparsity.
+        tol : float
+            Tolerance used to determine if an array entry is zero or nonzero when computing
+            sparsity.
+        orders : int
+            Number of orders +/- for the tolerance sweep when computing sparsity.
         directory : str or None
             If not None, the coloring for this system will be saved to the given directory.
             The file will be named as the system's pathname with dots replaced by underscores.
@@ -861,35 +854,48 @@ class System(object):
             If not None, use this as the name of the coloring file.  If a relative path, make
             it relative to the specified directory if there is one, else the current working
             directory.  If None, set the filename to the object's classname + '.pkl'.
+        recurse : bool
+            If True, recurse from this system down the system hierarchy.  Whenever a group
+            is encountered that has specified its coloring metadata, we don't recurse below
+            that group.
 
         Returns
         -------
-        Coloring
+        Coloring or None
             The computed coloring.
         """
+        if self._approx_coloring_info is None:
+            if recurse:
+                coloring = None
+                for s in self._subsystems_myproc:
+                    coloring = s.compute_approx_coloring(wrt, method, form, step, repeats,
+                                                         perturb_size,
+                                                         directory, fname, recurse)
+                return coloring
+
         if directory is None:
             directory = os.path.join(os.getcwd(), 'coloring_files')
+        if not os.path.exists(directory):
+            os.mkdir(directory)
+
         self.set_approx_coloring_meta(wrt, method, form, step, directory, fname)
-        # set a flag to say we're generating a coloring
-        self._approx_coloring_info['generate'] = True
-        approx_scheme = self._get_approx_scheme(method)
-
-        starting_inputs = self._inputs._data.copy()
-        in_offsets = starting_inputs.copy()
-        in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= rel_perturbation_size
-
-        starting_outputs = self._outputs._data.copy()
-        out_offsets = starting_outputs.copy()
-        out_offsets[out_offsets == 0.0] = 1.0
-        out_offsets *= rel_perturbation_size
+        approx_scheme = self._get_approx_scheme(self._approx_coloring_info['method'])
 
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
 
-        # compute absolute perturbations
+        # compute perturbations
+        starting_inputs = self._inputs._data.copy()
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= perturb_size
+
+        starting_outputs = self._outputs._data.copy()
+        out_offsets = starting_outputs.copy()
+        out_offsets[out_offsets == 0.0] = 1.0
+        out_offsets *= perturb_size
+
         self._setup_static_approx_coloring()
-        self._jac_saves_remaining = repeats
         for i in range(repeats):
             # randomize inputs (and outputs if implicit)
             if i > 0:
@@ -903,9 +909,26 @@ class System(object):
                 else:
                     self._apply_nonlinear()
 
-            # when run_linearize is called after the appropriate number of repeats,
-            # the coloring will be computed and saved.
             self.run_linearize()
+            self._jacobian._save_sparsity(self)
+
+        info = self._approx_coloring_info
+        sparsity, ordered_ofs, ordered_wrts = \
+            self._jacobian._compute_sparsity(self, info['wrt_matches'], tol=tol, orders=orders)
+        self._jacobian._jac_summ = None  # reclaim the memory
+
+        coloring = _compute_coloring(sparsity, 'fwd')
+        coloring._row_vars = list(ordered_ofs)
+        coloring._col_vars = list(ordered_wrts)
+        coloring._row_var_sizes = list(ordered_ofs.values())
+        coloring._col_var_sizes = list(ordered_wrts.values())
+        coloring._meta = {}  # save metadata we used to create the coloring
+        for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step'):
+            if name in info:
+                coloring._meta[name] = info[name]
+        info['coloring'] = coloring
+
+        self._save_coloring(coloring, info['directory'], info['fname'])
 
         # restore original inputs/outputs
         self._inputs._data[:] = starting_inputs
@@ -926,20 +949,10 @@ class System(object):
         fname : str or None
             Specific file name.  If None, the class + '.pkl' will be used.
         """
-        if fname is not None:
-            abs_path = os.path.abspath(fname)
-            if abs_path != fname and directory is not None:
-                final_name = os.path.join(directory, fname)
-            else:
-                final_name = fname
-        elif directory is not None:
-            final_name = os.path.join(directory, self.__class__.__name__ + '.pkl')
-
-        name, ext = os.path.splitext(final_name)
-        if not ext:
-            final_name += '.pkl'
-
-        coloring.save(final_name)
+        # under MPI, only save on proc 0
+        if ((self._full_comm is not None and self._full_comm.rank == 0) or
+                (self._full_comm is None and self.comm.rank == 0)):
+            coloring.save(get_coloring_fname(self, directory, fname))
 
     def set_coloring_spec(self, coloring):
         """
@@ -2012,8 +2025,7 @@ class System(object):
         """
         pass
 
-    def system_iter(self, include_self=False, recurse=True,
-                    typ=None):
+    def system_iter(self, include_self=False, recurse=True, typ=None):
         """
         Yield a generator of local subsystems of this system.
 
