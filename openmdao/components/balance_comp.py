@@ -137,7 +137,7 @@ class BalanceComp(ImplicitComponent):
         """
         if 'guess_func' in kwargs:
             super(BalanceComp, self).__init__(guess_func=kwargs['guess_func'])
-            kwargs.pop('guess_func', None)
+            kwargs.pop('guess_func')
         else:
             super(BalanceComp, self).__init__()
 
