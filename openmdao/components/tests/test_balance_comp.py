@@ -634,10 +634,9 @@ class TestBalanceComp(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
             DirectSolver, BalanceComp
 
-        prob = Problem(model=Group(assembled_jac_type='dense'))
+        prob = Problem()
 
         bal = BalanceComp()
-
         bal.add_balance('x', use_mult=True)
 
         tgt = IndepVarComp(name='y_tgt', val=4)
@@ -648,9 +647,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
         prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
-
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
-
         prob.model.add_subsystem(name='balance', subsys=bal)
 
         prob.model.connect('y_tgt', 'balance.rhs:x')
@@ -659,7 +656,6 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
-
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
@@ -676,10 +672,9 @@ class TestBalanceComp(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
             DirectSolver, BalanceComp
 
-        prob = Problem(model=Group(assembled_jac_type='dense'))
+        prob = Problem()
 
         bal = BalanceComp()
-
         bal.add_balance('x', use_mult=True, mult_val=2.0)
 
         tgt = IndepVarComp(name='y_tgt', val=4)
@@ -687,9 +682,7 @@ class TestBalanceComp(unittest.TestCase):
         exec_comp = ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
-
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
-
         prob.model.add_subsystem(name='balance', subsys=bal)
 
         prob.model.connect('y_tgt', 'balance.rhs:x')
@@ -697,7 +690,6 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
-
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
@@ -717,7 +709,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 100
 
-        prob = Problem(model=Group(assembled_jac_type='dense'))
+        prob = Problem()
 
         exec_comp = ExecComp('y=b*x+c',
                              b={'value': np.random.uniform(0.01,100, size=n)},

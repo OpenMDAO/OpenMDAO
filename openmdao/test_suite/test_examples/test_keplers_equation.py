@@ -17,7 +17,7 @@ class TestKeplersEquation(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, \
             ExecComp, DirectSolver, NewtonSolver
 
-        prob = Problem(model=Group())
+        prob = Problem()
 
         ivc = IndepVarComp()
 
@@ -47,7 +47,8 @@ class TestKeplersEquation(unittest.TestCase):
                             E={'value': 0.0, 'units': 'rad'},
                             ecc={'value': 0.0})
 
-        prob.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['M', 'ecc'])
+        prob.model.add_subsystem(name='ivc', subsys=ivc,
+                                 promotes_outputs=['M', 'ecc'])
 
         prob.model.add_subsystem(name='balance', subsys=bal,
                                  promotes_inputs=['M'],
@@ -59,11 +60,9 @@ class TestKeplersEquation(unittest.TestCase):
         # Explicit connections
         prob.model.connect('lhs_comp.lhs', 'balance.lhs:E')
 
-        # Setup solvers
+        # Set up solvers
         prob.model.linear_solver = DirectSolver()
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -72,7 +71,7 @@ class TestKeplersEquation(unittest.TestCase):
 
         prob.run_model()
 
-        assert_almost_equal(np.degrees(prob['E'][0]), 115.9, decimal=1)
+        assert_almost_equal(np.degrees(prob['E']), 115.9, decimal=1)
 
 
 if __name__ == "__main__":
