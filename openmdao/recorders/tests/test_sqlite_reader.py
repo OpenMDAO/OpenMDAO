@@ -1983,11 +1983,16 @@ class TestSqliteCaseReader(unittest.TestCase):
 class TestFeatureSqliteReader(unittest.TestCase):
 
     def setUp(self):
+        import os
+        from tempfile import mkdtemp
         self.orig_dir = os.getcwd()
         self.temp_dir = mkdtemp()
         os.chdir(self.temp_dir)
 
     def tearDown(self):
+        import os
+        from shutil import rmtree
+        import errno
         os.chdir(self.orig_dir)
         try:
             rmtree(self.temp_dir)
@@ -1997,10 +2002,9 @@ class TestFeatureSqliteReader(unittest.TestCase):
                 raise e
 
     def test_feature_list_cases(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         import numpy as np
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         prob = Problem(model=SellarMDA())
 
@@ -2034,7 +2038,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(case, case)
 
     def test_feature_get_cases(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         import numpy as np
@@ -2067,7 +2071,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(case, case)
 
     def test_feature_get_cases_nested(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         import numpy as np
@@ -2116,7 +2120,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
                     self.assertEqual(grandchild, grandchild)
 
     def test_feature_list_sources(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         import numpy as np
@@ -2165,7 +2169,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
     def test_feature_reading_derivatives(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         import numpy as np

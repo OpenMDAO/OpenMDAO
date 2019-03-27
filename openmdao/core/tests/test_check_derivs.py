@@ -17,6 +17,7 @@ from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
+from openmdao.test_suite.components.array_comp import ArrayComp
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
 from openmdao.utils.mpi import MPI
@@ -117,48 +118,6 @@ class MyComp(ExplicitComponent):
         J = partials
         J['y', 'x1'] = np.array([4.0])
         J['y', 'x2'] = np.array([40])
-
-
-class ArrayComp(ExplicitComponent):
-
-    def setup(self):
-
-        J1 = np.array([[1.0, 3.0, -2.0, 7.0],
-                        [6.0, 2.5, 2.0, 4.0],
-                        [-1.0, 0.0, 8.0, 1.0],
-                        [1.0, 4.0, -5.0, 6.0]])
-
-        self.J1 = J1
-        self.J2 = J1 * 3.3
-        self.Jb = J1.T
-
-        # Inputs
-        self.add_input('x1', np.zeros([4]))
-        self.add_input('x2', np.zeros([4]))
-        self.add_input('bb', np.zeros([4]))
-
-        # Outputs
-        self.add_output('y1', np.zeros([4]))
-
-        self.declare_partials(of='*', wrt='*')
-        self.set_check_partial_options('x*', directional=True)
-
-        self.exec_count = 0
-
-    def compute(self, inputs, outputs):
-        """
-        Execution.
-        """
-        outputs['y1'] = self.J1.dot(inputs['x1']) + self.J2.dot(inputs['x2']) + self.Jb.dot(inputs['bb'])
-        self.exec_count += 1
-
-    def compute_partials(self, inputs, partials):
-        """
-        Analytical derivatives.
-        """
-        partials[('y1', 'x1')] = self.J1
-        partials[('y1', 'x2')] = self.J2
-        partials[('y1', 'bb')] = self.Jb
 
 
 class TestProblemCheckPartials(unittest.TestCase):
@@ -1739,6 +1698,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(step_calc='rel', compact_print=True)
 
     def test_feature_check_partials_show_only_incorrect(self):
+        import numpy as np
         from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
 
         class MyCompGoodPartials(ExplicitComponent):
@@ -1820,6 +1780,8 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True, includes='*c*c*', excludes=['*e*'])
 
     def test_directional(self):
+        from openmdao.api import Problem
+        from openmdao.test_suite.components.array_comp import ArrayComp
 
         prob = Problem()
         model = prob.model

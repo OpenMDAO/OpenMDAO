@@ -802,7 +802,7 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_basic(self):
         import numpy as np
 
-        from openmdao.api import Problem, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.api import Problem, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, DirectSolver
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
@@ -835,7 +835,7 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_maxiter(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, DirectSolver
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
@@ -869,7 +869,7 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_rtol(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, DirectSolver
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
@@ -903,7 +903,7 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_atol(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, DirectSolver
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
@@ -1012,7 +1012,8 @@ class TestNewtonFeatures(unittest.TestCase):
     def test_feature_err_on_maxiter(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, ExecComp, AnalysisError
+        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, LinearBlockGS, \
+                                 ExecComp, AnalysisError, DirectSolver
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()

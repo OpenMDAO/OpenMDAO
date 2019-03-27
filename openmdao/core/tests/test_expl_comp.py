@@ -614,6 +614,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         import numpy as np
         from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+        from openmdao.utils.general_utils import printoptions
 
         class ArrayAdder(ExplicitComponent):
             """

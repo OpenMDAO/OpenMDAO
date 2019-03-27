@@ -54,6 +54,6 @@ You can also specify solvers as part of the initialization of a Group
 
 .. embed-code::
     openmdao.test_suite.components.double_sellar.DoubleSellar
-    :layout: interleave
+    :layout: code
 
 .. tags:: Solver

@@ -1137,9 +1137,10 @@ class TestParallelDOE(unittest.TestCase):
 class TestDOEDriverFeature(unittest.TestCase):
 
     def setUp(self):
+        import json
         import os
-        import shutil
         import tempfile
+        import numpy as np
 
         self.startdir = os.getcwd()
         self.tempdir = tempfile.mkdtemp(prefix='TestDOEDriverFeature-')
@@ -1193,6 +1194,9 @@ class TestDOEDriverFeature(unittest.TestCase):
             f.write(self.expected_json)
 
     def tearDown(self):
+        import os
+        import shutil
+
         os.chdir(self.startdir)
         try:
             shutil.rmtree(self.tempdir)
@@ -1337,8 +1341,8 @@ class TestParallelDOEFeature(unittest.TestCase):
 
     def setUp(self):
         import os
-        import shutil
         import tempfile
+        import numpy as np
 
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.rank

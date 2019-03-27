@@ -55,7 +55,7 @@ with a "uniform" distribution, our control points are evenly spaced over the dom
 in the figure below.
 
 .. embed-code::
-    openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeature.test_distribution_uniform
+    openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeatureWithPlotting.test_distribution_uniform
     :layout: code, plot
     :scale: 90
     :align: center
@@ -65,7 +65,7 @@ as seen below. This is beneficial if we know that the optimal design will have m
 higher spatial frequency content) near the edges than the middle.
 
 .. embed-code::
-    openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeature.test_distribution_sine
+    openmdao.components.tests.test_bsplines_comp.TestBsplinesCompFeatureWithPlotting.test_distribution_sine
     :layout: code, plot
     :scale: 90
     :align: center
