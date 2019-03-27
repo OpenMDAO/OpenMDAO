@@ -107,6 +107,8 @@ _PROCESS_ARROWS = False
 _MAX_BOX_LINES = None
 # If components are indexed, this will be the first index. 0 or 1
 _START_INDEX = 0
+# Place the number one row above ("vertical") or in the same row as text ("horizontal")
+_DEFAULT_NUMBER_ALIGNMENT = 'horizontal'
 
 
 class BaseXDSMWriter(object):
@@ -198,6 +200,8 @@ class AbstractXDSMWriter(BaseXDSMWriter):
 
     @staticmethod
     def _make_loop_str(first, last, start_index=0):
+        # Implement, so number is formatted as follows: start, end --> next
+        # Where start = first + start_index, end = last + start_index, next = start + 1
         return ''
 
 
@@ -217,10 +221,11 @@ class XDSMjsWriter(AbstractXDSMWriter):
         # If component ends with this string, it will be treated as a parallel component
         self._multi_suffix = '_multi'
         self.reserved_words = self._ul, self._br  # Ignored at text formatting
+        # Output file saved with this extension
         self.extension = 'html'
         if self.name in _COMPONENT_TYPE_MAP:
             self.type_map = _COMPONENT_TYPE_MAP[self.name]
-        else:
+        else:  # Use default
             self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
             msg = 'Name not "{}" found in component type mapping, will default to "{}"'
             warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
@@ -461,12 +466,14 @@ else:
         """
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
-                     number_alignment='horizontal', add_component_indices=True):
+                     number_alignment=_DEFAULT_NUMBER_ALIGNMENT, add_component_indices=True):
             super(XDSMWriter, self).__init__()
             self.name = name
+            # Formatting options
             self.box_stacking = box_stacking
             self.number_alignment = number_alignment
             self.add_component_indices = add_component_indices
+            # Output file saved with this extension
             self.extension = 'pdf'
             if self.name in _COMPONENT_TYPE_MAP:
                 self.type_map = _COMPONENT_TYPE_MAP[self.name]
@@ -474,9 +481,13 @@ else:
                 self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
                 msg = 'Name not "{}" found in component type mapping, will default to "{}"'
                 warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
+            # Number of components
             self._nr_comps = 0
+            # Maps the component names to their index (position on the matrix diagonal)
             self._comp_indices = {}
+            # List of component dictionaries
             self._comps = []
+            # Index of last components in a process
             self._loop_ends = []
 
         def write(self, filename=None, **kwargs):
@@ -501,7 +512,7 @@ else:
                 if self.add_component_indices:
                     i = i0 = comp.pop('index', None)
                     step = comp.pop('step', None)
-                    # For each closed loop inrement the process index by one
+                    # For each closed loop increment the process index by one
                     for loop in self._loop_ends:
                         if loop < i0:
                             i += 1
@@ -540,6 +551,8 @@ else:
                                                stack=stack, faded=faded)
 
         def _add_system(self, node_name, style, label, stack=False, faded=False):
+            # Adds a system dictionary to the components.
+            # This dictionary can be modified by other methods.
             if label is None:
                 label = node_name
             self._comp_indices[node_name] = self._nr_comps
@@ -996,7 +1009,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     box_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
     # In XDSMjs components are numbered by default, so only add for pyXDSM as an option
     add_component_indices = kwargs.pop('numbered_comps', True)
-    number_alignment = kwargs.pop('number_alignment', 'horizontal')  # nothing, space or new line
+    # Number alignment can be "horizontal" or "vertical"
+    number_alignment = kwargs.pop('number_alignment', _DEFAULT_NUMBER_ALIGNMENT)
 
     error_msg = ('Undefined XDSM writer "{}". '
                  'Provide  a valid name or a BaseXDSMWriter instance.')
@@ -1060,9 +1074,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # Adds a solver.
         # Uses some vars from the outer scope.
         # Returns True, if it is a non-default linear or nonlinear solver
-        print('solverdct', solver_dct['abs_name'], len(solver_dct['comps']), [c['name'] for c in solver_dct['comps']])
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
-        first = solver_dct['index']
         solver_label = _format_solver_str(solver_dct,
                                           stacking=box_stacking,
                                           add_indices=add_component_indices)
@@ -1071,14 +1083,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
         if solver_label:  # At least one non-default solver (default solvers are ignored)
             # If there is a driver, the start index is increased by one.
-            start_index = _START_INDEX + len(x.comps)
             solvers.append(solver_label)
-            nr_components = len(comp_names)
-            if add_component_indices:
-                # start, end --> next
-                solver_index = x._make_loop_str(first=first,
-                                                last=first+nr_components,
-                                                start_index=start_index)
             x.add_solver(name=solver_name, label=solver_label)
 
             # Add the connections
@@ -1098,12 +1103,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     if driver is not None:
         driver_label = driver
         driver_name = _format_name(driver)
-        if add_component_indices:
-            opt_index = len(comps)
-            if include_solver:
-                opt_index += len(solvers)
-            nr_comps = len(x.comps)
-            index_str = x._make_loop_str(first=nr_comps, last=opt_index, start_index=_START_INDEX)
         x.add_driver(name=driver_name, label=driver_label, driver_type=driver_type.lower())
 
         design_vars2 = _collect_connections(design_vars, recurse=recurse, model_path=model_path)
@@ -1138,7 +1137,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     # Add components
     solver_dcts = []
     for comp in comps:  # Driver is 1, so starting from 2
-        i = len(x.comps) + _START_INDEX
         label = _replace_chars(comp['name'], substitutes=subs)
         stack = comp['is_parallel'] and show_parallel
         if include_solver and comp['type'] == 'solver':  # solver
