@@ -11,6 +11,14 @@ represents a set of simple mathematical relationships between inputs and outputs
 automatically takes care of all of the component API methods, so you just need to instantiate
 it with an equation.
 
+ExecComp Options
+--------------------
+
+.. embed-options::
+    openmdao.components.exec_comp
+    ExecComp
+    options
+
 ExecComp Constructor
 --------------------
 
@@ -57,8 +65,8 @@ For more information about these metadata, see the documentation for the argumen
 
 - :meth:`add_output <openmdao.core.component.Component.add_output>`
 
-ExecComp Usage Examples
------------------------
+ExecComp Example: Simple
+------------------------
 
 For example, here is a simple component that takes the input and adds one to it.
 
@@ -66,13 +74,19 @@ For example, here is a simple component that takes the input and adds one to it.
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_simple
     :layout: interleave
 
+ExecComp Example: Multiple Outputs
+----------------------------------
+
 You can also create an ExecComp with multiple outputs by placing the expressions in a list.
 
 .. embed-code::
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_multi_output
     :layout: interleave
 
-You can also declare an ExecComp with arrays for inputs and outputs, but when you do, you must also
+ExecComp Example: Arrays
+------------------------
+
+You can declare an ExecComp with arrays for inputs and outputs, but when you do, you must also
 pass in a correctly-sized array as an argument to the ExecComp call. This can be the initial value
 in the case of unconnected inputs, or just an empty array with the correct size.
 
@@ -80,17 +94,8 @@ in the case of unconnected inputs, or just an empty array with the correct size.
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_array
     :layout: interleave
 
-If all of your ExecComp's array inputs and array outputs are the same size and happen to have
-diagonal partials, you can create a vectorized ExecComp by specifying a `vectorize=True` arg
-to `__init__`.  This will cause the ExecComp to solve for its partials by complex stepping
-all entries of an array input at once instead of looping over each entry individually.  Here's
-a simple example:
-
-
-.. embed-code::
-    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_vectorize
-    :layout: interleave
-
+ExecComp Example: Math Functions
+--------------------------------
 
 Functions from the math library are available for use in the expression strings.
 
@@ -98,14 +103,39 @@ Functions from the math library are available for use in the expression strings.
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_math
     :layout: interleave
 
+ExecComp Example: Variable Properties
+-------------------------------------
 
-You can also declare options like 'units', 'upper', or 'lower' on the inputs and outputs. Here is an example
-where we declare all our inputs to be inches to trigger conversion from a variable expressed in feet in one
-connection source.
+You can also declare properties like 'units', 'upper', or 'lower' on the inputs and outputs. In this 
+example we declare all our inputs to be inches to trigger conversion from a variable expressed in feet
+in one connection source.
 
 .. embed-code::
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_metadata
     :layout: interleave
 
+ExecComp Example: Vectorized
+----------------------------
+
+If all of your ExecComp's array inputs and array outputs are the same size and happen to have
+diagonal partials, you can create a vectorized ExecComp by specifying a `vectorize=True` argument
+to `__init__` or via the component options. This will cause the ExecComp to solve for its partials 
+by complex stepping all entries of an array input at once instead of looping over each entry individually.
+
+.. embed-code::
+    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_vectorize
+    :layout: interleave
+
+ExecComp Example: Options
+-------------------------
+
+Other options that can apply to all the variables in the component are variable shape and units.
+These can also be set as a keyword argument in the constructor or via the component options. In the 
+following example the variables all share the same shape, which is specified in the constructor, and
+common units that are specified by setting the option.
+
+.. embed-code::
+    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_options
+    :layout: interleave
 
 .. tags:: ExecComp, Component, Examples

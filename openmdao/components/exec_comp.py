@@ -22,6 +22,7 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_names = {'vectorize', 'units', 'shape'}
 
+
 def array_idx_iter(shape):
     """
     Return an iterator over the indices into a n-dimensional array.
@@ -66,21 +67,23 @@ class ExecComp(ExplicitComponent):
             if option is 'units' and value is not None and not valid_units(value):
                 raise ValueError("The units '%s' are invalid." % value)
 
-
         self.options.declare('vectorize', types=bool, default=False,
                              desc='If True, treat all array/array partials as diagonal if both '
                                   'arrays have size > 1. All arrays with size > 1 must have the '
                                   'same flattened size or an exception will be raised.')
 
-        self.options.declare('units', types=str, allow_none=True, default=None, check_valid=check_option,
-                             desc='Units to be assigned to all variables in this component. Default is '
-                                  'None, which means units are provided for variables individually.')
+        self.options.declare('units', types=str, allow_none=True, default=None,
+                             desc='Units to be assigned to all variables in this component. '
+                                  'Default is None, which means units are provided for variables '
+                                  'individually.',
+                             check_valid=check_option)
 
         self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
-                             desc='Shape to be assigned to all variables in this component. Default is '
-                                  'None, which means shape is provided for variables individually.')
+                             desc='Shape to be assigned to all variables in this component. '
+                                  'Default is None, which means shape is provided for variables '
+                                  'individually.')
 
-    def __init__(self, exprs, **kwargs):
+    def __init__(self, exprs=[], **kwargs):
         r"""
         Create a <Component> using only an expression string.
 
@@ -210,6 +213,9 @@ class ExecComp(ExplicitComponent):
         """
         Set up variable name and metadata lists.
         """
+        if not self._exprs:
+            raise RuntimeError("%s: No valid expressions provided to ExecComp(): %s."
+                               % (self.pathname, self._exprs))
         outs = set()
         allvars = set()
         exprs = self._exprs

@@ -259,6 +259,14 @@ _ufunc_test_data = {
 
 class TestExecComp(unittest.TestCase):
 
+    def test_no_expr(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('C1', ExecComp())
+        with self.assertRaises(Exception) as context:
+            prob.setup(check=False)
+        self.assertEqual(str(context.exception),
+                         "C1: No valid expressions provided to ExecComp(): [].")
+
     def test_colon_vars(self):
         prob = Problem(model=Group())
         prob.model.add_subsystem('C1', ExecComp('y=foo:bar+1.'))
@@ -933,6 +941,27 @@ class TestExecComp(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp.z'], 24.0, 0.00001)
+
+    def test_feature_options(self):
+        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+
+        model = Group()
+
+        indep = model.add_subsystem('indep', IndepVarComp('x', shape=(2,), units='cm'))
+        xcomp = model.add_subsystem('comp', ExecComp('y=2*x', shape=(2,)))
+
+        xcomp.options['units'] = 'm'
+
+        model.connect('indep.x', 'comp.x')
+
+        prob = Problem(model)
+        prob.setup()
+
+        prob['indep.x'] = [100., 200.]
+
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.y'], [2., 4.], 0.00001)
 
 
 class TestExecCompParameterized(unittest.TestCase):
