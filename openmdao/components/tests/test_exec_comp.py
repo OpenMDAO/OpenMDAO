@@ -390,7 +390,9 @@ class TestExecComp(unittest.TestCase):
                                                     y={'units': 'm'},
                                                     units=2.0))
 
-        self.assertEqual(str(cm.exception), "The units argument should be a str or None.")
+        self.assertEqual(str(cm.exception),
+                         "Value (2.0) of option 'units' has type of (<class 'float'>), "
+                         "but expected type (<class 'str'>).")
 
     def test_units_varname_str(self):
         prob = Problem(model=Group())
