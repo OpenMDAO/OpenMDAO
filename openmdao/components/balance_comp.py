@@ -192,6 +192,11 @@ class BalanceComp(ImplicitComponent):
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
+        if inputs._under_complex_step:
+            self._scale_factor = self._scale_factor.astype(np.complex)
+        else:
+            self._scale_factor = self._scale_factor.astype(np.float)
+
         for name, options in iteritems(self._state_vars):
             lhs = inputs[options['lhs_name']]
             rhs = inputs[options['rhs_name']]
@@ -226,6 +231,11 @@ class BalanceComp(ImplicitComponent):
         jacobian : Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
+        if inputs._under_complex_step:
+            self._dscale_drhs = self._dscale_drhs.astype(np.complex)
+        else:
+            self._dscale_drhs = self._dscale_drhs.astype(np.float)
+
         for name, options in iteritems(self._state_vars):
             lhs_name = options['lhs_name']
             rhs_name = options['rhs_name']
