@@ -39,7 +39,7 @@ class TestOptionsDict(unittest.TestCase):
             "Option    Default      Acceptable Values Acceptable Types      Description         ",
             "========= ============ ================= ===================== ====================",
             "comp      MyComp       N/A               ['ExplicitComponent']                     ",
-            "flag      False        N/A               ['bool']                                  ",
+            "flag      False        [True, False]     ['bool']                                  ",
             "long_desc **Required** N/A               ['str']               This description is ",
             "                                                               long and verbose, so",
             "                                                                it takes up multipl",
@@ -59,7 +59,7 @@ class TestOptionsDict(unittest.TestCase):
             "==================================================================== ",
             "comp      MyComp       N/A               ['ExplicitComponent']                      "
             "                                                                     ",
-            "flag      False        N/A               ['bool']                                   "
+            "flag      False        [True, False]     ['bool']                                   "
             "                                                                     ",
             "long_desc **Required** N/A               ['str']               This description is l"
             "ong and verbose, so it takes up multiple lines in the options table. ",
