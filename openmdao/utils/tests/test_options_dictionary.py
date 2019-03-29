@@ -100,11 +100,14 @@ class TestOptionsDict(unittest.TestCase):
                        "but one of types ('int', 'float') was expected."
         self.assertEqual(expected_msg, str(context.exception))
 
-        # make sure bools work
+        # make sure bools work and allowed values are populated
         self.dict.declare('flag', default=False, types=bool)
         self.assertEqual(self.dict['flag'], False)
         self.dict['flag'] = True
         self.assertEqual(self.dict['flag'], True)
+
+        meta = self.dict._dict['flag']
+        self.assertEqual(meta['values'], (True, False))
 
     def test_allow_none(self):
         self.dict.declare('test', types=int, allow_none=True, desc='Test integer value')

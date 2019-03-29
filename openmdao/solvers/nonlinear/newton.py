@@ -71,7 +71,7 @@ class NewtonSolver(NonlinearSolver):
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
-        self.options.declare('cs_reconverge', default=True,
+        self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
 

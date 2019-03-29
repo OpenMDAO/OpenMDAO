@@ -165,7 +165,7 @@ class DirectSolver(LinearSolver):
         """
         super(DirectSolver, self)._declare_options()
 
-        self.options.declare('err_on_singular', default=True,
+        self.options.declare('err_on_singular', types=bool, default=True,
                              desc="Raise an error if LU decomposition is singular.")
 
         # this solver does not iterate
