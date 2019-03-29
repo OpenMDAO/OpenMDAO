@@ -1830,6 +1830,8 @@ class Group(System):
         pro2abs = self._var_allprocs_prom2abs_list
         abs2prom = self._var_allprocs_abs2prom
         abs2meta = self._var_allprocs_abs2meta
+        abs_outs = self._var_allprocs_abs_names['output']
+        abs_ins = self._var_allprocs_abs_names['input']
         info = self._approx_coloring_info
         if info is not None and (self._owns_approx_of is None or self._owns_approx_wrt is None):
             if self.pathname == '':
@@ -1872,8 +1874,8 @@ class Group(System):
             # Skip indepvarcomp res wrt other srcs
             of -= ivc
 
-        of_dict = OrderedDict()
-        wrt_dict = OrderedDict()
+        ofset = set()
+        wrtset = set()
         wrt_colors_matched = set()
         if info is not None and (self._owns_approx_of or self.pathname):
             wrt_color_patterns = info['wrt_patterns']
@@ -1910,8 +1912,8 @@ class Group(System):
             meta.update(self._owns_approx_jac_meta)
 
             if self.pathname:
-                of_dict[key[0]] = None
-                wrt_dict[key[1]] = None
+                ofset.add(key[0])
+                wrtset.add(key[1])
 
             if meta['value'] is None:
                 shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
@@ -1939,8 +1941,9 @@ class Group(System):
             # we're taking semi-total derivs for this group. Update _owns_approx_of
             # and _owns_approx_wrt so we can use the same approx code for totals and
             # semi-totals.
-            self._owns_approx_of = of_dict
-            self._owns_approx_wrt = wrt_dict
+            self._owns_approx_of = OrderedDict((n, None) for n in abs_outs)
+            self._owns_approx_wrt = OrderedDict((n, None) for n in chain(abs_outs, abs_ins)
+                                                if n in wrtset)
 
         if info is not None:
             if info['coloring'] is not None:
@@ -1955,48 +1958,48 @@ class Group(System):
                                          "'{}': {}.".format(self.pathname, wrt_color_patterns))
                     info['wrt_matches'] = wrt_colors_matched
 
-    def _get_approx_of_wrt_ivc(self):
-        pro2abs = self._var_allprocs_prom2abs_list
-        if self._owns_approx_wrt and not self.pathname:
-            candidate_wrt = self._owns_approx_wrt  # these are ordered according to the driver
-        else:
-            candidate_wrt = self._var_allprocs_abs_names['input']
+    # def _get_approx_of_wrt_ivc(self):
+    #     pro2abs = self._var_allprocs_prom2abs_list
+    #     if self._owns_approx_wrt and not self.pathname:
+    #         candidate_wrt = self._owns_approx_wrt  # these are ordered according to the driver
+    #     else:
+    #         candidate_wrt = self._var_allprocs_abs_names['input']
 
-        from openmdao.core.indepvarcomp import IndepVarComp
-        wrt = set()
-        ivc = set()
-        for var in candidate_wrt:
-            # Weed out inputs connected to anything inside our system unless the source is an
-            # IndepVarComp.
-            if var in self._conn_abs_in2out:
-                src = self._conn_abs_in2out[var]
-                compname = src.rsplit('.', 1)[0]
-                comp = self._get_subsystem(compname)
-                if isinstance(comp, IndepVarComp):
-                    wrt.add(src)
-                    ivc.add(src)
-            else:
-                wrt.add(var)
+    #     from openmdao.core.indepvarcomp import IndepVarComp
+    #     wrt = set()
+    #     ivc = set()
+    #     for var in candidate_wrt:
+    #         # Weed out inputs connected to anything inside our system unless the source is an
+    #         # IndepVarComp.
+    #         if var in self._conn_abs_in2out:
+    #             src = self._conn_abs_in2out[var]
+    #             compname = src.rsplit('.', 1)[0]
+    #             comp = self._get_subsystem(compname)
+    #             if isinstance(comp, IndepVarComp):
+    #                 wrt.add(src)
+    #                 ivc.add(src)
+    #         else:
+    #             wrt.add(var)
 
-        wrts = wrt
-        if self._owns_approx_wrt is None:
-            wrts = OrderedDict()
-            # put wrt in order according to jacobian column order
-            for w in self._var_allprocs_abs_names['output']:
-                wrts[w] = None
-            for w in self._var_allprocs_abs_names['input']:
-                if w not in ivc:
-                    wrts[w] = None
+    #     wrts = wrt
+    #     if self._owns_approx_wrt is None:
+    #         wrts = OrderedDict()
+    #         # put wrt in order according to jacobian column order
+    #         for w in self._var_allprocs_abs_names['output']:
+    #             wrts[w] = None
+    #         for w in self._var_allprocs_abs_names['input']:
+    #             if w not in ivc:
+    #                 wrts[w] = None
 
-        if self._owns_approx_of:
-            ofs = self._owns_approx_of  # these are ordered according to the driver
-        else:
-            # Skip IndepVarComp res wrt other srcs
-            # Also, since we're not doing totals, jac output rows are ordered according
-            # to the order of _var_allprocs_abs_names['output']
-            ofs = [v for v in self._var_allprocs_abs_names['output'] if v not in ivc]
+    #     if self._owns_approx_of:
+    #         ofs = self._owns_approx_of  # these are ordered according to the driver
+    #     else:
+    #         # Skip IndepVarComp res wrt other srcs
+    #         # Also, since we're not doing totals, jac output rows are ordered according
+    #         # to the order of _var_allprocs_abs_names['output']
+    #         ofs = [v for v in self._var_allprocs_abs_names['output'] if v not in ivc]
 
-        return ofs, wrts, ivc
+    #     return ofs, wrts, ivc
 
     def _setup_static_approx_coloring(self):
         self._setup_approx_partials()

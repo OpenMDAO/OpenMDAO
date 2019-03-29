@@ -155,7 +155,6 @@ class ApproximationScheme(object):
         outputs = system._outputs
         inputs = system._inputs
         iproc = system.comm.rank
-        pro2abs = system._var_allprocs_prom2abs_list
         abs2meta = system._var_allprocs_abs2meta
 
         out_slices = outputs.get_slice_dict()
@@ -193,7 +192,7 @@ class ApproximationScheme(object):
                     full_wrts = wrt_names
 
                 full_sizes = wrtsizes
-                full_ofs = list(system._outputs._views)
+                full_ofs = system._var_allprocs_abs_names['output']
 
                 if len(wrt_names) != len(wrt_matches):
                     new_names = []
@@ -357,6 +356,8 @@ class ApproximationScheme(object):
         mult = self._get_multiplier(data)
         if colored_shape is not None:  # coloring is active
             if par_fd_w_serial_model:
+                # TODO: should really only have to transfer rows and cols once.  Only data
+                # needs to be transferred each time
                 Jcolored = mycomm.allgather((jrows, jcols, jdata))
                 allrows = np.hstack(rows for rows, _, _ in Jcolored if rows)
                 allcols = np.hstack(cols for _, cols, _ in Jcolored if cols)
