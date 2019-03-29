@@ -302,11 +302,9 @@ class Jacobian(object):
 
         if system._owns_approx_of or system._owns_approx_wrt:
             # we're computing totals
-            ofs = [n for n in system._var_allprocs_abs_names['output']
-                   if n in system._owns_approx_of]
+            ofs = list(system._owns_approx_of)
             if system.pathname:  # doing semitotals
-                wrts = [n for n in system._var_allprocs_abs_names['input']
-                        if n in system._owns_approx_wrt]
+                wrts = list(system._owns_approx_wrt)
                 wrt_info = [(ofs, ofsizes, (approx_of_idx)), (wrts, isizes, approx_wrt_idx)]
             else:
                 wrts = [n for n in system._var_allprocs_abs_names['output']

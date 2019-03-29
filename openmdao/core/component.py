@@ -1293,6 +1293,51 @@ class Component(System):
 
         return approx_jac
 
+    def _get_ordered_jac_vars(self, absolute=True):
+        """
+        Get names and sizes of jacobian variables and their sizes in the correct order.
+
+        Parameters
+        ----------
+        absolute : bool
+            If True, return the names in absolute form, else promoted form.
+
+        Returns
+        -------
+        (list, list, list, list)
+            Tuple containing of names, of sizes, wrt names, wrt sizes
+            'of' vars correspond to rows and 'wrt' vars correspond to columns of the jacobian.
+        """
+        ofs, wrts = self._get_partials_varlists()
+        if absolute and self.pathname:
+            ofs = ['.'.join((self.pathname, n)) for n in ofs]
+            wrts = ['.'.join((self.pathname, n)) for n in wrts]
+
+        return (ofs, wrts)
+
+    def _get_ordered_jac_vars_and_sizes(self, absolute=True):
+        """
+        Get names and sizes of jacobian variables and their sizes in the correct order.
+
+        Parameters
+        ----------
+        absolute : bool
+            If True, return the names in absolute form, else promoted form.
+
+        Returns
+        -------
+        (list, list, list, list)
+            Tuple containing of names, of sizes, wrt names, wrt sizes
+            'of' vars correspond to rows and 'wrt' vars correspond to columns of the jacobian.
+        """
+        ofs, wrts = self._get_partials_varlists()
+        of_sizes, wrt_sizes = self._get_partials_var_sizes()
+        if absolute and self.pathname:
+            ofs = ['.'.join(self.pathname, n) for n in ofs]
+            wrts = ['.'.join(self.pathname, n) for n in wrts]
+
+        return (ofs, of_sizes, wrts, wrt_sizes)
+
 
 class _DictValues(object):
     """

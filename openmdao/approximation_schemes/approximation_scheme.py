@@ -175,7 +175,7 @@ class ApproximationScheme(object):
             if wrt == '@color':   # use coloring (there should be only 1 of these)
                 wrt_matches = system._approx_coloring_info['wrt_matches']
                 options = approx[0][1]
-                if is_total and system.pathname == '':
+                if is_total and system.pathname == '':  # top level approx totals
                     of_names = [n for n in system._var_allprocs_abs_names['output']
                                 if n in system._owns_approx_of]
                     full_wrts = all_wrt_names
@@ -185,7 +185,7 @@ class ApproximationScheme(object):
                     total_sizes = system._var_sizes['nonlinear']['output'][iproc]
                 else:
                     of_names, wrt_names = system._get_partials_varlists()
-                    ofsizes, wrtsizes = system._get_partials_sizes()
+                    ofsizes, wrtsizes = system._get_partials_var_sizes()
                     # this is always at Component level, so the promoted name is
                     # always just the relative name.
                     wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
@@ -303,29 +303,29 @@ class ApproximationScheme(object):
                 if fd_count % num_par_fd == system._par_fd_id:
                     result = self._run_point(system, idx_info, data, results_array, total)
                     if par_fd_w_serial_model or not is_parallel:
-                        row_map = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
-                        if row_map is not None:
+                        rowmap = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
+                        if rowmap is not None:
                             if nz_rows is None:  # uncolored column
                                 nrows = tmpJ['@nrows']
                                 jrows.extend(range(nrows))
                                 jcols.extend(col_idxs * nrows)  # col_idxs is size 1 here
-                                jdata.extend(self._collect_result(result[row_map]))
+                                jdata.extend(self._transform_result(result[rowmap]))
                             else:
                                 for i, col in enumerate(col_idxs):
                                     jrows.extend(nz_rows[i])
                                     jcols.extend([col] * len(nz_rows[i]))
-                                    jdata.extend(self._collect_result(result[row_map[nz_rows[i]]]))
+                                    jdata.extend(self._transform_result(result[rowmap[nz_rows[i]]]))
                         else:
                             if nz_rows is None:  # uncolored column
                                 nrows = tmpJ['@nrows']
                                 jrows.extend(range(nrows))
                                 jcols.extend(col_idxs * nrows)
-                                jdata.extend(self._collect_result(result))
+                                jdata.extend(self._transform_result(result))
                             else:
                                 for i, col in enumerate(col_idxs):
                                     jrows.extend(nz_rows[i])
                                     jcols.extend([col] * len(nz_rows[i]))
-                                    jdata.extend(self._collect_result(result[nz_rows[i]]))
+                                    jdata.extend(self._transform_result(result[nz_rows[i]]))
                     else:  # parallel model (some vars are remote)
                         raise NotImplementedError("simul approx coloring with par FD is "
                                                   "only supported currently when using "
@@ -334,6 +334,7 @@ class ApproximationScheme(object):
                 fd_count += 1
             else:  # uncolored
                 J = tmpJ[wrt]
+                full_idxs = J['full_out_idxs']
                 out_slices = tmpJ['@out_slices']
                 for i_count, idxs in enumerate(col_idxs):
                     if fd_count % num_par_fd == system._par_fd_id:
@@ -346,10 +347,10 @@ class ApproximationScheme(object):
                                 if owns[of] == iproc:
                                     results[(of, wrt)].append(
                                         (i_count,
-                                         self._collect_result(
+                                         self._transform_result(
                                              result[out_slices[of]][out_idxs]).copy()))
                         else:
-                            J['data'][:, i_count] = self._collect_result(result[J['full_out_idxs']])
+                            J['data'][:, i_count] = self._transform_result(result[full_idxs])
 
                     fd_count += 1
 
@@ -490,7 +491,6 @@ def _get_wrt_subjacs(system, approxs):
     J = {}
     ofdict = {}
 
-    # in the non-colored case, all wrts will be the same for all entries in approxs
     for key, options in approxs:
         of, wrt = key
         if wrt not in J:
@@ -539,3 +539,37 @@ def _get_wrt_subjacs(system, approxs):
             J[wrt]['full_out_idxs'] = _full_slice
 
     return J
+
+
+def _initialize_model_approx(model, driver, of=None, wrt=None):
+    """
+    Set up internal data structures needed for computing approx totals.
+    """
+    if of is None:
+        of = driver._get_ordered_nl_responses()
+    if wrt is None:
+        wrt = driver._designvars
+
+    of_dict = OrderedDict()
+    for vname in of:
+        of_dict[vname] = None
+    wrt_dict = OrderedDict()
+    for vname in wrt:
+        wrt_dict[vname] = None
+
+    # Initialization based on driver (or user) -requested "of" and "wrt".
+    if (not model._owns_approx_jac or model._owns_approx_of is None or
+            model._owns_approx_of.keys() != of_dict.keys() or model._owns_approx_wrt is None or
+            model._owns_approx_wrt.keys() != wrt_dict.keys()):
+        model._owns_approx_of = of_dict
+        model._owns_approx_wrt = wrt_dict
+
+        # Support for indices defined on driver vars.
+        model._owns_approx_of_idx = {
+            key: val['indices'] for key, val in iteritems(driver._responses)
+            if val['indices'] is not None
+        }
+        model._owns_approx_wrt_idx = {
+            key: val['indices'] for key, val in iteritems(driver._designvars)
+            if val['indices'] is not None
+        }

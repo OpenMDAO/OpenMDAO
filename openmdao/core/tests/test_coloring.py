@@ -101,6 +101,11 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
     p.driver = driver_class()
+    if 'approx' in options:
+        p.model.approx_totals(method=options['method'])
+        del options['approx']
+        del options['method']
+
     p.driver.options.update(options)
 
     p.model.add_design_var('x')
@@ -473,6 +478,24 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
                           dynamic_simul_derivs=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - bidirectional coloring saves 11 solves per driver iter  (11 vs 22)
+        # - initial solve for linear constraints takes 1 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
+        self.assertEqual((p.model._solve_count - 1) / 22,
+                         (p_color.model._solve_count - 1 - 22 * 3) / 11)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_fwd_simul_coloring_snopt_approx(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
+                          dynamic_simul_derivs=True, approx=True, method='fd')
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)

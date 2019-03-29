@@ -156,7 +156,7 @@ class ComplexStep(ApproximationScheme):
     def _get_multiplier(self, delta):
         return (1.0 / delta * 1j).real
 
-    def _collect_result(self, array):
+    def _transform_result(self, array):
         return array.imag
 
     def _run_point(self, system, idx_info, delta, result_array, total):

@@ -70,7 +70,7 @@ class ExplicitComponent(Component):
         wrt = list(self._var_allprocs_prom2abs_list['input'])
         return of, wrt
 
-    def _get_partials_sizes(self):
+    def _get_partials_var_sizes(self):
         """
         Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
 

@@ -7,7 +7,7 @@ import sys
 import numpy as np
 
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.coloring import get_simul_meta
+from openmdao.utils.coloring import compute_total_coloring
 
 class TotJacBuilder(object):
     def __init__(self, rows, cols):
@@ -61,9 +61,9 @@ class TotJacBuilder(object):
             col_idx += shape[1]
 
     def color(self, mode='auto', stream=sys.stdout):
-        self.coloring = get_simul_meta(None, mode, include_sparsity=False, setup=False,
-                                       run_model=False, bool_jac=self.J,
-                                       stream=stream)
+        self.coloring = compute_total_coloring(None, mode, include_sparsity=False, setup=False,
+                                               run_model=False, bool_jac=self.J,
+                                               stream=stream)
         return self.coloring
 
     def show(self, stream=sys.stdout):

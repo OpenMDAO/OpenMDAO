@@ -229,7 +229,7 @@ class FiniteDifference(ApproximationScheme):
     def _get_multiplier(self, data):
         return 1.0
 
-    def _collect_result(self, array):
+    def _transform_result(self, array):
         return array
 
     def _run_point(self, system, idx_info, data, results_array, total):

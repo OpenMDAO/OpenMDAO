@@ -14,7 +14,7 @@ from itertools import combinations
 from distutils.version import LooseVersion
 from contextlib import contextmanager
 
-from six import iteritems
+from six import iteritems, string_types
 from six.moves import range
 
 import numpy as np
@@ -26,6 +26,7 @@ from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
+from openmdao.approximation_schemes.approximation_scheme import _initialize_model_approx
 
 
 CITATIONS = """
@@ -363,34 +364,31 @@ class Coloring(object):
         with open(fname, 'r') as f:
             return _json2coloring(json.load(f))
 
-    def save(self, fname):
+    def save(self, stream=sys.stdout):
         """
         Write the coloring object to the given stream.
 
         Parameters
         ----------
-        fname : str
-            Name of file to save to, or 'stdout' or 'stderr'.
+        stream : file-like or str
+            File to save to.
         """
-        if fname is None:
+        if stream is None:
             return   # don't try to save
 
-        if fname in ('stdout', 'stderr'):
-            fmt = fname
-            stream = getattr(sys, fname)
-        else:
+        if isinstance(stream, string_types):
+            fname = stream
             name, fmt = fname.rsplit('.', 1)
-            stream = None
-        try:
-            writer, otype = self._writers[fmt]
-        except KeyError:
-            raise RuntimeError("No writer available for format '%s'", fmt)
 
-        if stream:
-            writer(stream)
-        else:
+            try:
+                writer, otype = self._writers[fmt]
+            except KeyError:
+                raise RuntimeError("No writer available for format '%s'", fmt)
+
             with open(fname, otype) as f:
                 writer(f)
+        else:
+            self._write_pickle(stream)
 
     def _write_pickle(self, stream):
         """
@@ -447,9 +445,9 @@ class Coloring(object):
             stream.write("],\n[\n")
             last_idx = len(nonzero_entries) - 1
             for i, nonzeros in enumerate(nonzero_entries):
-                if isinstance(nonzeros, np.ndarray):
+                if isinstance(nonzeros, list):
                     # convert to list to make json serializable
-                    stream.write("   %s" % list(nonzeros))
+                    stream.write("   %s" % nonzeros)
                 else:  # a full slice
                     stream.write("   %s" % none)
 
@@ -1363,9 +1361,9 @@ def _compute_coloring(J, mode):
     return coloring
 
 
-def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
-                   include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                   stream=sys.stdout):
+def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
+                           include_sparsity=True, setup=False, run_model=False, bool_jac=None,
+                           stream=sys.stdout):
     """
     Compute simultaneous derivative colorings for the total jacobian of the given problem.
 
@@ -1402,21 +1400,29 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
 
     if problem is not None:
         driver = problem.driver
-        if mode is None:
-            mode = problem._orig_mode
-        if mode != problem._orig_mode:
-            raise RuntimeError("given mode (%s) does not agree with Problem mode (%s)" %
-                               (mode, problem._mode))
-        J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup,
-                                run_model=run_model)
-
         ofs = driver._get_ordered_nl_responses()
         wrts = list(driver._designvars)
         of_sizes = _get_response_sizes(driver, ofs)
         wrt_sizes = _get_desvar_sizes(driver, wrts)
 
-        if include_sparsity:
-            sparsity = _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes)
+        model = problem.model
+        if model._approx_schemes:  # need to use total approx coloring
+            _initialize_model_approx(model, driver)
+            coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0])
+            if include_sparsity:
+                sparsity = coloring.get_subjac_sparsity()
+        else:
+            if mode is None:
+                mode = problem._orig_mode
+            if mode != problem._orig_mode:
+                raise RuntimeError("given mode (%s) does not agree with Problem mode (%s)" %
+                                   (mode, problem._mode))
+            J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup,
+                                    run_model=run_model)
+            coloring = _compute_coloring(J, mode)
+
+            if include_sparsity:
+                sparsity = _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes)
 
         driver._total_jac = None
     elif bool_jac is not None:
@@ -1425,12 +1431,12 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
         if mode is None:
             mode = 'auto'
         driver = None
+        coloring = _compute_coloring(J, mode)
     else:
-        raise RuntimeError("You must supply either problem or bool_jac to get_simul_meta().")
+        raise RuntimeError("You must supply either problem or bool_jac to "
+                           "compute_total_coloring().")
 
-    coloring = _compute_coloring(J, mode)
-
-    if problem is not None:
+    if bool_jac is None:
         coloring._row_vars = ofs
         coloring._row_var_sizes = of_sizes
         coloring._col_vars = wrts
@@ -1440,12 +1446,10 @@ def get_simul_meta(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
         coloring._subjac_sparsity = sparsity
 
     if stream is not None:
-        if stream.isatty():
-            stream.write("\n########### BEGIN COLORING DATA ################\n")
+        if stream is sys.stdout:
             coloring._write_json(stream)
-            stream.write("\n########### END COLORING DATA ############\n")
         else:
-            coloring._write_pickle(stream)
+            coloring.save(stream)
 
         if show_jac:
             s = stream if stream.isatty() else sys.stdout
@@ -1504,10 +1508,11 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=F
 
     # save the coloring.pkl file for later inspection
     with open("coloring.pkl", "wb") as f:
-        coloring = get_simul_meta(problem,
-                                  repeats=driver.options['dynamic_derivs_repeats'],
-                                  tol=1.e-15, include_sparsity=do_sparsity,
-                                  setup=False, run_model=run_model, show_jac=show_jac, stream=f)
+        coloring = compute_total_coloring(problem,
+                                          repeats=driver.options['dynamic_derivs_repeats'],
+                                          tol=1.e-15, include_sparsity=do_sparsity,
+                                          setup=False, run_model=run_model, show_jac=show_jac,
+                                          stream=f)
     driver.set_coloring_spec(coloring)
     driver._setup_simul_coloring()
     if do_sparsity:
@@ -1572,19 +1577,19 @@ def _simul_coloring_cmd(options):
             Problem._post_setup_func = None  # avoid recursive loop
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
-                coloring = get_simul_meta(prob,
-                                          repeats=options.num_jacs, tol=options.tolerance,
-                                          show_jac=options.show_jac,
-                                          include_sparsity=not options.no_sparsity,
-                                          setup=False, run_model=True,
-                                          stream=outfile)
+                coloring = compute_total_coloring(prob,
+                                                  repeats=options.num_jacs, tol=options.tolerance,
+                                                  show_jac=options.show_jac,
+                                                  include_sparsity=not options.no_sparsity,
+                                                  setup=False, run_model=True,
+                                                  stream=outfile)
 
             if sys.stdout.isatty():
                 coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
-    return coloring
+    return _simul_coloring
 
 
 def get_coloring_fname(system, directory=None, fname=None):

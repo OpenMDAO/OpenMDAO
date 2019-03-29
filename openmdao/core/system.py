@@ -3245,7 +3245,7 @@ class System(object):
         # wrt should include implicit states
         return of, of + wrt
 
-    def _get_partials_sizes(self):
+    def _get_partials_var_sizes(self):
         """
         Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
 

@@ -24,6 +24,7 @@ from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, simple_warning
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.mpi import MPI
+from openmdao.approximation_schemes.approximation_scheme import _initialize_model_approx
 
 
 _contains_all = ContainsAll()
@@ -181,7 +182,7 @@ class _TotalJacInfo(object):
         abs2meta = model._var_allprocs_abs2meta
 
         if approx:
-            self._initialize_approx()
+            _initialize_model_approx(model, driver, self.of, self.wrt)
         else:
             constraints = driver._cons
 
@@ -219,21 +220,6 @@ class _TotalJacInfo(object):
                 self.in_idx_map[mode], self.in_loc_idxs[mode], self.idx_iter_dict[mode] = \
                     self._create_in_idx_map(mode)
 
-            has_remote_vars = {'fwd': False, 'rev': False}
-            zeros = model._var_sizes['linear']['output'] == 0
-            if 'fwd' in modes:
-                for name in of:
-                    if (np.any(zeros[:, model._var_allprocs_abs2idx['linear'][name]]) or
-                            abs2meta[name]['distributed']):
-                        has_remote_vars['fwd'] = True
-                        break
-            if 'rev' in modes:
-                for name in wrt:
-                    if (np.any(zeros[:, model._var_allprocs_abs2idx['linear'][name]]) or
-                            abs2meta[name]['distributed']):
-                        has_remote_vars['rev'] = True
-                        break
-
         self.of_meta, self.of_size = self._get_tuple_map(of, responses, abs2meta)
         self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta)
         self.out_meta = {'fwd': self.of_meta, 'rev': self.wrt_meta}
@@ -252,10 +238,10 @@ class _TotalJacInfo(object):
             self.jac_petsc = {}
             self.soln_petsc = {}
             if 'fwd' in modes:
-                self._compute_jac_scatters('fwd', J.shape[0], has_remote_vars)
+                self._compute_jac_scatters('fwd', J.shape[0])
 
             if 'rev' in modes:
-                self._compute_jac_scatters('rev', J.shape[1], has_remote_vars)
+                self._compute_jac_scatters('rev', J.shape[1])
 
         # for dict type return formats, map var names to views of the Jacobian array.
         if return_format == 'array':
@@ -276,14 +262,13 @@ class _TotalJacInfo(object):
             self.prom_design_vars = {prom_wrt[i]: design_vars[dv] for i, dv in enumerate(wrt)}
             self.prom_responses = {prom_of[i]: responses[r] for i, r in enumerate(of)}
 
-    def _compute_jac_scatters(self, mode, size, has_remote_vars):
+    def _compute_jac_scatters(self, mode, size):
         rank = self.comm.rank
         self.jac_scatters[mode] = jac_scatters = {}
         model = self.model
 
-        # if self.comm.size > 1 or (model._full_comm is not None and
-        #                           model._full_comm.size > 1):
-        if has_remote_vars:
+        if self.comm.size > 1 or (model._full_comm is not None and
+                                  model._full_comm.size > 1):
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(size, dtype=float),
                                                   comm=self.comm)
             self.jac_petsc[mode] = tgt_vec
@@ -316,31 +301,6 @@ class _TotalJacInfo(object):
         else:
             for vecname in model._lin_vec_names:
                 jac_scatters[vecname] = None
-
-    def _initialize_approx(self):
-        """
-        Set up internal data structures needed for computing approx totals.
-        """
-        of_set = frozenset(self.of)
-        wrt_set = frozenset(self.wrt)
-
-        model = self.model
-
-        # Initialization based on driver (or user) -requested "of" and "wrt".
-        if not model._owns_approx_jac or model._owns_approx_of != of_set \
-           or model._owns_approx_wrt != wrt_set:
-            model._owns_approx_of = of_set
-            model._owns_approx_wrt = wrt_set
-
-            # Support for indices defined on driver vars.
-            model._owns_approx_of_idx = {
-                key: val['indices'] for key, val in iteritems(self.responses)
-                if val['indices'] is not None
-            }
-            model._owns_approx_wrt_idx = {
-                key: val['indices'] for key, val in iteritems(self.design_vars)
-                if val['indices'] is not None
-            }
 
     def _get_dict_J(self, J, wrt, prom_wrt, of, prom_of, wrt_meta, of_meta, return_format):
         """
@@ -1362,8 +1322,13 @@ class _TotalJacInfo(object):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
-                    tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
-                                                  prom_out, prom_in, of_idx, wrt_idx)
+                    if prom_out == prom_in and isinstance(tot[prom_in], dict):
+                        rows, cols, data = tot[prom_in]['coo']
+                        data[:] = _get_subjac(approx_jac[output_name, input_name],
+                                              prom_out, prom_in, of_idx, wrt_idx)[rows, cols]
+                    else:
+                        tot[prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
+                                                      prom_out, prom_in, of_idx, wrt_idx)
         else:
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
