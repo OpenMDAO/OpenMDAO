@@ -503,7 +503,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
 
-        self.assertEqual(str(context.exception).replace('1L,', '1,'),  # 1L on Windows
+        self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
                          "comp: shape of (5,) has been specified for variable 'x', "
                          "but a value of shape (1,) has been provided.")
 
@@ -554,7 +554,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
 
-        self.assertEqual(str(context.exception).replace('1L,', '1,'),  # 1L on Windows
+        self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
                          "comp: shape of (10,) has been specified for variable 'y', "
                          "but shape of (5,) has been specified for the entire component.")
 
