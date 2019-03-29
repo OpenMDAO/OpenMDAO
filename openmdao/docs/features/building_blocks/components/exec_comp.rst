@@ -12,7 +12,7 @@ automatically takes care of all of the component API methods, so you just need t
 it with an equation.
 
 ExecComp Options
---------------------
+----------------
 
 .. embed-options::
     openmdao.components.exec_comp
