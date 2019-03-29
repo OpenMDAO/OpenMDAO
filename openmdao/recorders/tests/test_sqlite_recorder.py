@@ -1841,7 +1841,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
             "=============== ======= ================= ================ =========================================\n"
             "Option          Default Acceptable Values Acceptable Types Description                              \n"
             "=============== ======= ================= ================ =========================================\n"
-            "distributed     False   N/A               N/A              True if the component has variables that \n"
+            "distributed     False   [True, False]     ['bool']         True if the component has variables that \n"
             "                                                           are distributed across multiple processes\n"
             "                                                           .\n"
             "options value 1 1       N/A               N/A                                                       \n"
