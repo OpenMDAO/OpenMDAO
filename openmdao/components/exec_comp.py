@@ -24,6 +24,20 @@ _disallowed_names = {'vectorize', 'units', 'shape'}
 
 
 def check_option(option, value):
+    """
+    Check option for validity.
+
+    Parameters
+    ----------
+    option : str
+        The name of the option
+    value : any
+        The value of the option
+
+    Raises
+    ------
+    ValueError
+    """
     if option is 'units' and value is not None and not valid_units(value):
         raise ValueError("The units '%s' are invalid." % value)
 
