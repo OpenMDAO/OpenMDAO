@@ -399,8 +399,8 @@ class TestExecComp(unittest.TestCase):
                                                     units=2.0))
 
         self.assertEqual(str(cm.exception),
-                         "Value (2.0) of option 'units' has type of (<class 'float'>), "
-                         "but expected type (<class 'str'>).")
+                         "Value (2.0) of option 'units' has type 'float', "
+                         "but type 'str' was expected.")
 
     def test_units_varname_str(self):
         prob = Problem(model=Group())

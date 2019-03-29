@@ -211,11 +211,18 @@ class OptionsDictionary(object):
             # If only types is declared
             elif types is not None:
                 if not isinstance(value, types):
-                    vtype = type(value)
+                    vtype = type(value).__name__
+
                     if isinstance(value, string_types):
                         value = "'{}'".format(value)
-                    raise TypeError("Value ({}) of option '{}' has type of ({}), but "
-                                    "expected type ({}).".format(value, name, vtype, types))
+
+                    if isinstance(types, (tuple, list)):
+                        typs = tuple([type_.__name__ for type_ in types])
+                        raise TypeError("Value ({}) of option '{}' has type '{}', but one of "
+                                        "types {} was expected.".format(value, name, vtype, typs))
+                    else:
+                        raise TypeError("Value ({}) of option '{}' has type '{}', but type '{}' "
+                                        "was expected.".format(value, name, vtype, types.__name__))
 
             if upper is not None:
                 if value > upper:
