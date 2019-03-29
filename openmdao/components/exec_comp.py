@@ -23,6 +23,11 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
 _disallowed_names = {'vectorize', 'units', 'shape'}
 
 
+def check_option(option, value):
+    if option is 'units' and value is not None and not valid_units(value):
+        raise ValueError("The units '%s' are invalid." % value)
+
+
 def array_idx_iter(shape):
     """
     Return an iterator over the indices into a n-dimensional array.
@@ -63,10 +68,6 @@ class ExecComp(ExplicitComponent):
         """
         Declare options.
         """
-        def check_option(option, value):
-            if option is 'units' and value is not None and not valid_units(value):
-                raise ValueError("The units '%s' are invalid." % value)
-
         self.options.declare('vectorize', types=bool, default=False,
                              desc='If True, treat all array/array partials as diagonal if both '
                                   'arrays have size > 1. All arrays with size > 1 must have the '
