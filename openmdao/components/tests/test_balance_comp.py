@@ -318,6 +318,38 @@ class TestBalanceComp(unittest.TestCase):
             for (of, wrt) in cpd['balance']:
                 assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
+    def test_shape(self):
+        n = 100
+
+        bal = BalanceComp()
+        bal.add_balance('x', shape=(n,))
+
+        tgt = IndepVarComp(name='y_tgt', val=4*np.ones(n))
+
+        exe = ExecComp('y=x**2', x=np.zeros(n), y=np.zeros(n))
+
+        model = Group()
+
+        model.add_subsystem('tgt', tgt, promotes_outputs=['y_tgt'])
+        model.add_subsystem('exe', exe)
+        model.add_subsystem('bal', bal)
+
+        model.connect('y_tgt', 'bal.rhs:x')
+        model.connect('bal.x', 'exe.x')
+        model.connect('exe.y', 'bal.lhs:x')
+
+        model.linear_solver = DirectSolver(assemble_jac=True)
+        model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
+
+        prob = Problem(model)
+        prob.setup()
+
+        prob['bal.x'] = np.random.rand(n)
+
+        prob.run_model()
+
+        assert_almost_equal(prob['bal.x'], 2.0*np.ones(n), decimal=7)
+
     def test_scalar(self):
 
         n = 1
