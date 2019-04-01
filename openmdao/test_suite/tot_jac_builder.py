@@ -72,7 +72,7 @@ class TotJacBuilder(object):
         maxdeg_fwd = np.max(np.count_nonzero(self.J, axis=1))
         maxdeg_rev = np.max(np.count_nonzero(self.J, axis=0))
 
-        print("Shape:", self.J.shape, file=stream)
+        print("Shape:", self.J.shape)
         print("Density:", np.count_nonzero(self.J) / self.J.size)
         print("Max degree (fwd, rev):", maxdeg_fwd, maxdeg_rev)
 
