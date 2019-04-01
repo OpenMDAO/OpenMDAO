@@ -60,13 +60,13 @@ class TotJacBuilder(object):
             row_idx += shape[0]
             col_idx += shape[1]
 
-    def color(self, mode='auto', stream=sys.stdout):
+    def color(self, mode='auto', fname=None):
         self.coloring = compute_total_coloring(None, mode, include_sparsity=False, setup=False,
                                                run_model=False, bool_jac=self.J,
-                                               stream=stream)
+                                               fname=fname)
         return self.coloring
 
-    def show(self, stream=sys.stdout):
+    def show(self):
         self.coloring.display()
 
         maxdeg_fwd = np.max(np.count_nonzero(self.J, axis=1))
@@ -76,7 +76,7 @@ class TotJacBuilder(object):
         print("Density:", np.count_nonzero(self.J) / self.J.size)
         print("Max degree (fwd, rev):", maxdeg_fwd, maxdeg_rev)
 
-        self.coloring.summary(stream=stream)
+        self.coloring.summary()
 
     def shuffle_rows(self):
         np.random.shuffle(self.J)

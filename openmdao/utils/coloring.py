@@ -364,7 +364,7 @@ class Coloring(object):
         with open(fname, 'r') as f:
             return _json2coloring(json.load(f))
 
-    def save(self, stream=sys.stdout):
+    def save(self, stream):
         """
         Write the coloring object to the given stream.
 
@@ -1248,8 +1248,8 @@ def _get_response_sizes(driver, names):
     return [responses[n]['size'] for n in names]
 
 
-def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=False,
-                         setup=False, run_model=False, stream=sys.stdout):
+def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15,
+                         setup=False, run_model=False):
     """
     Compute derivative sparsity for the given problem.
 
@@ -1263,10 +1263,6 @@ def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=Fa
         Number of times to repeat total jacobian computation.
     tol : float
         Tolerance used to determine if an array entry is nonzero.
-    show_jac : bool
-        If True, display a visualization of the final total jacobian used to compute the coloring.
-    stream : file-like or None
-        Stream where output coloring info will be written.
     setup : bool
         If True, run setup before calling compute_totals.
     run_model : bool
@@ -1276,6 +1272,8 @@ def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=Fa
     -------
     dict
         A nested dict specifying subjac sparsity for each total deriv, e.g., sparsity[resp][dv].
+    ndarray
+        Boolean sparsity matrix.
     """
     driver = problem.driver
 
@@ -1290,15 +1288,7 @@ def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15, show_jac=Fa
 
     driver._total_jac = None
 
-    if stream is not None:
-        _write_sparsity(sparsity, stream)
-        stream.write("\n")
-
-        if show_jac and stream is not None:
-            stream.write("\n\n")
-            array_viz(J, problem, ofs, wrts, stream)
-
-    return sparsity
+    return sparsity, J
 
 
 def _split_groups(groups):
@@ -1361,9 +1351,9 @@ def _compute_coloring(J, mode):
     return coloring
 
 
-def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, show_jac=False,
+def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15,
                            include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                           stream=sys.stdout):
+                           fname=None):
     """
     Compute simultaneous derivative colorings for the total jacobian of the given problem.
 
@@ -1377,8 +1367,6 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, show_jac=F
         Number of times to repeat total jacobian computation.
     tol : float
         Tolerance used to determine if an array entry is nonzero.
-    show_jac : bool
-        If True, display a visualiation of the final total jacobian used to compute the coloring.
     include_sparsity : bool
         If True, include the sparsity structure of the total jacobian mapped to design vars
         and responses.  (This info is used by pyOptSparseDriver).
@@ -1388,8 +1376,8 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, show_jac=F
         If True, run run_model before calling compute_totals.
     bool_jac : ndarray
         If problem is not supplied, a previously computed boolean jacobian can be used.
-    stream : file-like or None
-        Stream where output coloring info will be written.
+    fname : filename or None
+        File where output coloring info will be written. If None, no info will be written.
 
     Returns
     -------
@@ -1406,17 +1394,27 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, show_jac=F
         wrt_sizes = _get_desvar_sizes(driver, wrts)
 
         model = problem.model
+
+        if mode is None:
+            if model._approx_schemes:
+                mode = 'fwd'
+            else:
+                mode = problem._orig_mode
+        if mode != problem._orig_mode:
+            raise RuntimeError("given mode (%s) does not agree with Problem mode (%s)" %
+                               (mode, problem._mode))
+
         if model._approx_schemes:  # need to use total approx coloring
-            _initialize_model_approx(model, driver)
-            coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0])
+            if len(ofs) != len(driver._responses):
+                raise NotImplementedError("Currently there is no support for approx coloring when "
+                                          "linear constraint derivatives are computed separately "
+                                          "from nonlinear ones.")
+            _initialize_model_approx(model, driver, ofs, wrts)
+            coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0],
+                                                     repeats=repeats)
             if include_sparsity:
                 sparsity = coloring.get_subjac_sparsity()
         else:
-            if mode is None:
-                mode = problem._orig_mode
-            if mode != problem._orig_mode:
-                raise RuntimeError("given mode (%s) does not agree with Problem mode (%s)" %
-                                   (mode, problem._mode))
             J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup,
                                     run_model=run_model)
             coloring = _compute_coloring(J, mode)
@@ -1445,16 +1443,8 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, show_jac=F
     if include_sparsity:
         coloring._subjac_sparsity = sparsity
 
-    if stream is not None:
-        if stream is sys.stdout:
-            coloring._write_json(stream)
-        else:
-            coloring.save(stream)
-
-        if show_jac:
-            s = stream if stream.isatty() else sys.stdout
-            s.write("\n\n")
-            coloring.display(stream=s)
+    if fname is not None:
+        coloring.save(fname)
 
     return coloring
 
@@ -1477,14 +1467,16 @@ def dynamic_sparsity(driver):
     repeats = driver.options['dynamic_derivs_repeats']
 
     # save the sparsity.json file for later inspection
+    sparsity, _ = get_tot_jac_sparsity(problem, mode=problem._mode, repeats=repeats)
+
     with open("sparsity.json", "w") as f:
-        sparsity = get_tot_jac_sparsity(problem, mode=problem._mode, repeats=repeats, stream=f)
+        _write_sparsity(sparsity, f)
 
     driver.set_total_jac_sparsity(sparsity)
     driver._setup_tot_jac_sparsity()
 
 
-def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=False):
+def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False):
     """
     Compute simultaneous deriv coloring during runtime.
 
@@ -1496,8 +1488,6 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=F
         If True, call run_model before computing coloring.
     do_sparsity : bool
         If True, setup the total jacobian sparsity (needed by pyOptSparseDriver).
-    show_jac : bool
-        If True, display a visualization of the colored jacobian.
     """
     problem = driver._problem
     if not problem.model._use_derivatives:
@@ -1506,19 +1496,17 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False, show_jac=F
 
     driver._total_jac = None
 
+    coloring = compute_total_coloring(problem,
+                                      repeats=driver.options['dynamic_derivs_repeats'],
+                                      tol=1.e-15, include_sparsity=do_sparsity,
+                                      setup=False, run_model=run_model)
     # save the coloring.pkl file for later inspection
-    with open("coloring.pkl", "wb") as f:
-        coloring = compute_total_coloring(problem,
-                                          repeats=driver.options['dynamic_derivs_repeats'],
-                                          tol=1.e-15, include_sparsity=do_sparsity,
-                                          setup=False, run_model=run_model, show_jac=show_jac,
-                                          stream=f)
+    coloring.save('coloring.pkl')
+
     driver.set_coloring_spec(coloring)
     driver._setup_simul_coloring()
     if do_sparsity:
         driver._setup_tot_jac_sparsity()
-
-    coloring.summary(stream=sys.stdout)
 
 
 def _simul_coloring_setup_parser(parser):
@@ -1569,22 +1557,19 @@ def _simul_coloring_cmd(options):
     _use_sparsity = False
 
     def _simul_coloring(prob):
-        if options.outfile is None:
-            outfile = sys.stdout
-        else:
-            outfile = open(options.outfile, 'w')
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 coloring = compute_total_coloring(prob,
                                                   repeats=options.num_jacs, tol=options.tolerance,
-                                                  show_jac=options.show_jac,
                                                   include_sparsity=not options.no_sparsity,
                                                   setup=False, run_model=True,
-                                                  stream=outfile)
+                                                  fname=options.outfile)
 
             if sys.stdout.isatty():
+                if options.show_jac:
+                    coloring.display()
                 coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
@@ -1807,13 +1792,22 @@ def _sparsity_cmd(options):
     _use_sparsity = False
 
     def _sparsity(prob):
+        Problem._post_setup_func = None  # avoid recursive loop
+        _, J = get_tot_jac_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance,
+                                    mode=prob._mode, setup=True, run_model=True)
+
         if options.outfile is None:
             outfile = sys.stdout
         else:
             outfile = open(options.outfile, 'w')
-        Problem._post_setup_func = None  # avoid recursive loop
-        get_tot_jac_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance, mode=prob._mode,
-                             show_jac=options.show_jac, setup=True, run_model=True, stream=outfile)
+        _write_sparsity(sparsity, outfile)
+
+        if options.show_jac:
+            print("\n")
+            ofs = prob.driver._get_ordered_nl_responses()
+            wrts = list(prob.driver._designvars)
+            array_viz(J, prob, ofs, wrts)
+
         exit()
     return _sparsity
 

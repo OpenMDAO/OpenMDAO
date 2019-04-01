@@ -18,7 +18,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecCo
     ExplicitComponent, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
-from openmdao.utils.coloring import get_coloring_fname
+from openmdao.utils.coloring import get_coloring_fname, compute_total_coloring
 
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 
@@ -381,11 +381,12 @@ class TestCSStaticColoring(unittest.TestCase):
         model.comp.add_constraint('y1')
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
+        model.approx_totals(method=self.FD_METHOD)
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = model.compute_approx_coloring(wrt='*', method=self.FD_METHOD, directory=self.tempdir)
-
+        coloring = compute_total_coloring(prob)
+        coloring.save(get_coloring_fname(model, self.tempdir))
 
         prob = Problem()
         model = prob.model = Group()
@@ -396,7 +397,6 @@ class TestCSStaticColoring(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
-        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -437,7 +437,31 @@ class TestCSStaticColoring(unittest.TestCase):
         model.nonlinear_solver = NonlinearBlockGS()
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
-        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0')
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        model.approx_totals(method=self.FD_METHOD)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        coloring = compute_total_coloring(prob)
+        coloring.save(get_coloring_fname(model, self.tempdir))
+
+        prob = Problem()
+        model = prob.model = Group(dynamic_derivs_repeats=1)
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -446,16 +470,11 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
 
+        model.set_coloring_spec(get_coloring_fname(model, self.tempdir))
+
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-
-        start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
-        # one run per column of jac
-        nruns = comp._nruns - start_nruns
-        # wrts of size 5, 2 runs of the implicit comp per approx point run (1 for solver init and 1 for 1 solver iter)
-        self.assertEqual(nruns, 5 * 2)
 
         start_nruns = comp._nruns
         derivs = prob.driver._compute_totals()  # colored
@@ -482,6 +501,31 @@ class TestCSStaticColoring(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0', indices=[0,2])
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        model.approx_totals(method=self.FD_METHOD)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        coloring = compute_total_coloring(prob)
+        coloring.save(get_coloring_fname(model, self.tempdir))
+
+
+        prob = Problem()
+        model = prob.model = Group(dynamic_derivs_repeats=1)
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
         model.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -490,15 +534,12 @@ class TestCSStaticColoring(unittest.TestCase):
         model.comp.add_constraint('y1')
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
+
+        model.set_coloring_spec(get_coloring_fname(model, self.tempdir))
+
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-
-        start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
-        # one run per column of jac
-        nruns = comp._nruns - start_nruns
-        self.assertEqual(nruns, sparsity.shape[1])
 
         start_nruns = comp._nruns
         derivs = prob.driver._compute_totals()  # colored
@@ -527,6 +568,32 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0')
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0', indices=[0,2])
+        model.add_design_var('indeps.x1')
+        model.approx_totals(method=self.FD_METHOD)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        coloring = compute_total_coloring(prob)
+        coloring.save(get_coloring_fname(model, self.tempdir))
+
+
+        prob = Problem()
+        model = prob.model = Group(dynamic_derivs_repeats=1)
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                                  isplit=2, osplit=2))
         model.set_approx_coloring_meta('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -535,15 +602,12 @@ class TestCSStaticColoring(unittest.TestCase):
         model.comp.add_constraint('y1')
         model.add_design_var('indeps.x0', indices=[0,2])
         model.add_design_var('indeps.x1')
+
+        model.set_coloring_spec(get_coloring_fname(model, self.tempdir))
+
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-
-        start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
-        # one run per column of jac
-        nruns = comp._nruns - start_nruns
-        self.assertEqual(nruns, sparsity.shape[1] - 1)
 
         start_nruns = comp._nruns
         derivs = prob.driver._compute_totals()  # colored
@@ -581,15 +645,39 @@ class TestCSStaticColoring(unittest.TestCase):
         model.comp.add_constraint('y1')
         model.add_design_var('indeps.x0', indices=[0,2])
         model.add_design_var('indeps.x1')
+
+        model.approx_totals(method=self.FD_METHOD)
+
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
+        coloring = compute_total_coloring(prob)
+        coloring.save(get_coloring_fname(model, self.tempdir))
 
-        start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()  # uncolored, computing sparsity
-        # one run per column of jac
-        nruns = comp._nruns - start_nruns
-        self.assertEqual(nruns, sparsity.shape[1] - 1)
+
+        prob = Problem()
+        model = prob.model = Group(dynamic_derivs_repeats=1)
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                                  isplit=2, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0', indices=[0,2])
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0', indices=[0,2])
+        model.add_design_var('indeps.x1')
+
+        model.set_coloring_spec(get_coloring_fname(model, self.tempdir))
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
 
         start_nruns = comp._nruns
         derivs = prob.driver._compute_totals()  # colored

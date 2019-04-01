@@ -815,8 +815,7 @@ class System(object):
         pass
 
     def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
-                                repeats=2, perturb_size=1e-3,
-                                tol=1e-15, orders=5,
+                                repeats=2, perturb_size=1e-3, tol=1e-15,
                                 directory=None, fname=None, recurse=False):
         """
         Compute a coloring of the approximated derivatives.
@@ -845,8 +844,6 @@ class System(object):
         tol : float
             Tolerance used to determine if an array entry is zero or nonzero when computing
             sparsity.
-        orders : int
-            Number of orders +/- for the tolerance sweep when computing sparsity.
         directory : str or None
             If not None, the coloring for this system will be saved to the given directory.
             The file will be named as the system's pathname with dots replaced by underscores.
@@ -914,7 +911,7 @@ class System(object):
 
         info = self._approx_coloring_info
         sparsity, ordered_ofs, ordered_wrts = \
-            self._jacobian._compute_sparsity(self, info['wrt_matches'], tol=tol, orders=orders)
+            self._jacobian._compute_sparsity(self, info['wrt_matches'], tol=tol)
         self._jacobian._jac_summ = None  # reclaim the memory
 
         coloring = _compute_coloring(sparsity, 'fwd')

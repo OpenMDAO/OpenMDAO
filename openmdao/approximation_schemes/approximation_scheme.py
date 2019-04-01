@@ -248,19 +248,16 @@ class ApproximationScheme(object):
                     in_idx = np.asarray(system._owns_approx_wrt_idx[wrt], dtype=int)
                     if arr is not None:
                         in_idx += slices[wrt].start
-                    in_size = len(in_idx)
                 else:
-                    in_size = system._var_allprocs_abs2meta[wrt]['size']
                     if arr is None:
-                        in_idx = range(in_size)
+                        in_idx = range(system._var_allprocs_abs2meta[wrt]['size'])
                     else:
-                        in_idx = range(slices[wrt].start, slices[wrt].start + in_size)
+                        in_idx = range(slices[wrt].start, slices[wrt].stop)
 
                 # Directional derivatives for quick partial checking.
                 # We place the indices in a list so that they are all stepped at the same time.
                 if directional:
                     in_idx = [list(in_idx)]
-                    in_size = 1
 
                 tmpJ = _get_wrt_subjacs(system, approx)
                 tmpJ['@out_slices'] = out_slices
@@ -342,7 +339,7 @@ class ApproximationScheme(object):
                                                  data, results_array, total)
 
                         if is_parallel:
-                            for of, (oview, out_idxs) in iteritems(J['ofs']):
+                            for of, (oview, out_idxs, _, _) in iteritems(J['ofs']):
                                 if owns[of] == iproc:
                                     results[(of, wrt)].append(
                                         (i_count,
@@ -374,12 +371,11 @@ class ApproximationScheme(object):
             if mult != 1.0:
                 Jcolored.data *= mult
 
-        elif is_parallel:  # uncolored with parallel systems
-            results = _gather_jac_results(mycomm, results)
-
-        if colored_shape is not None:
             # convert COO matrix to dense for easier slicing
             Jcolored = Jcolored.toarray()
+
+        elif is_parallel:  # uncolored with parallel systems
+            results = _gather_jac_results(mycomm, results)
 
         for wrt, data, _, tmpJ, _, _ in approx_groups:
             if wrt is None:  # colored
@@ -387,17 +383,15 @@ class ApproximationScheme(object):
                 for key, slc in iteritems(tmpJ['@jac_slices']):
                     if uses_voi_indices:
                         jac._override_checks = True
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc], None, None)
                         jac._override_checks = False
                     else:
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
-
-                tmpJ['matrix'] = None  # reclaim memory
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc], None, None)
             else:
                 ofs = tmpJ[wrt]['ofs']
                 for of in ofs:
                     key = (of, wrt)
-                    oview, _ = ofs[of]
+                    oview, _, rows_reduced, cols_reduced = ofs[of]
                     if is_parallel:
                         for i, result in results[key]:
                             oview[:, i] = result
@@ -405,10 +399,10 @@ class ApproximationScheme(object):
                     oview *= mult
                     if uses_voi_indices:
                         jac._override_checks = True
-                        jac[key] = _from_dense(jacobian, key, oview)
+                        jac[key] = _from_dense(jacobian, key, oview, rows_reduced, cols_reduced)
                         jac._override_checks = False
                     else:
-                        jac[key] = _from_dense(jacobian, key, oview)
+                        jac[key] = _from_dense(jacobian, key, oview, rows_reduced, cols_reduced)
 
     def ncolors(self):
         """
@@ -426,7 +420,7 @@ class ApproximationScheme(object):
         return color_count
 
 
-def _from_dense(jac, key, subjac):
+def _from_dense(jac, key, subjac, reduced_rows=_full_slice, reduced_cols=_full_slice):
     """
     Convert given subjac from a dense array to whatever form matches our internal subjac.
 
@@ -445,7 +439,10 @@ def _from_dense(jac, key, subjac):
     meta = jac._subjacs_info[key]
     val = meta['value']
     if meta['rows'] is not None:   # internal format is our home grown COO
-        return subjac[meta['rows'], meta['cols']]
+        if reduced_rows is not _full_slice or reduced_cols is not _full_slice:
+            return subjac[reduced_rows, reduced_cols]
+        else:
+            return subjac[meta['rows'], meta['cols']]
     elif isinstance(val, np.ndarray):
         return subjac
     elif isinstance(val, coo_matrix):
@@ -487,18 +484,23 @@ def _get_wrt_subjacs(system, approxs):
     abs2meta = system._var_allprocs_abs2meta
     approx_of_idx = system._owns_approx_of_idx
     approx_wrt_idx = system._owns_approx_wrt_idx
+    approx_of = system._owns_approx_of
     iproc = system.comm.rank
 
     J = {}
     ofdict = {}
+    nondense = {}
 
     for key, options in approxs:
         of, wrt = key
+        if 'rows' in options and options['rows'] is not None:
+            nondense[key] = options
         if wrt not in J:
-            J[wrt] = {'ofs': [], 'tot_rows': 0, 'directional': options['directional']}
+            J[wrt] = {'ofs': set(), 'tot_rows': 0, 'directional': options['directional']}
 
-        if of not in ofdict:
-            J[wrt]['ofs'].append(of)
+        tmpJ = None
+        if of not in ofdict and (approx_of is None or (approx_of and of in approx_of)):
+            J[wrt]['ofs'].add(of)
             if of in approx_of_idx:
                 out_idx = approx_of_idx[of]
                 out_size = len(out_idx)
@@ -509,25 +511,44 @@ def _get_wrt_subjacs(system, approxs):
             J[wrt]['tot_rows'] += out_size
 
     for wrt in J:
-        lst = J[wrt]['ofs']
-        J[wrt]['ofs'] = wrt_ofs = OrderedDict()
+        unsorted_ofs = J[wrt]['ofs']
+        J[wrt]['ofs'] = wrt_ofs = {}
+        wrt_idx = approx_wrt_idx.get(wrt, _full_slice)
 
         # create dense array to contain all nonzero subjacs for this wrt
         if J[wrt]['directional']:
             J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], 1))
-        elif wrt in approx_wrt_idx:
-            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], len(approx_wrt_idx[wrt])))
+        elif wrt_idx is not _full_slice:
+            J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], len(wrt_idx)))
         else:
             J[wrt]['data'] = arr = np.zeros((J[wrt]['tot_rows'], abs2meta[wrt]['size']))
 
         # sort ofs into the proper order to match outputs/resids vecs
         start = end = 0
-        sorted_ofs = sorted(lst, key=lambda n: abs2idx[n])
+        if system._owns_approx_of:
+            sorted_ofs = [n for n in system._owns_approx_of if n in unsorted_ofs]
+        else:
+            sorted_ofs = sorted(unsorted_ofs, key=lambda n: abs2idx[n])
+
         for of in sorted_ofs:
+            key = (of, wrt)
             osize, oidx = ofdict[of]
             end += osize
+            # if needed, compute reduced row idxs and col idxs
+            if key in nondense and (oidx is not _full_slice or wrt_idx is not _full_slice):
+                # TODO: also need to handle scipy sparse matrices
+                rows = nondense[key]['rows']
+                cols = nondense[key]['cols']
+                Jfull = np.zeros(nondense[key]['shape'], dtype=bool)
+                Jfull[rows, cols] = True
+                Jreduced = Jfull[oidx, wrt_idx]
+                rows_reduced, cols_reduced = np.nonzero(Jreduced)
+                Jfull = Jreduced = None
+            else:
+                rows_reduced = cols_reduced = None
+
             # store subview corresponding to the (of, wrt) subjac and any index info
-            wrt_ofs[of] = (arr[start:end, :], oidx)
+            wrt_ofs[of] = (arr[start:end, :], oidx, rows_reduced, cols_reduced)
             start = end
 
         if len(sorted_ofs) != len(system._var_allprocs_abs_names['output']):
