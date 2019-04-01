@@ -110,11 +110,24 @@ class ImplicitComponent(Component):
         Provide initial guess for states.
         """
         self._inputs.read_only = self._residuals.read_only = True
+        complex_step = self._inputs._under_complex_step
 
         try:
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+                if complex_step:
+                    self._inputs.set_complex_step_mode(False, keep_real=True)
+                    self._outputs.set_complex_step_mode(False, keep_real=True)
+                    self._residuals.set_complex_step_mode(False, keep_real=True)
                 self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
         finally:
+            if complex_step:
+                # Note: passing in False swaps back to the complex vector, which is valid since
+                # the inputs and residuals value cannot be edited.
+                self._inputs.set_complex_step_mode(False)
+                self._inputs._under_complex_step = True
+                self._outputs.set_complex_step_mode(True)
+                self._residuals.set_complex_step_mode(False)
+                self._residuals._under_complex_step = True
             self._inputs.read_only = self._residuals.read_only = False
 
     def _apply_linear(self, jac, vec_names, rel_systems, mode, scope_out=None, scope_in=None):
