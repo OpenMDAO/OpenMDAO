@@ -19,12 +19,11 @@ class DistributedAdder(ExplicitComponent):
     Distributes the work of adding 10 to every item in the param vector
     """
 
-    def __init__(self, size):
-        super(DistributedAdder, self).__init__()
-
+    def initialize(self):
         self.options['distributed'] = True
 
-        self.local_size = self.size = size
+        self.options.declare('size', types=int, default=1,
+                             desc="Size of input and output vectors.")
 
     def setup(self):
         """
@@ -37,9 +36,8 @@ class DistributedAdder(ExplicitComponent):
 
         # NOTE: evenly_distrib_idxs is a helper function to split the array
         #       up as evenly as possible
-        sizes, offsets = evenly_distrib_idxs(comm.size, self.size)
+        sizes, offsets = evenly_distrib_idxs(comm.size,self.options['size'])
         local_size, local_offset = sizes[rank], offsets[rank]
-        self.local_size = local_size
 
         start = local_offset
         end = local_offset + local_size
@@ -62,14 +60,14 @@ class Summer(ExplicitComponent):
     vector addition and computes a total
     """
 
-    def __init__(self, size):
-        super(Summer, self).__init__()
-        self.size = size
+    def initialize(self):
+        self.options.declare('size', types=int, default=1,
+                             desc="Size of input and output vectors.")
 
     def setup(self):
         # NOTE: this component depends on the full y array, so OpenMDAO
         #       will automatically gather all the values for it
-        self.add_input('y', val=np.zeros(self.size))
+        self.add_input('y', val=np.zeros(self.options['size']))
         self.add_output('sum', 0.0, shape=1)
 
     def compute(self, inputs, outputs):
@@ -78,7 +76,7 @@ class Summer(ExplicitComponent):
 
 @unittest.skipIf(PETScVector is None, "PETSc is required.")
 @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
-class DistributedAdderTest(unittest.TestCase):
+class DistributedListVarsTest(unittest.TestCase):
 
     N_PROCS = 2
 
@@ -90,8 +88,8 @@ class DistributedAdderTest(unittest.TestCase):
         prob.model = Group()
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
-        prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
-        prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
+        prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
+        prob.model.add_subsystem('summer', Summer(size=size), promotes=['y', 'sum'])
 
         prob.setup(check=False)
 
