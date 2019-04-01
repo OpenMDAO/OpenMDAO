@@ -874,8 +874,8 @@ class TestGroupComplexStep(unittest.TestCase):
                           'test_array_comp_'+'_'.join(title(a) for a in p.args))
     def test_array_comp(self, vec_class):
 
-        #if not vec_class:
-        #   raise unittest.SkipTest("PETSc is not installed")
+        if not vec_class:
+            raise unittest.SkipTest("PETSc is not installed")
 
         class DoubleArrayFD(DoubleArrayComp):
 
