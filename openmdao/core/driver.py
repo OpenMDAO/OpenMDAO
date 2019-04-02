@@ -76,7 +76,7 @@ class Driver(object):
         Dict of lists of var names indicating what to record
     _model_viewer_data : dict
         Structure of model, used to make n2 diagram.
-    _simul_coloring_info : tuple of dicts
+    _total_coloring_info : tuple of dicts
         A data structure describing coloring for simultaneous derivs.
     _total_jac_sparsity : dict, str, or None
         Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
@@ -162,7 +162,7 @@ class Driver(object):
         self._model_viewer_data = None
         self.cite = ""
 
-        self._simul_coloring_info = None
+        self._total_coloring_info = None
         self._total_jac_sparsity = None
         self._res_jacs = {}
         self._total_jac = None
@@ -274,7 +274,7 @@ class Driver(object):
         self._remote_responses.update(self._remote_objs)
 
         # set up simultaneous deriv coloring
-        if (coloring_mod._use_sparsity and self._simul_coloring_info and
+        if (coloring_mod._use_sparsity and self._total_coloring_info and
                 self.supports['simultaneous_derivatives']):
             self._setup_simul_coloring()
 
@@ -916,7 +916,7 @@ class Driver(object):
 
         """
         if self.supports['simultaneous_derivatives']:
-            self._simul_coloring_info = simul_info
+            self._total_coloring_info = simul_info
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
@@ -985,27 +985,27 @@ class Driver(object):
             simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
 
-        if isinstance(self._simul_coloring_info, string_types):
-            self._simul_coloring_info = coloring_mod.Coloring.load(self._simul_coloring_info)
+        if isinstance(self._total_coloring_info, string_types):
+            self._total_coloring_info = coloring_mod.Coloring.load(self._total_coloring_info)
 
-        if self._simul_coloring_info._rev and problem._orig_mode not in ('rev', 'auto'):
-            revcol = self._simul_coloring_info._rev[0][0]
+        if self._total_coloring_info._rev and problem._orig_mode not in ('rev', 'auto'):
+            revcol = self._total_coloring_info._rev[0][0]
             if revcol:
                 raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
-        if self._simul_coloring_info._fwd and problem._orig_mode not in ('fwd', 'auto'):
-            fwdcol = self._simul_coloring_info._fwd[0][0]
+        if self._total_coloring_info._fwd and problem._orig_mode not in ('fwd', 'auto'):
+            fwdcol = self._total_coloring_info._fwd[0][0]
             if fwdcol:
                 raise RuntimeError("Simultaneous coloring does forward solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
 
-        # simul_coloring_info can contain data for either fwd, rev, or both, along with optional
+        # total_coloring_info can contain data for either fwd, rev, or both, along with optional
         # sparsity patterns
-        sparsity = self._simul_coloring_info._subjac_sparsity
+        sparsity = self._total_coloring_info._subjac_sparsity
 
         if sparsity is not None:
             if self._total_jac_sparsity is not None:
-                raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
+                raise RuntimeError("Total jac sparsity was set in both _total_coloring_info"
                                    " and _total_jac_sparsity.")
             self._total_jac_sparsity = sparsity
 

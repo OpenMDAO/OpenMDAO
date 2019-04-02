@@ -20,16 +20,16 @@ Simultaneous derivative coloring in OpenMDAO can be performed either statically 
 
 When mode is set to 'fwd' or 'rev', a unidirectional coloring algorithm is used to group columns
 or rows, respectively, for simultaneous derivative calculation.  The algorithm used in this case
-is the greedy algorithm with ordering by incidence degree found in 
+is the greedy algorithm with ordering by incidence degree found in
 T. F. Coleman and J. J. More, *Estimation of sparse Jacobian matrices and graph coloring
 problems*, SIAM J. Numer. Anal., 20 (1983), pp. 187–209.
 
-When using simultaneous derivatives, setting `mode='auto'` will indicate that bidirectional coloring 
-should be used.  Bidirectional coloring can significantly decrease the number of linear solves needed 
+When using simultaneous derivatives, setting `mode='auto'` will indicate that bidirectional coloring
+should be used.  Bidirectional coloring can significantly decrease the number of linear solves needed
 to generate the total Jacobian relative to coloring only in fwd or rev mode.
 
 For more information on the bidirectional coloring algorithm, see
-T. F. Coleman and A. Verma, *The efficient computation of sparse Jacobian matrices using automatic 
+T. F. Coleman and A. Verma, *The efficient computation of sparse Jacobian matrices using automatic
 differentiation*, SIAM J. Sci. Comput., 19 (1998), pp. 1210–1233.
 
 .. note::
@@ -161,7 +161,7 @@ coloring of your model. So care must be taken to keep the coloring up to date wh
 you change your model.
 
 To streamline the process, OpenMDAO provides an automatic coloring algorithm that uses the
-sparsity pattern given by the :ref:`declare_partials <feature_sparse_partials>` calls from all 
+sparsity pattern given by the :ref:`declare_partials <feature_sparse_partials>` calls from all
 of the components in your model.
 So you should :ref:`specify the sparsity of the partial derivatives<feature_sparse_partials>`
 of your components in order to make it possible to find a more optimal automatic coloring
@@ -357,9 +357,9 @@ The coloring will be written in json format to the given file and can be loaded 
     prob.driver.set_simul_deriv_color('my_coloring.json')
 
 
-If you run *openmdao simul_coloring* and it turns out there is no simultaneous coloring available,
-or that you don't gain very much by coloring, don't be surprised.  Not all total Jacobians are 
-sparse enough to benefit signficantly from simultaneous derivatives.
+If you run *openmdao total_coloring* and it turns out there is no simultaneous total coloring
+available, or that you don't gain very much by coloring, don't be surprised.  Not all total
+Jacobians are sparse enough to benefit signficantly from simultaneous derivatives.
 
 
 Checking that it works

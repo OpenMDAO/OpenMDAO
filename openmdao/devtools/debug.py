@@ -131,7 +131,7 @@ def _get_color_printer(stream=sys.stdout, colors=True, rank=0):
     return color_print, Fore, Back, Style
 
 
-def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
+def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=True,
          filter=None, max_depth=0, rank=0, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.
@@ -149,6 +149,8 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
         If True, include jacobian types in the tree.
     show_colors : bool
         If True and stream is a terminal that supports it, display in color.
+    show_approx : bool
+        If True, mark systems that are approximating their derivatives.
     filter : function(System)
         A function taking a System arg and returning None or an iter of (name, value) tuples.
         If None is returned, that system will not be displayed.  Otherwise, the system will
@@ -216,6 +218,10 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
                     cprint(" NL_jac: ")
                     cprint(type(jacsolvers[0]._assembled_jac).__name__,
                            color=Fore.MAGENTA + Style.BRIGHT)
+
+        if show_approx:
+            if s._approx_schemes:
+                cprint("  APPROX: %s" % list(s._approx_schemes))
 
         cprint('', end='\n')
 

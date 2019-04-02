@@ -817,7 +817,7 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        coloring_info = driver._simul_coloring_info
+        coloring_info = driver._total_coloring_info
         if coloring_info and coloring._use_sparsity:
             # if we're using simultaneous derivatives then our effective size is less
             # than the full size

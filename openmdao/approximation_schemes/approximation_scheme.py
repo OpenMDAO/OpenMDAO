@@ -360,13 +360,12 @@ class ApproximationScheme(object):
                 allcols = np.hstack(cols for _, cols, _ in Jcolored if cols)
                 alldata = np.hstack(dat for _, _, dat in Jcolored if dat)
 
-                Jcolored = coo_matrix((alldata, (allrows, allcols)),
-                                      shape=colored_shape)
+                Jcolored = coo_matrix((alldata, (allrows, allcols)), shape=colored_shape)
 
             elif is_parallel:
                 raise NotImplementedError("colored FD/CS over parallel groups not supported yet")
             else:  # serial colored
-                Jcolored = coo_matrix((jdata, (jrows, jcols)))
+                Jcolored = coo_matrix((jdata, (jrows, jcols)), shape=colored_shape)
 
             if mult != 1.0:
                 Jcolored.data *= mult

@@ -217,7 +217,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
                          (p_color.model._solve_count - 21) / 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
-    def test_dynamic_simul_coloring_snopt_auto(self):
+    def test_dynamic_total_coloring_snopt_auto(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
@@ -235,7 +235,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
                          (p_color.model._solve_count - 21 * 4) / 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
-    def test_dynamic_simul_coloring_snopt_auto_assembled(self):
+    def test_dynamic_total_coloring_snopt_auto_assembled(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'auto', assemble_type='dense', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'auto', assemble_type='dense', optimizer='SNOPT', print_results=False,
@@ -335,7 +335,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21) / 5)
 
-    def test_dynamic_simul_coloring_pyoptsparse_slsqp_auto(self):
+    def test_dynamic_total_coloring_pyoptsparse_slsqp_auto(self):
         try:
             from pyoptsparse import OPT
         except ImportError:
@@ -692,7 +692,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does forward solves but mode has been set to 'rev'")
 
-    def test_dynamic_simul_coloring_auto(self):
+    def test_dynamic_total_coloring_auto(self):
 
         # first, run w/o coloring
         p = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
@@ -877,7 +877,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does reverse solves but mode has been set to 'fwd'")
 
-    def test_dynamic_simul_coloring(self):
+    def test_dynamic_total_coloring(self):
 
         p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_simul_derivs=True)
         p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
@@ -893,7 +893,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         self.assertEqual((p.model._solve_count - 1) / 22,
                          (p_color.model._solve_count - 1 - 22 * 3) / 11)
 
-    def test_dynamic_simul_coloring_no_derivs(self):
+    def test_dynamic_total_coloring_no_derivs(self):
         with self.assertRaises(Exception) as context:
             p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False,
                               dynamic_simul_derivs=True, derivs=False)

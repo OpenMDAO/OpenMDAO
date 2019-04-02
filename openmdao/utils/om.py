@@ -9,7 +9,7 @@ import argparse
 from six import iteritems
 
 from openmdao.core.problem import Problem
-from openmdao.utils.coloring import _simul_coloring_setup_parser, _simul_coloring_cmd, \
+from openmdao.utils.coloring import _total_coloring_setup_parser, _total_coloring_cmd, \
     _sparsity_setup_parser, _sparsity_cmd, _partial_coloring_setup_parser, _partial_coloring_cmd
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
@@ -360,7 +360,7 @@ _post_setup_map = {
     'summary': (_config_summary_setup_parser, _config_summary_cmd),
     'tree': (_tree_setup_parser, _tree_cmd),
     'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
-    'simul_coloring': (_simul_coloring_setup_parser, _simul_coloring_cmd),
+    'total_coloring': (_total_coloring_setup_parser, _total_coloring_cmd),
     'partial_coloring': (_partial_coloring_setup_parser, _partial_coloring_cmd),
     'sparsity': (_sparsity_setup_parser, _sparsity_cmd),
     'cite': (_cite_setup_parser, _cite_cmd),

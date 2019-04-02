@@ -193,7 +193,7 @@ class _TotalJacInfo(object):
                     break
             else:
                 has_lin_cons = False
-                self.simul_coloring = driver._simul_coloring_info
+                self.simul_coloring = driver._total_coloring_info
 
                 # if we don't get wrt and of from driver, turn off coloring
                 if self.simul_coloring is not None and (wrt != driver_wrt or of != driver_of):

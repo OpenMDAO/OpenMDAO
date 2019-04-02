@@ -44,7 +44,7 @@ CITATIONS = """
 
 # If this is True, then IF simul coloring/sparsity is specified, use it.
 # If False, don't use it regardless.
-# The command line simul_coloring and sparsity commands make this False when generating a
+# The command line total_coloring and sparsity commands make this False when generating a
 # new coloring and/or sparsity.
 _use_sparsity = True
 
@@ -1085,7 +1085,7 @@ def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_m
         A boolean composite of 'repeats' total jacobians.
     """
     # clear out any old simul coloring info
-    prob.driver._simul_coloring_info = None
+    prob.driver._total_coloring_info = None
     prob.driver._res_jacs = {}
 
     if setup:
@@ -1400,7 +1400,7 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15,
                 mode = 'fwd'
             else:
                 mode = problem._orig_mode
-        if mode != problem._orig_mode:
+        if mode != problem._orig_mode and mode != problem._mode:
             raise RuntimeError("given mode (%s) does not agree with Problem mode (%s)" %
                                (mode, problem._mode))
 
@@ -1476,7 +1476,7 @@ def dynamic_sparsity(driver):
     driver._setup_tot_jac_sparsity()
 
 
-def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False):
+def dynamic_total_coloring(driver, run_model=True, do_sparsity=False):
     """
     Compute simultaneous deriv coloring during runtime.
 
@@ -1509,9 +1509,9 @@ def dynamic_simul_coloring(driver, run_model=True, do_sparsity=False):
         driver._setup_tot_jac_sparsity()
 
 
-def _simul_coloring_setup_parser(parser):
+def _total_coloring_setup_parser(parser):
     """
-    Set up the openmdao subparser for the 'openmdao simul_coloring' command.
+    Set up the openmdao subparser for the 'openmdao total_coloring' command.
 
     Parameters
     ----------
@@ -1534,9 +1534,9 @@ def _simul_coloring_setup_parser(parser):
                         help="Do profiling on the coloring process.")
 
 
-def _simul_coloring_cmd(options):
+def _total_coloring_cmd(options):
     """
-    Return the post_setup hook function for 'openmdao simul_coloring'.
+    Return the post_setup hook function for 'openmdao total_coloring'.
 
     Parameters
     ----------
@@ -1556,7 +1556,7 @@ def _simul_coloring_cmd(options):
 
     _use_sparsity = False
 
-    def _simul_coloring(prob):
+    def _total_coloring(prob):
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
 
@@ -1574,7 +1574,7 @@ def _simul_coloring_cmd(options):
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
-    return _simul_coloring
+    return _total_coloring
 
 
 def get_coloring_fname(system, directory=None, fname=None):
@@ -1634,10 +1634,15 @@ def _partial_coloring_setup_parser(parser):
                         help='pathname of system to color or to start recursing from if --recurse'
                         ' is set.')
     parser.add_argument('-c', '--class', action='append', dest='classes', default=[],
-                        help='compute a coloring for the first occurrence of the given class. '
+                        help='compute a coloring for instances of the given class. '
                         'This option may be be used multiple times to specify multiple classes. '
                         'Class name can optionally contain the full module path. '
                         'Not compatible with the --recurse option.')
+    parser.add_argument('--first_only', action='store_true', dest='first_only',
+                        help="If using the --class option, only generate coloring for the first "
+                        "instance found for each class.")
+    parser.add_argument('--activate', action='store_true', dest='activate',
+                        help="Activate the computed coloring(s) and continue running the script.")
     parser.add_argument('--method', action='store', dest='method',
                         help='approximation method ("fd" or "cs").')
     parser.add_argument('--step', action='store', dest='step',
@@ -1648,8 +1653,6 @@ def _partial_coloring_setup_parser(parser):
     parser.add_argument('--perturbation', action='store', dest='perturb_size', default=1e-3,
                         type=float, help='random perturbation size used when computing sparsity.')
     parser.add_argument('--sparsity_tol', action='store', dest='tol', default=1e-15, type=float,
-                        help='tolerance used to determine nonzero entries when computing sparsity.')
-    parser.add_argument('--orders', action='store', dest='orders', default=5, type=int,
                         help='tolerance used to determine nonzero entries when computing sparsity.')
     parser.add_argument('-n', action='store', dest='repeats', default=3, type=int,
                         help='number of times to repeat derivative computation when '
@@ -1676,7 +1679,7 @@ def _get_partial_coloring_kwargs(options):
                                "specified.")
 
     kwargs = {}
-    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol', 'orders', 'directory',
+    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol', 'directory',
              'fname', 'recurse')
     for name in names:
         if getattr(options, name):
@@ -1708,6 +1711,7 @@ def _partial_coloring_cmd(options):
     _use_sparsity = False
 
     def _partial_coloring(prob):
+        global _use_sparsity
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
 
@@ -1716,6 +1720,7 @@ def _partial_coloring_cmd(options):
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 if options.system == '':
                     system = prob.model
+                    _initialize_model_approx(system, prob.driver)
                 else:
                     system = prob.model.get_subsystem(options.system)
                 if system is None:
@@ -1730,25 +1735,37 @@ def _partial_coloring_cmd(options):
                             klass = s.__class__.__name__
                             mod = s.__class__.__module__
                             if c == klass or c == '.'.join([mod, klass]):
-                                to_find.remove(c)
+                                if c in to_find:
+                                    to_find.remove(c)
                                 coloring = s.compute_approx_coloring(**kwargs)
+                                print("Approx coloring for '%s' (class %s)\n" % (s.pathname, klass))
+                                if options.show_jac:
+                                    coloring.display()
+                                coloring.summary()
+                                print('\n')
+                                if options.activate:
+                                    s.set_coloring_spec(coloring)
+                                    s._setup_static_approx_coloring()
                                 break
-                        if not to_find:
+                        if not to_find and options.first_only:
                             break
                     else:
-                        raise RuntimeError("Failed to find any instance of classes %s" %
-                                           sorted(to_find))
+                        if to_find:
+                            raise RuntimeError("Failed to find any instance of classes %s" %
+                                               sorted(to_find))
                 else:
                     coloring = system.compute_approx_coloring(**kwargs)
 
-            if options.show_jac:
-                coloring.display()
+                    if options.show_jac:
+                        coloring.display()
 
-            if sys.stdout.isatty():
-                coloring.summary()
+                    coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
-        exit()
+        if options.activate:
+            _use_sparsity = True
+        else:
+            exit()
     return _partial_coloring
 
 
