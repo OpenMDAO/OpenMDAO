@@ -79,7 +79,7 @@ class OptionsDictionary(object):
                 types = "N/A"
 
             elif types is not None:
-                if not isinstance(types, (tuple, list)):
+                if not isinstance(types, (set, tuple, list)):
                     types = (types,)
 
                 types = [type_.__name__ for type_ in types]
@@ -88,7 +88,7 @@ class OptionsDictionary(object):
                 values = "N/A"
 
             elif values is not None:
-                if not isinstance(values, (tuple, list)):
+                if not isinstance(values, (set, tuple, list)):
                     values = (values,)
 
                 values = [value for value in values]
@@ -211,11 +211,18 @@ class OptionsDictionary(object):
             # If only types is declared
             elif types is not None:
                 if not isinstance(value, types):
-                    vtype = type(value)
+                    vtype = type(value).__name__
+
                     if isinstance(value, string_types):
                         value = "'{}'".format(value)
-                    raise TypeError("Value ({}) of option '{}' has type of ({}), but "
-                                    "expected type ({}).".format(value, name, vtype, types))
+
+                    if isinstance(types, (set, tuple, list)):
+                        typs = tuple([type_.__name__ for type_ in types])
+                        raise TypeError("Value ({}) of option '{}' has type '{}', but one of "
+                                        "types {} was expected.".format(value, name, vtype, typs))
+                    else:
+                        raise TypeError("Value ({}) of option '{}' has type '{}', but type '{}' "
+                                        "was expected.".format(value, name, vtype, types.__name__))
 
             if upper is not None:
                 if value > upper:
@@ -274,6 +281,7 @@ class OptionsDictionary(object):
         if values is not None and not isinstance(values, (set, list, tuple)):
             raise TypeError("In declaration of option '%s', the 'values' arg must be of type None,"
                             " list, or tuple - not %s." % (name, values))
+
         if types is not None and not isinstance(types, (type, set, list, tuple)):
             raise TypeError("In declaration of option '%s', the 'types' arg must be None, a type "
                             "or a tuple - not %s." % (name, types))
@@ -281,6 +289,9 @@ class OptionsDictionary(object):
         if types is not None and values is not None:
             raise RuntimeError("'types' and 'values' were both specified for option '%s'." %
                                name)
+
+        if types is bool:
+            values = (True, False)
 
         default_provided = default is not _undefined
 
