@@ -158,7 +158,7 @@ class TestForDocs(unittest.TestCase):
 
     def test(self):
         """
-        A simple example to compute power as the dot-product of force and velocity vectors
+        A simple example to compute power as the dot product of force and velocity vectors
         at 100 points simultaneously.
         """
         import numpy as np
