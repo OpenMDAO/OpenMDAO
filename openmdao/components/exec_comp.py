@@ -209,8 +209,7 @@ class ExecComp(ExplicitComponent):
         options = {}
         for name in _disallowed_names:
             if name in kwargs:
-                options[name] = kwargs[name]
-                kwargs.pop(name)
+                options[name] = kwargs.pop(name)
 
         super(ExecComp, self).__init__(**options)
 
