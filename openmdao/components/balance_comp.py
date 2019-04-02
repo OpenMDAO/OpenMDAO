@@ -26,7 +26,7 @@ class BalanceComp(ImplicitComponent):
         """
         Declare options.
         """
-        self.options.declare('guess_func', types=(FunctionType), allow_none=True, default=None,
+        self.options.declare('guess_func', types=FunctionType, allow_none=True, default=None,
                              desc='A callable function in the form f(inputs, outputs, residuals) '
                                   'that can provide an initial "guess" value of the state '
                                   'variable(s) based on the inputs, outputs and residuals.')
