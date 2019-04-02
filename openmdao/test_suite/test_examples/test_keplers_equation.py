@@ -17,7 +17,7 @@ class TestKeplersEquation(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, \
             ExecComp, DirectSolver, NewtonSolver
 
-        prob = Problem(model=Group())
+        prob = Problem()
 
         ivc = IndepVarComp()
 
@@ -33,12 +33,13 @@ class TestKeplersEquation(unittest.TestCase):
 
         bal = BalanceComp()
 
-        def guess_function(inputs, outputs, residuals):
-            # Use M (mean anomaly) as the initial guess for E (eccentric anomaly)
-            return inputs['M']
+        bal.add_balance(name='E', val=0.0, units='rad', eq_units='rad', rhs_name='M')
 
-        bal.add_balance(name='E', val=0.0, units='rad', eq_units='rad', rhs_name='M',
-                        guess_func=guess_function)
+        # Use M (mean anomaly) as the initial guess for E (eccentric anomaly)
+        def guess_function(inputs, outputs, residuals):
+            outputs['E'] = inputs['M']
+
+        bal.options['guess_func'] = guess_function
 
         # ExecComp used to compute the LHS of Kepler's equation.
         lhs_comp = ExecComp('lhs=E - ecc * sin(E)',
@@ -46,7 +47,8 @@ class TestKeplersEquation(unittest.TestCase):
                             E={'value': 0.0, 'units': 'rad'},
                             ecc={'value': 0.0})
 
-        prob.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['M', 'ecc'])
+        prob.model.add_subsystem(name='ivc', subsys=ivc,
+                                 promotes_outputs=['M', 'ecc'])
 
         prob.model.add_subsystem(name='balance', subsys=bal,
                                  promotes_inputs=['M'],
@@ -58,11 +60,9 @@ class TestKeplersEquation(unittest.TestCase):
         # Explicit connections
         prob.model.connect('lhs_comp.lhs', 'balance.lhs:E')
 
-        # Setup solvers
+        # Set up solvers
         prob.model.linear_solver = DirectSolver()
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['maxiter'] = 100
-        prob.model.nonlinear_solver.options['iprint'] = 0
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -72,8 +72,6 @@ class TestKeplersEquation(unittest.TestCase):
         prob.run_model()
 
         assert_almost_equal(np.degrees(prob['E']), 115.9, decimal=1)
-
-        print('E (deg) = ', np.degrees(prob['E'][0]))
 
 
 if __name__ == "__main__":
