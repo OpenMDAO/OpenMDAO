@@ -8,7 +8,7 @@ from openmdao.api import Problem, Group, IndepVarComp, CrossProductComp
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class TestDotProductCompNx3(unittest.TestCase):
+class TestCrossProductCompNx3(unittest.TestCase):
 
     def setUp(self):
         self.n = 5
@@ -63,7 +63,7 @@ class TestDotProductCompNx3(unittest.TestCase):
                                                desired=cpd[comp][var, wrt]['J_fd'],
                                                decimal=6)
 
-class TestDotProductCompNx3x1(unittest.TestCase):
+class TestCrossProductCompNx3x1(unittest.TestCase):
 
     def setUp(self):
         self.nn = 5
@@ -118,7 +118,7 @@ class TestDotProductCompNx3x1(unittest.TestCase):
                                                desired=cpd[comp][var, wrt]['J_fd'],
                                                decimal=6)
 
-class TestDotProductCompNonVectorized(unittest.TestCase):
+class TestCrossProductCompNonVectorized(unittest.TestCase):
 
     def setUp(self):
         self.p = Problem(model=Group())
