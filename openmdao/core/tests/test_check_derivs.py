@@ -13,6 +13,7 @@ from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, \
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
+from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives
@@ -1457,6 +1458,32 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(mycomp.exec_count, 10)
 
         assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
+
+    def test_bug_local_method(self):
+        # This fixes a bug setting the check method on a component overrode the requested method for
+        # subsequent components.
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('comp1', Paraboloid())
+        fdcomp = model.add_subsystem('comp2', Paraboloid())
+        model.add_subsystem('comp3', Paraboloid())
+
+        fdcomp.set_check_partial_options(wrt='*', method='fd')
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        data = prob.check_partials(method='cs', out_stream=None)
+
+        # Comp1 and Comp3 are complex step, so have tighter tolerances.
+        for key, val in iteritems(data['comp1']):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
+        for key, val in iteritems(data['comp2']):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+        for key, val in iteritems(data['comp3']):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
 
 
 class TestCheckPartialsFeature(unittest.TestCase):
