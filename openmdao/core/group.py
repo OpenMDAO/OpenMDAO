@@ -5,6 +5,7 @@ from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
 from numbers import Number
 import inspect
+import copy
 
 from six import iteritems, string_types, itervalues
 from six.moves import range
@@ -713,7 +714,8 @@ class Group(System):
             for vec_name in self._lin_rel_vec_name_list:
                 sizes = self._var_sizes[vec_name]
                 for type_ in ['input', 'output']:
-                    self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                    sizes_in = copy.deepcopy(sizes[type_][iproc, :])
+                    self.comm.Allgather(sizes_in, sizes[type_])
 
             # compute owning ranks
             owns = self._owning_rank
