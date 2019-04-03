@@ -403,7 +403,7 @@ class Component(System):
                                       if k in self._subjacs_info)
             approx = self._get_approx_scheme(info['method'])
             # remove any uncolored matching approximations
-            new_list = [tup for tup in approx._exec_list if tup[0][1] in wrt_matches]
+            new_list = [tup for tup in approx._exec_list if tup[0][1] not in wrt_matches]
             approx._exec_list = new_list
             approx.add_approximation((None, None), colmeta)
             approx._approx_groups = None  # force a re-init of approximations

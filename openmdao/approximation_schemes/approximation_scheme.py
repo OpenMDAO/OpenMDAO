@@ -544,7 +544,7 @@ def _get_wrt_subjacs(system, approxs):
                 rows_reduced, cols_reduced = np.nonzero(Jreduced)
                 Jfull = Jreduced = None
             else:
-                rows_reduced = cols_reduced = None
+                rows_reduced = cols_reduced = _full_slice
 
             # store subview corresponding to the (of, wrt) subjac and any index info
             wrt_ofs[of] = (arr[start:end, :], oidx, rows_reduced, cols_reduced)
