@@ -1,11 +1,15 @@
 
 .. _dotproductcomp_feature:
 
+.. meta::
+   :description: OpenMDAO Feature doc for DotProductComp, which performs a dot product on two inputs
+   :keywords: dot product, DotProductComp
+
 **************
 DotProductComp
 **************
 
-`DotProductComp` performs a dot-product between two compatible inputs.  It may be vectorized to provide the result at one or more points simultaneously.
+`DotProductComp` performs a dot product between two compatible inputs.  It may be vectorized to provide the result at one or more points simultaneously.
 
 .. math::
 
@@ -37,6 +41,6 @@ Note that no internal checks are performed to ensure that `c_units` are consiste
 with `a_units` and `b_units`.
 
 .. embed-code::
-    openmdao.components.tests.test_cross_product_comp.TestForDocs.test
+    openmdao.components.tests.test_dot_product_comp.TestForDocs.test
 
 .. tags:: DotProductComp, Component

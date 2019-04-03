@@ -9,7 +9,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 
 class CrossProductComp(ExplicitComponent):
     """
-    Compute a vectorized dot product.
+    Compute a vectorized cross product.
 
     math::
         c = np.cross(a, b)
@@ -32,7 +32,7 @@ class CrossProductComp(ExplicitComponent):
         Declare options.
         """
         self.options.declare('vec_size', types=int, default=1,
-                             desc='The number of points at which the dot product is computed')
+                             desc='The number of points at which the cross product is computed')
         self.options.declare('a_name', types=string_types, default='a',
                              desc='The variable name for vector a.')
         self.options.declare('b_name', types=string_types, default='b',
@@ -85,7 +85,7 @@ class CrossProductComp(ExplicitComponent):
 
     def compute(self, inputs, outputs):
         """
-        Compute the dot product of inputs `a` and `b` using np.cross.
+        Compute the cross product of inputs `a` and `b` using np.cross.
 
         Parameters
         ----------
