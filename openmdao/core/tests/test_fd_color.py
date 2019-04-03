@@ -240,6 +240,56 @@ class TestCSStaticColoring(unittest.TestCase):
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
 
+    def test_simple_partials_explicit_shape_bug(self):
+        prob = Problem()
+        model = prob.model
+
+        # create sparsity with last row and col all zeros.
+        # bug happened when we created a COO matrix without supplying shape
+        sparsity = np.array(
+                [[1, 0, 0, 1, 1, 1, 0],
+                 [0, 1, 0, 1, 0, 1, 0],
+                 [0, 1, 0, 1, 1, 1, 0],
+                 [1, 0, 0, 0, 0, 1, 0],
+                 [0, 0, 0, 0, 0, 0, 0]], dtype=float
+            )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.random.random(4))
+        indeps.add_output('x1', np.random.random(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        # comp.set_approx_coloring_meta('x*', method=self.FD_METHOD, directory=self.tempdir)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        coloring = comp.compute_approx_coloring(wrt='x*', method=self.FD_METHOD, directory=self.tempdir)
+
+        # now make a second problem to use the coloring
+        prob = Problem()
+        model = prob.model
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        comp.set_coloring_spec(get_coloring_fname(comp, self.tempdir))
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        comp._linearize()
+
     def test_simple_partials_implicit_static(self):
         prob = Problem()
         model = prob.model
@@ -388,6 +438,7 @@ class TestCSStaticColoring(unittest.TestCase):
         coloring = compute_total_coloring(prob)
         coloring.save(get_coloring_fname(model, self.tempdir))
 
+        # new Problem, loading the coloring we just computed
         prob = Problem()
         model = prob.model = Group()
 
