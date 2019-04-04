@@ -1012,7 +1012,7 @@ class BidirectionalTestCase(unittest.TestCase):
                              "%d" % (n, tot_colors, n))
 
     def test_arrowhead(self):
-        for n in range(5, 50, 55):
+        for n in [55, 50, 5]:
             builder = TotJacBuilder(n, n)
             builder.add_row(0)
             builder.add_col(0)
