@@ -518,6 +518,19 @@ class Solver(object):
         # shut down all recorders
         self._rec_mgr.shutdown()
 
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        pass
+
 
 class NonlinearSolver(Solver):
     """
@@ -749,19 +762,6 @@ class LinearSolver(Solver):
                                  self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.stack.pop()
-
-    def _set_complex_step_mode(self, active):
-        """
-        Turn on or off complex stepping mode.
-
-        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
-
-        Parameters
-        ----------
-        active : bool
-            Complex mode flag; set to True prior to commencing complex step.
-        """
-        pass
 
 
 class BlockLinearSolver(LinearSolver):

@@ -100,7 +100,7 @@ class SimpleGADriver(Driver):
                              'every unspecified variable is assumed to be integer, and the number '
                              'of bits is calculated automatically. If you have a continuous var, '
                              'you should set a bits value as a key in this dictionary.')
-        self.options.declare('elitism', default=True,
+        self.options.declare('elitism', types=bool, default=True,
                              desc='If True, replace worst performing point with best from previous'
                              ' generation each iteration.')
         self.options.declare('max_gen', default=100,
@@ -108,7 +108,7 @@ class SimpleGADriver(Driver):
         self.options.declare('pop_size', default=0,
                              desc='Number of points in the GA. Set to 0 and it will be computed '
                              'as four times the number of bits.')
-        self.options.declare('run_parallel', default=False,
+        self.options.declare('run_parallel', types=bool, default=False,
                              desc='Set to True to execute the points in a generation in parallel.')
         self.options.declare('procs_per_model', default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')

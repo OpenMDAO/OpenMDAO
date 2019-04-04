@@ -153,18 +153,13 @@ class BalanceComp(ImplicitComponent):
         """
         for name, options in iteritems(self._state_vars):
 
+            meta = self.add_output(name, **options['kwargs'])
+
+            n = self._state_vars[name]['size'] = meta['size']
+
             for s in ('lhs', 'rhs', 'mult'):
                 if options['{0}_name'.format(s)] is None:
                     options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
-
-            val = options['kwargs'].get('val', np.ones(1))
-            if isinstance(val, Number):
-                n = 1
-            else:
-                n = len(val)
-            self._state_vars[name]['size'] = n
-
-            self.add_output(name, **options['kwargs'])
 
             self.add_input(options['lhs_name'],
                            val=np.ones(n),
@@ -202,6 +197,11 @@ class BalanceComp(ImplicitComponent):
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
+        if inputs._under_complex_step:
+            self._scale_factor = self._scale_factor.astype(np.complex)
+        else:
+            self._scale_factor = self._scale_factor.real
+
         for name, options in iteritems(self._state_vars):
             lhs = inputs[options['lhs_name']]
             rhs = inputs[options['rhs_name']]
@@ -236,6 +236,11 @@ class BalanceComp(ImplicitComponent):
         jacobian : Jacobian
             sub-jac components written to jacobian[output_name, input_name]
         """
+        if inputs._under_complex_step:
+            self._dscale_drhs = self._dscale_drhs.astype(np.complex)
+        else:
+            self._dscale_drhs = self._dscale_drhs.real
+
         for name, options in iteritems(self._state_vars):
             lhs_name = options['lhs_name']
             rhs_name = options['rhs_name']

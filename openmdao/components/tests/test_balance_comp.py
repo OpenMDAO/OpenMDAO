@@ -2,9 +2,11 @@ from __future__ import print_function, division, absolute_import
 
 import os
 import unittest
+import warnings
 
 import numpy as np
 from numpy.testing import assert_almost_equal
+
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
     NewtonSolver, DirectSolver
 from openmdao.api import BalanceComp
@@ -304,6 +306,79 @@ class TestBalanceComp(unittest.TestCase):
 
         for (of, wrt) in cpd['balance']:
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+
+    def test_shape(self):
+        n = 100
+
+        bal = BalanceComp()
+        bal.add_balance('x', shape=(n,))
+
+        tgt = IndepVarComp(name='y_tgt', val=4*np.ones(n))
+
+        exe = ExecComp('y=x**2', x=np.zeros(n), y=np.zeros(n))
+
+        model = Group()
+
+        model.add_subsystem('tgt', tgt, promotes_outputs=['y_tgt'])
+        model.add_subsystem('exe', exe)
+        model.add_subsystem('bal', bal)
+
+        model.connect('y_tgt', 'bal.rhs:x')
+        model.connect('bal.x', 'exe.x')
+        model.connect('exe.y', 'bal.lhs:x')
+
+        model.linear_solver = DirectSolver(assemble_jac=True)
+        model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
+
+        prob = Problem(model)
+        prob.setup()
+
+        prob['bal.x'] = np.random.rand(n)
+
+        prob.run_model()
+
+        assert_almost_equal(prob['bal.x'], 2.0*np.ones(n), decimal=7)
+
+    def test_complex_step(self):
+
+        n = 1
+
+        prob = Problem(model=Group(assembled_jac_type='dense'))
+
+        bal = BalanceComp()
+
+        bal.add_balance('x')
+
+        tgt = IndepVarComp(name='y_tgt', val=4)
+
+        exec_comp = ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
+
+        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('y_tgt', 'balance.rhs:x')
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.linear_solver = DirectSolver(assemble_jac=True)
+
+        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
+
+        prob.setup(force_alloc_complex=True)
+
+        prob['balance.x'] = np.random.rand(n)
+
+        prob.run_model()
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action="error", category=np.ComplexWarning)
+            cpd = prob.check_partials(out_stream=None, method='cs')
+
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=10)
 
     def test_scalar(self):
 
