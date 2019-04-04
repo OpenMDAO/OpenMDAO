@@ -153,18 +153,13 @@ class BalanceComp(ImplicitComponent):
         """
         for name, options in iteritems(self._state_vars):
 
+            meta = self.add_output(name, **options['kwargs'])
+
+            n = self._state_vars[name]['size'] = meta['size']
+
             for s in ('lhs', 'rhs', 'mult'):
                 if options['{0}_name'.format(s)] is None:
                     options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
-
-            val = options['kwargs'].get('val', np.ones(1))
-            if isinstance(val, Number):
-                n = 1
-            else:
-                n = len(val)
-            self._state_vars[name]['size'] = n
-
-            self.add_output(name, **options['kwargs'])
 
             self.add_input(options['lhs_name'],
                            val=np.ones(n),
