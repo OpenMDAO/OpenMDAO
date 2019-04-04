@@ -1601,8 +1601,7 @@ class Group(System):
             self._residuals._under_complex_step = True
 
             self._outputs.set_complex_step_mode(True)
-            self._outputs._data[:] += imag_cache*1j
-
+            self._outputs._data[:] += imag_cache * 1j
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         """
