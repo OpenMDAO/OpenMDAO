@@ -26,6 +26,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
+from openmdao.recorders.case_reader import CaseReader
 
 # Toolbar settings
 _FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
@@ -153,28 +154,7 @@ def _get_viewer_data(data_source):
             return {}
 
     elif isinstance(data_source, str):
-        check_valid_sqlite3_db(data_source)
-        import sqlite3
-        con = sqlite3.connect(data_source, detect_types=sqlite3.PARSE_DECLTYPES)
-        cur = con.cursor()
-        cur.execute("SELECT format_version FROM metadata")
-        row = cur.fetchone()
-        format_version = row[0]
-
-        cur.execute("SELECT model_viewer_data FROM driver_metadata;")
-        model_text = cur.fetchone()
-
-        from six import PY2, PY3
-        if row is not None:
-            if format_version >= 3:
-                return json.loads(model_text[0])
-            elif format_version in (1, 2):
-                if PY2:
-                    import cPickle
-                    return cPickle.loads(str(model_text[0]))
-                if PY3:
-                    import pickle
-                    return pickle.loads(model_text[0])
+        return CaseReader(data_source).problem_metadata
 
     else:
         raise TypeError('_get_viewer_data only accepts Problems, Groups or filenames')
