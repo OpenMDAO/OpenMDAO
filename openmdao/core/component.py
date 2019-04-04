@@ -854,6 +854,11 @@ class Component(System):
         meta['dependent'] = dependent
         if has_diag_jac:
             meta['has_diag_jac'] = has_diag_jac
+
+        # If only one of rows/cols is specified
+        if (rows is None) ^ (cols is None):
+            raise ValueError('If one of rows/cols is specified, then both must be specified')
+
         if dependent:
             meta['value'] = val
             if rows is not None:
@@ -875,10 +880,6 @@ class Component(System):
                     raise RuntimeError("%s: declare_partials has been called with rows and cols "
                                        "that specify the following duplicate subjacobian entries: "
                                        "%s." % (self.pathname, sorted(dups)))
-
-        # If only one of rows/cols is specified
-        if (rows is None) ^ (cols is None):
-            raise ValueError('If one of rows/cols is specified, then both must be specified')
 
         if rows is not None:
             # check for repeated rows/cols indices

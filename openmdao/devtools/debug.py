@@ -219,9 +219,17 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
                     cprint(type(jacsolvers[0]._assembled_jac).__name__,
                            color=Fore.MAGENTA + Style.BRIGHT)
 
-        if show_approx:
-            if s._approx_schemes:
-                cprint("  APPROX: %s" % list(s._approx_schemes))
+        if show_approx and s._approx_schemes:
+            approx_keys = set()
+            keys = set()
+            for k, sjac in iteritems(s._subjacs_info):
+                if 'method' in sjac and sjac['method']:
+                    approx_keys.add(k)
+                else:
+                    keys.add(k)
+            diff = approx_keys - keys
+            cprint("  APPROX: ", color=Fore.MAGENTA + Style.BRIGHT)
+            cprint("%s (%d of %d)" % (list(s._approx_schemes), len(diff), len(s._subjacs_info)))
 
         cprint('', end='\n')
 

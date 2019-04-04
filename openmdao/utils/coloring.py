@@ -914,14 +914,12 @@ def MNCO_bidir(J):
             Jc_rows[r] = M_cols[M_rows == r]
             Jc_nz_max = max(nnz_r, Jc_nz_max)
 
-            keep = M_rows != r
-            M_rows = M_rows[keep]
-            M_cols = M_cols[keep]
-
-            M_row_nonzeros[r] = ncols + 2  # make sure we don't pick this one again
+            M_row_nonzeros[r] = ncols + 1  # make sure we don't pick this one again
             M_col_nonzeros[Jc_rows[r]] -= 1
 
+            keep = M_rows != r
             r = M_row_nonzeros.argmin()
+            c = M_col_nonzeros.argmin()
             nnz_r = M_row_nonzeros[r]
 
             row_i += 1
@@ -929,17 +927,18 @@ def MNCO_bidir(J):
             Jr_cols[c] = M_rows[M_cols == c]
             Jr_nz_max = max(nnz_c, Jr_nz_max)
 
-            keep = M_cols != c
-            M_rows = M_rows[keep]
-            M_cols = M_cols[keep]
-
-            M_col_nonzeros[c] = nrows + 2  # make sure we don't pick this one again
+            M_col_nonzeros[c] = nrows + 1  # make sure we don't pick this one again
             M_row_nonzeros[Jr_cols[c]] -= 1
 
+            keep = M_cols != c
+            r = M_row_nonzeros.argmin()
             c = M_col_nonzeros.argmin()
             nnz_c = M_col_nonzeros[c]
 
             col_i += 1
+
+        M_rows = M_rows[keep]
+        M_cols = M_cols[keep]
 
     nnz_Jc = nnz_Jr = 0
     jac = np.zeros(J.shape, dtype=bool)
