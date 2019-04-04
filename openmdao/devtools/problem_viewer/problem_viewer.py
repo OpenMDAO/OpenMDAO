@@ -56,6 +56,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['component_type'] = 'explicit'
         else:
             tree_dict['component_type'] = None
+
         component_execution_orders[system.pathname] = component_execution_index[0]
         component_execution_index[0] += 1
 
@@ -181,6 +182,9 @@ def _get_viewer_data(data_source):
 
         count = 0
         edges_list = []
+        sys_pathnames_dict = {}
+        sys_pathnames_list = []
+
         for li in scc_list:
             if src_subsystem in li and tgt_subsystem in li:
                 count += 1
@@ -196,7 +200,24 @@ def _get_viewer_data(data_source):
                 for edge in subg.edges():
                     edge_str = ' '.join(edge)
                     if edge_str != src_to_tgt_str:
-                        edges_list.append(edge_str)
+                        src, tgt = edge
+
+                        # replace src & tgt pathnames with indices into pathname list
+                        if src in sys_pathnames_dict:
+                            src = sys_pathnames_dict[src]
+                        else:
+                            sys_pathnames_list.append(src)
+                            src = len(sys_pathnames_list) - 1
+
+                        if tgt in sys_pathnames_dict:
+                            tgt = sys_pathnames_dict[tgt]
+                        else:
+                            sys_pathnames_list.append(tgt)
+                            tgt = len(sys_pathnames_list) - 1
+
+                        assert(edge_str == ' '.join([sys_pathnames_list[src], sys_pathnames_list[tgt]]))
+
+                        edges_list.append((src, tgt))
 
         if edges_list:
             edges_list.sort()  # make deterministic so same .html file will be produced each run
@@ -205,6 +226,7 @@ def _get_viewer_data(data_source):
         else:
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
 
+    data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list
 
     data_dict['abs2prom'] = root_group._var_abs2prom
