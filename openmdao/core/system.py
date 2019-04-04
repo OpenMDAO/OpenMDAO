@@ -2932,6 +2932,9 @@ class System(object):
                 if sub.linear_solver:
                     sub.linear_solver._set_complex_step_mode(active)
 
+                if sub.nonlinear_solver:
+                    sub.nonlinear_solver._set_complex_step_mode(active)
+
                 if sub._owns_approx_jac:
                     sub._jacobian.set_complex_step_mode(active)
 

@@ -560,7 +560,7 @@ class Vector(object):
         print('-' * 35)
         print()
 
-    def set_complex_step_mode(self, active):
+    def set_complex_step_mode(self, active, keep_real=False):
         """
         Turn on or off complex stepping mode.
 
@@ -571,9 +571,16 @@ class Vector(object):
         ----------
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
+
+        keep_real : bool
+            When this flag is True, keep the real value when turning off complex step. You only
+            need to do this when temporarily disabling complex step for guess_nonlinear.
         """
         if active:
             self._cplx_data[:] = self._data
+
+        elif keep_real:
+            self._cplx_data[:] = self._data.real
 
         self._data, self._cplx_data = self._cplx_data, self._data
         self._views, self._cplx_views = self._cplx_views, self._views
