@@ -2,12 +2,13 @@ from __future__ import print_function, division, absolute_import
 
 import os
 import unittest
+import warnings
 
 import numpy as np
 from numpy.testing import assert_almost_equal
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
-    NewtonSolver, DirectSolver
-from openmdao.api import BalanceComp
+
+from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, DirectSolver, \
+     BalanceComp
 
 
 class TestBalanceComp(unittest.TestCase):
@@ -337,7 +338,7 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['bal.x'], 2.0*np.ones(n), decimal=7)
 
-    def test_scalar(self):
+    def test_complex_step(self):
 
         n = 1
 
@@ -365,18 +366,18 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
 
         prob['balance.x'] = np.random.rand(n)
 
         prob.run_model()
 
-        assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
-
-        cpd = prob.check_partials(out_stream=None)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action="error", category=np.ComplexWarning)
+            cpd = prob.check_partials(out_stream=None, method='cs')
 
         for (of, wrt) in cpd['balance']:
-            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=10)
 
     def test_scalar_with_guess_func(self):
 
