@@ -1527,6 +1527,8 @@ def _total_coloring_setup_parser(parser):
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
                         help="Display a visualization of the final jacobian used to "
                         "compute the coloring.")
+    parser.add_argument('--activate', action='store_true', dest='activate',
+                        help="Activate the computed coloring and continue running the script.")
     parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
                         help="Exclude the sparsity structure from the coloring data structure.")
     parser.add_argument('--profile', action='store_true', dest='profile',
@@ -1556,22 +1558,33 @@ def _total_coloring_cmd(options):
     _use_sparsity = False
 
     def _total_coloring(prob):
+        global _use_sparsity
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
+            do_sparsity = not options.no_sparsity
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 coloring = compute_total_coloring(prob,
                                                   repeats=options.num_jacs, tol=options.tolerance,
-                                                  include_sparsity=not options.no_sparsity,
+                                                  include_sparsity=do_sparsity,
                                                   setup=False, run_model=True,
                                                   fname=options.outfile)
 
             if options.show_jac:
                 coloring.display()
             coloring.summary()
+            if options.activate:
+                prob.driver.set_coloring_spec(coloring)
+                prob.driver._setup_simul_coloring()
+                if do_sparsity:
+                    prob.driver._setup_tot_jac_sparsity()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
-        exit()
+            exit()
+        if options.activate:
+            _use_sparsity = True
+        else:
+            exit()
     return _total_coloring
 
 
