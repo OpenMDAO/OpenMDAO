@@ -63,10 +63,10 @@ class NonlinearBlockGS(NonlinearSolver):
                              desc='lower limit for Aitken relaxation factor')
         self.options.declare('aitken_max_factor', default=1.5,
                              desc='upper limit for Aitken relaxation factor')
-        self.options.declare('cs_reconverge', default=True,
+        self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
-        self.options.declare('use_apply_nonlinear', False,
+        self.options.declare('use_apply_nonlinear', types=bool, default=False,
                              desc="Set to True to always call apply_linear on the solver's system "
                              "after solve_nonlinear has been called.")
 

@@ -113,7 +113,7 @@ class Component(System):
         """
         super(Component, self)._declare_options()
 
-        self.options.declare('distributed', False,
+        self.options.declare('distributed', types=bool, default=False,
                              desc='True if the component has variables that are distributed '
                                   'across multiple processes.')
 

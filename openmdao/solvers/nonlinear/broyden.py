@@ -105,7 +105,7 @@ class BroydenSolver(NonlinearSolver):
                              desc="Value to scale the starting Jacobian, which is Identity. This "
                                   "option does nothing if you compute the initial Jacobian "
                                   "instead.")
-        self.options.declare('compute_jacobian', default=True,
+        self.options.declare('compute_jacobian', types=bool, default=True,
                              desc="When True, compute an initial Jacobian, otherwise start "
                                   "with Identity scaled by alpha. Further Jacobians may also be "
                                   "computed depending on the other options.")
@@ -114,7 +114,7 @@ class BroydenSolver(NonlinearSolver):
                                   "convergence is considered a failure. The Jacobian will be "
                                   "regenerated once this condition has been reached a number of "
                                   "consecutive times as specified in max_converge_failures.")
-        self.options.declare('cs_reconverge', default=True,
+        self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
         self.options.declare('diverge_limit', default=2.0,

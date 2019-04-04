@@ -140,7 +140,7 @@ class KSComp(ExplicitComponent):
         self.options.declare('width', types=int, default=1, desc='Width of constraint vector.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='The number of rows to independently aggregate.')
-        self.options.declare('lower_flag', False,
+        self.options.declare('lower_flag', types=bool, default=False,
                              desc="Set to True to reverse sign of input constraints.")
         self.options.declare('rho', 50.0, desc="Constraint Aggregation Factor.")
         self.options.declare('upper', 0.0, desc="Upper bound for constraint, default is zero.")

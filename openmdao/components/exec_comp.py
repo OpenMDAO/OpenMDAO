@@ -19,8 +19,27 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
                  'flat_src_indices'}
 
-# Names that are not allowed for input or output variables
-_disallowed_names = {'units'}
+# Names that are not allowed for input or output variables (keywords for options)
+_disallowed_names = {'vectorize', 'units', 'shape'}
+
+
+def check_option(option, value):
+    """
+    Check option for validity.
+
+    Parameters
+    ----------
+    option : str
+        The name of the option
+    value : any
+        The value of the option
+
+    Raises
+    ------
+    ValueError
+    """
+    if option is 'units' and value is not None and not valid_units(value):
+        raise ValueError("The units '%s' are invalid." % value)
 
 
 def array_idx_iter(shape):
@@ -59,7 +78,27 @@ class ExecComp(ExplicitComponent):
 
     """
 
-    def __init__(self, exprs, vectorize=False, units=None, **kwargs):
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('vectorize', types=bool, default=False,
+                             desc='If True, treat all array/array partials as diagonal if both '
+                                  'arrays have size > 1. All arrays with size > 1 must have the '
+                                  'same flattened size or an exception will be raised.')
+
+        self.options.declare('units', types=str, allow_none=True, default=None,
+                             desc='Units to be assigned to all variables in this component. '
+                                  'Default is None, which means units are provided for variables '
+                                  'individually.',
+                             check_valid=check_option)
+
+        self.options.declare('shape', types=(int, tuple, list), allow_none=True, default=None,
+                             desc='Shape to be assigned to all variables in this component. '
+                                  'Default is None, which means shape is provided for variables '
+                                  'individually.')
+
+    def __init__(self, exprs=[], **kwargs):
         r"""
         Create a <Component> using only an expression string.
 
@@ -131,15 +170,6 @@ class ExecComp(ExplicitComponent):
             standard Python operators, a subset of numpy and scipy functions
             is supported.
 
-        vectorize : bool
-            If True, treat all array/array partials as diagonal if both arrays have size > 1.
-            All arrays with size > 1 must have the same flattened size or an exception will be
-            raised.
-
-        units : str or None
-            Units to be assigned to all variables in this component.
-            Default is None, which means units are provided for variables individually.
-
         **kwargs : dict of named args
             Initial values of variables can be set by setting a named
             arg with the var name.  If the value is a dict it is assumed
@@ -175,14 +205,13 @@ class ExecComp(ExplicitComponent):
                               x={'value': numpy.ones(10,dtype=float),
                                  'units': 'ft'})
         """
-        super(ExecComp, self).__init__()
+        # separate disallowed var names from kwargs, pass them as options to __init__
+        options = {}
+        for name in _disallowed_names:
+            if name in kwargs:
+                options[name] = kwargs.pop(name)
 
-        # Check that units arg is valid
-        if units is not None:
-            if not isinstance(units, str):
-                raise TypeError('The units argument should be a str or None.')
-            if not valid_units(units):
-                raise ValueError("The units '%s' are invalid." % units)
+        super(ExecComp, self).__init__(**options)
 
         # if complex step is used for derivatives, this is the stepsize
         self.complex_stepsize = 1.e-40
@@ -193,18 +222,21 @@ class ExecComp(ExplicitComponent):
         self._exprs = exprs[:]
         self._codes = None
         self._kwargs = kwargs
-        self._vectorize = vectorize
-        self._units = units
 
     def setup(self):
         """
         Set up variable name and metadata lists.
         """
+        if not self._exprs:
+            raise RuntimeError("%s: No valid expressions provided to ExecComp(): %s."
+                               % (self.pathname, self._exprs))
         outs = set()
         allvars = set()
         exprs = self._exprs
         kwargs = self._kwargs
-        units = self._units
+
+        units = self.options['units']
+        shape = self.options['shape']
 
         # find all of the variables and which ones are outputs
         for expr in exprs:
@@ -240,18 +272,32 @@ class ExecComp(ExplicitComponent):
                     else:
                         kwargs2[arg]['units'] = units
 
+                if shape is not None:
+                    if 'shape' in val and val['shape'] != shape:
+                        raise RuntimeError("%s: shape of %s has been specified for "
+                                           "variable '%s', but shape of %s has been "
+                                           "specified for the entire component." %
+                                           (self.pathname, val['shape'], arg, shape))
+                    elif 'value' in val and np.atleast_1d(val['value']).shape != shape:
+                        raise RuntimeError("%s: value of shape %s has been specified for "
+                                           "variable '%s', but shape of %s has been "
+                                           "specified for the entire component." %
+                                           (self.pathname, np.atleast_1d(val['value']).shape,
+                                            arg, shape))
+                    else:
+                        init_vals[arg] = np.ones(shape)
+
                 if 'value' in val:
                     init_vals[arg] = val['value']
                     del kwargs2[arg]['value']
 
                 if 'shape' in val:
-                    shape = val['shape']
                     if arg not in init_vals:
-                        init_vals[arg] = np.ones(shape)
-                    elif shape != np.atleast_1d(init_vals[arg]).shape:
+                        init_vals[arg] = np.ones(val['shape'])
+                    elif np.atleast_1d(init_vals[arg]).shape != val['shape']:
                         raise RuntimeError("%s: shape of %s has been specified for variable "
                                            "'%s', but a value of shape %s has been provided." %
-                                           (self.pathname, str(shape), arg,
+                                           (self.pathname, str(val['shape']), arg,
                                             str(np.atleast_1d(init_vals[arg]).shape)))
                     del kwargs2[arg]['shape']
             else:
@@ -263,14 +309,15 @@ class ExecComp(ExplicitComponent):
                 val = init_vals[var]
             else:
                 init_vals[var] = val = 1.0
-            meta = kwargs2.get(var, {'units': units})
+
+            meta = kwargs2.get(var, {'units': units, 'shape': shape})
 
             if var in outs:
                 self.add_output(var, val, **meta)
             else:
                 self.add_input(var, val, **meta)
 
-        if self._vectorize:
+        if self.options['vectorize']:
             # check that sizes of any input/output vars match or one of them is size 1
             osorted = sorted(self._var_rel_names['output'])
             for inp in sorted(self._var_rel_names['input']):
@@ -387,6 +434,7 @@ class ExecComp(ExplicitComponent):
         step = self.complex_stepsize * 1j
         out_names = self._var_allprocs_prom2abs_list['output']
         inv_stepsize = 1.0 / self.complex_stepsize
+        vectorize = self.options['vectorize']
 
         for param in inputs:
 
@@ -395,7 +443,7 @@ class ExecComp(ExplicitComponent):
             psize = pval.size
             pwrap[param] = np.asarray(pval, npcomplex)
 
-            if self._vectorize or psize == 1:
+            if vectorize or psize == 1:
                 # set a complex param value
                 pwrap[param] += step
 
