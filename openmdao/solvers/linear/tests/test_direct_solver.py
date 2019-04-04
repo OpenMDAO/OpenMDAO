@@ -576,15 +576,16 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
                 self.nonlinear_solver = NewtonSolver()
                 self.linear_solver = DirectSolver()
 
-        prob = Problem(model=Rectifier())
+        prob = Problem()
+        prob.model.add_subsystem('sub', Rectifier())
 
         prob.setup(check=False)
-        prob.set_solver_print(level=2)
+        prob.set_solver_print(level=0)
 
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Identical rows or columns found in jacobian. Problem is underdetermined."
+        expected_msg = "Identical rows or columns found in jacobian in 'sub'. Problem is underdetermined."
 
         self.assertEqual(expected_msg, str(cm.exception))
 

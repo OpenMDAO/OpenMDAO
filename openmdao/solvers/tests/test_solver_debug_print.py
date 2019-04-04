@@ -44,9 +44,12 @@ nonlinear_solvers = [
 
 class TestNonlinearSolvers(unittest.TestCase):
     def setUp(self):
+        import re
+        import os
+        from tempfile import mkdtemp
         # perform test in temporary directory
         self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='test_solver')
+        self.tempdir = mkdtemp(prefix='test_solver')
         os.chdir(self.tempdir)
 
         # iteration coordinate, file name and variable data are common for all tests
@@ -81,10 +84,13 @@ class TestNonlinearSolvers(unittest.TestCase):
         ])
 
     def tearDown(self):
+        import os
+        from shutil import rmtree
+
         # clean up the temporary directory
         os.chdir(self.startdir)
         try:
-            shutil.rmtree(self.tempdir)
+            rmtree(self.tempdir)
         except OSError:
             pass
 
@@ -145,6 +151,8 @@ class TestNonlinearSolvers(unittest.TestCase):
             self.assertEqual(f.read(), self.expected_data)
 
     def test_solver_debug_print_feature(self):
+        from distutils.version import LooseVersion
+        import numpy as np
         from openmdao.api import Problem, IndepVarComp, NewtonSolver, AnalysisError
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
         from openmdao.utils.general_utils import printoptions

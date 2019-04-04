@@ -15,9 +15,11 @@ from openmdao.utils.assert_utils import assert_rel_error
 
 class CacheLinearTestCase(unittest.TestCase): 
 
-    def test_feature_cache_linear(self): 
+    def test_feature_cache_linear(self):
 
-        import numpy as np 
+        from distutils.version import LooseVersion
+        import numpy as np
+        import scipy
         from scipy.sparse.linalg import gmres
 
         from openmdao.api import ImplicitComponent, Group, IndepVarComp, Problem

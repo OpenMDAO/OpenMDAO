@@ -207,9 +207,9 @@ class pyOptSparseDriver(Driver):
         con_meta = self._cons
         model_ran = False
         if optimizer in run_required or np.any([con['linear'] for con in itervalues(self._cons)]):
-            with RecordingDebugging(optimizer, self.iter_count, self) as rec:
+            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 # Initial Run
-                self.run_solve_nonlinear()
+                model.run_solve_nonlinear()
                 rec.abs = 0.0
                 rec.rel = 0.0
                 model_ran = True
@@ -371,8 +371,8 @@ class pyOptSparseDriver(Driver):
         for name in indep_list:
             self.set_design_var(name, dv_dict[name])
 
-        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
-            self.run_solve_nonlinear()
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+            model.run_solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
@@ -425,10 +425,10 @@ class pyOptSparseDriver(Driver):
             # print(dv_dict)
 
             # Execute the model
-            with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
+            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
                 try:
-                    self.run_solve_nonlinear()
+                    model.run_solve_nonlinear()
 
                 # Let the optimizer try to handle the error
                 except AnalysisError:
@@ -547,7 +547,7 @@ class pyOptSparseDriver(Driver):
         str
             The name of the current optimizer.
         """
-        return self.options['optimizer']
+        return "pyOptSparse_" + self.options['optimizer']
 
     def _get_ordered_nl_responses(self):
         """

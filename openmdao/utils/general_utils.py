@@ -212,7 +212,7 @@ def ensure_compatible(name, value, shape=None, indices=None):
         if np.isscalar(value) or value.shape == (1,):
             value = np.ones(shape) * value
         else:
-            value = np.atleast_1d(value)
+            value = np.atleast_1d(value).astype(np.float64)
             if value.shape != shape:
                 raise ValueError("Incompatible shape for '%s': "
                                  "Expected %s but got %s." %

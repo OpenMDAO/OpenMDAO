@@ -111,7 +111,7 @@ class Component(System):
         """
         super(Component, self)._declare_options()
 
-        self.options.declare('distributed', False,
+        self.options.declare('distributed', types=bool, default=False,
                              desc='True if the component has variables that are distributed '
                                   'across multiple processes.')
 
@@ -855,10 +855,26 @@ class Component(System):
         if has_diag_jac:
             meta['has_diag_jac'] = has_diag_jac
         if dependent:
+            meta['value'] = val
             if rows is not None:
                 meta['rows'] = rows
                 meta['cols'] = cols
-            meta['value'] = val
+
+                # First, check the length of rows and cols to catch this easy mistake and give a
+                # clear message.
+                if len(cols) != len(rows):
+                    msg = "{0}: declare_partials has been called with rows and cols, which" + \
+                          " should be arrays of equal length, but rows is length {1} while " + \
+                          "cols is length {2}."
+                    raise RuntimeError(msg.format(self.pathname, len(rows), len(cols)))
+
+                # Check for repeated rows/cols indices.
+                idxset = set(zip(rows, cols))
+                if len(rows) - len(idxset) > 0:
+                    dups = [n for n, val in iteritems(Counter(zip(rows, cols))) if val > 1]
+                    raise RuntimeError("%s: declare_partials has been called with rows and cols "
+                                       "that specify the following duplicate subjacobian entries: "
+                                       "%s." % (self.pathname, sorted(dups)))
 
         # If only one of rows/cols is specified
         if (rows is None) ^ (cols is None):

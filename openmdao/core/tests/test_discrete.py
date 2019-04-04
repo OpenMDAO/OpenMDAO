@@ -15,9 +15,7 @@ from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeD
     ImplicitComponent, ParallelGroup, BroydenSolver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDerivatives
-from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
-     SellarNoDerivatives, SellarDerivatives, SellarStateConnection, StateConnection, \
+from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 
 class ModCompEx(ExplicitComponent):
@@ -394,6 +392,7 @@ class DiscretePromTestCase(unittest.TestCase):
 
 class DiscreteFeatureTestCase(unittest.TestCase):
     def test_feature_discrete(self):
+        import numpy as np
         from openmdao.api import Problem, IndepVarComp, ExplicitComponent
 
         class BladeSolidity(ExplicitComponent):

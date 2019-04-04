@@ -6,9 +6,18 @@
 BalanceComp
 ***********
 
-`BalanceComp` is a specialized implementation of `ImplicitComponent` that
-is intended to provide a simple way to implement most implicit equations
-without the need to define your own residuals.
+`BalanceComp` is a specialized implementation of :ref:`ImplicitComponent <comp-type-3-implicitcomp>`
+that is intended to provide a simple way to implement most implicit equations without the need to 
+define your own residuals.
+
+BalanceComp Options
+--------------------
+
+.. embed-options::
+    openmdao.components.balance_comp
+    BalanceComp
+    options
+
 
 `BalanceComp` allows you to add one or more state variables and its associated
 implicit equations.  For each ``balance`` added to the component it
@@ -110,8 +119,10 @@ they need not be connected.
 Example:  Providing an Initial Guess for a State Variable
 ---------------------------------------------------------
 
-As mentioned above, there is an optional argument to :code:`add_balance` called :code:`guess_func` which can
-provide an initial guess for a state variable.
+`BalanceComp` has a :code:`guess_func` option that can be used to supply an initial guess 
+value for the state variables.  This option provides the same functionality as the 
+:meth:`guess_nonlinear <openmdao.core.implicitcomponent.ImplicitComponent.guess_nonlinear>` 
+method of `ImplicitComponent`.
 
 The Kepler example script shows how :code:`guess_func` can be used.
 

@@ -100,7 +100,7 @@ class SimpleGADriver(Driver):
                              'every unspecified variable is assumed to be integer, and the number '
                              'of bits is calculated automatically. If you have a continuous var, '
                              'you should set a bits value as a key in this dictionary.')
-        self.options.declare('elitism', default=True,
+        self.options.declare('elitism', types=bool, default=True,
                              desc='If True, replace worst performing point with best from previous'
                              ' generation each iteration.')
         self.options.declare('max_gen', default=100,
@@ -108,7 +108,7 @@ class SimpleGADriver(Driver):
         self.options.declare('pop_size', default=0,
                              desc='Number of points in the GA. Set to 0 and it will be computed '
                              'as four times the number of bits.')
-        self.options.declare('run_parallel', default=False,
+        self.options.declare('run_parallel', types=bool, default=False,
                              desc='Set to True to execute the points in a generation in parallel.')
         self.options.declare('procs_per_model', default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
@@ -190,6 +190,17 @@ class SimpleGADriver(Driver):
         self._concurrent_pop_size = 0
         self._concurrent_color = 0
         return comm
+
+    def _get_name(self):
+        """
+        Get name of current Driver.
+
+        Returns
+        -------
+        str
+            Name of current Driver.
+        """
+        return "SimpleGA"
 
     def run(self):
         """
@@ -275,8 +286,8 @@ class SimpleGADriver(Driver):
             val = desvar_new[i:j]
             self.set_design_var(name, val)
 
-        with RecordingDebugging('SimpleGA', self.iter_count, self) as rec:
-            self.run_solve_nonlinear()
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+            model.run_solve_nonlinear()
             rec.abs = 0.0
             rec.rel = 0.0
         self.iter_count += 1
@@ -378,10 +389,10 @@ class SimpleGADriver(Driver):
         almost_inf = openmdao.INF_BOUND
 
         # Execute the model
-        with RecordingDebugging('SimpleGA', self.iter_count, self) as rec:
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             self.iter_count += 1
             try:
-                self.run_solve_nonlinear()
+                model.run_solve_nonlinear()
 
             # Tell the optimizer that this is a bad point.
             except AnalysisError:

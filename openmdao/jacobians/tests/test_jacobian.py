@@ -514,7 +514,7 @@ class TestJacobian(unittest.TestCase):
         assert_rel_error(self, prob['G1.C2.y'], 243.0)
 
     def test_declare_partial_reference(self):
-        # Test for a bug where declare partial is given an array reference
+        # Test for a bug where declare_partials is given an array reference
         # that compute also uses and could get corrupted
 
         class Comp(ExplicitComponent):
@@ -538,6 +538,49 @@ class TestJacobian(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['y'], 2 * np.ones(2))
+
+    def test_declare_partials_row_col_size_mismatch(self):
+        # Make sure we have clear error messages.
+
+        class Comp1(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=np.array((2, 2)))
+                self.add_output('y', val=np.array((2, 2)))
+
+                self.declare_partials('y', 'x', rows=np.array([0, 1]), cols=np.array([0]))
+
+            def compute(self, inputs, outputs):
+                pass
+
+        class Comp2(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=np.array((2, 2)))
+                self.add_output('y', val=np.array((2, 2)))
+
+                self.declare_partials('y', 'x', rows=np.array([0]), cols=np.array([0, 1]))
+
+            def compute(self, inputs, outputs):
+                pass
+
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('comp', Comp1())
+
+        msg = "comp: declare_partials has been called with rows and cols, which" + \
+              " should be arrays of equal length, but rows is length 2 while " + \
+              "cols is length 1."
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup()
+
+        prob = Problem()
+        model = prob.model
+        model.add_subsystem('comp', Comp2())
+
+        msg = "comp: declare_partials has been called with rows and cols, which" + \
+            " should be arrays of equal length, but rows is length 1 while " + \
+            "cols is length 2."
+        with assertRaisesRegex(self, RuntimeError, msg):
+            prob.setup()
 
     def test_assembled_jacobian_unsupported_cases(self):
 

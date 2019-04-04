@@ -357,7 +357,7 @@ class TestScipyKrylovFeature(unittest.TestCase):
     def test_specify_precon(self):
         import numpy as np
 
-        from openmdao.api import Problem, ScipyKrylov, NewtonSolver, LinearBlockGS, \
+        from openmdao.api import Problem, Group, ScipyKrylov, NewtonSolver, LinearBlockGS, \
              DirectSolver, ExecComp, PETScKrylov
 
         from openmdao.test_suite.components.quad_implicit import QuadraticComp

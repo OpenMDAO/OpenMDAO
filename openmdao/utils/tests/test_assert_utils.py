@@ -97,6 +97,9 @@ class TestAssertUtils(unittest.TestCase):
             self.fail('Exception expected.')
 
     def test_feature_assert_check_partials_exception_expected(self):
+        import numpy as np
+        from openmdao.api import ExplicitComponent, Problem
+        from openmdao.utils.assert_utils import assert_check_partials
         class MyComp(ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)

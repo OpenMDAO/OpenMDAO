@@ -391,7 +391,7 @@ class SimulColoringRecordingTestCase(unittest.TestCase):
 
         cr = CaseReader('cases.sql')
 
-        self.assertEqual(cr.list_cases(), ['rank0:SNOPT|%d' % i for i in range(p.driver.iter_count)])
+        self.assertEqual(cr.list_cases(), ['rank0:pyOptSparse_SNOPT|%d' % i for i in range(p.driver.iter_count)])
 
 
 class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
@@ -713,6 +713,8 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver
         import numpy as np
+
+        SIZE = 10
 
         p = Problem()
 

@@ -1080,6 +1080,7 @@ class MetaModelTestCase(unittest.TestCase):
         self.assertTrue('step_calc' not in trig._subjacs_info[('trig.sin_x', 'trig.x2')])
 
     def test_feature_metamodel_use_fd_if_no_surrogate_linearize(self):
+        from math import sin
         from openmdao.api import SurrogateModel, MetaModelUnStructuredComp, Problem, IndepVarComp
         class SinSurrogate(SurrogateModel):
             def train(self, x, y):

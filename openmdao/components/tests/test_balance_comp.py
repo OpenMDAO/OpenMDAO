@@ -8,11 +8,9 @@ from numpy.testing import assert_almost_equal
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
     NewtonSolver, DirectSolver
 from openmdao.api import BalanceComp
-from openmdao.utils.general_utils import printoptions
 
 
 class TestBalanceComp(unittest.TestCase):
-
 
     def test_scalar_example(self):
 
@@ -44,7 +42,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.run_model()
 
-        cpd = prob.check_partials()
+        cpd = prob.check_partials(out_stream=None)
 
         for (of, wrt) in cpd['balance']:
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
@@ -59,11 +57,10 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        with printoptions(linewidth=1024):
-            cpd = prob.check_partials()
+        cpd = prob.check_partials(out_stream=None)
 
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_create_on_init(self):
 
@@ -97,11 +94,10 @@ class TestBalanceComp(unittest.TestCase):
         # Assert that normalization is happening
         assert_almost_equal(prob.model.balance._scale_factor, 1.0 / np.abs(2))
 
-        with printoptions(linewidth=1024):
-            cpd = prob.check_partials()
+        cpd = prob.check_partials(out_stream=None)
 
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_create_on_init_no_normalization(self):
 
@@ -124,8 +120,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = DirectSolver()
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.nonlinear_solver.options['iprint'] = 2
+        prob.model.nonlinear_solver = NewtonSolver(iprint=0)
 
         prob.setup()
 
@@ -135,11 +130,10 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob.model.balance._scale_factor, 1.0)
 
-        with printoptions(linewidth=1024):
-            cpd = prob.check_partials()
+        cpd = prob.check_partials(out_stream=None)
 
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_vectorized(self):
 
@@ -177,12 +171,10 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        with printoptions(linewidth=1024):
+        cpd = prob.check_partials(out_stream=None)
 
-            cpd = prob.check_partials()
-
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_vectorized_no_normalization(self):
 
@@ -220,12 +212,10 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(1.7), decimal=7)
 
-        with printoptions(linewidth=1024):
+        cpd = prob.check_partials(out_stream=None)
 
-            cpd = prob.check_partials()
-
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_vectorized_with_mult(self):
 
@@ -267,12 +257,10 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        with printoptions(linewidth=1024):
+        cpd = prob.check_partials(out_stream=None)
 
-            cpd = prob.check_partials()
-
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_vectorized_with_default_mult(self):
         """
@@ -312,12 +300,10 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        with printoptions(linewidth=1024):
+        cpd = prob.check_partials(out_stream=None)
 
-            cpd = prob.check_partials()
-
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_scalar(self):
 
@@ -355,65 +341,58 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        with printoptions(linewidth=1024):
+        cpd = prob.check_partials(out_stream=None)
 
-            cpd = prob.check_partials()
-
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_scalar_with_guess_func(self):
 
         n = 1
 
-        prob = Problem(model=Group(assembled_jac_type='dense'))
+        model=Group(assembled_jac_type='dense')
 
-        bal = BalanceComp()
+        def guess_function(inputs, outputs, residuals):
+            outputs['x'] = np.sqrt(inputs['rhs:x'])
 
-        bal.add_balance('x', guess_func=lambda inputs, outputs, resids: np.sqrt(inputs['rhs:x']))
+        bal = BalanceComp('x', guess_func=guess_function)  # test guess_func as kwarg
 
         tgt = IndepVarComp(name='y_tgt', val=4)
 
         exec_comp = ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
 
-        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
+        model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
+        model.add_subsystem(name='exec', subsys=exec_comp)
+        model.add_subsystem(name='balance', subsys=bal)
 
-        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+        model.connect('y_tgt', 'balance.rhs:x')
+        model.connect('balance.x', 'exec.x')
+        model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.add_subsystem(name='balance', subsys=bal)
+        model.linear_solver = DirectSolver(assemble_jac=True)
+        model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
-        prob.model.connect('y_tgt', 'balance.rhs:x')
-        prob.model.connect('balance.x', 'exec.x')
-        prob.model.connect('exec.y', 'balance.lhs:x')
-
-        prob.model.linear_solver = DirectSolver(assemble_jac=True)
-
-        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
-
+        prob = Problem(model)
         prob.setup()
 
         prob['balance.x'] = np.random.rand(n)
-
         prob.run_model()
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        with printoptions(linewidth=1024):
+        # should converge with no iteration due to the guess function
+        self.assertEqual(model.nonlinear_solver._iter_count, 1)
 
-            cpd = prob.check_partials()
-
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        cpd = prob.check_partials(out_stream=None)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_scalar_with_guess_func_additional_input(self):
 
-        n = 1
-
-        prob = Problem(model=Group(assembled_jac_type='dense'))
+        model = Group(assembled_jac_type='dense')
 
         bal = BalanceComp()
-
-        bal.add_balance('x', guess_func=lambda inputs, outputs, resids: inputs['guess_x'])
+        bal.add_balance('x')
         bal.add_input('guess_x', val=0.0)
 
         ivc = IndepVarComp()
@@ -422,41 +401,48 @@ class TestBalanceComp(unittest.TestCase):
 
         exec_comp = ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
 
-        prob.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['y_tgt', 'guess_x'])
+        model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['y_tgt', 'guess_x'])
+        model.add_subsystem(name='exec', subsys=exec_comp)
+        model.add_subsystem(name='balance', subsys=bal)
 
-        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+        model.connect('guess_x', 'balance.guess_x')
+        model.connect('y_tgt', 'balance.rhs:x')
+        model.connect('balance.x', 'exec.x')
+        model.connect('exec.y', 'balance.lhs:x')
 
-        prob.model.add_subsystem(name='balance', subsys=bal)
+        model.linear_solver = DirectSolver(assemble_jac=True)
+        model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
-        prob.model.connect('guess_x', 'balance.guess_x')
-        prob.model.connect('y_tgt', 'balance.rhs:x')
-        prob.model.connect('balance.x', 'exec.x')
-        prob.model.connect('exec.y', 'balance.lhs:x')
-
-        prob.model.linear_solver = DirectSolver(assemble_jac=True)
-
-        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
-
+        prob = Problem(model)
         prob.setup()
 
-        prob['balance.x'] = np.random.rand(n)
-
+        # run problem without a guess function
+        prob['balance.x'] = .5
         prob.run_model()
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        with printoptions(linewidth=1024):
+        iters_no_guess = model.nonlinear_solver._iter_count
 
-            cpd = prob.check_partials()
+        # run problem with same initial value and a guess function
+        def guess_function(inputs, outputs, resids):
+            outputs['x'] = inputs['guess_x']
 
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        bal.options['guess_func'] = guess_function
+
+        prob['balance.x'] = .5
+        prob.run_model()
+
+        assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
+
+        iters_with_guess = model.nonlinear_solver._iter_count
+
+        # verify it converges faster with the guess function
+        self.assertTrue(iters_with_guess < iters_no_guess)
 
     def test_scalar_guess_func_using_outputs(self):
-        # Implicitly solve -(ax^2 + bx) = c using a BalanceComp.
-        # For a=1, b=-4 and c=3, there are solutions at x=1 and x=3.
 
-        # Verify that we can set the guess value (and target a solution) based on outputs.
+        model = Group()
 
         ind = IndepVarComp()
         ind.add_output('a', 1)
@@ -464,18 +450,7 @@ class TestBalanceComp(unittest.TestCase):
         ind.add_output('c', 3)
 
         lhs = ExecComp('lhs=-(a*x**2+b*x)')
-
-        bal = BalanceComp()
-
-        def guess_function(inputs, outputs, residuals):
-            if outputs['x'] < 0:
-                return 5.
-            else:
-                return 0.
-
-        bal.add_balance(name='x', rhs_name='c', guess_func=guess_function)
-
-        model = Group()
+        bal = BalanceComp(name='x', rhs_name='c')
 
         model.add_subsystem('ind_comp', ind, promotes_outputs=['a', 'b', 'c'])
         model.add_subsystem('lhs_comp', lhs, promotes_inputs=['a', 'b', 'x'])
@@ -484,20 +459,50 @@ class TestBalanceComp(unittest.TestCase):
         model.connect('lhs_comp.lhs', 'bal_comp.lhs:x')
 
         model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver(maxiter=1000, iprint=0)
+        model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
+        # first verify behavior of the balance comp without the guess function
+        # at initial conditions x=5, x=0 and x=-1
         prob = Problem(model)
         prob.setup()
 
-        # initial value of 'x' less than zero, guess should steer us to solution of 3.
-        prob['bal_comp.x'] = -1
+        # default solution with initial value of 5 is x=3.
+        prob['x'] = 5
         prob.run_model()
-        assert_almost_equal(prob['bal_comp.x'], 3.0, decimal=7)
+        assert_almost_equal(prob['x'], 3.0, decimal=7)
 
-        # initial value of 'x' greater than zero, guess should steer us to solution of 1.
-        prob['bal_comp.x'] = 99
+        # default solution with initial value of 0 is x=1.
+        prob['x'] = 0
         prob.run_model()
-        assert_almost_equal(prob['bal_comp.x'], 1.0, decimal=7)
+        assert_almost_equal(prob['x'], 1.0, decimal=7)
+
+        # default solution with initial value of -1 is x=1.
+        prob['x'] = -1
+        prob.run_model()
+        assert_almost_equal(prob['x'], 1.0, decimal=7)
+
+        # now use a guess function that steers us to the x=3 solution only
+        # if the initial value of x is less than zero
+        def guess_function(inputs, outputs, residuals):
+            if outputs['x'] < 0:
+                outputs['x'] = 3.
+
+        bal.options['guess_func'] = guess_function
+
+        # solution with initial value of 5 is still x=3.
+        prob['x'] = 5
+        prob.run_model()
+        assert_almost_equal(prob['x'], 3.0, decimal=7)
+
+        # solution with initial value of 0 is still x=1.
+        prob['x'] = 0
+        prob.run_model()
+        assert_almost_equal(prob['x'], 1.0, decimal=7)
+
+        # solution with initial value of -1 is now x=3.
+        prob['x'] = -1
+        prob.run_model()
+        assert_almost_equal(prob['x'], 3.0, decimal=7)
 
     def test_rhs_val(self):
         """ Test solution with a default RHS value and no connected RHS variable. """
@@ -529,12 +534,10 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
-        with printoptions(linewidth=1024):
+        cpd = prob.check_partials(out_stream=None)
 
-            cpd = prob.check_partials()
-
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_scalar_with_mult(self):
 
@@ -576,12 +579,10 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        with printoptions(linewidth=1024):
+        cpd = prob.check_partials(out_stream=None)
 
-            cpd = prob.check_partials()
-
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_renamed_vars(self):
 
@@ -623,22 +624,19 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
-        with printoptions(linewidth=1024):
+        cpd = prob.check_partials(out_stream=None)
 
-            cpd = prob.check_partials()
-
-            for (of, wrt) in cpd['balance']:
-                assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
     def test_feature_scalar(self):
         from numpy.testing import assert_almost_equal
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
             DirectSolver, BalanceComp
 
-        prob = Problem(model=Group(assembled_jac_type='dense'))
+        prob = Problem()
 
         bal = BalanceComp()
-
         bal.add_balance('x', use_mult=True)
 
         tgt = IndepVarComp(name='y_tgt', val=4)
@@ -649,9 +647,7 @@ class TestBalanceComp(unittest.TestCase):
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
         prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
-
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
-
         prob.model.add_subsystem(name='balance', subsys=bal)
 
         prob.model.connect('y_tgt', 'balance.rhs:x')
@@ -660,7 +656,6 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
-
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
@@ -669,8 +664,6 @@ class TestBalanceComp(unittest.TestCase):
         prob['balance.x'] = 1.0
 
         prob.run_model()
-
-        print('x = ', prob['balance.x'])
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
@@ -679,10 +672,9 @@ class TestBalanceComp(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, NewtonSolver, \
             DirectSolver, BalanceComp
 
-        prob = Problem(model=Group(assembled_jac_type='dense'))
+        prob = Problem()
 
         bal = BalanceComp()
-
         bal.add_balance('x', use_mult=True, mult_val=2.0)
 
         tgt = IndepVarComp(name='y_tgt', val=4)
@@ -690,9 +682,7 @@ class TestBalanceComp(unittest.TestCase):
         exec_comp = ExecComp('y=x**2', x={'value': 1}, y={'value': 1})
 
         prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
-
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
-
         prob.model.add_subsystem(name='balance', subsys=bal)
 
         prob.model.connect('y_tgt', 'balance.rhs:x')
@@ -700,7 +690,6 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
-
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
@@ -709,8 +698,6 @@ class TestBalanceComp(unittest.TestCase):
         prob['balance.x'] = 1.0
 
         prob.run_model()
-
-        print('x = ', prob['balance.x'])
 
         assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
 
@@ -722,7 +709,7 @@ class TestBalanceComp(unittest.TestCase):
 
         n = 100
 
-        prob = Problem(model=Group(assembled_jac_type='dense'))
+        prob = Problem()
 
         exec_comp = ExecComp('y=b*x+c',
                              b={'value': np.random.uniform(0.01,100, size=n)},
@@ -731,14 +718,12 @@ class TestBalanceComp(unittest.TestCase):
                              y={'value': np.ones(n)})
 
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
-
         prob.model.add_subsystem(name='balance', subsys=BalanceComp('x', val=np.ones(n)))
 
         prob.model.connect('balance.x', 'exec.x')
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
-
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup(check=False)
@@ -751,11 +736,7 @@ class TestBalanceComp(unittest.TestCase):
         c = prob['exec.c']
 
         assert_almost_equal(prob['balance.x'], -c/b, decimal=6)
-
-        print('solution')
-        print(prob['balance.x'])
-        print('expected')
-        print(-c/b)
+        assert_almost_equal(-c/b, prob['balance.x'], decimal=6)  # expected
 
 
 if __name__ == '__main__':  # pragma: no cover

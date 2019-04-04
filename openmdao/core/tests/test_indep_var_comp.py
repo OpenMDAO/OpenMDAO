@@ -133,6 +133,22 @@ class TestIndepVarComp(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
+    def test_add_output_type_bug(self):
+        prob = Problem()
+        model = prob.model
+
+        ivc = IndepVarComp()
+        ivc.add_output('x1', val=[1, 2, 3], lower=0, upper=10)
+
+        model.add_subsystem('p', ivc)
+
+        prob.setup()
+
+        prob['p.x1'][0] = 0.5
+        prob.run_model()
+
+        assert_rel_error(self, prob['p.x1'][0], 0.5)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -77,7 +77,7 @@ class KrigingSurrogate(SurrogateModel):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('eval_rmse', default=False,
+        self.options.declare('eval_rmse', types=bool, default=False,
                              desc="Flag indicating whether the Root Mean Squared Error (RMSE) "
                                   "should be computed. Set to False by default.")
 

@@ -93,6 +93,8 @@ class ActuatorDisc(ExplicitComponent):
 class TestBetzLimit(unittest.TestCase):
 
     def test_betz(self):
+        from distutils.version import LooseVersion
+        import scipy
         from openmdao.api import Problem, ScipyOptimizeDriver, IndepVarComp, ExplicitComponent
 
         class ActuatorDisc(ExplicitComponent):

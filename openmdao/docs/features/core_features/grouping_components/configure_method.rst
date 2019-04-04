@@ -1,8 +1,8 @@
 .. _feature_configure:
 
-************************************************
-Modify Children of a Group with Configure Method
-************************************************
+***************************************************
+Modifying Children of a Group with Configure Method
+***************************************************
 
 
 Most of the time, the :code:`setup` method is the only one you need to define on a group. The main exception is the case where you

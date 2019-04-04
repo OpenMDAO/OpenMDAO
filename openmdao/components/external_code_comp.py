@@ -55,7 +55,7 @@ class ExternalCodeDelegate(object):
         comp.options.declare('external_output_files', [],
                              desc='List of output files that must exist after execution, '
                                   'otherwise an Exception is raised.')
-        comp.options.declare('fail_hard', True,
+        comp.options.declare('fail_hard', types=bool, default=True,
                              desc="If True, external code errors raise a 'hard' exception "
                                   "(RuntimeError), otherwise errors raise a 'soft' exception "
                                   "(AnalysisError).")

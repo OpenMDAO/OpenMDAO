@@ -918,7 +918,7 @@ def MNCO_bidir(J):
             M_rows = M_rows[keep]
             M_cols = M_cols[keep]
 
-            M_row_nonzeros[r] = ncols + 1  # make sure we don't pick this one again
+            M_row_nonzeros[r] = ncols + 2  # make sure we don't pick this one again
             M_col_nonzeros[Jc_rows[r]] -= 1
 
             r = M_row_nonzeros.argmin()
@@ -933,7 +933,7 @@ def MNCO_bidir(J):
             M_rows = M_rows[keep]
             M_cols = M_cols[keep]
 
-            M_col_nonzeros[c] = nrows + 1  # make sure we don't pick this one again
+            M_col_nonzeros[c] = nrows + 2  # make sure we don't pick this one again
             M_row_nonzeros[Jr_cols[c]] -= 1
 
             c = M_col_nonzeros.argmin()
@@ -1567,10 +1567,9 @@ def _total_coloring_cmd(options):
                                                   setup=False, run_model=True,
                                                   fname=options.outfile)
 
-            if sys.stdout.isatty():
-                if options.show_jac:
-                    coloring.display()
-                coloring.summary()
+            if options.show_jac:
+                coloring.display()
+            coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()

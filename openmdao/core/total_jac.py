@@ -1211,7 +1211,9 @@ class _TotalJacInfo(object):
             vec_dresid[vec_name]._data[:] = 0.0
 
         # Linearize Model
-        model._linearize(model._assembled_jac, sub_do_ln=model._linear_solver._linearize_children())
+        with model._scaled_context_all():
+            model._linearize(model._assembled_jac,
+                             sub_do_ln=model._linear_solver._linearize_children())
         model._linear_solver._linearize()
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian

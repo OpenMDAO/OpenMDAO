@@ -73,7 +73,7 @@ class DOEDriver(Driver):
         """
         self.options.declare('generator', types=(DOEGenerator), default=DOEGenerator(),
                              desc='The case generator. If default, no cases are generated.')
-        self.options.declare('run_parallel', default=False,
+        self.options.declare('run_parallel', types=bool, default=False,
                              desc='Set to True to execute cases in parallel.')
         self.options.declare('procs_per_model', default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
@@ -189,9 +189,9 @@ class DOEDriver(Driver):
                 if msg:
                     raise(ValueError(msg))
 
-        with RecordingDebugging(self._name, self.iter_count, self) as rec:
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
-                self.run_solve_nonlinear()
+                self._problem.model.run_solve_nonlinear()
                 metadata['success'] = 1
                 metadata['msg'] = ''
             except AnalysisError:

@@ -1891,7 +1891,7 @@ class TestComponentComplexStep(unittest.TestCase):
         prob.check_partials(method='cs', step=1e-14, out_stream=None)
 
     def test_feature_under_complex_step(self):
-        from openmdao.api import Problem, ExplicitComponent
+        from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
 
         class SimpleComp(ExplicitComponent):
 

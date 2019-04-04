@@ -119,7 +119,8 @@ class ExplicitComponent(Component):
             }
 
             # ExplicitComponent jacobians have -1 on the diagonal.
-            self._declare_partials(out_name, out_name, dct)
+            if arange.size > 0:
+                self._declare_partials(out_name, out_name, dct)
 
     def _setup_jacobians(self, recurse=True):
         """

@@ -161,7 +161,7 @@ class ScipyOptimizeDriver(Driver):
                              'control, use solver-specific options.')
         self.options.declare('maxiter', 200, lower=0,
                              desc='Maximum number of iterations.')
-        self.options.declare('disp', True,
+        self.options.declare('disp', True, types=bool,
                              desc='Set to False to prevent printing of Scipy convergence messages')
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically if True')
@@ -178,7 +178,7 @@ class ScipyOptimizeDriver(Driver):
         str
             The name of the current optimizer.
         """
-        return self.options['optimizer']
+        return "ScipyOptimize_" + self.options['optimizer']
 
     def _setup_driver(self, problem):
         """
@@ -240,8 +240,8 @@ class ScipyOptimizeDriver(Driver):
         self._total_jac = None
 
         # Initial Run
-        with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
-            self.run_solve_nonlinear()
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+            model.run_solve_nonlinear()
             self.iter_count += 1
 
         self._con_cache = self.get_constraint_values()
@@ -555,9 +555,9 @@ class ScipyOptimizeDriver(Driver):
                 self.set_design_var(name, x_new[i:i + size])
                 i += size
 
-            with RecordingDebugging(self.options['optimizer'], self.iter_count, self) as rec:
+            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
-                self.run_solve_nonlinear()
+                model.run_solve_nonlinear()
 
             # Get the objective function evaluations
             for obj in itervalues(self.get_objective_values()):

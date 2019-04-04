@@ -191,17 +191,17 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver_cases = cr.list_cases('driver')
 
         self.assertEqual(driver_cases, [
-            'rank0:SLSQP|0', 'rank0:SLSQP|1', 'rank0:SLSQP|2',
-            'rank0:SLSQP|3', 'rank0:SLSQP|4', 'rank0:SLSQP|5',
-            'rank0:SLSQP|6'
+            'rank0:ScipyOptimize_SLSQP|0', 'rank0:ScipyOptimize_SLSQP|1', 'rank0:ScipyOptimize_SLSQP|2',
+            'rank0:ScipyOptimize_SLSQP|3', 'rank0:ScipyOptimize_SLSQP|4', 'rank0:ScipyOptimize_SLSQP|5',
+            'rank0:ScipyOptimize_SLSQP|6'
         ])
 
         # Test to see if the access by case keys works:
-        seventh_slsqp_iteration_case = cr.get_case('rank0:SLSQP|6')
+        seventh_slsqp_iteration_case = cr.get_case('rank0:ScipyOptimize_SLSQP|6')
         np.testing.assert_almost_equal(seventh_slsqp_iteration_case.outputs['z'],
                                        [1.97846296, -2.21388305e-13], decimal=2)
 
-        deriv_case = cr.get_case('rank0:SLSQP|4')
+        deriv_case = cr.get_case('rank0:ScipyOptimize_SLSQP|4')
         np.testing.assert_almost_equal(deriv_case.jacobian['obj', 'pz.z'],
                                        [[3.8178954, 1.73971323]], decimal=2)
 
@@ -220,7 +220,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test to see if the case keys (iteration coords) come back correctly
         for i, iter_coord in enumerate(driver_cases):
-            self.assertEqual(iter_coord, 'rank0:SLSQP|{}'.format(i))
+            self.assertEqual(iter_coord, 'rank0:ScipyOptimize_SLSQP|{}'.format(i))
 
     def test_reading_system_cases(self):
         prob = SellarProblem()
@@ -453,13 +453,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check driver cases
         expected_coords = [
-            'rank0:SLSQP|0',
-            'rank0:SLSQP|1',
-            'rank0:SLSQP|2',
-            'rank0:SLSQP|3',
-            'rank0:SLSQP|4',
-            'rank0:SLSQP|5',
-            'rank0:SLSQP|6'
+            'rank0:pyOptSparse_SLSQP|0',
+            'rank0:pyOptSparse_SLSQP|1',
+            'rank0:pyOptSparse_SLSQP|2',
+            'rank0:pyOptSparse_SLSQP|3',
+            'rank0:pyOptSparse_SLSQP|4',
+            'rank0:pyOptSparse_SLSQP|5',
+            'rank0:pyOptSparse_SLSQP|6'
         ]
 
         last_counter = 0
@@ -472,27 +472,27 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check driver cases with recursion, flat
         expected_coords = [
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0',
-            'rank0:SLSQP|0',
-            'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
-            'rank0:SLSQP|1|root._solve_nonlinear|1',
-            'rank0:SLSQP|1',
-            'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
-            'rank0:SLSQP|2|root._solve_nonlinear|2',
-            'rank0:SLSQP|2',
-            'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
-            'rank0:SLSQP|3|root._solve_nonlinear|3',
-            'rank0:SLSQP|3',
-            'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
-            'rank0:SLSQP|4|root._solve_nonlinear|4',
-            'rank0:SLSQP|4',
-            'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
-            'rank0:SLSQP|5|root._solve_nonlinear|5',
-            'rank0:SLSQP|5',
-            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0',
-            'rank0:SLSQP|6|root._solve_nonlinear|6',
-            'rank0:SLSQP|6',
+            'rank0:pyOptSparse_SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:pyOptSparse_SLSQP|0|root._solve_nonlinear|0',
+            'rank0:pyOptSparse_SLSQP|0',
+            'rank0:pyOptSparse_SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:pyOptSparse_SLSQP|1|root._solve_nonlinear|1',
+            'rank0:pyOptSparse_SLSQP|1',
+            'rank0:pyOptSparse_SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:pyOptSparse_SLSQP|2|root._solve_nonlinear|2',
+            'rank0:pyOptSparse_SLSQP|2',
+            'rank0:pyOptSparse_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:pyOptSparse_SLSQP|3|root._solve_nonlinear|3',
+            'rank0:pyOptSparse_SLSQP|3',
+            'rank0:pyOptSparse_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:pyOptSparse_SLSQP|4|root._solve_nonlinear|4',
+            'rank0:pyOptSparse_SLSQP|4',
+            'rank0:pyOptSparse_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:pyOptSparse_SLSQP|5|root._solve_nonlinear|5',
+            'rank0:pyOptSparse_SLSQP|5',
+            'rank0:pyOptSparse_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0',
+            'rank0:pyOptSparse_SLSQP|6|root._solve_nonlinear|6',
+            'rank0:pyOptSparse_SLSQP|6',
         ]
 
         last_counter = 0
@@ -509,13 +509,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check child cases with recursion, flat
         expected_coords = [
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
-            'rank0:SLSQP|0|root._solve_nonlinear|0',
-            'rank0:SLSQP|0',
+            'rank0:pyOptSparse_SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:pyOptSparse_SLSQP|0|root._solve_nonlinear|0',
+            'rank0:pyOptSparse_SLSQP|0',
         ]
 
         last_counter = 0
-        for i, c in enumerate(cr.get_cases('rank0:SLSQP|0', recurse=True, flat=True)):
+        for i, c in enumerate(cr.get_cases('rank0:pyOptSparse_SLSQP|0', recurse=True, flat=True)):
             self.assertEqual(c.iteration_coordinate, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
@@ -524,14 +524,14 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check child cases with recursion, nested
         expected_coords = {
-            'rank0:SLSQP|0': {
-                'rank0:SLSQP|0|root._solve_nonlinear|0': {
-                    'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0': {}
+            'rank0:pyOptSparse_SLSQP|0': {
+                'rank0:pyOptSparse_SLSQP|0|root._solve_nonlinear|0': {
+                    'rank0:pyOptSparse_SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0': {}
                 },
             }
         }
 
-        cases = cr.get_cases('rank0:SLSQP|0', recurse=True, flat=False)
+        cases = cr.get_cases('rank0:pyOptSparse_SLSQP|0', recurse=True, flat=False)
 
         count = 0
         for case in cases:
@@ -564,7 +564,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         cr = CaseReader(self.filename)
 
-        parent_coord = 'rank0:SLSQP|2|root._solve_nonlinear|2'
+        parent_coord = 'rank0:ScipyOptimize_SLSQP|2|root._solve_nonlinear|2'
         coord = parent_coord + '|NLRunOnce|0'
 
         # user scenario: given a case (with coord), get all cases with same parent
@@ -639,7 +639,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         # get a recursive list of child cases
         #
-        parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear|0'
+        parent_coord = 'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0'
 
         expected_coords = [
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
@@ -671,11 +671,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # verify the coordinates of the returned cases are all there as expected
         expected_coord = {
-            'driver':                    r'rank0:SLSQP\|\d',
-            'root':                      r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d',
-            'root.nonlinear_solver':     r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0',
-            'root.mda':                  r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d',
-            'root.mda.nonlinear_solver': r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d\|NonlinearBlockGS\|\d',
+            'driver':                    r'rank0:ScipyOptimize_SLSQP\|\d',
+            'root':                      r'rank0:ScipyOptimize_SLSQP\|\d\|root._solve_nonlinear\|\d',
+            'root.nonlinear_solver':     r'rank0:ScipyOptimize_SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0',
+            'root.mda':                  r'rank0:ScipyOptimize_SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d',
+            'root.mda.nonlinear_solver': r'rank0:ScipyOptimize_SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d\|NonlinearBlockGS\|\d',
         }
         counter = 0
         mda_counter = 0
@@ -851,7 +851,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         # get a recursive list of child cases
         #
-        parent_coord = 'rank0:SLSQP|0|root._solve_nonlinear|0'
+        parent_coord = 'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0'
 
         expected_coords = [
             parent_coord + '|NLRunOnce|0|mda._solve_nonlinear|0|NonlinearBlockGS|0',
@@ -883,11 +883,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # verify the coordinates of the returned cases are as expected and that the cases are all there
         expected_coord = {
-            'driver':                    r'rank0:SLSQP\|\d',
-            'root':                      r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d',
-            'root.nonlinear_solver':     r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0',
-            'root.mda':                  r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d',
-            'root.mda.nonlinear_solver': r'rank0:SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d\|NonlinearBlockGS\|\d',
+            'driver':                    r'rank0:ScipyOptimize_SLSQP\|\d',
+            'root':                      r'rank0:ScipyOptimize_SLSQP\|\d\|root._solve_nonlinear\|\d',
+            'root.nonlinear_solver':     r'rank0:ScipyOptimize_SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0',
+            'root.mda':                  r'rank0:ScipyOptimize_SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d',
+            'root.mda.nonlinear_solver': r'rank0:ScipyOptimize_SLSQP\|\d\|root._solve_nonlinear\|\d\|NLRunOnce\|0\|mda._solve_nonlinear\|\d\|NonlinearBlockGS\|\d',
         }
         counter = 0
         mda_counter = 0
@@ -1752,13 +1752,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         system_cases = cr.list_cases('root.pz', recurse=False)
         expected_cases = [
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
-            'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
-            'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0|pz._solve_nonlinear|2',
-            'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0|pz._solve_nonlinear|3',
-            'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|pz._solve_nonlinear|4',
-            'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|pz._solve_nonlinear|5',
-            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|pz._solve_nonlinear|6'
+            'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0|pz._solve_nonlinear|0',
+            'rank0:ScipyOptimize_SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0|pz._solve_nonlinear|1',
+            'rank0:ScipyOptimize_SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0|pz._solve_nonlinear|2',
+            'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0|pz._solve_nonlinear|3',
+            'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0|pz._solve_nonlinear|4',
+            'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0|pz._solve_nonlinear|5',
+            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0|pz._solve_nonlinear|6'
         ]
         self.assertEqual(len(system_cases), len(expected_cases))
         for i, coord in enumerate(system_cases):
@@ -1783,13 +1783,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         root_solver_cases = cr.list_cases('root.nonlinear_solver', recurse=False)
         expected_cases = [
-            'rank0:SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
-            'rank0:SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
-            'rank0:SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
-            'rank0:SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
-            'rank0:SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
-            'rank0:SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
-            'rank0:SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
+            'rank0:ScipyOptimize_SLSQP|0|root._solve_nonlinear|0|NLRunOnce|0',
+            'rank0:ScipyOptimize_SLSQP|1|root._solve_nonlinear|1|NLRunOnce|0',
+            'rank0:ScipyOptimize_SLSQP|2|root._solve_nonlinear|2|NLRunOnce|0',
+            'rank0:ScipyOptimize_SLSQP|3|root._solve_nonlinear|3|NLRunOnce|0',
+            'rank0:ScipyOptimize_SLSQP|4|root._solve_nonlinear|4|NLRunOnce|0',
+            'rank0:ScipyOptimize_SLSQP|5|root._solve_nonlinear|5|NLRunOnce|0',
+            'rank0:ScipyOptimize_SLSQP|6|root._solve_nonlinear|6|NLRunOnce|0'
         ]
         self.assertEqual(len(root_solver_cases), len(expected_cases))
         for i, coord in enumerate(root_solver_cases):
@@ -1852,13 +1852,13 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         driver_cases = cr.list_cases('driver', recurse=False)
         expected_cases = [
-            'rank0:SLSQP|0',
-            'rank0:SLSQP|1',
-            'rank0:SLSQP|2',
-            'rank0:SLSQP|3',
-            'rank0:SLSQP|4',
-            'rank0:SLSQP|5',
-            'rank0:SLSQP|6'
+            'rank0:ScipyOptimize_SLSQP|0',
+            'rank0:ScipyOptimize_SLSQP|1',
+            'rank0:ScipyOptimize_SLSQP|2',
+            'rank0:ScipyOptimize_SLSQP|3',
+            'rank0:ScipyOptimize_SLSQP|4',
+            'rank0:ScipyOptimize_SLSQP|5',
+            'rank0:ScipyOptimize_SLSQP|6'
         ]
         # check that there are multiple iterations and they have the expected coordinates
         self.assertTrue(len(driver_cases), len(expected_cases))
@@ -1909,7 +1909,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         all_driver_cases = cr.list_cases('driver', recurse=True, flat=True)
 
         expected_cases = driver_cases + \
-            [c for c in all_solver_cases if c.startswith('rank0:SLSQP')]
+            [c for c in all_solver_cases if c.startswith('rank0:ScipyOptimize_SLSQP')]
 
         self.assertEqual(len(all_driver_cases), len(expected_cases))
         for case in expected_cases:
@@ -1983,11 +1983,16 @@ class TestSqliteCaseReader(unittest.TestCase):
 class TestFeatureSqliteReader(unittest.TestCase):
 
     def setUp(self):
+        import os
+        from tempfile import mkdtemp
         self.orig_dir = os.getcwd()
         self.temp_dir = mkdtemp()
         os.chdir(self.temp_dir)
 
     def tearDown(self):
+        import os
+        from shutil import rmtree
+        import errno
         os.chdir(self.orig_dir)
         try:
             rmtree(self.temp_dir)
@@ -1997,10 +2002,9 @@ class TestFeatureSqliteReader(unittest.TestCase):
                 raise e
 
     def test_feature_list_cases(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         import numpy as np
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         prob = Problem(model=SellarMDA())
 
@@ -2026,7 +2030,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         case_ids = cr.list_cases()
 
         self.assertEqual(len(case_ids), driver.iter_count)
-        self.assertEqual(case_ids, ['rank0:SLSQP|%d' % i for i in range(driver.iter_count)])
+        self.assertEqual(case_ids, ['rank0:ScipyOptimize_SLSQP|%d' % i for i in range(driver.iter_count)])
         self.assertEqual('', '')
 
         for case_id in case_ids:
@@ -2034,7 +2038,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(case, case)
 
     def test_feature_get_cases(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         import numpy as np
@@ -2067,7 +2071,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(case, case)
 
     def test_feature_get_cases_nested(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         import numpy as np
@@ -2116,7 +2120,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
                     self.assertEqual(grandchild, grandchild)
 
     def test_feature_list_sources(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         import numpy as np
@@ -2165,7 +2169,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
                          ('inputs:', ['x', 'y1', 'y2', 'z'], 'outputs:', ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']))
 
     def test_feature_reading_derivatives(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
         from openmdao.test_suite.components.sellar_feature import SellarMDA
 
         import numpy as np
