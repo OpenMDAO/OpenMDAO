@@ -167,23 +167,27 @@ def _get_viewer_data(data_source):
 
     connections_list = []
 
+    sys_pathnames_list = []  # list of pathnames of systems found in cycles
+    sys_pathnames_dict = {}  # map of pathnames to index of pathname in list
+
     # sort to make deterministic for testing
     sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items()))
     root_group._conn_global_abs_in2out = sorted_abs_input2src
+
     G = root_group.compute_sys_graph(comps_only=True)
     scc = nx.strongly_connected_components(G)
     scc_list = [s for s in scc if len(s) > 1]
+
     for in_abs, out_abs in iteritems(sorted_abs_input2src):
         if out_abs is None:
             continue
+
         src_subsystem = out_abs.rsplit('.', 1)[0]
         tgt_subsystem = in_abs.rsplit('.', 1)[0]
         src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
 
         count = 0
         edges_list = []
-        sys_pathnames_dict = {}
-        sys_pathnames_list = []
 
         for li in scc_list:
             if src_subsystem in li and tgt_subsystem in li:
@@ -202,19 +206,18 @@ def _get_viewer_data(data_source):
                     if edge_str != src_to_tgt_str:
                         src, tgt = edge
 
+                        # add src & tgt to pathnames list & dict if not already there
+                        for pathname in edge:
+                            if pathname not in sys_pathnames_dict:
+                                sys_pathnames_list.append(pathname)
+                                sys_pathnames_dict[pathname] = len(sys_pathnames_list) - 1
+
                         # replace src & tgt pathnames with indices into pathname list
-                        if src in sys_pathnames_dict:
-                            src = sys_pathnames_dict[src]
-                        else:
-                            sys_pathnames_list.append(src)
-                            src = len(sys_pathnames_list) - 1
+                        src = sys_pathnames_dict[src]
+                        tgt = sys_pathnames_dict[tgt]
 
-                        if tgt in sys_pathnames_dict:
-                            tgt = sys_pathnames_dict[tgt]
-                        else:
-                            sys_pathnames_list.append(tgt)
-                            tgt = len(sys_pathnames_list) - 1
-
+                        # make sure no duplicates in pathnames list & that pathnames map correctly
+                        assert(len(sys_pathnames_list) == len(set(sys_pathnames_list)))
                         assert(edge_str == ' '.join([sys_pathnames_list[src], sys_pathnames_list[tgt]]))
 
                         edges_list.append((src, tgt))
@@ -228,7 +231,6 @@ def _get_viewer_data(data_source):
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list
-
     data_dict['abs2prom'] = root_group._var_abs2prom
 
     return data_dict
