@@ -61,7 +61,7 @@ class TotJacBuilder(object):
             col_idx += shape[1]
 
     def color(self, mode='auto', fname=None):
-        self.coloring = compute_total_coloring(None, mode, include_sparsity=False, setup=False,
+        self.coloring = compute_total_coloring(None, mode, setup=False,
                                                run_model=False, bool_jac=self.J,
                                                fname=fname)
         return self.coloring

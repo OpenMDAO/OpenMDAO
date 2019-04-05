@@ -172,4 +172,10 @@ run either :code:`openmdao iprof` or :code:`openmdao iprof_totals` directly on t
    introduced by the python function that collects timing data.
 
 
+.. warning::
+
+    If your script contains any `quit()` or `exit()` calls, it will cause the profiling to fail
+    because the profiling performs certain necessary operations in a function registered with
+    `atexit`.  This function will not execute if a `quit()` or `exit()` is encountered.
+
 .. tags:: Tutorials, Profiling

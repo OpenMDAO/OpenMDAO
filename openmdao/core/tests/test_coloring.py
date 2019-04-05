@@ -147,6 +147,9 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
     def test_simul_coloring_snopt_fwd(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
+        #from openmdao.utils.coloring import compute_total_coloring
+        #p.driver._total_jac = None
+        #color = compute_total_coloring(p, mode='fwd', repeats=2)
         color_info = Coloring()
         color_info._fwd = [[
            [20],   # uncolored columns

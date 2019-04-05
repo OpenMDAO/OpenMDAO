@@ -81,8 +81,6 @@ class Coloring(object):
         Row indices of nonzero entries in the full jac sparsity matrix.
     _nzcols : ndarray of int or None
         Column indices of nonzero entries in the full jac sparsity matrix.
-    _subjac_sparsity : dict or None
-        Mapping of (of, wrt) keys to corresponding (nzrows, nzcols, shape) for that subjac.
     _coloring_time : float or None
         If known, the time it took to compute the coloring.
     _fwd : tuple (col_lists, row_maps)
@@ -105,7 +103,8 @@ class Coloring(object):
         if the file should be ascii ('w') or binary ('wb').
     """
 
-    def __init__(self, sparsity=None):
+    def __init__(self, sparsity=None, row_vars=None, row_var_sizes=None, col_vars=None,
+                 col_var_sizes=None):
         """
         Initialize data structures.
 
@@ -113,6 +112,14 @@ class Coloring(object):
         ----------
         sparsity : ndarray or None
             Full jacobian sparsity matrix (dense bool form).
+        row_vars : list of str or None
+            Names of variables corresponding to rows.
+        row_var_sizes : ndarray or None
+            Sizes of row variables.
+        col_vars : list of str or None
+            Names of variables corresponding to columns.
+        col_var_sizes : ndarray or None
+            Sizes of column variables.
         """
         # store the nonzero row and column indices if jac sparsity is provided
         if sparsity is not None:
@@ -120,14 +127,15 @@ class Coloring(object):
             self._shape = sparsity.shape
         else:
             self._nzrows = self._nzcols = self._shape = None
-        self._subjac_sparsity = None
+
+        self._row_vars = row_vars
+        self._row_var_sizes = row_var_sizes
+        self._col_vars = col_vars
+        self._col_var_sizes = col_var_sizes
+
         self._coloring_time = None
         self._fwd = None
         self._rev = None
-        self._col_vars = None
-        self._col_var_sizes = None
-        self._row_vars = None
-        self._row_var_sizes = None
         self._meta = {}
         self._writers = {
             'json': (self._write_json, 'w'),
@@ -412,7 +420,7 @@ class Coloring(object):
         """
         tty = stream.isatty()
         none = 'null'
-        sparsity = self._subjac_sparsity
+        sparsity = self.get_subjac_sparsity()
         modes = [self._fwd, self._rev]
 
         stream.write("{\n")
@@ -612,17 +620,18 @@ class Coloring(object):
         """
         Compute the sparsity structure of each subjacobian based on the full jac sparsity.
 
+        If row/col variables and sizes are not known, returns None.
+
         Returns
         -------
-        dict
+        dict or None
             Mapping of (of, wrt) keys to thier corresponding (nzrows, nzcols, shape).
         """
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
             J = np.zeros(self._shape, dtype=bool)
             J[self._nzrows, self._nzcols] = True
-            self._subjac_sparsity = _jac2subjac_sparsity(J, self._row_vars, self._col_vars,
-                                                         self._row_var_sizes, self._col_var_sizes)
-            return self._subjac_sparsity
+            return _jac2subjac_sparsity(J, self._row_vars, self._col_vars,
+                                        self._row_var_sizes, self._col_var_sizes)
 
     def get_declare_partials_calls(self):
         """
@@ -634,14 +643,13 @@ class Coloring(object):
             A string containing a declare_partials() call for each nonzero subjac. This
             string may be cut and pasted into a component's setup() method.
         """
-        if self._subjac_sparsity is None:
-            self.get_subjac_sparsity()
+        subjac_sparsity = self.get_subjac_sparsity()
 
-        if self._subjac_sparsity is None:
+        if subjac_sparsity is None:
             raise RuntimeError("Coloring doesn't have enough info to compute subjac sparsity.")
 
         lines = []
-        for of, sub in iteritems(self._subjac_sparsity):
+        for of, sub in iteritems(subjac_sparsity):
             for wrt, tup in iteritems(sub):
                 nzrows, nzcols, shape = tup
                 if nzrows.size > 0:
@@ -974,7 +982,7 @@ def MNCO_bidir(J):
     return coloring
 
 
-def _tol_sweep(arr, tol=1e-15, orders=5):
+def _tol_sweep(arr, tol=1e-15, orders=12):
     """
     Find best tolerance 'around' tol to choose nonzero values of arr.
 
@@ -1014,9 +1022,17 @@ def _tol_sweep(arr, tol=1e-15, orders=5):
 
     # pick lowest tolerance corresponding to the most repeated number of 'zero' entries
     sorted_items = sorted(nzeros.items(), key=lambda x: len(x[1]), reverse=True)
+    n_matching = len(sorted_items[0][1])
+
+    if n_matching == 1:
+        raise RuntimeError("Could not find more than 1 tolerance to match any number of nonzeros. "
+                           "This indicates that your tolerance sweep of +- %d orders, starting "
+                           "from %s is not big enough.  To get a 'stable' sparsity pattern, "
+                           "try re-running with a larger tolerance sweep." % (orders, tol))
+
     good_tol = sorted_items[0][1][-1]
 
-    return good_tol, len(sorted_items[0][1]), n_tested, sorted_items[0][0]
+    return good_tol, n_matching, n_tested, sorted_items[0][0]
 
 
 @contextmanager
@@ -1050,7 +1066,7 @@ def _compute_total_coloring_context(top):
             jac._randomize = False
 
 
-def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=5, setup=False, run_model=False):
+def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=12, setup=False, run_model=False):
     """
     Return a boolean version of the total jacobian.
 
@@ -1350,9 +1366,8 @@ def _compute_coloring(J, mode):
     return coloring
 
 
-def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15,
-                           include_sparsity=True, setup=False, run_model=False, bool_jac=None,
-                           fname=None):
+def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=12, setup=False,
+                           run_model=False, bool_jac=None, fname=None):
     """
     Compute simultaneous derivative colorings for the total jacobian of the given problem.
 
@@ -1366,9 +1381,8 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15,
         Number of times to repeat total jacobian computation.
     tol : float
         Tolerance used to determine if an array entry is nonzero.
-    include_sparsity : bool
-        If True, include the sparsity structure of the total jacobian mapped to design vars
-        and responses.  (This info is used by pyOptSparseDriver).
+    orders : int
+        Number of orders above and below the tolerance to check during the tolerance sweep.
     setup : bool
         If True, run setup before calling compute_totals.
     run_model : bool
@@ -1411,17 +1425,17 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15,
             _initialize_model_approx(model, driver, ofs, wrts)
             coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0],
                                                      repeats=repeats)
-            if include_sparsity:
-                sparsity = coloring.get_subjac_sparsity()
         else:
-            J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup,
+            J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, orders=orders, setup=setup,
                                     run_model=run_model)
             coloring = _compute_coloring(J, mode)
-
-            if include_sparsity:
-                sparsity = _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes)
+            coloring._row_vars = ofs
+            coloring._row_var_sizes = of_sizes
+            coloring._col_vars = wrts
+            coloring._col_var_sizes = wrt_sizes
 
         driver._total_jac = None
+
     elif bool_jac is not None:
         J = bool_jac
         time_sparsity = 0.
@@ -1432,15 +1446,6 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15,
     else:
         raise RuntimeError("You must supply either problem or bool_jac to "
                            "compute_total_coloring().")
-
-    if bool_jac is None:
-        coloring._row_vars = ofs
-        coloring._row_var_sizes = of_sizes
-        coloring._col_vars = wrts
-        coloring._col_var_sizes = wrt_sizes
-
-    if include_sparsity:
-        coloring._subjac_sparsity = sparsity
 
     if fname is not None:
         coloring.save(fname)
@@ -1475,7 +1480,7 @@ def dynamic_sparsity(driver):
     driver._setup_tot_jac_sparsity()
 
 
-def dynamic_total_coloring(driver, run_model=True, do_sparsity=False):
+def dynamic_total_coloring(driver, run_model=True):
     """
     Compute simultaneous deriv coloring during runtime.
 
@@ -1485,8 +1490,6 @@ def dynamic_total_coloring(driver, run_model=True, do_sparsity=False):
         The driver performing the optimization.
     run_model : bool
         If True, call run_model before computing coloring.
-    do_sparsity : bool
-        If True, setup the total jacobian sparsity (needed by pyOptSparseDriver).
     """
     problem = driver._problem
     if not problem.model._use_derivatives:
@@ -1497,15 +1500,13 @@ def dynamic_total_coloring(driver, run_model=True, do_sparsity=False):
 
     coloring = compute_total_coloring(problem,
                                       repeats=driver.options['dynamic_derivs_repeats'],
-                                      tol=1.e-15, include_sparsity=do_sparsity,
+                                      tol=1.e-15,
                                       setup=False, run_model=run_model)
     # save the coloring.pkl file for later inspection
     coloring.save('coloring.pkl')
 
     driver.set_coloring_spec(coloring)
     driver._setup_simul_coloring()
-    if do_sparsity:
-        driver._setup_tot_jac_sparsity()
 
 
 def _total_coloring_setup_parser(parser):
@@ -1566,7 +1567,6 @@ def _total_coloring_cmd(options):
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 coloring = compute_total_coloring(prob,
                                                   repeats=options.num_jacs, tol=options.tolerance,
-                                                  include_sparsity=do_sparsity,
                                                   setup=False, run_model=True,
                                                   fname=options.outfile)
 

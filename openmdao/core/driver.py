@@ -994,7 +994,7 @@ class Driver(object):
 
         # total_coloring_info can contain data for either fwd, rev, or both, along with optional
         # sparsity patterns
-        sparsity = self._total_coloring_info._subjac_sparsity
+        sparsity = self._total_coloring_info.get_subjac_sparsity()
 
         if sparsity is not None:
             if self._total_jac_sparsity is not None:

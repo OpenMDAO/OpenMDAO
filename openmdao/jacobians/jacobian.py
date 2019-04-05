@@ -262,7 +262,7 @@ class Jacobian(object):
             for key in subjacs:
                 summ[key] += np.abs(subjacs[key]['value'])
 
-    def _compute_sparsity(self, system, wrt_matches, tol=1e-15, orders=5):
+    def _compute_sparsity(self, system, wrt_matches, tol=1e-15, orders=12):
         """
         Compute a dense sparsity matrix for this jacobian using saved absolute summations.
 
