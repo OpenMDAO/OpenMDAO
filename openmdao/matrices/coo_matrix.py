@@ -152,13 +152,13 @@ class COOMatrix(Matrix):
         data, rows, cols = self._build_sparse(num_rows, num_cols)
 
         metadata = self._metadata
-        for key, (ind1, ind2, idxs, jac_type, factor) in iteritems(metadata):
+        for key, (start, end, idxs, jac_type, factor) in iteritems(metadata):
             if idxs is None:
-                metadata[key] = (slice(ind1, ind2), jac_type, factor)
+                metadata[key] = (slice(start, end), jac_type, factor)
             else:
                 # store reverse indices to avoid copying subjac data during
                 # update_submat.
-                metadata[key] = (np.argsort(idxs) + ind1, jac_type, factor)
+                metadata[key] = (np.argsort(idxs) + start, jac_type, factor)
 
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 

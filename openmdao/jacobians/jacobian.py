@@ -392,7 +392,7 @@ class Jacobian(object):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for key, meta in iteritems(self._subjacs_info):
+        for meta in itervalues(self._subjacs_info):
             if active:
                 meta['value'] = meta['value'].astype(np.complex)
             else:

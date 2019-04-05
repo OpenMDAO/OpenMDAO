@@ -321,6 +321,10 @@ class AssembledJacobian(Jacobian):
         system : System
             System that is updating this jacobian.
         """
+        if self._int_mtx is None:
+            self._initialize(system)
+            self._init_view(system)
+
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
         subjacs = system._subjacs_info
@@ -422,10 +426,11 @@ class AssembledJacobian(Jacobian):
         """
         super(AssembledJacobian, self).set_complex_step_mode(active)
 
-        self._int_mtx.set_complex_step_mode(active)
-        for mtx in itervalues(self._ext_mtx):
-            if mtx:
-                mtx.set_complex_step_mode(active)
+        if self._int_mtx is not None:
+            self._int_mtx.set_complex_step_mode(active)
+            for mtx in itervalues(self._ext_mtx):
+                if mtx:
+                    mtx.set_complex_step_mode(active)
 
 
 class DenseJacobian(AssembledJacobian):
