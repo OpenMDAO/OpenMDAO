@@ -1503,7 +1503,7 @@ def dynamic_total_coloring(driver, run_model=True):
                                       tol=1.e-15,
                                       setup=False, run_model=run_model)
     # save the coloring.pkl file for later inspection
-    coloring.save('coloring.pkl')
+    coloring.save('total_coloring.pkl')
 
     driver.set_coloring_spec(coloring)
     driver._setup_simul_coloring()

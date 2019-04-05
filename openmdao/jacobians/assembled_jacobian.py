@@ -20,7 +20,7 @@ _empty_dict = {}
 
 class AssembledJacobian(Jacobian):
     """
-    Assemble dense global <Jacobian>.
+    Assemble a global <Jacobian>.
 
     Attributes
     ----------
@@ -232,7 +232,7 @@ class AssembledJacobian(Jacobian):
                 res_size = abs2meta[res_abs_name]['size']
 
                 for in_abs_name in s._var_abs_names['input']:
-                    if in_abs_name not in conns:
+                    if in_abs_name not in conns:  # unconnected input
                         abs_key = (res_abs_name, in_abs_name)
 
                         if abs_key not in subjacs_info:

@@ -742,7 +742,7 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def set_approx_coloring_meta(self, wrt=None, method=None, form=None, step=None,
+    def declare_partial_coloring(self, wrt=None, method=None, form=None, step=None,
                                  directory=None, fname=None):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
@@ -762,11 +762,13 @@ class System(object):
             or default value.
         directory : str or None
             If not None, the coloring for this system will be saved to the given directory.
-            The file will be named as the system's pathname with dots replaced by underscores.
+            If None, the directory will be the current directory whenever compute_approx_coloring
+            is called.
         fname : str or None
             If not None, use this as the name of the coloring file.  If a relative path, make
             it relative to the specified directory if there is one, else the current working
-            directory.  If None, set the filename to the object's classname + '.pkl'.
+            directory.  If None, set the filename to the full module path of the object's
+            classname with dots replaced by underscores + '.pkl'.
         """
         if method is None:
             if self._approx_coloring_info is None:
@@ -875,7 +877,7 @@ class System(object):
         if not os.path.exists(directory):
             os.mkdir(directory)
 
-        self.set_approx_coloring_meta(wrt, method, form, step, directory, fname)
+        self.declare_partial_coloring(wrt, method, form, step, directory, fname)
         approx_scheme = self._get_approx_scheme(self._approx_coloring_info['method'])
 
         from openmdao.core.group import Group

@@ -207,7 +207,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        # comp.set_approx_coloring_meta('x*', method=self.FD_METHOD, directory=self.tempdir)
+        # comp.declare_partial_coloring('x*', method=self.FD_METHOD, directory=self.tempdir)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -261,7 +261,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        # comp.set_approx_coloring_meta('x*', method=self.FD_METHOD, directory=self.tempdir)
+        # comp.declare_partial_coloring('x*', method=self.FD_METHOD, directory=self.tempdir)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -577,7 +577,7 @@ class TestCSStaticColoring(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
-        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
+        model.declare_partial_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -645,7 +645,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                                   isplit=2, osplit=2))
-        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
+        model.declare_partial_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -688,7 +688,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        model.set_approx_coloring_meta('*', method=self.FD_METHOD)
+        model.declare_partial_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
