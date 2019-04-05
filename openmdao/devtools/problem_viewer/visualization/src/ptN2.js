@@ -1,7 +1,6 @@
 function PtN2Diagram(parentDiv, modelData) {
     var root = modelData.tree;
     var conns = modelData.connections_list;
-    var sys_pathnames = modelData.sys_pathnames_list;
     var abs2prom = modelData.hasOwnProperty("abs2prom") ? modelData.abs2prom : undefined;
 
     var FONT_SIZE_PX = 11;
@@ -1236,6 +1235,8 @@ function PtN2Diagram(parentDiv, modelData) {
         }
 
         ClearConnections(root);
+
+        var sys_pathnames = modelData.sys_pathnames_list;
 
         for (var i = 0; i < conns.length; ++i) {
             var srcSplitArray = conns[i].src.split(/\.|:/);
