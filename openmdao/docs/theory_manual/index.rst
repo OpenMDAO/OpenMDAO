@@ -17,6 +17,7 @@ mathematical manner to help users gain a deeper understanding of how the framewo
    implicit_transformation_of_vars.rst
    setup_stack.rst
    solver_api.rst
+   scaling.rst
 
 
 Total Derivatives Theory
