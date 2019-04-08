@@ -1,11 +1,11 @@
 .. _theory_scaling:
 
-*******************
-Scaling in OpenMDAO
-*******************
+*****************************
+Scaling Variables in OpenMDAO
+*****************************
 
-In the :ref:`feature doc on scaling <scale_outputs_and_resids>`, you learned how you can specify multiplicative and additive scale factors
-that are applied to the output and residual variables to aid solver convergence. This theory document shows how scaling is handled internally.
+In the :ref:`section of the documentation that covered scaling variables <scale_outputs_and_resids>`, you learned how you can specify multiplicative and additive scale factors
+that are applied to the output and residual variables to aid solver convergence. This theory document shows how that scaling is handled internally.
 
 When OpenMDAO runs a model, all of the numerical data from connections is assembled into a set of vectors called the "inputs" and "outputs"
 vectors. When a component calls its "compute" function, it is passed a sub-vector that contains views to just the data relevant to that component.
@@ -19,18 +19,18 @@ calls a user-written function like "compute", the vectors will always be in an u
 
 **outputs and residuals (linear and nonlinear) are in an unscaled state**
 
- - Before run_model is called
- - After run_model is finished
- - During ExplicitComponent API calls compute, compute_partials
- - During ImplicitComponent API calls apply_nonlinear, linearize
- - During guess_nonlinear
+ - Before `run_model` is called
+ - After `run_model` is finished
+ - During ExplicitComponent API calls to `compute`, `compute_partials`
+ - During ImplicitComponent API calls to `apply_nonlinear`, `linearize`
+ - During `guess_nonlinear`
  - When a Driver runs the model or computes a total derivative
 
 **outputs and residuals (linear and nonlinear) are in a scaled state**
 
- - At all points "in between" the cases listed above
  - During solver iteration (computing next step, determining convergence)
  - When data is passed from outputs to inputs
+ - When OpenMDAO loops over the model hieararchy
 
 The scaling system is also used to handle unit conversion. This proves to be a good fit because every unit in the unit library can be represented
 as a multiplication and an addition.  Unit conversion happens upon the passing of data from outputs to inputs. You cannot specify scaling for
@@ -65,12 +65,12 @@ are converted to a scaled state for the overall operation, and then unscaled for
 
 The first phase is linearize, where compute_partials is called on the Paraboloid. During this phase, the entire jacobian is assembled from the component
 subjacobians. Note that, while for a single iteration it might seem like a waste to scale at the start of the linearization, keep in mind that linearize
-normally follows on after execution, so the model is already in a scaled state.
+normally occurs immediately after execution, so the model is already in a scaled state.
 
 The second phase loops over the right hand sides and performs the LU solve. This essentially takes the contents of the linear residuals (or outputs in "rev" mode)
 and multiplies with the inverse jacobian, placing the results in the linear outputs (or residuals in "rev" mode).  This operation is always done with
-the vectors unscaled. You might ask why we don't just scale the jacobian, but that would involve n**2 multiplications compared to 2*n (or 4*n if we could eliminate the unscale
-during linearize), so for any problem larger than a few variables, it is considerably more efficient to just scale the vectors as needed.
+the vectors unscaled. You might ask why we don't just scale the jacobian, but that would involve n**2 multiplications compared to 2*n so for any problem
+larger than a few variables, it is considerably more efficient to just scale the vectors as needed.
 
 .. figure:: sequence_diagrams/scaling_compute_totals_direct.png
    :align: center
@@ -81,11 +81,11 @@ during linearize), so for any problem larger than a few variables, it is conside
 Scenarios: computing total derivatives with ScipyKrylov
 -------------------------------------------------------
 
-This sqeuence shows computation of derivatives with a Krylov iterative solver rather than a direct solver. Aside from the additional looping, the main
+This sequence shows computation of derivatives with a Krylov iterative solver rather than a direct solver. Aside from the additional looping, the main
 difference is that unit conversion of the derivatives are also handled by unscaling the linear inputs vector when it is passed rather than being baked in
 to the assembled jacobian.
 
 .. figure:: sequence_diagrams/scaling_compute_totals_gmres.png
    :align: center
    :width: 100%
-   :alt: Sequence diagrams for scaling during copute_totals with ScipyKrylov
+   :alt: Sequence diagrams for scaling during compute_totals with ScipyKrylov
