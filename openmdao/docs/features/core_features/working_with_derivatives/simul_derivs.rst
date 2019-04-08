@@ -45,11 +45,11 @@ Dynamic coloring computes the derivative colors at runtime, shortly after the dr
 optimization.  This has the advantage of simplicity and robustness to changes in the model, but
 adds the cost of the coloring computation to the run time of the optimization.  For a typical
 optimization, however, this cost will be small.  Activating dynamic coloring is simple.  Just
-set the `dynamic_simul_derivs` option on the driver.  For example:
+set the `dynamic_total_derivs` option on the driver.  For example:
 
 .. code-block:: python
 
-    prob.driver.options['dynamic_simul_derivs'] = True
+    prob.driver.options['dynamic_total_derivs'] = True
 
 
 If you want to change the number of compute_totals calls that the coloring algorithm uses to

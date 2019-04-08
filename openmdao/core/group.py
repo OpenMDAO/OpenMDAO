@@ -288,6 +288,22 @@ class Group(System):
 
         self.configure()
 
+        if self.pathname == '' and self.options['dynamic_semi_total_derivs']:
+            raise RuntimeError("The `dynamic_semi_total_derivs' option was set on the top level "
+                               "Group.")
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        self.options.declare('dynamic_semi_total_derivs', default=False, types=bool,
+                             desc="Compute semi-total derivative coloring dynamically if True. "
+                             "This only works for sub-groups.  For the top level group, set "
+                             "the 'dynamic_total_derivs' option on the driver.")
+        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
+                             desc='Number of _linearize calls during dynamic computation of '
+                             'semi-total derivative coloring')
+
     def _setup_procs(self, pathname, comm, mode):
         """
         Execute first phase of the setup process.
@@ -1831,7 +1847,7 @@ class Group(System):
 
     def set_coloring_spec(self, coloring):
         """
-        Specify a static coloring to use for this System.
+        Specify a static coloring to use for this Group.
 
         Parameters
         ----------

@@ -166,23 +166,19 @@ class Jacobian(object):
 
                 if rows is None:
                     # Dense subjac
-                    shape = self._abs_key2shape(abs_key)
                     subjac = np.atleast_2d(subjac)
-                    if subjac.shape == (1, 1):
-                        subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
-                    else:
+                    if subjac.shape != (1, 1):
+                        shape = self._abs_key2shape(abs_key)
                         subjac = subjac.reshape(shape)
                 else:
                     # Sparse subjac
-                    if subjac.shape == (1,):
-                        subjac = subjac[0] * np.ones(rows.shape, dtype=safe_dtype)
-
-                    if subjac.shape != rows.shape:
+                    if subjac.shape != (1,) and subjac.shape != rows.shape:
                         raise ValueError("Sub-jacobian for key %s has "
                                          "the wrong shape (%s), expected (%s)." %
                                          (abs_key, subjac.shape, rows.shape))
 
-                np.copyto(subjacs_info['value'], subjac)
+                subjacs_info['value'][:] = subjac
+
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))

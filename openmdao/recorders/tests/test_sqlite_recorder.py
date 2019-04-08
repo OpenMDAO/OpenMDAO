@@ -1836,17 +1836,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                          sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
 
         # options for system 'd1', with second option excluded
-        self.assertEqual(str(metadata['d1']['component_options']),
-            "=============== ======= ================= ================ =========================================\n"
-            "Option          Default Acceptable Values Acceptable Types Description                              \n"
-            "=============== ======= ================= ================ =========================================\n"
-            "distributed     False   [True, False]     ['bool']         True if the component has variables that \n"
-            "                                                           are distributed across multiple processes\n"
-            "                                                           .\n"
-            "options value 1 1       N/A               N/A                                                       \n"
-            "=============== ======= ================= ================ =========================================")
-
         self.assertEqual(metadata['d1']['component_options']['distributed'], False)
+        self.assertEqual(metadata['d1']['component_options']['dynamic_partial_derivs'], False)
+        self.assertEqual(metadata['d1']['component_options']['options value 1'], 1)
 
     def test_feature_system_options(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader

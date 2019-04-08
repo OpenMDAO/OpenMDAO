@@ -95,6 +95,8 @@ class Coloring(object):
         Names of variables corresponding to rows.
     _row_var_sizes : ndarray or None
         Sizes of row variables.
+    _static : bool
+        If True, this coloring was not generated dynamically during the current session.
     _meta : dict
         Dictionary of metadata used to create the coloring.
     _writers : dict
@@ -134,6 +136,7 @@ class Coloring(object):
         self._col_var_sizes = col_var_sizes
 
         self._coloring_time = None
+        self._static = True
         self._fwd = None
         self._rev = None
         self._meta = {}
@@ -1100,7 +1103,7 @@ def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=12, setup=False, run_
         A boolean composite of 'repeats' total jacobians.
     """
     # clear out any old simul coloring info
-    prob.driver._total_coloring_info = None
+    prob.driver._total_coloring = None
     prob.driver._res_jacs = {}
 
     if setup:
@@ -1498,13 +1501,23 @@ def dynamic_total_coloring(driver, run_model=True):
 
     driver._total_jac = None
 
+    if driver._total_coloring is not None:
+        if driver._total_coloring._static:
+            raise RuntimeError("A total coloring was already set and would be overridden by the "
+                               "requested dynamic coloring.")
+        else:
+            # this is not the first time run_driver has been executed.  Go ahead and regen the
+            # coloring just in case something has changed since the first call, but reset anything
+            # that will raise exceptions about multiple definition.
+            driver._total_jac_sparsity = None  # prevent complaints about redefining the sparsity
+
     coloring = compute_total_coloring(problem,
                                       repeats=driver.options['dynamic_derivs_repeats'],
                                       tol=1.e-15,
-                                      setup=False, run_model=run_model)
-    # save the coloring.pkl file for later inspection
-    coloring.save('total_coloring.pkl')
+                                      setup=False, run_model=run_model,
+                                      fname='total_coloring.pkl')
 
+    coloring._static = False
     driver.set_coloring_spec(coloring)
     driver._setup_simul_coloring()
 

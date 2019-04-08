@@ -114,6 +114,11 @@ class Component(System):
         self.options.declare('distributed', types=bool, default=False,
                              desc='True if the component has variables that are distributed '
                                   'across multiple processes.')
+        self.options.declare('dynamic_partial_derivs', default=False, types=bool,
+                             desc='Compute partial derivative coloring dynamically if True')
+        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
+                             desc='Number of _linearize calls during dynamic computation of '
+                             'partial derivative coloring')
 
     @property
     def distributed(self):
