@@ -4,7 +4,7 @@
 Scaling Variables in OpenMDAO
 *****************************
 
-In the :ref:`section of the documentation that covered scaling variables <scale_outputs_and_resids>`, you learned how you can specify multiplicative and additive scale factors
+In the :ref:`section of the documentation that covers scaling variables <scale_outputs_and_resids>`, you learned how you can specify multiplicative and additive scale factors
 that are applied to the output and residual variables to aid solver convergence. This theory document shows how that scaling is handled internally.
 
 When OpenMDAO runs a model, all of the numerical data from connections is assembled into a set of vectors called the "inputs" and "outputs"
