@@ -266,6 +266,8 @@ class System(object):
         If True, perform any memory allocations necessary for derivative computation.
     _approx_coloring_info : tuple
         Metadata that defines how to perform coloring of this System's approx jacobian.
+    _check_dyn_coloring : bool
+        If True, check for dynamic coloring metadata and compute coloring
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -418,6 +420,7 @@ class System(object):
         self._owning_rank = None
         self._lin_vec_names = []
         self._approx_coloring_info = None
+        self._check_dyn_coloring = True   # will check in first call to _linearize
 
     def _declare_options(self):
         """
@@ -742,7 +745,7 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def declare_partial_coloring(self, wrt=None, method=None, form=None, step=None,
+    def _declare_approx_coloring(self, wrt=None, method=None, form=None, step=None,
                                  per_instance=False):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
@@ -805,9 +808,6 @@ class System(object):
         options.update({k: v for k, v in iteritems(new_opts) if v is not None})
         self._approx_coloring_info = options
 
-    def _setup_approx_coloring(self):
-        pass
-
     def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
                                 repeats=2, perturb_size=1e-3, tol=1e-15,
                                 directory='coloring_files', per_instance=False, recurse=False):
@@ -865,12 +865,16 @@ class System(object):
                                                          directory, per_instance, recurse)
                 return coloring
             else:
-                self.declare_partial_coloring(wrt=wrt, method=method, form=form, step=step,
+                self._declare_approx_coloring(wrt=wrt, method=method, form=form, step=step,
                                               per_instance=per_instance)
+
+        rank0 = ((self._full_comm is not None and self._full_comm.rank == 0) or
+                 (self._full_comm is None and self.comm.rank == 0))
 
         if directory is not None and not os.path.abspath(directory) == directory:
             directory = os.path.join(os.getcwd(), directory)
-        if not os.path.exists(directory):
+
+        if rank0 and not os.path.exists(directory):
             os.mkdir(directory)
 
         approx_scheme = self._get_approx_scheme(self._approx_coloring_info['method'])
@@ -917,7 +921,7 @@ class System(object):
         coloring._row_var_sizes = list(ordered_ofs.values())
         coloring._col_var_sizes = list(ordered_wrts.values())
         coloring._meta = {}  # save metadata we used to create the coloring
-        for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step'):
+        for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step', 'per_instance'):
             if name in info:
                 coloring._meta[name] = info[name]
         info['coloring'] = coloring

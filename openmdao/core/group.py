@@ -1740,6 +1740,15 @@ class Group(System):
         """
         # Group finite difference
         if self._owns_approx_jac:
+            if self._check_dyn_coloring:
+                self._check_dyn_coloring = False  # only do this once
+                if self._approx_coloring_info is not None:
+                    if self._approx_coloring_info['coloring'] is None:
+                        coloring = self.compute_approx_coloring()
+                        coloring.summary()
+                        self.set_coloring_spec(coloring)
+                    self._setup_static_approx_coloring()
+
             jac = self._jacobian
             if self.pathname == "":
                 for approximation in itervalues(self._approx_schemes):
@@ -1845,6 +1854,33 @@ class Group(System):
 
         super(Group, self)._setup_jacobians(recurse=recurse)
 
+    def declare_semi_total_coloring(self, wrt=None, method=None, form=None, step=None,
+                                    per_instance=False):
+        """
+        Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain input names, output names, or glob patterns.
+        method : str
+            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference. Leave undeclared to keep unchanged from previous
+            or default value.
+        per_instance : bool
+            If True, a separate coloring will be generated for each instance of a given class.
+            Otherwise, only one coloring for a given class will be generated and all instances
+            of that class will use it.
+        """
+        if self.pathname == '':
+            raise RuntimeError("Can't call declare_semi_total_coloring on top level Group.")
+        self._declare_approx_coloring(wrt, method, form, step, per_instance)
+
     def set_coloring_spec(self, coloring):
         """
         Specify a static coloring to use for this Group.
@@ -1917,7 +1953,7 @@ class Group(System):
         wrt_colors_matched = set()
         if info is not None and (self._owns_approx_of or self.pathname):
             wrt_color_patterns = info['wrt_patterns']
-            color_meta = self._setup_approx_coloring()
+            color_meta = self._get_approx_coloring_meta()
         else:
             wrt_color_patterns = ()
 
@@ -2003,7 +2039,7 @@ class Group(System):
                                "compute_total_coloring on the driver.")
         self._setup_approx_partials()
 
-    def _setup_approx_coloring(self):
+    def _get_approx_coloring_meta(self):
         info = self._approx_coloring_info
         method = info['method']
         approx_scheme = self._get_approx_scheme(method)

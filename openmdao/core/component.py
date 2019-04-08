@@ -356,10 +356,32 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
-    def _setup_static_approx_coloring(self):
-        self._setup_approx_coloring()
+    def declare_partial_coloring(self, wrt=None, method=None, form=None, step=None,
+                                 per_instance=False):
+        """
+        Set options for partial deriv coloring of a set of wrt vars matching the given pattern(s).
 
-    def _setup_approx_coloring(self):
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain input names, output names, or glob patterns.
+        method : str
+            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference. Leave undeclared to keep unchanged from previous
+            or default value.
+        per_instance : bool
+            If True, a separate coloring will be generated for each instance of a given class.
+            Otherwise, only one coloring for a given class will be generated and all instances
+            of that class will use it.
+        """
+        self._declare_approx_coloring(wrt, method, form, step, per_instance)
+
+    def _setup_static_approx_coloring(self):
         if self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 

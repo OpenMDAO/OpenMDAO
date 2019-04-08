@@ -132,9 +132,6 @@ class ExplicitComponent(Component):
             If True, setup jacobians in all descendants. (ignored)
         """
         if self._use_derivatives:
-            if self._approx_coloring_info is not None:
-                self._setup_approx_coloring()
-
             self._set_partials_meta()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
@@ -397,6 +394,15 @@ class ExplicitComponent(Component):
         """
         if not (self._has_compute_partials or self._approx_schemes):
             return
+
+        if self._check_dyn_coloring:
+            self._check_dyn_coloring = False  # only do this once
+            if self._approx_coloring_info is not None:
+                if self._approx_coloring_info['coloring'] is None:
+                    coloring = self.compute_approx_coloring()
+                    coloring.summary()
+                    self.set_coloring_spec(coloring)
+                self._setup_static_approx_coloring()
 
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
             # Computing the approximation before the call to compute_partials allows users to

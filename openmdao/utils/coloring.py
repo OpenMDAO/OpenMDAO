@@ -1775,9 +1775,11 @@ def _partial_coloring_cmd(options):
                 else:
                     coloring = system.compute_approx_coloring(**kwargs)
 
+                    print("Approx coloring for '%s' (class %s)\n" % (s.pathname, klass))
                     if options.show_jac:
                         coloring.display()
                     coloring.summary()
+                    print('\n')
 
                     if options.activate:
                         system.set_coloring_spec(coloring)

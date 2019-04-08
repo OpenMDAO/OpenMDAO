@@ -261,21 +261,6 @@ class ImplicitComponent(Component):
                 if method is not None and method in self._approx_schemes:
                     self._approx_schemes[method].add_approximation(key, meta)
 
-    def _setup_jacobians(self, recurse=True):
-        """
-        Set and populate jacobians down through the system tree.
-
-        Parameters
-        ----------
-        recurse : bool
-            If True, setup jacobians in all descendants.
-        """
-        if self._use_derivatives:
-            if self._approx_coloring_info is not None:
-                self._setup_approx_coloring()
-
-        super(ImplicitComponent, self)._setup_jacobians(recurse)
-
     def _linearize(self, jac=None, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
@@ -287,6 +272,15 @@ class ImplicitComponent(Component):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        if self._check_dyn_coloring:
+            self._check_dyn_coloring = False  # only do this once
+            if self._approx_coloring_info is not None:
+                if self._approx_coloring_info['coloring'] is None:
+                    coloring = self.compute_approx_coloring()
+                    coloring.summary()
+                    self.set_coloring_spec(coloring)
+                self._setup_static_approx_coloring()
+
         with self._unscaled_context(outputs=[self._outputs]):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
