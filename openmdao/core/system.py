@@ -743,7 +743,7 @@ class System(object):
         self._setup_connections(recurse=recurse)
 
     def declare_partial_coloring(self, wrt=None, method=None, form=None, step=None,
-                                 directory=None, fname=None):
+                                 per_instance=False):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -760,15 +760,10 @@ class System(object):
         step : float
             Step size for finite difference. Leave undeclared to keep unchanged from previous
             or default value.
-        directory : str or None
-            If not None, the coloring for this system will be saved to the given directory.
-            If None, the directory will be the current directory whenever compute_approx_coloring
-            is called.
-        fname : str or None
-            If not None, use this as the name of the coloring file.  If a relative path, make
-            it relative to the specified directory if there is one, else the current working
-            directory.  If None, set the filename to the full module path of the object's
-            classname with dots replaced by underscores + '.pkl'.
+        per_instance : bool
+            If True, a separate coloring will be generated for each instance of a given class.
+            Otherwise, only one coloring for a given class will be generated and all instances
+            of that class will use it.
         """
         if method is None:
             if self._approx_coloring_info is None:
@@ -787,8 +782,6 @@ class System(object):
         options['wrt_patterns'] = ('*',)
         options['method'] = method
         options['coloring'] = None
-        options['directory'] = None
-        options['fname'] = None
 
         # overwrite with any old values
         if self._approx_coloring_info is not None:
@@ -806,8 +799,7 @@ class System(object):
             'wrt_patterns': wrt_patterns,
             'form': form,
             'step': step,
-            'directory': directory,
-            'fname': fname,
+            'per_instance': per_instance,
         }
 
         options.update({k: v for k, v in iteritems(new_opts) if v is not None})
@@ -818,7 +810,7 @@ class System(object):
 
     def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
                                 repeats=2, perturb_size=1e-3, tol=1e-15,
-                                directory=None, fname=None, recurse=False):
+                                directory='coloring_files', per_instance=False, recurse=False):
         """
         Compute a coloring of the approximated derivatives.
 
@@ -847,12 +839,12 @@ class System(object):
             Tolerance used to determine if an array entry is zero or nonzero when computing
             sparsity.
         directory : str or None
-            If not None, the coloring for this system will be saved to the given directory.
-            The file will be named as the system's pathname with dots replaced by underscores.
-        fname : str or None
-            If not None, use this as the name of the coloring file.  If a relative path, make
-            it relative to the specified directory if there is one, else the current working
-            directory.  If None, set the filename to the object's classname + '.pkl'.
+            If not None, the coloring(s) for any colored system will be saved to the given
+            directory.
+        per_instance : bool
+            If True, a separate coloring will be generated for each instance of a given class.
+            Otherwise, only one coloring for a given class will be generated and all instances
+            of that class will use it.
         recurse : bool
             If True, recurse from this system down the system hierarchy.  Whenever a group
             is encountered that has specified its coloring metadata, we don't recurse below
@@ -864,20 +856,23 @@ class System(object):
             The computed coloring.
         """
         if self._approx_coloring_info is None:
+            # we only recurse if we're not doing approx coloring at this level
             if recurse:
                 coloring = None
                 for s in self._subsystems_myproc:
                     coloring = s.compute_approx_coloring(wrt, method, form, step, repeats,
                                                          perturb_size,
-                                                         directory, fname, recurse)
+                                                         directory, per_instance, recurse)
                 return coloring
+            else:
+                self.declare_partial_coloring(wrt=wrt, method=method, form=form, step=step,
+                                              per_instance=per_instance)
 
-        if directory is None:
-            directory = os.path.join(os.getcwd(), 'coloring_files')
+        if directory is not None and not os.path.abspath(directory) == directory:
+            directory = os.path.join(os.getcwd(), directory)
         if not os.path.exists(directory):
             os.mkdir(directory)
 
-        self.declare_partial_coloring(wrt, method, form, step, directory, fname)
         approx_scheme = self._get_approx_scheme(self._approx_coloring_info['method'])
 
         from openmdao.core.group import Group
@@ -927,7 +922,7 @@ class System(object):
                 coloring._meta[name] = info[name]
         info['coloring'] = coloring
 
-        self._save_coloring(coloring, info['directory'], info['fname'])
+        self._save_coloring(coloring, directory, info['per_instance'])
 
         # restore original inputs/outputs
         self._inputs._data[:] = starting_inputs
@@ -935,9 +930,9 @@ class System(object):
 
         return self._approx_coloring_info['coloring']
 
-    def _save_coloring(self, coloring, directory=None, fname=None):
+    def _save_coloring(self, coloring, directory=None, per_instance=False):
         """
-        Save the coloring to a file based on the supplied directory, fname, and our classname.
+        Save the coloring to a file based on the supplied directory and per_instance flag.
 
         Parameters
         ----------
@@ -945,13 +940,15 @@ class System(object):
             See Coloring class docstring.
         directory : str or None
             Specified directory where file should be written.
-        fname : str or None
-            Specific file name.  If None, the class + '.pkl' will be used.
+        per_instance : bool
+            If True, a separate coloring will be saved for each instance of a given class.
+            Otherwise, only one coloring for a given class will be saved and all instances
+            of that class will use it.
         """
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(get_coloring_fname(self, directory, fname))
+            coloring.save(get_coloring_fname(self, directory, per_instance))
 
     def set_coloring_spec(self, coloring):
         """

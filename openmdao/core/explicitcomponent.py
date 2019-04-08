@@ -395,7 +395,7 @@ class ExplicitComponent(Component):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if not self._has_compute_partials and not self._approx_schemes:
+        if not (self._has_compute_partials or self._approx_schemes):
             return
 
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):

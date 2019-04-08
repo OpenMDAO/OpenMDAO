@@ -104,6 +104,7 @@ def _setup_func_group():
     global func_group, base_classes
 
     from openmdao.core.system import System
+    from openmdao.core.component import Component
     from openmdao.core.explicitcomponent import ExplicitComponent
     from openmdao.core.problem import Problem
     from openmdao.core.driver import Driver
@@ -114,10 +115,12 @@ def _setup_func_group():
     from openmdao.jacobians.jacobian import Jacobian
     from openmdao.matrices.matrix import Matrix
     from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
+    from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
     for class_ in [System, ExplicitComponent, Problem, Driver, _TotalJacInfo, Solver, LinearSolver,
                    NewtonSolver, Jacobian, Matrix, DefaultVector, DefaultTransfer]:
         base_classes[class_.__name__] = class_
+
 
     func_group.update({
         'openmdao': [
@@ -187,7 +190,22 @@ def _setup_func_group():
         'transfer': [
             ('*', (DefaultTransfer,)),
             ('_transfer', (System,))
-        ]
+        ],
+        # NOTE: context managers and other functions that yield instead of return will NOT show
+        # up properly in the trace.  For example, our context managers for scaling will show up
+        # as a call and immediate return from the context manager, followed by the functions that
+        # should show up as inside of the context manager but don't.
+        # 'scaling': [
+        #     ('*scaled_context*', (System,)),
+        #     ('compute*', (Component, ApproximationScheme)),
+        #     ('_solve*', (System,)),
+        #     ('solve_*', (System,)),
+        #     ('run_*', (System,)),
+        #     ('guess_*', (System,)),
+        #     ('*apply*', (System,)),
+        #     ('_apply', (Jacobian,)),
+        #     ('*linearize', (System,)),
+        # ],
     })
 
     try:

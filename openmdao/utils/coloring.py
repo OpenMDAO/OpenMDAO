@@ -1601,7 +1601,7 @@ def _total_coloring_cmd(options):
     return _total_coloring
 
 
-def get_coloring_fname(system, directory=None, fname=None):
+def get_coloring_fname(system, directory=None, per_instance=False):
     """
     Return the full pathname to a coloring file, generating a default name if necessary.
 
@@ -1611,31 +1611,29 @@ def get_coloring_fname(system, directory=None, fname=None):
         The System having its coloring saved or loaded.
     directory : str or None
         Pathname of the directory where the coloring file will be saved
-    fname : str or None
-        Name of the coloring file.
+    per_instance : bool
+        If True, the file will be named for each instance of a given class.
+        Otherwise, the file will be named based on the class name.
 
     Returns
     -------
     str
         Full pathname of the coloring file.
     """
-    if fname is not None:
-        abs_path = os.path.abspath(fname)
-        if abs_path != fname and directory is not None:
-            final_name = os.path.join(directory, fname)
+    if directory is None:
+        return  # the file won't be saved if we return None here
+
+    directory = os.path.abspath(directory)
+
+    if per_instance:
+        if system.pathname:
+            return os.path.join(directory,
+                                'coloring_' + system.pathname.replace('.', '_') + '.pkl')
         else:
-            final_name = fname
-    elif directory is not None:
-        fn = '_'.join([system.__class__.__module__.replace('.', '_'), system.__class__.__name__])
-        final_name = os.path.join(directory, fn + '.pkl')
+            return os.path.join(directory, 'total_coloring.pkl')
     else:
-        return None
-
-    name, ext = os.path.splitext(final_name)
-    if not ext:
-        final_name += '.pkl'
-
-    return final_name
+        fn = '_'.join([system.__class__.__module__.replace('.', '_'), system.__class__.__name__])
+        return os.path.join(directory, fn + '.pkl')
 
 
 def _partial_coloring_setup_parser(parser):
@@ -1648,8 +1646,6 @@ def _partial_coloring_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', action='store', dest='fname',
-                        help="output file (pickle format). Can't be used with --recurse option.")
     parser.add_argument('--dir', action='store', dest='directory',
                         help='Directory where coloring files are saved.')
     parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
@@ -1693,18 +1689,13 @@ def _partial_coloring_setup_parser(parser):
 def _get_partial_coloring_kwargs(options):
     if options.system != '' and options.classes:
         raise RuntimeError("Can't specify --system and --class together.")
-    if options.fname is not None and options.recurse:
-        raise RuntimeError("Can't specify output file if --recurse option is set.")
     if options.classes:
         if options.recurse:
             raise RuntimeError("Can't specify --class if --recurse option is set.")
-        if len(options.classes) > 1 and options.fname:
-            raise RuntimeError("Can't specify output file if multiple classes are "
-                               "specified.")
 
     kwargs = {}
     names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol', 'directory',
-             'fname', 'recurse')
+             'recurse')
     for name in names:
         if getattr(options, name):
             kwargs[name] = getattr(options, name)
@@ -1751,9 +1742,13 @@ def _partial_coloring_cmd(options):
                     raise RuntimeError("Can't find system with pathname '%s'." % options.system)
 
                 kwargs = _get_partial_coloring_kwargs(options)
+                if 'directory' not in kwargs:
+                    kwargs['directory'] = \
+                        os.path.join(os.path.abspath(os.path.dirname(options.file[0])),
+                                     'coloring_files')
 
-                to_find = set(options.classes)
                 if options.classes:
+                    to_find = set(options.classes)
                     for s in system.system_iter(include_self=True, recurse=True):
                         for c in options.classes:
                             klass = s.__class__.__name__
@@ -1782,11 +1777,15 @@ def _partial_coloring_cmd(options):
 
                     if options.show_jac:
                         coloring.display()
-
                     coloring.summary()
+
+                    if options.activate:
+                        system.set_coloring_spec(coloring)
+                        system._setup_static_approx_coloring()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         if options.activate:
+            # instead of exiting, keep running using the computed coloring(s)
             _use_sparsity = True
         else:
             exit()
