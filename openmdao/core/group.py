@@ -1743,17 +1743,18 @@ class Group(System):
 
             if self._check_dyn_coloring:
                 self._check_dyn_coloring = False  # only do this once
+                info = self._approx_coloring_info
                 if self.options['dynamic_semi_total_derivs']:
                     coloring = self.compute_approx_coloring()
-                elif self._approx_coloring_info is not None and self._approx_coloring_info['coloring'] is not None:
-                    coloring = self._approx_coloring_info['coloring']
+                elif info is not None and info['coloring'] is not None:
+                    coloring = info['coloring']
                 else:
                     coloring = None
                 if coloring is not None:
                     coloring.summary()
                     self.set_coloring_spec(coloring)
                     self._setup_static_approx_coloring()
-        
+
             jac = self._jacobian
             if self.pathname == "":
                 for approximation in itervalues(self._approx_schemes):

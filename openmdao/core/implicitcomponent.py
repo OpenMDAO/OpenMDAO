@@ -274,10 +274,11 @@ class ImplicitComponent(Component):
         """
         if self._check_dyn_coloring:
             self._check_dyn_coloring = False  # only do this once
+            info = self._approx_coloring_info
             if self.options['dynamic_partial_derivs']:
                 coloring = self.compute_approx_coloring()
-            elif self._approx_coloring_info is not None and self._approx_coloring_info['coloring'] is not None:
-                coloring = self._approx_coloring_info['coloring']
+            elif info is not None and info['coloring'] is not None:
+                coloring = info['coloring']
             else:
                 coloring = None
             if coloring is not None:
