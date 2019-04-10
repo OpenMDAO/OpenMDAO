@@ -337,7 +337,7 @@ class ApproximationScheme(object):
                 fd_count += 1
             else:  # uncolored
                 J = tmpJ[wrt]
-                full_idxs = J['full_out_idxs']
+                full_idxs = J['loc_outvec_idxs']
                 out_slices = tmpJ['@out_slices']
                 for i_count, idxs in enumerate(col_idxs):
                     if fd_count % num_par_fd == system._par_fd_id:
@@ -496,7 +496,7 @@ def _get_wrt_subjacs(system, approxs):
     ofdict = {}
     nondense = {}
     slicedict = system._outputs.get_slice_dict()
-    abs_out_names = [n for n in system._var_allprocs_abs_names['output'] if n in slicedict]
+    abs_out_names = set([n for n in system._var_allprocs_abs_names['output'] if n in slicedict])
 
     for key, options in approxs:
         of, wrt = key
@@ -558,17 +558,18 @@ def _get_wrt_subjacs(system, approxs):
             wrt_ofs[of] = (arr[start:end, :], oidx, rows_reduced, cols_reduced)
             start = end
 
-        if len(sorted_ofs) != len(abs_out_names):
+        if abs_out_names.difference(sorted_ofs):
             full_idxs = []
             for sof in sorted_ofs:
-                slc = slicedict[sof]
-                if sof in approx_of_idx:
-                    full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[sof]])
-                else:
-                    full_idxs.append(range(slc.start, slc.stop))
-            J[wrt]['full_out_idxs'] = np.hstack(full_idxs)
+                if sof in slicedict:
+                    slc = slicedict[sof]
+                    if sof in approx_of_idx:
+                        full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[sof]])
+                    else:
+                        full_idxs.append(range(slc.start, slc.stop))
+            J[wrt]['loc_outvec_idxs'] = np.hstack(full_idxs)
         else:
-            J[wrt]['full_out_idxs'] = _full_slice
+            J[wrt]['loc_outvec_idxs'] = _full_slice
 
     return J
 
