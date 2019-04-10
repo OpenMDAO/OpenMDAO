@@ -216,7 +216,10 @@ class FiniteDifference(ApproximationScheme):
         self._starting_outs = system._outputs._data.copy()
         self._starting_resids = system._residuals._data.copy()
         self._starting_ins = system._inputs._data.copy()
-        self._results_tmp = self._starting_outs.copy()
+        if total:
+            self._results_tmp = self._starting_outs.copy()
+        else:
+            self._results_tmp = self._starting_resids.copy()
 
         self._compute_approximations(system, jac, total, system._outputs._under_complex_step)
 
@@ -296,20 +299,20 @@ class FiniteDifference(ApproximationScheme):
         if total:
             system.run_solve_nonlinear()
             self._results_tmp[:] = system._outputs._data
+            system._outputs._data[:] = self._starting_outs
         else:
             system.run_apply_nonlinear()
             self._results_tmp[:] = system._residuals._data
+            system._residuals._data[:] = self._starting_resids
 
         # save results and restore starting inputs/outputs
         system._inputs._data[:] = self._starting_ins
-        system._outputs._data[:] = self._starting_outs
-        system._residuals._data[:] = self._starting_resids
 
-        ## if results_vec are the residuals then we need to remove the delta's we added earlier
-        ## to the outputs
-        # if not total:
-            # for arr, idxs in idx_info:
-                # if arr is outputs:
-                    # arr._data[idxs] -= delta
+        # if results_vec are the residuals then we need to remove the delta's we added earlier
+        # to the outputs
+        if not total:
+            for arr, idxs in idx_info:
+                if arr is system._outputs:
+                    arr._data[idxs] -= delta
 
         return self._results_tmp

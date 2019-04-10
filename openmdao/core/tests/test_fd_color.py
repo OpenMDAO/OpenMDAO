@@ -209,9 +209,10 @@ class TestCSColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        comp._linearize()  # this first call is when the dynmamic coloring is computed, so it'll have extra executions
+        comp.run_linearize()
+        prob.run_model()
         start_nruns = comp._nruns
-        comp._linearize()
+        comp.run_linearize()
         self.assertEqual(comp._nruns - start_nruns, 5)
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity)
@@ -276,9 +277,10 @@ class TestCSColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        comp._linearize()
+        comp.run_linearize()  # trigger dynamic coloring
+        prob.run_model()   # get a good point to linearize around
         start_nruns = comp._nruns
-        comp._linearize()
+        comp.run_linearize()
         # add 5 to number of runs to cover the 5 uncolored output columns
         self.assertEqual(comp._nruns - start_nruns, sparsity.shape[0] + 5)
         jac = comp._jacobian._subjacs_info

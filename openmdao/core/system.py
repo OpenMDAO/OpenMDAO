@@ -894,6 +894,8 @@ class System(object):
         out_offsets = starting_outputs.copy()
         out_offsets[out_offsets == 0.0] = 1.0
         out_offsets *= perturb_size
+        
+        starting_resids = self._residuals._data.copy()
 
         self._setup_static_approx_coloring()
         for i in range(repeats):
@@ -936,6 +938,7 @@ class System(object):
         # restore original inputs/outputs
         self._inputs._data[:] = starting_inputs
         self._outputs._data[:] = starting_outputs
+        self._residuals._data[:] = starting_resids
 
         return coloring
 
