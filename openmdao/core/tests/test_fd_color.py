@@ -15,7 +15,7 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
-    ExplicitComponent, NonlinearBlockGS
+    ExplicitComponent, NonlinearBlockGS, pyOptSparseDriver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import get_coloring_fname, compute_total_coloring
@@ -30,6 +30,11 @@ try:
 except ImportError:
     vector_class = DefaultVector
     PETScVector = None
+
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+
+# check that pyoptsparse is installed. if it is, try to use SLSQP.
+OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 
 
 def setup_vars(self, ofs, wrts):
@@ -171,6 +176,358 @@ def _check_semitotal_matrix(system, jac, expected):
             blocks.append(np.hstack(cblocks))
     fullJ = np.vstack(blocks)
     np.testing.assert_almost_equal(fullJ, expected)
+
+
+class TestCSColoring(unittest.TestCase):
+    FD_METHOD = 'cs'
+
+    def test_simple_partials_explicit(self):
+        prob = Problem()
+        model = prob.model
+
+        sparsity = np.array(
+                [[1, 0, 0, 1, 1, 1, 0],
+                 [0, 1, 0, 1, 0, 1, 1],
+                 [0, 1, 0, 1, 1, 1, 0],
+                 [1, 0, 0, 0, 0, 1, 0],
+                 [0, 1, 1, 0, 1, 1, 1]], dtype=float
+            )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.random.random(4))
+        indeps.add_output('x1', np.random.random(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2,
+                                                              dynamic_partial_derivs=True))
+        comp.declare_partial_coloring('x*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        comp._linearize()  # this first call is when the dynmamic coloring is computed, so it'll have extra executions
+        start_nruns = comp._nruns
+        comp._linearize()
+        self.assertEqual(comp._nruns - start_nruns, 5)
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity)
+
+    def test_simple_partials_explicit_shape_bug(self):
+        prob = Problem()
+        model = prob.model
+
+        # create sparsity with last row and col all zeros.
+        # bug happened when we created a COO matrix without supplying shape
+        sparsity = np.array(
+                [[1, 0, 0, 1, 1, 1, 0],
+                 [0, 1, 0, 1, 0, 1, 0],
+                 [0, 1, 0, 1, 1, 1, 0],
+                 [1, 0, 0, 0, 0, 1, 0],
+                 [0, 0, 0, 0, 0, 0, 0]], dtype=float
+            )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.random.random(4))
+        indeps.add_output('x1', np.random.random(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2,
+                                                              dynamic_partial_derivs=True))
+        # comp.declare_partial_coloring('x*', method=self.FD_METHOD, directory=self.tempdir)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        comp._linearize()
+
+    def test_simple_partials_implicit(self):
+        prob = Problem()
+        model = prob.model
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1, 1, 0],
+             [0, 1, 0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1, 1, 0],
+             [1, 0, 0, 0, 0, 1, 0],
+             [0, 1, 1, 0, 1, 1, 1]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(4))
+        indeps.add_output('x1', np.ones(3))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2,
+                                                              dynamic_partial_derivs=True))
+        comp.declare_partial_coloring('x*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        comp._linearize()
+        start_nruns = comp._nruns
+        comp._linearize()
+        # add 5 to number of runs to cover the 5 uncolored output columns
+        self.assertEqual(comp._nruns - start_nruns, sparsity.shape[0] + 5)
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity)
+
+    def test_simple_semitotals(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 0]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        sub = model.add_subsystem('sub', Group(dynamic_semi_total_derivs=True))
+        comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.connect('indeps.x0', 'sub.comp.x0')
+        model.connect('indeps.x1', 'sub.comp.x1')
+
+        model.sub.comp.add_constraint('y0')
+        model.sub.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        derivs = prob.driver._compute_totals()  # this is when the dynamic coloring update happens
+
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()
+
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3)
+        _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity)
+
+    @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
+    def test_simple_totals(self):
+        prob = Problem()
+        model = prob.model = Group()
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        prob.driver.options['dynamic_total_derivs'] = True
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 0]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_objective('y0', index=0)  # pyoptsparse SLSQP requires a scalar objective, so pick index 0
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        model.approx_totals(method=self.FD_METHOD)
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_driver()  # need this to trigger the dynamic coloring
+
+        prob.driver._total_jac = None
+        
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3)
+        _check_total_matrix(model, derivs, sparsity[[0,3,4],:])
+
+    def test_totals_over_implicit_comp(self):
+        prob = Problem()
+        model = prob.model = Group(dynamic_total_derivs=True)
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 0]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.nonlinear_solver = NonlinearBlockGS()
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0')
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        model.approx_totals(method=self.FD_METHOD)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3 * 2)
+        _check_total_matrix(model, derivs, sparsity)
+
+    def test_totals_of_indices(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 0]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0', indices=[0,2])
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0')
+        model.add_design_var('indeps.x1')
+        model.approx_totals(method=self.FD_METHOD)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3)
+        rows = [0,2,3,4]
+        _check_total_matrix(model, derivs, sparsity[rows, :])
+
+    def test_totals_wrt_indices(self):
+        prob = Problem()
+        model = prob.model = Group(dynamic_total_derivs=True)
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 0]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0')
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0', indices=[0,2])
+        model.add_design_var('indeps.x1')
+        model.approx_totals(method=self.FD_METHOD)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+
+        nruns = comp._nruns - start_nruns
+        # only 4 cols to solve for, but we get coloring of [[2],[3],[0,1]] so only 1 better
+        self.assertEqual(nruns, 3)
+        cols = [0,2,3,4]
+        _check_total_matrix(model, derivs, sparsity[:, cols])
+
+    def test_totals_of_wrt_indices(self):
+        prob = Problem()
+        model = prob.model = Group(dynamic_total_derivs=True)
+
+        sparsity = np.array(
+            [[1, 0, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [0, 1, 0, 1, 1],
+             [1, 0, 0, 0, 0],
+             [0, 1, 1, 0, 0]], dtype=float
+        )
+
+        indeps = IndepVarComp()
+        indeps.add_output('x0', np.ones(3))
+        indeps.add_output('x1', np.ones(2))
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
+                                                              isplit=2, osplit=2))
+        # model.declare_partial_coloring('*', method=self.FD_METHOD)
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+
+        model.comp.add_constraint('y0', indices=[0,2])
+        model.comp.add_constraint('y1')
+        model.add_design_var('indeps.x0', indices=[0,2])
+        model.add_design_var('indeps.x1')
+
+        model.approx_totals(method=self.FD_METHOD)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        start_nruns = comp._nruns
+        derivs = prob.driver._compute_totals()  # colored
+
+        nruns = comp._nruns - start_nruns
+        self.assertEqual(nruns, 3)
+        cols = rows = [0,2,3,4]
+        _check_total_matrix(model, derivs, sparsity[rows, :][:, cols])
+
+
+class TestFDColoring(TestCSColoring):
+    FD_METHOD = 'fd'
 
 
 class TestCSStaticColoring(unittest.TestCase):

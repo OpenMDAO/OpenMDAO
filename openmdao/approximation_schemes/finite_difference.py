@@ -213,11 +213,8 @@ class FiniteDifference(ApproximationScheme):
         if jac is None:
             jac = system._jacobian
 
-        if total:
-            self._starting_outs = system._outputs._data.copy()
-        else:
-            self._starting_outs = system._residuals._data.copy()
-
+        self._starting_outs = system._outputs._data.copy()
+        self._starting_resids = system._residuals._data.copy()
         self._starting_ins = system._inputs._data.copy()
         self._results_tmp = self._starting_outs.copy()
 
@@ -292,31 +289,27 @@ class FiniteDifference(ApproximationScheme):
         ndarray
             The results from running the perturbed system.
         """
-        inputs = system._inputs
-        outputs = system._outputs
-        resids = system._residuals
-
         for arr, idxs in idx_info:
             if arr is not None:
                 arr._data[idxs] += delta
 
         if total:
             system.run_solve_nonlinear()
-            results_vec = outputs
+            self._results_tmp[:] = system._outputs._data
         else:
             system.run_apply_nonlinear()
-            results_vec = resids
+            self._results_tmp[:] = system._residuals._data
 
         # save results and restore starting inputs/outputs
-        self._results_tmp[:] = results_vec._data
-        inputs._data[:] = self._starting_ins
-        results_vec._data[:] = self._starting_outs
+        system._inputs._data[:] = self._starting_ins
+        system._outputs._data[:] = self._starting_outs
+        system._residuals._data[:] = self._starting_resids
 
-        # if results_vec are the residuals then we need to remove the delta's we added earlier
-        # to the outputs
-        if not total:
-            for arr, idxs in idx_info:
-                if arr is outputs:
-                    arr._data[idxs] -= delta
+        ## if results_vec are the residuals then we need to remove the delta's we added earlier
+        ## to the outputs
+        # if not total:
+            # for arr, idxs in idx_info:
+                # if arr is outputs:
+                    # arr._data[idxs] -= delta
 
         return self._results_tmp

@@ -865,6 +865,8 @@ class System(object):
                                                          directory, per_instance, recurse)
                 return coloring
             else:
+                if method is None and self._approx_schemes:
+                    method = list(self._approx_schemes)[0]
                 self._declare_approx_coloring(wrt=wrt, method=method, form=form, step=step,
                                               per_instance=per_instance)
 
@@ -907,6 +909,9 @@ class System(object):
                 else:
                     self._apply_nonlinear()
 
+                for scheme in self._approx_schemes.values():
+                    scheme._approx_groups = None  # force a re-initialization of approx
+
             self.run_linearize()
             self._jacobian._save_sparsity(self)
 
@@ -932,7 +937,7 @@ class System(object):
         self._inputs._data[:] = starting_inputs
         self._outputs._data[:] = starting_outputs
 
-        return self._approx_coloring_info['coloring']
+        return coloring
 
     def _save_coloring(self, coloring, directory=None, per_instance=False):
         """

@@ -42,18 +42,27 @@ if OPTIMIZER:
 class CounterGroup(Group):
     def __init__(self, *args, **kwargs):
         self._solve_count = 0
+        self._solve_nl_count = 0
+        self._apply_nl_count = 0
         super(CounterGroup, self).__init__(*args, **kwargs)
 
     def _solve_linear(self, *args, **kwargs):
         super(CounterGroup, self)._solve_linear(*args, **kwargs)
         self._solve_count += 1
 
+    def _solve_nonlinear(self, *args, **kwargs):
+        super(CounterGroup, self)._solve_nonlinear(*args, **kwargs)
+        self._solve_nl_count += 1
+
+    def _apply_nonlinear(self, *args, **kwargs):
+        super(CounterGroup, self)._apply_nonlinear(*args, **kwargs)
+        self._apply_nl_count += 1
 
 # note: size must be an even number
 SIZE = 10
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=None, derivs=True,
-            recorder=None, **options):
+            recorder=None, has_lin_constraint=True, vectorize=True, **options):
 
     p = Problem(model=CounterGroup())
 
@@ -71,23 +80,23 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
                                      -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
     indeps.add_output('r', .7)
 
-    p.model.add_subsystem('arctan_yox', ExecComp('g=arctan(y/x)', vectorize=True,
+    p.model.add_subsystem('arctan_yox', ExecComp('g=arctan(y/x)', vectorize=vectorize,
                                                  g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
     p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
 
-    p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
+    p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=vectorize,
                                             g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
     thetas = np.linspace(0, np.pi/4, SIZE)
-    p.model.add_subsystem('theta_con', ExecComp('g = x - theta', vectorize=True,
+    p.model.add_subsystem('theta_con', ExecComp('g = x - theta', vectorize=vectorize,
                                                 g=np.ones(SIZE), x=np.ones(SIZE),
                                                 theta=thetas))
-    p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd', vectorize=True,
+    p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd', vectorize=vectorize,
                                                       g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                       odd=np.ones(SIZE//2)))
 
-    p.model.add_subsystem('l_conx', ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+    p.model.add_subsystem('l_conx', ExecComp('g=x-1', vectorize=vectorize, g=np.ones(SIZE), x=np.ones(SIZE)))
 
     IND = np.arange(SIZE, dtype=int)
     ODD_IND = IND[1::2]  # all odd indices
@@ -101,9 +110,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
     p.driver = driver_class()
-    if 'approx' in options:
+    if 'method' in options:
         p.model.approx_totals(method=options['method'])
-        del options['approx']
         del options['method']
 
     p.driver.options.update(options)
@@ -121,8 +129,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     # this constrains x[0] to be 1 (see definition of l_conx)
     p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
 
-    # linear constraint
-    p.model.add_constraint('y', equals=0, indices=[0,], linear=True)
+    # linear constraint (if has_lin_constraint is set)
+    p.model.add_constraint('y', equals=0, indices=[0,], linear=has_lin_constraint)
 
     p.model.add_objective('circle.area', ref=-1)
 
@@ -147,9 +155,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
     def test_simul_coloring_snopt_fwd(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
-        #from openmdao.utils.coloring import compute_total_coloring
-        #p.driver._total_jac = None
-        #color = compute_total_coloring(p, mode='fwd', repeats=2)
+
         color_info = Coloring()
         color_info._fwd = [[
            [20],   # uncolored columns
@@ -493,24 +499,24 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         self.assertEqual((p.model._solve_count - 1) / 22,
                          (p_color.model._solve_count - 1 - 22 * 3) / 11)
 
-    @unittest.expectedFailure
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_fwd_simul_coloring_snopt_approx(self):
         # first, run w/o coloring
-        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
-        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
-                          dynamic_total_derivs=True, approx=True, method='fd')
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False, has_lin_constraint=False, method='cs')
+        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', has_lin_constraint=False,
+                          vectorize=True, print_results=False,
+                          dynamic_total_derivs=True, method='cs')
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
-        # - fwd coloring saves 11 solves per driver iter  (11 vs 22)
-        # - initial solve for linear constraints takes 1 in both cases (only done once)
-        # - dynamic case does 3 full compute_totals to compute coloring, which adds 22 * 3 solves
-        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
-        # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
-        self.assertEqual((p.model._solve_count - 1) / 22,
-                         (p_color.model._solve_count - 1 - 22 * 3) / 11)
+
+        # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
+        # - dynamic coloring takes 96 nonlinear solves (with repeat of 3)
+        # - (total_solves - 2) / (solves_per_iter) should be equal to 
+        #       (total_color_solves - 2 - dyn_solves) / color_solves_per_iter
+        self.assertEqual((p.model._solve_nl_count - 2) / 22,
+                         (p_color.model._solve_nl_count - 2 - 96) / 6)
 
     def test_simul_coloring_pyoptsparse_slsqp(self):
         try:

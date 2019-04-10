@@ -175,13 +175,11 @@ class ApproximationScheme(object):
                 wrt_matches = system._approx_coloring_info['wrt_matches']
                 options = approx[0][1]
                 if is_total and system.pathname == '':  # top level approx totals
-                    of_names = [n for n in system._var_allprocs_abs_names['output']
-                                if n in system._owns_approx_of]
+                    of_names = list(system._owns_approx_of)
                     full_wrts = all_wrt_names
-                    wrt_names = [n for n in all_wrt_names if n in system._owns_approx_wrt]
+                    wrt_names = list(system._owns_approx_wrt)
                     ofsizes = [abs2meta[of]['size'] for of in of_names]
                     wrtsizes = [abs2meta[wrt]['size'] for wrt in wrt_names]
-                    total_sizes = system._var_sizes['nonlinear']['output'][iproc]
                 else:
                     of_names, wrt_names = system._get_partials_varlists()
                     ofsizes, wrtsizes = system._get_partials_var_sizes()
@@ -192,7 +190,6 @@ class ApproximationScheme(object):
                     full_wrts = wrt_names
 
                 full_sizes = wrtsizes
-                full_ofs = system._var_allprocs_abs_names['output']
 
                 if len(wrt_names) != len(wrt_matches):
                     new_names = []
@@ -215,7 +212,7 @@ class ApproximationScheme(object):
 
                 reduced_wrt_sizes = update_sizes(wrt_names, wrtsizes, approx_wrt_idx)
                 reduced_of_sizes = update_sizes(of_names, ofsizes, approx_of_idx)
-                # get slices info colored jac (which is some subset of the full jac)
+                # get slices into colored jac (which is some subset of the full jac)
                 tmpJ['@jac_slices'] = _get_jac_slice_dict(of_names, reduced_of_sizes,
                                                           wrt_names, reduced_wrt_sizes)
 
@@ -225,9 +222,19 @@ class ApproximationScheme(object):
                 else:
                     col_map = None
 
+                full_ofs = system._var_allprocs_abs_names['output']
                 if is_total and (approx_of_idx or len(full_ofs) > len(of_names)):
-                    tmpJ['@row_idx_map'] = sub2full_indices(full_ofs, system._owns_approx_of,
-                                                            total_sizes, approx_of_idx)
+                    # total_sizes = system._var_sizes['nonlinear']['output'][iproc]
+                    # tmpJ['@row_idx_map'] = sub2full_indices(full_ofs, system._owns_approx_of,
+                    #                                         total_sizes, approx_of_idx)
+                    full_idxs = []
+                    for sof in of_names:
+                        slc = out_slices[sof]
+                        if sof in approx_of_idx:
+                            full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[sof]])
+                        else:
+                            full_idxs.append(range(slc.start, slc.stop))
+                    tmpJ['@row_idx_map'] = np.hstack(full_idxs)
 
                 for cols, nzrows in coloring.color_nonzero_iter('fwd'):
                     ccols = cols if col_map is None else col_map[cols]
@@ -245,7 +252,7 @@ class ApproximationScheme(object):
                     arr = None
 
                 if wrt in system._owns_approx_wrt_idx:
-                    in_idx = np.asarray(system._owns_approx_wrt_idx[wrt], dtype=int)
+                    in_idx = np.array(system._owns_approx_wrt_idx[wrt], dtype=int)
                     if arr is not None:
                         in_idx += slices[wrt].start
                 else:
@@ -478,7 +485,6 @@ def _get_wrt_subjacs(system, approxs):
     This allows for setting an entire column of the jacobian at once instead of looping over
     each subjac.
     """
-    abs_out_names = system._var_allprocs_abs_names['output']
     abs2idx = system._var_allprocs_abs2idx['nonlinear']
     abs2meta = system._var_allprocs_abs2meta
     approx_of_idx = system._owns_approx_of_idx
@@ -489,6 +495,8 @@ def _get_wrt_subjacs(system, approxs):
     J = {}
     ofdict = {}
     nondense = {}
+    slicedict = system._outputs.get_slice_dict()
+    abs_out_names = [n for n in system._var_allprocs_abs_names['output'] if n in slicedict]
 
     for key, options in approxs:
         of, wrt = key
@@ -550,12 +558,15 @@ def _get_wrt_subjacs(system, approxs):
             wrt_ofs[of] = (arr[start:end, :], oidx, rows_reduced, cols_reduced)
             start = end
 
-        if len(sorted_ofs) != len(system._var_allprocs_abs_names['output']):
-            ofset = set(sorted_ofs)
-            J[wrt]['full_out_idxs'] = \
-                sub2full_indices(system._var_allprocs_abs_names['output'], ofset,
-                                 system._var_sizes['nonlinear']['output'][iproc],
-                                 approx_of_idx)
+        if len(sorted_ofs) != len(abs_out_names):
+            full_idxs = []
+            for sof in sorted_ofs:
+                slc = slicedict[sof]
+                if sof in approx_of_idx:
+                    full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[sof]])
+                else:
+                    full_idxs.append(range(slc.start, slc.stop))
+            J[wrt]['full_out_idxs'] = np.hstack(full_idxs)
         else:
             J[wrt]['full_out_idxs'] = _full_slice
 

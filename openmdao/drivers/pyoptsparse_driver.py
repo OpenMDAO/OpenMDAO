@@ -521,7 +521,7 @@ class pyOptSparseDriver(Driver):
                             row, col, data = coo['coo']
                             coo['coo'][2] = arr[row, col].flatten()
                             newdv[ikey] = coo
-                        else:
+                        elif okey in sens_dict:
                             newdv[ikey] = sens_dict[okey][ikey]
                 sens_dict = new_sens
 

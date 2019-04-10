@@ -1511,6 +1511,13 @@ def dynamic_total_coloring(driver, run_model=True):
             # that will raise exceptions about multiple definition.
             driver._total_jac_sparsity = None  # prevent complaints about redefining the sparsity
 
+    # if model is using approx derivs, we must ensure that we're starting from a valid point
+    if problem.model._approx_schemes:
+        problem.run_model()
+
+    problem.driver._total_coloring = None
+    problem.driver._res_jacs = {}
+
     coloring = compute_total_coloring(problem,
                                       repeats=driver.options['dynamic_derivs_repeats'],
                                       tol=1.e-15,
