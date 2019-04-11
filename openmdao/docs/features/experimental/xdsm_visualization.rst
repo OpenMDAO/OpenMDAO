@@ -10,7 +10,14 @@ OpenMDAO also supports the generation of XDSM diagrams of models. For more infor
 
 The diagrams can be in the form of HTML or LaTeX files.
 
-To use this feature the you need to install PyXDSM. This can be done by:
+To use the feature which generates LaTeX files, you must have LaTeX installed and you will also
+need to install PyXDSM. This can be done by:
+
+.. code-block:: none
+
+    pip install git+https://github.com/mdolab/pyXDSM
+
+or:
 
 .. code-block:: none
 
@@ -18,7 +25,6 @@ To use this feature the you need to install PyXDSM. This can be done by:
     cd pyXDSM
     python setup.py install
 
-To use the feature which generates LaTeX files, LaTeX must be installed.
 
 You can generate XDSM files either from the command line or from a script.
 
@@ -27,8 +33,8 @@ From the Command Line
 
 .. _om-command-view_xdsm:
 
-Generating an XDSM diagram for a model from the command line is easy. First, you need a Python script that contains
-and runs the model.
+Generating an XDSM diagram for a model from the command line is easy. First, you need a Python
+script that runs the model or a case recording file that was created when running the model.
 
 .. note::
 
@@ -47,6 +53,10 @@ viewable in a browser, for example:
 
 will generate an XDSM diagram like the one below.
 
+
+.. raw:: html
+    :file: examples/xdsm_circuit_with_unconnected_input.html
+
 The :code:`openmdao xdsm` command has many options:
 
 .. embed-shell-cmd::
@@ -58,12 +68,19 @@ From a Script
 
 .. _script_view_xdsm:
 
-You can do the same thing programmatically by calling the `write_html` function.
+You can do the same thing programmatically by calling the `write_xdsm` function.
 
 .. autofunction:: openmdao.devtools.xdsm_viewer.xdsm_writer.write_xdsm
    :noindex:
 
-Here is a code snippet showing how to use this function.
+Notice that the `problem` argument can be either a :code:`Problem` containing the model or 
+or a case recorder database containing the model data. The latter is indicated by a string 
+giving the file path to the case recorder file.
+
+Here are some code snippets showing the two cases.
+
+Problem as Data Source
+**********************
 
 .. code::
 
@@ -74,6 +91,25 @@ Here is a code snippet showing how to use this function.
     write_xdsm(p, 'xdsmjs_circuit', out_format='html', show_browser=False)
 
 
-.. raw:: html
-    :file: examples/xdsm_circuit_with_unconnected_input.html
+Case Recorder as Data Source
+****************************
 
+.. code::
+
+    r = SqliteRecorder('circuit.sqlite')
+    p.driver.add_recorder(r)
+
+    p.setup()
+    p.final_setup()
+    r.shutdown()
+
+    from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm
+
+    write_xdsm('circuit.sqlite', 'xdsmjs_circuit', out_format='html', show_browser=False)
+
+
+In the latter case, you could view the XDSM diagram at a later time using the command:
+
+.. code-block:: none
+
+    openmdao xdsm circuit.sqlite
