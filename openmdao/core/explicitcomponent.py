@@ -395,8 +395,8 @@ class ExplicitComponent(Component):
         if not (self._has_compute_partials or self._approx_schemes):
             return
 
-        if self._check_dyn_coloring:
-            self._check_dyn_coloring = False  # only do this once
+        if self._first_call_to_linearize:
+            self._first_call_to_linearize = False  # only do this once
             info = self._approx_coloring_info
             if self.options['dynamic_partial_derivs']:
                 coloring = self.compute_approx_coloring()

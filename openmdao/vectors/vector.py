@@ -81,6 +81,8 @@ class Vector(object):
         True if this vector performs scaling.
     _scaling : dict
         Contains scale factors to convert data arrays.
+    _scaled_to : str
+        Indicates scaling of the vector, either 'phys' or 'norm'.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _under_complex_step : bool
@@ -147,6 +149,7 @@ class Vector(object):
                             (kind == 'residual' and system._has_resid_scaling))
 
         self._scaling = {}
+        self._scaled_to = 'phys'
 
         if root_vector is None:
             self._root_vector = self
@@ -456,6 +459,7 @@ class Vector(object):
             Values are "phys" or "norm" to scale to physical or normalized.
         """
         scaling = self._scaling[scale_to]
+        self._scaled_to = scale_to
         if self._ncol == 1:
             self._data *= scaling[1]
             if scaling[0] is not None:  # nonlinear only

@@ -68,6 +68,16 @@ def setup_vars(self, ofs, wrts):
     self.declare_partials(of=ofs, wrt=wrts, method=self.method)
 
 
+class CounterGroup(Group):
+    def __init__(self, *args, **kwargs):
+        super(CounterGroup, self).__init__(*args, **kwargs)
+        self._nruns = 0
+
+    def _solve_nonlinear(self, *args, **kwargs):
+        super(CounterGroup, self)._solve_nonlinear(*args, **kwargs)
+        self._nruns += 1
+
+
 class SparseCompImplicit(ImplicitComponent):
 
     def __init__(self, sparsity, method='fd', isplit=1, osplit=1, **kwargs):
@@ -303,7 +313,7 @@ class TestCSColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        sub = model.add_subsystem('sub', Group(dynamic_semi_total_derivs=True))
+        sub = model.add_subsystem('sub', CounterGroup(dynamic_semi_total_derivs=True))
         comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
         model.connect('indeps.x0', 'sub.comp.x0')
         model.connect('indeps.x1', 'sub.comp.x1')
@@ -318,19 +328,18 @@ class TestCSColoring(unittest.TestCase):
 
         derivs = prob.driver._compute_totals()  # this is when the dynamic coloring update happens
 
-        start_nruns = comp._nruns
+        start_nruns = sub._nruns
         derivs = prob.driver._compute_totals()
-
-        nruns = comp._nruns - start_nruns
-        self.assertEqual(nruns, 3)
+        self.assertEqual(sub._nruns - start_nruns, 3)
         _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity)
 
     @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
     def test_simple_totals(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         prob.driver.options['dynamic_total_derivs'] = True
+        prob.driver.options['dynamic_derivs_repeats'] = 1
 
         sparsity = np.array(
             [[1, 0, 0, 1, 1],
@@ -348,27 +357,31 @@ class TestCSColoring(unittest.TestCase):
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
+        model.declare_total_coloring('*', method=self.FD_METHOD, step=1e-6 if self.FD_METHOD=='fd' else None)
 
         model.comp.add_objective('y0', index=0)  # pyoptsparse SLSQP requires a scalar objective, so pick index 0
-        model.comp.add_constraint('y1')
-        model.add_design_var('indeps.x0')
-        model.add_design_var('indeps.x1')
+        model.comp.add_constraint('y1', lower=[1., 2.])
+        model.add_design_var('indeps.x0', lower=np.ones(3), upper=np.ones(3)+.1)
+        model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
         model.approx_totals(method=self.FD_METHOD)
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
+        prob.run_model()
         prob.run_driver()  # need this to trigger the dynamic coloring
 
         prob.driver._total_jac = None
-        
-        start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()
-        nruns = comp._nruns - start_nruns
-        self.assertEqual(nruns, 3)
+
+        start_nruns = model._nruns
+        derivs = prob.compute_totals()
         _check_total_matrix(model, derivs, sparsity[[0,3,4],:])
+        nruns = model._nruns - start_nruns
+        self.assertEqual(nruns, 3)
 
     def test_totals_over_implicit_comp(self):
         prob = Problem()
-        model = prob.model = Group(dynamic_total_derivs=True)
+        model = prob.model = CounterGroup()
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        prob.driver.options['dynamic_total_derivs'] = True
 
         sparsity = np.array(
             [[1, 0, 0, 1, 1],
@@ -388,106 +401,31 @@ class TestCSColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        model.comp.add_constraint('y0')
-        model.comp.add_constraint('y1')
-        model.add_design_var('indeps.x0')
-        model.add_design_var('indeps.x1')
+        model.comp.add_objective('y0', index=1)
+        model.comp.add_constraint('y1', lower=[1., 2.])
+        model.add_design_var('indeps.x0', lower=np.ones(3), upper=np.ones(3)+.1)
+        model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
+        
+        
         model.approx_totals(method=self.FD_METHOD)
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
-        prob.run_model()
+        prob.run_driver()  # need this to trigger the dynamic coloring
 
-        start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()  # colored
+        prob.driver._total_jac = None
 
-        nruns = comp._nruns - start_nruns
-        self.assertEqual(nruns, 3 * 2)
-        _check_total_matrix(model, derivs, sparsity)
-
-    def test_totals_of_indices(self):
-        prob = Problem()
-        model = prob.model = Group()
-
-        sparsity = np.array(
-            [[1, 0, 0, 1, 1],
-             [0, 1, 0, 1, 1],
-             [0, 1, 0, 1, 1],
-             [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
-        )
-
-        indeps = IndepVarComp()
-        indeps.add_output('x0', np.ones(3))
-        indeps.add_output('x1', np.ones(2))
-
-        model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
-        model.connect('indeps.x0', 'comp.x0')
-        model.connect('indeps.x1', 'comp.x1')
-
-        model.comp.add_constraint('y0', indices=[0,2])
-        model.comp.add_constraint('y1')
-        model.add_design_var('indeps.x0')
-        model.add_design_var('indeps.x1')
-        model.approx_totals(method=self.FD_METHOD)
-
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()  # colored
-
-        nruns = comp._nruns - start_nruns
-        self.assertEqual(nruns, 3)
-        rows = [0,2,3,4]
+        start_nruns = model._nruns
+        derivs = prob.driver._compute_totals()
+        self.assertEqual(model._nruns - start_nruns, 3)
+        rows = [1,3,4]
         _check_total_matrix(model, derivs, sparsity[rows, :])
-
-    def test_totals_wrt_indices(self):
-        prob = Problem()
-        model = prob.model = Group(dynamic_total_derivs=True)
-
-        sparsity = np.array(
-            [[1, 0, 0, 1, 1],
-             [0, 1, 0, 1, 1],
-             [0, 1, 0, 1, 1],
-             [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
-        )
-
-        indeps = IndepVarComp()
-        indeps.add_output('x0', np.ones(3))
-        indeps.add_output('x1', np.ones(2))
-
-        model.add_subsystem('indeps', indeps)
-        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
-                                                              isplit=2, osplit=2))
-        model.connect('indeps.x0', 'comp.x0')
-        model.connect('indeps.x1', 'comp.x1')
-
-        model.comp.add_constraint('y0')
-        model.comp.add_constraint('y1')
-        model.add_design_var('indeps.x0', indices=[0,2])
-        model.add_design_var('indeps.x1')
-        model.approx_totals(method=self.FD_METHOD)
-
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
-        prob.run_model()
-
-        start_nruns = comp._nruns
-        derivs = prob.driver._compute_totals()  # colored
-
-        nruns = comp._nruns - start_nruns
-        # only 4 cols to solve for, but we get coloring of [[2],[3],[0,1]] so only 1 better
-        self.assertEqual(nruns, 3)
-        cols = [0,2,3,4]
-        _check_total_matrix(model, derivs, sparsity[:, cols])
 
     def test_totals_of_wrt_indices(self):
         prob = Problem()
-        model = prob.model = Group(dynamic_total_derivs=True)
+        model = prob.model = CounterGroup()
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        prob.driver.options['dynamic_total_derivs'] = True
 
         sparsity = np.array(
             [[1, 0, 0, 1, 1],
@@ -508,23 +446,25 @@ class TestCSColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        model.comp.add_constraint('y0', indices=[0,2])
-        model.comp.add_constraint('y1')
-        model.add_design_var('indeps.x0', indices=[0,2])
-        model.add_design_var('indeps.x1')
+        model.comp.add_objective('y0', index=1)
+        model.comp.add_constraint('y1', lower=[1., 2.])
+        model.add_design_var('indeps.x0',  indices=[0,2], lower=np.ones(2), upper=np.ones(2)+.1)
+        model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
 
         model.approx_totals(method=self.FD_METHOD)
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
-        prob.run_model()
+        prob.run_driver()  # need this to trigger the dynamic coloring
 
-        start_nruns = comp._nruns
+        prob.driver._total_jac = None
+
+        start_nruns = model._nruns
         derivs = prob.driver._compute_totals()  # colored
 
-        nruns = comp._nruns - start_nruns
-        self.assertEqual(nruns, 3)
-        cols = rows = [0,2,3,4]
+        self.assertEqual(model._nruns - start_nruns, 2)
+        cols = [0,2,3,4]
+        rows = [1,3,4]
         _check_total_matrix(model, derivs, sparsity[rows, :][:, cols])
 
 

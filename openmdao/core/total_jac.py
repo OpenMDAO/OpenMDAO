@@ -25,6 +25,7 @@ from openmdao.utils.general_utils import ContainsAll, simple_warning
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.mpi import MPI
 from openmdao.approximation_schemes.approximation_scheme import _initialize_model_approx
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 
 
 _contains_all = ContainsAll()
@@ -1303,6 +1304,8 @@ class _TotalJacInfo(object):
                 model.approx_totals(method='fd')
 
             model._setup_jacobians(recurse=False)
+            if model._approx_schemes or model._approx_coloring_info is not None:
+                model._setup_approx_partials()
 
         # Linearize Model
         model._linearize(model._assembled_jac,

@@ -190,6 +190,7 @@ class Component(System):
         self.comm = comm
         self._mode = mode
         self._subsystems_proc_range = []
+        self._first_call_to_linearize = True
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}

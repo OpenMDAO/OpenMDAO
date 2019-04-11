@@ -9,6 +9,7 @@ import os
 import time
 from numbers import Integral
 import itertools
+from pprint import pprint
 
 from six import iteritems, itervalues, string_types
 
@@ -266,8 +267,8 @@ class System(object):
         If True, perform any memory allocations necessary for derivative computation.
     _approx_coloring_info : tuple
         Metadata that defines how to perform coloring of this System's approx jacobian.
-    _check_dyn_coloring : bool
-        If True, check for dynamic coloring metadata and compute coloring
+    _first_call_to_linearize : bool
+        If True, this is the first call to _linearize.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -420,7 +421,7 @@ class System(object):
         self._owning_rank = None
         self._lin_vec_names = []
         self._approx_coloring_info = None
-        self._check_dyn_coloring = True   # will check in first call to _linearize
+        self._first_call_to_linearize = True   # will check in first call to _linearize
 
     def _declare_options(self):
         """
@@ -809,7 +810,7 @@ class System(object):
         self._approx_coloring_info = options
 
     def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
-                                repeats=2, perturb_size=1e-3, tol=1e-15,
+                                repeats=2, perturb_size=1e-9, tol=1e-15,
                                 directory='coloring_files', per_instance=False, recurse=False):
         """
         Compute a coloring of the approximated derivatives.
@@ -898,6 +899,8 @@ class System(object):
         starting_resids = self._residuals._data.copy()
 
         self._setup_static_approx_coloring()
+        save_first_call = self._first_call_to_linearize
+        self._first_call_to_linearize = False
         for i in range(repeats):
             # randomize inputs (and outputs if implicit)
             if i > 0:
@@ -939,6 +942,8 @@ class System(object):
         self._inputs._data[:] = starting_inputs
         self._outputs._data[:] = starting_outputs
         self._residuals._data[:] = starting_resids
+
+        self._filtered_vars_to_record = save_first_call
 
         return coloring
 
@@ -1588,11 +1593,6 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_jacobians()
 
-        # allocate internal matrices now that we have all of the subjac metadata
-        # if asm_jac is not None:
-        #     asm_jac._initialize(self)
-        #     asm_jac._init_view(self)
-
     def set_initial_values(self):
         """
         Set all input and output variables to their declared initial values.
@@ -1726,7 +1726,7 @@ class System(object):
         return self.options
 
     @contextmanager
-    def _unscaled_context(self, outputs=[], residuals=[]):
+    def _unscaled_context(self, outputs=(), residuals=()):
         """
         Context manager for units and scaling for vectors.
 

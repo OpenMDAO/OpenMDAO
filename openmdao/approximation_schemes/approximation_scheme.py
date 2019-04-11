@@ -78,22 +78,27 @@ class ApproximationScheme(object):
             # if key[0] is None, we've already updated the coloring
             if key[0] is not None and 'coloring' in options:
                 colored.add(key)
-                if new_entry is None:
-                    options = options.copy()
-                    options['coloring'] = coloring
-                    options['approxs'] = [tup]
-                    new_entry = ((None, None), options)
-                    new_list.append(new_entry)
-                else:
-                    new_entry[1]['approxs'].append(tup)
+                if coloring is None:
+                    new_list.append(tup)
+                else:  # coloring is defined
+                    if new_entry is None:
+                        options = options.copy()
+                        options['coloring'] = coloring
+                        options['approxs'] = [tup]
+                        new_entry = ((None, None), options)
+                        new_list.append(new_entry)
+                    else:
+                        new_entry[1]['approxs'].append(tup)
 
-        for tup in self._exec_list:
-            key, _ = tup
-            if key not in colored:
-                new_list.append(tup)
+        # remove entries that have same keys as colored entries
+        if colored:
+            for tup in self._exec_list:
+                key, _ = tup
+                if key not in colored:
+                    new_list.append(tup)
 
-        self._exec_list = new_list
-        self._approx_groups = None  # will force approx_groups to be rebuilt later
+            self._exec_list = new_list
+            self._approx_groups = None  # will force approx_groups to be rebuilt later
 
     def add_approximation(self, abs_key, kwargs):
         """
@@ -496,7 +501,7 @@ def _get_wrt_subjacs(system, approxs):
     ofdict = {}
     nondense = {}
     slicedict = system._outputs.get_slice_dict()
-    abs_out_names = set([n for n in system._var_allprocs_abs_names['output'] if n in slicedict])
+    abs_out_names = [n for n in system._var_allprocs_abs_names['output'] if n in slicedict]
 
     for key, options in approxs:
         of, wrt = key
@@ -555,10 +560,11 @@ def _get_wrt_subjacs(system, approxs):
                 rows_reduced = cols_reduced = _full_slice
 
             # store subview corresponding to the (of, wrt) subjac and any index info
+            # print('wrt, of:', wrt, of, start, end, oidx)
             wrt_ofs[of] = (arr[start:end, :], oidx, rows_reduced, cols_reduced)
             start = end
 
-        if abs_out_names.difference(sorted_ofs):
+        if abs_out_names != sorted_ofs:
             full_idxs = []
             for sof in sorted_ofs:
                 if sof in slicedict:

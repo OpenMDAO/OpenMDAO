@@ -12,6 +12,7 @@ from openmdao.approximation_schemes.approximation_scheme import ApproximationSch
     _gather_jac_results
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map
+from openmdao.utils.general_utils import printoptions
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
 
@@ -303,7 +304,7 @@ class FiniteDifference(ApproximationScheme):
         else:
             system.run_apply_nonlinear()
             self._results_tmp[:] = system._residuals._data
-            system._residuals._data[:] = self._starting_resids
+        system._residuals._data[:] = self._starting_resids
 
         # save results and restore starting inputs/outputs
         system._inputs._data[:] = self._starting_ins

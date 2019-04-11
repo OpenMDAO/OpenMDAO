@@ -1633,7 +1633,7 @@ class TestGroupComplexStep(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        #with self.assertRaises(RuntimeError) as cm:
+        # with self.assertRaises(RuntimeError) as cm:
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
 
         msg = "Nested Complex Step is not supported in system 'd1'"

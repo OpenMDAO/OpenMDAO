@@ -124,7 +124,7 @@ def remove_unused(topnode, check_stacks=True):
                     #if statements:
                         #for s in statements:
                             #try:
-                                #print(n, astunparse.unparse(s).strip())
+                                # print(n, astunparse.unparse(s).strip())
                                 ## if vis.smap[s].used: print('   USED:', vis.smap[s].used)
                                 ## if vis.smap[s].defs: print('   DEFS:', vis.smap[s].defs)
                             #except:
@@ -132,18 +132,18 @@ def remove_unused(topnode, check_stacks=True):
                                 ## print(n, '???')
                     ## else:
                     ##     print(n, 'None')
-                    #print("OUT:", [n for n, _ in block.out])
+                    # print("OUT:", [n for n, _ in block.out])
 
-                #print("edges:", list(vis.graph.edges()))
+                # print("edges:", list(vis.graph.edges()))
                 ppmap = get_matching_push_map(node) if check_stacks else {}
 
                 un = unused(vis)
                 changed = bool(un)
                 import astunparse
                 to_remove = set()
-                #print("\nunused:")
+                # print("\nunused:")
                 for n, s in un:
-                    #print(n, astunparse.unparse(s))
+                    # print(n, astunparse.unparse(s))
                     to_remove.add(s)
                     if check_stacks and s in ppmap:
                         push = ppmap[s]
@@ -151,7 +151,7 @@ def remove_unused(topnode, check_stacks=True):
                             raise RuntimeError("No matching push for '%s'" %
                                                astunparse.unparse(s).strip())
                         else:
-                            #print("matching push:", astunparse.unparse(ppmap[s]))
+                            # print("matching push:", astunparse.unparse(ppmap[s]))
                             to_remove.add(ppmap[s])
                 rem = Remover(to_remove)
                 rem.visit(node)
