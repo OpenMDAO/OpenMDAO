@@ -6,6 +6,7 @@ from __future__ import print_function, division
 import sys
 import six
 from six.moves import range
+from itertools import product
 
 import numpy as np
 
@@ -272,3 +273,32 @@ def _global2local_offsets(global_offsets):
                 off_vn[type_] -= goff[:, 0].reshape((goff.shape[0], 1))
 
     return offsets
+
+
+def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
+    """
+    Convert src_indices into a flat form.
+
+    Parameters
+    ----------
+    src_indices : ndarray
+        Array of src_indices.  Can be flat or multi-dimensional.
+    shape_in : tuple
+        Shape of the input variable.
+    shape_out : tuple
+        Shape of the output variable.
+    size_out : int
+        Size of the output variable.
+
+    Returns
+    -------
+    ndarray
+        The flattened src_indices.
+    """
+    if len(shape_out) == 1 or shape_in == src_indices.shape:
+        return convert_neg(src_indices.flatten(), size_out)
+
+    entries = [list(range(x)) for x in shape_in]
+    cols = np.vstack(src_indices[i] for i in product(*entries))
+    dimidxs = [convert_neg(cols[:, i], shape_out[i]) for i in range(cols.shape[1])]
+    return np.ravel_multi_index(dimidxs, shape_out)

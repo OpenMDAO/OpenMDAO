@@ -23,7 +23,8 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.array_utils import convert_neg, array_connection_compatible
+from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
+    _flatten_src_indices
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors, \
     simple_warning
 from openmdao.utils.units import is_compatible, get_conversion
@@ -224,18 +225,10 @@ class Group(System):
                             raise RuntimeError("vector scalers with distrib vars "
                                                "not supported yet.")
 
-                        global_shape_out = meta_out['global_shape']
                         if src_indices.ndim != 1:
-                            shape_in = meta_in['shape']
-                            if len(meta_out['shape']) == 1 or shape_in == src_indices.shape:
-                                src_indices = src_indices.flatten()
-                                src_indices = convert_neg(src_indices, src_indices.size)
-                            else:
-                                entries = [list(range(x)) for x in shape_in]
-                                cols = np.vstack(src_indices[i] for i in product(*entries))
-                                dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
-                                           for i in range(cols.shape[1])]
-                                src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
+                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
+                                                               meta_out['global_shape'],
+                                                               meta_out['global_size'])
 
                         ref = ref[src_indices]
                         ref0 = ref0[src_indices]

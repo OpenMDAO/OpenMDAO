@@ -14,6 +14,7 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.utils.units import get_conversion
+from openmdao.utils.array_utils import _flatten_src_indices
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -126,6 +127,7 @@ class AssembledJacobian(Jacobian):
         is_top = system.pathname == ''
 
         abs2meta = system._var_abs2meta
+        all_meta = system._var_allprocs_abs2meta
 
         self._int_mtx = int_mtx = self._matrix_class(system.comm)
         ext_mtx = self._matrix_class(system.comm)
@@ -158,9 +160,11 @@ class AssembledJacobian(Jacobian):
             elif wrt_abs_name in in_ranges:
                 if wrt_abs_name in conns:  # connected input
                     out_abs_name = conns[wrt_abs_name]
+                    meta_in = abs2meta[wrt_abs_name]
+                    all_out_meta = all_meta[out_abs_name]
                     # calculate unit conversion
-                    in_units = abs2meta[wrt_abs_name]['units']
-                    out_units = abs2meta[out_abs_name]['units']
+                    in_units = meta_in['units']
+                    out_units = all_out_meta['units']
                     if in_units and out_units and in_units != out_units:
                         factor, _ = get_conversion(out_units, in_units)
                         if factor == 1.0:
@@ -180,7 +184,10 @@ class AssembledJacobian(Jacobian):
                         shape = info['shape']
                     else:
                         shape = abs_key2shape(abs_key2)
-
+                        if len(src_indices.shape) > 1:
+                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
+                                                               all_out_meta['global_shape'],
+                                                               all_out_meta['global_size'])
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
                                         src_indices, shape, factor)
 
