@@ -1219,7 +1219,7 @@ def _process_connections(conns, recurse=True, subs=None):
         return _convert_name(x, recurse=recurse, subs=subs)
 
     conns_new = [
-        {k: convert(v) for k, v in iteritems(conn) if k is not 'cycle_arrows'} for conn in conns
+        {k: convert(v) for k, v in iteritems(conn) if k in ('src', 'tgt')} for conn in conns
     ]
     return _accumulate_connections(conns_new)
 
