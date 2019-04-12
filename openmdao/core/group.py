@@ -1811,6 +1811,23 @@ class Group(System):
                     if subsys._linear_solver is not None:
                         subsys._linear_solver._linearize()
 
+    def _check_first_linearize(self):
+        if self._first_call_to_linearize:
+            self._first_call_to_linearize = False  # only do this once
+            info = self._approx_coloring_info
+            if self.options['dynamic_partial_coloring']:
+                coloring = self.compute_approx_coloring()
+            elif info is not None and info['coloring'] is not None:
+                coloring = info['coloring']
+            else:
+                coloring = None
+            if coloring is not None:
+                coloring.summary()
+                self.set_coloring_spec(coloring)
+                self._setup_static_approx_coloring()
+            elif self._approx_schemes:
+                self._setup_approx_partials()
+
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
         Approximate derivatives for a Group using the specified approximation method.

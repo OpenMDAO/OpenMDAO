@@ -1347,6 +1347,22 @@ class Component(System):
 
         return approx_jac
 
+    def _check_first_linearize(self):
+        if self._first_call_to_linearize:
+            self._first_call_to_linearize = False  # only do this once
+            info = self._approx_coloring_info
+            if self.options['dynamic_partial_coloring']:
+                coloring = self.compute_approx_coloring()
+            elif info is not None and info['coloring'] is not None:
+                coloring = info['coloring']
+            else:
+                coloring = None
+            if coloring is not None:
+                coloring.summary()
+                self.set_coloring_spec(coloring)
+                self._setup_static_approx_coloring()
+            return coloring
+
     def _get_ordered_jac_vars(self, absolute=True):
         """
         Get names and sizes of jacobian variables and their sizes in the correct order.
