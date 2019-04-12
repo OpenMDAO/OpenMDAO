@@ -2,7 +2,7 @@ from __future__ import print_function
 
 import unittest
 
-from six import assertRaisesRegex
+from six import assertRaisesRegex, iteritems
 from six.moves import range
 
 import itertools
@@ -960,6 +960,59 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
 
         assert_rel_error(self, p['discipline.x'], 1.41421356, 1e-6)
+
+    def test_guess_nonlinear_complex_step(self):
+
+        class Discipline(Group):
+
+            def setup(self):
+                self.add_subsystem('comp0', ExecComp('y=x**2'))
+                self.add_subsystem('comp1', ExecComp('z=2*external_input'),
+                                   promotes_inputs=['external_input'])
+
+                self.add_subsystem('balance', BalanceComp('x', lhs_name='y', rhs_name='z'),
+                                   promotes_outputs=['x'])
+
+                self.connect('comp0.y', 'balance.y')
+                self.connect('comp1.z', 'balance.z')
+
+                self.connect('x', 'comp0.x')
+
+                self.nonlinear_solver = NewtonSolver(iprint=2, solve_subsystems=True)
+                self.linear_solver = DirectSolver()
+
+            def guess_nonlinear(self, inputs, outputs, residuals):
+
+                if outputs._data.dtype == np.complex:
+                    raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
+
+                # inputs are addressed using full path name, regardless of promotion
+                external_input = inputs['comp1.external_input']
+
+                # balance drives x**2 = 2*external_input
+                x_guess = (2*external_input)**.5
+
+                # outputs are addressed by the their promoted names
+                outputs['x'] = x_guess # perfect guess should converge in 0 iterations
+
+        p = Problem()
+
+        p.model.add_subsystem('parameters', IndepVarComp('input_value', 1.))
+        p.model.add_subsystem('discipline', Discipline())
+
+        p.model.connect('parameters.input_value', 'discipline.external_input')
+
+        p.setup(force_alloc_complex=True)
+        p.run_model()
+
+        self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
+
+        assert_rel_error(self, p['discipline.x'], 1.41421356, 1e-6)
+
+        totals = p.check_totals(of=['discipline.comp1.z'], wrt=['parameters.input_value'], method='cs', out_stream=None)
+
+        for key, val in iteritems(totals):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
 
 
 class MyComp(ExplicitComponent):
