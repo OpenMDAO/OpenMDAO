@@ -230,7 +230,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
-                          dynamic_total_derivs=True)
+                          dynamic_total_coloring=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -248,7 +248,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'auto', assemble_type='dense', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'auto', assemble_type='dense', optimizer='SNOPT', print_results=False,
-                          dynamic_total_derivs=True)
+                          dynamic_total_coloring=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -356,7 +356,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False,
-                          dynamic_total_derivs=True)
+                          dynamic_total_coloring=True)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # run w/o coloring
@@ -396,7 +396,7 @@ class SimulColoringRecordingTestCase(unittest.TestCase):
         recorder = SqliteRecorder('cases.sql')
 
         p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SNOPT',
-                    dynamic_total_derivs=True, print_results=False, recorder=recorder)
+                    dynamic_total_coloring=True, print_results=False, recorder=recorder)
 
         cr = CaseReader('cases.sql')
 
@@ -486,7 +486,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
-                          dynamic_total_derivs=True)
+                          dynamic_total_coloring=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -505,7 +505,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False, has_lin_constraint=False, method='cs')
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', has_lin_constraint=False,
                           vectorize=True, print_results=False,
-                          dynamic_total_derivs=True, method='cs')
+                          dynamic_total_coloring=True, method='cs')
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -613,7 +613,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
             raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
 
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SLSQP', print_results=False,
-                          dynamic_total_derivs=True)
+                          dynamic_total_coloring=True)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 
         # Tests a bug where coloring ran the model when not needed.
@@ -705,7 +705,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         # first, run w/o coloring
         p = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
-        p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_derivs=True)
+        p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -891,7 +891,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_dynamic_total_coloring(self):
 
-        p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_derivs=True)
+        p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -908,7 +908,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
     def test_dynamic_total_coloring_no_derivs(self):
         with self.assertRaises(Exception) as context:
             p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False,
-                              dynamic_total_derivs=True, derivs=False)
+                              dynamic_total_coloring=True, derivs=False)
         self.assertEqual(str(context.exception),
                          "Derivative support has been turned off but compute_totals was called.")
 

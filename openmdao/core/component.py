@@ -114,7 +114,7 @@ class Component(System):
         self.options.declare('distributed', types=bool, default=False,
                              desc='True if the component has variables that are distributed '
                                   'across multiple processes.')
-        self.options.declare('dynamic_partial_derivs', default=False, types=bool,
+        self.options.declare('dynamic_partial_coloring', default=False, types=bool,
                              desc='Compute partial derivative coloring dynamically if True')
         self.options.declare('dynamic_derivs_repeats', default=3, types=int,
                              desc='Number of _linearize calls during dynamic computation of '
@@ -214,6 +214,15 @@ class Component(System):
         if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
                                                                 self._approx_schemes):
             raise RuntimeError("'%s': num_par_fd is > 1 but no FD is active." % self.pathname)
+
+        # check here if declare_partial_coloring was called during setup but declare_partials wasn't
+        if self._approx_coloring_info is not None:
+            for key, meta in iteritems(self._declared_partials):
+                if 'method' in meta:
+                    break
+            else:
+                raise RuntimeError("%s: declare_partial_coloring was called but no approx partials"
+                                   " were declared." % self.pathname)
 
         self._static_mode = True
 

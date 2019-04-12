@@ -210,7 +210,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2,
-                                                              dynamic_partial_derivs=True))
+                                                              dynamic_partial_coloring=True))
         comp.declare_partial_coloring('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -248,7 +248,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2,
-                                                              dynamic_partial_derivs=True))
+                                                              dynamic_partial_coloring=True))
         # comp.declare_partial_coloring('x*', method=self.FD_METHOD, directory=self.tempdir)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -278,7 +278,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2,
-                                                              dynamic_partial_derivs=True))
+                                                              dynamic_partial_coloring=True))
         comp.declare_partial_coloring('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')

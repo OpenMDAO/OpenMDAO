@@ -630,7 +630,9 @@ class System(object):
         ApproximationScheme
             The ApproximationScheme associated with the given method.
         """
-        if method not in _supported_methods or method == 'exact':
+        if method == 'exact':
+            return None
+        if method not in _supported_methods:
             msg = 'Method "{}" is not supported, method must be one of {}'
             raise ValueError(msg.format(method, [m for m in _supported_methods if m != 'exact']))
         if method not in self._approx_schemes:
@@ -778,10 +780,10 @@ class System(object):
         if method not in ('fd', 'cs'):
             raise RuntimeError("method must be one of ['fd', 'cs'].")
 
-        approx_class = _supported_methods[method]
+        approx = self._get_approx_scheme(method)
 
         # start with defaults
-        options = approx_class.DEFAULT_OPTIONS.copy()
+        options = approx.DEFAULT_OPTIONS.copy()
         options['wrt_matches'] = None
         options['wrt_patterns'] = ('*',)
         options['method'] = method

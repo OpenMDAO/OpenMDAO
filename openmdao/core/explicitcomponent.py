@@ -398,7 +398,7 @@ class ExplicitComponent(Component):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
             info = self._approx_coloring_info
-            if self.options['dynamic_partial_derivs']:
+            if self.options['dynamic_partial_coloring']:
                 coloring = self.compute_approx_coloring()
             elif info is not None and info['coloring'] is not None:
                 coloring = info['coloring']
