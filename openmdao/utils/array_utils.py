@@ -277,7 +277,7 @@ def _global2local_offsets(global_offsets):
 
 def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
     """
-    Convert src_indices into a flat form.
+    Convert src_indices into a flat, non-negative form.
 
     Parameters
     ----------
