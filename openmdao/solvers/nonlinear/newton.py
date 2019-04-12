@@ -71,7 +71,7 @@ class NewtonSolver(NonlinearSolver):
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
-        self.options.declare('cs_reconverge', default=True,
+        self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
 
@@ -257,6 +257,22 @@ class NewtonSolver(NonlinearSolver):
 
         # Enable local fd
         system._owns_approx_jac = approx_status
+
+    def _set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        Recurses to turn on or off complex stepping mode in all subsystems and their vectors.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        if self.linear_solver is not None:
+            self.linear_solver._set_complex_step_mode(active)
+            if self.linear_solver._assembled_jac is not None:
+                self.linear_solver._assembled_jac.set_complex_step_mode(active)
 
     def _mpi_print_header(self):
         """

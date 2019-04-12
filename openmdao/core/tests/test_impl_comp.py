@@ -3,11 +3,13 @@ from __future__ import division
 
 import unittest
 
+from six import iteritems
 from six.moves import cStringIO
+
 import numpy as np
 
 from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
-    NewtonSolver, ScipyKrylov, AnalysisError
+    NewtonSolver, ScipyKrylov, AnalysisError, ExecComp
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -315,6 +317,82 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         prob.run_model()
         assert_rel_error(self, prob['comp2.x'], 3.)
+
+    def test_guess_nonlinear_complex_step(self):
+
+        class ImpWithInitial(ImplicitComponent):
+            """
+            An implicit component to solve the quadratic equation: x^2 - 4x + 3
+            (solutions at x=1 and x=3)
+            """
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_input('b', val=-4.)
+                self.add_input('c', val=3.)
+
+                self.add_output('x', val=0.)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+                residuals['x'] = a * x ** 2 + b * x + c
+
+            def linearize(self, inputs, outputs, partials):
+                a = inputs['a']
+                b = inputs['b']
+                c = inputs['c']
+                x = outputs['x']
+
+                partials['x', 'a'] = x ** 2
+                partials['x', 'b'] = x
+                partials['x', 'c'] = 1.0
+                partials['x', 'x'] = 2 * a * x + b
+
+            def guess_nonlinear(self, inputs, outputs, resids):
+
+                if outputs._data.dtype == np.complex:
+                    raise RuntimeError('Vector should not be complex when guess_nonlinear is called.')
+
+                # Default initial state of zero for x takes us to x=1 solution.
+                # Here we set it to a value that will take us to the x=3 solution.
+                outputs['x'] = 5.0
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        indep = IndepVarComp()
+        indep.add_output('a', 1.0)
+        indep.add_output('b', -4.0)
+        indep.add_output('c', 3.0)
+        model.add_subsystem('p', indep)
+        model.add_subsystem('comp', ImpWithInitial())
+        model.add_subsystem('fn', ExecComp(['y = .03*a*x*x - .04*a*a*b*x - c']))
+
+        model.connect('p.a', 'comp.a')
+        model.connect('p.a', 'fn.a')
+        model.connect('p.b', 'fn.b')
+        model.connect('p.c', 'fn.c')
+        model.connect('comp.x', 'fn.x')
+
+        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver.options['rtol'] = 1e-12
+        model.nonlinear_solver.options['atol'] = 1e-12
+        model.nonlinear_solver.options['maxiter'] = 15
+        model.linear_solver = ScipyKrylov()
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.x'], 3.)
+
+        totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', out_stream=None)
+
+        for key, val in iteritems(totals):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-9)
 
     def test_guess_nonlinear_transfer(self):
         # Test that data is transfered to a component before calling guess_nonlinear.

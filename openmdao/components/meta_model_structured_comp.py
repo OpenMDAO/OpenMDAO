@@ -724,6 +724,9 @@ class MetaModelStructuredComp(ExplicitComponent):
             if self.options['training_data_gradients']:
                 self._declare_partials(of=name, wrt="%s_train" % name)
 
+        # MetaModelStructuredComp does not support complex step.
+        self.set_check_partial_options('*', method='fd')
+
     def compute(self, inputs, outputs):
         """
         Perform the interpolation at run time.

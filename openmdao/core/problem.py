@@ -1133,6 +1133,7 @@ class Problem(object):
         alloc_complex = model._outputs._alloc_complex
         all_fd_options = {}
         comps_could_not_cs = set()
+        requested_method = method
         for comp in comps:
 
             c_name = comp.pathname
@@ -1156,6 +1157,7 @@ class Problem(object):
                 local_wrt = rel_key[1]
 
                 # Determine if fd or cs.
+                method = requested_method
                 if local_wrt in local_opts:
                     local_method = local_opts[local_wrt]['method']
                     if local_method:

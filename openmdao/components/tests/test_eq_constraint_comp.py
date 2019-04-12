@@ -1,6 +1,8 @@
 import unittest
+import warnings
 
 import numpy as np
+from numpy.testing import assert_almost_equal
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
     EQConstraintComp, ScipyOptimizeDriver
@@ -8,7 +10,6 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, \
 from openmdao.test_suite.components.sellar_feature import SellarIDF
 
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
-from numpy.testing import assert_almost_equal
 
 class TestEQConstraintComp(unittest.TestCase):
 
@@ -303,6 +304,36 @@ class TestEQConstraintComp(unittest.TestCase):
             assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
+
+    def test_complex_step(self):
+        prob = Problem()
+        model = prob.model
+
+        # find where 2*x == x^2
+        model.add_subsystem('indep', IndepVarComp('x', val=1.))
+        model.add_subsystem('multx', IndepVarComp('m', val=2.))
+        model.add_subsystem('f', ExecComp('y=x**2', x=1.))
+        model.add_subsystem('equal', EQConstraintComp('y', use_mult=True))
+
+        model.connect('indep.x', 'f.x')
+
+        model.connect('indep.x', 'equal.lhs:y')
+        model.connect('multx.m', 'equal.mult:y')
+        model.connect('f.y', 'equal.rhs:y')
+
+        model.add_design_var('indep.x', lower=0., upper=10.)
+        model.add_constraint('equal.y', equals=0.)
+        model.add_objective('f.y')
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.driver = ScipyOptimizeDriver(disp=False)
+        prob.run_driver()
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(action="error", category=np.ComplexWarning)
+            cpd = prob.check_partials(out_stream=None, method='cs')
+
+        assert_check_partials(cpd, atol=1e-10, rtol=1e-10)
 
     def test_vectorized_with_mult(self):
         prob = Problem()
