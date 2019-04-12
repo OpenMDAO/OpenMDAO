@@ -764,7 +764,7 @@ else:
                 return txt
 
 
-def write_xdsm(problem, filename, model_path=None, recurse=True,
+def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
                add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE, **kwargs):
@@ -816,7 +816,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     Parameters
     ----------
-    problem : Problem or str
+    data_source : Problem or str
         The Problem or case recorder database containing the model or model data.
     filename : str
         Name of the output files (do not provide file extension)
@@ -869,40 +869,30 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
             else:
                 build_pdf = True
 
-    viewer_data = _get_viewer_data(problem)
+    viewer_data = _get_viewer_data(data_source)
 
-    if isinstance(problem, Problem):
-        driver = problem.driver
-        if model_path is None:
-            _model = problem.model
-        else:
-            _model = problem.model._get_subsystem(model_path)
+    driver_name = viewer_data.get('driver_name', None)
+    driver_type = viewer_data.get('driver_type', 'optimization')
+    design_vars = viewer_data.get('design_vars', None)
+    responses = viewer_data.get('responses', None)
+
+    if model_path is not None:
+        if isinstance(data_source, Problem):
+            _model = data_source.model._get_subsystem(model_path)
             if _model is None:
                 msg = 'Model path "{}" does not exist in problem "{}".'
-                raise ValueError(msg.format(model_path, problem))
-        design_vars = _model.get_design_vars()
-        responses = _model.get_responses()
-    elif isinstance(problem, str):  # SQL file
-        # from openmdao.recorders.sqlite_reader import SqliteCaseReader
-        # reader = SqliteCaseReader(problem)
-        driver = None
-        design_vars = None
-        responses = None
-        # TODO get design variables, responses and the driver name from the SQL file
-        warnings.warn('For SQL input the XDSM writer shows only the model hierarchy, '
-                      'and the driver, design variables and responses are not part of the '
-                      'diagram.')
-    else:
-        msg = 'write_xdsm() only accepts Problems, Groups or filenames, not "{}"'
-        raise TypeError(msg.format(type(problem)))
+                raise ValueError(msg.format(model_path, data_source))
+            design_vars = _model.get_design_vars()
+            responses = _model.get_responses()
+        else:
+            msg = 'Model path is not supported when data source is "{}".'
+            raise ValueError(msg.format(type(data_source)))
 
-    try:
-        from openmdao.drivers.doe_driver import DOEDriver
-        driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
-    except ImportError:
-        driver_type = 'optimization'
-    # Name is None if the driver is not specified
-    driver_name = _get_cls_name(driver) if driver else None
+    if design_vars is None:
+        warnings.warn('The XDSM diagram will show only the model hierarchy, '
+                      'as the driver, design variables and responses are not '
+                      'available.')
+
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
     # If the "writer" argument not provided, the output format is used to choose the writer
@@ -928,6 +918,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
         else:
             msg = 'Custom XDSM writer should be an instance of BaseXDSMWriter, now it is a "{}".'
             raise TypeError(msg.format(type(writer)))
+
     return _write_xdsm(filename, viewer_data=viewer_data,
                        driver=driver_name, include_solver=include_solver, model_path=model_path,
                        design_vars=design_vars, responses=responses, writer=writer,

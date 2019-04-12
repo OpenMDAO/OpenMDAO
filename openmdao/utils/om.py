@@ -84,7 +84,7 @@ def _xdsm_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('file', nargs=1, help='Python script or recording containing the model.')
     parser.add_argument('-o', '--outfile', default='xdsm_out', action='store', dest='outfile',
                         help='XDSM output file. (use pathname without extension)')
     parser.add_argument('-f', '--format', default='html', action='store', dest='format',

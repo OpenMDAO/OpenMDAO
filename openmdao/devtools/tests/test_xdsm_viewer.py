@@ -112,12 +112,8 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        msg = ('For SQL input the XDSM writer shows only the model hierarchy, '
-               'and the driver, design variables and responses are not part of the '
-               'diagram.')
-        with assert_warning(Warning, msg):
-            write_xdsm(case_recording_filename, filename=filename, out_format='tex',
-                       show_browser=False, quiet=QUIET)
+        write_xdsm(case_recording_filename, filename=filename, out_format='tex',
+                   show_browser=False, quiet=QUIET)
 
         # Check if file was created
         self.assertTrue(os.path.isfile(case_recording_filename))

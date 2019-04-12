@@ -10,8 +10,7 @@ OpenMDAO also supports the generation of XDSM diagrams of models. For more infor
 
 The diagrams can be in the form of HTML or LaTeX files.
 
-To use the feature which generates LaTeX files, you must have LaTeX installed and you will also
-need to install PyXDSM. This can be done by:
+To use the feature which generates LaTeX ('tex') files, you will need to install PyXDSM. This can be done as follows:
 
 .. code-block:: none
 
@@ -24,6 +23,8 @@ or:
     git clone https://github.com/mdolab/pyXDSM
     cd pyXDSM
     python setup.py install
+
+To generate PDF files you must also have LaTeX on your system, specifically the `pdflatex` command.
 
 
 You can generate XDSM files either from the command line or from a script.
@@ -73,7 +74,7 @@ You can do the same thing programmatically by calling the `write_xdsm` function.
 .. autofunction:: openmdao.devtools.xdsm_viewer.xdsm_writer.write_xdsm
    :noindex:
 
-Notice that the `problem` argument can be either a :code:`Problem` containing the model or 
+Notice that the data source can be either a :code:`Problem` containing the model or 
 or a case recorder database containing the model data. The latter is indicated by a string 
 giving the file path to the case recorder file.
 
@@ -104,7 +105,6 @@ Case Recorder as Data Source
     r.shutdown()
 
     from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm
-
     write_xdsm('circuit.sqlite', 'xdsmjs_circuit', out_format='html', show_browser=False)
 
 
