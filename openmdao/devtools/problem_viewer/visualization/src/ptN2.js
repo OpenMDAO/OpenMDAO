@@ -1225,8 +1225,11 @@ function PtN2Diagram(parentDiv, modelData) {
         }
 
         function ClearConnections(d) {
-            d.targetsParamView = [];
-            d.targetsHideParams = [];
+            // d.targetsParamView = [];
+            // d.targetsHideParams = [];
+            d.targetsParamView = new Set();
+            d.targetsHideParams = new Set();
+
             if (d.children) {
                 for (var i = 0; i < d.children.length; ++i) {
                     ClearConnections(d.children[i]);
@@ -1280,10 +1283,18 @@ function PtN2Diagram(parentDiv, modelData) {
 
 
             for (var j = 0; j < srcObjArray.length; ++j) {
-                if (!srcObjArray[j].hasOwnProperty('targetsParamView')) srcObjArray[j].targetsParamView = [];
-                if (!srcObjArray[j].hasOwnProperty('targetsHideParams')) srcObjArray[j].targetsHideParams = [];
-                srcObjArray[j].targetsParamView = srcObjArray[j].targetsParamView.concat(tgtObjArrayParamView);
-                srcObjArray[j].targetsHideParams = srcObjArray[j].targetsHideParams.concat(tgtObjArrayHideParams);
+                if (!srcObjArray[j].hasOwnProperty('targetsParamView')) srcObjArray[j].targetsParamView = new Set();
+                if (!srcObjArray[j].hasOwnProperty('targetsHideParams')) srcObjArray[j].targetsHideParams = new Set();
+
+                tgtObjArrayParamView.forEach(item => srcObjArray[j].targetsParamView.add(item));
+                tgtObjArrayHideParams.forEach(item => srcObjArray[j].targetsHideParams.add(item));
+
+
+
+                // if (!srcObjArray[j].hasOwnProperty('targetsParamView')) srcObjArray[j].targetsParamView = [];
+                // if (!srcObjArray[j].hasOwnProperty('targetsHideParams')) srcObjArray[j].targetsHideParams = [];
+                // srcObjArray[j].targetsParamView = srcObjArray[j].targetsParamView.concat(tgtObjArrayParamView);
+                // srcObjArray[j].targetsHideParams = srcObjArray[j].targetsHideParams.concat(tgtObjArrayHideParams);
             }
 
             var cycleArrowsArray = [];
@@ -1318,7 +1329,7 @@ function PtN2Diagram(parentDiv, modelData) {
             }
 
         }
-        RemoveDuplicates(root);
+        // RemoveDuplicates(root);
     }
 
     function ComputeMatrixN2() {
@@ -1328,8 +1339,9 @@ function PtN2Diagram(parentDiv, modelData) {
                 var srcObj = d3RightTextNodesArrayZoomed[si];
                 matrix[si + "_" + si] = { "r": si, "c": si, "obj": srcObj, "id": srcObj.id + "_" + srcObj.id };
                 var targets = (showParams) ? srcObj.targetsParamView : srcObj.targetsHideParams;
-                for (var j = 0; j < targets.length; ++j) {
-                    var tgtObj = targets[j];
+                for (let tgtObj of targets) {
+                // for (var j = 0; j < targets.length; ++j) {
+                //     var tgtObj = targets[j];
                     var ti = d3RightTextNodesArrayZoomed.indexOf(tgtObj);
                     if (ti != -1) {
                         matrix[si + "_" + ti] = { "r": si, "c": ti, "obj": srcObj, "id": srcObj.id + "_" + tgtObj.id }; //matrix[si][ti].z = 1;
@@ -1927,5 +1939,8 @@ function ChangeBlankSolverToNone(d) {
 }
 ChangeBlankSolverToNone(modelData.tree);
 
+console.time("PtN2Diagram");
+
 var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData);
 
+console.timeEnd("PtN2Diagram");
