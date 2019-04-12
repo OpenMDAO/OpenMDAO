@@ -163,8 +163,11 @@ class ScipyOptimizeDriver(Driver):
                              desc='Maximum number of iterations.')
         self.options.declare('disp', True, types=bool,
                              desc='Set to False to prevent printing of Scipy convergence messages')
-        self.options.declare('dynamic_total_derivs', default=False, types=bool,
+        self.options.declare('dynamic_total_coloring', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically if True '
+                             '(deprecated)')
         self.options.declare('dynamic_derivs_repeats', default=3, types=int,
                              desc='Number of compute_totals calls during dynamic computation of '
                                   'simultaneous derivative coloring')
@@ -412,7 +415,11 @@ class ScipyOptimizeDriver(Driver):
             hess = None
 
         # compute dynamic simul deriv coloring if option is set
-        if coloring_mod._use_sparsity and self.options['dynamic_total_derivs']:
+        if coloring_mod._use_sparsity and (self.options['dynamic_total_coloring'] or
+                                           self.options['dynamic_simul_derivs']):
+            if self.options['dynamic_simul_derivs']:
+                warn_deprecation("'dynamic_simul_derivs has been deprecated.  Use "
+                                 "'dynamic_total_coloring' instead.")
             coloring_mod.dynamic_total_coloring(self, run_model=False)
 
         # optimize

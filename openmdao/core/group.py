@@ -288,18 +288,18 @@ class Group(System):
 
         self.configure()
 
-        if self.pathname == '' and self.options['dynamic_semi_total_derivs']:
-            raise RuntimeError("The `dynamic_semi_total_derivs' option was set on the top level "
+        if self.pathname == '' and self.options['dynamic_semi_total_coloring']:
+            raise RuntimeError("The `dynamic_semi_total_coloring' option was set on the top level "
                                "Group.")
 
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
         """
-        self.options.declare('dynamic_semi_total_derivs', default=False, types=bool,
+        self.options.declare('dynamic_semi_total_coloring', default=False, types=bool,
                              desc="Compute semi-total derivative coloring dynamically if True. "
                              "This only works for sub-groups.  For the top level group, set "
-                             "the 'dynamic_total_derivs' option on the driver.")
+                             "the 'dynamic_total_coloring' option on the driver.")
         self.options.declare('dynamic_derivs_repeats', default=3, types=int,
                              desc='Number of _linearize calls during dynamic computation of '
                              'semi-total derivative coloring')
@@ -1765,7 +1765,7 @@ class Group(System):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
             info = self._approx_coloring_info
-            if self.options['dynamic_semi_total_derivs']:
+            if self.options['dynamic_semi_total_coloring']:
                 coloring = self.compute_approx_coloring()
             elif info is not None and info['coloring'] is not None:
                 coloring = info['coloring']

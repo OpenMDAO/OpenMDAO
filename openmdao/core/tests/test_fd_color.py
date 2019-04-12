@@ -313,7 +313,7 @@ class TestCSColoring(unittest.TestCase):
         indeps.add_output('x1', np.ones(2))
 
         model.add_subsystem('indeps', indeps)
-        sub = model.add_subsystem('sub', CounterGroup(dynamic_semi_total_derivs=True))
+        sub = model.add_subsystem('sub', CounterGroup(dynamic_semi_total_coloring=True))
         comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
         model.connect('indeps.x0', 'sub.comp.x0')
         model.connect('indeps.x1', 'sub.comp.x1')
@@ -338,7 +338,7 @@ class TestCSColoring(unittest.TestCase):
         prob = Problem()
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        prob.driver.options['dynamic_total_derivs'] = True
+        prob.driver.options['dynamic_total_coloring'] = True
         prob.driver.options['dynamic_derivs_repeats'] = 1
 
         sparsity = np.array(
@@ -381,7 +381,7 @@ class TestCSColoring(unittest.TestCase):
         prob = Problem()
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        prob.driver.options['dynamic_total_derivs'] = True
+        prob.driver.options['dynamic_total_coloring'] = True
 
         sparsity = np.array(
             [[1, 0, 0, 1, 1],
@@ -405,8 +405,8 @@ class TestCSColoring(unittest.TestCase):
         model.comp.add_constraint('y1', lower=[1., 2.])
         model.add_design_var('indeps.x0', lower=np.ones(3), upper=np.ones(3)+.1)
         model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
-        
-        
+
+
         model.approx_totals(method=self.FD_METHOD)
 
         prob.setup(check=False, mode='fwd')
@@ -425,7 +425,7 @@ class TestCSColoring(unittest.TestCase):
         prob = Problem()
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        prob.driver.options['dynamic_total_derivs'] = True
+        prob.driver.options['dynamic_total_coloring'] = True
 
         sparsity = np.array(
             [[1, 0, 0, 1, 1],

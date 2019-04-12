@@ -22,6 +22,7 @@ from pyoptsparse import Optimization
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.general_utils import warn_deprecation
 
 
 # names of optimizers that use gradients
@@ -153,8 +154,11 @@ class pyOptSparseDriver(Driver):
                              desc='Finite difference implementation to use')
         self.options.declare('dynamic_derivs_sparsity', default=False, types=bool,
                              desc='Compute derivative sparsity dynamically if True')
-        self.options.declare('dynamic_total_derivs', default=False, types=bool,
+        self.options.declare('dynamic_total_coloring', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically if True')
+        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
+                             desc='Compute simultaneous derivative coloring dynamically '
+                             'if True (deprecated)')
         self.options.declare('dynamic_derivs_repeats', default=3, types=int,
                              desc='Number of compute_totals calls during dynamic computation of '
                                   'simultaneous derivative coloring or derivatives sparsity')
@@ -217,7 +221,10 @@ class pyOptSparseDriver(Driver):
 
         # compute dynamic simul deriv coloring or just sparsity if option is set
         if coloring_mod._use_sparsity:
-            if self.options['dynamic_total_derivs']:
+            if self.options['dynamic_total_coloring'] or self.options['dynamic_simul_derivs']:
+                if self.options['dynamic_simul_derivs']:
+                    warn_deprecation("'dynamic_simul_derivs has been deprecated.  Use "
+                                     "'dynamic_total_coloring' instead.")
                 coloring_mod.dynamic_total_coloring(self, run_model=not model_ran)
                 self._setup_tot_jac_sparsity()
 

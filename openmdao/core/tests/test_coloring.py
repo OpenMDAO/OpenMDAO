@@ -513,7 +513,7 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 
         # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
         # - dynamic coloring takes 66 nonlinear solves (22 each for 3 repeats)
-        # - (total_solves - 2) / (solves_per_iter) should be equal to 
+        # - (total_solves - 2) / (solves_per_iter) should be equal to
         #       (total_color_solves - 2 - dyn_solves) / color_solves_per_iter
         self.assertEqual((p.model._solve_nl_count - 2) / 22,
                          (p_color.model._solve_nl_count - 2 - 66) / 6)
@@ -1085,7 +1085,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p = Problem()
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
-        p.driver.options['dynamic_total_derivs'] = True
+        p.driver.options['dynamic_total_coloring'] = True
         if OPTIMIZER == 'SNOPT':
             p.driver.opt_settings['Major iterations limit'] = 100
             p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6

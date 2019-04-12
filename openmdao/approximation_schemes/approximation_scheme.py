@@ -63,6 +63,10 @@ class ApproximationScheme(object):
         """
         Replace all 'colored' approx entries with a single entry containing the actual coloring.
 
+        Also remove any uncolored entries if the (of, wrt) key matches a colored entry.  If
+        coloring is None then only the de-duplication happens, without the consolidation of
+        all colored entries into a single entry.
+
         Parameters
         ----------
         system : System
@@ -92,10 +96,7 @@ class ApproximationScheme(object):
 
         # remove entries that have same keys as colored entries
         if colored:
-            for tup in self._exec_list:
-                key, _ = tup
-                if key not in colored:
-                    new_list.append(tup)
+            new_list.extend([tup for tup in self._exec_list if tup[0] not in colored])
 
             self._exec_list = new_list
             self._approx_groups = None  # will force approx_groups to be rebuilt later

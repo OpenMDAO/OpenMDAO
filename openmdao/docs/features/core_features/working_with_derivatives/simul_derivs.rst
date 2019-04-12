@@ -49,7 +49,7 @@ set the `dynamic_total_derivs` option on the driver.  For example:
 
 .. code-block:: python
 
-    prob.driver.options['dynamic_total_derivs'] = True
+    prob.driver.options['dynamic_total_coloring'] = True
 
 
 If you want to change the number of compute_totals calls that the coloring algorithm uses to
