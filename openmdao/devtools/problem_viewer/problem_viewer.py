@@ -26,6 +26,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
+from openmdao.recorders.case_reader import CaseReader
 
 # Toolbar settings
 _FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
@@ -55,6 +56,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['component_type'] = 'explicit'
         else:
             tree_dict['component_type'] = None
+
         component_execution_orders[system.pathname] = component_execution_index[0]
         component_execution_index[0] += 1
 
@@ -153,28 +155,7 @@ def _get_viewer_data(data_source):
             return {}
 
     elif isinstance(data_source, str):
-        check_valid_sqlite3_db(data_source)
-        import sqlite3
-        con = sqlite3.connect(data_source, detect_types=sqlite3.PARSE_DECLTYPES)
-        cur = con.cursor()
-        cur.execute("SELECT format_version FROM metadata")
-        row = cur.fetchone()
-        format_version = row[0]
-
-        cur.execute("SELECT model_viewer_data FROM driver_metadata;")
-        model_text = cur.fetchone()
-
-        from six import PY2, PY3
-        if row is not None:
-            if format_version >= 3:
-                return json.loads(model_text[0])
-            elif format_version in (1, 2):
-                if PY2:
-                    import cPickle
-                    return cPickle.loads(str(model_text[0]))
-                if PY3:
-                    import pickle
-                    return pickle.loads(model_text[0])
+        return CaseReader(data_source).problem_metadata
 
     else:
         raise TypeError('_get_viewer_data only accepts Problems, Groups or filenames')
@@ -186,21 +167,28 @@ def _get_viewer_data(data_source):
 
     connections_list = []
 
+    sys_pathnames_list = []  # list of pathnames of systems found in cycles
+    sys_pathnames_dict = {}  # map of pathnames to index of pathname in list
+
     # sort to make deterministic for testing
     sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items()))
     root_group._conn_global_abs_in2out = sorted_abs_input2src
+
     G = root_group.compute_sys_graph(comps_only=True)
     scc = nx.strongly_connected_components(G)
     scc_list = [s for s in scc if len(s) > 1]
+
     for in_abs, out_abs in iteritems(sorted_abs_input2src):
         if out_abs is None:
             continue
+
         src_subsystem = out_abs.rsplit('.', 1)[0]
         tgt_subsystem = in_abs.rsplit('.', 1)[0]
         src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
 
         count = 0
         edges_list = []
+
         for li in scc_list:
             if src_subsystem in li and tgt_subsystem in li:
                 count += 1
@@ -216,7 +204,23 @@ def _get_viewer_data(data_source):
                 for edge in subg.edges():
                     edge_str = ' '.join(edge)
                     if edge_str != src_to_tgt_str:
-                        edges_list.append(edge_str)
+                        src, tgt = edge
+
+                        # add src & tgt to pathnames list & dict if not already there
+                        for pathname in edge:
+                            if pathname not in sys_pathnames_dict:
+                                sys_pathnames_list.append(pathname)
+                                sys_pathnames_dict[pathname] = len(sys_pathnames_list) - 1
+
+                        # replace src & tgt pathnames with indices into pathname list
+                        src = sys_pathnames_dict[src]
+                        tgt = sys_pathnames_dict[tgt]
+
+                        # make sure no duplicates in pathnames list & that pathnames map correctly
+                        assert(len(sys_pathnames_list) == len(set(sys_pathnames_list)))
+                        assert(edge_str == ' '.join([sys_pathnames_list[src], sys_pathnames_list[tgt]]))
+
+                        edges_list.append((src, tgt))
 
         if edges_list:
             edges_list.sort()  # make deterministic so same .html file will be produced each run
@@ -225,8 +229,8 @@ def _get_viewer_data(data_source):
         else:
             connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
 
+    data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list
-
     data_dict['abs2prom'] = root_group._var_abs2prom
 
     return data_dict

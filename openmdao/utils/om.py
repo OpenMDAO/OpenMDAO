@@ -36,7 +36,7 @@ def _view_model_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('file', nargs=1, help='Python script or recording containing the model.')
     parser.add_argument('-o', default='n2.html', action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
@@ -47,24 +47,29 @@ def _view_model_setup_parser(parser):
 
 def _view_model_cmd(options):
     """
-    Return the post_setup hook function for 'openmdao view_model'.
+    Process command line args and call view_model on the specified file.
 
     Parameters
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The post-setup hook function.
     """
-    def _viewmod(prob):
-        view_model(prob, outfile=options.outfile,
+    if options.file[0].endswith('.py'):
+        # the file is a python script, run as a post_setup hook
+        def _viewmod(prob):
+            view_model(prob, outfile=options.outfile,
+                       show_browser=not options.no_browser,
+                       embeddable=options.embeddable)
+            exit()  # could make this command line selectable later
+
+        options.func = lambda options: _viewmod
+
+        _post_setup_exec(options)
+    else:
+        # assume the file is a recording, run standalone
+        view_model(options.file[0], outfile=options.outfile,
                    show_browser=not options.no_browser,
                    embeddable=options.embeddable)
-        exit()  # could make this command line selectable later
-    return _viewmod
 
 
 def _view_connections_setup_parser(parser):
@@ -354,7 +359,6 @@ def _post_setup_exec(options):
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, func)
 _post_setup_map = {
-    'view_model': (_view_model_setup_parser, _view_model_cmd),
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd),
     'summary': (_config_summary_setup_parser, _config_summary_cmd),
     'tree': (_tree_setup_parser, _tree_cmd),
@@ -369,6 +373,7 @@ _post_setup_map = {
 
 # Other non-post-setup functions go here
 _non_post_setup_map = {
+    'view_model': (_view_model_setup_parser, _view_model_cmd),
     'trace': (_itrace_setup_parser, _itrace_exec),
     'call_tree': (_calltree_setup_parser, _calltree_exec),
     'iprof': (_iprof_setup_parser, _iprof_exec),
@@ -376,7 +381,6 @@ _non_post_setup_map = {
     'mem': (_mem_prof_setup_parser, _mem_prof_exec),
     'mempost': (_mempost_setup_parser, _mempost_exec),
 }
-
 
 def openmdao_cmd():
     """

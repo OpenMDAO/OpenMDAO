@@ -1239,6 +1239,8 @@ function PtN2Diagram(parentDiv, modelData) {
 
         ClearConnections(root);
 
+        var sys_pathnames = modelData.sys_pathnames_list;
+
         for (var i = 0; i < conns.length; ++i) {
             var srcSplitArray = conns[i].src.split(/\.|:/);
             var srcObj = GetObjectInTree(root, srcSplitArray, 0);
@@ -1301,21 +1303,25 @@ function PtN2Diagram(parentDiv, modelData) {
             if (conns[i].cycle_arrows && conns[i].cycle_arrows.length > 0) {
                 var cycleArrows = conns[i].cycle_arrows;
                 for (var j = 0; j < cycleArrows.length; ++j) {
-                    var cycleArrowsSplitArray = cycleArrows[j].split(" ");
-                    if (cycleArrowsSplitArray.length != 2) {
-                        alert("error: cycleArrowsSplitArray length not 2: got " + cycleArrowsSplitArray.length);
+                    if (cycleArrows[j].length != 2) {
+                        alert("error: cycleArrowsSplitArray length not 2, got " + cycleArrows[j].length +
+                              ": " + cycleArrows[j]);
                         return;
                     }
-                    var splitArray = cycleArrowsSplitArray[0].split(/\.|:/);
+
+                    var src_pathname = sys_pathnames[cycleArrows[j][0]];
+                    var tgt_pathname = sys_pathnames[cycleArrows[j][1]];
+
+                    var splitArray = src_pathname.split(/\.|:/);
                     var arrowBeginObj = GetObjectInTree(root, splitArray, 0);
                     if (arrowBeginObj == null) {
-                        alert("error: cannot find cycle arrows begin object " + cycleArrowsSplitArray[0]);
+                        alert("error: cannot find cycle arrows begin object " + src_pathname);
                         return;
                     }
-                    splitArray = cycleArrowsSplitArray[1].split(/\.|:/);
+                    splitArray = tgt_pathname.split(/\.|:/);
                     var arrowEndObj = GetObjectInTree(root, splitArray, 0);
                     if (arrowEndObj == null) {
-                        alert("error: cannot find cycle arrows end object " + cycleArrowsSplitArray[1]);
+                        alert("error: cannot find cycle arrows end object " + tgt_pathname);
                         return;
                     }
                     cycleArrowsArray.push({ "begin": arrowBeginObj, "end": arrowEndObj });
