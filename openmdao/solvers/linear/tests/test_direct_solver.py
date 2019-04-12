@@ -174,6 +174,23 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
+    def test_multi_dim_src_indices(self):
+        prob = Problem()
+        model = prob.model
+        size = 5
+
+        model.add_subsystem('indeps', IndepVarComp('x', np.arange(5).reshape((1,size,1))))
+        model.add_subsystem('comp', ExecComp('y = x * 2.', x=np.zeros((size,)), y=np.zeros((size,))))
+        src_indices = [[0, i, 0] for i in range(size)]
+        model.connect('indeps.x', 'comp.x', src_indices=src_indices)
+
+        model.linear_solver = DirectSolver()
+        prob.setup()
+        prob.run_model()
+
+        J = prob.compute_totals(wrt=['indeps.x'], of=['comp.y'], return_format='array')
+        np.testing.assert_almost_equal(J, np.eye(size) * 2.)
+
     def test_raise_error_on_singular(self):
         prob = Problem()
         model = prob.model
