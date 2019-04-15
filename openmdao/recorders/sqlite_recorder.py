@@ -563,12 +563,12 @@ class SqliteRecorder(CaseRecorder):
             The unique ID to use for this data in the table.
         """
         if self.connection:
-            # convert numpy types to native types for JSON
+            # convert any remaining numpy types to native types for JSON
             def default(o):
                 if isinstance(o, np.int32) or isinstance(o, np.int64):
                     return int(o)
                 elif isinstance(o, np.ndarray):
-                    return o.tolist()
+                    return convert_to_list(o)
                 else:
                     return o
 
