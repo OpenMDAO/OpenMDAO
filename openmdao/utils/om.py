@@ -92,7 +92,8 @@ def _xdsm_setup_parser(parser):
     parser.add_argument('-m', '--model_path', action='store', dest='model_path',
                         help='Path to system to transcribe to XDSM.')
     parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
-                        help="Don't treat the top level of each name as the source/target component.")
+                        help="Don't treat the top level of each name as the source/target "
+                             "component.")
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
                         help="Don't display in a browser.")
     parser.add_argument('--no_parallel', action='store_true', dest='no_parallel',
@@ -119,7 +120,8 @@ def _xdsm_setup_parser(parser):
                         choices=['horizontal', 'vertical'], default='horizontal',
                         help='Positions the number either above or in front of the component label '
                         'if numbered_comps is true.')
-    parser.add_argument('--output_side', action='store', dest='output_side', default=_DEFAULT_OUTPUT_SIDE,
+    parser.add_argument('--output_side', action='store', dest='output_side',
+                        default=_DEFAULT_OUTPUT_SIDE,
                         help='Position of the outputs on the diagram. Left or right, or a '
                              'dictionary with component types as keys. Component type key can be '
                              '"optimization", "doe" or "default".')
@@ -151,7 +153,8 @@ def _xdsm_cmd(options):
                        out_format=options.format,
                        include_solver=options.include_solver, subs=_CHAR_SUBS,
                        show_browser=not options.no_browser, show_parallel=not options.no_parallel,
-                       add_process_conns=not options.no_process_conns, output_side=options.output_side,
+                       add_process_conns=not options.no_process_conns,
+                       output_side=options.output_side,
                        **kwargs)
             exit()
 

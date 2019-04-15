@@ -340,8 +340,11 @@ def assertViewerDataRecorded(test, expected):
 
         test.assertTrue(isinstance(model_viewer_data, dict))
 
-        # four primary keys
-        test.assertEqual(4, len(model_viewer_data))
+        # primary keys
+        test.assertEqual(set(model_viewer_data.keys()), {
+            'tree', 'sys_pathnames_list', 'connections_list', 'abs2prom',
+            'driver_type', 'driver_name', 'design_vars', 'responses'
+        })
 
         # system pathnames
         test.assertTrue(isinstance(model_viewer_data['sys_pathnames_list'], list))

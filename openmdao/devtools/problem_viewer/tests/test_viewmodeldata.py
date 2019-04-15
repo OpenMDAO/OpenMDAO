@@ -46,7 +46,7 @@ class TestViewModelData(unittest.TestCase):
                 {"src": "pz.z", "tgt": "sub.d1.z"},
                 {"src": "sub.d1.y1", "tgt": "sub.d2.y1"},
                 {"src": "pz.z", "tgt": "sub.d2.z"},
-                {"src": "sub.d2.y2", "tgt": "sub.state_eq_group.state_eq.y2_actual", "cycle_arrows": [[0, 1], [2, 0]]}
+                {"src": "sub.d2.y2", "tgt": "sub.state_eq_group.state_eq.y2_actual", "cycle_arrows": ["sub.d1 sub.d2", "sub.state_eq_group.state_eq sub.d1"]}
             ]
         """)
         self.expected_abs2prom = json.loads("""
