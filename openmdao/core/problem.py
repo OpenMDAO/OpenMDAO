@@ -819,7 +819,7 @@ class Problem(object):
 
         coloring_info = driver._total_coloring
         if coloring_info and coloring._use_sparsity:
-            # if we're using simultaneous derivatives then our effective size is less
+            # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
             if coloring_info._fwd and coloring_info._rev:
                 pass  # we're doing both!

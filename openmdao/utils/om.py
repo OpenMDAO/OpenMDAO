@@ -362,7 +362,7 @@ _post_setup_map = {
     'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd),
     'total_coloring': (_total_coloring_setup_parser, _total_coloring_cmd),
     'partial_coloring': (_partial_coloring_setup_parser, _partial_coloring_cmd),
-    'sparsity': (_sparsity_setup_parser, _sparsity_cmd),
+    'total_sparsity': (_sparsity_setup_parser, _sparsity_cmd),
     'cite': (_cite_setup_parser, _cite_cmd),
     'check': (_check_config_setup_parser, _check_config_cmd),
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd),

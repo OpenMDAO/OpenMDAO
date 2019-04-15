@@ -633,6 +633,7 @@ class Coloring(object):
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
             J = np.zeros(self._shape, dtype=bool)
             J[self._nzrows, self._nzcols] = True
+            array_viz(J)
             return _jac2subjac_sparsity(J, self._row_vars, self._col_vars,
                                         self._row_var_sizes, self._col_var_sizes)
 
@@ -1473,10 +1474,10 @@ def dynamic_sparsity(driver):
     driver._total_jac = None
     repeats = driver.options['dynamic_derivs_repeats']
 
-    # save the sparsity.json file for later inspection
+    # save the total_sparsity.json file for later inspection
     sparsity, _ = get_tot_jac_sparsity(problem, mode=problem._mode, repeats=repeats)
 
-    with open("sparsity.json", "w") as f:
+    with open("total_sparsity.json", "w") as f:
         _write_sparsity(sparsity, f)
 
     driver.set_total_jac_sparsity(sparsity)
@@ -1543,7 +1544,7 @@ def _total_coloring_setup_parser(parser):
     parser.add_argument('-n', action='store', dest='num_jacs', default=3, type=int,
                         help='number of times to repeat derivative computation when '
                         'computing sparsity')
-    parser.add_argument('--tol', action='store', dest='tolerance', default=1.e-15, type=float,
+    parser.add_argument('-t', '--tol', action='store', dest='tolerance', default=1.e-15, type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
                         help="Display a visualization of the final jacobian used to "
@@ -1580,6 +1581,7 @@ def _total_coloring_cmd(options):
 
     def _total_coloring(prob):
         global _use_sparsity
+        import wingdbstub
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
             do_sparsity = not options.no_sparsity
@@ -1823,7 +1825,7 @@ def _sparsity_setup_parser(parser):
 
 def _sparsity_cmd(options):
     """
-    Return the post_setup hook function for 'openmdao sparsity'.
+    Return the post_setup hook function for 'openmdao total_sparsity'.
 
     Parameters
     ----------
@@ -1842,8 +1844,8 @@ def _sparsity_cmd(options):
 
     def _sparsity(prob):
         Problem._post_setup_func = None  # avoid recursive loop
-        _, J = get_tot_jac_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance,
-                                    mode=prob._mode, setup=True, run_model=True)
+        sparsity, J = get_tot_jac_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance,
+                                           mode=prob._mode, setup=True, run_model=True)
 
         if options.outfile is None:
             outfile = sys.stdout
@@ -1857,7 +1859,7 @@ def _sparsity_cmd(options):
             wrts = list(prob.driver._designvars)
             array_viz(J, prob, ofs, wrts)
 
-        exit()
+        exit(0)
     return _sparsity
 
 

@@ -366,7 +366,6 @@ class TestCSColoring(unittest.TestCase):
         model.approx_totals(method=self.FD_METHOD)
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
-        prob.run_model()
         prob.run_driver()  # need this to trigger the dynamic coloring
 
         prob.driver._total_jac = None
@@ -506,7 +505,6 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        # comp.declare_partial_coloring('x*', method=self.FD_METHOD, directory=self.tempdir)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -560,7 +558,6 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        # comp.declare_partial_coloring('x*', method=self.FD_METHOD, directory=self.tempdir)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 

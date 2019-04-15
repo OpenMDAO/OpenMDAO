@@ -19,11 +19,11 @@ Sparsity can be computed at runtime, shortly after the driver begins the optimiz
 This has the advantage of simplicity and robustness to changes in the model, but adds
 the cost of the sparsity computation to the run time of the optimization.  For a typical
 optimization, however, this cost will be small.  Activating dynamic sparsity detection
-is simple.  Just set the `dynamic_derivs_sparsity` option on the driver.  For example:
+is simple.  Just set the `dynamic_total_sparsity` option on the driver.  For example:
 
 .. code-block:: python
 
-    prob.driver.options['dynamic_derivs_sparsity'] = True
+    prob.driver.options['dynamic_total_sparsity'] = True
 
 If you want to change the number of compute_totals calls that the algorithm uses to
 compute the jacobian sparsity (default is 3), you can set the `dynamic_derivs_repeats`
@@ -34,26 +34,28 @@ option. For example:
     prob.driver.options['dynamic_derivs_repeats'] = 2
 
 
-Whenever a dynamic sparsity is computed, the sparsity is written to a file called *sparsity.json*
-for later inspection.
+Whenever a dynamic sparsity is computed, the sparsity is written to a file called
+*total_sparsity.json* for later inspection or static use.
 
 
 Static Determination of Sparsity
 ================================
 
 To get rid of the runtime cost of computing the sparsity, you can precompute it using the
-:code:`openmdao sparsity` command line tool.  The sparsity dictionary will be displayed on
+:code:`openmdao total_sparsity` command line tool.  The sparsity dictionary will be displayed on
 the terminal and can be cut-and-pasted into your python script, or you can specify an output
 file on the command line and the sparsity dictionary will be written in JSON format to the
-specified file.  Here's an example of writing the sparsity information to the terminal:
+specified file.  The name of that file can then be passed into the `set_total_jac_sparsity`
+method of the driver.  Here's an example of writing the sparsity information to the terminal:
+
 
 .. embed-shell-cmd::
-    :cmd: openmdao sparsity circle_opt.py
+    :cmd: openmdao total_sparsity circle_opt.py
     :dir: ../test_suite/scripts
 
 
-Once the sparsity data exists, you tell OpenMDAO about it by calling the `set_total_jac_sparsity`
-method on the driver.  For example:
+Here's what the code would look like if we cut-and-pasted the output of the
+:code:`openmdao total_sparsity` command and passed it into :code:`set_total_jac_sparsity`.
 
 
 .. code-block:: python
@@ -90,11 +92,12 @@ method on the driver.  For example:
     prob.driver.set_total_jac_sparsity(sparsity)
 
 
-If we want to write the sparsity output to a JSON file instead, the command would look like this:
+Here's how to write the sparsity information to a file instead.  In this case the file is called
+`total_sparsity.json`.
 
 .. code-block:: none
 
-    openmdao sparsity circle_opt.py -o sparsity.json
+    openmdao total_sparsity circle_opt.py -o total_sparsity.json
 
 
 and we would specify the sparsity in our python script as follows:
@@ -102,7 +105,7 @@ and we would specify the sparsity in our python script as follows:
 .. code-block:: python
 
     # we would specify total jacobian sparsity by calling this on our driver
-    prob.driver.set_total_jac_sparsity('sparsity.json')
+    prob.driver.set_total_jac_sparsity('total_sparsity.json')
 
 .. note::
 

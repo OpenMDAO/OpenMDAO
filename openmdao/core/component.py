@@ -215,14 +215,19 @@ class Component(System):
                                                                 self._approx_schemes):
             raise RuntimeError("'%s': num_par_fd is > 1 but no FD is active." % self.pathname)
 
-        # check here if declare_partial_coloring was called during setup but declare_partials wasn't
+        # check here if declare_partial_coloring was called during setup but declare_partials
+        # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
+        # have something to color.
         if self._approx_coloring_info is not None:
             for key, meta in iteritems(self._declared_partials):
                 if 'method' in meta:
                     break
             else:
-                raise RuntimeError("%s: declare_partial_coloring was called but no approx partials"
-                                   " were declared." % self.pathname)
+                method = self._approx_coloring_info['method']
+                simple_warning("%s: declare_partial_coloring was called but no approx partials "
+                               "were declared.  Declaring all partials as approximated using "
+                               "default metadata and method='%s'." % (self.pathname, method))
+                self.declare_partials('*', '*', method=method)
 
         self._static_mode = True
 

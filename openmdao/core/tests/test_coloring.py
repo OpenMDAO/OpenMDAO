@@ -961,7 +961,7 @@ class SparsityTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
 
         # run with dynamic sparsity
-        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_derivs_sparsity=True,
+        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_total_sparsity=True,
                             optimizer='SNOPT', print_results=False)
 
         # run with provided sparsity
@@ -987,7 +987,7 @@ class SparsityTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
 
         # run with dynamic sparsity
-        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_derivs_sparsity=True,
+        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_total_sparsity=True,
                             optimizer='SLSQP', print_results=False)
 
         # run with provided sparsity
