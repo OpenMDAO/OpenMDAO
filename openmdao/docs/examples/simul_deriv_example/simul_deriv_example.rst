@@ -13,6 +13,8 @@ determined by the values of the *x* and *y* arrays defined in our problem.
 .. embed-code::
     openmdao.core.tests.test_coloring.SimulColoringScipyTestCase.test_simul_coloring_example
     :layout: interleave
+    :imports-not-required:
+
 
 
 Total derivatives with respect to *x* and *y* will be solved for simultaneously based on the

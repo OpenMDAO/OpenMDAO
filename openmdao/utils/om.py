@@ -19,7 +19,10 @@ from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setu
 from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, \
     _mempost_exec, _mempost_setup_parser
-from openmdao.utils.ad_common import _ad_setup_parser, _ad_cmd, _ad_exec
+try:
+    from openmdao.utils.ad_common import _ad_setup_parser, _ad_cmd, _ad_exec
+except Exception:
+    _ad_setup_parser = _ad_cmd = _ad_exec = None
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.devtools.iprof_utils import _Options
 from openmdao.devtools.xdsm_viewer.xdsm_writer import _xdsm_setup_parser, _xdsm_cmd
@@ -381,9 +384,9 @@ _non_post_setup_map = {
 
 
 # functions that can be either post-setup or not go here
-_dual_setup_map = {
-    'ad': (_ad_setup_parser, _ad_cmd, _ad_exec),
-}
+_dual_setup_map = {}
+if _ad_setup_parser is not None:
+    _dual_setup_map['ad'] = (_ad_setup_parser, _ad_cmd, _ad_exec)
 
 
 def openmdao_cmd():

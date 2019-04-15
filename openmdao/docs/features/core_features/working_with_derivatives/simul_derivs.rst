@@ -1,8 +1,8 @@
 .. _feature_simul_coloring:
 
-********************************************
-Simultaneous Coloring For Separable Problems
-********************************************
+*************************************************************
+Simultaneous Total Derivative Coloring For Separable Problems
+*************************************************************
 
 When OpenMDAO solves for total derivatives, it loops over either design variables in 'fwd' mode
 or responses in 'rev' mode.  For each of those variables, it performs a linear solve for each
@@ -73,6 +73,11 @@ Whenever a dynamic coloring is computed, the coloring is written to a file calle
 *total_coloring.pkl* for later 'static' use.
 
 
+You can see a more complete example of setting up an optimization with
+simultaneous derivatives in the
+:ref:`Simple Optimization using Simultaneous Derivatives <simul_deriv_example>` example.
+
+
 .. _feature_automatic_coloring:
 
 Static Coloring
@@ -91,11 +96,6 @@ While this has the advantage of removing the runtime cost of computing the color
 it should be used with care, because any changes in the model, design variables, or responses
 can make the existing coloring invalid.  If *anything* about the optimization changes, it's
 recommended to always regenerate the coloring before re-running the optimization.
-
-
-You can see a more complete example of setting up an optimization with
-simultaneous derivatives in the
-:ref:`Simple Optimization using Simultaneous Derivatives <simul_deriv_example>` example.
 
 
 The coloring can be generated automatically and written to the `total_coloring.pkl` file
@@ -153,35 +153,36 @@ structure with rows and columns labelled with the response and design variable n
 
 .. code-block:: none
 
-    ....................x 0  circle.area
-    x.........x.........x 1  r_con.g
-    .x.........x........x 2  r_con.g
-    ..x.........x.......x 3  r_con.g
-    ...x.........x......x 4  r_con.g
-    ....x.........x.....x 5  r_con.g
-    .....x.........x....x 6  r_con.g
-    ......x.........x...x 7  r_con.g
-    .......x.........x..x 8  r_con.g
-    ........x.........x.x 9  r_con.g
-    .........x.........xx 10  r_con.g
-    x.........x.......... 11  theta_con.g
-    ..x.........x........ 12  theta_con.g
-    ....x.........x...... 13  theta_con.g
-    ......x.........x.... 14  theta_con.g
-    ........x.........x.. 15  theta_con.g
-    xx........xx......... 16  delta_theta_con.g
-    ..xx........xx....... 17  delta_theta_con.g
-    ....xx........xx..... 18  delta_theta_con.g
-    ......xx........xx... 19  delta_theta_con.g
-    ........xx........xx. 20  delta_theta_con.g
-    x.................... 21  l_conx.g
+    ....................f 0  circle.area
+    f.........f.........f 1  r_con.g
+    .f.........f........f 2  r_con.g
+    ..f.........f.......f 3  r_con.g
+    ...f.........f......f 4  r_con.g
+    ....f.........f.....f 5  r_con.g
+    .....f.........f....f 6  r_con.g
+    ......f.........f...f 7  r_con.g
+    .......f.........f..f 8  r_con.g
+    ........f.........f.f 9  r_con.g
+    .........f.........ff 10  r_con.g
+    f.........f.......... 11  theta_con.g
+    ..f.........f........ 12  theta_con.g
+    ....f.........f...... 13  theta_con.g
+    ......f.........f.... 14  theta_con.g
+    ........f.........f.. 15  theta_con.g
+    ff........ff......... 16  delta_theta_con.g
+    ..ff........ff....... 17  delta_theta_con.g
+    ....ff........ff..... 18  delta_theta_con.g
+    ......ff........ff... 19  delta_theta_con.g
+    ........ff........ff. 20  delta_theta_con.g
+    f.................... 21  l_conx.g
     |indeps.x
-              |indeps.y
+            |indeps.y
                         |indeps.r
 
-
 Note that the design variables are displayed along the bottom of the matrix, with a pipe symbol (|)
-that lines up with the starting column for that variable.
+that lines up with the starting column for that variable.  Also, an 'f' indicates a nonzero value
+that is colored in 'fwd' mode, while an 'r' indicates a nonzero value colored in 'rev' mode.  A
+'.' indicates a zero value.
 
 
 You can also use the `-o` command line option if you'd rather call you coloring file something

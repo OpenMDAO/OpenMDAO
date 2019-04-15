@@ -770,6 +770,9 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.driver.options['optimizer'] = 'SLSQP'
         p.driver.options['disp'] = False
 
+        # set up dynamic total coloring here
+        p.driver.options['dynamic_total_coloring'] = True
+
         p.model.add_design_var('x')
         p.model.add_design_var('y')
         p.model.add_design_var('r', lower=.5, upper=10)
@@ -787,41 +790,6 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model.add_constraint('y', equals=0, indices=[0,], linear=True)
 
         p.model.add_objective('circle.area', ref=-1)
-
-        # setup coloring
-        color_info = Coloring()
-        color_info._fwd = [[
-           [20],   # uncolored column list
-           [0, 2, 4, 6, 8],   # color 1
-           [1, 3, 5, 7, 9],   # color 2
-           [10, 12, 14, 16, 18],   # color 3
-           [11, 13, 15, 17, 19],   # color 4
-        ],
-        [
-           [1, 11, 16, 21],   # column 0
-           [2, 16],   # column 1
-           [3, 12, 17],   # column 2
-           [4, 17],   # column 3
-           [5, 13, 18],   # column 4
-           [6, 18],   # column 5
-           [7, 14, 19],   # column 6
-           [8, 19],   # column 7
-           [9, 15, 20],   # column 8
-           [10, 20],   # column 9
-           [1, 11, 16],   # column 10
-           [2, 16],   # column 11
-           [3, 12, 17],   # column 12
-           [4, 17],   # column 13
-           [5, 13, 18],   # column 14
-           [6, 18],   # column 15
-           [7, 14, 19],   # column 16
-           [8, 19],   # column 17
-           [9, 15, 20],   # column 18
-           [10, 20],   # column 19
-           None,   # column 20
-        ]]
-
-        p.driver.set_coloring_spec(color_info)
 
         p.setup(mode='fwd')
         p.run_driver()
@@ -1140,3 +1108,4 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

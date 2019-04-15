@@ -147,7 +147,7 @@ class Coloring(object):
 
     def color_iter(self, direction):
         """
-        Based on the given direction, yield an iterator over column (or row) groups.
+        Given a direction, yield an iterator over column (or row) groups.
 
         Parameters
         ----------
@@ -172,6 +172,25 @@ class Coloring(object):
         for i in range(1, len(colors)):
             yield colors[i]
 
+    def color_nonzero_iter(self, direction):
+        """
+        Given a direction, yield an iterator over (columns, nz_rows) or (rows, nz_columns).
+
+        Parameters
+        ----------
+        direction : str
+            Indicates which coloring subdict ('fwd' or 'rev') to use.
+
+        Yields
+        ------
+        (column or row groups, nonzero row or column lists)
+            Yields a list of columns/rows and their associated nonzero rows/columns for each
+            color.
+        """
+        nz_rows = self.get_row_col_map(direction)
+        for col_chunk in self.color_iter(direction):
+            yield col_chunk, [nz_rows[c] for c in col_chunk]
+
     def get_row_col_map(self, direction):
         """
         Return mapping of nonzero rows to each column (fwd) or nonzeros columns to each row (rev).
@@ -193,25 +212,6 @@ class Coloring(object):
             return self._rev[1]
         else:
             raise RuntimeError("Invalid direction '%s' in get_row_col_map" % direction)
-
-    def color_nonzero_iter(self, direction):
-        """
-        Given a direction, iterate over column groups (fwd) or row groups (rev).
-
-        Parameters
-        ----------
-        direction : str
-            Indicates which coloring subdict ('fwd' or 'rev') to use.
-
-        Yields
-        ------
-        (column or row groups, nonzero row or column lists)
-            Yields a list of columns/rows and their associated nonzero rows/columns associated
-            with a color.
-        """
-        nz_rows = self.get_row_col_map(direction)
-        for col_chunk in self.color_iter(direction):
-            yield col_chunk, [nz_rows[c] for c in col_chunk]
 
     def modes(self):
         """
@@ -633,7 +633,6 @@ class Coloring(object):
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
             J = np.zeros(self._shape, dtype=bool)
             J[self._nzrows, self._nzcols] = True
-            array_viz(J)
             return _jac2subjac_sparsity(J, self._row_vars, self._col_vars,
                                         self._row_var_sizes, self._col_var_sizes)
 
@@ -1028,7 +1027,7 @@ def _tol_sweep(arr, tol=1e-15, orders=12):
     sorted_items = sorted(nzeros.items(), key=lambda x: len(x[1]), reverse=True)
     n_matching = len(sorted_items[0][1])
 
-    if n_matching == 1:
+    if n_matching <= 1:
         raise RuntimeError("Could not find more than 1 tolerance to match any number of nonzeros. "
                            "This indicates that your tolerance sweep of +- %d orders, starting "
                            "from %s is not big enough.  To get a 'stable' sparsity pattern, "
@@ -1525,6 +1524,8 @@ def dynamic_total_coloring(driver, run_model=True):
                                       setup=False, run_model=run_model,
                                       fname='total_coloring.pkl')
 
+    coloring.summary()
+
     coloring._static = False
     driver.set_coloring_spec(coloring)
     driver._setup_simul_coloring()
@@ -1581,7 +1582,6 @@ def _total_coloring_cmd(options):
 
     def _total_coloring(prob):
         global _use_sparsity
-        import wingdbstub
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
             do_sparsity = not options.no_sparsity

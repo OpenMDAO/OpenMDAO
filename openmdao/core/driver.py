@@ -903,7 +903,7 @@ class Driver(object):
         ----------
         coloring : str or Coloring
             Information about simultaneous coloring for design vars and responses.  If a
-            string, then simul_info is assumed to be the name of a file that contains the
+            string, then coloring is assumed to be the name of a file that contains the
             coloring information in pickle format. Otherwise it must be a Coloring object.
             See the docstring for Coloring for details.
 
@@ -922,7 +922,7 @@ class Driver(object):
         ----------
         coloring : str or Coloring
             Information about simultaneous coloring for design vars and responses.  If a
-            string, then simul_info is assumed to be the name of a file that contains the
+            string, then coloring is assumed to be the name of a file that contains the
             coloring information in pickle format. Otherwise it must be a Coloring object.
             See the docstring for Coloring for details.
 

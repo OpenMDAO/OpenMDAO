@@ -57,34 +57,33 @@ method of the driver.  Here's an example of writing the sparsity information to 
 Here's what the code would look like if we cut-and-pasted the output of the
 :code:`openmdao total_sparsity` command and passed it into :code:`set_total_jac_sparsity`.
 
-
 .. code-block:: python
 
     sparsity = {
         "circle.area": {
-           "indeps.x": [[], [], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[0], [0], [1, 1]]
-        },
-        "r_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [10, 10]],
-           "indeps.r": [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10, 1]]
-        },
-        "theta_con.g": {
-           "indeps.x": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.y": [[0, 1, 2, 3, 4], [0, 2, 4, 6, 8], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
+        "indeps.r": [[0], [0], [1, 1]],
+        "indeps.x": [[], [], [1, 10]],
+        "indeps.y": [[], [], [1, 10]]
         },
         "delta_theta_con.g": {
-           "indeps.x": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.y": [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [5, 10]],
-           "indeps.r": [[], [], [5, 1]]
+        "indeps.r": [[], [], [5, 1]],
+        "indeps.x": [[0 0 1 1 2 2 3 3 4 4], [0 1 2 3 4 5 6 7 8 9], [5, 10]],
+        "indeps.y": [[0 0 1 1 2 2 3 3 4 4], [0 1 2 3 4 5 6 7 8 9], [5, 10]]
         },
         "l_conx.g": {
-           "indeps.x": [[0], [0], [1, 10]],
-           "indeps.y": [[], [], [1, 10]],
-           "indeps.r": [[], [], [1, 1]]
+        "indeps.r": [[], [], [1, 1]],
+        "indeps.x": [[0], [0], [1, 10]],
+        "indeps.y": [[], [], [1, 10]]
+        },
+        "r_con.g": {
+        "indeps.r": [[0 1 2 3 4 5 6 7 8 9], [0 0 0 0 0 0 0 0 0 0], [10, 1]],
+        "indeps.x": [[0 1 2 3 4 5 6 7 8 9], [0 1 2 3 4 5 6 7 8 9], [10, 10]],
+        "indeps.y": [[0 1 2 3 4 5 6 7 8 9], [0 1 2 3 4 5 6 7 8 9], [10, 10]]
+        },
+        "theta_con.g": {
+        "indeps.r": [[], [], [5, 1]],
+        "indeps.x": [[0 1 2 3 4], [0 2 4 6 8], [5, 10]],
+        "indeps.y": [[0 1 2 3 4], [0 2 4 6 8], [5, 10]]
         }
     }
 
