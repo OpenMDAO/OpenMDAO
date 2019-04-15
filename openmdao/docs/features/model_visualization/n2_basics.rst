@@ -29,15 +29,17 @@ From the Command Line
 
 .. _om-command-view_n2:
 
-Generating an N2 diagram for a model from the command line is easy. First, you need either a Python
-script that runs the model or a case recording file that was created when running the model.
+Generating an N2 diagram for a model from the command line is easy. First, you need a Python script that contains
+and runs the model.
 
 .. note::
 
-    If using a script and :code:`final_setup` isn't called in the script (either directly or as a
-    result of :code:`run_model` or :code:`run_driver`) then nothing will happen. Also, when using
-    the command line version, even if the script does call :code:`run_model` or :code:`run_driver`,
+    If :code:`final_setup` isn't called in the script (either directly or as a result
+    of :code:`run_model`
+    or :code:`run_driver`) then nothing will happen. Also, when using the command line version,
+    even if the script does call :code:`run_model` or :code:`run_driver`,
     the script will terminate after :code:`final_setup` and will not actually run the model.
+
 
 
 The :code:`openmdao view_model` command will generate an N2 diagram of the model that is
@@ -47,15 +49,16 @@ viewable in a browser, for example:
 
     openmdao view_model openmdao/test_suite/scripts/circuit_with_unconnected_input.py
 
-will generate an N2 diagram like the one below.
 
-.. embed-n2::
-    ../test_suite/scripts/circuit_with_unconnected_input.py
+will generate an N2 diagram like the one below.
 
 The :code:`openmdao view_model` has several options:
 
 .. embed-shell-cmd::
     :cmd: openmdao view_model -h
+
+.. embed-n2::
+    ../test_suite/scripts/circuit_with_unconnected_input.py
 
 
 From a Script
@@ -68,9 +71,8 @@ You can do the same thing programmatically by calling the :code:`view_model` fun
 .. autofunction:: openmdao.devtools.problem_viewer.problem_viewer.view_model
    :noindex:
 
-Notice that the data source can be either a :code:`Problem` or case recorder database containing
-the model or model data. The latter is indicated by a string giving the file path to the case 
-recorder file.
+Notice that the data source can be either a :code:`Problem` or case recorder database containing the model or model data.
+The latter is indicated by a string giving the file path to the case recorder file.
 
 Here are some code snippets showing the two cases.
 
@@ -89,23 +91,17 @@ Case Recorder as Data Source
 
 .. code::
 
+    p = Problem()
+    p.model = SellarStateConnection()
     r = SqliteRecorder('circuit.sqlite')
     p.driver.add_recorder(r)
-
-    p.setup()
+    p.setup(check=False)
     p.final_setup()
     r.shutdown()
 
     from openmdao.api import view_model
 
     view_model('circuit.sqlite', outfile='circuit.html')
-
-
-In the latter case, you could view the N2 diagram at a later time using the command:
-
-.. code-block:: none
-
-    openmdao view_model circuit.sqlite
 
 
 For more details on N2 diagrams, see the :ref:`N2 Details<n2_details>` section.
