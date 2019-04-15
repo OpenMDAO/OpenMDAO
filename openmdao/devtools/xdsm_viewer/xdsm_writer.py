@@ -1218,7 +1218,9 @@ def _process_connections(conns, recurse=True, subs=None):
     def convert(x):
         return _convert_name(x, recurse=recurse, subs=subs)
 
-    conns_new = [{k: convert(v) for k, v in iteritems(conn)} for conn in conns]
+    conns_new = [
+        {k: convert(v) for k, v in iteritems(conn) if k in ('src', 'tgt')} for conn in conns
+    ]
     return _accumulate_connections(conns_new)
 
 

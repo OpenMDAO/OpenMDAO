@@ -1396,8 +1396,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(set(cr.system_metadata.keys()),
                          set(['root'] + [sys.name for sys in prob.model._subsystems_allprocs]))
 
-        self.assertEqual(sorted(cr.problem_metadata.keys()),
-                         ['abs2prom', 'connections_list', 'tree', 'variables'])
+        self.assertEqual(set(cr.problem_metadata.keys()),
+                         {'abs2prom', 'connections_list', 'sys_pathnames_list', 'tree', 'variables'})
 
         self.assertEqual(len(cr._driver_cases._cases), 0)
         self.assertEqual(len(cr._system_cases._cases), 0)
@@ -1423,7 +1423,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                          set(['root'] + [sys.name for sys in prob.model._subsystems_allprocs]))
 
         self.assertEqual(set(cr.problem_metadata.keys()),
-                         set(['abs2prom', 'connections_list', 'tree', 'variables']))
+                         {'abs2prom', 'connections_list', 'sys_pathnames_list', 'tree', 'variables'})
 
         self.assertEqual(len(cr._driver_cases._cases), num_driver_cases)
         self.assertEqual(len(cr._system_cases._cases), num_system_cases)

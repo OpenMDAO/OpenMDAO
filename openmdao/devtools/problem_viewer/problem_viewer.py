@@ -224,10 +224,10 @@ def _get_viewer_data(data_source):
 
         if edges_list:
             edges_list.sort()  # make deterministic so same .html file will be produced each run
-            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs),
-                                                 ('cycle_arrows', edges_list)]))
+            connections_list.append(dict([('src', out_abs), ('tgt', in_abs),
+                                          ('cycle_arrows', edges_list)]))
         else:
-            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
+            connections_list.append(dict([('src', out_abs), ('tgt', in_abs)]))
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list

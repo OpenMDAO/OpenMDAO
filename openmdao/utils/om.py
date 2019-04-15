@@ -382,6 +382,7 @@ _non_post_setup_map = {
     'mempost': (_mempost_setup_parser, _mempost_exec),
 }
 
+
 def openmdao_cmd():
     """
     Wrap a number of Problem viewing/debugging command line functions.

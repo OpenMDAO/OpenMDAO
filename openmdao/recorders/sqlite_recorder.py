@@ -563,13 +563,22 @@ class SqliteRecorder(CaseRecorder):
             The unique ID to use for this data in the table.
         """
         if self.connection:
-            model_viewer_data = json.dumps(model_viewer_data)
+            # convert numpy types to native types for JSON
+            def default(o):
+                if isinstance(o, np.int32) or isinstance(o, np.int64):
+                    return int(o)
+                elif isinstance(o, np.ndarray):
+                    return o.tolist()
+                else:
+                    return o
+
+            json_data = json.dumps(model_viewer_data, default=default)
 
             # Note: recorded to 'driver_metadata' table for legacy/compatibility reasons.
             try:
                 with self.connection as c:
-                    c.execute("INSERT INTO driver_metadata(id, model_viewer_data) "
-                              "VALUES(?,?)", (key, model_viewer_data))
+                    c.execute("INSERT INTO driver_metadata(id, model_viewer_data) VALUES(?,?)",
+                              (key, json_data))
             except sqlite3.IntegrityError:
                 print("Model viewer data has already has already been recorded for %s." % key)
 
