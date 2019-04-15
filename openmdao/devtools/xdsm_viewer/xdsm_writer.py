@@ -19,11 +19,11 @@ from __future__ import print_function
 
 import json
 import os
-import warnings
 
 from six import iteritems, string_types
 
 from openmdao.core.problem import Problem
+from openmdao.utils.general_utils import simple_warning
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.devtools.webview import webview
 from openmdao.devtools.xdsm_viewer.html_writer import write_html
@@ -228,7 +228,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         else:  # Use default
             self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
             msg = 'Name not "{}" found in component type mapping, will default to "{}"'
-            warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
+            simple_warning(msg.format(self.name, _DEFAULT_WRITER))
 
     def _format_id(self, name, subs=(('_', ''),)):
         # Changes forbidden characters in the "id" of a component
@@ -394,7 +394,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         if side == "left":
             self.connect(src=name, target=self._ul, label=label)
         else:
-            warnings.warn('Right side outputs not implemented for XDSMjs.')
+            simple_warning('Right side outputs not implemented for XDSMjs.')
             self.connect(src=name, target=self._ul, label=label)
 
     def collect_data(self):
@@ -480,7 +480,7 @@ else:
             else:
                 self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
                 msg = 'Name not "{}" found in component type mapping, will default to "{}"'
-                warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
+                simple_warning(msg.format(self.name, _DEFAULT_WRITER))
             # Number of components
             self._nr_comps = 0
             # Maps the component names to their index (position on the matrix diagonal)
@@ -889,9 +889,9 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
             raise ValueError(msg.format(type(data_source)))
 
     if design_vars is None:
-        warnings.warn('The XDSM diagram will show only the model hierarchy, '
-                      'as the driver, design variables and responses are not '
-                      'available.')
+        simple_warning('The XDSM diagram will show only the model hierarchy, '
+                       'as the driver, design variables and responses are not '
+                       'available.')
 
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
@@ -913,7 +913,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                 msg = 'Writer name "{0}" not found, there will be no character ' \
                       'substitutes used. Add "{0}" to your settings, or provide a tuple for' \
                       'character substitutes.'
-                warnings.warn(msg.format(writer.name, subs))
+                simple_warning(msg.format(writer.name, subs))
                 subs = ()
         else:
             msg = 'Custom XDSM writer should be an instance of BaseXDSMWriter, now it is a "{}".'
@@ -1043,7 +1043,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     comps = _get_comps(tree, model_path=model_path, recurse=recurse, include_solver=include_solver)
     if include_solver:
         msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
-        warnings.warn(msg)
+        simple_warning(msg)
 
         # Add the top level solver
         top_level_solver = dict(tree)
@@ -1153,7 +1153,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 x.connect(src, tgt, label=format_block(conn_vars), stack=stack)
             else:  # Source or target missing
                 msg = 'Connection "{conn}" from "{src}" to "{tgt}" ignored.'
-                warnings.warn(msg.format(src=src, tgt=tgt, conn=conn_vars))
+                simple_warning(msg.format(src=src, tgt=tgt, conn=conn_vars))
 
     # Add the externally sourced inputs
     for src, tgts in iteritems(external_inputs2):
@@ -1164,7 +1164,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 x.add_input(tgt, format_block(formatted_conn_vars), stack=stack)
             else:  # Target missing
                 msg = 'External input to "{tgt}" ignored.'
-                warnings.warn(msg.format(tgt=tgt, conn=conn_vars))
+                simple_warning(msg.format(tgt=tgt, conn=conn_vars))
 
     # Add the externally connected outputs
     if include_external_outputs:
@@ -1178,7 +1178,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 x.add_output(src, formatted_outputs, side='right', stack=stack)
             else:  # Source or target missing
                 msg = 'External output "{conn}" from "{src}" ignored.'
-                warnings.warn(msg.format(src=src, conn=output_vars))
+                simple_warning(msg.format(src=src, conn=output_vars))
 
     x.write(filename, cleanup=cleanup, quiet=quiet, build=build_pdf, **kwargs)
 

@@ -708,3 +708,27 @@ def json_loads_byteified(json_str):
         return _byteify(json.loads(json_str, object_hook=_byteify), ignore_dicts=True)
     else:
         return json.loads(json_str)
+
+
+def make_serializable(o):
+    """
+    Recursively convert numpy types to native types for JSON serialization.
+
+    Parameters
+    ----------
+    o : object
+        the object to be converted
+
+    Returns
+    -------
+    The converted object.
+    """
+    if (isinstance(o, np.int8) or isinstance(o, np.int16) or
+        isinstance(o, np.int32) or isinstance(o, np.int64)):
+        return o.item()
+    elif isinstance(o, np.ndarray):
+        return make_serializable(o.tolist())
+    elif isinstance(o, (list, tuple, set)):
+        return [make_serializable(item) for item in o]
+    else:
+        return o

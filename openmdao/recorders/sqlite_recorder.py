@@ -17,7 +17,7 @@ from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
 from openmdao.utils.record_util import values_to_array
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.core.driver import Driver
 from openmdao.core.system import System
 from openmdao.core.problem import Problem
@@ -86,28 +86,6 @@ def blob_to_array(blob):
     out = BytesIO(blob)
     out.seek(0)
     return np.load(out)
-
-
-def convert_to_list(vals):
-    """
-    Recursively convert arrays, tuples, and sets to lists.
-
-    Parameters
-    ----------
-    vals : numpy.array or list or tuple
-        the object to be converted to a list
-
-    Returns
-    -------
-    list :
-        The converted list.
-    """
-    if isinstance(vals, np.ndarray):
-        return convert_to_list(vals.tolist())
-    elif isinstance(vals, (list, tuple, set)):
-        return [convert_to_list(item) for item in vals]
-    else:
-        return vals
 
 
 class SqliteRecorder(CaseRecorder):
@@ -243,17 +221,8 @@ class SqliteRecorder(CaseRecorder):
         Convert all abs2meta variable properties to a form that can be dumped as JSON.
         """
         for name in self._abs2meta:
-            if 'lower' in self._abs2meta[name]:
-                self._abs2meta[name]['lower'] = convert_to_list(self._abs2meta[name]['lower'])
-            if 'upper' in self._abs2meta[name]:
-                self._abs2meta[name]['upper'] = convert_to_list(self._abs2meta[name]['upper'])
             for prop in self._abs2meta[name]:
-                val = self._abs2meta[name][prop]
-                if isinstance(val, np.int8) or isinstance(val, np.int16) or\
-                   isinstance(val, np.int32) or isinstance(val, np.int64):
-                    self._abs2meta[name][prop] = val.item()
-                elif isinstance(val, tuple):
-                    self._abs2meta[name][prop] = [int(v) for v in val]
+                self._abs2meta[name][prop] = make_serializable(self._abs2meta[name][prop])
 
     def _cleanup_var_settings(self, var_settings):
         """
@@ -273,15 +242,7 @@ class SqliteRecorder(CaseRecorder):
         var_settings = deepcopy(var_settings)
         for name in var_settings:
             for prop in var_settings[name]:
-                val = var_settings[name][prop]
-                if isinstance(val, np.int8) or isinstance(val, np.int16) or\
-                   isinstance(val, np.int32) or isinstance(val, np.int64):
-                    var_settings[name][prop] = val.item()
-                elif isinstance(val, tuple):
-                    var_settings[name][prop] = [int(v) for v in val]
-                elif isinstance(val, np.ndarray):
-                    var_settings[name][prop] = convert_to_list(var_settings[name][prop])
-
+                var_settings[name][prop] = make_serializable(var_settings[name][prop])
         return var_settings
 
     def startup(self, recording_requester):
@@ -395,7 +356,7 @@ class SqliteRecorder(CaseRecorder):
                 if in_out is None:
                     continue
                 for var in in_out:
-                    in_out[var] = convert_to_list(in_out[var])
+                    in_out[var] = make_serializable(in_out[var])
 
             outputs_text = json.dumps(outputs)
             inputs_text = json.dumps(inputs)
@@ -431,7 +392,7 @@ class SqliteRecorder(CaseRecorder):
             # convert to list so this can be dumped as JSON
             if outputs is not None:
                 for var in outputs:
-                    outputs[var] = convert_to_list(outputs[var])
+                    outputs[var] = make_serializable(outputs[var])
 
             outputs_text = json.dumps(outputs)
 
@@ -467,7 +428,7 @@ class SqliteRecorder(CaseRecorder):
                 if i_o_r is None:
                     continue
                 for var in i_o_r:
-                    i_o_r[var] = convert_to_list(i_o_r[var])
+                    i_o_r[var] = make_serializable(i_o_r[var])
 
             outputs_text = json.dumps(outputs)
             inputs_text = json.dumps(inputs)
@@ -516,7 +477,7 @@ class SqliteRecorder(CaseRecorder):
                 if i_o_r is None:
                     continue
                 for var in i_o_r:
-                    i_o_r[var] = convert_to_list(i_o_r[var])
+                    i_o_r[var] = make_serializable(i_o_r[var])
 
             outputs_text = json.dumps(outputs)
             inputs_text = json.dumps(inputs)
@@ -563,16 +524,7 @@ class SqliteRecorder(CaseRecorder):
             The unique ID to use for this data in the table.
         """
         if self.connection:
-            # convert any remaining numpy types to native types for JSON
-            def default(o):
-                if isinstance(o, np.int32) or isinstance(o, np.int64):
-                    return int(o)
-                elif isinstance(o, np.ndarray):
-                    return convert_to_list(o)
-                else:
-                    return o
-
-            json_data = json.dumps(model_viewer_data, default=default)
+            json_data = json.dumps(model_viewer_data, default=make_serializable)
 
             # Note: recorded to 'driver_metadata' table for legacy/compatibility reasons.
             try:

@@ -23,7 +23,7 @@ from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.general_utils import warn_deprecation, simple_warning, make_serializable
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 from openmdao.recorders.case_reader import CaseReader
@@ -280,8 +280,8 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
     """
     # grab the model viewer data
-    model_viewer_data = _get_viewer_data(data_source)
-    model_viewer_data = 'var modelData = %s' % json.dumps(model_viewer_data)
+    model_data = _get_viewer_data(data_source)
+    model_data = 'var modelData = %s' % json.dumps(model_data, default=make_serializable)
 
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
@@ -316,7 +316,7 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     for name, code in iteritems(srcs):
         h.insert('{{{}_lib}}'.format(name.lower()), write_script(code, indent=_IND))
 
-    h.insert('{{model_data}}', write_script(model_viewer_data, indent=_IND))
+    h.insert('{{model_data}}', write_script(model_data, indent=_IND))
 
     # Toolbar
     toolbar = h.toolbar
