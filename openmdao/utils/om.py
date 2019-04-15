@@ -480,6 +480,7 @@ _non_post_setup_map = {
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd),
 }
 
+
 def openmdao_cmd():
     """
     Wrap a number of Problem viewing/debugging command line functions.

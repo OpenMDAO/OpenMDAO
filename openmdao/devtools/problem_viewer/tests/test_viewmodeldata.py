@@ -92,18 +92,29 @@ class TestViewModelData(unittest.TestCase):
         Verify that the correct model structure data exists when stored as compared
         to the expected structure, using the SellarStateConnection model.
         """
-        p = Problem()
-        p.model = SellarStateConnection()
+        p = Problem(model=SellarStateConnection())
         p.setup(check=False)
+
         model_viewer_data = _get_viewer_data(p)
 
+        # check expected model tree
         self.assertDictEqual(model_viewer_data['tree'], self.expected_tree)
-        # FIXME: pathnames list is not deterministic
-        # from pprint import pprint
-        # pprint(model_viewer_data['sys_pathnames_list'])
-        # pprint(model_viewer_data['connections_list'])
-        self.assertListEqual(model_viewer_data['sys_pathnames_list'], self.expected_pathnames)
-        self.assertListEqual(model_viewer_data['connections_list'], self.expected_conns)
+
+        # check expected system pathnames
+        pathnames = model_viewer_data['sys_pathnames_list']
+        self.assertListEqual(sorted(pathnames), self.expected_pathnames)
+
+        # check expected connections, after mapping cycle_arrows indices back to pathnames
+        connections = model_viewer_data['connections_list']
+        for conn in connections:
+            if 'cycle_arrows' in conn:
+                cycle_arrows = []
+                for src, tgt in conn['cycle_arrows']:
+                    cycle_arrows.append(' '.join([pathnames[src], pathnames[tgt]]))
+                conn['cycle_arrows'] = sorted(cycle_arrows)
+        self.assertListEqual(connections, self.expected_conns)
+
+        # check expected abs2prom map
         self.assertDictEqual(model_viewer_data['abs2prom'], self.expected_abs2prom)
 
     def test_model_viewer_has_correct_data_from_sqlite(self):
@@ -112,18 +123,35 @@ class TestViewModelData(unittest.TestCase):
         and then pulled out of a sqlite db file and compared to the expected
         structure.  Uses the SellarStateConnection model.
         """
-        p = Problem()
-        p.model = SellarStateConnection()
+        p = Problem(model=SellarStateConnection())
+
         r = SqliteRecorder(self.sqlite_db_filename)
         p.driver.add_recorder(r)
+
         p.setup(check=False)
         p.final_setup()
         r.shutdown()
 
         model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
 
+        # check expected model tree
         self.assertDictEqual(model_viewer_data['tree'], self.expected_tree)
-        self.assertListEqual(model_viewer_data['connections_list'], self.expected_conns)
+
+        # check expected system pathnames
+        pathnames = model_viewer_data['sys_pathnames_list']
+        self.assertListEqual(sorted(pathnames), self.expected_pathnames)
+
+        # check expected connections, after mapping cycle_arrows indices back to pathnames
+        connections = model_viewer_data['connections_list']
+        for conn in connections:
+            if 'cycle_arrows' in conn:
+                cycle_arrows = []
+                for src, tgt in conn['cycle_arrows']:
+                    cycle_arrows.append(' '.join([pathnames[src], pathnames[tgt]]))
+                conn['cycle_arrows'] = sorted(cycle_arrows)
+        self.assertListEqual(connections, self.expected_conns)
+
+        # check expected abs2prom map
         self.assertDictEqual(model_viewer_data['abs2prom'], self.expected_abs2prom)
 
     def test_view_model_from_problem(self):
