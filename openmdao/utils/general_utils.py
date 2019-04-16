@@ -721,10 +721,10 @@ def make_serializable(o):
 
     Returns
     -------
-    The converted object.
+    object
+        The converted object.
     """
-    if (isinstance(o, np.int8) or isinstance(o, np.int16) or
-        isinstance(o, np.int32) or isinstance(o, np.int64)):
+    if (isinstance(o, np.number)):
         return o.item()
     elif isinstance(o, np.ndarray):
         return make_serializable(o.tolist())
