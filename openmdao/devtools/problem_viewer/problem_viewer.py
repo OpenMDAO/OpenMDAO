@@ -23,10 +23,11 @@ from openmdao.core.problem import Problem
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.general_utils import warn_deprecation, simple_warning, make_serializable
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 from openmdao.recorders.case_reader import CaseReader
+from openmdao.drivers.doe_driver import DOEDriver
 
 # Toolbar settings
 _FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
@@ -143,19 +144,26 @@ def _get_viewer_data(data_source):
     """
     if isinstance(data_source, Problem):
         root_group = data_source.model
+
         if not isinstance(root_group, Group):
             simple_warning("The model is not a Group, viewer data is unavailable.")
             return {}
 
+        driver = data_source.driver
+        driver_name = driver.__class__.__name__
+        driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
+
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
             root_group = data_source
+            driver_name = None
+            driver_type = None
         else:
             # this function only makes sense when it is at the root
             return {}
 
     elif isinstance(data_source, str):
-        return CaseReader(data_source).problem_metadata
+        return CaseReader(data_source, pre_load=False).problem_metadata
 
     else:
         raise TypeError('_get_viewer_data only accepts Problems, Groups or filenames')
@@ -216,22 +224,23 @@ def _get_viewer_data(data_source):
                         src = sys_pathnames_dict[src]
                         tgt = sys_pathnames_dict[tgt]
 
-                        # make sure no duplicates in pathnames list & that pathnames map correctly
-                        assert(len(sys_pathnames_list) == len(set(sys_pathnames_list)))
-                        assert(edge_str == ' '.join([sys_pathnames_list[src], sys_pathnames_list[tgt]]))
-
-                        edges_list.append((src, tgt))
+                        edges_list.append([src, tgt])
 
         if edges_list:
             edges_list.sort()  # make deterministic so same .html file will be produced each run
-            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs),
-                                                 ('cycle_arrows', edges_list)]))
+            connections_list.append(dict([('src', out_abs), ('tgt', in_abs),
+                                          ('cycle_arrows', edges_list)]))
         else:
-            connections_list.append(OrderedDict([('src', out_abs), ('tgt', in_abs)]))
+            connections_list.append(dict([('src', out_abs), ('tgt', in_abs)]))
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list
     data_dict['abs2prom'] = root_group._var_abs2prom
+
+    data_dict['driver_name'] = driver_name
+    data_dict['driver_type'] = driver_type
+    data_dict['design_vars'] = root_group.get_design_vars()
+    data_dict['responses'] = root_group.get_responses()
 
     return data_dict
 
@@ -267,8 +276,8 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
     """
     # grab the model viewer data
-    model_viewer_data = _get_viewer_data(data_source)
-    model_viewer_data = 'var modelData = %s' % json.dumps(model_viewer_data)
+    model_data = _get_viewer_data(data_source)
+    model_data = 'var modelData = %s' % json.dumps(model_data, default=make_serializable)
 
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
@@ -303,7 +312,7 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     for name, code in iteritems(srcs):
         h.insert('{{{}_lib}}'.format(name.lower()), write_script(code, indent=_IND))
 
-    h.insert('{{model_data}}', write_script(model_viewer_data, indent=_IND))
+    h.insert('{{model_data}}', write_script(model_data, indent=_IND))
 
     # Toolbar
     toolbar = h.toolbar

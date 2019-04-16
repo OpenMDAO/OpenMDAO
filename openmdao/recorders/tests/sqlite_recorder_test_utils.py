@@ -340,26 +340,36 @@ def assertViewerDataRecorded(test, expected):
 
         test.assertTrue(isinstance(model_viewer_data, dict))
 
-        test.assertEqual(3, len(model_viewer_data))
+        # primary keys
+        test.assertEqual(set(model_viewer_data.keys()), {
+            'tree', 'sys_pathnames_list', 'connections_list', 'abs2prom',
+            'driver_type', 'driver_name', 'design_vars', 'responses'
+        })
 
+        # system pathnames
+        test.assertTrue(isinstance(model_viewer_data['sys_pathnames_list'], list))
+
+        # connections
         test.assertTrue(isinstance(model_viewer_data['connections_list'], list))
 
         test.assertEqual(expected['connections_list_length'],
                          len(model_viewer_data['connections_list']))
 
-        test.assertEqual(expected['tree_length'], len(model_viewer_data['tree']))
+        cl = model_viewer_data['connections_list']
+        for c in cl:
+            test.assertTrue(set(c.keys()).issubset(set(['src', 'tgt', 'cycle_arrows'])))
 
+        # model tree
         tr = model_viewer_data['tree']
+        test.assertEqual(expected['tree_length'], len(tr))
+
         test.assertEqual({'name', 'type', 'subsystem_type', 'children', 'linear_solver',
                           'nonlinear_solver', 'is_parallel', 'component_type'},
                          set(tr.keys()))
         test.assertEqual(expected['tree_children_length'],
                          len(model_viewer_data['tree']['children']))
 
-        cl = model_viewer_data['connections_list']
-        for c in cl:
-            test.assertTrue(set(c.keys()).issubset(set(['src', 'tgt', 'cycle_arrows'])))
-
+        # abs2prom map
         abs2prom = model_viewer_data['abs2prom']
         for io in ['input', 'output']:
             for var in expected['abs2prom'][io]:

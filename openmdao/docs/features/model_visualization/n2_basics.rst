@@ -30,7 +30,7 @@ From the Command Line
 .. _om-command-view_n2:
 
 Generating an N2 diagram for a model from the command line is easy. First, you need either a Python
-script that runs the model or a case recording file that was created by running the model.
+script that runs the model or a case recording file that was created when running the model.
 
 .. note::
 
@@ -49,13 +49,13 @@ viewable in a browser, for example:
 
 will generate an N2 diagram like the one below.
 
+.. embed-n2::
+    ../test_suite/scripts/circuit_with_unconnected_input.py
+
 The :code:`openmdao view_model` has several options:
 
 .. embed-shell-cmd::
     :cmd: openmdao view_model -h
-
-.. embed-n2::
-    ../test_suite/scripts/circuit_with_unconnected_input.py
 
 
 From a Script
@@ -89,10 +89,9 @@ Case Recorder as Data Source
 
 .. code::
 
-    p = Problem()
-    p.model = SellarStateConnection()
     r = SqliteRecorder('circuit.sqlite')
     p.driver.add_recorder(r)
+
     p.setup()
     p.final_setup()
     r.shutdown()
