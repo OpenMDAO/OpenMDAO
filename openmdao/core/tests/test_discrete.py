@@ -47,6 +47,40 @@ class ModCompIm(ImplicitComponent):
         discrete_outputs['y'] = discrete_inputs['x'] % self.modval
 
 
+class CompDiscWDerivs(ExplicitComponent):
+    def setup(self):
+        self.add_discrete_input('N', 2)
+        self.add_discrete_input('Nout', 2)
+        self.add_input('x')
+        self.add_output('y')
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        discrete_outputs['Nout'] = discrete_inputs['N'] * 2
+        outputs['y'] = inputs['x'] * 3.
+
+    def compute_partials(self, inputs, partials, discrete_inputs):
+        partials['y', 'x'] = 3.
+
+
+class CompDiscWDerivsImplicit(ImplicitComponent):
+    def setup(self):
+        self.add_discrete_input('N', 2)
+        self.add_discrete_input('Nout', 2)
+        self.add_input('x')
+        self.add_output('y')
+
+    def solve_nonlinear(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        discrete_outputs['Nout'] = discrete_inputs['N'] * 2
+        outputs['y'] = inputs['x'] * 3.
+
+    def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs, discrete_outputs):
+        discrete_outputs['Nout'] = discrete_inputs['N'] * 2
+        outputs['y'] = inputs['x'] * 3.
+
+    def linearize(self, inputs, outputs, partials, discrete_inputs, discrete_outputs):
+        partials['y', 'x'] = 3.
+
+
 class MixedCompDiscIn(ExplicitComponent):
     def __init__(self, mult, **kwargs):
         super(MixedCompDiscIn, self).__init__(**kwargs)
@@ -54,13 +88,11 @@ class MixedCompDiscIn(ExplicitComponent):
 
     def setup(self):
         self.add_discrete_input('x', val=1)
-        self.add_input('mult')
         self.add_output('y')
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
         outputs['y'] = discrete_inputs['x'] * self.mult
 
-    def compute_partials(self, inputs, partials, discrete_inputs):
 
 class MixedCompDiscOut(ExplicitComponent):
     def __init__(self, mult, **kwargs):
