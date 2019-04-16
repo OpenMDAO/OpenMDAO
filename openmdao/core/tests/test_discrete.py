@@ -54,11 +54,13 @@ class MixedCompDiscIn(ExplicitComponent):
 
     def setup(self):
         self.add_discrete_input('x', val=1)
+        self.add_input('mult')
         self.add_output('y')
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
         outputs['y'] = discrete_inputs['x'] * self.mult
 
+    def compute_partials(self, inputs, partials, discrete_inputs):
 
 class MixedCompDiscOut(ExplicitComponent):
     def __init__(self, mult, **kwargs):
