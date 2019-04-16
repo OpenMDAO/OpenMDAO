@@ -83,6 +83,8 @@ class Coloring(object):
         Column indices of nonzero entries in the full jac sparsity matrix.
     _coloring_time : float or None
         If known, the time it took to compute the coloring.
+    _sparsity_time : float or None
+        If known, the time it took to compute the sparsity.
     _fwd : tuple (col_lists, row_maps)
         Contains lists of grouped columns and nonzero rows for each column for forward coloring.
     _rev : tuple (col_lists, row_maps)
@@ -136,6 +138,7 @@ class Coloring(object):
         self._col_var_sizes = col_var_sizes
 
         self._coloring_time = None
+        self._sparsity_time = None
         self._static = True
         self._fwd = None
         self._rev = None
@@ -512,11 +515,15 @@ class Coloring(object):
             Where the output will go.
         """
         stream.write('\n')
+        if self._sparsity_time is not None:
+            stream.write("Time to compute sparsity: %f sec.\n" % self._sparsity_time)
         if self._coloring_time is not None:
-            stream.write("Time to compute coloring: %f\n" % self._coloring_time)
+            stream.write("Time to compute coloring: %f sec.\n" % self._coloring_time)
 
         nrows = self._shape[0] if self._shape else -1
         ncols = self._shape[1] if self._shape else -1
+
+        stream.write("Jacobian shape: (%d, %d)\n" % (nrows, ncols))
 
         if self._fwd is None and self._rev is None:
             tot_size = min(nrows, ncols)
@@ -985,7 +992,7 @@ def MNCO_bidir(J):
     return coloring
 
 
-def _tol_sweep(arr, tol=1e-15, orders=12):
+def _tol_sweep(arr, tol=1e-15, orders=20):
     """
     Find best tolerance 'around' tol to choose nonzero values of arr.
 
@@ -1031,7 +1038,8 @@ def _tol_sweep(arr, tol=1e-15, orders=12):
         raise RuntimeError("Could not find more than 1 tolerance to match any number of nonzeros. "
                            "This indicates that your tolerance sweep of +- %d orders, starting "
                            "from %s is not big enough.  To get a 'stable' sparsity pattern, "
-                           "try re-running with a larger tolerance sweep." % (orders, tol))
+                           "try re-running with a larger tolerance sweep.\nNonzeros found for "
+                           "each tolerance: %s" % (orders, tol, sorted_items))
 
     good_tol = sorted_items[0][1][-1]
 
@@ -1069,7 +1077,7 @@ def _compute_total_coloring_context(top):
             jac._randomize = False
 
 
-def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=12, setup=False, run_model=False):
+def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=20, setup=False, run_model=False):
     """
     Return a boolean version of the total jacobian.
 
@@ -1369,7 +1377,7 @@ def _compute_coloring(J, mode):
     return coloring
 
 
-def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=12, setup=False,
+def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20, setup=False,
                            run_model=False, bool_jac=None, fname=None):
     """
     Compute simultaneous derivative colorings for the total jacobian of the given problem.
@@ -1429,13 +1437,16 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=12,
             coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0],
                                                      repeats=repeats)
         else:
+            start_time = time.time()
             J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, orders=orders, setup=setup,
                                     run_model=run_model)
+            sparsity_time = time.time() - start_time
             coloring = _compute_coloring(J, mode)
             coloring._row_vars = ofs
             coloring._row_var_sizes = of_sizes
             coloring._col_vars = wrts
             coloring._col_var_sizes = wrt_sizes
+            coloring._sparsity_time = sparsity_time
 
         driver._total_jac = None
 
