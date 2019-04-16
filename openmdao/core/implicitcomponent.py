@@ -278,7 +278,11 @@ class ImplicitComponent(Component):
             self._inputs.read_only = self._outputs.read_only = True
 
             try:
-                self.linearize(self._inputs, self._outputs, self._jacobian)
+                if self._discrete_inputs or self._discrete_outputs:
+                    self.linearize(self._inputs, self._outputs, self._jacobian,
+                                   self._discrete_inputs, self._discrete_outputs)
+                else:
+                    self.linearize(self._inputs, self._outputs, self._jacobian)
             finally:
                 self._inputs.read_only = self._outputs.read_only = False
 
@@ -391,7 +395,7 @@ class ImplicitComponent(Component):
         else:  # rev
             d_residuals.set_vec(d_outputs)
 
-    def linearize(self, inputs, outputs, jacobian):
+    def linearize(self, inputs, outputs, jacobian, discrete_inputs=None, discrete_outputs=None):
         """
         Compute sub-jacobian parts and any applicable matrix factorizations.
 
@@ -405,6 +409,10 @@ class ImplicitComponent(Component):
             unscaled, dimensional output variables read via outputs[key]
         jacobian : Jacobian
             sub-jac components written to jacobian[output_name, input_name]
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        discrete_outputs : dict or None
+            If not None, dict containing discrete output values.
         """
         pass
 
