@@ -163,7 +163,7 @@ def _get_viewer_data(data_source):
             return {}
 
     elif isinstance(data_source, str):
-        return CaseReader(data_source).problem_metadata
+        return CaseReader(data_source, pre_load=False).problem_metadata
 
     else:
         raise TypeError('_get_viewer_data only accepts Problems, Groups or filenames')
@@ -223,10 +223,6 @@ def _get_viewer_data(data_source):
                         # replace src & tgt pathnames with indices into pathname list
                         src = sys_pathnames_dict[src]
                         tgt = sys_pathnames_dict[tgt]
-
-                        # make sure no duplicates in pathnames list & that pathnames map correctly
-                        assert(len(sys_pathnames_list) == len(set(sys_pathnames_list)))
-                        assert(edge_str == ' '.join([sys_pathnames_list[src], sys_pathnames_list[tgt]]))
 
                         edges_list.append([src, tgt])
 
