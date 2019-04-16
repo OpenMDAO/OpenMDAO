@@ -118,7 +118,11 @@ class ImplicitComponent(Component):
                     self._inputs.set_complex_step_mode(False, keep_real=True)
                     self._outputs.set_complex_step_mode(False, keep_real=True)
                     self._residuals.set_complex_step_mode(False, keep_real=True)
-                self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+                if self._discrete_inputs or self._discrete_outputs:
+                    self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
+                                         self._discrete_inputs, self._discrete_outputs)
+                else:
+                    self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
         finally:
             if complex_step:
                 # Note: passing in False swaps back to the complex vector, which is valid since
@@ -311,7 +315,8 @@ class ImplicitComponent(Component):
         """
         pass
 
-    def guess_nonlinear(self, inputs, outputs, residuals):
+    def guess_nonlinear(self, inputs, outputs, residuals,
+                        discrete_inputs=None, discrete_outputs=None):
         """
         Provide initial guess for states.
 
@@ -325,6 +330,10 @@ class ImplicitComponent(Component):
             unscaled, dimensional output variables read via outputs[key]
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        discrete_outputs : dict or None
+            If not None, dict containing discrete output values.
         """
         pass
 
