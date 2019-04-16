@@ -49,13 +49,6 @@ class TestPyXDSMViewer(unittest.TestCase):
             except OSError:
                 pass
 
-    def test_command(self):
-        """
-        Check that there are no errors when running from the command line with a script.
-        """
-        from openmdao.test_suite.scripts import sellar
-        check_call('openmdao xdsm --no_browser %s' % os.path.abspath(sellar.__file__))
-
     def test_pyxdsm_output_sides(self):
         """Makes XDSM for the Sellar problem"""
         prob = Problem()
@@ -977,6 +970,14 @@ class TestXDSMjsViewer(unittest.TestCase):
         # no output checking, just make sure no exceptions raised
         with self.assertRaises(ValueError):
             write_xdsm(prob, filename=filename, out_format='jpg', subs=(), show_browser=SHOW)
+
+    def test_command(self):
+        """
+        Check that there are no errors when running from the command line with a script.
+        """
+        from openmdao.test_suite.scripts import sellar
+        filename = os.path.abspath(sellar.__file__).replace('.pyc', '.py')  # PY2
+        check_call('openmdao xdsm --no_browser %s' % filename)
 
 
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")

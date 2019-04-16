@@ -195,7 +195,8 @@ class TestViewModelData(unittest.TestCase):
         Check that there are no errors when running from the command line with a script.
         """
         from openmdao.test_suite.scripts import sellar
-        check_call('openmdao view_model --no_browser %s' % os.path.abspath(sellar.__file__))
+        filename = os.path.abspath(sellar.__file__).replace('.pyc', '.py')  # PY2
+        check_call('openmdao view_model --no_browser %s' % filename)
 
 
 if __name__ == "__main__":
