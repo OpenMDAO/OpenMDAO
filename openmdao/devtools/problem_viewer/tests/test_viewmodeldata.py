@@ -12,6 +12,7 @@ from openmdao.core.problem import Problem
 from openmdao.test_suite.components.sellar import SellarStateConnection
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data, view_model
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
+from openmdao.utils.shell_proc import check_call
 
 
 # set DEBUG to True if you want to view the generated HTML file(s)
@@ -185,6 +186,16 @@ class TestViewModelData(unittest.TestCase):
         self.assertTrue(os.path.isfile(self.sqlite_html_filename),
                         (self.problem_html_filename + " is not a valid file."))
         self.assertGreater(os.path.getsize(self.sqlite_html_filename), 100)
+
+        # Check that there are no errors when running from the command line with a recording.
+        check_call('openmdao view_model --no_browser %s' % self.sqlite_db_filename2)
+
+    def test_view_model_command(self):
+        """
+        Check that there are no errors when running from the command line with a script.
+        """
+        from openmdao.test_suite.scripts import sellar
+        check_call('openmdao view_model --no_browser %s' % os.path.abspath(sellar.__file__))
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from openmdao.test_suite.components.sellar import SellarNoDerivatives, SellarDis
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.scripts.circuit import Circuit
 from openmdao.utils.assert_utils import assert_warning
+from openmdao.utils.shell_proc import check_call
 
 try:
     from pyxdsm.XDSM import XDSM
@@ -47,6 +48,13 @@ class TestPyXDSMViewer(unittest.TestCase):
                 shutil.rmtree(self.tempdir)
             except OSError:
                 pass
+
+    def test_command(self):
+        """
+        Check that there are no errors when running from the command line with a script.
+        """
+        from openmdao.test_suite.scripts import sellar
+        check_call('openmdao xdsm --no_browser %s' % os.path.abspath(sellar.__file__))
 
     def test_pyxdsm_output_sides(self):
         """Makes XDSM for the Sellar problem"""
@@ -118,6 +126,9 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile(case_recording_filename))
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+
+        # Check that there are no errors when running from the command line with a recording.
+        check_call('openmdao xdsm --no_browser %s' % case_recording_filename)
 
     def test_pyxdsm_sellar_no_recurse(self):
         """Makes XDSM for the Sellar problem, with no recursion."""
