@@ -17,6 +17,8 @@ function PtN2Diagram(parentDiv, modelData) {
 
     var RIGHT_TEXT_MARGIN_PX = 8; // How much space in px (left and) right of text in partition tree
 
+    var text_width_cache = {}; // used to speed up GetTextWidth using memoization
+
     //N^2 vars
     var backButtonHistory = [], forwardButtonHistory = [];
     var chosenCollapseDepth = -1;
@@ -228,10 +230,10 @@ function PtN2Diagram(parentDiv, modelData) {
         collapseDepthElement.appendChild(option);
     }
 
-    Update();
+    Update(computeNewTreeLayout=false);
     SetupLegend(d3, d3ContentDiv);
 
-    function Update() {
+    function Update(computeNewTreeLayout=true) {
         parentDiv.querySelector("#currentPathId").innerHTML = "PATH: root" + ((zoomedElement.parent) ? "." : "") + zoomedElement.absPathName;
 
         parentDiv.querySelector("#backButtonId").disabled = (backButtonHistory.length == 0) ? "disabled" : false;
@@ -240,8 +242,10 @@ function PtN2Diagram(parentDiv, modelData) {
         parentDiv.querySelector("#returnToRootButtonId").disabled = (zoomedElement === root) ? "disabled" : false;
 
         // Compute the new tree layout.
-        ComputeLayout(); //updates d3NodesArray
-        ComputeMatrixN2();
+        if (computeNewTreeLayout) {
+            ComputeLayout(); //updates d3NodesArray
+            ComputeMatrixN2();
+        }
 
         for (var i = 2; i <= maxDepth; ++i) {
             parentDiv.querySelector("#idCollapseDepthOption" + i + "").style.display = (i <= zoomedElement.depth) ? "none" : "block";
@@ -744,8 +748,16 @@ function PtN2Diagram(parentDiv, modelData) {
         }
 
         function GetTextWidth(s) {
+            var width ;
+
+            if ( text_width_cache[ s ] != null )
+                return text_width_cache[ s ];
+
             textWidthText.text(s);
-            return textWidthTextNode.getBoundingClientRect().width;
+            width = textWidthTextNode.getBoundingClientRect().width;
+
+            text_width_cache[ s ] = width;
+            return width;
         }
 
         function UpdateTextWidths(d) {
@@ -1074,7 +1086,17 @@ function PtN2Diagram(parentDiv, modelData) {
             TRANSITION_DURATION = TRANSITION_DURATION_FAST;
             lastClickWasLeft = false;
             Toggle(d);
-            Update(d);
+
+
+
+            // Update(d);
+
+
+
+            Update();
+
+
+
         }
     }
 
@@ -1945,8 +1967,5 @@ function ChangeBlankSolverToNone(d) {
 }
 ChangeBlankSolverToNone(modelData.tree);
 
-console.time("PtN2Diagram");
-
 var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData);
 
-console.timeEnd("PtN2Diagram");
