@@ -996,8 +996,11 @@ class Problem(object):
 
                 with comp._unscaled_context():
 
-                    of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
-                    wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
+                    of_list = list(comp._var_allprocs_prom2abs_list['output'])
+                    wrt_list = list(comp._var_allprocs_prom2abs_list['input'])
+                    if comp._discrete_inputs or comp._discrete_outputs:
+                        of_list = [n for n in of_list if n not in comp._discrete_outputs]
+                        wrt_list = [n for n in wrt_list if n not in comp._discrete_inputs]
 
                     # The only outputs in wrt should be implicit states.
                     if not explicit:
@@ -1143,8 +1146,11 @@ class Problem(object):
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
 
-            of = list(comp._var_allprocs_prom2abs_list['output'].keys())
-            wrt = list(comp._var_allprocs_prom2abs_list['input'].keys())
+            of = list(comp._var_allprocs_prom2abs_list['output'])
+            wrt = list(comp._var_allprocs_prom2abs_list['input'])
+            if comp._discrete_inputs or comp._discrete_outputs:
+                of = [n for n in of if n not in comp._discrete_outputs]
+                wrt = [n for n in wrt if n not in comp._discrete_inputs]
 
             # The only outputs in wrt should be implicit states.
             if not explicit:
