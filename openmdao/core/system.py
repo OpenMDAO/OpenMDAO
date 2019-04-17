@@ -903,6 +903,7 @@ class System(object):
         self._setup_static_approx_coloring()
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
+        sparsity_start_time = time.time()
         for i in range(repeats):
             # randomize inputs (and outputs if implicit)
             if i > 0:
@@ -921,6 +922,7 @@ class System(object):
 
             self.run_linearize()
             self._jacobian._save_sparsity(self)
+        sparsity_time = time.time() - sparsity_start_time
 
         info = self._approx_coloring_info
         sparsity, ordered_ofs, ordered_wrts = \
@@ -932,6 +934,7 @@ class System(object):
         coloring._col_vars = list(ordered_wrts)
         coloring._row_var_sizes = list(ordered_ofs.values())
         coloring._col_var_sizes = list(ordered_wrts.values())
+        coloring._sparsity_time = sparsity_time
         coloring._meta = {}  # save metadata we used to create the coloring
         for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step', 'per_instance'):
             if name in info:

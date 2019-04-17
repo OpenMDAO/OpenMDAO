@@ -230,10 +230,13 @@ class Jacobian(object):
         """
         if isinstance(subjac, sparse_types):  # sparse
             sparse = subjac.copy()
-            sparse.data = rand(sparse.data.size) + 1.0
+            sparse.data = rand(sparse.data.size)
+            sparse.data += 1.0
             return sparse
 
-        return rand(*subjac.shape) + 1.0
+        r = rand(*subjac.shape)
+        r += 1.0
+        return r
 
     def _get_ranges(self, system, vtype):
         iproc = system.comm.rank

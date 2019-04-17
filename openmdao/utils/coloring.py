@@ -85,6 +85,8 @@ class Coloring(object):
         If known, the time it took to compute the coloring.
     _sparsity_time : float or None
         If known, the time it took to compute the sparsity.
+    _pct_nonzero : float or None
+        If known, percentage of nonzero vs total array entries.
     _fwd : tuple (col_lists, row_maps)
         Contains lists of grouped columns and nonzero rows for each column for forward coloring.
     _rev : tuple (col_lists, row_maps)
@@ -129,8 +131,9 @@ class Coloring(object):
         if sparsity is not None:
             self._nzrows, self._nzcols = np.nonzero(sparsity)
             self._shape = sparsity.shape
+            self._pct_nonzero = np.count_nonzero(sparsity) / (self._shape[0] * self._shape[1]) * 100
         else:
-            self._nzrows = self._nzcols = self._shape = None
+            self._nzrows = self._nzcols = self._shape = self._pct_nonzero = None
 
         self._row_vars = row_vars
         self._row_var_sizes = row_var_sizes
@@ -523,7 +526,11 @@ class Coloring(object):
         nrows = self._shape[0] if self._shape else -1
         ncols = self._shape[1] if self._shape else -1
 
-        stream.write("Jacobian shape: (%d, %d)\n" % (nrows, ncols))
+        if self._pct_nonzero is None:
+            stream.write("Jacobian shape: (%d, %d)\n" % (nrows, ncols))
+        else:
+            stream.write("Jacobian shape: (%d, %d)  (%5.2f%% nonzero)\n" % (nrows, ncols,
+                                                                            self._pct_nonzero))
 
         if self._fwd is None and self._rev is None:
             tot_size = min(nrows, ncols)
@@ -1144,7 +1151,7 @@ def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=20, setup=False, run_
     boolJ = np.zeros(fullJ.shape, dtype=bool)
     boolJ[fullJ > good_tol] = True
 
-    return boolJ
+    return boolJ, elapsed
 
 
 def _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes, cvt2json=False):
@@ -1303,7 +1310,7 @@ def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15,
     """
     driver = problem.driver
 
-    J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup, run_model=run_model)
+    J, _ = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup, run_model=run_model)
 
     ofs = driver._get_ordered_nl_responses()
     wrts = list(driver._designvars)
@@ -1437,10 +1444,9 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
             coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0],
                                                      repeats=repeats)
         else:
-            start_time = time.time()
-            J = _get_bool_total_jac(problem, repeats=repeats, tol=tol, orders=orders, setup=setup,
-                                    run_model=run_model)
-            sparsity_time = time.time() - start_time
+            J, sparsity_time = _get_bool_total_jac(problem, repeats=repeats, tol=tol,
+                                                   orders=orders, setup=setup,
+                                                   run_model=run_model)
             coloring = _compute_coloring(J, mode)
             coloring._row_vars = ofs
             coloring._row_var_sizes = of_sizes
