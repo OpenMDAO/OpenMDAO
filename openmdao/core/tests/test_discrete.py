@@ -281,10 +281,14 @@ class DiscreteTestCase(unittest.TestCase):
         model = prob.model
 
         indep = model.add_subsystem('indep', IndepVarComp())
-        indep.add_output('x', 1.0)
+        indep.add_output('x', 1.0, ref=10.)
+        indep.add_discrete_output('N', 1)
 
         comp = model.add_subsystem('comp', CompDiscWDerivsImplicit())
+        sink = model.add_subsystem('sink', MixedCompDiscIn(1.0))
         model.connect('indep.x', 'comp.y2_actual')
+        model.connect('indep.N', 'comp.N')
+        model.connect('comp.Nout', 'sink.x')
 
         model.add_design_var('indep.x')
         model.add_objective('comp.y2_command')

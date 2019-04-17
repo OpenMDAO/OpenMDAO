@@ -204,7 +204,7 @@ class Group(System):
             abs2meta_in = self._var_abs2meta
             allprocs_meta_out = self._var_allprocs_abs2meta
             for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
-                if abs_in not in abs2meta_in or abs_out not in allprocs_meta_out:
+                if abs_in not in abs2meta_in:
                     # we only perform scaling on local, non-discrete arrays, so skip
                     continue
 

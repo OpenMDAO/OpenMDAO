@@ -1050,10 +1050,6 @@ class Component(System):
                         del self._subjacs_info[abs_key]
                     continue
 
-                if abs_key[0] not in abs2meta or abs_key[1] not in abs2meta:
-                    # var is discrete so skip it
-                    continue
-
                 if abs_key in self._subjacs_info:
                     meta = self._subjacs_info[abs_key]
                 else:

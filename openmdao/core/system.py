@@ -1453,7 +1453,6 @@ class System(object):
         if self._discrete_inputs:
             wrt_list = [n for n in wrt_list if n not in self._discrete_inputs]
 
-        # The only outputs in wrt should be implicit states.
         if include_wrt_outputs:
             wrt_list = of_list + wrt_list
 
