@@ -9,7 +9,7 @@ that are applied to the output and residual variables to aid solver convergence.
 
 When OpenMDAO runs a model, all of the numerical data from connections is assembled into a set of vectors called the "inputs" and "outputs"
 vectors. When a component calls its "compute" function, it is passed a sub-vector that contains views to just the data relevant to that component.
-A similar-sized vector called "residuals" is also created to house implicit and cycle-induced residuals. Each vector can transform all of its data
+A vector called "residuals" with the same size as "outputs" is also created to house implicit and cycle-induced residuals. Each vector can transform all of its data
 or a portion of its data into a scaled or unscaled state when requested. Doing so requires multiplication with a vector of scalers and
 addition with a vector of adders.  There is a small amount of cost to this, so OpenMDAO tries to scale/unscale only when necessary and only over
 as tight a scope as required.
