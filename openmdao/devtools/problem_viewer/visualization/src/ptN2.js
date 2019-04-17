@@ -17,6 +17,8 @@ function PtN2Diagram(parentDiv, modelData) {
 
     var RIGHT_TEXT_MARGIN_PX = 8; // How much space in px (left and) right of text in partition tree
 
+    var text_width_cache = {}; // used to speed up GetTextWidth using memoization
+
     //N^2 vars
     var backButtonHistory = [], forwardButtonHistory = [];
     var chosenCollapseDepth = -1;
@@ -228,10 +230,10 @@ function PtN2Diagram(parentDiv, modelData) {
         collapseDepthElement.appendChild(option);
     }
 
-    Update();
+    Update(computeNewTreeLayout=false);
     SetupLegend(d3, d3ContentDiv);
 
-    function Update() {
+    function Update(computeNewTreeLayout=true) {
         parentDiv.querySelector("#currentPathId").innerHTML = "PATH: root" + ((zoomedElement.parent) ? "." : "") + zoomedElement.absPathName;
 
         parentDiv.querySelector("#backButtonId").disabled = (backButtonHistory.length == 0) ? "disabled" : false;
@@ -240,8 +242,10 @@ function PtN2Diagram(parentDiv, modelData) {
         parentDiv.querySelector("#returnToRootButtonId").disabled = (zoomedElement === root) ? "disabled" : false;
 
         // Compute the new tree layout.
-        ComputeLayout(); //updates d3NodesArray
-        ComputeMatrixN2();
+        if (computeNewTreeLayout) {
+            ComputeLayout(); //updates d3NodesArray
+            ComputeMatrixN2();
+        }
 
         for (var i = 2; i <= maxDepth; ++i) {
             parentDiv.querySelector("#idCollapseDepthOption" + i + "").style.display = (i <= zoomedElement.depth) ? "none" : "block";
@@ -744,8 +748,16 @@ function PtN2Diagram(parentDiv, modelData) {
         }
 
         function GetTextWidth(s) {
+            var width ;
+
+            if ( text_width_cache[ s ] != null )
+                return text_width_cache[ s ];
+
             textWidthText.text(s);
-            return textWidthTextNode.getBoundingClientRect().width;
+            width = textWidthTextNode.getBoundingClientRect().width;
+
+            text_width_cache[ s ] = width;
+            return width;
         }
 
         function UpdateTextWidths(d) {
@@ -1074,7 +1086,7 @@ function PtN2Diagram(parentDiv, modelData) {
             TRANSITION_DURATION = TRANSITION_DURATION_FAST;
             lastClickWasLeft = false;
             Toggle(d);
-            Update(d);
+            Update();
         }
     }
 
@@ -1188,31 +1200,6 @@ function PtN2Diagram(parentDiv, modelData) {
             return null;
         }
 
-        function RemoveDuplicates(d) { //remove redundant elements in every objects' sources and targets arrays
-            if (d.children) {
-                for (var i = 0; i < d.children.length; ++i) {
-                    RemoveDuplicates(d.children[i]);
-                }
-            }
-
-            function unique(elem, pos, arr) {
-                return arr.indexOf(elem) == pos;
-            }
-
-            if (d.targetsParamView) {
-                //numElementsBefore += d.targetsParamView.length;
-                var uniqueArray = d.targetsParamView.filter(unique);
-                d.targetsParamView = uniqueArray;
-                //numElementsAfter += d.targetsParamView.length;
-            }
-            if (d.targetsHideParams) {
-                //numElementsBefore += d.targetsHideParams.length;
-                var uniqueArray = d.targetsHideParams.filter(unique);
-                d.targetsHideParams = uniqueArray;
-                //numElementsAfter += d.targetsHideParams.length;
-            }
-        }
-
         function AddLeaves(d, objArray) {
             if (d.type !== "param" && d.type !== "unconnected_param") {
                 objArray.push(d);
@@ -1225,8 +1212,9 @@ function PtN2Diagram(parentDiv, modelData) {
         }
 
         function ClearConnections(d) {
-            d.targetsParamView = [];
-            d.targetsHideParams = [];
+            d.targetsParamView = new Set();
+            d.targetsHideParams = new Set();
+
             if (d.children) {
                 for (var i = 0; i < d.children.length; ++i) {
                     ClearConnections(d.children[i]);
@@ -1235,6 +1223,8 @@ function PtN2Diagram(parentDiv, modelData) {
         }
 
         ClearConnections(root);
+
+        var sys_pathnames = modelData.sys_pathnames_list;
 
         for (var i = 0; i < conns.length; ++i) {
             var srcSplitArray = conns[i].src.split(/\.|:/);
@@ -1280,31 +1270,36 @@ function PtN2Diagram(parentDiv, modelData) {
 
 
             for (var j = 0; j < srcObjArray.length; ++j) {
-                if (!srcObjArray[j].hasOwnProperty('targetsParamView')) srcObjArray[j].targetsParamView = [];
-                if (!srcObjArray[j].hasOwnProperty('targetsHideParams')) srcObjArray[j].targetsHideParams = [];
-                srcObjArray[j].targetsParamView = srcObjArray[j].targetsParamView.concat(tgtObjArrayParamView);
-                srcObjArray[j].targetsHideParams = srcObjArray[j].targetsHideParams.concat(tgtObjArrayHideParams);
+                if (!srcObjArray[j].hasOwnProperty('targetsParamView')) srcObjArray[j].targetsParamView = new Set();
+                if (!srcObjArray[j].hasOwnProperty('targetsHideParams')) srcObjArray[j].targetsHideParams = new Set();
+
+                tgtObjArrayParamView.forEach(item => srcObjArray[j].targetsParamView.add(item));
+                tgtObjArrayHideParams.forEach(item => srcObjArray[j].targetsHideParams.add(item));
             }
 
             var cycleArrowsArray = [];
             if (conns[i].cycle_arrows && conns[i].cycle_arrows.length > 0) {
                 var cycleArrows = conns[i].cycle_arrows;
                 for (var j = 0; j < cycleArrows.length; ++j) {
-                    var cycleArrowsSplitArray = cycleArrows[j].split(" ");
-                    if (cycleArrowsSplitArray.length != 2) {
-                        alert("error: cycleArrowsSplitArray length not 2: got " + cycleArrowsSplitArray.length);
+                    if (cycleArrows[j].length != 2) {
+                        alert("error: cycleArrowsSplitArray length not 2, got " + cycleArrows[j].length +
+                              ": " + cycleArrows[j]);
                         return;
                     }
-                    var splitArray = cycleArrowsSplitArray[0].split(/\.|:/);
+
+                    var src_pathname = sys_pathnames[cycleArrows[j][0]];
+                    var tgt_pathname = sys_pathnames[cycleArrows[j][1]];
+
+                    var splitArray = src_pathname.split(/\.|:/);
                     var arrowBeginObj = GetObjectInTree(root, splitArray, 0);
                     if (arrowBeginObj == null) {
-                        alert("error: cannot find cycle arrows begin object " + cycleArrowsSplitArray[0]);
+                        alert("error: cannot find cycle arrows begin object " + src_pathname);
                         return;
                     }
-                    splitArray = cycleArrowsSplitArray[1].split(/\.|:/);
+                    splitArray = tgt_pathname.split(/\.|:/);
                     var arrowEndObj = GetObjectInTree(root, splitArray, 0);
                     if (arrowEndObj == null) {
-                        alert("error: cannot find cycle arrows end object " + cycleArrowsSplitArray[1]);
+                        alert("error: cannot find cycle arrows end object " + tgt_pathname);
                         return;
                     }
                     cycleArrowsArray.push({ "begin": arrowBeginObj, "end": arrowEndObj });
@@ -1318,7 +1313,6 @@ function PtN2Diagram(parentDiv, modelData) {
             }
 
         }
-        RemoveDuplicates(root);
     }
 
     function ComputeMatrixN2() {
@@ -1328,8 +1322,7 @@ function PtN2Diagram(parentDiv, modelData) {
                 var srcObj = d3RightTextNodesArrayZoomed[si];
                 matrix[si + "_" + si] = { "r": si, "c": si, "obj": srcObj, "id": srcObj.id + "_" + srcObj.id };
                 var targets = (showParams) ? srcObj.targetsParamView : srcObj.targetsHideParams;
-                for (var j = 0; j < targets.length; ++j) {
-                    var tgtObj = targets[j];
+                for (let tgtObj of targets) {
                     var ti = d3RightTextNodesArrayZoomed.indexOf(tgtObj);
                     if (ti != -1) {
                         matrix[si + "_" + ti] = { "r": si, "c": ti, "obj": srcObj, "id": srcObj.id + "_" + tgtObj.id }; //matrix[si][ti].z = 1;

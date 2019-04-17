@@ -19,11 +19,11 @@ from __future__ import print_function
 
 import json
 import os
-import warnings
 
 from six import iteritems, string_types
 
 from openmdao.core.problem import Problem
+from openmdao.utils.general_utils import simple_warning
 from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 from openmdao.devtools.webview import webview
 from openmdao.devtools.xdsm_viewer.html_writer import write_html
@@ -228,7 +228,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         else:  # Use default
             self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
             msg = 'Name not "{}" found in component type mapping, will default to "{}"'
-            warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
+            simple_warning(msg.format(self.name, _DEFAULT_WRITER))
 
     def _format_id(self, name, subs=(('_', ''),)):
         # Changes forbidden characters in the "id" of a component
@@ -394,7 +394,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         if side == "left":
             self.connect(src=name, target=self._ul, label=label)
         else:
-            warnings.warn('Right side outputs not implemented for XDSMjs.')
+            simple_warning('Right side outputs not implemented for XDSMjs.')
             self.connect(src=name, target=self._ul, label=label)
 
     def collect_data(self):
@@ -480,7 +480,7 @@ else:
             else:
                 self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
                 msg = 'Name not "{}" found in component type mapping, will default to "{}"'
-                warnings.warn(msg.format(self.name, _DEFAULT_WRITER))
+                simple_warning(msg.format(self.name, _DEFAULT_WRITER))
             # Number of components
             self._nr_comps = 0
             # Maps the component names to their index (position on the matrix diagonal)
@@ -764,7 +764,7 @@ else:
                 return txt
 
 
-def write_xdsm(problem, filename, model_path=None, recurse=True,
+def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
                add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE, **kwargs):
@@ -816,7 +816,7 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
 
     Parameters
     ----------
-    problem : Problem or str
+    data_source : Problem or str
         The Problem or case recorder database containing the model or model data.
     filename : str
         Name of the output files (do not provide file extension)
@@ -869,40 +869,30 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
             else:
                 build_pdf = True
 
-    viewer_data = _get_viewer_data(problem)
+    viewer_data = _get_viewer_data(data_source)
 
-    if isinstance(problem, Problem):
-        driver = problem.driver
-        if model_path is None:
-            _model = problem.model
-        else:
-            _model = problem.model._get_subsystem(model_path)
+    driver_name = viewer_data.get('driver_name', None)
+    driver_type = viewer_data.get('driver_type', 'optimization')
+    design_vars = viewer_data.get('design_vars', None)
+    responses = viewer_data.get('responses', None)
+
+    if model_path is not None:
+        if isinstance(data_source, Problem):
+            _model = data_source.model._get_subsystem(model_path)
             if _model is None:
                 msg = 'Model path "{}" does not exist in problem "{}".'
-                raise ValueError(msg.format(model_path, problem))
-        design_vars = _model.get_design_vars()
-        responses = _model.get_responses()
-    elif isinstance(problem, str):  # SQL file
-        # from openmdao.recorders.sqlite_reader import SqliteCaseReader
-        # reader = SqliteCaseReader(problem)
-        driver = None
-        design_vars = None
-        responses = None
-        # TODO get design variables, responses and the driver name from the SQL file
-        warnings.warn('For SQL input the XDSM writer shows only the model hierarchy, '
-                      'and the driver, design variables and responses are not part of the '
-                      'diagram.')
-    else:
-        msg = 'write_xdsm() only accepts Problems, Groups or filenames, not "{}"'
-        raise TypeError(msg.format(type(problem)))
+                raise ValueError(msg.format(model_path, data_source))
+            design_vars = _model.get_design_vars()
+            responses = _model.get_responses()
+        else:
+            msg = 'Model path is not supported when data source is "{}".'
+            raise ValueError(msg.format(type(data_source)))
 
-    try:
-        from openmdao.drivers.doe_driver import DOEDriver
-        driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
-    except ImportError:
-        driver_type = 'optimization'
-    # Name is None if the driver is not specified
-    driver_name = _get_cls_name(driver) if driver else None
+    if design_vars is None:
+        simple_warning('The XDSM diagram will show only the model hierarchy, '
+                       'as the driver, design variables and responses are not '
+                       'available.')
+
     filename = filename.replace('\\', '/')  # Needed for LaTeX
 
     # If the "writer" argument not provided, the output format is used to choose the writer
@@ -923,11 +913,12 @@ def write_xdsm(problem, filename, model_path=None, recurse=True,
                 msg = 'Writer name "{0}" not found, there will be no character ' \
                       'substitutes used. Add "{0}" to your settings, or provide a tuple for' \
                       'character substitutes.'
-                warnings.warn(msg.format(writer.name, subs))
+                simple_warning(msg.format(writer.name, subs))
                 subs = ()
         else:
             msg = 'Custom XDSM writer should be an instance of BaseXDSMWriter, now it is a "{}".'
             raise TypeError(msg.format(type(writer)))
+
     return _write_xdsm(filename, viewer_data=viewer_data,
                        driver=driver_name, include_solver=include_solver, model_path=model_path,
                        design_vars=design_vars, responses=responses, writer=writer,
@@ -1052,7 +1043,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     comps = _get_comps(tree, model_path=model_path, recurse=recurse, include_solver=include_solver)
     if include_solver:
         msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
-        warnings.warn(msg)
+        simple_warning(msg)
 
         # Add the top level solver
         top_level_solver = dict(tree)
@@ -1162,7 +1153,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 x.connect(src, tgt, label=format_block(conn_vars), stack=stack)
             else:  # Source or target missing
                 msg = 'Connection "{conn}" from "{src}" to "{tgt}" ignored.'
-                warnings.warn(msg.format(src=src, tgt=tgt, conn=conn_vars))
+                simple_warning(msg.format(src=src, tgt=tgt, conn=conn_vars))
 
     # Add the externally sourced inputs
     for src, tgts in iteritems(external_inputs2):
@@ -1173,7 +1164,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 x.add_input(tgt, format_block(formatted_conn_vars), stack=stack)
             else:  # Target missing
                 msg = 'External input to "{tgt}" ignored.'
-                warnings.warn(msg.format(tgt=tgt, conn=conn_vars))
+                simple_warning(msg.format(tgt=tgt, conn=conn_vars))
 
     # Add the externally connected outputs
     if include_external_outputs:
@@ -1187,7 +1178,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 x.add_output(src, formatted_outputs, side='right', stack=stack)
             else:  # Source or target missing
                 msg = 'External output "{conn}" from "{src}" ignored.'
-                warnings.warn(msg.format(src=src, conn=output_vars))
+                simple_warning(msg.format(src=src, conn=output_vars))
 
     x.write(filename, cleanup=cleanup, quiet=quiet, build=build_pdf, **kwargs)
 
@@ -1218,7 +1209,9 @@ def _process_connections(conns, recurse=True, subs=None):
     def convert(x):
         return _convert_name(x, recurse=recurse, subs=subs)
 
-    conns_new = [{k: convert(v) for k, v in iteritems(conn)} for conn in conns]
+    conns_new = [
+        {k: convert(v) for k, v in iteritems(conn) if k in ('src', 'tgt')} for conn in conns
+    ]
     return _accumulate_connections(conns_new)
 
 
@@ -1561,89 +1554,3 @@ def _multiline_block(*texts, **kwargs):
     template = '$\\begin{{array}}{{{pos}}} {text} \\end{{array}}$'
     new_line = ' \\\\ '
     return template.format(text=new_line.join(texts), pos='c'*len(texts))
-
-
-##### openmdao command line setup
-
-
-def _xdsm_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao xdsm' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', '--outfile', default='xdsm_out', action='store', dest='outfile',
-                        help='XDSM output file. (use pathname without extension)')
-    parser.add_argument('-f', '--format', default='html', action='store', dest='format',
-                        choices=['html', 'pdf', 'tex'], help='format of XSDM output.')
-    parser.add_argument('-m', '--model_path', action='store', dest='model_path',
-                        help='Path to system to transcribe to XDSM.')
-    parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
-                        help="Don't treat the top level of each name as the source/target component.")
-    parser.add_argument('--no_browser', action='store_true', dest='no_browser',
-                        help="Don't display in a browser.")
-    parser.add_argument('--no_parallel', action='store_true', dest='no_parallel',
-                        help="don't show stacked parallel blocks. Only active for 'pdf' and 'tex' "
-                             "formats.")
-    parser.add_argument('--no_ext', action='store_true', dest='no_extern_outputs',
-                        help="Don't show externally connected outputs.")
-    parser.add_argument('-s', '--include_solver', action='store_true', dest='include_solver',
-                        help="Include the problem model's solver in the XDSM.")
-    parser.add_argument('--no_process_conns', action='store_true', dest='no_process_conns',
-                        help="Don't add process connections (thin black lines).")
-    parser.add_argument('--box_stacking', action='store', default=_DEFAULT_BOX_STACKING,
-                        choices=['max_chars', 'vertical', 'horizontal', 'cut_chars', 'empty'],
-                        dest='box_stacking', help='Controls the appearance of boxes.')
-    parser.add_argument('--box_width', action='store', default=_DEFAULT_BOX_WIDTH,
-                        dest='box_width', type=int, help='Controls the width of boxes.')
-    parser.add_argument('--box_lines', action='store', default=_MAX_BOX_LINES,
-                        dest='box_lines', type=int,
-                        help='Limits number of vertical lines in box if box_stacking is vertical.')
-    parser.add_argument('--numbered_comps', action='store_true', dest='numbered_comps',
-                        help="Display components with numbers.  Only active for 'pdf' and 'tex' "
-                        "formats.")
-    parser.add_argument('--number_alignment', action='store', dest='number_alignment',
-                        choices=['horizontal', 'vertical'], default='horizontal',
-                        help='Positions the number either above or in front of the component label '
-                        'if numbered_comps is true.')
-    parser.add_argument('--output_side', action='store', dest='output_side', default=_DEFAULT_OUTPUT_SIDE,
-                        help='Position of the outputs on the diagram. Left or right, or a '
-                             'dictionary with component types as keys. Component type key can be '
-                             '"optimization", "doe" or "default".')
-
-
-def _xdsm_cmd(options):
-    """
-    Return the post_setup hook function for 'openmdao xdsm'.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-
-    Returns
-    -------
-    function
-        The post-setup hook function.
-    """
-    def _xdsm(prob):
-        kwargs = {}
-        for name in ['box_stacking', 'box_width', 'box_lines', 'numbered_comps', 'number_alignment']:
-            val = getattr(options, name)
-            if val is not None:
-                kwargs[name] = val
-
-        write_xdsm(prob, filename=options.outfile, model_path=options.model_path,
-                   recurse=options.recurse,
-                   include_external_outputs=not options.no_extern_outputs,
-                   out_format=options.format,
-                   include_solver=options.include_solver, subs=_CHAR_SUBS,
-                   show_browser=not options.no_browser, show_parallel=not options.no_parallel,
-                   add_process_conns=not options.no_process_conns, output_side=options.output_side,
-                   **kwargs)
-        exit()
-    return _xdsm

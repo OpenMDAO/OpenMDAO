@@ -37,7 +37,7 @@ class Comp(ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
-class TestCSColoring(unittest.TestCase):
+class TestSrcIndices(unittest.TestCase):
     NUM_PROCS = 4
 
     def test_zero_src_indices(self):

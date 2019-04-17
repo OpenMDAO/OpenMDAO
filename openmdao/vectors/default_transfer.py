@@ -10,7 +10,7 @@ import numpy as np
 
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
-from openmdao.utils.array_utils import convert_neg, _global2local_offsets
+from openmdao.utils.array_utils import convert_neg, _global2local_offsets, _flatten_src_indices
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
@@ -99,26 +99,15 @@ class DefaultTransfer(Transfer):
                     idx_out = allprocs_abs2idx[abs_out]
 
                     # Read in and process src_indices
-                    shape_in = meta_in['shape']
-                    shape_out = meta_out['shape']
-                    global_size_out = meta_out['global_size']
                     src_indices = meta_in['src_indices']
                     if src_indices is None:
                         pass
                     elif src_indices.ndim == 1:
-                        src_indices = convert_neg(src_indices, global_size_out)
+                        src_indices = convert_neg(src_indices, meta_out['global_size'])
                     else:
-                        if len(shape_out) == 1 or shape_in == src_indices.shape:
-                            src_indices = src_indices.flatten()
-                            src_indices = convert_neg(src_indices, global_size_out)
-                        else:
-                            # TODO: this duplicates code found
-                            # in System._setup_scaling.
-                            entries = [list(range(x)) for x in shape_in]
-                            cols = np.vstack(src_indices[i] for i in product(*entries))
-                            dimidxs = [convert_neg(cols[:, i], shape_out[i])
-                                       for i in range(cols.shape[1])]
-                            src_indices = np.ravel_multi_index(dimidxs, shape_out)
+                        src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
+                                                           meta_out['global_shape'],
+                                                           meta_out['global_size'])
 
                     # 1. Compute the output indices
                     offset = offsets_out[iproc, idx_out]
