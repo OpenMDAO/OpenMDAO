@@ -204,13 +204,13 @@ class Group(System):
             abs2meta_in = self._var_abs2meta
             allprocs_meta_out = self._var_allprocs_abs2meta
             for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
-                meta_out = allprocs_meta_out[abs_out]
                 if abs_in not in abs2meta_in:
-                    # we only perform scaling on local arrays, so skip
+                    # we only perform scaling on local, non-discrete arrays, so skip
                     continue
 
                 meta_in = abs2meta_in[abs_in]
 
+                meta_out = allprocs_meta_out[abs_out]
                 ref = meta_out['ref']
                 ref0 = meta_out['ref0']
 
@@ -1583,7 +1583,11 @@ class Group(System):
             imag_cache[:] = self._outputs._data.imag
             self._outputs.set_complex_step_mode(False, keep_real=True)
 
-        self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+        if self._discrete_inputs or self._discrete_outputs:
+            self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
+                                 self._discrete_inputs, self._discrete_outputs)
+        else:
+            self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
 
         if complex_step:
             # Note: passing in False swaps back to the complex vector, which is valid since
@@ -1596,7 +1600,8 @@ class Group(System):
             self._outputs.set_complex_step_mode(True)
             self._outputs._data[:] += imag_cache * 1j
 
-    def guess_nonlinear(self, inputs, outputs, residuals):
+    def guess_nonlinear(self, inputs, outputs, residuals,
+                        discrete_inputs=None, discrete_outputs=None):
         """
         Provide initial guess for states.
 
@@ -1610,6 +1615,10 @@ class Group(System):
             unscaled, dimensional output variables read via outputs[key]
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        discrete_outputs : dict or None
+            If not None, dict containing discrete output values.
         """
         pass
 

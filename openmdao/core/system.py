@@ -1426,6 +1426,38 @@ class System(object):
             self._scope_cache[None] = (frozenset(self._var_abs_names['output']), _empty_frozen_set)
             return self._scope_cache[None]
 
+    def _get_potential_partials_lists(self, include_wrt_outputs=True):
+        """
+        Return full lists of possible 'of' and 'wrt' variables.
+
+        Filters out any discrete variables.
+
+        Parameters
+        ----------
+        include_wrt_outputs : bool
+            If True, include outputs in the wrt list.
+
+        Returns
+        -------
+        list
+            List of 'of' variable names.
+        list
+            List of 'wrt' variable names.
+        """
+        of_list = list(self._var_allprocs_prom2abs_list['output'])
+        wrt_list = list(self._var_allprocs_prom2abs_list['input'])
+
+        # filter out any discrete inputs or outputs
+        if self._discrete_outputs:
+            of_list = [n for n in of_list if n not in self._discrete_outputs]
+        if self._discrete_inputs:
+            wrt_list = [n for n in wrt_list if n not in self._discrete_inputs]
+
+        if include_wrt_outputs:
+            wrt_list = of_list + wrt_list
+
+        return of_list, wrt_list
+
     @property
     def metadata(self):
         """

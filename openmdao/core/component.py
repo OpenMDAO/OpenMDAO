@@ -915,14 +915,12 @@ class Component(System):
             Dictionary keyed by name with tuples of options (method, form, step, step_calc)
         """
         opts = {}
-        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
-        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
-
+        of, wrt = self._get_potential_partials_lists()
         invalid_wrt = []
 
         for wrt_list, method, form, step, step_calc, directional in self._declared_partial_checks:
             for pattern in wrt_list:
-                matches = find_matches(pattern, outs + ins)
+                matches = find_matches(pattern, wrt)
 
                 # if a non-wildcard var name was specified and not found, save for later Exception
                 if len(matches) == 0 and _valid_var_name(pattern):
@@ -1108,11 +1106,10 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        outs = list(self._var_allprocs_prom2abs_list['output'])
-        ins = list(self._var_allprocs_prom2abs_list['input'])
+        of, wrt = self._get_potential_partials_lists()
 
-        of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, outs + ins)) for pattern in wrt_list]
+        of_pattern_matches = [(pattern, find_matches(pattern, of)) for pattern in of_list]
+        wrt_pattern_matches = [(pattern, find_matches(pattern, wrt)) for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
     def _check_partials_meta(self, abs_key, val, shape):
