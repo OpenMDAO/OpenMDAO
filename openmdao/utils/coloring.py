@@ -10,7 +10,7 @@ import warnings
 import json
 import pickle
 from collections import OrderedDict, defaultdict
-from itertools import combinations
+from itertools import combinations, chain
 from distutils.version import LooseVersion
 from contextlib import contextmanager
 
@@ -673,6 +673,65 @@ class Coloring(object):
                     lines.append("    self.declare_partials(of='%s', wrt='%s', rows=%s, cols=%s)" %
                                  (of, wrt, list(nzrows), list(nzcols)))
         return '\n'.join(lines)
+
+    def get_row_var_coloring(self, varname):
+        """
+        Return the number of fwd and rev solves needed for a particular row variable.
+
+        Parameters
+        ----------
+        varname : str
+            Name of the row variable.
+
+        Returns
+        -------
+        int
+            Number of forward solves needed for the given variable.
+        int
+            Number of reverse solves needed for the given variable.
+        """
+        fwd_solves = 0
+        rev_solves = 0
+        if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
+            row_slice = col_slice = slice(None)
+            start = end = 0
+            for name, size in zip(self._row_vars, self._row_var_sizes):
+                end += size
+                if name == varname:
+                    row_slice = slice(start, end)
+                    break
+                start = end
+            else:
+                raise RuntimeError("Can't find variable '%s' in coloring." % varname)
+
+            J = np.zeros(self._shape, dtype=bool)
+            subJ = J[row_slice, col_slice]
+
+            if self._fwd:
+                uncolored = [[c] for c in self._fwd[0][0]]
+
+                colored = self._fwd[0][1:]
+                nzrows = self._fwd[1]
+                for color_group in chain(uncolored, colored):
+                    subJ[:, :] = False
+                    # if any color in the group has nonzeros in our variable, add a solve
+                    for c in color_group:
+                        J[nzrows[c], c] = True
+
+                    if np.any(subJ):
+                        fwd_solves += 1
+
+            if self._rev:
+                uncolored = [[r] for r in self._rev[0][0]]
+                colored = self._rev[0][1:]
+                for color_group in chain(uncolored, colored):
+                    subJ[:, :] = False
+                    J[color_group, :] = True
+
+                    if np.any(subJ):
+                        rev_solves += 1
+
+        return fwd_solves, rev_solves
 
 
 _loaders = {

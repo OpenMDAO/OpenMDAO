@@ -311,11 +311,11 @@ class Jacobian(object):
                 wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
         else:
             is_total = False
-            from openmdao.core.implicitcomponent import ImplicitComponent
+            from openmdao.core.explicitcomponent import ExplicitComponent
             ofs = system._var_allprocs_abs_names['output']
             wrts = system._var_allprocs_abs_names['input']
             wrt_info = []
-            if isinstance(system, ImplicitComponent):
+            if not isinstance(system, ExplicitComponent):
                 wrt_info.append(((ofs, ofsizes, ())))
             wrt_info.append((wrts, isizes, ()))
 

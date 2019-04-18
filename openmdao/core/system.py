@@ -922,6 +922,7 @@ class System(object):
 
             self.run_linearize()
             self._jacobian._save_sparsity(self)
+
         sparsity_time = time.time() - sparsity_start_time
 
         info = self._approx_coloring_info
