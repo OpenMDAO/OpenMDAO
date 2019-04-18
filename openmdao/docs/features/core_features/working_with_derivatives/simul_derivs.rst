@@ -98,7 +98,7 @@ can make the existing coloring invalid.  If *anything* about the optimization ch
 recommended to always regenerate the coloring before re-running the optimization.
 
 
-The coloring can be generated automatically and written to the `total_coloring.pkl` file
+The total coloring can be generated automatically and written to the `total_coloring.pkl` file
 using the following command:
 
 .. code-block:: none
@@ -201,6 +201,34 @@ The coloring will be written in pickle format to the given file and can be loade
 .. code-block:: python
 
     prob.driver.set_coloring_spec('my_coloring.pkl')
+
+
+If you have a coloring file that was generated earlier and you want to view its statistics,
+you can use the `openmdao coloring_report` command to generate a small report.
+
+.. code-block:: none
+
+    openmdao coloring_report <your_coloring_file> -m
+
+
+will show metadata associated with the creation of the coloring along with a short summary.
+For example:
+
+
+.. code-block:: none
+
+    Coloring metadata:
+    {'orders': 20, 'repeats': 3, 'tol': 1e-15}
+
+    Jacobian shape: (22, 21)  (13.42% nonzero)
+
+    FWD solves: 5   REV solves: 0
+
+    Total colors vs. total size: 5 vs 21  (76.2% improvement)
+
+    Time to compute sparsity: 0.024192 sec.
+    Time to compute coloring: 0.001076 sec.
+
 
 
 If you run *openmdao total_coloring* and it turns out there is no simultaneous total coloring

@@ -10,7 +10,8 @@ from six import iteritems
 
 from openmdao.core.problem import Problem
 from openmdao.utils.coloring import _total_coloring_setup_parser, _total_coloring_cmd, \
-    _sparsity_setup_parser, _sparsity_cmd, _partial_coloring_setup_parser, _partial_coloring_cmd
+    _sparsity_setup_parser, _sparsity_cmd, _partial_coloring_setup_parser, _partial_coloring_cmd, \
+    _coloring_report_setup_parser, _coloring_report_exec
 from openmdao.devtools.problem_viewer.problem_viewer import view_model
 from openmdao.devtools.viewconns import view_connections
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
@@ -380,6 +381,7 @@ _non_post_setup_map = {
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec),
     'mempost': (_mempost_setup_parser, _mempost_exec),
+    'coloring_report': (_coloring_report_setup_parser, _coloring_report_exec)
 }
 
 

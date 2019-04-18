@@ -812,7 +812,7 @@ class System(object):
         self._approx_coloring_info = options
 
     def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
-                                repeats=2, perturb_size=1e-9, tol=1e-15,
+                                repeats=2, perturb_size=1e-9, tol=1e-15, orders=20,
                                 directory='coloring_files', per_instance=False, recurse=False):
         """
         Compute a coloring of the approximated derivatives.
@@ -841,6 +841,9 @@ class System(object):
         tol : float
             Tolerance used to determine if an array entry is zero or nonzero when computing
             sparsity.
+        orders : int
+            Number of orders of magnitude for one direction of the tolerance sweep when determining
+            jacobian sparsity.
         directory : str or None
             If not None, the coloring(s) for any colored system will be saved to the given
             directory.
@@ -863,9 +866,12 @@ class System(object):
             if recurse:
                 coloring = None
                 for s in self._subsystems_myproc:
-                    coloring = s.compute_approx_coloring(wrt, method, form, step, repeats,
-                                                         perturb_size,
-                                                         directory, per_instance, recurse)
+                    coloring = s.compute_approx_coloring(wrt=wrt, method=method, form=form,
+                                                         step=step, repeats=repeats,
+                                                         perturb_size=perturb_size, tol=tol,
+                                                         orders=orders, directory=directory,
+                                                         per_instance=per_instance,
+                                                         recurse=recurse)
                 return coloring
             else:
                 if method is None and self._approx_schemes:
@@ -927,7 +933,7 @@ class System(object):
 
         info = self._approx_coloring_info
         sparsity, ordered_ofs, ordered_wrts = \
-            self._jacobian._compute_sparsity(self, info['wrt_matches'], tol=tol)
+            self._jacobian._compute_sparsity(self, info['wrt_matches'], tol=tol, orders=orders)
         self._jacobian._jac_summ = None  # reclaim the memory
 
         coloring = _compute_coloring(sparsity, 'fwd')
@@ -936,10 +942,16 @@ class System(object):
         coloring._row_var_sizes = list(ordered_ofs.values())
         coloring._col_var_sizes = list(ordered_wrts.values())
         coloring._sparsity_time = sparsity_time
+
         coloring._meta = {}  # save metadata we used to create the coloring
         for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step', 'per_instance'):
             if name in info:
                 coloring._meta[name] = info[name]
+        coloring._meta['repeats'] = repeats
+        coloring._meta['perturb_size'] = perturb_size
+        coloring._meta['tol'] = tol
+        coloring._meta['orders'] = orders
+
         info['coloring'] = coloring
 
         self._save_coloring(coloring, directory, info['per_instance'])

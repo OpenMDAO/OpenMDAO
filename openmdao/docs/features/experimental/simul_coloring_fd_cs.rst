@@ -17,7 +17,7 @@ using them, but depending on the sparsity pattern of the jacobian, it may still 
 to get significant efficiency gains.
 
 Setting up a problem to use simultaneous coloring of approximated derivatives requires a
-call to the :code:`set_approx_coloring`.  For example, the code below sets up coloring for
+call to the :code:`set_approx_coloring` function.  For example, the code below sets up coloring for
 partial derivatives of outputs of `comp` with respect to inputs of `comp` starting with 'x'.
 Let's assume here that :code:`MyComp` is an :code:`ExplicitComponent`.  If it were an
 :code:`ImplicitComponent`, then the wildcard pattern 'x*' would be applied to all inputs *and*

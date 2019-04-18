@@ -13,6 +13,7 @@ from collections import OrderedDict, defaultdict
 from itertools import combinations, chain
 from distutils.version import LooseVersion
 from contextlib import contextmanager
+from pprint import pprint
 
 from six import iteritems, string_types
 from six.moves import range
@@ -517,21 +518,14 @@ class Coloring(object):
         stream : file-like
             Where the output will go.
         """
-        stream.write('\n')
-        if self._sparsity_time is not None:
-            stream.write("Time to compute sparsity: %f sec.\n" % self._sparsity_time)
-        if self._coloring_time is not None:
-            stream.write("Time to compute coloring: %f sec.\n" % self._coloring_time)
-
         nrows = self._shape[0] if self._shape else -1
         ncols = self._shape[1] if self._shape else -1
 
         if self._pct_nonzero is None:
-            stream.write("Jacobian shape: (%d, %d)\n" % (nrows, ncols))
+            stream.write("\nJacobian shape: (%d, %d)\n" % (nrows, ncols))
         else:
-            stream.write("Jacobian shape: (%d, %d)  (%5.2f%% nonzero)\n" % (nrows, ncols,
-                                                                            self._pct_nonzero))
-
+            stream.write("\nJacobian shape: (%d, %d)  (%5.2f%% nonzero)\n" % (nrows, ncols,
+                                                                              self._pct_nonzero))
         if self._fwd is None and self._rev is None:
             tot_size = min(nrows, ncols)
             if tot_size < 0:
@@ -544,6 +538,12 @@ class Coloring(object):
             stream.write("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
             stream.write("\n\nTotal colors vs. total size: %d vs %s  (%.1f%% improvement)\n" %
                          (tot_colors, tot_size, pct))
+
+        stream.write('\n')
+        if self._sparsity_time is not None:
+            stream.write("Time to compute sparsity: %f sec.\n" % self._sparsity_time)
+        if self._coloring_time is not None:
+            stream.write("Time to compute coloring: %f sec.\n" % self._coloring_time)
 
     def display(self, stream=sys.stdout):
         """
@@ -650,6 +650,18 @@ class Coloring(object):
             return _jac2subjac_sparsity(J, self._row_vars, self._col_vars,
                                         self._row_var_sizes, self._col_var_sizes)
 
+    def _subjac_sparsity_iter(self):
+        subjac_sparsity = self.get_subjac_sparsity()
+
+        if subjac_sparsity is None:
+            raise RuntimeError("Coloring doesn't have enough info to compute subjac sparsity.")
+
+        for of, sub in iteritems(subjac_sparsity):
+            for wrt, tup in iteritems(sub):
+                nzrows, nzcols, shape = tup
+                if nzrows.size > 0:
+                    yield (of, wrt, list(nzrows), list(nzcols))
+
     def get_declare_partials_calls(self):
         """
         Return a string containing declare_partials() calls based on the subjac sparsity.
@@ -660,18 +672,10 @@ class Coloring(object):
             A string containing a declare_partials() call for each nonzero subjac. This
             string may be cut and pasted into a component's setup() method.
         """
-        subjac_sparsity = self.get_subjac_sparsity()
-
-        if subjac_sparsity is None:
-            raise RuntimeError("Coloring doesn't have enough info to compute subjac sparsity.")
-
         lines = []
-        for of, sub in iteritems(subjac_sparsity):
-            for wrt, tup in iteritems(sub):
-                nzrows, nzcols, shape = tup
-                if nzrows.size > 0:
-                    lines.append("    self.declare_partials(of='%s', wrt='%s', rows=%s, cols=%s)" %
-                                 (of, wrt, list(nzrows), list(nzcols)))
+        for of, wrt, nzrows, nzcols in self._subjac_sparsity_iter():
+            lines.append("    self.declare_partials(of='%s', wrt='%s', rows=%s, cols=%s)" %
+                         (of, wrt, nzrows, nzcols))
         return '\n'.join(lines)
 
     def get_row_var_coloring(self, varname):
@@ -1501,7 +1505,7 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
                                           "from nonlinear ones.")
             _initialize_model_approx(model, driver, ofs, wrts)
             coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0],
-                                                     repeats=repeats)
+                                                     repeats=repeats, tol=tol, orders=orders)
         else:
             J, sparsity_time = _get_bool_total_jac(problem, repeats=repeats, tol=tol,
                                                    orders=orders, setup=setup,
@@ -1512,6 +1516,9 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
             coloring._col_vars = wrts
             coloring._col_var_sizes = wrt_sizes
             coloring._sparsity_time = sparsity_time
+
+            # save metadata we used to create the coloring
+            coloring._meta = {'repeats': repeats, 'tol': tol, 'orders': orders}
 
         driver._total_jac = None
 
@@ -1868,7 +1875,8 @@ def _partial_coloring_cmd(options):
                 else:
                     coloring = system.compute_approx_coloring(**kwargs)
 
-                    print("Approx coloring for '%s' (class %s)\n" % (s.pathname, klass))
+                    print("Approx coloring for '%s' (class %s)\n" % (system.pathname,
+                                                                     system.__class__.__name__))
                     if options.show_jac:
                         coloring.display()
                     coloring.summary()
@@ -1945,6 +1953,58 @@ def _sparsity_cmd(options):
 
         exit(0)
     return _sparsity
+
+
+def _coloring_report_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao coloring_report' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='coloring file.')
+    parser.add_argument('-j', action='store_true', dest='show_jac',
+                        help="Display a visualization of the final sparsity matrix used to "
+                        "compute the coloring.")
+    parser.add_argument('-s', action='store_true', dest='subjac_sparsity',
+                        help="Display sparsity patterns for subjacs.")
+    parser.add_argument('-m', action='store_true', dest='show_meta',
+                        help="Display coloring metadata.")
+    parser.add_argument('-v', '--var', action='store', dest='color_var',
+                        help='show the coloring (number of fwd and rev solves needed) '
+                        'for a particular variable.')
+
+
+def _coloring_report_exec(options):
+    """
+    Execute the 'openmdao coloring_report' command.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    """
+    coloring = Coloring.load(options.file[0])
+    if options.show_jac:
+        coloring.display()
+
+    if options.subjac_sparsity:
+        print("\nSubjacobian sparsity:")
+        for tup in coloring._subjac_sparsity_iter():
+            print("(%s, %s)\n   rows=%s\n   cols=%s" % tup)
+        print()
+
+    if options.color_var is not None:
+        fwd, rev = coloring.get_row_var_coloring(options.color_var)
+        print("\nVar: %s  (fwd solves: %d,  rev solves: %d)\n" % (options.color_var, fwd, rev))
+
+    if options.show_meta:
+        print("\nColoring metadata:")
+        pprint(coloring._meta)
+
+    coloring.summary()
 
 
 def _check_coloring(J, coloring):
