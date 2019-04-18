@@ -656,16 +656,22 @@ class Problem(object):
         obj_vars = {name: obj_vars[name] for name in filt['obj']}
         con_vars = {name: con_vars[name] for name in filt['con']}
 
+        names = model._outputs._names
+        views = model._outputs._views
+        sys_vars = {name: views[name] for name in names if name in filt['sys']}
+
         if MPI:
-            des_vars = model._gather_vars(model, des_vars)
-            obj_vars = model._gather_vars(model, obj_vars)
-            con_vars = model._gather_vars(model, con_vars)
+            des_vars = driver._gather_vars(model, des_vars)
+            obj_vars = driver._gather_vars(model, obj_vars)
+            con_vars = driver._gather_vars(model, con_vars)
+            sys_vars = driver._gather_vars(model, sys_vars)
 
         outs = {}
         if not MPI or model.comm.rank == 0:
             outs.update(des_vars)
             outs.update(obj_vars)
             outs.update(con_vars)
+            outs.update(sys_vars)
 
         data = {
             'out': outs,
