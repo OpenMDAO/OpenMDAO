@@ -1681,11 +1681,6 @@ class TestSqliteRecorder(unittest.TestCase):
         objectives = final_case.get_objectives()
         constraints = final_case.get_constraints()
 
-        print(desvars.keys())
-        print(objectives.keys())
-        print(constraints.keys())
-        print(final_case.outputs.keys())
-
         self.assertEqual(len(desvars), 2)
         self.assertEqual(len(objectives), 1)
         self.assertEqual(len(constraints), 2)
