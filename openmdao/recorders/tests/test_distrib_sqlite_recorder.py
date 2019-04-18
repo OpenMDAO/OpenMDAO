@@ -1,6 +1,7 @@
 import errno
 import os
 import unittest
+from time import time
 from shutil import rmtree
 from tempfile import mkdtemp
 
@@ -12,7 +13,8 @@ from openmdao.utils.mpi import MPI
 from openmdao.api import ExecComp, ExplicitComponent, Problem, \
     Group, ParallelGroup, IndepVarComp, SqliteRecorder, ScipyOptimizeDriver
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.recorders.tests.sqlite_recorder_test_utils import assertDriverIterDataRecorded
+from openmdao.recorders.tests.sqlite_recorder_test_utils import \
+    assertDriverIterDataRecorded, assertProblemDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 
 if MPI:
@@ -204,17 +206,22 @@ class DistributedRecorderTest(unittest.TestCase):
 
         # Create problem and run driver
         prob = Problem(model, driver)
+        prob.add_recorder(self.recorder)
         prob.setup()
+
         t0, t1 = run_driver(prob)
+        prob.record_iteration('final')
+        t2 = time()
+
         prob.cleanup()
 
         # Since the test will compare the last case recorded, just check the
         # current values in the problem. This next section is about getting those values
 
         # These involve collective gathers so all ranks need to run this
-        expected_outputs = prob.driver.get_design_var_values()
-        expected_outputs.update(prob.driver.get_objective_values())
-        expected_outputs.update(prob.driver.get_constraint_values())
+        expected_outputs = driver.get_design_var_values()
+        expected_outputs.update(driver.get_objective_values())
+        expected_outputs.update(driver.get_constraint_values())
 
         # includes for outputs are specified as promoted names but we need absolute names
         prom2abs = model._var_allprocs_prom2abs_list['output']
@@ -252,6 +259,9 @@ class DistributedRecorderTest(unittest.TestCase):
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
             assertDriverIterDataRecorded(self, expected_data, self.eps)
+
+            expected_data = (('final', (t1, t2), expected_outputs),)
+            assertProblemDataRecorded(self, expected_data, self.eps)
 
 
 if __name__ == "__main__":
