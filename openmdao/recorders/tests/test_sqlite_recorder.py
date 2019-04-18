@@ -1577,6 +1577,37 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertFalse(system._rec_mgr.has_recorders())
         self.assertFalse(solver._rec_mgr.has_recorders())
 
+    def test_problem_record_no_voi(self):
+        prob = Problem(model=SellarDerivatives())
+
+        prob.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+
+        prob.record_iteration('final')
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(len(problem_cases), 1)
+
+        final_case = cr.get_case('final')
+
+        # we didn't declare any VOIs
+        desvars = final_case.get_design_vars()
+        objectives = final_case.get_objectives()
+        constraints = final_case.get_constraints()
+
+        self.assertEqual(len(desvars), 0)
+        self.assertEqual(len(objectives), 0)
+        self.assertEqual(len(constraints), 0)
+
+        # by default we should get all outputs
+        self.assertEqual(set(final_case.outputs.keys()),
+                         {'con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z'})
+
     def test_problem_record_with_options(self):
         prob = Problem(model=SellarDerivatives())
 
@@ -1590,7 +1621,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         prob.add_recorder(SqliteRecorder("cases.sql"))
 
-        prob.recording_options['includes'] = []
         prob.recording_options['record_objectives'] = False
         prob.recording_options['record_constraints'] = False
         prob.recording_options['record_desvars'] = False
@@ -1615,6 +1645,54 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertEqual(len(desvars), 0)
         self.assertEqual(len(objectives), 0)
         self.assertEqual(len(constraints), 0)
+
+        # includes all outputs (default) minus the VOIs, which we have excluded
+        self.assertEqual(set(final_case.outputs.keys()), {'y1', 'y2'})
+
+    def test_problem_record_options_includes(self):
+        prob = Problem(model=SellarDerivatives())
+
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.add_recorder(SqliteRecorder("cases.sql"))
+
+        prob.recording_options['includes'] = []
+
+        prob.setup()
+        prob.run_driver()
+
+        prob.record_iteration('final')
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+
+        problem_cases = cr.list_cases('problem')
+        self.assertEqual(len(problem_cases), 1)
+
+        final_case = cr.get_case('final')
+
+        desvars = final_case.get_design_vars()
+        objectives = final_case.get_objectives()
+        constraints = final_case.get_constraints()
+
+        print(desvars.keys())
+        print(objectives.keys())
+        print(constraints.keys())
+        print(final_case.outputs.keys())
+
+        self.assertEqual(len(desvars), 2)
+        self.assertEqual(len(objectives), 1)
+        self.assertEqual(len(constraints), 2)
+
+        # includes no outputs except the the VOIs that are recorded by default
+        self.assertEqual(set(final_case.outputs.keys()),
+                         {'con1', 'con2', 'obj', 'x', 'z'})
 
     def test_simple_paraboloid_scaled_desvars(self):
         prob = Problem()
