@@ -915,7 +915,7 @@ class Component(System):
             Dictionary keyed by name with tuples of options (method, form, step, step_calc)
         """
         opts = {}
-        of, wrt = self._get_unfiltered_partials_lists()
+        of, wrt = self._get_potential_partials_lists()
         invalid_wrt = []
 
         for wrt_list, method, form, step, step_calc, directional in self._declared_partial_checks:
@@ -1106,7 +1106,7 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        of, wrt = self._get_unfiltered_partials_lists()
+        of, wrt = self._get_potential_partials_lists()
 
         of_pattern_matches = [(pattern, find_matches(pattern, of)) for pattern in of_list]
         wrt_pattern_matches = [(pattern, find_matches(pattern, wrt)) for pattern in wrt_list]

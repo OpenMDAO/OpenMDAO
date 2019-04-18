@@ -1426,7 +1426,7 @@ class System(object):
             self._scope_cache[None] = (frozenset(self._var_abs_names['output']), _empty_frozen_set)
             return self._scope_cache[None]
 
-    def _get_unfiltered_partials_lists(self, include_wrt_outputs=True):
+    def _get_potential_partials_lists(self, include_wrt_outputs=True):
         """
         Return full lists of possible 'of' and 'wrt' variables.
 

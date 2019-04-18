@@ -997,7 +997,7 @@ class Problem(object):
                 with comp._unscaled_context():
 
                     of_list, wrt_list = \
-                        comp._get_unfiltered_partials_lists(include_wrt_outputs=not explicit)
+                        comp._get_potential_partials_lists(include_wrt_outputs=not explicit)
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
@@ -1139,7 +1139,7 @@ class Problem(object):
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
 
-            of, wrt = comp._get_unfiltered_partials_lists(include_wrt_outputs=not explicit)
+            of, wrt = comp._get_potential_partials_lists(include_wrt_outputs=not explicit)
 
             # Load up approximation objects with the requested settings.
             local_opts = comp._get_check_partial_options()
