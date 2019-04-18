@@ -302,6 +302,7 @@ class Jacobian(object):
 
         if system._owns_approx_of or system._owns_approx_wrt:
             # we're computing totals
+            is_total = True
             ofs = list(system._owns_approx_of)
             wrts = list(system._owns_approx_wrt)
             if system.pathname:  # doing semitotals
@@ -309,6 +310,7 @@ class Jacobian(object):
             else:
                 wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
         else:
+            is_total = False
             from openmdao.core.implicitcomponent import ImplicitComponent
             ofs = system._var_allprocs_abs_names['output']
             wrts = system._var_allprocs_abs_names['input']
@@ -376,6 +378,10 @@ class Jacobian(object):
         boolJ = np.zeros(J.shape, dtype=bool)
         boolJ[J > good_tol] = True
 
+        if not is_total or (is_total and system.pathname):  # convert to promoted names
+            ordered_ofs = _odict_abs2prom(system, ordered_ofs)
+            ordered_wrts = _odict_abs2prom(system, ordered_wrts)
+
         return boolJ, ordered_ofs, ordered_wrts
 
     def set_complex_step_mode(self, active):
@@ -415,3 +421,30 @@ class Jacobian(object):
                     print(meta['value'])
                 else:
                     print(meta['value'])
+
+
+def _odict_abs2prom(system, odict):
+    """
+    Return a new OrderedDict with keys converted from absolute to promoted names.
+
+    Parameters
+    ----------
+    system : System
+        The system used to compute promoted names.
+    odict : OrderedDict
+        The OrderedDict that uses absolute name keys.
+
+    Returns
+    -------
+    OrderedDict
+        The new OrderedDict with promoted name keys.
+    """
+    new_dict = OrderedDict()
+    abs2prom_in = system._var_allprocs_abs2prom['input']
+    abs2prom_out = system._var_allprocs_abs2prom['output']
+    for abs_name, value in iteritems(odict):
+        if abs_name in abs2prom_out:
+            new_dict[abs2prom_out[abs_name]] = value
+        else:
+            new_dict[abs2prom_in[abs_name]] = value
+    return new_dict

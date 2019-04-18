@@ -1689,6 +1689,9 @@ def _partial_coloring_setup_parser(parser):
                         "instance found for each class.")
     parser.add_argument('--activate', action='store_true', dest='activate',
                         help="Activate the computed coloring(s) and continue running the script.")
+    parser.add_argument('--compute_decl_partials', action='store_true', dest='compute_decls',
+                        help="Display declare_partials() calls required to specify computed "
+                        "sparsity.")
     parser.add_argument('--method', action='store', dest='method',
                         help='approximation method ("fd" or "cs").')
     parser.add_argument('--step', action='store', dest='step',
@@ -1744,6 +1747,7 @@ def _partial_coloring_cmd(options):
         The post-setup hook function.
     """
     from openmdao.core.problem import Problem
+    from openmdao.core.component import Component
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context
 
@@ -1788,6 +1792,10 @@ def _partial_coloring_cmd(options):
                                     coloring.display()
                                 coloring.summary()
                                 print('\n')
+                                if options.compute_decls and isinstance(s, Component):
+                                    print('    # add the following lines to class %s to declare '
+                                          'sparsity' % klass)
+                                    print(coloring.get_declare_partials_calls())
                                 if options.activate:
                                     s.set_coloring_spec(coloring)
                                     s._setup_static_approx_coloring()
