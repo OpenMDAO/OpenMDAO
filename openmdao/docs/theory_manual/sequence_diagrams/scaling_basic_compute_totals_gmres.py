@@ -71,9 +71,9 @@ locs = [('Problem.compute_totals()', None, []),
         ('      ExplicitComponent._apply_linear()', None, []),
         ('      DictionaryJacobian._apply()', ((4, 6), ), []),
         ('      ExplicitComponent._unscaled_context()', ((0, 2), (0, 3), (0, 5), (0, 6)), ['stagger']),
-        ('      (Multiply jac keys))', ((7, 6), (5, 6)), ['stagger']),
+        ('      (Multiply jac keys)', ((7, 6), (5, 6)), ['stagger']),
+        ('      ExplicitComponent._unscaled_context()', ((0, 2), (0, 3), (0, 5), (0, 6)), ['italic', 'stagger']),
         ('    ScipyKrylov.matvec()', ((6, 0), ), ['italic']),
-        ('    DictionaryJacobian._unscaled_context()', ((0, 2), (0, 3), (0, 5), (0, 6)), ['italic', 'stagger']),
         ('  System.scaled_context_all()', ((0, 2), (0, 3), (0, 5), (0, 6)), ['italic', 'stagger']),
         ('  _TotalJacInfo.single_jac_setter()', [(5, 0)], []),
 ]
@@ -99,7 +99,7 @@ for loc_tup in locs:
     y_mid = y - 5.0
     y_mids.append(y_mid)
     if arrows:
-        grid_pts = [x + 10 * len(loc)] + vertical_locs
+        grid_pts = [x + 10 * len(loc) + 10] + vertical_locs
 
         num_arrow = len(arrows)
 
@@ -135,19 +135,19 @@ scaled_regions = [
                   (1, (2, 5)),
                   (1, (7, 8)),
                   (1, (11, 22)),
-                  (1, (25, 26)),
+                  (1, (24, 26)),
                   (2, (2, 5)),
                   (2, (7, 8)),
                   (2, (11, 22)),
-                  (2, (25, 26)),
+                  (2, (24, 26)),
                   (4, (2, 5)),
                   (4, (7, 8)),
                   (4, (11, 22)),
-                  (4, (25, 26)),
+                  (4, (24, 26)),
                   (5, (2, 5)),
                   (5, (7, 8)),
                   (5, (11, 22)),
-                  (5, (25, 26)),
+                  (5, (24, 26)),
                   (3, (17, 19)),
                   ]
 

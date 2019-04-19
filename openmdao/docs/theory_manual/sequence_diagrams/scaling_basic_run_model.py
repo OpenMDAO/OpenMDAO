@@ -11,7 +11,7 @@ from svgwrite import Drawing
 filename = 'scaling_run_model.svg'
 color_phys = '#85C1E9'
 color_scaled = '#EC7063'
-main_font_size = 20
+main_font_size = 24
 
 dwg = Drawing(filename, (2500, 2000), debug=True)
 
@@ -38,7 +38,7 @@ v_lines = dwg.add(dwg.g(stroke_width=7.0, stroke=color_phys, fill='none'))
 v_lines_scaled = dwg.add(dwg.g(stroke_width=7.0, stroke=color_scaled, fill='none'))
 
 for loc in vertical_locs:
-    v_lines.add(dwg.line(start=(loc, y+15), end=(loc, 1200)))
+    v_lines.add(dwg.line(start=(loc, y+15), end=(loc, 1100)))
 
 extra_text = dwg.add(dwg.g(font_size=main_font_size - 3, style="font-family: arial;"))
 extra_text.add(dwg.text('Unit Conversion', (vertical_locs[0] + 10, 650)))
@@ -82,7 +82,7 @@ for loc_tup in locs:
     y_mid = y - 5.0
     y_mids.append(y_mid)
     if arrows:
-        grid_pts = [x + 10 * len(loc)] + vertical_locs
+        grid_pts = [x + 10 * len(loc) + 70] + vertical_locs
 
         # Arrowheads
         for arrow in arrows:
