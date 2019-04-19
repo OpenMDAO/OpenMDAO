@@ -5,6 +5,7 @@ from __future__ import division
 from collections import OrderedDict, Iterable, Counter
 from itertools import product
 from six import string_types, iteritems
+import copy
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
@@ -323,7 +324,8 @@ class Component(System):
                 sizes = self._var_sizes[vec_name]
                 if self.options['distributed']:
                     for type_ in ['input', 'output']:
-                        self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                        sizes_in = copy.deepcopy(sizes[type_][iproc, :])
+                        self.comm.Allgather(sizes_in, sizes[type_])
                 else:
                     # if component isn't distributed, we don't need to allgather sizes since
                     # they'll all be the same.
