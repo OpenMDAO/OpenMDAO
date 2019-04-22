@@ -1746,7 +1746,7 @@ def _partial_coloring_setup_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('--dir', action='store', dest='directory',
                         help='Directory where coloring files are saved.')
-    parser.add_argument('--no-recurse', action='store_true', dest='norecurse',
+    parser.add_argument('--no_recurse', action='store_true', dest='norecurse',
                         help='Do not recurse from the provided system down.')
     parser.add_argument('--system', action='store', dest='system', default='',
                         help='pathname of system to color or to start recursing from.')
@@ -1774,7 +1774,7 @@ def _partial_coloring_setup_parser(parser):
     parser.add_argument('-n', action='store', dest='repeats', default=3, type=int,
                         help='number of times to repeat derivative computation when '
                         'computing sparsity')
-    parser.add_argument('--tol', action='store', dest='tolerance', default=1.e-15, type=float,
+    parser.add_argument('--tol', action='store', dest='tol', default=1.e-15, type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
                         help="Display a visualization of the final jacobian used to "
@@ -1787,11 +1787,11 @@ def _get_partial_coloring_kwargs(options):
     if options.system != '' and options.classes:
         raise RuntimeError("Can't specify --system and --class together.")
     if options.classes:
-        if options.recurse:
-            raise RuntimeError("Can't specify --class if --recurse option is set.")
+        if not options.norecurse:
+            raise RuntimeError("Can't specify --class if recurse option is set.")
 
     kwargs = {}
-    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tolerance', 'directory')
+    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol', 'directory')
     for name in names:
         if getattr(options, name):
             kwargs[name] = getattr(options, name)
@@ -1841,10 +1841,6 @@ def _partial_coloring_cmd(options):
                     raise RuntimeError("Can't find system with pathname '%s'." % options.system)
 
                 kwargs = _get_partial_coloring_kwargs(options)
-                if 'directory' not in kwargs:
-                    kwargs['directory'] = \
-                        os.path.join(os.path.abspath(os.path.dirname(options.file[0])),
-                                     'coloring_files')
 
                 if options.classes:
                     to_find = set(options.classes)
