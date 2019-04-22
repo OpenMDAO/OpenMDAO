@@ -823,7 +823,7 @@ class System(object):
 
     def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
                                 repeats=2, perturb_size=1e-9, tol=1e-15, orders=20,
-                                directory='coloring_files', per_instance=False, recurse=False):
+                                per_instance=False, recurse=False):
         """
         Compute a coloring of the approximated derivatives.
 
@@ -854,9 +854,6 @@ class System(object):
         orders : int
             Number of orders of magnitude for one direction of the tolerance sweep when determining
             jacobian sparsity.
-        directory : str or None
-            If not None, the coloring(s) for any colored system will be saved to the given
-            directory.
         per_instance : bool
             If True, a separate coloring will be generated for each instance of a given class.
             Otherwise, only one coloring for a given class will be generated and all instances
@@ -879,8 +876,7 @@ class System(object):
                     coloring = s.compute_approx_coloring(wrt=wrt, method=method, form=form,
                                                          step=step, repeats=repeats,
                                                          perturb_size=perturb_size, tol=tol,
-                                                         orders=orders, directory=directory,
-                                                         per_instance=per_instance,
+                                                         orders=orders, per_instance=per_instance,
                                                          recurse=recurse)
             if self._approx_coloring_info is None:
                 return coloring
@@ -895,15 +891,6 @@ class System(object):
             method = list(self._approx_schemes)[0]
         self._declare_approx_coloring(wrt=wrt, method=method, form=form, step=step,
                                       per_instance=per_instance)
-
-        rank0 = ((self._full_comm is not None and self._full_comm.rank == 0) or
-                 (self._full_comm is None and self.comm.rank == 0))
-
-        if directory is not None and not os.path.abspath(directory) == directory:
-            directory = os.path.join(os.getcwd(), directory)
-
-        if rank0 and not os.path.exists(directory):
-            os.mkdir(directory)
 
         approx_scheme = self._get_approx_scheme(self._approx_coloring_info['method'])
 
@@ -971,7 +958,7 @@ class System(object):
 
         info['coloring'] = coloring
 
-        self._save_coloring(coloring, directory, info['per_instance'])
+        self._save_coloring(coloring, info['per_instance'])
 
         # restore original inputs/outputs
         self._inputs._data[:] = starting_inputs
@@ -982,7 +969,7 @@ class System(object):
 
         return coloring
 
-    def _save_coloring(self, coloring, directory=None, per_instance=False):
+    def _save_coloring(self, coloring, per_instance=False):
         """
         Save the coloring to a file based on the supplied directory and per_instance flag.
 
@@ -990,8 +977,6 @@ class System(object):
         ----------
         coloring : Coloring
             See Coloring class docstring.
-        directory : str or None
-            Specified directory where file should be written.
         per_instance : bool
             If True, a separate coloring will be saved for each instance of a given class.
             Otherwise, only one coloring for a given class will be saved and all instances
@@ -1000,7 +985,11 @@ class System(object):
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(get_coloring_fname(self, directory, per_instance))
+            fname = get_coloring_fname(self, per_instance)
+            directory = os.path.dirname(fname)
+            if not os.path.exists(directory):
+                os.mkdir(directory)
+            coloring.save(fname)
 
     def set_coloring_spec(self, coloring):
         """

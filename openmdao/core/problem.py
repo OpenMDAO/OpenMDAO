@@ -129,7 +129,7 @@ class Problem(object):
 
     _post_setup_func = None
 
-    def __init__(self, model=None, driver=None, comm=None, root=None):
+    def __init__(self, model=None, driver=None, comm=None, root=None, **options):
         """
         Initialize attributes.
 
@@ -143,6 +143,8 @@ class Problem(object):
             The global communicator.
         root : <System> or None
             Deprecated kwarg for `model`.
+        **options : named args
+            All remaining named args are converted to options.
         """
         self.cite = CITATION
 
@@ -203,6 +205,8 @@ class Problem(object):
 
         self.options.declare('directory', types=str, default=os.getcwd(),
                              desc='Working directory for this Problem.')
+
+        self.options.update(options)
 
         # Case recording options
         self.recording_options = OptionsDictionary()

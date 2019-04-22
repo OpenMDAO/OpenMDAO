@@ -1700,7 +1700,7 @@ def _total_coloring_cmd(options):
     return _total_coloring
 
 
-def get_coloring_fname(system, directory=None, per_instance=False):
+def get_coloring_fname(system, per_instance=False, directory=None):
     """
     Return the full pathname to a coloring file, generating a default name if necessary.
 
@@ -1708,11 +1708,11 @@ def get_coloring_fname(system, directory=None, per_instance=False):
     ----------
     system : System
         The System having its coloring saved or loaded.
-    directory : str or None
-        Pathname of the directory where the coloring file will be saved
     per_instance : bool
         If True, the file will be named for each instance of a given class.
         Otherwise, the file will be named based on the class name.
+    directory : str or None
+        Name of destination directory for coloring files.
 
     Returns
     -------
@@ -1720,8 +1720,7 @@ def get_coloring_fname(system, directory=None, per_instance=False):
         Full pathname of the coloring file.
     """
     if directory is None:
-        return  # the file won't be saved if we return None here
-
+        directory = os.path.join(system._problem_options['directory'], 'coloring_files')
     directory = os.path.abspath(directory)
 
     if per_instance:
