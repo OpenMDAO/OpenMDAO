@@ -72,7 +72,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._static_surrogate_output_names = []
         self._static_input_size = 0
 
-    def _setup_procs(self, pathname, comm, mode):
+    def _setup_procs(self, pathname, comm, mode, prob_options):
         self._surrogate_input_names = []
         self._surrogate_output_names = []
 
@@ -80,7 +80,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._surrogate_output_names.extend(self._static_surrogate_output_names)
         self._input_size = self._static_input_size
 
-        super(MetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode)
+        super(MetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode, prob_options)
 
     def initialize(self):
         """

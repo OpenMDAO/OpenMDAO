@@ -80,6 +80,8 @@ class System(object):
         options dictionary
     recording_options : OptionsDictionary
         Recording options dictionary
+    _problem_options : OptionsDictionary
+        Problem level options.
     under_complex_step : bool
         When True, this system is undergoing complex step.
     force_alloc_complex : bool
@@ -316,6 +318,8 @@ class System(object):
                                        '(processed post-includes)')
         self.recording_options.declare('options_excludes', types=list, default=[],
                                        desc='User-defined metadata to exclude in recording')
+
+        self._problem_options = None
 
         # Case recording related
         self.iter_count = 0
@@ -683,7 +687,7 @@ class System(object):
                           force_alloc_complex=self._outputs._alloc_complex)
 
     def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class,
-               use_derivatives):
+               use_derivatives, prob_options=None):
         """
         Perform setup for this system and its descendant systems.
 
@@ -708,7 +712,13 @@ class System(object):
             and associated transfers involved in intraprocess communication.
         use_derivatives : bool
             If True, perform any memory allocations necessary for derivative computation.
+        prob_options : OptionsDictionary
+            Problem level options dictionary.
         """
+        # save a ref to the problem level options
+        if prob_options is not None:
+            self._problem_options = prob_options
+
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
             recurse = True
@@ -731,7 +741,7 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed.
         if recurse:
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm, mode)
+            self._setup_procs(self.pathname, comm, mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
         self._configure()
@@ -854,30 +864,37 @@ class System(object):
         recurse : bool
             If True, recurse from this system down the system hierarchy.  Whenever a group
             is encountered that has specified its coloring metadata, we don't recurse below
-            that group.
+            that group unless that group has a subsystem that has a nonlinear solver that uses
+            gradients.
 
         Returns
         -------
         Coloring or None
             The computed coloring.
         """
-        if self._approx_coloring_info is None:
-            # we only recurse if we're not doing approx coloring at this level
-            if recurse:
-                coloring = None
-                for s in self._subsystems_myproc:
+        if recurse:
+            coloring = None
+            for s in self._subsystems_myproc:
+                if self._approx_coloring_info is None or s._contains_gradient_nl_solver():
                     coloring = s.compute_approx_coloring(wrt=wrt, method=method, form=form,
                                                          step=step, repeats=repeats,
                                                          perturb_size=perturb_size, tol=tol,
                                                          orders=orders, directory=directory,
                                                          per_instance=per_instance,
                                                          recurse=recurse)
+            if self._approx_coloring_info is None:
                 return coloring
-            else:
-                if method is None and self._approx_schemes:
-                    method = list(self._approx_schemes)[0]
-                self._declare_approx_coloring(wrt=wrt, method=method, form=form, step=step,
-                                              per_instance=per_instance)
+
+        # don't override metadata if it's already declared
+        if self._approx_coloring_info is not None:
+            method = self._approx_coloring_info['method']
+            form = self._approx_coloring_info.get('form')
+            step = self._approx_coloring_info.get('step')
+            per_instance = self._approx_coloring_info['per_instance']
+        elif method is None and self._approx_schemes:
+            method = list(self._approx_schemes)[0]
+        self._declare_approx_coloring(wrt=wrt, method=method, form=form, step=step,
+                                      per_instance=per_instance)
 
         rank0 = ((self._full_comm is not None and self._full_comm.rank == 0) or
                  (self._full_comm is None and self.comm.rank == 0))
@@ -3287,6 +3304,29 @@ class System(object):
         out_sizes = self._var_sizes['nonlinear']['output'][iproc]
         in_sizes = self._var_sizes['nonlinear']['input'][iproc]
         return out_sizes, np.hstack((out_sizes, in_sizes))
+
+    def _contains_gradient_nl_solver(self, include_self=True):
+        """
+        Return True if this System or any of its descendents has a gradient nonlinear solver.
+
+        Parameters
+        ----------
+        include_self : bool
+            If True, check the current system for a gradient solver, else just check children.
+
+        Returns
+        -------
+        bool
+            Whether or not a gradient nonlinear solver was found.
+        """
+        if include_self and self.nonlinear_solver.supports['gradients']:
+            return True
+
+        for s in self._subsystems_myproc:
+            if s._contains_gradient_nl_solver():
+                return True
+
+        return False
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

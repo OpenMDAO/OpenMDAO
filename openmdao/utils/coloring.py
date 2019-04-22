@@ -24,7 +24,7 @@ from scipy.sparse import coo_matrix
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import sparse_types
-from openmdao.utils.array_utils import array_viz
+from openmdao.utils.array_utils import array_viz, _get_jac_slice_dict
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 from openmdao.approximation_schemes.approximation_scheme import _initialize_model_approx
@@ -656,11 +656,18 @@ class Coloring(object):
         if subjac_sparsity is None:
             raise RuntimeError("Coloring doesn't have enough info to compute subjac sparsity.")
 
+        ostart = oend = 0
         for of, sub in iteritems(subjac_sparsity):
-            for wrt, tup in iteritems(sub):
+            istart = iend = 0
+            for i, (wrt, tup) in enumerate(iteritems(sub)):
                 nzrows, nzcols, shape = tup
+                iend += shape[1]
+                if i == 0:
+                    oend += shape[0]
                 if nzrows.size > 0:
-                    yield (of, wrt, list(nzrows), list(nzcols))
+                    yield (of, wrt, list(nzrows), list(nzcols), ostart, oend, istart, iend)
+                istart = iend
+            ostart = oend
 
     def get_declare_partials_calls(self):
         """
@@ -673,7 +680,7 @@ class Coloring(object):
             string may be cut and pasted into a component's setup() method.
         """
         lines = []
-        for of, wrt, nzrows, nzcols in self._subjac_sparsity_iter():
+        for of, wrt, nzrows, nzcols, _, _, _, _ in self._subjac_sparsity_iter():
             lines.append("    self.declare_partials(of='%s', wrt='%s', rows=%s, cols=%s)" %
                          (of, wrt, nzrows, nzcols))
         return '\n'.join(lines)
@@ -1740,16 +1747,14 @@ def _partial_coloring_setup_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('--dir', action='store', dest='directory',
                         help='Directory where coloring files are saved.')
-    parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
-                        help='Recurse from the provided system down.')
+    parser.add_argument('--no-recurse', action='store_true', dest='norecurse',
+                        help='Do not recurse from the provided system down.')
     parser.add_argument('--system', action='store', dest='system', default='',
-                        help='pathname of system to color or to start recursing from if --recurse'
-                        ' is set.')
+                        help='pathname of system to color or to start recursing from.')
     parser.add_argument('-c', '--class', action='append', dest='classes', default=[],
                         help='compute a coloring for instances of the given class. '
                         'This option may be be used multiple times to specify multiple classes. '
-                        'Class name can optionally contain the full module path. '
-                        'Not compatible with the --recurse option.')
+                        'Class name can optionally contain the full module path.')
     parser.add_argument('--first_only', action='store_true', dest='first_only',
                         help="If using the --class option, only generate coloring for the first "
                         "instance found for each class.")
@@ -1767,8 +1772,6 @@ def _partial_coloring_setup_parser(parser):
                         'to "fd" method.')
     parser.add_argument('--perturbation', action='store', dest='perturb_size', default=1e-3,
                         type=float, help='random perturbation size used when computing sparsity.')
-    parser.add_argument('--sparsity_tol', action='store', dest='tol', default=1e-15, type=float,
-                        help='tolerance used to determine nonzero entries when computing sparsity.')
     parser.add_argument('-n', action='store', dest='repeats', default=3, type=int,
                         help='number of times to repeat derivative computation when '
                         'computing sparsity')
@@ -1789,11 +1792,12 @@ def _get_partial_coloring_kwargs(options):
             raise RuntimeError("Can't specify --class if --recurse option is set.")
 
     kwargs = {}
-    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol', 'directory',
-             'recurse')
+    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tolerance', 'directory')
     for name in names:
         if getattr(options, name):
             kwargs[name] = getattr(options, name)
+
+    kwargs['recurse'] = not options.norecurse
 
     return kwargs
 
@@ -1993,7 +1997,7 @@ def _coloring_report_exec(options):
     if options.subjac_sparsity:
         print("\nSubjacobian sparsity:")
         for tup in coloring._subjac_sparsity_iter():
-            print("(%s, %s)\n   rows=%s\n   cols=%s" % tup)
+            print("(%s, %s)\n   rows=%s\n   cols=%s" % tup[:4])
         print()
 
     if options.color_var is not None:

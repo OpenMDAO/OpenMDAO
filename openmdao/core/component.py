@@ -160,7 +160,7 @@ class Component(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm, mode):
+    def _setup_procs(self, pathname, comm, mode, prob_options):
         """
         Execute first phase of the setup process.
 
@@ -175,8 +175,11 @@ class Component(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
+        prob_options : OptionsDictionary
+            Problem level options.
         """
         self.pathname = pathname
+        self._problem_options = prob_options
 
         orig_comm = comm
         if self._num_par_fd > 1:

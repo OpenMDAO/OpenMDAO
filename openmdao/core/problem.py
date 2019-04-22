@@ -3,6 +3,7 @@
 from __future__ import division, print_function
 
 import sys
+import os
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -85,6 +86,10 @@ class Problem(object):
     _mode : 'fwd' or 'rev'
         Derivatives calculation mode, 'fwd' for forward, and 'rev' for
         reverse (adjoint).
+    _orig_mode : 'fwd', 'rev', or 'auto'
+        Derivatives calculation mode assigned by the user.  If set to 'auto', _mode will be
+        automatically assigned to 'fwd' or 'rev' based on relative sizes of design variables vs.
+        responses.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
     _initial_condition_cache : dict
@@ -98,6 +103,8 @@ class Problem(object):
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
+    options : <OptionsDictionary>
+        Dictionary with general options for the problem.
     recording_options : <OptionsDictionary>
         Dictionary with problem recording options.
     _rec_mgr : <RecordingManager>
@@ -106,6 +113,18 @@ class Problem(object):
         Dict of lists of var names indicating what to record
     _remote_var_set : set
         Set of variables (absolute names) that require remote data transfer to reach all procs.
+    _check : bool
+        If True, call check_config at the end of final_setup.
+    _recording_iter : _RecIteration
+        Manages recording of iterations.
+    _filtered_vars_to_record : dict
+        Dictionary of lists of design vars, constraints, etc. to record.
+    _logger : object or None
+        Object for logging config checks if _check is True.
+    _force_alloc_complex : bool
+        Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+        detect when you need to do this, but in some cases (e.g., complex step is used
+        after a reconfiguration) you may need to set this to True.
     """
 
     _post_setup_func = None
@@ -178,6 +197,12 @@ class Problem(object):
             'objectivenames': set(),
             'constraintnames': set(),
         }
+
+        # General options
+        self.options = OptionsDictionary()
+
+        self.options.declare('directory', types=str, default=os.getcwd(),
+                             desc='Working directory for this Problem.')
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -751,7 +776,7 @@ class Problem(object):
         model_comm = self.driver._setup_comm(comm)
 
         model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
-                     derivatives)
+                     derivatives, self.options)
 
         # get set of all vars that we may need to bcast later
         self._remote_var_set = remote_var_set = set()
