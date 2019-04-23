@@ -5,6 +5,7 @@ from __future__ import division
 from collections import OrderedDict, Iterable, Counter, defaultdict
 from itertools import product
 from six import string_types, iteritems, itervalues
+import copy
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
@@ -342,7 +343,8 @@ class Component(System):
                 sizes = self._var_sizes[vec_name]
                 if self.options['distributed']:
                     for type_ in ['input', 'output']:
-                        self.comm.Allgather(sizes[type_][iproc, :], sizes[type_])
+                        sizes_in = copy.deepcopy(sizes[type_][iproc, :])
+                        self.comm.Allgather(sizes_in, sizes[type_])
                 else:
                     # if component isn't distributed, we don't need to allgather sizes since
                     # they'll all be the same.
@@ -1063,14 +1065,12 @@ class Component(System):
             Dictionary keyed by name with tuples of options (method, form, step, step_calc)
         """
         opts = {}
-        outs = list(self._var_allprocs_prom2abs_list['output'].keys())
-        ins = list(self._var_allprocs_prom2abs_list['input'].keys())
-
+        of, wrt = self._get_potential_partials_lists()
         invalid_wrt = []
 
         for wrt_list, method, form, step, step_calc, directional in self._declared_partial_checks:
             for pattern in wrt_list:
-                matches = find_matches(pattern, outs + ins)
+                matches = find_matches(pattern, wrt)
 
                 # if a non-wildcard var name was specified and not found, save for later Exception
                 if len(matches) == 0 and _valid_var_name(pattern):
@@ -1259,11 +1259,10 @@ class Component(System):
         """
         of_list = [of] if isinstance(of, string_types) else of
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
-        outs = list(self._var_allprocs_prom2abs_list['output'])
-        all_wrts = outs + list(self._var_allprocs_prom2abs_list['input'])
+        of, wrt = self._get_potential_partials_lists()
 
-        of_pattern_matches = [(pattern, find_matches(pattern, outs)) for pattern in of_list]
-        wrt_pattern_matches = [(pattern, find_matches(pattern, all_wrts)) for pattern in wrt_list]
+        of_pattern_matches = [(pattern, find_matches(pattern, of)) for pattern in of_list]
+        wrt_pattern_matches = [(pattern, find_matches(pattern, wrt)) for pattern in wrt_list]
         return of_pattern_matches, wrt_pattern_matches
 
     def _check_partials_meta(self, abs_key, val, shape):

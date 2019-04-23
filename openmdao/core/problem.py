@@ -685,16 +685,22 @@ class Problem(object):
         obj_vars = {name: obj_vars[name] for name in filt['obj']}
         con_vars = {name: con_vars[name] for name in filt['con']}
 
+        names = model._outputs._names
+        views = model._outputs._views
+        sys_vars = {name: views[name] for name in names if name in filt['sys']}
+
         if MPI:
-            des_vars = model._gather_vars(model, des_vars)
-            obj_vars = model._gather_vars(model, obj_vars)
-            con_vars = model._gather_vars(model, con_vars)
+            des_vars = driver._gather_vars(model, des_vars)
+            obj_vars = driver._gather_vars(model, obj_vars)
+            con_vars = driver._gather_vars(model, con_vars)
+            sys_vars = driver._gather_vars(model, sys_vars)
 
         outs = {}
         if not MPI or model.comm.rank == 0:
             outs.update(des_vars)
             outs.update(obj_vars)
             outs.update(con_vars)
+            outs.update(sys_vars)
 
         data = {
             'out': outs,
@@ -1020,12 +1026,8 @@ class Problem(object):
 
                 with comp._unscaled_context():
 
-                    of_list = list(comp._var_allprocs_prom2abs_list['output'].keys())
-                    wrt_list = list(comp._var_allprocs_prom2abs_list['input'].keys())
-
-                    # The only outputs in wrt should be implicit states.
-                    if not explicit:
-                        wrt_list.extend(of_list)
+                    of_list, wrt_list = \
+                        comp._get_potential_partials_lists(include_wrt_outputs=not explicit)
 
                     # Matrix-free components need to calculate their Jacobian by matrix-vector
                     # product.
@@ -1167,12 +1169,7 @@ class Problem(object):
             approximations = {'fd': FiniteDifference(),
                               'cs': ComplexStep()}
 
-            of = list(comp._var_allprocs_prom2abs_list['output'])
-            wrt = list(comp._var_allprocs_prom2abs_list['input'])
-
-            # The only outputs in wrt should be implicit states.
-            if not explicit:
-                wrt.extend(of)
+            of, wrt = comp._get_potential_partials_lists(include_wrt_outputs=not explicit)
 
             # Load up approximation objects with the requested settings.
             local_opts = comp._get_check_partial_options()

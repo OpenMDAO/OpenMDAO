@@ -14,6 +14,7 @@ from openmdao.test_suite.components.sellar import SellarNoDerivatives, SellarDis
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.scripts.circuit import Circuit
 from openmdao.utils.assert_utils import assert_warning
+from openmdao.utils.shell_proc import check_call
 
 try:
     from pyxdsm.XDSM import XDSM
@@ -112,16 +113,15 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.final_setup()
 
         # Write output
-        msg = ('For SQL input the XDSM writer shows only the model hierarchy, '
-               'and the driver, design variables and responses are not part of the '
-               'diagram.')
-        with assert_warning(Warning, msg):
-            write_xdsm(case_recording_filename, filename=filename, out_format='tex',
-                       show_browser=False, quiet=QUIET)
+        write_xdsm(case_recording_filename, filename=filename, out_format='tex',
+                   show_browser=False, quiet=QUIET)
 
         # Check if file was created
         self.assertTrue(os.path.isfile(case_recording_filename))
         self.assertTrue(os.path.isfile('.'.join([filename, 'tex'])))
+
+        # Check that there are no errors when running from the command line with a recording.
+        check_call('openmdao xdsm --no_browser %s' % case_recording_filename)
 
     def test_pyxdsm_sellar_no_recurse(self):
         """Makes XDSM for the Sellar problem, with no recursion."""
@@ -977,6 +977,14 @@ class TestXDSMjsViewer(unittest.TestCase):
         # no output checking, just make sure no exceptions raised
         with self.assertRaises(ValueError):
             write_xdsm(prob, filename=filename, out_format='jpg', subs=(), show_browser=SHOW)
+
+    def test_command(self):
+        """
+        Check that there are no errors when running from the command line with a script.
+        """
+        from openmdao.test_suite.scripts import sellar
+        filename = os.path.abspath(sellar.__file__).replace('.pyc', '.py')  # PY2
+        check_call('openmdao xdsm --no_browser %s' % filename)
 
 
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")

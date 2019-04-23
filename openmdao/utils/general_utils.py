@@ -791,9 +791,33 @@ def get_module_attr(mod_obj_path):
     -------
     object
         The specified module attribute.
-
     """
     modpath, attr = mod_obj_path.rsplit('.', 1)
     importlib.import_module(modpath)
     mod = sys.modules[modpath]
     return getattr(mod, attr)
+
+
+def make_serializable(o):
+    """
+    Recursively convert numpy types to native types for JSON serialization.
+
+    Parameters
+    ----------
+    o : object
+        the object to be converted
+
+    Returns
+    -------
+    object
+        The converted object.
+
+    """
+    if (isinstance(o, np.number)):
+        return o.item()
+    elif isinstance(o, np.ndarray):
+        return make_serializable(o.tolist())
+    elif isinstance(o, (list, tuple, set)):
+        return [make_serializable(item) for item in o]
+    else:
+        return o

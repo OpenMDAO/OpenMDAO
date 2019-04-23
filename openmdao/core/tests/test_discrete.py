@@ -47,6 +47,40 @@ class ModCompIm(ImplicitComponent):
         discrete_outputs['y'] = discrete_inputs['x'] % self.modval
 
 
+class CompDiscWDerivs(ExplicitComponent):
+    def setup(self):
+        self.add_discrete_input('N', 2)
+        self.add_discrete_output('Nout', 2)
+        self.add_input('x')
+        self.add_output('y')
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        discrete_outputs['Nout'] = discrete_inputs['N'] * 2
+        outputs['y'] = inputs['x'] * 3.
+
+    def compute_partials(self, inputs, partials, discrete_inputs):
+        partials['y', 'x'] = 3.
+
+
+class CompDiscWDerivsImplicit(StateConnection):
+    def setup(self):
+        super(CompDiscWDerivsImplicit, self).setup()
+        self.add_discrete_input('N', 2)
+        self.add_discrete_output('Nout', 2)
+
+    def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs, discrete_outputs):
+        super(CompDiscWDerivsImplicit, self).apply_nonlinear(inputs, outputs, residuals)
+        discrete_outputs['Nout'] = discrete_inputs['N'] * 2
+
+    def solve_nonlinear(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        super(CompDiscWDerivsImplicit, self).solve_nonlinear(inputs, outputs)
+        discrete_outputs['Nout'] = discrete_inputs['N'] * 2
+        
+    def linearize(self, inputs, outputs, J, discrets_inputs, discrete_outputs):
+        super(CompDiscWDerivsImplicit, self).linearize(inputs, outputs, J)
+
+
 class MixedCompDiscIn(ExplicitComponent):
     def __init__(self, mult, **kwargs):
         super(MixedCompDiscIn, self).__init__(**kwargs)
@@ -221,6 +255,50 @@ class DiscreteTestCase(unittest.TestCase):
             prob.setup()
         self.assertEqual(str(ctx.exception),
                          "Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+
+    def test_discrete_deriv_explicit(self):
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_output('x', 1.0)
+
+        comp = model.add_subsystem('comp', CompDiscWDerivs())
+        model.connect('indep.x', 'comp.x')
+
+        model.add_design_var('indep.x')
+        model.add_objective('comp.y')
+
+        prob.setup()
+        prob.run_model()
+
+        J = prob.compute_totals(return_format='array')
+
+        np.testing.assert_almost_equal(J, np.array([[3.]]))
+
+    def test_discrete_deriv_implicit(self):
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_output('x', 1.0, ref=10.)
+        indep.add_discrete_output('N', 1)
+
+        comp = model.add_subsystem('comp', CompDiscWDerivsImplicit())
+        sink = model.add_subsystem('sink', MixedCompDiscIn(1.0))
+        model.connect('indep.x', 'comp.y2_actual')
+        model.connect('indep.N', 'comp.N')
+        model.connect('comp.Nout', 'sink.x')
+
+        model.add_design_var('indep.x')
+        model.add_objective('comp.y2_command')
+
+        prob.setup()
+        prob.run_model()
+
+        J = prob.compute_totals(return_format='array')
+
+        np.testing.assert_almost_equal(J, np.array([[-1]]))
 
     def test_deriv_err(self):
         prob = Problem()

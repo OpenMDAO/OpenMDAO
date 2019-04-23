@@ -38,5 +38,28 @@ must be a valid subclass of the type of the input or the connection will raise a
     output variable, an exception will be raised.
 
 
+If a component or group contains discrete variables, then the discrete inputs and/or outputs will
+be passed to the relevant API functions.  In general, if nonlinear inputs are passed to a function,
+then a discrete inputs arg will be added.  If nonlinear outputs are passed, then a discrete outputs
+arg will be added.  The signatures of the affected functions are shown below:
+
+
+.. automethod:: openmdao.core.explicitcomponent.ExplicitComponent.compute
+    :noindex:
+
+.. automethod:: openmdao.core.explicitcomponent.ExplicitComponent.compute_jacvec_product
+    :noindex:
+
+.. automethod:: openmdao.core.explicitcomponent.ExplicitComponent.compute_partials
+    :noindex:
+
+.. automethod:: openmdao.core.implicitcomponent.ImplicitComponent.guess_nonlinear
+    :noindex:
+
+.. automethod:: openmdao.core.implicitcomponent.ImplicitComponent.linearize
+    :noindex:
+
+.. automethod:: openmdao.core.group.Group.guess_nonlinear
+    :noindex:
 
 

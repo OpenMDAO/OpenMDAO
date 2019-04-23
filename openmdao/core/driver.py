@@ -377,29 +377,28 @@ class Driver(object):
 
             filtered_vars_to_record['in'] = list(myinputs)
 
-        # system outputs (if the options being processed are for the driver itself)
-        if recording_options is self.recording_options:
-            myoutputs = set()
+        # system outputs
+        myoutputs = set()
 
-            if incl:
-                myoutputs = {n for n in model._outputs
-                             if n in abs2prom and check_path(abs2prom[n], incl, excl)}
+        if incl:
+            myoutputs = {n for n in model._outputs
+                         if n in abs2prom and check_path(abs2prom[n], incl, excl)}
 
-                if MPI:
-                    # gather the variables from all ranks to rank 0
-                    all_vars = model.comm.gather(myoutputs, root=0)
-                    if MPI.COMM_WORLD.rank == 0:
-                        myoutputs = all_vars[-1]
-                        for d in all_vars[:-1]:
-                            myoutputs.update(d)
+            if MPI:
+                # gather the variables from all ranks to rank 0
+                all_vars = model.comm.gather(myoutputs, root=0)
+                if MPI.COMM_WORLD.rank == 0:
+                    myoutputs = all_vars[-1]
+                    for d in all_vars[:-1]:
+                        myoutputs.update(d)
 
-                # de-duplicate
-                myoutputs = myoutputs.difference(all_desvars, all_objectives, all_constraints)
+            # de-duplicate
+            myoutputs = myoutputs.difference(all_desvars, all_objectives, all_constraints)
 
-                if MPI:
-                    myoutputs = [n for n in myoutputs if rrank == rowned[n]]
+            if MPI:
+                myoutputs = [n for n in myoutputs if rrank == rowned[n]]
 
-            filtered_vars_to_record['sys'] = list(myoutputs)
+        filtered_vars_to_record['sys'] = list(myoutputs)
 
         return filtered_vars_to_record
 

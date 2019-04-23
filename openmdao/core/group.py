@@ -25,7 +25,8 @@ from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
-from openmdao.utils.array_utils import convert_neg, array_connection_compatible
+from openmdao.utils.array_utils import convert_neg, array_connection_compatible, \
+    _flatten_src_indices
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ancestors, \
     simple_warning
 from openmdao.utils.units import is_compatible, get_conversion
@@ -206,13 +207,13 @@ class Group(System):
             abs2meta_in = self._var_abs2meta
             allprocs_meta_out = self._var_allprocs_abs2meta
             for abs_in, abs_out in iteritems(self._conn_global_abs_in2out):
-                meta_out = allprocs_meta_out[abs_out]
                 if abs_in not in abs2meta_in:
-                    # we only perform scaling on local arrays, so skip
+                    # we only perform scaling on local, non-discrete arrays, so skip
                     continue
 
                 meta_in = abs2meta_in[abs_in]
 
+                meta_out = allprocs_meta_out[abs_out]
                 ref = meta_out['ref']
                 ref0 = meta_out['ref0']
 
@@ -227,18 +228,10 @@ class Group(System):
                             raise RuntimeError("vector scalers with distrib vars "
                                                "not supported yet.")
 
-                        global_shape_out = meta_out['global_shape']
                         if src_indices.ndim != 1:
-                            shape_in = meta_in['shape']
-                            if len(meta_out['shape']) == 1 or shape_in == src_indices.shape:
-                                src_indices = src_indices.flatten()
-                                src_indices = convert_neg(src_indices, src_indices.size)
-                            else:
-                                entries = [list(range(x)) for x in shape_in]
-                                cols = np.vstack(src_indices[i] for i in product(*entries))
-                                dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
-                                           for i in range(cols.shape[1])]
-                                src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
+                            src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
+                                                               meta_out['global_shape'],
+                                                               meta_out['global_size'])
 
                         ref = ref[src_indices]
                         ref0 = ref0[src_indices]
@@ -1638,7 +1631,11 @@ class Group(System):
             imag_cache[:] = self._outputs._data.imag
             self._outputs.set_complex_step_mode(False, keep_real=True)
 
-        self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
+        if self._discrete_inputs or self._discrete_outputs:
+            self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
+                                 self._discrete_inputs, self._discrete_outputs)
+        else:
+            self.guess_nonlinear(self._inputs, self._outputs, self._residuals)
 
         if complex_step:
             # Note: passing in False swaps back to the complex vector, which is valid since
@@ -1651,7 +1648,8 @@ class Group(System):
             self._outputs.set_complex_step_mode(True)
             self._outputs._data[:] += imag_cache * 1j
 
-    def guess_nonlinear(self, inputs, outputs, residuals):
+    def guess_nonlinear(self, inputs, outputs, residuals,
+                        discrete_inputs=None, discrete_outputs=None):
         """
         Provide initial guess for states.
 
@@ -1665,6 +1663,10 @@ class Group(System):
             unscaled, dimensional output variables read via outputs[key]
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        discrete_outputs : dict or None
+            If not None, dict containing discrete output values.
         """
         pass
 

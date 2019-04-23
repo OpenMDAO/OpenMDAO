@@ -26,7 +26,8 @@ except Exception:
     _ad_setup_parser = _ad_cmd = _ad_exec = None
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.devtools.iprof_utils import _Options
-from openmdao.devtools.xdsm_viewer.xdsm_writer import _xdsm_setup_parser, _xdsm_cmd
+from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm, \
+    _DEFAULT_BOX_STACKING, _DEFAULT_BOX_WIDTH, _MAX_BOX_LINES, _DEFAULT_OUTPUT_SIDE, _CHAR_SUBS
 from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
@@ -41,7 +42,7 @@ def _view_model_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('file', nargs=1, help='Python script or recording containing the model.')
     parser.add_argument('-o', default='n2.html', action='store', dest='outfile',
                         help='html output file.')
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
@@ -52,24 +53,129 @@ def _view_model_setup_parser(parser):
 
 def _view_model_cmd(options):
     """
-    Return the post_setup hook function for 'openmdao view_model'.
+    Process command line args and call view_model on the specified file.
 
     Parameters
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The post-setup hook function.
     """
-    def _viewmod(prob):
-        view_model(prob, outfile=options.outfile,
+    filename = options.file[0]
+
+    if filename.endswith('.py'):
+        # the file is a python script, run as a post_setup hook
+        def _viewmod(prob):
+            view_model(prob, outfile=options.outfile,
+                       show_browser=not options.no_browser,
+                       embeddable=options.embeddable)
+            exit()  # could make this command line selectable later
+
+        options.func = lambda options: _viewmod
+
+        _post_setup_exec(options)
+    else:
+        # assume the file is a recording, run standalone
+        view_model(filename, outfile=options.outfile,
                    show_browser=not options.no_browser,
                    embeddable=options.embeddable)
-        exit()  # could make this command line selectable later
-    return _viewmod
+
+
+def _xdsm_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao xdsm' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python script or recording containing the model.')
+    parser.add_argument('-o', '--outfile', default='xdsm_out', action='store', dest='outfile',
+                        help='XDSM output file. (use pathname without extension)')
+    parser.add_argument('-f', '--format', default='html', action='store', dest='format',
+                        choices=['html', 'pdf', 'tex'], help='format of XSDM output.')
+    parser.add_argument('-m', '--model_path', action='store', dest='model_path',
+                        help='Path to system to transcribe to XDSM.')
+    parser.add_argument('-r', '--recurse', action='store_true', dest='recurse',
+                        help="Don't treat the top level of each name as the source/target "
+                             "component.")
+    parser.add_argument('--no_browser', action='store_true', dest='no_browser',
+                        help="Don't display in a browser.")
+    parser.add_argument('--no_parallel', action='store_true', dest='no_parallel',
+                        help="don't show stacked parallel blocks. Only active for 'pdf' and 'tex' "
+                             "formats.")
+    parser.add_argument('--no_ext', action='store_true', dest='no_extern_outputs',
+                        help="Don't show externally connected outputs.")
+    parser.add_argument('-s', '--include_solver', action='store_true', dest='include_solver',
+                        help="Include the problem model's solver in the XDSM.")
+    parser.add_argument('--no_process_conns', action='store_true', dest='no_process_conns',
+                        help="Don't add process connections (thin black lines).")
+    parser.add_argument('--box_stacking', action='store', default=_DEFAULT_BOX_STACKING,
+                        choices=['max_chars', 'vertical', 'horizontal', 'cut_chars', 'empty'],
+                        dest='box_stacking', help='Controls the appearance of boxes.')
+    parser.add_argument('--box_width', action='store', default=_DEFAULT_BOX_WIDTH,
+                        dest='box_width', type=int, help='Controls the width of boxes.')
+    parser.add_argument('--box_lines', action='store', default=_MAX_BOX_LINES,
+                        dest='box_lines', type=int,
+                        help='Limits number of vertical lines in box if box_stacking is vertical.')
+    parser.add_argument('--numbered_comps', action='store_true', dest='numbered_comps',
+                        help="Display components with numbers.  Only active for 'pdf' and 'tex' "
+                        "formats.")
+    parser.add_argument('--number_alignment', action='store', dest='number_alignment',
+                        choices=['horizontal', 'vertical'], default='horizontal',
+                        help='Positions the number either above or in front of the component label '
+                        'if numbered_comps is true.')
+    parser.add_argument('--output_side', action='store', dest='output_side',
+                        default=_DEFAULT_OUTPUT_SIDE,
+                        help='Position of the outputs on the diagram. Left or right, or a '
+                             'dictionary with component types as keys. Component type key can be '
+                             '"optimization", "doe" or "default".')
+
+
+def _xdsm_cmd(options):
+    """
+    Process command line args and call xdsm on the specified file.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    """
+    filename = options.file[0]
+
+    kwargs = {}
+    for name in ['box_stacking', 'box_width', 'box_lines', 'numbered_comps', 'number_alignment']:
+        val = getattr(options, name)
+        if val is not None:
+            kwargs[name] = val
+
+    if filename.endswith('.py'):
+        # the file is a python script, run as a post_setup hook
+        def _xdsm(prob):
+            write_xdsm(prob, filename=options.outfile, model_path=options.model_path,
+                       recurse=options.recurse,
+                       include_external_outputs=not options.no_extern_outputs,
+                       out_format=options.format,
+                       include_solver=options.include_solver, subs=_CHAR_SUBS,
+                       show_browser=not options.no_browser, show_parallel=not options.no_parallel,
+                       add_process_conns=not options.no_process_conns,
+                       output_side=options.output_side,
+                       **kwargs)
+            exit()
+
+        options.func = lambda options: _xdsm
+
+        _post_setup_exec(options)
+    else:
+        # assume the file is a recording, run standalone
+        write_xdsm(filename, filename=options.outfile, model_path=options.model_path,
+                   recurse=options.recurse,
+                   include_external_outputs=not options.no_extern_outputs,
+                   out_format=options.format,
+                   include_solver=options.include_solver, subs=_CHAR_SUBS,
+                   show_browser=not options.no_browser, show_parallel=not options.no_parallel,
+                   add_process_conns=not options.no_process_conns, output_side=options.output_side,
+                   **kwargs)
 
 
 def _view_connections_setup_parser(parser):
@@ -359,7 +465,6 @@ def _post_setup_exec(options):
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, func)
 _post_setup_map = {
-    'view_model': (_view_model_setup_parser, _view_model_cmd),
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd),
     'summary': (_config_summary_setup_parser, _config_summary_cmd),
     'tree': (_tree_setup_parser, _tree_cmd),
@@ -369,19 +474,20 @@ _post_setup_map = {
     'total_sparsity': (_sparsity_setup_parser, _sparsity_cmd),
     'cite': (_cite_setup_parser, _cite_cmd),
     'check': (_check_config_setup_parser, _check_config_cmd),
-    'xdsm': (_xdsm_setup_parser, _xdsm_cmd),
 }
 
 
 # Other non-post-setup functions go here
 _non_post_setup_map = {
+    'view_model': (_view_model_setup_parser, _view_model_cmd),
     'trace': (_itrace_setup_parser, _itrace_exec),
     'call_tree': (_calltree_setup_parser, _calltree_exec),
     'iprof': (_iprof_setup_parser, _iprof_exec),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec),
     'mempost': (_mempost_setup_parser, _mempost_exec),
-    'coloring_report': (_coloring_report_setup_parser, _coloring_report_exec)
+    'coloring_report': (_coloring_report_setup_parser, _coloring_report_exec),
+    'xdsm': (_xdsm_setup_parser, _xdsm_cmd),
 }
 
 

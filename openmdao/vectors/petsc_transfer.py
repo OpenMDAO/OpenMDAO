@@ -11,7 +11,7 @@ from openmdao.vectors.transfer import Transfer
 from openmdao.vectors.default_transfer import DefaultTransfer
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
-from openmdao.utils.array_utils import convert_neg
+from openmdao.utils.array_utils import convert_neg, _flatten_src_indices
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
@@ -98,10 +98,6 @@ class PETScTransfer(DefaultTransfer):
                     idx_out = allprocs_abs2idx[abs_out]
 
                     # Read in and process src_indices
-                    shape_in = meta_in['shape']
-                    shape_out = meta_out['shape']
-                    global_shape_out = meta_out['global_shape']
-                    global_size_out = meta_out['global_size']
                     src_indices = meta_in['src_indices']
                     if src_indices is None:
                         owner = group._owning_rank[abs_out]
@@ -111,19 +107,11 @@ class PETScTransfer(DefaultTransfer):
                         if meta_in['size'] > sizes_out[owner, idx_out]:
                             src_indices = np.arange(meta_in['size'], dtype=INT_DTYPE)
                     elif src_indices.ndim == 1:
-                        src_indices = convert_neg(src_indices, global_size_out)
+                        src_indices = convert_neg(src_indices, meta_out['global_size'])
                     else:
-                        if len(shape_out) == 1 or shape_in == src_indices.shape:
-                            src_indices = src_indices.flatten()
-                            src_indices = convert_neg(src_indices, global_size_out)
-                        else:
-                            # TODO: this duplicates code found
-                            # in System._setup_scaling.
-                            entries = [list(range(x)) for x in shape_in]
-                            cols = np.vstack(src_indices[i] for i in product(*entries))
-                            dimidxs = [convert_neg(cols[:, i], global_shape_out[i])
-                                       for i in range(cols.shape[1])]
-                            src_indices = np.ravel_multi_index(dimidxs, global_shape_out)
+                        src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
+                                                           meta_out['global_shape'],
+                                                           meta_out['global_size'])
 
                     # 1. Compute the output indices
                     if src_indices is None:
