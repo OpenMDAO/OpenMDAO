@@ -852,16 +852,16 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        coloring_info = driver._total_coloring
-        if coloring_info and coloring._use_sparsity:
+        coloring = driver._total_coloring
+        if coloring and coloring._use_sparsity:
             # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
-            if coloring_info._fwd and coloring_info._rev:
+            if coloring._fwd and coloring._rev:
                 pass  # we're doing both!
-            elif mode == 'fwd' and coloring_info._fwd:
-                desvar_size = coloring_info.total_solves()
-            elif mode == 'rev' and coloring_info._rev:
-                response_size = coloring_info.total_solves()
+            elif mode == 'fwd' and coloring._fwd:
+                desvar_size = coloring.total_solves()
+            elif mode == 'rev' and coloring._rev:
+                response_size = coloring.total_solves()
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):

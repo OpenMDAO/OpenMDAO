@@ -724,12 +724,12 @@ class _TotalJacInfo(object):
         method
             Jac setter method.
         """
-        coloring_info = imeta['coloring']
-        both = coloring_info._fwd and coloring_info._rev
+        coloring = imeta['coloring']
+        both = coloring._fwd and coloring._rev
         input_setter = self.simul_coloring_input_setter
         jac_setter = self.simul_coloring_jac_setter
 
-        for color, ilist in enumerate(coloring_info.color_iter(mode)):
+        for color, ilist in enumerate(coloring.color_iter(mode)):
             if len(ilist) == 1:
                 if both:
                     yield ilist, input_setter, jac_setter, None
