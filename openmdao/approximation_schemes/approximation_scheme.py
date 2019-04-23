@@ -77,10 +77,11 @@ class ApproximationScheme(object):
         new_list = []
         new_entry = None
         colored = set()
+        wrt_matches = set() if coloring is None else coloring._meta['wrt_matches']
         for tup in self._exec_list:
             key, options = tup
             # if key[0] is None, we've already updated the coloring
-            if key[0] is not None and 'coloring' in options:
+            if key[0] is not None and (key[1] in wrt_matches or 'coloring' in options):
                 colored.add(key)
                 if coloring is None:
                     new_list.append(tup)

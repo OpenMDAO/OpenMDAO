@@ -14,14 +14,15 @@ from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, _supported_methods
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.units import valid_units
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, find_matches, simple_warning
-from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 from openmdao.utils.mpi import MPI
 import openmdao.utils.mod_wrapper as mod_wrapper
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
+from openmdao.utils.coloring import get_coloring_fname
 
 
 # the following metadata will be accessible for vars on all procs
@@ -114,11 +115,6 @@ class Component(System):
         self.options.declare('distributed', types=bool, default=False,
                              desc='True if the component has variables that are distributed '
                                   'across multiple processes.')
-        self.options.declare('dynamic_partial_coloring', default=False, types=bool,
-                             desc='Compute partial derivative coloring dynamically if True')
-        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
-                             desc='Number of _linearize calls during dynamic computation of '
-                             'partial derivative coloring')
 
     @property
     def distributed(self):
@@ -221,7 +217,7 @@ class Component(System):
         # check here if declare_partial_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
         # have something to color.
-        if self._approx_coloring_info is not None:
+        if self._approx_coloring_info:
             for key, meta in iteritems(self._declared_partials):
                 if 'method' in meta:
                     break
@@ -375,7 +371,8 @@ class Component(System):
             self._declare_partials(of, wrt, dct)
 
     def declare_partial_coloring(self, wrt=None, method=None, form=None, step=None,
-                                 per_instance=False):
+                                 per_instance=False, repeats=None, tol=None, orders=None,
+                                 perturb_size=None, dynamic=False):
         """
         Set options for partial deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -396,10 +393,25 @@ class Component(System):
             If True, a separate coloring will be generated for each instance of a given class.
             Otherwise, only one coloring for a given class will be generated and all instances
             of that class will use it.
+        repeats : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+            (ignored unless dynamic is True).
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination
+            (ignored unless dynamic is True).
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep
+            (ignored unless dynamic is True).
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity
+            (ignored unless dynamic is True).
+        dynamic : bool
+            If True, compute the coloring dynamically at run time.
         """
-        self._declare_approx_coloring(wrt, method, form, step, per_instance)
+        self._declare_approx_coloring(wrt, method, form, step, per_instance, repeats, tol, orders,
+                                      perturb_size, dynamic)
 
-    def _setup_static_approx_coloring(self):
+    def _setup_static_approx_coloring(self, dynamic):
         if self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
@@ -414,7 +426,7 @@ class Component(System):
 
         abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
 
-        if info['coloring'] is None:
+        if not info or info['coloring'] is None:
             wrt_patterns = info['wrt_patterns']
             matches = set()
             for w in wrt_patterns:
@@ -441,8 +453,10 @@ class Component(System):
                 if key in self._subjacs_info:
                     approx_scheme.add_approximation(key, meta)
         else:  # a static coloring has already been specified
+            coloring, _ = self._get_coloring()
+
             colmeta = meta.copy()
-            colmeta['coloring'] = info['coloring']
+            colmeta['coloring'] = coloring
             wrt_matches = info['wrt_matches']
             colmeta['approxs'] = list((k, meta) for k in product(abs_ofs, wrt_matches)
                                       if k in self._subjacs_info)
@@ -452,6 +466,26 @@ class Component(System):
             approx._exec_list = new_list
             approx.add_approximation((None, None), colmeta)
             approx._approx_groups = None  # force a re-init of approximations
+            pathname = self.pathname
+
+            # When total coloring is being used in addition to partial coloring,
+            # we need to ensure that randomized partial sub-jacobians are represented with the
+            # proper sparsity so that the resulting total jacobian will also have the proper
+            # sparsity, so we make the Jacobian aware of the sparsity so it can make the
+            # necessary adjustment in _randomize_subjac.
+            sparsity = coloring.get_subjac_sparsity()
+            # sparsity uses relative names, so we need to convert to absolute
+            new_sp = {}
+            for of, sub in iteritems(sparsity):
+                of_abs = '.'.join((self.pathname, of)) if self.pathname else of
+                for wrt, tup in iteritems(sub):
+                    wrt_abs = '.'.join((self.pathname, wrt)) if self.pathname else wrt
+                    new_sp[(of_abs, wrt_abs)] = tup
+
+            if self._assembled_jac:
+                self._assembled_jac._subjac_sparsity = new_sp
+            if self._jacobian:
+                self._jacobian._subjac_sparsity = new_sp
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):
@@ -1358,17 +1392,9 @@ class Component(System):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
-            info = self._approx_coloring_info
-            if self.options['dynamic_partial_coloring']:
-                coloring = self.compute_approx_coloring()
-            elif info is not None and info['coloring'] is not None:
-                coloring = info['coloring']
-            else:
-                coloring = None
+            coloring, _ = self._get_coloring()
             if coloring is not None:
-                coloring.summary()
-                self.set_coloring_spec(coloring)
-                self._setup_static_approx_coloring()
+                self._setup_static_approx_coloring(False)
             return coloring
 
     def _get_ordered_jac_vars(self, absolute=True):

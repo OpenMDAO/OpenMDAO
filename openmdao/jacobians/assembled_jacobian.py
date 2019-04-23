@@ -321,6 +321,7 @@ class AssembledJacobian(Jacobian):
         system : System
             System that is updating this jacobian.
         """
+        # _initialize has been delayed until the first _update call
         if self._int_mtx is None:
             self._initialize(system)
             self._init_view(system)
@@ -337,10 +338,10 @@ class AssembledJacobian(Jacobian):
 
         if self._randomize:
             for key in iters:
-                int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
+                int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value'], key))
 
             for key in iters_in_ext:
-                ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value']))
+                ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['value'], key))
         else:
 
             for key in iters:

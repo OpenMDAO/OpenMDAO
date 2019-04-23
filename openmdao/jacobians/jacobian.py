@@ -47,6 +47,9 @@ class Jacobian(object):
     _jac_summ : dict or None
         A dict containing a summation of some number of instantaneous absolute values of this
         jacobian, for use later to determine jacobian sparsity and simultaneous coloring.
+    _subjac_sparsity : dict or None
+        If partial or semi-total coloring is active, this will contain the row/col indices and
+        shapes for any colored subjacs.
     """
 
     def __init__(self, system):
@@ -65,6 +68,7 @@ class Jacobian(object):
         self._abs_keys = defaultdict(bool)
         self._randomize = False
         self._jac_summ = None
+        self._subjac_sparsity = None
 
     def _get_abs_key(self, key):
         abskey = self._abs_keys[key]
@@ -214,7 +218,7 @@ class Jacobian(object):
         """
         pass
 
-    def _randomize_subjac(self, subjac):
+    def _randomize_subjac(self, subjac, key):
         """
         Return a subjac that is the given subjac filled with random values.
 
@@ -222,6 +226,8 @@ class Jacobian(object):
         ----------
         subjac : ndarray or csc_matrix
             Sub-jacobian to be randomized.
+        key : tuple (of, wrt)
+            Key for subjac within the jacobian.
 
         Returns
         -------
@@ -234,8 +240,14 @@ class Jacobian(object):
             sparse.data += 1.0
             return sparse
 
-        r = rand(*subjac.shape)
-        r += 1.0
+        if self._subjac_sparsity is not None and key in self._subjac_sparsity:
+            assert self._subjacs_info[key]['rows'] is None
+            rows, cols, shape = self._subjac_sparsity[key]
+            r = np.zeros(shape)
+            r[rows, cols] = rand(len(rows)) + 1.0
+        else:
+            r = rand(*subjac.shape)
+            r += 1.0
         return r
 
     def _get_ranges(self, system, vtype):
@@ -262,7 +274,7 @@ class Jacobian(object):
             for key in subjacs:
                 summ[key] += np.abs(subjacs[key]['value'])
 
-    def _compute_sparsity(self, system, wrt_matches, tol=1e-15, orders=12):
+    def _compute_sparsity(self, system, wrt_matches, repeats, tol, orders):
         """
         Compute a dense sparsity matrix for this jacobian using saved absolute summations.
 
@@ -275,6 +287,8 @@ class Jacobian(object):
             The System containing the jacobian whose sparsity will be computed.
         wrt_matches : set of str
             Set of wrt variables to compute sparsity for.
+        repeats : int
+            Number of times to compute partial jacobian when computing sparsity.
         tol : float
             Tolerance used to determine if an array entry is zero or nonzero.
         orders : int
@@ -371,7 +385,7 @@ class Jacobian(object):
                 J[jslice] = summ[key]
 
         # normalize by number of saved jacs, giving a sort of 'average' jac
-        J /= system.options['dynamic_derivs_repeats']
+        J /= repeats
 
         good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(J, tol, orders)
 

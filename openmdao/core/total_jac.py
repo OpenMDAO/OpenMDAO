@@ -1304,7 +1304,7 @@ class _TotalJacInfo(object):
                 model.approx_totals(method='fd')
 
             model._setup_jacobians(recurse=False)
-            if model._approx_schemes or model._approx_coloring_info is not None:
+            if model._approx_schemes or model._approx_coloring_info:
                 model._setup_approx_partials()
 
         # Linearize Model

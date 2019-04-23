@@ -1546,7 +1546,7 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
     return coloring
 
 
-def dynamic_sparsity(driver):
+def dynamic_total_sparsity(driver):
     """
     Compute deriv sparsity during runtime.
 
@@ -1617,7 +1617,7 @@ def dynamic_total_coloring(driver, run_model=True):
     coloring.summary()
 
     coloring._static = False
-    driver.set_coloring_spec(coloring)
+    driver.use_static_coloring(coloring)
     driver._setup_simul_coloring()
 
 
@@ -1686,7 +1686,7 @@ def _total_coloring_cmd(options):
                 coloring.display()
             coloring.summary()
             if options.activate:
-                prob.driver.set_coloring_spec(coloring)
+                prob.driver.use_static_coloring(coloring)
                 prob.driver._setup_simul_coloring()
                 if do_sparsity:
                     prob.driver._setup_tot_jac_sparsity()
@@ -1791,7 +1791,7 @@ def _get_partial_coloring_kwargs(options):
             raise RuntimeError("Can't specify --class if recurse option is set.")
 
     kwargs = {}
-    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol', 'directory')
+    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol')
     for name in names:
         if getattr(options, name):
             kwargs[name] = getattr(options, name)
@@ -1862,8 +1862,8 @@ def _partial_coloring_cmd(options):
                                           'sparsity' % klass)
                                     print(coloring.get_declare_partials_calls())
                                 if options.activate:
-                                    s.set_coloring_spec(coloring)
-                                    s._setup_static_approx_coloring()
+                                    s.use_static_coloring(coloring)
+                                    s._setup_static_approx_coloring(False)
                                 break
                         if not to_find and options.first_only:
                             break
@@ -1882,8 +1882,8 @@ def _partial_coloring_cmd(options):
                     print('\n')
 
                     if options.activate:
-                        system.set_coloring_spec(coloring)
-                        system._setup_static_approx_coloring()
+                        system.use_static_coloring(coloring)
+                        system._setup_static_approx_coloring(False)
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         if options.activate:

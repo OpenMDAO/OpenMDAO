@@ -895,7 +895,7 @@ class Driver(object):
         """
         return "Driver"
 
-    def set_coloring_spec(self, coloring):
+    def use_static_coloring(self, coloring):
         """
         Set the coloring (and possibly the sub-jac sparsity) for simultaneous total derivatives.
 
@@ -916,7 +916,7 @@ class Driver(object):
 
     def set_simul_deriv_color(self, coloring):
         """
-        See set_coloring_spec. This method is deprecated.
+        See use_static_coloring. This method is deprecated.
 
         Parameters
         ----------
@@ -927,8 +927,8 @@ class Driver(object):
             See the docstring for Coloring for details.
 
         """
-        warn_deprecation("set_simul_deriv_color is deprecated.  Use set_coloring_spec instead.")
-        self.set_coloring_spec(coloring)
+        warn_deprecation("set_simul_deriv_color is deprecated.  Use use_static_coloring instead.")
+        self.use_static_coloring(coloring)
 
     def set_total_jac_sparsity(self, sparsity):
         """
@@ -967,7 +967,7 @@ class Driver(object):
         """
         Set up metadata for coloring of total derivative solution.
 
-        If set_coloring_spec was called with a filename, load the coloring file.
+        If use_static_coloring was called with a filename, load the coloring file.
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
         if not coloring_mod._use_sparsity:

@@ -1837,7 +1837,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # options for system 'd1', with second option excluded
         self.assertEqual(metadata['d1']['component_options']['distributed'], False)
-        self.assertEqual(metadata['d1']['component_options']['dynamic_partial_coloring'], False)
         self.assertEqual(metadata['d1']['component_options']['options value 1'], 1)
 
     def test_feature_system_options(self):

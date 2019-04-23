@@ -737,7 +737,7 @@ class ExperimentalDriver(object):
         """
         return "Driver"
 
-    def set_coloring_spec(self, simul_info):
+    def use_static_coloring(self, simul_info):
         """
         Set the coloring for simultaneous derivatives.
 

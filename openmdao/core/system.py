@@ -52,6 +52,19 @@ _supported_methods = {
     'exact': None
 }
 
+_DEFAULT_COLORING_META = {
+    'wrt_patterns': ('*',),
+    'method': 'fd',
+    'repeats': 3,
+    'tol': 1e-15,
+    'orders': 15,
+    'perturb_size': 1e-9,
+    'wrt_matches': None,
+    'coloring': None,
+}
+
+_STD_COLORING_FNAME = object()
+
 
 class System(object):
     """
@@ -424,7 +437,7 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         self._lin_vec_names = []
-        self._approx_coloring_info = None
+        self._approx_coloring_info = {}
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
     def _declare_options(self):
@@ -759,7 +772,8 @@ class System(object):
         self._setup_connections(recurse=recurse)
 
     def _declare_approx_coloring(self, wrt=None, method=None, form=None, step=None,
-                                 per_instance=False):
+                                 per_instance=False, repeats=None, tol=None, orders=None,
+                                 perturb_size=None, dynamic=False):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -780,9 +794,23 @@ class System(object):
             If True, a separate coloring will be generated for each instance of a given class.
             Otherwise, only one coloring for a given class will be generated and all instances
             of that class will use it.
+        repeats : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+            (ignored unless dynamic is True).
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination
+            (ignored unless dynamic is True).
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep
+            (ignored unless dynamic is True).
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity
+            (ignored unless dynamic is True).
+        dynamic : bool
+            If True, compute the coloring dynamically at run time.
         """
         if method is None:
-            if self._approx_coloring_info is None:
+            if not self._approx_coloring_info:
                 method = 'fd'
             else:
                 method = self._approx_coloring_info['method']
@@ -793,14 +821,12 @@ class System(object):
         approx = self._get_approx_scheme(method)
 
         # start with defaults
-        options = approx.DEFAULT_OPTIONS.copy()
-        options['wrt_matches'] = None
-        options['wrt_patterns'] = ('*',)
+        options = _DEFAULT_COLORING_META.copy()
+        options.update(approx.DEFAULT_OPTIONS)
         options['method'] = method
-        options['coloring'] = None
 
-        # overwrite with any old values
-        if self._approx_coloring_info is not None:
+        # overwrite with old values if not None
+        if self._approx_coloring_info:
             options.update({
                 k: v for k, v in iteritems(self._approx_coloring_info) if v is not None
             })
@@ -810,12 +836,16 @@ class System(object):
         else:
             wrt_patterns = None
 
-        # finally, overwrite with any new values
+        # finally, overwrite with any new values if not None
         new_opts = {
             'wrt_patterns': wrt_patterns,
             'form': form,
             'step': step,
             'per_instance': per_instance,
+            'repeats': repeats,
+            'tol': tol,
+            'orders': orders,
+            'dynamic': dynamic,
         }
 
         options.update({k: v for k, v in iteritems(new_opts) if v is not None})
@@ -872,25 +902,30 @@ class System(object):
         if recurse:
             coloring = None
             for s in self._subsystems_myproc:
-                if self._approx_coloring_info is None or s._contains_gradient_nl_solver():
+                if not self._approx_coloring_info or s._contains_gradient_nl_solver():
                     coloring = s.compute_approx_coloring(wrt=wrt, method=method, form=form,
                                                          step=step, repeats=repeats,
                                                          perturb_size=perturb_size, tol=tol,
                                                          orders=orders, per_instance=per_instance,
                                                          recurse=recurse)
-            if self._approx_coloring_info is None:
+            if not self._approx_coloring_info:
                 return coloring
 
         # don't override metadata if it's already declared
-        if self._approx_coloring_info is not None:
+        if self._approx_coloring_info:
             method = self._approx_coloring_info['method']
             form = self._approx_coloring_info.get('form')
             step = self._approx_coloring_info.get('step')
+            repeats = self._approx_coloring_info.get('repeats')
+            tol = self._approx_coloring_info.get('tol')
+            orders = self._approx_coloring_info.get('orders')
+            perturb_size = self._approx_coloring_info.get('perturb_size')
             per_instance = self._approx_coloring_info['per_instance']
         elif method is None and self._approx_schemes:
             method = list(self._approx_schemes)[0]
         self._declare_approx_coloring(wrt=wrt, method=method, form=form, step=step,
-                                      per_instance=per_instance)
+                                      per_instance=per_instance, repeats=repeats, tol=tol,
+                                      orders=orders, dynamic=False)
 
         approx_scheme = self._get_approx_scheme(self._approx_coloring_info['method'])
 
@@ -910,7 +945,7 @@ class System(object):
 
         starting_resids = self._residuals._data.copy()
 
-        self._setup_static_approx_coloring()
+        self._setup_static_approx_coloring(False)
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
@@ -937,7 +972,8 @@ class System(object):
 
         info = self._approx_coloring_info
         sparsity, ordered_ofs, ordered_wrts = \
-            self._jacobian._compute_sparsity(self, info['wrt_matches'], tol=tol, orders=orders)
+            self._jacobian._compute_sparsity(self, info['wrt_matches'], repeats=repeats, tol=tol,
+                                             orders=orders)
         self._jacobian._jac_summ = None  # reclaim the memory
 
         coloring = _compute_coloring(sparsity, 'fwd')
@@ -948,13 +984,10 @@ class System(object):
         coloring._sparsity_time = sparsity_time
 
         coloring._meta = {}  # save metadata we used to create the coloring
-        for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step', 'per_instance'):
+        for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step', 'per_instance',
+                     'repeats', 'tol', 'orders', 'dynamic'):
             if name in info:
                 coloring._meta[name] = info[name]
-        coloring._meta['repeats'] = repeats
-        coloring._meta['perturb_size'] = perturb_size
-        coloring._meta['tol'] = tol
-        coloring._meta['orders'] = orders
 
         info['coloring'] = coloring
 
@@ -991,29 +1024,52 @@ class System(object):
                 os.mkdir(directory)
             coloring.save(fname)
 
-    def set_coloring_spec(self, coloring):
+    def use_static_coloring(self, coloring=_STD_COLORING_FNAME):
         """
         Specify a static coloring to use for this System.
 
         Parameters
         ----------
-        coloring : str or Coloring
-            If a str, assume a filename and load the coloring from that file, else just
-            use the Coloring object provided.
-
-        Returns
-        -------
-        Coloring
-            The give coloring or the coloring loaded from the given file.
+        coloring : str or Coloring or None
+            If a str, assume a filename and load the coloring from that file. If a
+            Coloring object is provided, use that.  If coloring is _STD_COLORING_FNAME,
+            the default, assume that a coloring file exists in a standard location
+            (Problem.options['directory']/coloring_files), using a standard naming
+            convention.  If different instances of the current class can have different
+            colorings, then the standard name will be based on the full system pathname
+            of the current instance, with '.' replaced by '_'.  If all instances of the
+            current class are the same, the standard name will be based on the full
+            module path of the current class, again with '.' replaced by '_'.
         """
-        if isinstance(coloring, string_types):  # it's a filename
-            # load the coloring from the file
-            coloring = Coloring.load(coloring)
-        if self._approx_coloring_info is None:
-            self._approx_coloring_info = {}
         self._approx_coloring_info['coloring'] = coloring
-        self._approx_coloring_info.update(coloring._meta)
-        return coloring
+
+    def _get_coloring(self):
+        info = self._approx_coloring_info
+        coloring = info.get('coloring')
+        dynamic = False
+        if isinstance(coloring, Coloring):
+            return coloring, False
+        elif coloring is _STD_COLORING_FNAME:
+            # load the coloring file now that we have enough info
+            if 'per_instance' in info:
+                fname = get_coloring_fname(self, info['per_instance'])
+            else:
+                fname = get_coloring_fname(self, True)
+                if not os.path.isfile(fname):
+                    fname = get_coloring_fname(self, False)
+            coloring = Coloring.load(fname)
+        elif isinstance(coloring, string_types):
+            coloring = Coloring.load(info['coloring'])
+        elif info.get('dynamic'):
+            coloring = self.compute_approx_coloring()
+            coloring.summary()
+            dynamic = True
+
+        if coloring is not None:
+            info['coloring'] = coloring
+            info.update(coloring._meta)
+
+        return coloring, dynamic
 
     def _setup_par_fd_procs(self, comm):
         """

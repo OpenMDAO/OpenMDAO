@@ -58,11 +58,28 @@ class CounterGroup(Group):
         super(CounterGroup, self)._apply_nonlinear(*args, **kwargs)
         self._apply_nl_count += 1
 
+
 # note: size must be an even number
 SIZE = 10
 
+
+class DynPartialsComp(ExplicitComponent):
+    def setup(self):
+        self.add_input('y', np.ones(SIZE))
+        self.add_input('x', np.ones(SIZE))
+        self.add_output('g', np.ones(SIZE))
+        self.declare_partials('*', '*', method='cs')
+        self.declare_partial_coloring(wrt='*', method='cs', perturb_size=1e-5,
+                                      repeats=2, tol=1e-20, orders=20, dynamic=True)
+
+    def compute(self, inputs, outputs):
+        outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
+
+
+
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=None, derivs=True,
-            recorder=None, has_lin_constraint=True, vectorize=True, **options):
+            recorder=None, has_lin_constraint=True, vectorize=True, partial_coloring=False,
+            **options):
 
     p = Problem(model=CounterGroup())
 
@@ -80,8 +97,13 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
                                      -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
     indeps.add_output('r', .7)
 
-    p.model.add_subsystem('arctan_yox', ExecComp('g=arctan(y/x)', vectorize=vectorize,
-                                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+    if partial_coloring:
+        arctan_yox = DynPartialsComp()
+    else:
+        arctan_yox = ExecComp('g=arctan(y/x)', vectorize=vectorize,
+                              g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE))
+        
+    p.model.add_subsystem('arctan_yox', arctan_yox)
 
     p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
 
@@ -136,7 +158,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
 
     # # setup coloring
     if color_info is not None:
-        p.driver.set_coloring_spec(color_info)
+        p.driver.use_static_coloring(color_info)
     elif sparsity is not None:
         p.driver.set_total_jac_sparsity(sparsity)
 
@@ -231,6 +253,24 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False)
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
                           dynamic_total_coloring=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model._solve_count - 21) / 21,
+                         (p_color.model._solve_count - 21 * 4) / 5)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_total_coloring_snopt_auto_dyn_partials(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True, partial_coloring=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)

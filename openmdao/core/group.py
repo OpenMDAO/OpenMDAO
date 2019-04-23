@@ -1,6 +1,7 @@
 """Define the Group class."""
 from __future__ import division
 
+import os
 from collections import Iterable, Counter, OrderedDict, defaultdict
 from itertools import product, chain
 from numbers import Number
@@ -17,7 +18,7 @@ import networkx as nx
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System, INT_DTYPE, get_relevant_vars
+from openmdao.core.system import System, INT_DTYPE, get_relevant_vars, _STD_COLORING_FNAME
 from openmdao.core.component import Component, _DictValues
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
@@ -29,6 +30,7 @@ from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ance
     simple_warning
 from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.mpi import MPI
+from openmdao.utils.coloring import get_coloring_fname
 
 # regex to check for valid names.
 import re
@@ -288,22 +290,6 @@ class Group(System):
 
         self.configure()
 
-        if self.pathname == '' and self.options['dynamic_semi_total_coloring']:
-            raise RuntimeError("The `dynamic_semi_total_coloring' option was set on the top level "
-                               "Group.")
-
-    def _declare_options(self):
-        """
-        Declare options before kwargs are processed in the init method.
-        """
-        self.options.declare('dynamic_semi_total_coloring', default=False, types=bool,
-                             desc="Compute semi-total derivative coloring dynamically if True. "
-                             "This only works for sub-groups.  For the top level group, set "
-                             "the 'dynamic_total_coloring' option on the driver.")
-        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
-                             desc='Number of _linearize calls during dynamic computation of '
-                             'semi-total derivative coloring')
-
     def _setup_procs(self, pathname, comm, mode, prob_options):
         """
         Execute first phase of the setup process.
@@ -327,8 +313,10 @@ class Group(System):
         self._problem_options = prob_options
 
         if self._num_par_fd > 1:
+            info = self._approx_coloring_info
             if comm.size > 1:
-                if self._owns_approx_jac:
+                # if approx_totals has been declared, or there is an approx coloring, setup par FD
+                if self._owns_approx_jac or (info and info.get('coloring')):
                     comm = self._setup_par_fd_procs(comm)
                 else:
                     msg = "'%s': num_par_fd = %d but FD is not active." % (self.pathname,
@@ -1766,21 +1754,7 @@ class Group(System):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self._first_call_to_linearize:
-            self._first_call_to_linearize = False  # only do this once
-            info = self._approx_coloring_info
-            if self.options['dynamic_semi_total_coloring']:
-                coloring = self.compute_approx_coloring()
-            elif info is not None and info['coloring'] is not None:
-                coloring = info['coloring']
-            else:
-                coloring = None
-            if coloring is not None:
-                coloring.summary()
-                self.set_coloring_spec(coloring)
-                self._setup_static_approx_coloring()
-            elif self._approx_schemes:
-                self._setup_approx_partials()
+        self._check_first_linearize()
 
         # Group finite difference
         if self._owns_approx_jac:
@@ -1816,19 +1790,13 @@ class Group(System):
                         subsys._linear_solver._linearize()
 
     def _check_first_linearize(self):
+        info = self._approx_coloring_info
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
-            info = self._approx_coloring_info
-            if self.options['dynamic_partial_coloring']:
-                coloring = self.compute_approx_coloring()
-            elif info is not None and info['coloring'] is not None:
-                coloring = info['coloring']
-            else:
-                coloring = None
+            coloring, dynamic = self._get_coloring()
             if coloring is not None:
-                coloring.summary()
-                self.set_coloring_spec(coloring)
-                self._setup_static_approx_coloring()
+                self.use_static_coloring(coloring)
+                self._setup_static_approx_coloring(dynamic)
             elif self._approx_schemes:
                 self._setup_approx_partials()
 
@@ -1885,7 +1853,8 @@ class Group(System):
                 info.update(subsys._subjacs_info)
 
     def declare_semi_total_coloring(self, wrt=None, method=None, form=None, step=None,
-                                    per_instance=False):
+                                    per_instance=False, repeats=None, tol=None, orders=None,
+                                    perturb_size=None, dynamic=False):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1906,13 +1875,29 @@ class Group(System):
             If True, a separate coloring will be generated for each instance of a given class.
             Otherwise, only one coloring for a given class will be generated and all instances
             of that class will use it.
+        repeats : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+            (ignored unless dynamic is True).
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination
+            (ignored unless dynamic is True).
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep
+            (ignored unless dynamic is True).
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity
+            (ignored unless dynamic is True).
+        dynamic : bool
+            If True, compute the coloring dynamically at run time.
         """
         if self.pathname == '':
             raise RuntimeError("Can't call declare_semi_total_coloring on top level Group.")
-        self._declare_approx_coloring(wrt, method, form, step, per_instance)
+        self._declare_approx_coloring(wrt, method, form, step, per_instance, repeats, tol, orders,
+                                      perturb_size, dynamic)
 
     def declare_total_coloring(self, wrt=None, method=None, form=None, step=None,
-                               per_instance=False):
+                               per_instance=False, repeats=None, tol=None, orders=None,
+                               perturb_size=None, dynamic=False):
         """
         Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -1933,30 +1918,25 @@ class Group(System):
             If True, a separate coloring will be generated for each instance of a given class.
             Otherwise, only one coloring for a given class will be generated and all instances
             of that class will use it.
+        repeats : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+            (ignored unless dynamic is True).
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination
+            (ignored unless dynamic is True).
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep
+            (ignored unless dynamic is True).
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity
+            (ignored unless dynamic is True).
+        dynamic : bool
+            If True, compute the coloring dynamically at run time.
         """
         if self.pathname != '':
             raise RuntimeError("You can only call declare_total_coloring on the top level Group.")
-        self._declare_approx_coloring(wrt, method, form, step, per_instance)
-
-    def set_coloring_spec(self, coloring):
-        """
-        Specify a static coloring to use for this Group.
-
-        Parameters
-        ----------
-        coloring : str or Coloring
-            If a str, assume a filename and load the coloring from that file, else just
-            use the Coloring object provided.
-
-        Returns
-        -------
-        Coloring
-            The give coloring or the coloring loaded from the given file.
-        """
-        coloring = super(Group, self).set_coloring_spec(coloring)
-        meta = coloring._meta
-        self.approx_totals(meta['method'], meta['step'], meta.get('form'))
-        return coloring
+        self._declare_approx_coloring(wrt, method, form, step, per_instance, repeats, tol, orders,
+                                      perturb_size, dynamic)
 
     def _setup_approx_partials(self):
         self._jacobian = DictionaryJacobian(system=self)
@@ -1967,7 +1947,7 @@ class Group(System):
         abs_outs = self._var_allprocs_abs_names['output']
         abs_ins = self._var_allprocs_abs_names['input']
         info = self._approx_coloring_info
-        if info is not None and (self._owns_approx_of is None or self._owns_approx_wrt is None):
+        if info and (self._owns_approx_of is None or self._owns_approx_wrt is None):
             method = info['method']
         else:
             method = list(self._approx_schemes)[0]
@@ -2011,8 +1991,13 @@ class Group(System):
         ofset = set()
         wrtset = set()
         wrt_colors_matched = set()
-        if info is not None and (self._owns_approx_of or self.pathname):
-            wrt_color_patterns = info['wrt_patterns']
+        if info and (self._owns_approx_of or self.pathname):
+            coloring, _ = self._get_coloring()
+
+            if coloring is not None:
+                wrt_color_patterns = coloring._meta['wrt_patterns']
+            else:
+                wrt_color_patterns = info['wrt_patterns']
             color_meta = self._get_approx_coloring_meta()
         else:
             wrt_color_patterns = ()
@@ -2080,8 +2065,9 @@ class Group(System):
             self._owns_approx_wrt = OrderedDict((n, None) for n in chain(abs_outs, abs_ins)
                                                 if n in wrtset)
 
-        if info is not None:
-            if info['coloring'] is not None:
+        if info:
+            coloring, _ = self._get_coloring()
+            if coloring is not None:
                 # static coloring was already defined
                 approx = self._get_approx_scheme(info['method'])
                 approx._update_coloring(self, info['coloring'])
@@ -2094,10 +2080,14 @@ class Group(System):
                     info['wrt_matches'] = wrt_colors_matched
                 approx._update_coloring(self, None)
 
-    def _setup_static_approx_coloring(self):
-        if self.pathname == '' and not self._owns_approx_of:
+    def _setup_static_approx_coloring(self, dynamic):
+        if self.pathname == '' and not self._owns_approx_of and dynamic:
             raise RuntimeError("coloring for the top level Group should only be done using "
                                "compute_total_coloring on the driver.")
+        coloring, _ = self._get_coloring()
+        if coloring is not None:
+            meta = coloring._meta
+            self.approx_totals(meta['method'], meta['step'], meta.get('form'))
         self._setup_approx_partials()
 
     def _get_approx_coloring_meta(self):

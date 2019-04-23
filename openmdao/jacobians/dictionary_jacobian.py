@@ -104,7 +104,7 @@ class DictionaryJacobian(Jacobian):
             for abs_key in self._iter_abs_keys(system, d_residuals._name):
                 subjac_info = subjacs_info[abs_key]
                 if self._randomize:
-                    subjac = self._randomize_subjac(subjac_info['value'])
+                    subjac = self._randomize_subjac(subjac_info['value'], abs_key)
                 else:
                     subjac = subjac_info['value']
                 res_name, other_name = abs_key

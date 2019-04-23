@@ -232,11 +232,11 @@ class pyOptSparseDriver(Driver):
                 coloring_mod.dynamic_total_coloring(self, run_model=not model_ran)
                 self._setup_tot_jac_sparsity()
             elif self.options['dynamic_total_sparsity']:
-                coloring_mod.dynamic_sparsity(self)
+                coloring_mod.dynamic_total_sparsity(self)
             elif self.options['dynamic_derivs_sparsity']:
                 warn_deprecation("'dynamic_derivs_sparsity' has been deprecated. Use "
                                  "'dynamic_total_sparsity' instead.")
-                coloring_mod.dynamic_sparsity(self)
+                coloring_mod.dynamic_total_sparsity(self)
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
