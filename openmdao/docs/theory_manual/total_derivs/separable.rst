@@ -134,7 +134,7 @@ The result is problem-dependent.
 How to actually use it!
 -----------------------
 OpenMDAO provides a mechanism for you to specify a coloring to take advantage of separability, via the
-:ref:`use_static_coloring<feature_simul_coloring>` method.
+:ref:`set_coloring<feature_simul_coloring>` method.
 OpenMDAO also provides a :ref:`coloring tool<feature_automatic_coloring>` to determine the minimum number of colors your problem can be reduced to.
 
 You can also see an example of setting up an optimization with simultaneous derivatives in

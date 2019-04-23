@@ -102,7 +102,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     else:
         arctan_yox = ExecComp('g=arctan(y/x)', vectorize=vectorize,
                               g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE))
-        
+
     p.model.add_subsystem('arctan_yox', arctan_yox)
 
     p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
@@ -158,7 +158,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
 
     # # setup coloring
     if color_info is not None:
-        p.driver.use_static_coloring(color_info)
+        p.driver.set_coloring(color_info)
     elif sparsity is not None:
         p.driver.set_total_jac_sparsity(sparsity)
 

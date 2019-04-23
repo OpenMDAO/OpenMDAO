@@ -1797,7 +1797,7 @@ class Group(System):
             self._first_call_to_linearize = False  # only do this once
             coloring, dynamic = self._get_coloring()
             if coloring is not None:
-                self.use_static_coloring(coloring)
+                self.set_coloring(coloring)
                 self._setup_static_approx_coloring(dynamic)
             elif self._approx_schemes:
                 self._setup_approx_partials()

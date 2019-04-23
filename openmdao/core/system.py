@@ -1024,9 +1024,9 @@ class System(object):
                 os.mkdir(directory)
             coloring.save(fname)
 
-    def use_static_coloring(self, coloring=_STD_COLORING_FNAME):
+    def set_coloring(self, coloring=_STD_COLORING_FNAME):
         """
-        Specify a static coloring to use for this System.
+        Specify a coloring to use for this System.
 
         Parameters
         ----------

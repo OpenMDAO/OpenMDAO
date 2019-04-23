@@ -737,17 +737,3 @@ class ExperimentalDriver(object):
         """
         return "Driver"
 
-    def use_static_coloring(self, simul_info):
-        """
-        Set the coloring for simultaneous derivatives.
-
-        Parameters
-        ----------
-        simul_info : ({dv1: colors, ...}, {resp1: {dv1: {0: [res_idxs, dv_idxs]} ...} ...})
-            Information about simultaneous coloring for design vars and responses.
-        """
-        if self.supports['simultaneous_derivatives']:
-            self._total_coloring = simul_info
-        else:
-            raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
-                               self._get_name())

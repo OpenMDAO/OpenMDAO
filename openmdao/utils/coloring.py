@@ -1617,7 +1617,7 @@ def dynamic_total_coloring(driver, run_model=True):
     coloring.summary()
 
     coloring._static = False
-    driver.use_static_coloring(coloring)
+    driver.set_coloring(coloring)
     driver._setup_simul_coloring()
 
 
@@ -1686,7 +1686,7 @@ def _total_coloring_cmd(options):
                 coloring.display()
             coloring.summary()
             if options.activate:
-                prob.driver.use_static_coloring(coloring)
+                prob.driver.set_coloring(coloring)
                 prob.driver._setup_simul_coloring()
                 if do_sparsity:
                     prob.driver._setup_tot_jac_sparsity()
@@ -1862,7 +1862,7 @@ def _partial_coloring_cmd(options):
                                           'sparsity' % klass)
                                     print(coloring.get_declare_partials_calls())
                                 if options.activate:
-                                    s.use_static_coloring(coloring)
+                                    s.set_coloring(coloring)
                                     s._setup_static_approx_coloring(False)
                                 break
                         if not to_find and options.first_only:
@@ -1882,7 +1882,7 @@ def _partial_coloring_cmd(options):
                     print('\n')
 
                     if options.activate:
-                        system.use_static_coloring(coloring)
+                        system.set_coloring(coloring)
                         system._setup_static_approx_coloring(False)
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")

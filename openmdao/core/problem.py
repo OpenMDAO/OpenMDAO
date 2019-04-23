@@ -35,7 +35,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
-from openmdao.utils import coloring
+from openmdao.utils import coloring as coloring_mod
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.name_maps import abs_key2rel_key
 
@@ -853,7 +853,7 @@ class Problem(object):
         driver._setup_driver(self)
 
         coloring = driver._total_coloring
-        if coloring and coloring._use_sparsity:
+        if coloring and coloring_mod._use_sparsity:
             # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
             if coloring._fwd and coloring._rev:

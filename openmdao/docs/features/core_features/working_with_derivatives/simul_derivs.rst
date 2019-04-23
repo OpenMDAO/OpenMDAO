@@ -84,11 +84,11 @@ Static Coloring
 ===============
 
 To get rid of the runtime cost of computing the coloring, you can precompute it and tell the
-driver what coloring to use by calling the :code:`use_static_coloring` method on your
+driver what coloring to use by calling the :code:`set_coloring` method on your
 Driver.
 
 
-.. automethod:: openmdao.core.driver.Driver.use_static_coloring
+.. automethod:: openmdao.core.driver.Driver.set_coloring
     :noindex:
 
 
@@ -195,12 +195,12 @@ other than `total_coloring.pkl`.
 
 
 The coloring will be written in pickle format to the given file and can be loaded using the
-*use_static_coloring* function like this:
+*set_coloring* function like this:
 
 
 .. code-block:: python
 
-    prob.driver.use_static_coloring('my_coloring.pkl')
+    prob.driver.set_coloring('my_coloring.pkl')
 
 
 If you have a coloring file that was generated earlier and you want to view its statistics,

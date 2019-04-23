@@ -526,7 +526,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        comp.use_static_coloring(get_coloring_fname(comp, directory=os.path.join(prob.options['directory'], 'coloring_files')))
+        comp.set_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -580,7 +580,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        comp.use_static_coloring(get_coloring_fname(comp, directory=os.path.join(prob.options['directory'], 'coloring_files')))
+        comp.set_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -629,7 +629,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        comp.use_static_coloring(get_coloring_fname(comp, directory=os.path.join(prob.options['directory'], 'coloring_files')))
+        comp.set_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -692,7 +692,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
 
-        sub.use_static_coloring(get_coloring_fname(sub, directory=os.path.join(prob.options['directory'], 'coloring_files')))
+        sub.set_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -756,7 +756,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.use_static_coloring()
+        model.set_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -822,7 +822,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.use_static_coloring()
+        model.set_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -887,7 +887,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.use_static_coloring()
+        model.set_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -955,7 +955,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.use_static_coloring()
+        model.set_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -1026,7 +1026,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.use_static_coloring()
+        model.set_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -1123,7 +1123,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         # make sure coloring file exists by the time we try to load the spec
         MPI.COMM_WORLD.barrier()
 
-        sub.use_static_coloring()
+        sub.set_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -1185,7 +1185,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         # make sure coloring file exists by the time we try to load the spec
         MPI.COMM_WORLD.barrier()
 
-        coloring = comp.use_static_coloring(get_coloring_fname(comp, directory=os.path.join(prob.options['directory'], 'coloring_files')))
+        coloring = comp.set_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -1249,7 +1249,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         # make sure coloring file exists by the time we try to load the spec
         MPI.COMM_WORLD.barrier()
 
-        comp.use_static_coloring(get_coloring_fname(comp, directory=os.path.join(prob.options['directory'], 'coloring_files')))
+        comp.set_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
