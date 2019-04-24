@@ -8,7 +8,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecCo
     PETScVector, ParallelGroup
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver,\
     GeneticAlgorithm
-from openmdao.test_suite.components.branin import Branin
+from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
@@ -70,6 +70,35 @@ class TestSimpleGA(unittest.TestCase):
         assert_rel_error(self, prob['px.x'][1], -0.88654333, 1e-4)
 
     def test_mixed_integer_branin(self):
+        np.random.seed(1)
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('p1', IndepVarComp('xC', 7.5))
+        model.add_subsystem('p2', IndepVarComp('xI', 0.0))
+        model.add_subsystem('comp', Branin())
+
+        model.connect('p2.xI', 'comp.x0')
+        model.connect('p1.xC', 'comp.x1')
+
+        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
+        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = SimpleGADriver(max_gen=75, pop_size=25)
+        prob.driver.options['bits'] = {'p1.xC': 8}
+
+        prob.driver._randomstate = 1
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Optimal solution
+        assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
+        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+
+    def test_mixed_integer_branin_discrete(self):
         np.random.seed(1)
 
         prob = Problem()
@@ -302,7 +331,7 @@ class TestSimpleGA(unittest.TestCase):
         prob.model.add_objective('paraboloid2.f')
         prob.setup()
         prob.run_driver()
-        
+
         np.testing.assert_array_almost_equal(prob['indeps.x'], -5)
         np.testing.assert_array_almost_equal(prob['indeps.y'], [3, 1])
 
