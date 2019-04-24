@@ -47,9 +47,6 @@ class Jacobian(object):
     _jac_summ : dict or None
         A dict containing a summation of some number of instantaneous absolute values of this
         jacobian, for use later to determine jacobian sparsity and simultaneous coloring.
-    _subjac_sparsity : dict or None
-        If partial or semi-total coloring is active, this will contain the row/col indices and
-        shapes for any colored subjacs.
     """
 
     def __init__(self, system):
@@ -68,7 +65,6 @@ class Jacobian(object):
         self._abs_keys = defaultdict(bool)
         self._randomize = False
         self._jac_summ = None
-        self._subjac_sparsity = None
 
     def _get_abs_key(self, key):
         abskey = self._abs_keys[key]
@@ -240,9 +236,16 @@ class Jacobian(object):
             sparse.data += 1.0
             return sparse
 
-        if self._subjac_sparsity is not None and key in self._subjac_sparsity:
-            assert self._subjacs_info[key]['rows'] is None
-            rows, cols, shape = self._subjac_sparsity[key]
+        # if a subsystem has computed a dynamic partial or semi-total coloring,
+        # we use that sparsity information to set the sparsity of the randomized
+        # subjac.  Otherwise all subjacs that didn't have sparsity declared by the
+        # user will appear completely dense, which will lead to a total jacobian that
+        # is more dense than it should be, causing any total coloring that we compute
+        # to be overly conservative.
+        subjac_info = self._subjacs_info[key]
+        if 'sparsity' in subjac_info:
+            assert subjac_info['rows'] is None
+            rows, cols, shape = subjac_info['sparsity']
             r = np.zeros(shape)
             r[rows, cols] = rand(len(rows)) + 1.0
         else:

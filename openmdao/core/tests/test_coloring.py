@@ -284,6 +284,24 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
                          (p_color.model._solve_count - 21 * 4) / 5)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_total_coloring_snopt_auto_dyn_partials_assembled_jac(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True, partial_coloring=True)
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+        # - coloring saves 16 solves per driver iter  (5 vs 21)
+        # - initial solve for linear constraints takes 21 in both cases (only done once)
+        # - dynamic case does 3 full compute_totals to compute coloring, which adds 21 * 3 solves
+        # - (total_solves - N) / (solves_per_iter) should be equal between the two cases,
+        # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
+        self.assertEqual((p.model._solve_count - 21) / 21,
+                         (p_color.model._solve_count - 21 * 4) / 5)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_assembled(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'auto', assemble_type='dense', optimizer='SNOPT', print_results=False)

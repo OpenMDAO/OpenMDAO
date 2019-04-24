@@ -482,12 +482,10 @@ class Component(System):
                 of_abs = '.'.join((self.pathname, of)) if self.pathname else of
                 for wrt, tup in iteritems(sub):
                     wrt_abs = '.'.join((self.pathname, wrt)) if self.pathname else wrt
-                    new_sp[(of_abs, wrt_abs)] = tup
-
-            if self._assembled_jac:
-                self._assembled_jac._subjac_sparsity = new_sp
-            if self._jacobian:
-                self._jacobian._subjac_sparsity = new_sp
+                    abs_key = (of_abs, wrt_abs)
+                    if abs_key in self._subjacs_info:
+                        # add sparsity info to existing partial info
+                        self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):

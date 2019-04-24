@@ -998,7 +998,7 @@ class System(object):
         self._outputs._data[:] = starting_outputs
         self._residuals._data[:] = starting_resids
 
-        self._filtered_vars_to_record = save_first_call
+        self._first_call_to_linearize = save_first_call
 
         return coloring
 
