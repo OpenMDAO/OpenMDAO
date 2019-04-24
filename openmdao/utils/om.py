@@ -44,6 +44,8 @@ def _view_model_setup_parser(parser):
                         help="don't display in a browser.")
     parser.add_argument('--embed', action='store_true', dest='embeddable',
                         help="create embeddable version.")
+    parser.add_argument('--title', default=None,
+                        action='store', dest='title', help='diagram title.')
 
 
 def _view_model_cmd(options):
@@ -62,6 +64,7 @@ def _view_model_cmd(options):
         def _viewmod(prob):
             view_model(prob, outfile=options.outfile,
                        show_browser=not options.no_browser,
+                       title=options.title,
                        embeddable=options.embeddable)
             exit()  # could make this command line selectable later
 
@@ -71,6 +74,7 @@ def _view_model_cmd(options):
     else:
         # assume the file is a recording, run standalone
         view_model(filename, outfile=options.outfile,
+                   title=options.title,
                    show_browser=not options.no_browser,
                    embeddable=options.embeddable)
 
