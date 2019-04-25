@@ -69,8 +69,7 @@ class DynPartialsComp(ExplicitComponent):
         self.add_input('x', np.ones(SIZE))
         self.add_output('g', np.ones(SIZE))
         self.declare_partials('*', '*', method='cs')
-        self.declare_partial_coloring(wrt='*', method='cs', perturb_size=1e-5,
-                                      repeats=2, tol=1e-20, orders=20, dynamic=True)
+        self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, repeats=2, tol=1e-20, orders=20)
 
     def compute(self, inputs, outputs):
         outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
@@ -136,6 +135,10 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
         p.model.approx_totals(method=options['method'])
         del options['method']
 
+    if 'dynamic_total_coloring' in options:
+        p.driver.declare_coloring()
+        del options['dynamic_total_coloring']
+
     p.driver.options.update(options)
 
     p.model.add_design_var('x')
@@ -158,7 +161,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
 
     # # setup coloring
     if color_info is not None:
-        p.driver.set_coloring(color_info)
+        p.driver.use_fixed_coloring()
+        p.driver._coloring_info['coloring'] = color_info
     elif sparsity is not None:
         p.driver.set_total_jac_sparsity(sparsity)
 
@@ -318,6 +322,44 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_fwd_simul_coloring_snopt_approx_cs(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False, has_lin_constraint=False, method='cs')
+        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', has_lin_constraint=False,
+                          vectorize=True, print_results=False,
+                          dynamic_total_coloring=True, method='cs')
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+
+        # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
+        # - dynamic coloring takes 66 nonlinear solves (22 each for 3 repeats)
+        # - (total_solves - 2) / (solves_per_iter) should be equal to
+        #       (total_color_solves - 2 - dyn_solves) / color_solves_per_iter
+        self.assertEqual((p.model._solve_nl_count - 2) / 22,
+                         (p_color.model._solve_nl_count - 2 - 66) / 6)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_dynamic_fwd_simul_coloring_snopt_approx_fd(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False, has_lin_constraint=False, method='cs')
+        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', has_lin_constraint=False,
+                          vectorize=True, print_results=False,
+                          dynamic_total_coloring=True, method='fd')
+
+        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
+        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
+
+
+        # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
+        # - dynamic coloring takes 66 nonlinear solves (22 each for 3 repeats)
+        # - (total_solves - 2) / (solves_per_iter) should be equal to
+        #       (total_color_solves - 2 - dyn_solves) / color_solves_per_iter
+        self.assertEqual((p.model._solve_nl_count - 2) / 22,
+                         (p_color.model._solve_nl_count - 2 - 66) / 6)
 
     def test_simul_coloring_pyoptsparse_slsqp_fwd(self):
         try:
@@ -556,25 +598,6 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model._solve_count - 1) / 22,
                          (p_color.model._solve_count - 1 - 22 * 3) / 11)
-
-    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
-    def test_dynamic_fwd_simul_coloring_snopt_approx(self):
-        # first, run w/o coloring
-        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False, has_lin_constraint=False, method='cs')
-        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', has_lin_constraint=False,
-                          vectorize=True, print_results=False,
-                          dynamic_total_coloring=True, method='cs')
-
-        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
-        assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
-
-
-        # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
-        # - dynamic coloring takes 66 nonlinear solves (22 each for 3 repeats)
-        # - (total_solves - 2) / (solves_per_iter) should be equal to
-        #       (total_color_solves - 2 - dyn_solves) / color_solves_per_iter
-        self.assertEqual((p.model._solve_nl_count - 2) / 22,
-                         (p_color.model._solve_nl_count - 2 - 66) / 6)
 
     def test_simul_coloring_pyoptsparse_slsqp(self):
         try:
@@ -829,7 +852,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.driver.options['disp'] = False
 
         # set up dynamic total coloring here
-        p.driver.options['dynamic_total_coloring'] = True
+        p.driver.declare_coloring()
 
         p.model.add_design_var('x')
         p.model.add_design_var('y')
@@ -860,7 +883,6 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def setUp(self):
         self.color_info = Coloring()
-        self.color_info._static = True
         self.color_info._rev = [[
                [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
                [2, 21],   # color 1
@@ -987,7 +1009,7 @@ class SparsityTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
 
         # run with dynamic sparsity
-        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_total_sparsity=True,
+        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_derivs_sparsity=True,
                             optimizer='SNOPT', print_results=False)
 
         # run with provided sparsity
@@ -1013,7 +1035,7 @@ class SparsityTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
 
         # run with dynamic sparsity
-        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_total_sparsity=True,
+        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_derivs_sparsity=True,
                             optimizer='SLSQP', print_results=False)
 
         # run with provided sparsity
@@ -1111,7 +1133,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p = Problem()
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
-        p.driver.options['dynamic_total_coloring'] = True
+        p.driver.declare_coloring()
         if OPTIMIZER == 'SNOPT':
             p.driver.opt_settings['Major iterations limit'] = 100
             p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6

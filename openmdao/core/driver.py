@@ -5,6 +5,7 @@ import json
 from collections import OrderedDict
 import pprint
 import sys
+import os
 
 from six import iteritems, itervalues, string_types
 
@@ -78,6 +79,8 @@ class Driver(object):
         Structure of model, used to make n2 diagram.
     _total_coloring : tuple of dicts
         A data structure describing coloring for simultaneous derivs.
+    _coloring_info : dict
+        Metadata pertaining to total coloring.
     _total_jac_sparsity : dict, str, or None
         Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
     _res_jacs : dict
@@ -162,7 +165,7 @@ class Driver(object):
         self._model_viewer_data = None
         self.cite = ""
 
-        self._total_coloring = None
+        self._coloring_info = {'coloring': None}
         self._total_jac_sparsity = None
         self._res_jacs = {}
         self._total_jac = None
@@ -274,9 +277,10 @@ class Driver(object):
         self._remote_responses.update(self._remote_objs)
 
         # set up simultaneous deriv coloring
-        if (coloring_mod._use_sparsity and self._total_coloring and self._total_coloring._static and
-                self.supports['simultaneous_derivatives']):
-            self._setup_simul_coloring()
+        if coloring_mod._use_sparsity:
+            coloring = self._get_coloring()
+            if coloring is not None and self.supports['simultaneous_derivatives']:
+                self._setup_simul_coloring()
 
     def _get_vars_to_record(self, recording_options):
         """
@@ -894,41 +898,6 @@ class Driver(object):
         """
         return "Driver"
 
-    def set_coloring(self, coloring):
-        """
-        Set the coloring (and possibly the sub-jac sparsity) for simultaneous total derivatives.
-
-        Parameters
-        ----------
-        coloring : str or Coloring
-            Information about simultaneous coloring for design vars and responses.  If a
-            string, then coloring is assumed to be the name of a file that contains the
-            coloring information in pickle format. Otherwise it must be a Coloring object.
-            See the docstring for Coloring for details.
-
-        """
-        if self.supports['simultaneous_derivatives']:
-            self._total_coloring = coloring
-        else:
-            raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
-                               self._get_name())
-
-    def set_simul_deriv_color(self, coloring):
-        """
-        See set_coloring. This method is deprecated.
-
-        Parameters
-        ----------
-        coloring : str or Coloring
-            Information about simultaneous coloring for design vars and responses.  If a
-            string, then coloring is assumed to be the name of a file that contains the
-            coloring information in pickle format. Otherwise it must be a Coloring object.
-            See the docstring for Coloring for details.
-
-        """
-        warn_deprecation("set_simul_deriv_color is deprecated.  Use set_total_coloring instead.")
-        self.set_coloring(coloring)
-
     def set_total_jac_sparsity(self, sparsity):
         """
         Set the sparsity of sub-jacobians of the total jacobian.
@@ -962,6 +931,82 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
                                self._get_name())
 
+    def declare_coloring(self, repeats=3, tol=1e-15, orders=15, perturb_size=None):
+        """
+        Set options for total deriv coloring.
+
+        Parameters
+        ----------
+        repeats : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination.
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep.
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity.
+        """
+        self._coloring_info['repeats'] = repeats
+        self._coloring_info['tol'] = tol
+        self._coloring_info['orders'] = orders
+        self._coloring_info['perturb_size'] = perturb_size
+        self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
+
+    def use_fixed_coloring(self):
+        """
+        Set the coloring for total derivatives.
+        """
+        if self.supports['simultaneous_derivatives']:
+            self._set_coloring(coloring_mod._STD_COLORING_FNAME)
+        else:
+            raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
+                               self._get_name())
+
+    def set_simul_deriv_color(self, coloring):
+        """
+        See use_fixed_coloring. This method is deprecated.
+
+        Parameters
+        ----------
+        coloring : str or Coloring
+            Information about simultaneous coloring for design vars and responses.  If a
+            string, then coloring is assumed to be the name of a file that contains the
+            coloring information in pickle format. Otherwise it must be a Coloring object.
+            See the docstring for Coloring for details.
+
+        """
+        warn_deprecation("set_simul_deriv_color is deprecated.  Use use_fixed_coloring instead.")
+        self.use_fixed_coloring()
+
+    def _set_coloring(self, coloring):
+        self._coloring_info['coloring'] = coloring
+        return coloring
+
+    def _get_coloring(self):
+        """
+        Get the Coloring for this driver.
+
+        If necessary, load the Coloring from a file.
+
+        Returns
+        -------
+        Coloring or None
+            The pre-existing or loaded Coloring, or None
+        """
+        info = self._coloring_info
+        coloring = info['coloring']
+        assert not isinstance(coloring, string_types)
+
+        if isinstance(coloring, coloring_mod.Coloring):
+            return coloring
+        elif coloring is coloring_mod._STD_COLORING_FNAME:
+            fname = os.path.join(os.path.abspath(self._problem.options['directory']),
+                                 'coloring_files', 'total_coloring.pkl')
+            print("loading total coloring from file %s" % fname)
+            coloring = self._set_coloring(Coloring.load(fname))
+            info.update(coloring._meta)
+            return coloring
+
     def _setup_simul_coloring(self):
         """
         Set up metadata for coloring of total derivative solution.
@@ -977,23 +1022,22 @@ class Driver(object):
             simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
 
-        if isinstance(self._total_coloring, string_types):
-            self._total_coloring = coloring_mod.Coloring.load(self._total_coloring)
+        total_coloring = self._get_coloring()
 
-        if self._total_coloring._rev and problem._orig_mode not in ('rev', 'auto'):
-            revcol = self._total_coloring._rev[0][0]
+        if total_coloring._rev and problem._orig_mode not in ('rev', 'auto'):
+            revcol = total_coloring._rev[0][0]
             if revcol:
                 raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
-        if self._total_coloring._fwd and problem._orig_mode not in ('fwd', 'auto'):
-            fwdcol = self._total_coloring._fwd[0][0]
+        if total_coloring._fwd and problem._orig_mode not in ('fwd', 'auto'):
+            fwdcol = total_coloring._fwd[0][0]
             if fwdcol:
                 raise RuntimeError("Simultaneous coloring does forward solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
 
-        # total_coloring_info can contain data for either fwd, rev, or both, along with optional
+        # _total_coloring can contain data for either fwd, rev, or both, along with optional
         # sparsity patterns
-        sparsity = self._total_coloring.get_subjac_sparsity()
+        sparsity = total_coloring.get_subjac_sparsity()
 
         if sparsity is not None:
             if self._total_jac_sparsity is not None:

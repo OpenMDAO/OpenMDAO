@@ -133,7 +133,6 @@ class ExperimentalDriver(object):
         # TODO, support these in OpenMDAO
         self.supports.declare('integer_design_vars', types=bool, default=False)
 
-        self._total_coloring = None
         self._res_jacs = {}
 
         self.fail = False
@@ -314,13 +313,6 @@ class ExperimentalDriver(object):
         }
 
         self._rec_mgr.startup(self)
-
-        # set up simultaneous deriv coloring
-        if self._total_coloring and self.supports['simultaneous_derivatives']:
-            if problem._mode == 'fwd':
-                self._setup_simul_coloring()
-            else:
-                raise RuntimeError("simultaneous derivs are currently not supported in rev mode.")
 
     def _get_voi_val(self, name, meta, remote_vois):
         """

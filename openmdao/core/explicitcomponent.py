@@ -197,12 +197,12 @@ class ExplicitComponent(Component):
         """
         Set subjacobian info into our jacobian.
         """
-        info = self._approx_coloring_info
+        coloring = self._get_static_coloring()
         # if coloring has been specified, we don't want to have multiple
         # approximations for the same subjac, so don't register any new
         # approximations when the wrt matches those used in the coloring.
-        if info and info['coloring'] is not None:
-            self._get_coloring()  # make sure any coloring file has been loaded
+        if coloring is not None:
+            info = self._coloring_info
             # static coloring has been specified
             wrt_matches = info['wrt_matches']
         else:

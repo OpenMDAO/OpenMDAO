@@ -50,6 +50,14 @@ CITATIONS = """
 _use_sparsity = True
 
 
+# used as an indicator that we should automatically name coloring file based on class module
+# path or system pathname
+_STD_COLORING_FNAME = object()
+
+# used to indicate that we should dynamically generate a coloring
+_DYN_COLORING = object()
+
+
 # numpy versions before 1.12 don't use the 'axis' arg passed to count_nonzero and always
 # return an int instead of an array of ints, so create our own function for those versions.
 if LooseVersion(np.__version__) >= LooseVersion("1.12"):
@@ -143,7 +151,6 @@ class Coloring(object):
 
         self._coloring_time = None
         self._sparsity_time = None
-        self._static = True
         self._fwd = None
         self._rev = None
         self._meta = {}
@@ -1188,7 +1195,7 @@ def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=20, setup=False, run_
         A boolean composite of 'repeats' total jacobians.
     """
     # clear out any old simul coloring info
-    prob.driver._total_coloring = None
+    prob.driver._coloring_info['coloring'] = None
     prob.driver._res_jacs = {}
 
     if setup:
@@ -1511,6 +1518,8 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
                                           "linear constraint derivatives are computed separately "
                                           "from nonlinear ones.")
             _initialize_model_approx(model, driver, ofs, wrts)
+            if run_model:
+                problem.run_model()
             coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0],
                                                      repeats=repeats, tol=tol, orders=orders)
         else:
@@ -1527,7 +1536,7 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
             # save metadata we used to create the coloring
             coloring._meta = {'repeats': repeats, 'tol': tol, 'orders': orders}
 
-        driver._total_jac = None
+            driver._total_jac = None
 
     elif bool_jac is not None:
         J = bool_jac
@@ -1546,7 +1555,7 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
     return coloring
 
 
-def dynamic_total_sparsity(driver):
+def dynamic_derivs_sparsity(driver):
     """
     Compute deriv sparsity during runtime.
 
@@ -1591,33 +1600,23 @@ def dynamic_total_coloring(driver, run_model=True):
 
     driver._total_jac = None
 
-    if driver._total_coloring is not None:
-        if driver._total_coloring._static:
-            raise RuntimeError("A total coloring was already set and would be overridden by the "
-                               "requested dynamic coloring.")
-        else:
-            # this is not the first time run_driver has been executed.  Go ahead and regen the
-            # coloring just in case something has changed since the first call, but reset anything
-            # that will raise exceptions about multiple definition.
-            driver._total_jac_sparsity = None  # prevent complaints about redefining the sparsity
+    if driver._coloring_info['coloring'] is not None:
+        # this is not the first time run_driver has been executed.  Go ahead and regen the
+        # coloring just in case something has changed since the first call, but reset anything
+        # that will raise exceptions about multiple definition.
+        driver._total_jac_sparsity = None  # prevent complaints about redefining the sparsity
 
-    # if model is using approx derivs, we must ensure that we're starting from a valid point
-    if problem.model._approx_schemes:
-        problem.run_model()
-
-    problem.driver._total_coloring = None
+    problem.driver._coloring_info['coloring'] = None
     problem.driver._res_jacs = {}
 
     coloring = compute_total_coloring(problem,
-                                      repeats=driver.options['dynamic_derivs_repeats'],
+                                      repeats=driver._coloring_info['repeats'],
                                       tol=1.e-15,
-                                      setup=False, run_model=run_model,
-                                      fname='total_coloring.pkl')
+                                      setup=False, run_model=run_model)
 
     coloring.summary()
 
-    coloring._static = False
-    driver.set_coloring(coloring)
+    driver._coloring_info['coloring'] = coloring
     driver._setup_simul_coloring()
 
 
@@ -1686,7 +1685,7 @@ def _total_coloring_cmd(options):
                 coloring.display()
             coloring.summary()
             if options.activate:
-                prob.driver.set_coloring(coloring)
+                prob.driver._set_coloring(coloring)
                 prob.driver._setup_simul_coloring()
                 if do_sparsity:
                     prob.driver._setup_tot_jac_sparsity()
@@ -1862,7 +1861,7 @@ def _partial_coloring_cmd(options):
                                           'sparsity' % klass)
                                     print(coloring.get_declare_partials_calls())
                                 if options.activate:
-                                    s.set_coloring(coloring)
+                                    s._set_coloring(coloring)
                                     s._setup_static_approx_coloring(False)
                                 break
                         if not to_find and options.first_only:
@@ -1882,7 +1881,7 @@ def _partial_coloring_cmd(options):
                     print('\n')
 
                     if options.activate:
-                        system.set_coloring(coloring)
+                        system._set_coloring(coloring)
                         system._setup_static_approx_coloring(False)
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")

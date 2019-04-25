@@ -19,11 +19,11 @@ Sparsity can be computed at runtime, shortly after the driver begins the optimiz
 This has the advantage of simplicity and robustness to changes in the model, but adds
 the cost of the sparsity computation to the run time of the optimization.  For a typical
 optimization, however, this cost will be small.  Activating dynamic sparsity detection
-is simple.  Just set the `dynamic_total_sparsity` option on the driver.  For example:
+is simple.  Just set the `dynamic_derivs_sparsity` option on the driver.  For example:
 
 .. code-block:: python
 
-    prob.driver.options['dynamic_total_sparsity'] = True
+    prob.driver.options['dynamic_derivs_sparsity'] = True
 
 If you want to change the number of compute_totals calls that the algorithm uses to
 compute the jacobian sparsity (default is 3), you can set the `dynamic_derivs_repeats`

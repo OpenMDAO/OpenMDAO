@@ -30,7 +30,8 @@ from openmdao.utils.write_outputs import write_outputs
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
-from openmdao.utils.coloring import _compute_coloring, Coloring, get_coloring_fname
+from openmdao.utils.coloring import _compute_coloring, Coloring, get_coloring_fname, \
+    _STD_COLORING_FNAME, _DYN_COLORING
 from openmdao.utils.general_utils import simple_warning
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -63,7 +64,27 @@ _DEFAULT_COLORING_META = {
     'coloring': None,
 }
 
-_STD_COLORING_FNAME = object()
+
+class _DebugDict(object):
+    def __init__(self):
+        self._dict = {}
+
+    def __setitem__(self, name, value):
+        print('%s = %s' % (name, value))
+        self._dict[name] = value
+
+    def __getitem__(self, name):
+        return self._dict[name]
+
+    def update(self, dct):
+        for n, v in dct.items():
+            self[n] = v
+
+    def items(self):
+        return self._dict.items()
+
+    def get(self, name):
+        return self._dict.get(name)
 
 
 class System(object):
@@ -280,7 +301,7 @@ class System(object):
         ID used to determine which columns in the jacobian will be computed when using parallel FD.
     _use_derivatives : bool
         If True, perform any memory allocations necessary for derivative computation.
-    _approx_coloring_info : tuple
+    _coloring_info : tuple
         Metadata that defines how to perform coloring of this System's approx jacobian.
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
@@ -437,7 +458,7 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         self._lin_vec_names = []
-        self._approx_coloring_info = {}
+        self._coloring_info = {'coloring': None}
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
     def _declare_options(self):
@@ -771,11 +792,29 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def _declare_approx_coloring(self, wrt=None, method=None, form=None, step=None,
-                                 per_instance=False, repeats=None, tol=None, orders=None,
-                                 perturb_size=None, dynamic=False):
+    def use_fixed_coloring(self, recurse=True):
         """
-        Set options for approx deriv coloring of a set of wrt vars matching the given pattern(s).
+        Use a pre-existing coloring in this System.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, set fixed coloring in all subsystems that declare a coloring.
+        """
+        if self._coloring_info['coloring'] is not None:
+            self._set_coloring(_STD_COLORING_FNAME)
+        if recurse:
+            for s in self._subsystems_myproc:
+                s.use_fixed_coloring(recurse)
+
+    def _set_coloring(self, coloring):
+        self._coloring_info['coloring'] = coloring
+        return coloring
+
+    def declare_coloring(self, wrt=None, method=None, form=None, step=None, per_instance=False,
+                         repeats=None, tol=None, orders=None, perturb_size=None):
+        """
+        Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
         Parameters
         ----------
@@ -806,14 +845,12 @@ class System(object):
         perturb_size : float
             Size of input/output perturbation during generation of sparsity
             (ignored unless dynamic is True).
-        dynamic : bool
-            If True, compute the coloring dynamically at run time.
         """
         if method is None:
-            if not self._approx_coloring_info:
+            if 'method' not in self._coloring_info:
                 method = 'fd'
             else:
-                method = self._approx_coloring_info['method']
+                method = self._coloring_info['method']
 
         if method not in ('fd', 'cs'):
             raise RuntimeError("method must be one of ['fd', 'cs'].")
@@ -826,10 +863,9 @@ class System(object):
         options['method'] = method
 
         # overwrite with old values if not None
-        if self._approx_coloring_info:
-            options.update({
-                k: v for k, v in iteritems(self._approx_coloring_info) if v is not None
-            })
+        options.update({
+            k: v for k, v in iteritems(self._coloring_info) if v is not None
+        })
 
         if wrt is not None:
             wrt_patterns = [wrt] if isinstance(wrt, string_types) else wrt
@@ -845,11 +881,14 @@ class System(object):
             'repeats': repeats,
             'tol': tol,
             'orders': orders,
-            'dynamic': dynamic,
+            'coloring': _DYN_COLORING
         }
 
         options.update({k: v for k, v in iteritems(new_opts) if v is not None})
-        self._approx_coloring_info = options
+        if options['coloring'] is None:
+            options['coloring'] = _DYN_COLORING
+
+        self._coloring_info = options
 
     def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
                                 repeats=2, perturb_size=1e-9, tol=1e-15, orders=20,
@@ -902,32 +941,39 @@ class System(object):
         if recurse:
             coloring = None
             for s in self._subsystems_myproc:
-                if not self._approx_coloring_info or s._contains_gradient_nl_solver():
+                if not self._coloring_info or s._contains_gradient_nl_solver():
                     coloring = s.compute_approx_coloring(wrt=wrt, method=method, form=form,
                                                          step=step, repeats=repeats,
                                                          perturb_size=perturb_size, tol=tol,
                                                          orders=orders, per_instance=per_instance,
                                                          recurse=recurse)
-            if not self._approx_coloring_info:
+            if self._coloring_info['coloring'] is None:
                 return coloring
 
-        # don't override metadata if it's already declared
-        if self._approx_coloring_info:
-            method = self._approx_coloring_info['method']
-            form = self._approx_coloring_info.get('form')
-            step = self._approx_coloring_info.get('step')
-            repeats = self._approx_coloring_info.get('repeats')
-            tol = self._approx_coloring_info.get('tol')
-            orders = self._approx_coloring_info.get('orders')
-            perturb_size = self._approx_coloring_info.get('perturb_size')
-            per_instance = self._approx_coloring_info['per_instance']
-        elif method is None and self._approx_schemes:
-            method = list(self._approx_schemes)[0]
-        self._declare_approx_coloring(wrt=wrt, method=method, form=form, step=step,
-                                      per_instance=per_instance, repeats=repeats, tol=tol,
-                                      orders=orders, dynamic=False)
+        kwargs = {
+            'wrt': wrt,
+            'method': method,
+            'form': form,
+            'step': step,
+            'repeats': repeats,
+            'perturb_size': perturb_size,
+            'tol': tol,
+            'orders': orders,
+            'per_instance': per_instance,
+        }
 
-        approx_scheme = self._get_approx_scheme(self._approx_coloring_info['method'])
+        # don't override metadata if it's already declared
+        info = self._coloring_info
+        for name, val in iteritems(info):
+            if val is not None and name in kwargs:
+                kwargs[name] = val
+
+        if kwargs['method'] is None and self._approx_schemes:
+            method = list(self._approx_schemes)[0]
+
+        self.declare_coloring(**kwargs)
+
+        approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
 
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
@@ -945,10 +991,11 @@ class System(object):
 
         starting_resids = self._residuals._data.copy()
 
-        self._setup_static_approx_coloring(False)
+        self._setup_static_approx_coloring()
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
+
         for i in range(repeats):
             # randomize inputs (and outputs if implicit)
             if i > 0:
@@ -970,10 +1017,9 @@ class System(object):
 
         sparsity_time = time.time() - sparsity_start_time
 
-        info = self._approx_coloring_info
         sparsity, ordered_ofs, ordered_wrts = \
-            self._jacobian._compute_sparsity(self, info['wrt_matches'], repeats=repeats, tol=tol,
-                                             orders=orders)
+            self._jacobian._compute_sparsity(self, self._coloring_info['wrt_matches'],
+                                             repeats=repeats, tol=tol, orders=orders)
         self._jacobian._jac_summ = None  # reclaim the memory
 
         coloring = _compute_coloring(sparsity, 'fwd')
@@ -983,11 +1029,9 @@ class System(object):
         coloring._col_var_sizes = list(ordered_wrts.values())
         coloring._sparsity_time = sparsity_time
 
-        coloring._meta = {}  # save metadata we used to create the coloring
-        for name in ('wrt_matches', 'wrt_patterns', 'method', 'form', 'step', 'per_instance',
-                     'repeats', 'tol', 'orders', 'dynamic'):
-            if name in info:
-                coloring._meta[name] = info[name]
+        info = self._coloring_info
+        coloring._meta = info.copy()  # save metadata we used to create the coloring
+        del coloring._meta['coloring']
 
         info['coloring'] = coloring
 
@@ -1024,32 +1068,21 @@ class System(object):
                 os.mkdir(directory)
             coloring.save(fname)
 
-    def set_coloring(self, coloring=_STD_COLORING_FNAME):
+    def _get_static_coloring(self):
         """
-        Specify a coloring to use for this System.
+        Get the Coloring for this system.
 
-        Parameters
-        ----------
-        coloring : str or Coloring or None
-            If a str, assume a filename and load the coloring from that file. If a
-            Coloring object is provided, use that.  If coloring is _STD_COLORING_FNAME,
-            the default, assume that a coloring file exists in a standard location
-            (Problem.options['directory']/coloring_files), using a standard naming
-            convention.  If different instances of the current class can have different
-            colorings, then the standard name will be based on the full system pathname
-            of the current instance, with '.' replaced by '_'.  If all instances of the
-            current class are the same, the standard name will be based on the full
-            module path of the current class, again with '.' replaced by '_'.
+        If necessary, load the Coloring from a file.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possible loaded from a file, or None
         """
-        self._approx_coloring_info['coloring'] = coloring
+        info = self._coloring_info
+        coloring = info['coloring']
 
-    def _get_coloring(self):
-        info = self._approx_coloring_info
-        coloring = info.get('coloring')
-        dynamic = False
-        if isinstance(coloring, Coloring):
-            return coloring, False
-        elif coloring is _STD_COLORING_FNAME:
+        if coloring is _STD_COLORING_FNAME:
             # load the coloring file now that we have enough info
             if 'per_instance' in info:
                 fname = get_coloring_fname(self, info['per_instance'])
@@ -1057,19 +1090,36 @@ class System(object):
                 fname = get_coloring_fname(self, True)
                 if not os.path.isfile(fname):
                     fname = get_coloring_fname(self, False)
-            coloring = Coloring.load(fname)
+            print("%s: loading coloring from file %s" % (self.pathname, fname))
+            info['coloring'] = coloring = Coloring.load(fname)
+            info.update(info['coloring']._meta)
         elif isinstance(coloring, string_types):
-            coloring = Coloring.load(info['coloring'])
-        elif info.get('dynamic'):
-            coloring = self.compute_approx_coloring()
+            print("%s: loading coloring from file %s" % (self.pathname, fname))
+            info['coloring'] = coloring = Coloring.load(info['coloring'])
+            info.update(info['coloring']._meta)
+        elif coloring is _DYN_COLORING:
+            coloring = None
+
+        return coloring
+
+    def _get_coloring(self):
+        """
+        Get the Coloring for this system.
+
+        If necessary, load the Coloring from a file or dynamically generate it.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possible loaded from a file or dynamically generated, or None
+        """
+        coloring = self._get_static_coloring()
+        if coloring is None and self._coloring_info['coloring'] is _DYN_COLORING:
+            self._coloring_info['coloring'] = coloring = self.compute_approx_coloring()
             coloring.summary()
-            dynamic = True
+            self._coloring_info.update(coloring._meta)
 
-        if coloring is not None:
-            info['coloring'] = coloring
-            info.update(coloring._meta)
-
-        return coloring, dynamic
+        return coloring
 
     def _setup_par_fd_procs(self, comm):
         """

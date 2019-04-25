@@ -215,18 +215,18 @@ class Component(System):
                                                                 self._approx_schemes):
             raise RuntimeError("'%s': num_par_fd is > 1 but no FD is active." % self.pathname)
 
-        # check here if declare_partial_coloring was called during setup but declare_partials
+        # check here if declare_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
         # have something to color.
-        if self._approx_coloring_info:
+        if self._coloring_info['coloring'] is not None:
             for key, meta in iteritems(self._declared_partials):
                 if 'method' in meta:
                     break
             else:
-                method = self._approx_coloring_info['method']
-                simple_warning("%s: declare_partial_coloring was called but no approx partials "
-                               "were declared.  Declaring all partials as approximated using "
-                               "default metadata and method='%s'." % (self.pathname, method))
+                method = self._coloring_info['method']
+                simple_warning("%s: declare_coloring or use_fixed_coloring was called but no approx"
+                               " partials were declared.  Declaring all partials as approximated "
+                               "using default metadata and method='%s'." % (self.pathname, method))
                 self.declare_partials('*', '*', method=method)
 
         self._static_mode = True
@@ -372,52 +372,11 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
-    def declare_partial_coloring(self, wrt=None, method=None, form=None, step=None,
-                                 per_instance=False, repeats=None, tol=None, orders=None,
-                                 perturb_size=None, dynamic=False):
-        """
-        Set options for partial deriv coloring of a set of wrt vars matching the given pattern(s).
-
-        Parameters
-        ----------
-        wrt : str or list of str
-            The name or names of the variables that derivatives are taken with respect to.
-            This can contain input names, output names, or glob patterns.
-        method : str
-            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
-        form : str
-            Finite difference form, can be "forward", "central", or "backward". Leave
-            undeclared to keep unchanged from previous or default value.
-        step : float
-            Step size for finite difference. Leave undeclared to keep unchanged from previous
-            or default value.
-        per_instance : bool
-            If True, a separate coloring will be generated for each instance of a given class.
-            Otherwise, only one coloring for a given class will be generated and all instances
-            of that class will use it.
-        repeats : int
-            Number of times to repeat partial jacobian computation when computing sparsity.
-            (ignored unless dynamic is True).
-        tol : float
-            Tolerance used to determine if an array entry is nonzero during sparsity determination
-            (ignored unless dynamic is True).
-        orders : int
-            Number of orders above and below the tolerance to check during the tolerance sweep
-            (ignored unless dynamic is True).
-        perturb_size : float
-            Size of input/output perturbation during generation of sparsity
-            (ignored unless dynamic is True).
-        dynamic : bool
-            If True, compute the coloring dynamically at run time.
-        """
-        self._declare_approx_coloring(wrt, method, form, step, per_instance, repeats, tol, orders,
-                                      perturb_size, dynamic)
-
-    def _setup_static_approx_coloring(self, dynamic):
+    def _setup_static_approx_coloring(self):
         if self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
-        info = self._approx_coloring_info
+        info = self._coloring_info
         ofs, allwrt = self._get_partials_varlists()
         meta = {}
 
@@ -427,8 +386,9 @@ class Component(System):
             meta['step'] = info['step']
 
         abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
+        coloring = self._get_static_coloring()
 
-        if not info or info['coloring'] is None:
+        if coloring is None:
             wrt_patterns = info['wrt_patterns']
             matches = set()
             for w in wrt_patterns:
@@ -455,8 +415,6 @@ class Component(System):
                 if key in self._subjacs_info:
                     approx_scheme.add_approximation(key, meta)
         else:  # a static coloring has already been specified
-            coloring, _ = self._get_coloring()
-
             colmeta = meta.copy()
             colmeta['coloring'] = coloring
             wrt_matches = info['wrt_matches']
@@ -1389,9 +1347,9 @@ class Component(System):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
-            coloring, _ = self._get_coloring()
+            coloring = self._get_coloring()
             if coloring is not None:
-                self._setup_static_approx_coloring(False)
+                self._setup_static_approx_coloring()
             return coloring
 
     def _get_ordered_jac_vars(self, absolute=True):

@@ -210,7 +210,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        comp.declare_partial_coloring('x*', method=self.FD_METHOD, dynamic=True)
+        comp.declare_coloring('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -247,7 +247,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        comp.declare_partial_coloring('x*', method=self.FD_METHOD, dynamic=True)
+        comp.declare_coloring('x*', method=self.FD_METHOD)
 
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
@@ -277,7 +277,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompImplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        comp.declare_partial_coloring('x*', method=self.FD_METHOD, dynamic=True)
+        comp.declare_coloring('x*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -312,7 +312,7 @@ class TestCSColoring(unittest.TestCase):
 
         model.add_subsystem('indeps', indeps)
         sub = model.add_subsystem('sub', CounterGroup())
-        sub.declare_semi_total_coloring('*', method=self.FD_METHOD, dynamic=True)
+        sub.declare_coloring('*', method=self.FD_METHOD)
         comp = sub.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
         model.connect('indeps.x0', 'sub.comp.x0')
         model.connect('indeps.x1', 'sub.comp.x1')
@@ -337,7 +337,7 @@ class TestCSColoring(unittest.TestCase):
         prob = Problem()
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        prob.driver.options['dynamic_total_coloring'] = True
+        prob.driver.declare_coloring()
         prob.driver.options['dynamic_derivs_repeats'] = 1
 
         sparsity = np.array(
@@ -356,7 +356,7 @@ class TestCSColoring(unittest.TestCase):
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD, isplit=2, osplit=2))
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
-        model.declare_total_coloring('*', method=self.FD_METHOD, step=1e-6 if self.FD_METHOD=='fd' else None)
+        model.declare_coloring('*', method=self.FD_METHOD, step=1e-6 if self.FD_METHOD=='fd' else None)
 
         model.comp.add_objective('y0', index=0)  # pyoptsparse SLSQP requires a scalar objective, so pick index 0
         model.comp.add_constraint('y1', lower=[1., 2.])
@@ -379,7 +379,7 @@ class TestCSColoring(unittest.TestCase):
         prob = Problem()
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        prob.driver.options['dynamic_total_coloring'] = True
+        prob.driver.declare_coloring()
 
         sparsity = np.array(
             [[1, 0, 0, 1, 1],
@@ -423,7 +423,7 @@ class TestCSColoring(unittest.TestCase):
         prob = Problem()
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        prob.driver.options['dynamic_total_coloring'] = True
+        prob.driver.declare_coloring()
 
         sparsity = np.array(
             [[1, 0, 0, 1, 1],
@@ -440,7 +440,7 @@ class TestCSColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        # model.declare_partial_coloring('*', method=self.FD_METHOD)
+        # model.declare_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -526,7 +526,8 @@ class TestCSStaticColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        comp.set_coloring()
+        comp.declare_coloring(wrt='*', method=self.FD_METHOD)
+        comp.use_fixed_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -580,7 +581,8 @@ class TestCSStaticColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        comp.set_coloring()
+        comp.declare_coloring(wrt='*', method=self.FD_METHOD)
+        comp.use_fixed_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -629,7 +631,8 @@ class TestCSStaticColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        comp.set_coloring()
+        comp.declare_coloring(wrt='x*', method=self.FD_METHOD)
+        comp.use_fixed_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -692,7 +695,8 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
 
-        sub.set_coloring()
+        sub.declare_coloring(wrt='*', method=self.FD_METHOD)
+        sub.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -756,7 +760,8 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.set_coloring()
+        model.declare_coloring(wrt='*', method=self.FD_METHOD)
+        model.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -822,7 +827,8 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.set_coloring()
+        model.declare_coloring(wrt='*', method=self.FD_METHOD)
+        model.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -887,7 +893,8 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.set_coloring()
+        model.declare_coloring(wrt='*', method=self.FD_METHOD)
+        model.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -955,7 +962,8 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.set_coloring()
+        model.declare_coloring(wrt='*', method=self.FD_METHOD)
+        model.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -989,7 +997,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_subsystem('indeps', indeps)
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, self.FD_METHOD,
                                                               isplit=2, osplit=2))
-        # model.declare_partial_coloring('*', method=self.FD_METHOD)
+        # model.declare_coloring('*', method=self.FD_METHOD)
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
@@ -1026,7 +1034,8 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x1')
         model.approx_totals(method=self.FD_METHOD)
 
-        model.set_coloring()
+        model.declare_coloring(wrt='*', method=self.FD_METHOD)
+        model.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -1123,7 +1132,8 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         # make sure coloring file exists by the time we try to load the spec
         MPI.COMM_WORLD.barrier()
 
-        sub.set_coloring()
+        sub.declare_coloring(wrt='*', method=self.FD_METHOD)
+        sub.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -1185,7 +1195,8 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         # make sure coloring file exists by the time we try to load the spec
         MPI.COMM_WORLD.barrier()
 
-        coloring = comp.set_coloring()
+        comp.declare_coloring(wrt='*', method=self.FD_METHOD)
+        comp.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -1249,7 +1260,8 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         # make sure coloring file exists by the time we try to load the spec
         MPI.COMM_WORLD.barrier()
 
-        comp.set_coloring()
+        comp.declare_coloring(wrt='*', method=self.FD_METHOD)
+        comp.use_fixed_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()

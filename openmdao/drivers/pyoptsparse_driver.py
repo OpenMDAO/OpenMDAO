@@ -152,12 +152,8 @@ class pyOptSparseDriver(Driver):
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
-        self.options.declare('dynamic_total_sparsity', default=False, types=bool,
-                             desc='Compute derivative sparsity dynamically if True')
         self.options.declare('dynamic_derivs_sparsity', default=False, types=bool,
                              desc='Compute derivative sparsity dynamically if True (deprecated)')
-        self.options.declare('dynamic_total_coloring', default=False, types=bool,
-                             desc='Compute simultaneous derivative coloring dynamically if True')
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically '
                              'if True (deprecated)')
@@ -223,20 +219,16 @@ class pyOptSparseDriver(Driver):
 
         # compute dynamic simul deriv coloring or just sparsity if option is set
         if coloring_mod._use_sparsity:
-            if self.options['dynamic_total_coloring']:
+            if self._coloring_info['coloring'] is coloring_mod._DYN_COLORING:
                 coloring_mod.dynamic_total_coloring(self, run_model=not model_ran)
                 self._setup_tot_jac_sparsity()
             elif self.options['dynamic_simul_derivs']:
-                warn_deprecation("'dynamic_simul_derivs has been deprecated. Use "
-                                 "'dynamic_total_coloring' instead.")
+                warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
+                                 "the 'declare_coloring' function instead.")
                 coloring_mod.dynamic_total_coloring(self, run_model=not model_ran)
                 self._setup_tot_jac_sparsity()
-            elif self.options['dynamic_total_sparsity']:
-                coloring_mod.dynamic_total_sparsity(self)
             elif self.options['dynamic_derivs_sparsity']:
-                warn_deprecation("'dynamic_derivs_sparsity' has been deprecated. Use "
-                                 "'dynamic_total_sparsity' instead.")
-                coloring_mod.dynamic_total_sparsity(self)
+                coloring_mod.dynamic_derivs_sparsity(self)
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 

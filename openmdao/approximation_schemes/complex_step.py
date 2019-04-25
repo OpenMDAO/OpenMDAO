@@ -12,6 +12,7 @@ from openmdao.approximation_schemes.approximation_scheme import ApproximationSch
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, \
     update_sizes, _get_jac_slice_dict
+from openmdao.utils.coloring import Coloring
 
 
 _full_slice = slice(None)
@@ -86,7 +87,7 @@ class ComplexStep(ApproximationScheme):
 
         """
         options = approx_tuple[1]
-        if 'coloring' in options and options['coloring'] is not None:
+        if 'coloring' in options and options['coloring'].__class__ is Coloring:
             # this will only happen after the coloring has been computed
             return ('@color', options['step'], options['directional'])
         else:

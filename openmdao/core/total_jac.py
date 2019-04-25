@@ -182,19 +182,23 @@ class _TotalJacInfo(object):
 
         abs2meta = model._var_allprocs_abs2meta
 
+        constraints = driver._cons
+
+        for name in of:
+            if name in constraints and constraints[name]['linear']:
+                has_lin_cons = True
+                self.simul_coloring = None
+                break
+        else:
+            has_lin_cons = False
+
+        self.has_lin_cons = has_lin_cons
+
         if approx:
             _initialize_model_approx(model, driver, self.of, self.wrt)
         else:
-            constraints = driver._cons
-
-            for name in of:
-                if name in constraints and constraints[name]['linear']:
-                    has_lin_cons = True
-                    self.simul_coloring = None
-                    break
-            else:
-                has_lin_cons = False
-                self.simul_coloring = driver._total_coloring
+            if not has_lin_cons:
+                self.simul_coloring = driver._coloring_info['coloring']
 
                 # if we don't get wrt and of from driver, turn off coloring
                 if self.simul_coloring is not None and (wrt != driver_wrt or of != driver_of):
@@ -205,8 +209,6 @@ class _TotalJacInfo(object):
                            (driver_wrt, wrt, driver_of, of))
                     simple_warning(msg)
                     self.simul_coloring = None
-
-            self.has_lin_cons = has_lin_cons
 
             if self.simul_coloring is None:
                 modes = [self.mode]
@@ -1304,8 +1306,7 @@ class _TotalJacInfo(object):
                 model.approx_totals(method='fd')
 
             model._setup_jacobians(recurse=False)
-            if model._approx_schemes or model._approx_coloring_info:
-                model._setup_approx_partials()
+            model._setup_approx_partials()
 
         # Linearize Model
         model._linearize(model._assembled_jac,

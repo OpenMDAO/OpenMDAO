@@ -262,16 +262,15 @@ class ImplicitComponent(Component):
         """
         Set subjacobian info into our jacobian.
         """
-        info = self._approx_coloring_info
+        coloring = self._get_static_coloring()  # this will load coloring file if needed
+
         # if coloring has been specified, we don't want to have multiple
         # approximations for the same subjac, so don't register any new
         # approximations when the wrt matches those used in the coloring.
-        if info and info['coloring'] is not None:
-            self._get_coloring()  # make sure any coloring file has been loaded
-            # static coloring has been specified
-            wrt_matches = info['wrt_matches']
-        else:
+        if coloring is None:
             wrt_matches = ()
+        else:
+            wrt_matches = coloring._meta['wrt_matches']
 
         for key, meta in iteritems(self._subjacs_info):
             if 'method' in meta and key[1] not in wrt_matches:

@@ -53,20 +53,19 @@ Dynamic coloring computes the derivative colors at runtime, shortly after the dr
 optimization.  This has the advantage of simplicity and robustness to changes in the model, but
 adds the cost of the coloring computation to the run time of the optimization.  For a typical
 optimization, however, this cost will be small.  Activating dynamic coloring is simple.  Just
-set the `dynamic_total_coloring` option on the driver.  For example:
+call the `declare_coloring` function on the driver.  For example:
 
 .. code-block:: python
 
-    prob.driver.options['dynamic_total_coloring'] = True
+    prob.driver.declare_coloring()
 
 
 If you want to change the number of compute_totals calls that the coloring algorithm uses to
-compute the jacobian sparsity (default is 3), you can set the `dynamic_derivs_repeats` option.
-For example:
+compute the jacobian sparsity (default is 3), you can pass the `repeats` arg. For example:
 
 .. code-block:: python
 
-    prob.driver.options['dynamic_derivs_repeats'] = 2
+    prob.driver.declare_coloring(repeats=2)
 
 
 Whenever a dynamic coloring is computed, the coloring is written to a file called
