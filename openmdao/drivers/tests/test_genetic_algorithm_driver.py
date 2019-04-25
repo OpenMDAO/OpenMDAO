@@ -104,19 +104,22 @@ class TestSimpleGA(unittest.TestCase):
         prob = Problem()
         model = prob.model = Group()
 
-        model.add_subsystem('p1', IndepVarComp('xC', 7.5))
-        model.add_subsystem('p2', IndepVarComp('xI', 0.0))
-        model.add_subsystem('comp', Branin())
+        indep = IndepVarComp()
+        indep.add_output('xC', val=7.5)
+        indep.add_discrete_output('xI', val=0)
 
-        model.connect('p2.xI', 'comp.x0')
-        model.connect('p1.xC', 'comp.x1')
+        model.add_subsystem('p', indep)
+        model.add_subsystem('comp', BraninDiscrete())
 
-        model.add_design_var('p2.xI', lower=-5.0, upper=10.0)
-        model.add_design_var('p1.xC', lower=0.0, upper=15.0)
+        model.connect('p.xI', 'comp.x0')
+        model.connect('p.xC', 'comp.x1')
+
+        model.add_design_var('p.xI', lower=-5, upper=10)
+        model.add_design_var('p.xC', lower=0.0, upper=15.0)
         model.add_objective('comp.f')
 
         prob.driver = SimpleGADriver(max_gen=75, pop_size=25)
-        prob.driver.options['bits'] = {'p1.xC': 8}
+        prob.driver.options['bits'] = {'p.xC': 8}
 
         prob.driver._randomstate = 1
 
@@ -125,7 +128,7 @@ class TestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
-        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        self.assertTrue(int(prob['p.xI']) in [3, -3])
 
     def test_mixed_integer_3bar(self):
         np.random.seed(1)

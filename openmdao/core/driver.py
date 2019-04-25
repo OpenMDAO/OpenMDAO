@@ -64,12 +64,23 @@ class Driver(object):
         Provides a consistent way for drivers to declare what features they support.
     _designvars : dict
         Contains all design variable info.
+    _designvars_discrete : list
+        List of design variables that are discrete.
     _cons : dict
         Contains all constraint info.
     _objs : dict
         Contains all objective info.
     _responses : dict
         Contains all response info.
+    _remote_dvs : dict
+        Dict of design variables that are remote on at least one proc. Values are
+        (owning rank, size).
+    _remote_cons : dict
+        Dict of constraints that are remote on at least one proc. Values are
+        (owning rank, size).
+    _remote_objs : dict
+        Dict of objectives that are remote on at least one proc. Values are
+        (owning rank, size).
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this driver.
     _vars_to_record: dict
@@ -106,6 +117,7 @@ class Driver(object):
 
         self._problem = None
         self._designvars = None
+        self._designvars_discrete = []
         self._cons = None
         self._objs = None
         self._responses = None
@@ -235,6 +247,12 @@ class Driver(object):
             np.any([r['scaler'] is not None for r in itervalues(self._responses)]) or
             np.any([dv['scaler'] is not None for dv in itervalues(self._designvars)])
         )
+
+        # Determine if any design variables are discrete.
+        self._designvars_discrete = [dv for dv in self._designvars if dv not in self._problem.model._outputs]
+        if self.supports['integer_design_vars'] and len(self._designvars_discrete) > 1:
+            msg = "Discrete design variables are not supported by this driver."
+            raise RuntimeError(msg)
 
         con_set = set()
         obj_set = set()
@@ -459,7 +477,9 @@ class Driver(object):
 
             comm.Bcast(val, root=owner)
         else:
-            if indices is None or ignore_indices:
+            if name in self._designvars_discrete:
+                val = model._discrete_outputs[name]
+            elif indices is None or ignore_indices:
                 val = vec[name].copy()
             else:
                 val = vec[name][indices]
@@ -527,18 +547,33 @@ class Driver(object):
         if indices is None:
             indices = slice(None)
 
-        desvar = problem.model._outputs._views_flat[name]
-        desvar[indices] = value
+        if name in self._designvars_discrete:
+            problem.model._discrete_outputs[name] = value
 
-        if self._has_scaling:
-            # Scale design variable values
-            scaler = meta['scaler']
-            if scaler is not None:
-                desvar[indices] *= 1.0 / scaler
+            if self._has_scaling:
+                # Scale design variable values
+                var = problem.model._discrete_outputs[name]
+                scaler = meta['scaler']
+                if scaler is not None:
+                    var *= 1.0 / scaler
 
-            adder = meta['adder']
-            if adder is not None:
-                desvar[indices] -= adder
+                adder = meta['adder']
+                if adder is not None:
+                    var -= adder
+
+        else:
+            desvar = problem.model._outputs._views_flat[name]
+            desvar[indices] = value
+
+            if self._has_scaling:
+                # Scale design variable values
+                scaler = meta['scaler']
+                if scaler is not None:
+                    desvar[indices] *= 1.0 / scaler
+
+                adder = meta['adder']
+                if adder is not None:
+                    desvar[indices] -= adder
 
     def get_response_values(self, filter=None):
         """

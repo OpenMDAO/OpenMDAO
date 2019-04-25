@@ -46,7 +46,6 @@ class Branin(ExplicitComponent):
         """
         x0 = inputs['x0']
         x1 = inputs['x1']
-        print(x0, x1)
 
         a = 1.0
         b = 5.1/(4.0*np.pi**2)
@@ -103,7 +102,6 @@ class BraninDiscrete(ExplicitComponent):
         """
         x0 = discrete_inputs['x0']
         x1 = inputs['x1']
-        print(x0, x1)
 
         a = 1.0
         b = 5.1/(4.0*np.pi**2)
