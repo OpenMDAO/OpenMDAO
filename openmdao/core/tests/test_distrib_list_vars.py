@@ -170,7 +170,7 @@ class DistributedListVarsTest(unittest.TestCase):
         class Mygroup(Group):
 
             def setup(self):
-                self.add_subsystem('indep_var_comp', IndepVarComp('x', 1.0), promotes=['*'])
+                self.add_subsystem('indep_var_comp', IndepVarComp('x'), promotes=['*'])
                 self.add_subsystem('Cy', ExecComp('y=2*x'), promotes=['*'])
                 self.add_subsystem('Cc', ExecComp('c=x+2'), promotes=['*'])
 
