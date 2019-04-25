@@ -65,28 +65,6 @@ _DEFAULT_COLORING_META = {
 }
 
 
-class _DebugDict(object):
-    def __init__(self):
-        self._dict = {}
-
-    def __setitem__(self, name, value):
-        print('%s = %s' % (name, value))
-        self._dict[name] = value
-
-    def __getitem__(self, name):
-        return self._dict[name]
-
-    def update(self, dct):
-        for n, v in dct.items():
-            self[n] = v
-
-    def items(self):
-        return self._dict.items()
-
-    def get(self, name):
-        return self._dict.get(name)
-
-
 class System(object):
     """
     Base class for all systems in OpenMDAO.
