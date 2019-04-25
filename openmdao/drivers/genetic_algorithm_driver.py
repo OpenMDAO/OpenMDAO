@@ -244,7 +244,6 @@ class SimpleGADriver(Driver):
         bits = np.empty((count, ), dtype=np.int)
         x0 = np.empty(count)
 
-
         # Figure out bounds vectors and initial design vars
         for name, meta in iteritems(desvars):
             i, j = self._desvar_idx[name]

@@ -128,7 +128,8 @@ class TestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
-        self.assertTrue(int(prob['p.xI']) in [3, -3])
+        self.assertTrue(prob['p.xI'] in [3, -3])
+        self.assertTrue(isinstance(prob['p.xI'], int))
 
     def test_mixed_integer_3bar(self):
         np.random.seed(1)

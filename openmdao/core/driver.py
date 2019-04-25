@@ -164,7 +164,7 @@ class Driver(object):
         self.supports.declare('linear_constraints', types=bool, default=False)
         self.supports.declare('two_sided_constraints', types=bool, default=False)
         self.supports.declare('multiple_objectives', types=bool, default=False)
-        self.supports.declare('integer_design_vars', types=bool, default=False)
+        self.supports.declare('integer_design_vars', types=bool, default=True)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('active_set', types=bool, default=False)
         self.supports.declare('simultaneous_derivatives', types=bool, default=False)
@@ -249,9 +249,11 @@ class Driver(object):
         )
 
         # Determine if any design variables are discrete.
-        self._designvars_discrete = [dv for dv in self._designvars if dv not in self._problem.model._outputs]
-        if self.supports['integer_design_vars'] and len(self._designvars_discrete) > 1:
-            msg = "Discrete design variables are not supported by this driver."
+        self._designvars_discrete = [dv for dv in self._designvars
+                                     if dv in model._discrete_outputs]
+        if not self.supports['integer_design_vars'] and len(self._designvars_discrete) > 0:
+            msg = "Discrete design variables are not supported by this driver: "
+            msg += '.'.join(self._designvars_discrete)
             raise RuntimeError(msg)
 
         con_set = set()
@@ -548,18 +550,7 @@ class Driver(object):
             indices = slice(None)
 
         if name in self._designvars_discrete:
-            problem.model._discrete_outputs[name] = value
-
-            if self._has_scaling:
-                # Scale design variable values
-                var = problem.model._discrete_outputs[name]
-                scaler = meta['scaler']
-                if scaler is not None:
-                    var *= 1.0 / scaler
-
-                adder = meta['adder']
-                if adder is not None:
-                    var -= adder
+            problem.model._discrete_outputs[name] = int(value)
 
         else:
             desvar = problem.model._outputs._views_flat[name]
