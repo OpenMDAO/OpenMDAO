@@ -66,7 +66,7 @@ install:
     echo ">>> Building python environment";
     echo " >> Installing conda";
     echo "  > Downloading miniconda";
-    wget "https://repo.continuum.io/miniconda/Miniconda${PYTHON:0:1}-4.5.11-Linux-x86_64.sh" -O miniconda.sh;
+    wget "https://repo.continuum.io/miniconda/Miniconda${PYTHON:0:1}-latest-Linux-x86_64.sh" -O miniconda.sh;
     chmod +x miniconda.sh;
     echo "  > Installing miniconda";
     ./miniconda.sh -b  -p $HOME/miniconda;
