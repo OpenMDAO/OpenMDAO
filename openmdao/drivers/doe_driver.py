@@ -75,7 +75,7 @@ class DOEDriver(Driver):
                              desc='The case generator. If default, no cases are generated.')
         self.options.declare('run_parallel', types=bool, default=False,
                              desc='Set to True to execute cases in parallel.')
-        self.options.declare('procs_per_model', default=1, lower=1,
+        self.options.declare('procs_per_model', types=int, default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
     def _setup_comm(self, comm):
