@@ -17,6 +17,7 @@ Components
     mux_demux_comps.rst
     ks_comp.rst
     bsplines_comp.rst
+    akima_spline_comp.rst
     add_subtract_comp.rst
     cross_product_comp.rst
     dot_product_comp.rst

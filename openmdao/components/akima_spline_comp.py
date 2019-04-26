@@ -57,6 +57,13 @@ class AkimaSplineComp(ExplicitComponent):
     Assumes a uniform distribution of points. Control points fully span the distribution.
     Output (computational) points can be at either the end points or segment center
     points.
+
+    Attributes
+    ----------
+    x_grid : None or ndarray
+        Cached training grid.
+    x_cp_grid : None or ndarray
+        Cached interpolation grid.
     """
 
     def __init__(self, **kwargs):
@@ -167,9 +174,12 @@ class AkimaSplineComp(ExplicitComponent):
             self.declare_partials(of=y_name, wrt=xcp_name, rows=rows, cols=cols)
 
         if x_name is not None:
-            row_col = np.arange(num_points * vec_size)
+            row_col = np.arange(num_points)
+            rows = np.tile(row_col, vec_size) + np.repeat(num_points * np.arange(vec_size),
+                                                          num_points)
+            cols = np.tile(row_col, vec_size)
 
-            self.declare_partials(of=y_name, wrt=x_name, rows=row_col, cols=row_col)
+            self.declare_partials(of=y_name, wrt=x_name, rows=rows, cols=cols)
 
     def compute(self, inputs, outputs):
         """
@@ -198,11 +208,11 @@ class AkimaSplineComp(ExplicitComponent):
             x = inputs[opts['x_name']]
 
         # Train on control points.
-        self.akima_setup_dv(x_cp, y_cp[0, :])
+        self.akima_setup_dv(x_cp, y_cp)
 
         # Evaluate at computational points.
         y = self.akima_iterpolate(x, x_cp)
-        outputs[y_name][0, :] = y
+        outputs[y_name] = y
 
     def compute_partials(self, inputs, partials):
         """
@@ -232,131 +242,168 @@ class AkimaSplineComp(ExplicitComponent):
         Train the akima spline and save the derivatives.
 
         Conversion of fortran function AKIMA_DV.
+
+        Parameters
+        ----------
+        xpt : ndarray
+            Values at which the akima spline was trained.
+        ypt : ndarray
+            Training values for the akima spline.
         """
         opts = self.options
-        delta_x = self.options['delta_x']
-        eps = self.options['eps']
+        delta_x = opts['delta_x']
+        eps = opts['eps']
+        vec_size = opts['vec_size']
         ncp = opts['num_control_points']
         nbdirs = 2 * ncp
 
-        xptd = np.vstack([np.eye(ncp, dtype=ypt.dtype),
-                          np.zeros((ncp, ncp), dtype=ypt.dtype)])
-        yptd = np.vstack([np.zeros((ncp, ncp), dtype=ypt.dtype),
-                          np.eye(ncp, dtype=ypt.dtype)])
+        # Poly points and derivs
+        p1 = np.empty((vec_size, ncp - 1), dtype=ypt.dtype)
+        p2 = np.empty((vec_size, ncp - 1), dtype=ypt.dtype)
+        p3 = np.empty((vec_size, ncp - 1), dtype=ypt.dtype)
+        p0d = np.empty((vec_size, nbdirs, ncp - 1), dtype=ypt.dtype)
+        p1d = np.empty((vec_size, nbdirs, ncp - 1), dtype=ypt.dtype)
+        p2d = np.empty((vec_size, nbdirs, ncp - 1), dtype=ypt.dtype)
+        p3d = np.empty((vec_size, nbdirs, ncp - 1), dtype=ypt.dtype)
 
         md = np.zeros((nbdirs, ncp + 3), dtype=ypt.dtype)
         m = np.zeros((ncp + 3, ), dtype=ypt.dtype)
         td = np.zeros((nbdirs, ncp), dtype=ypt.dtype)
         t = np.zeros((ncp, ), dtype=ypt.dtype)
 
-        # Compute segment slopes
-        md[:, 2:ncp + 1] = ((yptd[:, 1:] - yptd[:, :-1]) * (xpt[1:] - xpt[:-1]) -
-                            (ypt[1:] - ypt[:-1]) * (xptd[:, 1:] - xptd[:, :-1])) / \
-            (xpt[1:] - xpt[:-1]) ** 2
+        xptd = np.vstack([np.eye(ncp, dtype=ypt.dtype),
+                          np.zeros((ncp, ncp), dtype=ypt.dtype)])
+        yptd = np.vstack([np.zeros((ncp, ncp), dtype=ypt.dtype),
+                          np.eye(ncp, dtype=ypt.dtype)])
 
-        m[2:ncp + 1] = (ypt[1:] - ypt[:-1]) / (xpt[1:] - xpt[:-1])
-
-        # Estimation for end points.
-        md[:, 1] = 2.0 * md[:, 2] - md[:, 3]
-        md[:, 0] = 2.0 * md[:, 1] - md[:, 2]
-        md[:, ncp + 1] = 2.0 * md[:, ncp] - md[:, ncp - 1]
-        md[:, ncp + 2] = 2.0 * md[:, ncp + 1] - md[:, ncp]
-
-        m[1] = 2.0 * m[2] - m[3]
-        m[0] = 2.0 * m[1] - m[2]
-        m[ncp + 1] = 2.0 * m[ncp] - m[ncp - 1]
-        m[ncp + 2] = 2.0 * m[ncp + 1] - m[ncp]
-
-        # Slope at points.
-        for i in range(2, ncp + 1):
-            m1d = md[:, i - 2]
-            m2d = md[:, i - 1]
-            m3d = md[:, i]
-            m4d = md[:, i + 1]
-            arg1d = m4d - m3d
-
-            m1 = m[i - 2]
-            m2 = m[i - 1]
-            m3 = m[i]
-            m4 = m[i + 1]
-            arg1 = m4 - m3
-
-            w1, w1d = abs_smooth_dv(arg1, arg1d, delta_x)
-
-            arg1d = m2d - m1d
-            arg1 = m2 - m1
-
-            w2, w2d = abs_smooth_dv(arg1, arg1d, delta_x)
-
-            if w1 < eps and w2 < eps:
-                # Special case to avoid divide by zero.
-                td[:, i - 2] = 0.5 * (m2d + m3d)
-                t[i - 2] = 0.5 * (m2 + m3)
-
-            else:
-                td[:, i - 2] = ((w1d * m2 + w1 * m2d + w2d * m3 + w2 * m3d) *
-                                (w1 + w2) - (w1 * m2 + w2 * m3) * (w1d + w2d)) \
-                    / (w1 + w2) ** 2
-
-                t[i - 2] = (w1 * m2 + w2 * m3) / (w1 + w2)
-
-        # Polynomial Coefficients
         dx = xpt[1:] - xpt[:-1]
         dx2 = dx**2
         dxd = xptd[:, 1:] - xptd[:, :-1]
-        t1 = t[:-1]
-        t2 = t[1:]
 
-        p0 = ypt
-        p1 = t1
-        p2 = (3.0 * m[2:ncp + 1] - 2.0 * t1 - t2) / dx
-        p3 = (t1 + t2 - 2.0 * m[2:ncp + 1]) / dx2
+        p0 = ypt[:, :-1]
 
-        p0d = yptd
-        p1d = td[:, :-1]
-        p2d = ((3.0 * md[:, 2:ncp + 1] - 2.0 * td[:, :-1] - td[:, 1:]) * dx -
-               (3.0 * m[2:ncp + 1] - 2.0 * t1 - t2) * dxd) / dx2
-        p3d = ((td[:, :-1] + td[:, 1:] - 2.0 * md[:, 2:ncp + 1]) * dx2 -
-               (t1 + t2 - 2.0 * m[2:ncp + 1]) * 2 * dx * dxd) / (dx2)**2
+        # TODO - It is possible to vectorize this further if some more effort is put in here.
+        # Returns might be marginal though, and counterbalanced by increased memory. For
+        # future investigation, here are the vectorized slopes:
+        # md_f[:, :, 2:ncp + 1] = ((yptd[:, 1:] - yptd[:, :-1]) * (xpt[1:] - xpt[:-1]) -
+        #                          np.einsum('ij,kj->ikj', ypt[:, 1:] - ypt[:, :-1],
+        #                                    xptd[:, 1:] - xptd[:, :-1])) / \
+        #     (xpt[1:] - xpt[:-1]) ** 2
+        # m_f[:, 2:ncp + 1] = (ypt[:, 1:] - ypt[:, :-1]) / (xpt[1:] - xpt[:-1])
+
+        for jj in range(vec_size):
+
+            ypt_jj = ypt[jj, :]
+
+            # Compute segment slopes
+            md[:, 2:ncp + 1] = ((yptd[:, 1:] - yptd[:, :-1]) * (xpt[1:] - xpt[:-1]) -
+                                (ypt_jj[1:] - ypt_jj[:-1]) * (xptd[:, 1:] - xptd[:, :-1])) / \
+                (xpt[1:] - xpt[:-1]) ** 2
+
+            m[2:ncp + 1] = (ypt_jj[1:] - ypt_jj[:-1]) / (xpt[1:] - xpt[:-1])
+
+            # Estimation for end points.
+            md[:, 1] = 2.0 * md[:, 2] - md[:, 3]
+            md[:, 0] = 2.0 * md[:, 1] - md[:, 2]
+            md[:, ncp + 1] = 2.0 * md[:, ncp] - md[:, ncp - 1]
+            md[:, ncp + 2] = 2.0 * md[:, ncp + 1] - md[:, ncp]
+
+            m[1] = 2.0 * m[2] - m[3]
+            m[0] = 2.0 * m[1] - m[2]
+            m[ncp + 1] = 2.0 * m[ncp] - m[ncp - 1]
+            m[ncp + 2] = 2.0 * m[ncp + 1] - m[ncp]
+
+            # Slope at points.
+            for i in range(2, ncp + 1):
+                m1d = md[:, i - 2]
+                m2d = md[:, i - 1]
+                m3d = md[:, i]
+                m4d = md[:, i + 1]
+                arg1d = m4d - m3d
+
+                m1 = m[i - 2]
+                m2 = m[i - 1]
+                m3 = m[i]
+                m4 = m[i + 1]
+                arg1 = m4 - m3
+
+                w1, w1d = abs_smooth_dv(arg1, arg1d, delta_x)
+
+                arg1d = m2d - m1d
+                arg1 = m2 - m1
+
+                w2, w2d = abs_smooth_dv(arg1, arg1d, delta_x)
+
+                if w1 < eps and w2 < eps:
+                    # Special case to avoid divide by zero.
+                    td[:, i - 2] = 0.5 * (m2d + m3d)
+                    t[i - 2] = 0.5 * (m2 + m3)
+
+                else:
+                    td[:, i - 2] = ((w1d * m2 + w1 * m2d + w2d * m3 + w2 * m3d) *
+                                    (w1 + w2) - (w1 * m2 + w2 * m3) * (w1d + w2d)) \
+                        / (w1 + w2) ** 2
+
+                    t[i - 2] = (w1 * m2 + w2 * m3) / (w1 + w2)
+
+            # Polynomial Coefficients
+            t1 = t[:-1]
+            t2 = t[1:]
+
+            p1[jj, :] = t1
+            p2[jj, :] = (3.0 * m[2:ncp + 1] - 2.0 * t1 - t2) / dx
+            p3[jj, :] = (t1 + t2 - 2.0 * m[2:ncp + 1]) / dx2
+
+            p0d[jj, ...] = yptd[:, :-1]
+            p1d[jj, ...] = td[:, :-1]
+            p2d[jj, ...] = ((3.0 * md[:, 2:ncp + 1] - 2.0 * td[:, :-1] - td[:, 1:]) * dx -
+                            (3.0 * m[2:ncp + 1] - 2.0 * t1 - t2) * dxd) / dx2
+            p3d[jj, ...] = ((td[:, :-1] + td[:, 1:] - 2.0 * md[:, 2:ncp + 1]) * dx2 -
+                            (t1 + t2 - 2.0 * m[2:ncp + 1]) * 2 * dx * dxd) / (dx2)**2
 
         self.p0 = p0
         self.p1 = p1
         self.p2 = p2
         self.p3 = p3
 
-        self.dp0_dxcp = p0d[:ncp, :].T
-        self.dp0_dycp = p0d[ncp:, :].T
-        self.dp1_dxcp = p1d[:ncp, :].T
-        self.dp1_dycp = p1d[ncp:, :].T
-        self.dp2_dxcp = p2d[:ncp, :].T
-        self.dp2_dycp = p2d[ncp:, :].T
-        self.dp3_dxcp = p3d[:ncp, :].T
-        self.dp3_dycp = p3d[ncp:, :].T
+        self.dp0_dxcp = p0d[:, :ncp, :].transpose((0, 2, 1))
+        self.dp0_dycp = p0d[:, ncp:, :].transpose((0, 2, 1))
+        self.dp1_dxcp = p1d[:, :ncp, :].transpose((0, 2, 1))
+        self.dp1_dycp = p1d[:, ncp:, :].transpose((0, 2, 1))
+        self.dp2_dxcp = p2d[:, :ncp, :].transpose((0, 2, 1))
+        self.dp2_dycp = p2d[:, ncp:, :].transpose((0, 2, 1))
+        self.dp3_dxcp = p3d[:, :ncp, :].transpose((0, 2, 1))
+        self.dp3_dycp = p3d[:, ncp:, :].transpose((0, 2, 1))
 
     def akima_iterpolate(self, x, xcp):
         """
         Interpolate the spline at the given points, returning values and derivatives.
 
         Conversion of fortran function INTERP.
+
+        Parameters
+        ----------
+        x : ndarray
+            Values at which to interpolate.
+        xcp : ndarray
+            Values at which the akima spline was trained.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
         """
         opts = self.options
         ncp = opts['num_control_points']
         n = opts['num_points']
+        vec_size = opts['vec_size']
 
         p0 = self.p0
         p1 = self.p1
         p2 = self.p2
         p3 = self.p3
 
-        dp0_dxcp = self.dp0_dxcp
-        dp1_dxcp = self.dp1_dxcp
-        dp2_dxcp = self.dp2_dxcp
-        dp3_dxcp = self.dp3_dxcp
-        dp0_dycp = self.dp0_dycp
-        dp1_dycp = self.dp1_dycp
-        dp2_dycp = self.dp2_dycp
-        dp3_dycp = self.dp3_dycp
-
+        # All vectorized points uses same grid, so find these once.
         j_idx = np.zeros(n, dtype=np.int)
         for i in range(n):
 
@@ -372,28 +419,31 @@ class AkimaSplineComp(ExplicitComponent):
 
             j_idx[i] = j
 
-        # Evaluate polynomial (and derivative)
         dx = x - xcp[j_idx]
         dx2 = dx * dx
         dx3 = dx2 * dx
 
-        y = p0[j_idx] + p1[j_idx] * dx + p2[j_idx] * dx2 + p3[j_idx] * dx3
+        # Evaluate polynomial (and derivative)
+        y = p0[:, j_idx] + p1[:, j_idx] * dx + p2[:, j_idx] * dx2 + p3[:, j_idx] * dx3
 
-        dydx = p1[j_idx] + 2.0 * p2[j_idx] * dx + 3.0 * p3[j_idx] * dx2
+        dydx = p1[:, j_idx] + 2.0 * p2[:, j_idx] * dx + 3.0 * p3[:, j_idx] * dx2
+
+        dydxcp = self.dp0_dxcp[:, j_idx, :] + \
+            np.einsum('kij,i->kij', self.dp1_dxcp[:, j_idx, :], dx) + \
+            np.einsum('kij,i->kij', self.dp2_dxcp[:, j_idx, :], dx2) + \
+            np.einsum('kij,i->kij', self.dp3_dxcp[:, j_idx, :], dx3)
+
+        for jj in range(vec_size):
+            for i in range(n):
+                j = j_idx[i]
+                dydxcp[jj, i, j] -= dydx[jj, i]
+
+        dydycp = self.dp0_dycp[:, j_idx, :] + \
+            np.einsum('kij,i->kij', self.dp1_dycp[:, j_idx, :], dx) + \
+            np.einsum('kij,i->kij', self.dp2_dycp[:, j_idx, :], dx2) + \
+            np.einsum('kij,i->kij', self.dp3_dycp[:, j_idx, :], dx3)
+
         self.dy_dx = dydx
-
-        dydxcp = dp0_dxcp[j_idx, :] + np.einsum('ij,i->ij', dp1_dxcp[j_idx, :], dx) + \
-            np.einsum('ij,i->ij', dp2_dxcp[j_idx, :], dx2) + \
-            np.einsum('ij,i->ij', dp3_dxcp[j_idx, :], dx3)
-
-        for i in range(n):
-            j = j_idx[i]
-            dydxcp[i, j] -= dydx[i]
-
-        dydycp = dp0_dycp[j_idx, :] + np.einsum('ij,i->ij', dp1_dycp[j_idx, :], dx) + \
-            np.einsum('ij,i->ij', dp2_dycp[j_idx, :], dx2) + \
-            np.einsum('ij,i->ij', dp3_dycp[j_idx, :], dx3)
-
         self.dy_dxcp = dydxcp
         self.dy_dycp = dydycp
 
