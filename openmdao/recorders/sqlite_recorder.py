@@ -85,7 +85,7 @@ def blob_to_array(blob):
     """
     out = BytesIO(blob)
     out.seek(0)
-    return np.load(out)
+    return np.load(out, allow_pickle=True)
 
 
 class SqliteRecorder(CaseRecorder):
