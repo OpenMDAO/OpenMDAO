@@ -159,7 +159,7 @@ class TestAkimaFeature(unittest.TestCase):
                         25.93872026, 27.11204263, 28.0871356 , 28.75334084, 29.        ]])
 
 
-        assert_rel_error(self, prob['akima.y'], y)
+        assert_rel_error(self, prob['akima.y'], y, 1e-6)
 
     def test_fixed_grid(self):
         import numpy as np
@@ -189,7 +189,7 @@ class TestAkimaFeature(unittest.TestCase):
                         14.99875415, 16.        , 17.93874585, 21.        , 25.8125    ,
                         29.        ]])
 
-        assert_rel_error(self, prob['akima.y'], y)
+        assert_rel_error(self, prob['akima.y'], y, 1e-6)
 
 
 if __name__ == '__main__':
