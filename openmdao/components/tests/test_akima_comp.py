@@ -23,15 +23,15 @@ class AkimaTestCase(unittest.TestCase):
         prob = Problem()
 
         comp = AkimaSplineComp(num_control_points=ncp, num_points=n,
-                               y_name='y', ycp_name='ycp', x_name='x', xcp_name='xcp')
+                               name='chord', input_x=True, input_xcp=True)
 
         prob.model.add_subsystem('akima', comp)
 
         prob.setup(force_alloc_complex=True)
 
-        prob['akima.xcp'] = xcp
-        prob['akima.ycp'] = ycp.reshape((1, ncp))
-        prob['akima.x'] = x
+        prob['akima.chord:x_cp'] = xcp
+        prob['akima.chord:y_cp'] = ycp.reshape((1, ncp))
+        prob['akima.chord:x'] = x
 
         prob.run_model()
 
@@ -47,7 +47,7 @@ class AkimaTestCase(unittest.TestCase):
                         25.93872026, 27.11204263, 28.0871356 , 28.75334084, 29.        ]])
 
 
-        assert_array_almost_equal(y, prob['akima.y'])
+        assert_array_almost_equal(y, prob['akima.chord:y'])
 
         derivs = prob.check_partials(compact_print=True, method='cs')
 
@@ -61,13 +61,13 @@ class AkimaTestCase(unittest.TestCase):
         prob = Problem()
 
         comp = AkimaSplineComp(num_control_points=ncp, num_points=n,
-                               y_name='y', ycp_name='ycp', evaluate_at='end')
+                               name='chord', eval_at='end')
 
         prob.model.add_subsystem('akima', comp)
 
         prob.setup(force_alloc_complex=True)
 
-        prob['akima.ycp'] = ycp.reshape((1, ncp))
+        prob['akima.chord:y_cp'] = ycp.reshape((1, ncp))
 
         prob.run_model()
 
@@ -75,7 +75,7 @@ class AkimaTestCase(unittest.TestCase):
                         14.99875415, 16.        , 17.93874585, 21.        , 25.8125    ,
                         29.        ]])
 
-        assert_array_almost_equal(y, prob['akima.y'])
+        assert_array_almost_equal(y, prob['akima.chord:y'])
 
         derivs = prob.check_partials(compact_print=True, method='cs')
 
@@ -92,15 +92,15 @@ class AkimaTestCase(unittest.TestCase):
         prob = Problem()
 
         comp = AkimaSplineComp(num_control_points=ncp, num_points=n, vec_size=2,
-                               y_name='y', ycp_name='ycp', x_name='x', xcp_name='xcp')
+                               name='chord', input_x=True, input_xcp=True)
 
         prob.model.add_subsystem('akima', comp)
 
         prob.setup(force_alloc_complex=True)
 
-        prob['akima.xcp'] = xcp
-        prob['akima.ycp'] = ycp
-        prob['akima.x'] = x
+        prob['akima.chord:x_cp'] = xcp
+        prob['akima.chord:y_cp'] = ycp
+        prob['akima.chord:x'] = x
 
         prob.run_model()
 
@@ -111,7 +111,7 @@ class AkimaTestCase(unittest.TestCase):
                         6.        ,  6.73660714,  8.46428571, 10.45982143, 12.        ,
                         13.26785714, 14.        ]])
 
-        assert_array_almost_equal(y, prob['akima.y'])
+        assert_array_almost_equal(y, prob['akima.chord:y'])
 
         derivs = prob.check_partials(compact_print=True, method='cs')
 
@@ -135,15 +135,15 @@ class TestAkimaFeature(unittest.TestCase):
         prob = Problem()
 
         comp = AkimaSplineComp(num_control_points=ncp, num_points=n,
-                               y_name='y', ycp_name='ycp', x_name='x', xcp_name='xcp')
+                               name='chord', input_x=True, input_xcp=True)
 
         prob.model.add_subsystem('akima', comp)
 
         prob.setup(force_alloc_complex=True)
 
-        prob['akima.xcp'] = xcp
-        prob['akima.ycp'] = ycp.reshape((1, ncp))
-        prob['akima.x'] = x
+        prob['akima.chord:x_cp'] = xcp
+        prob['akima.chord:y_cp'] = ycp.reshape((1, ncp))
+        prob['akima.chord:x'] = x
 
         prob.run_model()
 
@@ -159,7 +159,7 @@ class TestAkimaFeature(unittest.TestCase):
                         25.93872026, 27.11204263, 28.0871356 , 28.75334084, 29.        ]])
 
 
-        assert_rel_error(self, prob['akima.y'], y, 1e-6)
+        assert_rel_error(self, prob['akima.chord:y'], y, 1e-6)
 
     def test_fixed_grid(self):
         import numpy as np
@@ -175,13 +175,13 @@ class TestAkimaFeature(unittest.TestCase):
         prob = Problem()
 
         comp = AkimaSplineComp(num_control_points=ncp, num_points=n,
-                               y_name='y', ycp_name='ycp', evaluate_at='end')
+                               name='chord', eval_at='end')
 
         prob.model.add_subsystem('akima', comp)
 
         prob.setup(force_alloc_complex=True)
 
-        prob['akima.ycp'] = ycp.reshape((1, ncp))
+        prob['akima.chord:y_cp'] = ycp.reshape((1, ncp))
 
         prob.run_model()
 
@@ -189,7 +189,7 @@ class TestAkimaFeature(unittest.TestCase):
                         14.99875415, 16.        , 17.93874585, 21.        , 25.8125    ,
                         29.        ]])
 
-        assert_rel_error(self, prob['akima.y'], y, 1e-6)
+        assert_rel_error(self, prob['akima.chord:y'], y, 1e-6)
 
 
 if __name__ == '__main__':

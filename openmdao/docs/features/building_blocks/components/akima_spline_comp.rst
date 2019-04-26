@@ -31,8 +31,24 @@ The following is a simple example where an AkimaSplineComp is used to approximat
 11 points where we would like to evaluate it.  The approximating curve contains 6 points. Note that
 unlke the `BsplinesComp`, the control points fall on the curve.
 
-When we instantiate the AkimaSplineComp, we specify "ycp_name", which is the name of the input, and
-"y_name", which is the name of the output.
+When we instantiate the AkimaSplineComp, we specify "name", which is used as the stem for all inputs and
+outputs as follows:
+
++---------------+-----------------+------------------------------------------------------------+
+| Variable      | I/O             | Description                                                |
++===============+=================+============================================================+
+| name:x_cp     | Input or Output | Control point location (Input if `input_xcp` is True)      |
++---------------+-----------------+------------------------------------------------------------+
+| name:y_cp     | Input           | Control point values                                       |
++---------------+-----------------+------------------------------------------------------------+
+| name:x        | Input or Output | Interpolated point location (Input if `input_x` is True)   |
++---------------+-----------------+------------------------------------------------------------+
+| name:y        | Output          | Interpolated point values                                  |
++---------------+-----------------+------------------------------------------------------------+
+
+In this example, we let the AkimaSplineComp calculate the locations of the control and interpolated
+points using a linear distribution. These values are provided as a component output so that they
+can be used for post processing.
 
 .. embed-code::
     openmdao.components.tests.test_akima_comp.TestAkimaFeature.test_fixed_grid
@@ -42,11 +58,10 @@ When we instantiate the AkimaSplineComp, we specify "ycp_name", which is the nam
 AkimaSplineComp Input Grid Example
 ----------------------------------
 
-In this example, we also specify the grid for the control points and the grid for the interpolation points. The
-grid we define "xcp" is a non-uniform distribution of points, meaning that we can choose their locations arbitrarily.
-The additional inputs are created when we assign a value for "x_name" (for the interpolation points) and "xcp_name"
-(for the control points.)  Note that these values can come from a connected source component. Analytic derivatives
-with respect to these inputs are also defined.
+In this example, we also want to specify the grid for the control points and the grid for the interpolation points.
+We do this by setting "input_x" and "input_xcp" to True, and then setting the values on the unconnected component
+inputs. Note: you could also compute these in a connected source component and pass them in.  The control point
+locations we define here for "chord:x_cp" are a non-uniform distribution, which AkimaSplineComp is fine with.
 
 .. embed-code::
     openmdao.components.tests.test_akima_comp.TestAkimaFeature.test_input_grid

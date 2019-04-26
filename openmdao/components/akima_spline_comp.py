@@ -89,27 +89,24 @@ class AkimaSplineComp(ExplicitComponent):
         self.options.declare('num_points', types=int, default=20,
                              desc="Number of interpolated points.")
         self.options.declare('vec_size', types=int, default=1,
-                             desc='The number of independent rows to interpolate.')
-        self.options.declare('ycp_name', types=str, default='y_cp',
-                             desc="Name to use for the input variable (control points).")
-        self.options.declare('y_name', types=str, default='y',
-                             desc="Name to use for the output variable (interpolated points).")
-        self.options.declare('xcp_name', types=str, default=None, allow_none=True,
-                             desc="Name to use for the input grid (control points). When set to"
-                             "None (default), then the points will be generated internally.")
-        self.options.declare('x_name', types=str, default=None, allow_none=True,
-                             desc="Name to use for the output grid (interpolated points).")
+                             desc='Number of independent rows to interpolate.')
+        self.options.declare('name', types=str, default=None, allow_none=True,
+                             desc="Name to use for the interpolated variable.")
+        self.options.declare('input_x', types=bool, default=False,
+                             desc="When True, the interpolated x grid is a component input.")
+        self.options.declare('input_xcp', types=bool, default=False,
+                             desc="When True, the x control point grid is a component input.")
         self.options.declare('units', types=string_types, default=None, allow_none=True,
                              desc="Units to use for the y and ycp variables.")
         self.options.declare('x_units', types=string_types, default=None, allow_none=True,
                              desc="Units to use for the x and xcp variables.")
         self.options.declare('delta_x', default=0.1,
                              desc="half-width of the smoothing interval added in the valley of "
-                             "absolute-value function this allows the derivatives with respect to "
-                             "the data points (dydxpt, dydypt) to also be C1 continuous. Set to "
-                             "parameter to 0 to get the original Akima function (but only ifyou "
+                             "absolute-value function. This allows the derivatives with respect to"
+                             " the data points (dydxpt, dydypt) to also be C1 continuous. Set to "
+                             "parameter to 0 to get the original Akima function (but only if you "
                              "don't need dydxpt, dydypt")
-        self.options.declare('evaluate_at', default='end', values=['end', 'cell_center'],
+        self.options.declare('eval_at', default='end', values=['end', 'cell_center'],
                              desc="Where the return values are evaluate on the spline. When set "
                              "to end, compute num_points values spanning the full interval set by "
                              "the training points. When set to 'cell_center', compute values at "
@@ -120,37 +117,46 @@ class AkimaSplineComp(ExplicitComponent):
 
     def setup(self):
         """
-        Set up the B-spline component.
+        Set up the akima spline component.
         """
         opts = self.options
         num_control_points = opts['num_control_points']
         num_points = opts['num_points']
         vec_size = opts['vec_size']
-        ycp_name = opts['ycp_name']
-        y_name = opts['y_name']
-        xcp_name = opts['xcp_name']
-        x_name = opts['x_name']
         units = opts['units']
-        evaluate_at = opts['evaluate_at']
+        eval_at = opts['eval_at']
+        input_xcp = opts['input_xcp']
+        input_x = opts['input_x']
 
-        if xcp_name is not None:
+        name = opts['name']
+        x_name = name + ":x"
+        xcp_name = name + ":x_cp"
+        y_name = name + ":y"
+        ycp_name = name + ":y_cp"
+
+        if input_xcp:
             self.add_input(xcp_name, val=np.random.rand(num_control_points),
                            units=opts['x_units'])
 
         else:
             self.x_cp_grid = np.linspace(0., 1., num_control_points)
+            self.add_output(xcp_name, val=self.x_cp_grid,
+                            units=opts['x_units'])
 
-        if x_name is not None:
+        if input_x:
             self.add_input(x_name, val=np.random.rand(num_points),
                            units=opts['x_units'])
 
         else:
-            if evaluate_at == 'cell_center':
+            if eval_at == 'cell_center':
                 x_ends = np.linspace(0., 1., num_points + 1)
                 self.x_grid = 0.5 * (x_ends[:-1] + x_ends[1:])
 
-            elif evaluate_at == 'end':
+            elif eval_at == 'end':
                 self.x_grid = np.linspace(0., 1., num_points)
+
+            self.add_input(x_name, val=self.x_grid,
+                           units=opts['x_units'])
 
         self.add_input(ycp_name, val=np.random.rand(vec_size, num_control_points),
                        units=units)
@@ -167,13 +173,13 @@ class AkimaSplineComp(ExplicitComponent):
 
         self.declare_partials(of=y_name, wrt=ycp_name, rows=rows, cols=cols)
 
-        if xcp_name is not None:
+        if input_xcp:
             rows = np.tile(row, vec_size) + np.repeat(num_points * np.arange(vec_size), ntot)
             cols = np.tile(col, vec_size)
 
             self.declare_partials(of=y_name, wrt=xcp_name, rows=rows, cols=cols)
 
-        if x_name is not None:
+        if input_x:
             row_col = np.arange(num_points)
             rows = np.tile(row_col, vec_size) + np.repeat(num_points * np.arange(vec_size),
                                                           num_points)
@@ -193,26 +199,27 @@ class AkimaSplineComp(ExplicitComponent):
             `Vector` containing outputs.
         """
         opts = self.options
-        ycp_name = opts['ycp_name']
-        y_name = opts['y_name']
-        y_cp = inputs[ycp_name]
+        name = opts['name']
+        x_name = name + ":x"
+        xcp_name = name + ":x_cp"
+        y_name = name + ":y"
+        ycp_name = name + ":y_cp"
 
-        if self.x_cp_grid is not None:
+        if opts['input_xcp']:
+            x_cp = inputs[xcp_name]
+        else:
             x_cp = self.x_cp_grid
-        else:
-            x_cp = inputs[opts['xcp_name']]
 
-        if self.x_grid is not None:
-            x = self.x_grid
+        if opts['input_x']:
+            x = inputs[x_name]
         else:
-            x = inputs[opts['x_name']]
+            x = self.x_grid
 
         # Train on control points.
-        self.akima_setup_dv(x_cp, y_cp)
+        self.akima_setup_dv(x_cp, inputs[ycp_name])
 
         # Evaluate at computational points.
-        y = self.akima_iterpolate(x, x_cp)
-        outputs[y_name] = y
+        outputs[y_name] = self.akima_iterpolate(x, x_cp)
 
     def compute_partials(self, inputs, partials):
         """
@@ -226,15 +233,18 @@ class AkimaSplineComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         opts = self.options
-        y_name = opts['y_name']
-        ycp_name = opts['ycp_name']
-        xcp_name = opts['xcp_name']
-        x_name = opts['x_name']
+        name = opts['name']
+        x_name = name + ":x"
+        xcp_name = name + ":x_cp"
+        y_name = name + ":y"
+        ycp_name = name + ":y_cp"
 
         partials[y_name, ycp_name] = self.dy_dycp.flatten()
-        if xcp_name is not None:
+
+        if opts['input_xcp']:
             partials[y_name, xcp_name] = self.dy_dxcp.flatten()
-        if x_name is not None:
+
+        if opts['input_x']:
             partials[y_name, x_name] = self.dy_dx.flatten()
 
     def akima_setup_dv(self, xpt, ypt):
