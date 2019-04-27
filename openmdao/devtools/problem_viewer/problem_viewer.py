@@ -259,7 +259,8 @@ def view_tree(*args, **kwargs):
     view_model(*args, **kwargs)
 
 
-def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False):
+def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False,
+               title=None):
     """
     Generates an HTML file containing a tree viewer.
 
@@ -280,6 +281,10 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     embeddable : bool, optional
         If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
+
+    title : str, optional
+        The title for the diagram. Used in the HTML title and also shown on the page.
+
     """
     # grab the model viewer data
     model_data = _get_viewer_data(data_source)
@@ -305,8 +310,13 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
+    if title:
+        title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
+    else:
+        title = "OpenMDAO Model Hierarchy and N2 diagram"
+
     h = DiagramWriter(filename=os.path.join(vis_dir, "index.html"),
-                      title="OpenMDAO Model Hierarchy and N<sup>2</sup> diagram.",
+                      title=title,
                       styles=styles, embeddable=embeddable)
 
     # put all style and JS into index
