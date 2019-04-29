@@ -346,7 +346,11 @@ class TemplateWriter(object):
                 self.template = '\n\n'.join([style_elems, template])
             else:
                 meta = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">'
-                head = '\n\n'.join([meta, style_elems])  # Write styles to head
+                if title:
+                    title_tag = "<title>%s</title>" % title
+                    head = '\n\n'.join([title_tag, meta, style_elems])  # Write styles to head
+                else:
+                    head = '\n\n'.join([meta, style_elems])  # Write styles to head
                 self.template = head_and_body(head=head, body=template)
 
         if title is not None:
