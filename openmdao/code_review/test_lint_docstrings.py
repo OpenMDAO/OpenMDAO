@@ -169,6 +169,7 @@ class DecoratorFinder(ast.NodeVisitor):
             self.decorators[node.name].append(name)
 
 
+@unittest.skipUnless(NumpyDocString, "requires 'numpydoc', install openmdao[test]")
 class LintTestCase(unittest.TestCase):
 
     def check_summary(self, numpy_doc_string):
@@ -280,7 +281,7 @@ class LintTestCase(unittest.TestCase):
 
         return new_failures
 
-    def check_returns(self, func, numpy_doc_string):
+    def check_returns(self, func, numpy_doc_string, name_required=False):
         """ Check that the returns section is correct.
 
         Parameters
@@ -322,10 +323,8 @@ class LintTestCase(unittest.TestCase):
                                 'no \'Returns\' section in docstring')
         elif f.has_return and doc_returns:
             # Check formatting
-            for entry in doc_returns:
-                name = entry[0]
-                desc = '\n'.join(entry[2])
-                if not name:
+            for (name, typ, desc) in doc_returns:
+                if name_required and not name:
                     new_failures.append('no detectable name for Return '
                                         'value'.format(name))
                 if desc == '':
@@ -334,7 +333,6 @@ class LintTestCase(unittest.TestCase):
 
         return new_failures
 
-    @unittest.skipUnless(NumpyDocString, "requires 'NumpyDocString', install openmdao[test]")
     def check_method(self, dir_name, file_name,
                      class_name, method_name, method, failures):
         """
@@ -417,7 +415,6 @@ class LintTestCase(unittest.TestCase):
             else:
                 failures[key] = new_failures
 
-    @unittest.skipUnless(NumpyDocString, "requires 'NumpyDocString', install openmdao[test]")
     def check_function(self, dir_name, file_name, func_name, func, failures):
         """ Perform docstring checks on a function.
 
