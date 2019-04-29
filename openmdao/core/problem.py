@@ -15,16 +15,16 @@ from six.moves import range, cStringIO
 import numpy as np
 import scipy.sparse as sparse
 
-from openmdao.approximation_schemes.complex_step import ComplexStep
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
-from openmdao.solvers.solver import SolverInfo
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.group import System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.solvers.solver import SolverInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
@@ -36,8 +36,9 @@ from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
-from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.name_maps import abs_key2rel_key
+from openmdao.vectors.default_vector import DefaultVector
+from openmdao.utils.coloring import _get_color_dir_hash
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -147,6 +148,9 @@ class Problem(object):
             All remaining named args are converted to options.
         """
         self.cite = CITATION
+        # print("------- HASH ----------")
+        # print(_get_color_dir_hash())
+        # print('------------')
 
         if comm is None:
             try:
@@ -202,10 +206,8 @@ class Problem(object):
 
         # General options
         self.options = OptionsDictionary()
-
-        self.options.declare('directory', types=str, default=os.getcwd(),
-                             desc='Working directory for this Problem.')
-
+        self.options.declare('coloring_dir', types=str, default=os.getcwd(),
+                             desc='Directory containing coloring files (if any) for this Problem.')
         self.options.update(options)
 
         # Case recording options

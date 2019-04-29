@@ -23,7 +23,6 @@ from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
 from openmdao.utils.mpi import MPI
 import openmdao.utils.mod_wrapper as mod_wrapper
 from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
-from openmdao.utils.coloring import get_coloring_fname
 
 
 # the following metadata will be accessible for vars on all procs

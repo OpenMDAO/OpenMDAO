@@ -30,7 +30,7 @@ from openmdao.utils.write_outputs import write_outputs
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
-from openmdao.utils.coloring import _compute_coloring, Coloring, get_coloring_fname, \
+from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DYN_COLORING
 from openmdao.utils.general_utils import simple_warning
 from openmdao.approximation_schemes.complex_step import ComplexStep
@@ -772,7 +772,7 @@ class System(object):
 
     def use_fixed_coloring(self, recurse=True):
         """
-        Use a pre-existing coloring in this System.
+        Use a precomputed coloring for this System.
 
         Parameters
         ----------
@@ -1013,7 +1013,7 @@ class System(object):
 
         info['coloring'] = coloring
 
-        self._save_coloring(coloring, info['per_instance'])
+        self._save_coloring(coloring)
 
         # restore original inputs/outputs
         self._inputs._data[:] = starting_inputs
@@ -1024,27 +1024,48 @@ class System(object):
 
         return coloring
 
-    def _save_coloring(self, coloring, per_instance=False):
+    def get_approx_coloring_fname(self):
         """
-        Save the coloring to a file based on the supplied directory and per_instance flag.
+        Return the full pathname to a coloring file, generating a default name if necessary.
+
+        Parameters
+        ----------
+        system : System
+            The System having its coloring saved or loaded.
+
+        Returns
+        -------
+        str
+            Full pathname of the coloring file.
+        """
+        if not self.pathname:
+            # total coloring
+            return os.path.join(self._problem_options['coloring_dir'], 'total_coloring.pkl')
+
+        directory = self._problem_options['coloring_dir']
+        per_instance = self._coloring_info.get('per_instance')
+
+        if per_instance:
+            fname = 'coloring_' + self.pathname.replace('.', '_') + '.pkl'
+        else:
+            fname = 'coloring_' + '_'.join(
+                [self.__class__.__module__.replace('.', '_'), self.__class__.__name__]) + '.pkl'
+
+        return os.path.join(directory, fname)
+
+    def _save_coloring(self, coloring):
+        """
+        Save the coloring to a file based on this system's class or pathname.
 
         Parameters
         ----------
         coloring : Coloring
             See Coloring class docstring.
-        per_instance : bool
-            If True, a separate coloring will be saved for each instance of a given class.
-            Otherwise, only one coloring for a given class will be saved and all instances
-            of that class will use it.
         """
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            fname = get_coloring_fname(self, per_instance)
-            directory = os.path.dirname(fname)
-            if not os.path.exists(directory):
-                os.mkdir(directory)
-            coloring.save(fname)
+            coloring.save(self.get_approx_coloring_fname())
 
     def _get_static_coloring(self):
         """
@@ -1062,16 +1083,12 @@ class System(object):
 
         if coloring is _STD_COLORING_FNAME:
             # load the coloring file now that we have enough info
-            if 'per_instance' in info:
-                fname = get_coloring_fname(self, info['per_instance'])
-            else:
-                fname = get_coloring_fname(self, True)
-                if not os.path.isfile(fname):
-                    fname = get_coloring_fname(self, False)
+            fname = self.get_approx_coloring_fname()
             print("%s: loading coloring from file %s" % (self.pathname, fname))
             info['coloring'] = coloring = Coloring.load(fname)
             info.update(info['coloring']._meta)
         elif isinstance(coloring, string_types):
+            assert False
             print("%s: loading coloring from file %s" % (self.pathname, fname))
             info['coloring'] = coloring = Coloring.load(info['coloring'])
             info.update(info['coloring']._meta)
@@ -3424,7 +3441,7 @@ class System(object):
         bool
             Whether or not a gradient nonlinear solver was found.
         """
-        if include_self and self.nonlinear_solver.supports['gradients']:
+        if include_self and self.nonlinear_solver and self.nonlinear_solver.supports['gradients']:
             return True
 
         for s in self._subsystems_myproc:

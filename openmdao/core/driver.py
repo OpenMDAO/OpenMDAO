@@ -954,7 +954,7 @@ class Driver(object):
 
     def use_fixed_coloring(self):
         """
-        Set the coloring for total derivatives.
+        Tell the driver to use a precomputed coloring.
         """
         if self.supports['simultaneous_derivatives']:
             self._set_coloring(coloring_mod._STD_COLORING_FNAME)
@@ -1000,8 +1000,7 @@ class Driver(object):
         if isinstance(coloring, coloring_mod.Coloring):
             return coloring
         elif coloring is coloring_mod._STD_COLORING_FNAME:
-            fname = os.path.join(os.path.abspath(self._problem.options['directory']),
-                                 'coloring_files', 'total_coloring.pkl')
+            fname = os.path.join(self._problem.options['coloring_dir'], 'total_coloring.pkl')
             print("loading total coloring from file %s" % fname)
             coloring = self._set_coloring(Coloring.load(fname))
             info.update(coloring._meta)

@@ -31,7 +31,7 @@ from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ance
     simple_warning
 from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.mpi import MPI
-from openmdao.utils.coloring import get_coloring_fname, Coloring, _STD_COLORING_FNAME, _DYN_COLORING
+from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME, _DYN_COLORING
 
 # regex to check for valid names.
 import re

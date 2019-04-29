@@ -18,7 +18,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecCo
     ExplicitComponent, NonlinearBlockGS, pyOptSparseDriver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
-from openmdao.utils.coloring import get_coloring_fname, compute_total_coloring
+from openmdao.utils.coloring import compute_total_coloring
 
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 
@@ -486,7 +486,7 @@ class TestCSStaticColoring(unittest.TestCase):
             pass
 
     def test_simple_partials_explicit_static(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         sparsity = np.array(
@@ -511,10 +511,10 @@ class TestCSStaticColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
         coloring = comp.compute_approx_coloring(wrt='x*', method=self.FD_METHOD)
-        coloring.save(get_coloring_fname(comp))
+        comp._save_coloring(coloring)
 
         # now make a second problem to use the coloring
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(4))
@@ -539,7 +539,7 @@ class TestCSStaticColoring(unittest.TestCase):
         _check_partial_matrix(comp, jac, sparsity)
 
     def test_simple_partials_explicit_shape_bug(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         # create sparsity with last row and col all zeros.
@@ -569,7 +569,7 @@ class TestCSStaticColoring(unittest.TestCase):
         comp._save_coloring(coloring)
 
         # now make a second problem to use the coloring
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(4))
@@ -590,7 +590,7 @@ class TestCSStaticColoring(unittest.TestCase):
         comp._linearize()
 
     def test_simple_partials_implicit_static(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         sparsity = np.array(
@@ -618,7 +618,7 @@ class TestCSStaticColoring(unittest.TestCase):
         comp._save_coloring(coloring)
 
         # now create a new problem and set the static coloring
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         indeps = IndepVarComp()
@@ -645,7 +645,7 @@ class TestCSStaticColoring(unittest.TestCase):
         _check_partial_matrix(comp, jac, sparsity)
 
     def test_simple_semitotals_static(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
         sparsity = np.array(
@@ -677,7 +677,7 @@ class TestCSStaticColoring(unittest.TestCase):
         sub._save_coloring(coloring)
 
         # now create a second problem and use the static coloring
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
         indeps = IndepVarComp()
@@ -710,7 +710,7 @@ class TestCSStaticColoring(unittest.TestCase):
         _check_partial_matrix(sub, sub._jacobian._subjacs_info, sparsity)
 
     def test_simple_totals_static(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
         sparsity = np.array(
@@ -738,11 +738,10 @@ class TestCSStaticColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = compute_total_coloring(prob)
-        coloring.save(get_coloring_fname(model))
+        model._save_coloring(compute_total_coloring(prob))
 
         # new Problem, loading the coloring we just computed
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
         indeps = IndepVarComp()
@@ -775,7 +774,7 @@ class TestCSStaticColoring(unittest.TestCase):
         _check_total_matrix(model, derivs, sparsity)
 
     def test_totals_over_implicit_comp(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
         sparsity = np.array(
@@ -805,10 +804,9 @@ class TestCSStaticColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = compute_total_coloring(prob)
-        coloring.save(get_coloring_fname(model))
+        model._save_coloring(compute_total_coloring(prob))
 
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group(dynamic_derivs_repeats=1)
 
         indeps = IndepVarComp()
@@ -842,7 +840,7 @@ class TestCSStaticColoring(unittest.TestCase):
         _check_total_matrix(model, derivs, sparsity)
 
     def test_totals_of_indices(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group(dynamic_derivs_repeats=1)
 
         sparsity = np.array(
@@ -871,11 +869,10 @@ class TestCSStaticColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = compute_total_coloring(prob)
-        coloring.save(get_coloring_fname(model))
+        model._save_coloring(compute_total_coloring(prob))
 
 
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group(dynamic_derivs_repeats=1)
 
         indeps = IndepVarComp()
@@ -909,7 +906,7 @@ class TestCSStaticColoring(unittest.TestCase):
         _check_total_matrix(model, derivs, sparsity[rows, :])
 
     def test_totals_wrt_indices(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group(dynamic_derivs_repeats=1)
 
         sparsity = np.array(
@@ -939,11 +936,10 @@ class TestCSStaticColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = compute_total_coloring(prob)
-        coloring.save(get_coloring_fname(model))
+        model._save_coloring(compute_total_coloring(prob))
 
 
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group(dynamic_derivs_repeats=1)
 
         indeps = IndepVarComp()
@@ -979,7 +975,7 @@ class TestCSStaticColoring(unittest.TestCase):
         _check_total_matrix(model, derivs, sparsity[:, cols])
 
     def test_totals_of_wrt_indices(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group(dynamic_derivs_repeats=1)
 
         sparsity = np.array(
@@ -1011,11 +1007,10 @@ class TestCSStaticColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        coloring = compute_total_coloring(prob)
-        coloring.save(get_coloring_fname(model))
+        model._save_coloring(compute_total_coloring(prob))
 
 
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group(dynamic_derivs_repeats=1)
 
         indeps = IndepVarComp()
@@ -1077,7 +1072,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 pass
 
     def test_simple_semitotals_all_local_vars(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
         sparsity = np.array(
@@ -1110,7 +1105,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         sub._save_coloring(coloring)
 
         # now create a second problem and use the static coloring
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
         indeps = IndepVarComp()
@@ -1150,7 +1145,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         self.assertEqual(nruns, 3)
 
     def test_simple_partials_implicit(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         sparsity = np.array(
@@ -1214,7 +1209,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         _check_partial_matrix(comp, jac, sparsity)
 
     def test_simple_partials_explicit(self):
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         sparsity = np.array(
@@ -1243,7 +1238,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         comp._save_coloring(coloring)
 
         # now create a new problem and use the previously generated coloring
-        prob = Problem(directory=self.tempdir)
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         indeps = IndepVarComp()

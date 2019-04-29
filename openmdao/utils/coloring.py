@@ -9,6 +9,7 @@ import time
 import warnings
 import json
 import pickle
+import inspect
 from collections import OrderedDict, defaultdict
 from itertools import combinations, chain
 from distutils.version import LooseVersion
@@ -1610,7 +1611,7 @@ def dynamic_total_coloring(driver, run_model=True):
     problem.driver._res_jacs = {}
 
     coloring = compute_total_coloring(problem,
-                                      repeats=driver._coloring_info['repeats'],
+                                      repeats=driver._coloring_info.get('repeats', 3),
                                       tol=1.e-15,
                                       setup=False, run_model=run_model)
 
@@ -1674,12 +1675,15 @@ def _total_coloring_cmd(options):
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
             do_sparsity = not options.no_sparsity
+            if options.outfile:
+                outfile = options.outfile
+            else:
+                outfile = os.path.join(prob.options['coloring_dir'], 'total_coloring.pkl')
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 coloring = compute_total_coloring(prob,
                                                   repeats=options.num_jacs, tol=options.tolerance,
-                                                  setup=False, run_model=True,
-                                                  fname=options.outfile)
+                                                  setup=False, run_model=True, fname=outfile)
 
             if options.show_jac:
                 coloring.display()
@@ -1699,40 +1703,6 @@ def _total_coloring_cmd(options):
     return _total_coloring
 
 
-def get_coloring_fname(system, per_instance=False, directory=None):
-    """
-    Return the full pathname to a coloring file, generating a default name if necessary.
-
-    Parameters
-    ----------
-    system : System
-        The System having its coloring saved or loaded.
-    per_instance : bool
-        If True, the file will be named for each instance of a given class.
-        Otherwise, the file will be named based on the class name.
-    directory : str or None
-        Name of destination directory for coloring files.
-
-    Returns
-    -------
-    str
-        Full pathname of the coloring file.
-    """
-    if directory is None:
-        directory = os.path.join(system._problem_options['directory'], 'coloring_files')
-    directory = os.path.abspath(directory)
-
-    if per_instance:
-        if system.pathname:
-            return os.path.join(directory,
-                                'coloring_' + system.pathname.replace('.', '_') + '.pkl')
-        else:
-            return os.path.join(directory, 'total_coloring.pkl')
-    else:
-        fn = '_'.join([system.__class__.__module__.replace('.', '_'), system.__class__.__name__])
-        return os.path.join(directory, fn + '.pkl')
-
-
 def _partial_coloring_setup_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao partial_color' command.
@@ -1743,8 +1713,6 @@ def _partial_coloring_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('--dir', action='store', dest='directory',
-                        help='Directory where coloring files are saved.')
     parser.add_argument('--no_recurse', action='store_true', dest='norecurse',
                         help='Do not recurse from the provided system down.')
     parser.add_argument('--system', action='store', dest='system', default='',
@@ -1873,16 +1841,19 @@ def _partial_coloring_cmd(options):
                 else:
                     coloring = system.compute_approx_coloring(**kwargs)
 
-                    print("Approx coloring for '%s' (class %s)\n" % (system.pathname,
-                                                                     system.__class__.__name__))
-                    if options.show_jac:
-                        coloring.display()
-                    coloring.summary()
-                    print('\n')
+                    if coloring is None:
+                        print("No coloring found.")
+                    else:
+                        print("Approx coloring for '%s' (class %s)\n" % (system.pathname,
+                                                                         system.__class__.__name__))
+                        if options.show_jac:
+                            coloring.display()
+                        coloring.summary()
+                        print('\n')
 
-                    if options.activate:
-                        system._set_coloring(coloring)
-                        system._setup_static_approx_coloring(False)
+                        if options.activate:
+                            system._set_coloring(coloring)
+                            system._setup_static_approx_coloring(False)
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         if options.activate:
@@ -1953,9 +1924,9 @@ def _sparsity_cmd(options):
     return _sparsity
 
 
-def _coloring_report_setup_parser(parser):
+def _view_coloring_setup_parser(parser):
     """
-    Set up the openmdao subparser for the 'openmdao coloring_report' command.
+    Set up the openmdao subparser for the 'openmdao view_coloring' command.
 
     Parameters
     ----------
@@ -1975,9 +1946,9 @@ def _coloring_report_setup_parser(parser):
                         'for a particular variable.')
 
 
-def _coloring_report_exec(options):
+def _view_coloring_exec(options):
     """
-    Execute the 'openmdao coloring_report' command.
+    Execute the 'openmdao view_coloring' command.
 
     Parameters
     ----------
@@ -2080,3 +2051,41 @@ def _check_coloring(J, coloring):
         nzs = np.count_nonzero(J)
         if computed_nzs != nzs:
             raise RuntimeError("Colored nonzeros (%d) != nonzeros in J (%d)" % (computed_nzs, nzs))
+
+
+def _get_color_dir_hash():
+    """
+    Return a string that should be unique for each different top level python script.
+
+    Returns
+    -------
+    str
+        A unique string to prevent multiple uses of the same coloring dir by different
+        python scripts.
+    """
+    exclude = set()
+    for m in sys.modules.values():
+        try:
+            _file = m.__file__
+        except AttributeError:
+            continue
+        if not os.path.basename(_file).startswith('test_'):
+            exclude.add(_file)
+
+    files = set(os.path.abspath(f.filename) for f in inspect.getouterframes(inspect.currentframe())
+                if f.filename.endswith('.py'))
+
+    # add any python files from the command line
+    files.update(a for a in sys.argv if a.endswith('.py'))
+
+    files = sorted(files - exclude)
+
+    # get rid of any files coming from Wing
+    winghome = os.environ.get('WINGHOME')
+    if winghome:
+        files = [f for f in files if not f.startswith(winghome)]
+
+    if not files:
+        simple_warning("Could not determine any top level python script.")
+
+    return '|'.join(files)

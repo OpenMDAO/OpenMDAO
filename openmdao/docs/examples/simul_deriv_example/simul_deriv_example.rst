@@ -22,8 +22,8 @@ color of the points shown below.  Note that we have two colors and our *x* and *
 variables are of size 10. We have a third design variable, *r*, that is size 1.
 This means that if we don't solve for derivatives simultaneously, we must
 perform 21 linear solves (10 + 10 + 1) to solve for total derivatives with respect to
-all of our design variables.  But, since each of our *x* and *y* design variables have only
-two colors, we can solve for all of our total derivatives using only 5 linear solves (2 + 2 + 1).
+all of our design variables.  But, since all of our design variables have only
+5 colors, we can solve for all of our total derivatives using only 5 linear solves.
 This means that using simultaneous derivatives saves us 16 linear solves each time we compute our
 total derivatives.
 
