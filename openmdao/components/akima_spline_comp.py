@@ -90,7 +90,7 @@ class AkimaSplineComp(ExplicitComponent):
                              desc="Number of interpolated points.")
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of independent rows to interpolate.')
-        self.options.declare('name', types=str, default=None,
+        self.options.declare('name', types=str, default='var',
                              desc="Name to use for the interpolated variable.")
         self.options.declare('input_x', types=bool, default=False,
                              desc="When True, the interpolated x grid is a component input.")
