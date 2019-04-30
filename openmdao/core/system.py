@@ -784,8 +784,8 @@ class System(object):
         """
         if coloring is not _STD_COLORING_FNAME:
             if recurse:
-                simple_warning("%s: recurse was set in use_fixed_coloring but a specific coloring "
-                               "was set.  recurse was ignored." % self.pathname)
+                simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
+                               "coloring was set, so recurse was ignored." % self.pathname)
             self._set_coloring(coloring)
             return
 
