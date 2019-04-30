@@ -959,7 +959,6 @@ class Driver(object):
         self._coloring_info['show_summary'] = show_summary
         self._coloring_info['show_sparsity'] = show_sparsity
 
-
     def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
         """
         Tell the driver to use a precomputed coloring.

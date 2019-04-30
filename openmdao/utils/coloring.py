@@ -565,7 +565,7 @@ class Coloring(object):
             print("\nJacobian shape: (%d, %d)" % (nrows, ncols))
         else:
             print("\nJacobian shape: (%d, %d)  (%5.2f%% nonzero)" % (nrows, ncols,
-                                                                       self._pct_nonzero))
+                                                                     self._pct_nonzero))
         if self._fwd is None and self._rev is None:
             tot_size = min(nrows, ncols)
             if tot_size < 0:

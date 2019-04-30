@@ -929,6 +929,10 @@ class System(object):
             is encountered that has specified its coloring metadata, we don't recurse below
             that group unless that group has a subsystem that has a nonlinear solver that uses
             gradients.
+        show_summary : bool
+            If True, display summary information after generating coloring.
+        show_sparsity : bool
+            If True, display sparsity with coloring info after generating coloring.
 
         Returns
         -------
