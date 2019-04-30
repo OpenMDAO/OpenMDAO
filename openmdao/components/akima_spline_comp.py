@@ -90,7 +90,7 @@ class AkimaSplineComp(ExplicitComponent):
                              desc="Number of interpolated points.")
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of independent rows to interpolate.')
-        self.options.declare('name', types=str, default=None, allow_none=True,
+        self.options.declare('name', types=str, default=None,
                              desc="Name to use for the interpolated variable.")
         self.options.declare('input_x', types=bool, default=False,
                              desc="When True, the interpolated x grid is a component input.")
@@ -103,15 +103,15 @@ class AkimaSplineComp(ExplicitComponent):
         self.options.declare('delta_x', default=0.1,
                              desc="half-width of the smoothing interval added in the valley of "
                              "absolute-value function. This allows the derivatives with respect to"
-                             " the data points (dydxpt, dydypt) to also be C1 continuous. Set to "
+                             " the data points (dydxpt, dydypt) to also be C1 continuous. Set "
                              "parameter to 0 to get the original Akima function (but only if you "
                              "don't need dydxpt, dydypt")
         self.options.declare('eval_at', default='end', values=['end', 'cell_center'],
-                             desc="Where the return values are evaluate on the spline. When set "
-                             "to end, compute num_points values spanning the full interval set by "
-                             "the training points. When set to 'cell_center', compute values at "
-                             "centerpoints of num_points cells. Only used if xcp_name is not "
-                             "given.")
+                             desc="Where the return values are evaluated on the spline. When set "
+                             "to 'end', compute num_points values spanning the full interval set "
+                             "by the training points. When set to 'cell_center', compute values "
+                             "at centerpoints of num_points cells. Only used if input_x is "
+                             "True.")
         self.options.declare('eps', default=1e-30,
                              desc='Value that triggers division-by-zero safeguard.')
 
