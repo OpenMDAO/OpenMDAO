@@ -38,7 +38,7 @@ from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.utils.coloring import _get_color_dir_hash
+import openmdao.utils.coloring as coloring_mod
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -126,6 +126,8 @@ class Problem(object):
         Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
         detect when you need to do this, but in some cases (e.g., complex step is used
         after a reconfiguration) you may need to set this to True.
+    _color_dir_hash : str
+        Hash used to detect collisions of coloring files.
     """
 
     _post_setup_func = None
@@ -148,9 +150,8 @@ class Problem(object):
             All remaining named args are converted to options.
         """
         self.cite = CITATION
-        # print("------- HASH ----------")
-        # print(_get_color_dir_hash())
-        # print('------------')
+
+        self._color_dir_hash = coloring_mod._get_color_dir_hash()
 
         if comm is None:
             try:
@@ -206,7 +207,8 @@ class Problem(object):
 
         # General options
         self.options = OptionsDictionary()
-        self.options.declare('coloring_dir', types=str, default=os.getcwd(),
+        self.options.declare('coloring_dir', types=str,
+                             default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.update(options)
 
@@ -787,8 +789,13 @@ class Problem(object):
 
         model_comm = self.driver._setup_comm(comm)
 
+        # copy options dict so we can add stuff the user doesn't see
+        opts = {k: v['value'] for k, v in iteritems(self.options._dict)}
+        opts['coloring_dir_hash'] = self._color_dir_hash
+        opts['coloring_dir_file_hash'] = coloring_mod._get_color_dir_file_hash(opts['coloring_dir'])
+
         model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
-                     derivatives, self.options)
+                     derivatives, opts)
 
         # get set of all vars that we may need to bcast later
         self._remote_var_set = remote_var_set = set()

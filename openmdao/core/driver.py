@@ -952,12 +952,19 @@ class Driver(object):
         self._coloring_info['perturb_size'] = perturb_size
         self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
 
-    def use_fixed_coloring(self):
+    def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
         """
         Tell the driver to use a precomputed coloring.
+
+        Parameters
+        ----------
+        coloring : str
+            A coloring filename.  If no arg is passed, filename will be determined
+            automatically.
+
         """
         if self.supports['simultaneous_derivatives']:
-            self._set_coloring(coloring_mod._STD_COLORING_FNAME)
+            self._set_coloring(coloring)
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
@@ -976,7 +983,7 @@ class Driver(object):
 
         """
         warn_deprecation("set_simul_deriv_color is deprecated.  Use use_fixed_coloring instead.")
-        self.use_fixed_coloring()
+        self.use_fixed_coloring(coloring)
 
     def _set_coloring(self, coloring):
         self._coloring_info['coloring'] = coloring
@@ -1005,6 +1012,14 @@ class Driver(object):
             coloring = self._set_coloring(Coloring.load(fname))
             info.update(coloring._meta)
             return coloring
+        elif isinstance(coloring, string_types):
+            print("loading total coloring from file %s" % coloring)
+            info['coloring'] = Coloring.load(coloring)
+            info.update(info['coloring']._meta)
+            return info['coloring']
+
+    def _get_total_coloring_fname(self):
+        return os.path.join(self._problem.options['coloring_dir'], 'total_coloring.pkl')
 
     def _setup_simul_coloring(self):
         """
@@ -1034,7 +1049,7 @@ class Driver(object):
                 raise RuntimeError("Simultaneous coloring does forward solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
 
-        # _total_coloring can contain data for either fwd, rev, or both, along with optional
+        # _total_coloring can contain data for either fwd, rev, or both, along with
         # sparsity patterns
         sparsity = total_coloring.get_subjac_sparsity()
 

@@ -220,12 +220,14 @@ class pyOptSparseDriver(Driver):
         # compute dynamic simul deriv coloring or just sparsity if option is set
         if coloring_mod._use_sparsity:
             if self._coloring_info['coloring'] is coloring_mod._DYN_COLORING:
-                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran)
+                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
+                                                    fname=self._get_total_coloring_fname())
                 self._setup_tot_jac_sparsity()
             elif self.options['dynamic_simul_derivs']:
                 warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
                                  "the 'declare_coloring' function instead.")
-                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran)
+                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
+                                                    fname=self._get_total_coloring_fname())
                 self._setup_tot_jac_sparsity()
             elif self.options['dynamic_derivs_sparsity']:
                 coloring_mod.dynamic_derivs_sparsity(self)

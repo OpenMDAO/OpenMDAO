@@ -161,8 +161,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
 
     # # setup coloring
     if color_info is not None:
-        p.driver.use_fixed_coloring()
-        p.driver._coloring_info['coloring'] = color_info
+        p.driver.use_fixed_coloring(color_info)
     elif sparsity is not None:
         p.driver.set_total_jac_sparsity(sparsity)
 
@@ -176,6 +175,18 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
 
 
 class SimulColoringPyoptSparseTestCase(unittest.TestCase):
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_simul_coloring_snopt_fwd(self):
@@ -506,6 +517,18 @@ class SimulColoringRecordingTestCase(unittest.TestCase):
 class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
     """Reverse coloring tests for pyoptsparse."""
 
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_simul_coloring_snopt(self):
         # first, run w/o coloring
@@ -716,6 +739,10 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
 class SimulColoringScipyTestCase(unittest.TestCase):
 
     def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+        os.chdir(self.tempdir)
+
         self.color_info = Coloring()
         self.color_info._fwd = [[
                [20],   # uncolored columns
@@ -747,6 +774,13 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                [10, 20],   # column 19
                None   # column 20
             ]]
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
     def test_simul_coloring_fwd(self):
 
@@ -882,6 +916,10 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
     """Rev mode coloring tests."""
 
     def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+        os.chdir(self.tempdir)
+
         self.color_info = Coloring()
         self.color_info._rev = [[
                [4, 5, 6, 7, 8, 9, 10],   # uncolored rows
@@ -914,6 +952,14 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
                [8, 9, 18, 19],   # row 20
                [0]   # row 21
             ]]
+
+    def tearDown(self):
+        print("TEARDOWN")
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
     def test_simul_coloring(self):
 
@@ -1120,9 +1166,28 @@ def _get_mat(rows, cols):
         return np.random.random(rows * cols).reshape((rows, cols)) - 0.5
 
 
-@unittest.skipUnless(PETScVector is not None and OPTIMIZER is not None, "PETSc and pyOptSparse required.")
+@unittest.skipUnless(MPI is not None and PETScVector is not None and OPTIMIZER is not None, "PETSc and pyOptSparse required.")
 class MatMultMultipointTestCase(unittest.TestCase):
     N_PROCS = 4
+
+    def setUp(self):
+        self.startdir = os.getcwd()
+        if MPI.COMM_WORLD.rank == 0:
+            self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+            MPI.COMM_WORLD.bcast(self.tempdir, root=0)
+        else:
+            self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
+        os.chdir(self.tempdir)
+        MPI.COMM_WORLD.barrier()
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        MPI.COMM_WORLD.barrier()
+        if MPI.COMM_WORLD.rank == 0:
+            try:
+                shutil.rmtree(self.tempdir)
+            except OSError:
+                pass
 
     def test_multipoint_with_coloring(self):
         size = 10

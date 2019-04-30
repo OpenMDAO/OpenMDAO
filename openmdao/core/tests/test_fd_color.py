@@ -191,8 +191,20 @@ def _check_semitotal_matrix(system, jac, expected):
 class TestCSColoring(unittest.TestCase):
     FD_METHOD = 'cs'
 
+    def setUp(self):
+        self.startdir = os.getcwd()
+        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
+        os.chdir(self.tempdir)
+
+    def tearDown(self):
+        os.chdir(self.startdir)
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
+
     def test_simple_partials_explicit(self):
-        prob = Problem()
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         sparsity = np.array(
@@ -227,7 +239,7 @@ class TestCSColoring(unittest.TestCase):
         _check_partial_matrix(comp, jac, sparsity)
 
     def test_simple_partials_explicit_shape_bug(self):
-        prob = Problem()
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         # create sparsity with last row and col all zeros.
@@ -259,7 +271,7 @@ class TestCSColoring(unittest.TestCase):
         comp._linearize()
 
     def test_simple_partials_implicit(self):
-        prob = Problem()
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         sparsity = np.array(
@@ -295,7 +307,7 @@ class TestCSColoring(unittest.TestCase):
         _check_partial_matrix(comp, jac, sparsity)
 
     def test_simple_semitotals(self):
-        prob = Problem()
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
         sparsity = np.array(
@@ -334,7 +346,7 @@ class TestCSColoring(unittest.TestCase):
 
     @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
     def test_simple_totals(self):
-        prob = Problem()
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         prob.driver.declare_coloring()
@@ -376,7 +388,7 @@ class TestCSColoring(unittest.TestCase):
         self.assertEqual(nruns, 3)
 
     def test_totals_over_implicit_comp(self):
-        prob = Problem()
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         prob.driver.declare_coloring()
@@ -420,7 +432,7 @@ class TestCSColoring(unittest.TestCase):
         _check_total_matrix(model, derivs, sparsity[rows, :])
 
     def test_totals_of_wrt_indices(self):
-        prob = Problem()
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         prob.driver.declare_coloring()
@@ -1104,6 +1116,9 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         coloring = sub.compute_approx_coloring(wrt='*', method=self.FD_METHOD)
         sub._save_coloring(coloring)
 
+        # make sure coloring file exists by the time we try to load the spec
+        MPI.COMM_WORLD.barrier()
+
         # now create a second problem and use the static coloring
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
@@ -1123,9 +1138,6 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         model.sub.comp.add_constraint('y1')
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
-
-        # make sure coloring file exists by the time we try to load the spec
-        MPI.COMM_WORLD.barrier()
 
         sub.declare_coloring(wrt='*', method=self.FD_METHOD)
         sub.use_fixed_coloring()
@@ -1173,7 +1185,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         coloring = comp.compute_approx_coloring(wrt='x*', method=self.FD_METHOD)
         comp._save_coloring(coloring)
 
-        prob = Problem()
+        prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
         indeps = IndepVarComp()

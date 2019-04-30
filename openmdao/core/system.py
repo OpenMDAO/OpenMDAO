@@ -19,8 +19,6 @@ import networkx as nx
 import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
-    format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
@@ -32,7 +30,9 @@ from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DYN_COLORING
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
+    format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
+    simple_warning
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -770,20 +770,34 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def use_fixed_coloring(self, recurse=True):
+    def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
         """
         Use a precomputed coloring for this System.
 
         Parameters
         ----------
+        coloring : str
+            A coloring filename.  If no arg is passed, filename will be determined
+            automatically.
         recurse : bool
             If True, set fixed coloring in all subsystems that declare a coloring.
         """
-        if self._coloring_info['coloring'] is not None:
-            self._set_coloring(_STD_COLORING_FNAME)
+        if coloring is not _STD_COLORING_FNAME:
+            if recurse:
+                simple_warning("%s: recurse was set in use_fixed_coloring but a specific coloring "
+                               "was set.  recurse was ignored." % self.pathname)
+            self._set_coloring(coloring)
+            return
+
+        if self._coloring_info['coloring'] is None:
+            if __debug__:
+                print('%s: use_fixed_coloring() ignored because no coloring was declared.')
+        else:
+            self._set_coloring(coloring)
+
         if recurse:
             for s in self._subsystems_myproc:
-                s.use_fixed_coloring(recurse)
+                s.use_fixed_coloring(coloring, recurse)
 
     def _set_coloring(self, coloring):
         self._coloring_info['coloring'] = coloring
@@ -949,7 +963,24 @@ class System(object):
         if kwargs['method'] is None and self._approx_schemes:
             method = list(self._approx_schemes)[0]
 
-        self.declare_coloring(**kwargs)
+        if self._coloring_info['coloring'] is None:
+            self.declare_coloring(**kwargs)
+            # check to see if any approx derivs have been declared
+            for meta in self._subjacs_info.values():
+                if 'method' in meta and meta['method']:
+                    break
+            else:  # no approx derivs found
+                simple_warning("%s: No approx partials found but coloring was requested.  "
+                               "Declaring ALL partials as approx (method='%s')" %
+                               (self.pathname, self._coloring_info['method']))
+                try:
+                    self.declare_partials('*', '*', method=self._coloring_info['method'])
+                except AttributeError:  # this system must be a group
+                    for s in self._subsystems_myproc:
+                        s.declare_partials('*', '*', method=self._coloring_info['method'])
+                self._setup_partials(recurse=True)
+        else:
+            self.declare_coloring(**kwargs)
 
         approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
 
@@ -1038,11 +1069,11 @@ class System(object):
         str
             Full pathname of the coloring file.
         """
+        directory = self._problem_options['coloring_dir']
         if not self.pathname:
             # total coloring
-            return os.path.join(self._problem_options['coloring_dir'], 'total_coloring.pkl')
+            return os.path.join(directory, 'total_coloring.pkl')
 
-        directory = self._problem_options['coloring_dir']
         per_instance = self._coloring_info.get('per_instance')
 
         if per_instance:
@@ -1065,7 +1096,9 @@ class System(object):
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save(self.get_approx_coloring_fname())
+            coloring.save_and_write_hash(self.get_approx_coloring_fname(),
+                                         self._problem_options['coloring_dir_hash'],
+                                         self._problem_options['coloring_dir_file_hash'])
 
     def _get_static_coloring(self):
         """
@@ -1088,7 +1121,6 @@ class System(object):
             info['coloring'] = coloring = Coloring.load(fname)
             info.update(info['coloring']._meta)
         elif isinstance(coloring, string_types):
-            assert False
             print("%s: loading coloring from file %s" % (self.pathname, fname))
             info['coloring'] = coloring = Coloring.load(info['coloring'])
             info.update(info['coloring']._meta)
