@@ -152,12 +152,18 @@ def _get_viewer_data(data_source):
         driver = data_source.driver
         driver_name = driver.__class__.__name__
         driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
+        driver_options = {k: driver.options[k] for k in driver.options}
+        driver_opt_settings = None
+        if driver_type is 'optimization' and 'opt_settings' in dir(driver):
+            driver_opt_settings = driver.opt_settings   
 
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
             root_group = data_source
             driver_name = None
             driver_type = None
+            driver_options = None
+            driver_opt_settings = None
         else:
             # this function only makes sense when it is at the root
             return {}
@@ -237,8 +243,8 @@ def _get_viewer_data(data_source):
     data_dict['connections_list'] = connections_list
     data_dict['abs2prom'] = root_group._var_abs2prom
 
-    data_dict['driver_name'] = driver_name
-    data_dict['driver_type'] = driver_type
+    data_dict['driver'] = {'name': driver_name, 'type': driver_type, 
+                           'options': driver_options, 'opt_settings': driver_opt_settings} 
     data_dict['design_vars'] = root_group.get_design_vars()
     data_dict['responses'] = root_group.get_responses()
 
@@ -253,7 +259,8 @@ def view_tree(*args, **kwargs):
     view_model(*args, **kwargs)
 
 
-def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False):
+def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False,
+               title=None):
     """
     Generates an HTML file containing a tree viewer.
 
@@ -274,6 +281,10 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     embeddable : bool, optional
         If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
+
+    title : str, optional
+        The title for the diagram. Used in the HTML title and also shown on the page.
+
     """
     # grab the model viewer data
     model_data = _get_viewer_data(data_source)
@@ -299,8 +310,13 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     with open(os.path.join(style_dir, "fontello.woff"), "rb") as f:
         encoded_font = str(base64.b64encode(f.read()).decode("ascii"))
 
+    if title:
+        title = "OpenMDAO Model Hierarchy and N2 diagram: %s" % title
+    else:
+        title = "OpenMDAO Model Hierarchy and N2 diagram"
+
     h = DiagramWriter(filename=os.path.join(vis_dir, "index.html"),
-                      title="OpenMDAO Model Hierarchy and N<sup>2</sup> diagram.",
+                      title=title,
                       styles=styles, embeddable=embeddable)
 
     # put all style and JS into index

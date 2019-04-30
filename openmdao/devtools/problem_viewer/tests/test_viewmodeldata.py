@@ -198,6 +198,22 @@ class TestViewModelData(unittest.TestCase):
         filename = os.path.abspath(sellar.__file__).replace('.pyc', '.py')  # PY2
         check_call('openmdao view_model --no_browser %s' % filename)
 
+    def test_view_model_set_title(self):
+        """
+        Test that an n2 html file is generated from a Problem.
+        """
+        p = Problem()
+        p.model = SellarStateConnection()
+        p.setup(check=False)
+        view_model(p, outfile=self.problem_html_filename, show_browser=DEBUG,
+                   title="Sellar State Connection")
+
+        # Check that the html file has been created and has something in it.
+        self.assertTrue(os.path.isfile(self.problem_html_filename),
+                        (self.problem_html_filename + " is not a valid file."))
+        self.assertTrue( 'OpenMDAO Model Hierarchy and N2 diagram: Sellar State Connection' \
+                         in open(self.problem_html_filename).read() )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -819,5 +819,7 @@ def make_serializable(o):
         return make_serializable(o.tolist())
     elif isinstance(o, (list, tuple, set)):
         return [make_serializable(item) for item in o]
+    elif '__dict__' in dir(o):
+        return make_serializable(o.__class__.__name__)
     else:
         return o

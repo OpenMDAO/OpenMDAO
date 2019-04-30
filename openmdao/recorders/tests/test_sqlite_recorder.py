@@ -1841,6 +1841,57 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(sorted([child["name"] for child in cr.problem_metadata['tree']["children"]]),
                          ['con_cmp1', 'con_cmp2', 'd1', 'd2', 'obj_cmp', 'px', 'pz'])
 
+    def test_feature_problem_metadata_with_driver_information(self):
+        from openmdao.api import Problem, ScipyOptimizeDriver, SqliteRecorder, CaseReader
+        from openmdao.api import DOEDriver, UniformGenerator 
+        from openmdao.test_suite.components.sellar import SellarDerivatives
+
+        prob = Problem(SellarDerivatives())
+        model = prob.model
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]),
+                                  upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        # DOE
+        driver = prob.driver = DOEDriver(UniformGenerator())
+        recorder = SqliteRecorder("cases.sql")
+        prob.driver.add_recorder(recorder)
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        metadata = cr.problem_metadata['driver']
+        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
+        self.assertEqual(metadata['name'], 'DOEDriver')
+        self.assertEqual(metadata['type'], 'doe')
+        self.assertEqual(metadata['options'], {'debug_print': [], 'generator': 'UniformGenerator', 
+                                               'run_parallel': False, 'procs_per_model': 1}) 
+
+        # Optimization
+        driver = prob.driver = ScipyOptimizeDriver()
+        recorder = SqliteRecorder("cases.sql")
+        driver.options['optimizer'] = 'SLSQP'
+        driver.options['tol'] = 1e-3
+        driver.opt_settings['ACC'] = 1e-6
+        prob.driver.add_recorder(recorder)
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = CaseReader("cases.sql")
+        metadata = cr.problem_metadata['driver']
+        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
+        self.assertEqual(metadata['name'], 'ScipyOptimizeDriver')
+        self.assertEqual(metadata['type'], 'optimization')
+        self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP", 
+                                               "tol": 1e-03, "maxiter": 200, "disp": True, 
+                                               "dynamic_simul_derivs": False, "dynamic_derivs_repeats": 3}) 
+        self.assertEqual(metadata['opt_settings'], {"ACC": 1e-06})
+
     def test_feature_solver_metadata(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader, NonlinearBlockGS
         from openmdao.test_suite.components.sellar import SellarDerivatives

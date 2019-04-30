@@ -871,8 +871,14 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
 
     viewer_data = _get_viewer_data(data_source)
 
-    driver_name = viewer_data.get('driver_name', None)
-    driver_type = viewer_data.get('driver_type', 'optimization')
+    driver = viewer_data.get('driver', None)
+    if driver:
+        driver_name = driver.get('name', None)
+        driver_type = driver.get('name', 'optimization')
+    else:
+        driver_name = None
+        driver_type = 'optimization'
+
     design_vars = viewer_data.get('design_vars', None)
     responses = viewer_data.get('responses', None)
 
