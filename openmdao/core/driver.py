@@ -165,7 +165,7 @@ class Driver(object):
         self._model_viewer_data = None
         self.cite = ""
 
-        self._coloring_info = {'coloring': None}
+        self._coloring_info = {'coloring': None, 'show_summary': True, 'show_sparsity': False}
         self._total_jac_sparsity = None
         self._res_jacs = {}
         self._total_jac = None
@@ -931,7 +931,8 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
                                self._get_name())
 
-    def declare_coloring(self, repeats=3, tol=1e-15, orders=15, perturb_size=None):
+    def declare_coloring(self, repeats=3, tol=1e-15, orders=15, perturb_size=None,
+                         show_summary=True, show_sparsity=False):
         """
         Set options for total deriv coloring.
 
@@ -945,12 +946,19 @@ class Driver(object):
             Number of orders above and below the tolerance to check during the tolerance sweep.
         perturb_size : float
             Size of input/output perturbation during generation of sparsity.
+        show_summary : bool
+            If True, display summary information after generating coloring.
+        show_sparsity : bool
+            If True, display sparsity with coloring info after generating coloring.
         """
         self._coloring_info['repeats'] = repeats
         self._coloring_info['tol'] = tol
         self._coloring_info['orders'] = orders
         self._coloring_info['perturb_size'] = perturb_size
         self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
+        self._coloring_info['show_summary'] = show_summary
+        self._coloring_info['show_sparsity'] = show_sparsity
+
 
     def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
         """

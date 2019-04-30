@@ -40,9 +40,8 @@ differentiation*, SIAM J. Sci. Comput., 19 (1998), pp. 1210–1233.
 The OpenMDAO algorithms use the sparsity patterns for the partial derivatives given by the
 :ref:`declare_partials <feature_sparse_partials>` calls from all of the components in your model.
 So you should :ref:`specify the sparsity of the partial derivatives<feature_sparse_partials>`
-of your components in order to make it possible to find a more optimal automatic coloring
+of your components in order to make it possible to find a better automatic coloring
 for your model.
-
 
 
 Dynamic Coloring
@@ -50,9 +49,11 @@ Dynamic Coloring
 
 Dynamic coloring computes the derivative colors at runtime, shortly after the driver begins the
 optimization.  This has the advantage of simplicity and robustness to changes in the model, but
-adds the cost of the coloring computation to the run time of the optimization.  For a typical
-optimization, however, this cost will be small.  Activating dynamic coloring is simple.  Just
-call the `declare_coloring` function on the driver.  For example:
+adds the cost of the coloring computation to the run time of the optimization.  Generally, however,
+this cost will be small unless your total jacobian is very large.
+
+Activating dynamic coloring is simple.  Just call the `declare_coloring` function on the driver.
+For example:
 
 .. code-block:: python
 
@@ -70,10 +71,10 @@ you can pass the `repeats`, `tol`, and `orders` args. For example:
 
 
 Whenever a dynamic coloring is computed, the coloring is written to a file called
-*total_coloring.pkl* for later 'static' use.  The file will be written in a directory called
-*coloring_files* under the directory specified in :code:`problem.options['directory']`. If
-no value is set into :code:`problem.options['directory']` then the *coloring_files* directory
-will be placed under the current working directory at the time the problem is instantiated.
+*total_coloring.pkl* for later 'static' use.  The file will be written in a directory specified
+in :code:`problem.options['coloring_dir']`. If no value is set into
+:code:`problem.options['coloring_dir']` then *coloring_files* directory under the current working
+directory at the time the problem is instantiated will be used.
 
 
 You can see a more complete example of setting up an optimization with
@@ -87,7 +88,8 @@ Static Coloring
 ===============
 
 To get rid of the runtime cost of computing the coloring, you can precompute it and tell the
-driver to use its precomputed coloring by calling the :code:`use_fixed_coloring` method on the driver.
+driver to use its precomputed coloring by calling the :code:`use_fixed_coloring` method on the
+driver.  Note that this call should be made *after* calling :code:`declare_coloring`.
 
 
 .. automethod:: openmdao.core.driver.Driver.use_fixed_coloring
@@ -96,7 +98,9 @@ driver to use its precomputed coloring by calling the :code:`use_fixed_coloring`
 
 You don't need to tell :code:`use_fixed_coloring` the name of the coloring file to use,
 because it uses a fixed name, `total_coloring.pkl`, and knows what directory to look in based on
-the directory specified in :code:`problem.options['directory']`.
+the directory specified in :code:`problem.options['coloring_dir']`.  However, you *can* pass
+the name of a coloring file to :code:`use_fixed_coloring` if you want to use a specific coloring
+file that doesn't follow the standard naming convention.
 
 While using a precomputed coloring has the advantage of removing the runtime cost of computing
 the coloring, it should be used with care, because any changes in the model, design variables, or
@@ -104,8 +108,9 @@ responses can make the existing coloring invalid.  If *any* configuration change
 made to the optimization, it's recommended to regenerate the coloring before re-running the optimization.
 
 
-The total coloring can be generated automatically and written to the `total_coloring.pkl` file in
-a directory determined by the value of `problem.options['directory']` using the following command:
+The total coloring can be regenerated and written to the `total_coloring.pkl` file in
+a directory determined by the value of :code:`problem.options['coloring_files']` using the
+following command:
 
 .. code-block:: none
 
@@ -114,8 +119,8 @@ a directory determined by the value of `problem.options['directory']` using the 
 
 
 The total_coloring command also generates summary information that can sometimes be useful.
-The tolerance that was actually used to determine whether an entry in the total jacobian is
-considered to be zero or not is displayed, along with the number of zero entries found in this
+The tolerance that was actually used to determine if an entry in the total jacobian is
+considered to be non-zerois displayed, along with the number of zero entries found in this
 case, and how many times that number of zero entries occurred when sweeping over different tolerances
 between +- a number of orders of magnitude around the given tolerance.  If no tolerance is given, the default
 is 1e-15.  If the number of occurrences is only 1, an exception will be raised, and you should
@@ -236,16 +241,10 @@ For example:
 .. note::
 
     Your coloring file(s) will be found in the standard directory
-    `problem.options['directory']/coloring_files`.  That directory may contain a total coloring
+    `problem.options['coloring_dir']`.  That directory may contain a total coloring
     file, `total_coloring.pkl`, in additon to files containing partial derivative colorings for
     particular component classes or instances, as well as semi-total derivative coloring files
     for particular groups.
-
-.. warning::
-
-    Choose a different directory for `problem.options['directory']` for each problem.  Otherwise,
-    coloring files generated by running one problem can overwrite those generated by a different
-    problem.
 
 
 If you run *openmdao total_coloring* and it turns out there is no simultaneous total coloring

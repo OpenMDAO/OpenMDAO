@@ -436,7 +436,7 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         self._lin_vec_names = []
-        self._coloring_info = {'coloring': None}
+        self._coloring_info = {'coloring': None, 'show_summary': True, 'show_sparsity': False}
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
     def _declare_options(self):
@@ -780,7 +780,8 @@ class System(object):
             A coloring filename.  If no arg is passed, filename will be determined
             automatically.
         recurse : bool
-            If True, set fixed coloring in all subsystems that declare a coloring.
+            If True, set fixed coloring in all subsystems that declare a coloring. Ignored
+            if a specific coloring is passed in.
         """
         if coloring is not _STD_COLORING_FNAME:
             if recurse:
@@ -804,7 +805,8 @@ class System(object):
         return coloring
 
     def declare_coloring(self, wrt=None, method=None, form=None, step=None, per_instance=False,
-                         repeats=None, tol=None, orders=None, perturb_size=None):
+                         repeats=None, tol=None, orders=None, perturb_size=None,
+                         show_summary=True, show_sparsity=False):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -827,16 +829,16 @@ class System(object):
             of that class will use it.
         repeats : int
             Number of times to repeat partial jacobian computation when computing sparsity.
-            (ignored unless dynamic is True).
         tol : float
-            Tolerance used to determine if an array entry is nonzero during sparsity determination
-            (ignored unless dynamic is True).
+            Tolerance used to determine if an array entry is nonzero during sparsity determination.
         orders : int
-            Number of orders above and below the tolerance to check during the tolerance sweep
-            (ignored unless dynamic is True).
+            Number of orders above and below the tolerance to check during the tolerance sweep.
         perturb_size : float
-            Size of input/output perturbation during generation of sparsity
-            (ignored unless dynamic is True).
+            Size of input/output perturbation during generation of sparsity.
+        show_summary : bool
+            If True, display summary information after generating coloring.
+        show_sparsity : bool
+            If True, display sparsity with coloring info after generating coloring.
         """
         if method is None:
             if 'method' not in self._coloring_info:
@@ -873,7 +875,9 @@ class System(object):
             'repeats': repeats,
             'tol': tol,
             'orders': orders,
-            'coloring': _DYN_COLORING
+            'coloring': _DYN_COLORING,
+            'show_summary': show_summary,
+            'show_sparsity': show_sparsity,
         }
 
         options.update({k: v for k, v in iteritems(new_opts) if v is not None})
@@ -884,7 +888,8 @@ class System(object):
 
     def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
                                 repeats=2, perturb_size=1e-9, tol=1e-15, orders=20,
-                                per_instance=False, recurse=False):
+                                per_instance=False, recurse=False,
+                                show_summary=True, show_sparsity=False):
         """
         Compute a coloring of the approximated derivatives.
 
@@ -952,6 +957,8 @@ class System(object):
             'tol': tol,
             'orders': orders,
             'per_instance': per_instance,
+            'show_summary': show_summary,
+            'show_sparsity': show_sparsity,
         }
 
         # don't override metadata if it's already declared
@@ -1043,6 +1050,11 @@ class System(object):
         del coloring._meta['coloring']
 
         info['coloring'] = coloring
+
+        if info['show_sparsity']:
+            coloring.display()
+        if info['show_summary']:
+            coloring.summary()
 
         self._save_coloring(coloring)
 
@@ -1143,7 +1155,6 @@ class System(object):
         coloring = self._get_static_coloring()
         if coloring is None and self._coloring_info['coloring'] is _DYN_COLORING:
             self._coloring_info['coloring'] = coloring = self.compute_approx_coloring()
-            coloring.summary()
             self._coloring_info.update(coloring._meta)
 
         return coloring

@@ -549,7 +549,7 @@ class Coloring(object):
         return 'Coloring (direction: %s, ncolors: %d, shape: %s' % (direction, self.total_solves(),
                                                                     shape)
 
-    def summary(self, stream=sys.stdout):
+    def summary(self):
         """
         Print a summary of this coloring.
 
@@ -562,30 +562,30 @@ class Coloring(object):
         ncols = self._shape[1] if self._shape else -1
 
         if self._pct_nonzero is None:
-            stream.write("\nJacobian shape: (%d, %d)\n" % (nrows, ncols))
+            print("\nJacobian shape: (%d, %d)" % (nrows, ncols))
         else:
-            stream.write("\nJacobian shape: (%d, %d)  (%5.2f%% nonzero)\n" % (nrows, ncols,
-                                                                              self._pct_nonzero))
+            print("\nJacobian shape: (%d, %d)  (%5.2f%% nonzero)" % (nrows, ncols,
+                                                                       self._pct_nonzero))
         if self._fwd is None and self._rev is None:
             tot_size = min(nrows, ncols)
             if tot_size < 0:
                 tot_size = '?'
-            stream.write("\nSimultaneous derivatives can't improve on the total number of solves "
-                         "required (%s) for this configuration\n" % tot_size)
+            print("\nSimultaneous derivatives can't improve on the total number of solves "
+                  "required (%s) for this configuration" % tot_size)
         else:
             tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
 
-            stream.write("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
-            stream.write("\n\nTotal colors vs. total size: %d vs %s  (%.1f%% improvement)\n" %
-                         (tot_colors, tot_size, pct))
+            print("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
+            print("\nTotal colors vs. total size: %d vs %s  (%.1f%% improvement)" %
+                  (tot_colors, tot_size, pct))
 
-        stream.write('\n')
+        print()
         if self._sparsity_time is not None:
-            stream.write("Time to compute sparsity: %f sec.\n" % self._sparsity_time)
+            print("Time to compute sparsity: %f sec." % self._sparsity_time)
         if self._coloring_time is not None:
-            stream.write("Time to compute coloring: %f sec.\n" % self._coloring_time)
+            print("Time to compute coloring: %f sec." % self._coloring_time)
 
-    def display(self, stream=sys.stdout):
+    def display(self):
         """
         Display the structure of a boolean array with coloring info for each nonzero value.
 
@@ -595,11 +595,6 @@ class Coloring(object):
         If names and sizes of row and column vars are known, print the name of the row var
         alongside each row and print the names of the column vars, aligned with each column,
         at the bottom.
-
-        Parameters
-        ----------
-        stream : file-like
-            Stream where output will be written.
         """
         shape = self._shape
         nrows, ncols = shape
@@ -644,8 +639,8 @@ class Coloring(object):
             # we don't have var name/size info, so just show the unadorned matrix
             for r in range(nrows):
                 for c in range(ncols):
-                    stream.write(charr[r, c])
-                stream.write(' %d\n' % r)
+                    print(charr[r, c], end='')
+                print(' %d' % r)
         else:
             # we have var name/size info, so mark rows/cols with their respective variable names
             rowstart = rowend = 0
@@ -656,9 +651,9 @@ class Coloring(object):
                     for cv, cvsize in zip(self._col_vars, self._col_var_sizes):
                         colend += cvsize
                         for c in range(colstart, colend):
-                            stream.write(charr[r, c])
+                            print(charr[r, c], end='')
                         colstart = colend
-                    stream.write(' %d  %s\n' % (r, rv))  # include row variable with each row
+                    print(' %d  %s' % (r, rv))  # include row variable with each row
                 rowstart = rowend
 
             # now print the column vars below the matrix, with each one spaced over to line up
@@ -666,7 +661,7 @@ class Coloring(object):
             start = 0
             for name, size in zip(self._col_vars, self._col_var_sizes):
                 tab = ' ' * start
-                stream.write('%s|%s\n' % (tab, name))
+                print('%s|%s' % (tab, name))
                 start += size
 
         if has_overlap:
@@ -1658,7 +1653,10 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
                                       repeats=driver._coloring_info.get('repeats', 3),
                                       tol=1.e-15, setup=False, run_model=run_model, fname=fname)
 
-    coloring.summary()
+    if driver._coloring_info['show_sparsity']:
+        coloring.display()
+    if driver._coloring_info['show_summary']:
+        coloring.summary()
 
     driver._coloring_info['coloring'] = coloring
     driver._setup_simul_coloring()
@@ -1682,7 +1680,7 @@ def _total_coloring_setup_parser(parser):
                         'computing sparsity')
     parser.add_argument('-t', '--tol', action='store', dest='tolerance', default=1.e-15, type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
-    parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
+    parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final jacobian used to "
                         "compute the coloring.")
     parser.add_argument('--activate', action='store_true', dest='activate',
@@ -1742,7 +1740,7 @@ def _total_coloring_cmd(options):
                                                   repeats=options.num_jacs, tol=options.tolerance,
                                                   setup=False, run_model=True, fname=outfile)
 
-            if options.show_jac:
+            if options.show_sparsity:
                 coloring.display()
             coloring.summary()
             if options.activate:
@@ -1800,7 +1798,7 @@ def _partial_coloring_setup_parser(parser):
                         'computing sparsity')
     parser.add_argument('--tol', action='store', dest='tol', default=1.e-15, type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
-    parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
+    parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final jacobian used to "
                         "compute the coloring.")
     parser.add_argument('--profile', action='store_true', dest='profile',
@@ -1815,7 +1813,7 @@ def _get_partial_coloring_kwargs(options):
             raise RuntimeError("Can't specify --class if recurse option is set.")
 
     kwargs = {}
-    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol')
+    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol', 'show_sparsity')
     for name in names:
         if getattr(options, name):
             kwargs[name] = getattr(options, name)
@@ -1879,7 +1877,7 @@ def _partial_coloring_cmd(options):
                                     to_find.remove(c)
                                 coloring = s.compute_approx_coloring(**kwargs)
                                 print("Approx coloring for '%s' (class %s)\n" % (s.pathname, klass))
-                                if options.show_jac:
+                                if options.show_sparsity:
                                     coloring.display()
                                 coloring.summary()
                                 print('\n')
@@ -1905,7 +1903,7 @@ def _partial_coloring_cmd(options):
                     else:
                         print("Approx coloring for '%s' (class %s)\n" % (system.pathname,
                                                                          system.__class__.__name__))
-                        if options.show_jac:
+                        if options.show_sparsity:
                             coloring.display()
                         coloring.summary()
                         print('\n')
@@ -1938,7 +1936,7 @@ def _sparsity_setup_parser(parser):
                         help='number of times to repeat total derivative computation.')
     parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
                         help='tolerance used to determine if a total jacobian entry is nonzero.')
-    parser.add_argument('-j', '--jac', action='store_true', dest='show_jac',
+    parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final total jacobian used to "
                         "compute the sparsity.")
 
@@ -1973,7 +1971,7 @@ def _sparsity_cmd(options):
             outfile = open(options.outfile, 'w')
         _write_sparsity(sparsity, outfile)
 
-        if options.show_jac:
+        if options.show_sparsity:
             print("\n")
             ofs = prob.driver._get_ordered_nl_responses()
             wrts = list(prob.driver._designvars)
@@ -1993,7 +1991,7 @@ def _view_coloring_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='coloring file.')
-    parser.add_argument('-j', action='store_true', dest='show_jac',
+    parser.add_argument('-j', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final sparsity matrix used to "
                         "compute the coloring.")
     parser.add_argument('-s', action='store_true', dest='subjac_sparsity',
@@ -2015,7 +2013,7 @@ def _view_coloring_exec(options):
         Command line options.
     """
     coloring = Coloring.load(options.file[0])
-    if options.show_jac:
+    if options.show_sparsity:
         coloring.display()
 
     if options.subjac_sparsity:
@@ -2147,9 +2145,6 @@ def _get_color_dir_hash():
     winghome = os.environ.get('WINGHOME')
     if winghome:
         files = [f for f in files if not f.startswith(winghome)]
-
-    if not files:
-        simple_warning("Could not find a top level python script.")
 
     return '|'.join(files)
 
