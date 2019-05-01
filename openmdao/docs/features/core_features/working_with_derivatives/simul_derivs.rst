@@ -40,8 +40,7 @@ differentiation*, SIAM J. Sci. Comput., 19 (1998), pp. 1210–1233.
 The OpenMDAO algorithms use the sparsity patterns for the partial derivatives given by the
 :ref:`declare_partials <feature_sparse_partials>` calls from all of the components in your model.
 So you should :ref:`specify the sparsity of the partial derivatives<feature_sparse_partials>`
-of your components in order to make it possible to find a better automatic coloring
-for your model.
+of your components in order to make it possible to find a better automatic coloring.
 
 
 Dynamic Coloring
@@ -73,7 +72,7 @@ you can pass the `repeats`, `tol`, and `orders` args. For example:
 Whenever a dynamic coloring is computed, the coloring is written to a file called
 *total_coloring.pkl* for later 'static' use.  The file will be written in a directory specified
 in :code:`problem.options['coloring_dir']`. If no value is set into
-:code:`problem.options['coloring_dir']` then *coloring_files* directory under the current working
+:code:`problem.options['coloring_dir']` then the *coloring_files* directory under the current working
 directory at the time the problem is instantiated will be used.
 
 
@@ -186,7 +185,7 @@ structure with rows and columns labelled with the response and design variable n
     ........ff........ff. 20  delta_theta_con.g
     f.................... 21  l_conx.g
     |indeps.x
-            |indeps.y
+              |indeps.y
                         |indeps.r
 
 Note that the design variables are displayed along the bottom of the matrix, with a pipe symbol (|)

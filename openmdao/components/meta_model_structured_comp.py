@@ -716,8 +716,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             Whether to call this method in subsystems.
         """
         super(MetaModelStructuredComp, self)._setup_partials()
-        n = self.options['vec_size']
-        arange = np.arange(n)
+        arange = np.arange(self.options['vec_size'])
         pnames = tuple(self.pnames)
         dct = {
             'rows': arange,
@@ -744,7 +743,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        pt = np.transpose(np.array([inputs[pname].flatten() for pname in self.pnames]))
+        pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         for out_name in self.interps:
             if self.options['training_data_gradients']:
                 values = inputs["%s_train" % out_name]

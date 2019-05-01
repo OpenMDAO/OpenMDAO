@@ -1078,7 +1078,6 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
             ]]
 
     def tearDown(self):
-        print("TEARDOWN")
         os.chdir(self.startdir)
         try:
             shutil.rmtree(self.tempdir)
@@ -1302,7 +1301,6 @@ class MatMultMultipointTestCase(unittest.TestCase):
         else:
             self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
         os.chdir(self.tempdir)
-        MPI.COMM_WORLD.barrier()
 
     def tearDown(self):
         os.chdir(self.startdir)

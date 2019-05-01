@@ -863,7 +863,7 @@ class Problem(object):
 
         coloring = driver._coloring_info['coloring']
         if coloring is coloring_mod._STD_COLORING_FNAME:
-            coloring = driver._get_coloring()
+            coloring = driver._get_static_coloring()
         if coloring and coloring is not coloring_mod._DYN_COLORING and coloring_mod._use_sparsity:
             # if we're using simultaneous total derivatives then our effective size is less
             # than the full size

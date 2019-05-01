@@ -1132,37 +1132,6 @@ class Group(System):
                                                "dimension of size %d.")
                                         raise ValueError(msg % (abs_out, abs_in, i, d_size))
 
-    # def _setup_border_vars(self):
-    #     """
-    #     Set list of inputs and outputs in this system connected to variables outside this system.
-    #     """
-    #     # this is only reconfigurable from the top level
-    #     self._border_vars = border_vars = (set(), set())
-    #     if not self.pathname:
-    #         return  # top level has no border vars
-
-    #     pathdot = self.pathname + '.'
-    #     pathlen = len(pathdot)
-
-    #     for abs_in, abs_out in iteritems(self._all_conn_abs_in2out):
-    #         in_match = abs_in[:pathlen] == pathdot
-    #         out_match = abs_out[:pathlen] == pathdot
-    #         if in_match or out_match:
-    #             in_parts = abs_in.split('.')
-    #             out_parts = abs_out.split('.')
-    #             for i, (igrp, ogrp) in enumerate(zip(in_parts, out_parts)):
-    #                 if igrp != ogrp:
-    #                     if in_match:
-    #                         for j in range(i, len(in_parts) - 2):
-    #                             if '.'.join(in_parts[:j + 1]) == self.pathname:
-    #                                 border_vars[0].add(abs_in)
-    #                                 break
-    #                     if out_match:
-    #                         for j in range(i, len(out_parts) - 2):
-    #                             if '.'.join(out_parts[:j + 1]) == self.pathname:
-    #                                 border_vars[1].add(abs_out)
-    #                                 break
-
     def _transfer(self, vec_name, mode, isub=None):
         """
         Perform a vector transfer.
@@ -1796,7 +1765,6 @@ class Group(System):
             self._first_call_to_linearize = False  # only do this once
             coloring = self._get_coloring()
             if coloring is not None:
-                self._coloring_info['coloring'] = coloring
                 self._setup_static_approx_coloring()
             elif self._approx_schemes:
                 self._setup_approx_partials()
@@ -2064,86 +2032,3 @@ class Group(System):
             graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
-
-    def _get_ordered_jac_vars(self, absolute=True):
-        """
-        Get names jacobian variablesin the correct order.
-
-        Parameters
-        ----------
-        absolute : bool
-            If True, return the names in absolute form, else promoted form.
-
-        Returns
-        -------
-        (list, list)
-            Tuple containing of names, and wrt names. 'of' vars correspond to rows and 'wrt'
-            vars correspond to columns of the jacobian.
-        """
-        if not absolute:
-            raise NotImplementedError("_get_ordered_jac_vars_and_sizes currently supports only "
-                                      "absolute names for Group variables.")
-        if self._owns_approx_of is None or self._owns_approx_wrt is None:
-            # use whatever approximations have been added.  This will only happen when we're doing
-            # semi-totals or are calling linearize directly on the model without computing totals.
-            ofs, wrts, _ = self._get_approx_of_wrt_ivc()
-            return ofs, wrts
-
-        return (list(self._owns_approx_of), list(self._owns_approx_wrt))
-
-    def _get_ordered_jac_vars_and_sizes(self, absolute=True):
-        """
-        Get names and sizes of jacobian variables and their sizes in the correct order.
-
-        Parameters
-        ----------
-        absolute : bool
-            If True, return the names in absolute form, else promoted form.
-
-        Returns
-        -------
-        (list, list, list, list, list, list)
-            Tuple containing of names, of sizes, of reduced sizes, wrt names, wrt sizes,
-            and wrt reduced sizes. 'of' vars correspond to rows and 'wrt' vars correspond to
-            columns of the jacobian.
-        """
-        if not absolute:
-            raise NotImplementedError("_get_ordered_jac_vars_and_sizes currently supports only "
-                                      "absolute names for Group variables.")
-        if self._owns_approx_of is None or self._owns_approx_wrt is None:
-            raise RuntimeError("%s: Jacobian vars and sizes requested but the 'of' and 'wrt'"
-                               "vars have not been defined." % self.pathname)
-        iproc = self.comm.rank
-        out_sizes = self._var_sizes['nonlinear']['output'][iproc]
-        abs2idx = self._var_allprocs_abs2idx['nonlinear']
-        ofs = list(self._owns_approx_of)
-        of_sizes = [out_sizes[abs2idx[n]] for n in ofs]
-        if self._owns_approx_of_idx:
-            of_reduced = of_sizes.copy()
-            for i, n in ofs:
-                if n in self._owns_approx_of_idx:
-                    of_reduced[i] = len(self._owns_approx_of_idx[n])
-        else:
-            of_reduced = of_sizes
-
-        wrts = list(self._owns_approx_wrt)
-        if self.pathname:  # we're not the top level Group, so jac contains semi-totals
-            in_sizes = self._var_sizes['nonlinear']['input'][iproc]
-            wrt_sizes = []
-            for wrt in self._owns_approx_wrt:
-                if wrt in self._outputs._views:
-                    wrt_sizes.append(out_sizes[abs2idx[wrt]])
-                else:
-                    wrt_sizes.append(in_sizes[abs2idx[wrt]])
-        else:   # we're the top level Group, so we're computing a total jacobian.
-            wrt_sizes = [out_sizes[abs2idx[n]] for n in wrts]
-
-        if self._owns_approx_wrt_idx:
-            wrt_reduced = wrt_sizes.copy()
-            for i, n in wrts:
-                if n in self._owns_approx_wrt_idx:
-                    wrt_reduced[i] = len(self._owns_approx_wrt_idx)
-        else:
-            wrt_reduced = wrt_sizes
-
-        return (ofs, of_sizes, of_reduced, wrts, wrt_sizes, wrt_reduced)

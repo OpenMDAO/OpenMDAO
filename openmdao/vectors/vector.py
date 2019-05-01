@@ -81,8 +81,6 @@ class Vector(object):
         True if this vector performs scaling.
     _scaling : dict
         Contains scale factors to convert data arrays.
-    _scaled_to : str
-        Indicates scaling of the vector, either 'phys' or 'norm'.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _under_complex_step : bool
@@ -149,7 +147,6 @@ class Vector(object):
                             (kind == 'residual' and system._has_resid_scaling))
 
         self._scaling = {}
-        self._scaled_to = 'phys'
 
         if root_vector is None:
             self._root_vector = self
@@ -280,22 +277,6 @@ class Vector(object):
             True or False.
         """
         return name2abs_name(self._system, name, self._names, self._typ) is not None
-
-    def get_slice(self, slc):
-        """
-        Return the given slice of the data vector.
-
-        Parameters
-        ----------
-        slc : slice
-            The desired slice of the data vector.
-
-        Returns
-        -------
-        ndarray
-            A view of data vector specified by the given slice.
-        """
-        return self._data[slc]
 
     def __getitem__(self, name):
         """
@@ -459,7 +440,6 @@ class Vector(object):
             Values are "phys" or "norm" to scale to physical or normalized.
         """
         scaling = self._scaling[scale_to]
-        self._scaled_to = scale_to
         if self._ncol == 1:
             self._data *= scaling[1]
             if scaling[0] is not None:  # nonlinear only
@@ -617,27 +597,3 @@ class Vector(object):
         self._views, self._cplx_views = self._cplx_views, self._views
         self._views_flat, self._cplx_views_flat = self._cplx_views_flat, self._views_flat
         self._under_complex_step = active
-
-
-# stuff for AD
-def set_vec(vsource, vtarget):
-    """
-    Fill the data of the target Vector with data from the source Vector.
-
-    Use this in place of the Vector method set_vec if you intend to compute
-    your component's derivatives using the tangent AD system.
-
-    Parameters
-    ----------
-    vsource : Vector
-        The source Vector.
-    vtarget : Vector
-        The target Vector.
-
-    Returns
-    -------
-    Vector
-        The target Vector.
-    """
-    vtarget._data[:] = vsource._data
-    return vtarget

@@ -811,7 +811,6 @@ def make_serializable(o):
     -------
     object
         The converted object.
-
     """
     if (isinstance(o, np.number)):
         return o.item()

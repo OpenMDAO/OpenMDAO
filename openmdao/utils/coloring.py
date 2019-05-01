@@ -52,7 +52,7 @@ _use_sparsity = True
 
 
 # if True, perform check of coloring dir hash at the beginning of setup
-_check_coloring = True
+_check_coloring_hash = True
 
 
 # used as an indicator that we should automatically name coloring file based on class module
@@ -350,11 +350,17 @@ class Coloring(object):
         Coloring
             See docstring for Coloring class.
         """
-        name, ext = fname.rsplit('.', 1)
+        tup = fname.rsplit('.', 1)
+        if len(tup) == 1:
+            name = tup[0]
+            fmt = '.pkl'
+        else:
+            name, fmt = tup
+
         try:
-            loader = _loaders[ext]
+            loader = _loaders[fmt]
         except KeyError:
-            raise RuntimeError("Can't find a coloring loader for extension '%s'." % ext)
+            raise RuntimeError("Can't find a coloring loader for extension '%s'." % fmt)
 
         return loader(fname)
 
@@ -437,7 +443,7 @@ class Coloring(object):
         file_hash : str
             Value of has loaded from has file in coloring directory.
         """
-        if _check_coloring:
+        if _check_coloring_hash:
             color_dir = os.path.dirname(os.path.abspath(fname))
             _check_color_dir_hash(color_dir, file_hash, current_hash)
             if file_hash is None:
@@ -1097,7 +1103,7 @@ def MNCO_bidir(J):
     if np.count_nonzero(J) != nnz_Jc + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jc and Jr")
 
-    # _check_coloring(J, coloring)
+    # check_coloring(J, coloring)
 
     coloring._coloring_time = time.time() - start_time
 
@@ -1709,15 +1715,15 @@ def _total_coloring_cmd(options):
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context
 
-    global _use_sparsity, _check_coloring
+    global _use_sparsity, _check_coloring_hash
 
     _use_sparsity = False
 
     if options.outfile:
-        _check_coloring = False
+        _check_coloring_hash = False
 
     def _total_coloring(prob):
-        global _use_sparsity, _check_coloring
+        global _use_sparsity, _check_coloring_hash
 
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
@@ -1731,7 +1737,7 @@ def _total_coloring_cmd(options):
                 # we turned off the earlier check
                 if (cdir == os.path.dirname(outfile) and
                         os.path.basename(outfile) == 'total_coloring.pkl'):
-                    _check_coloring = True
+                    _check_coloring_hash = True
             else:
                 outfile = os.path.join(prob.options['coloring_dir'], 'total_coloring.pkl')
 
@@ -1813,7 +1819,7 @@ def _get_partial_coloring_kwargs(options):
             raise RuntimeError("Can't specify --class if recurse option is set.")
 
     kwargs = {}
-    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol', 'show_sparsity')
+    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol')
     for name in names:
         if getattr(options, name):
             kwargs[name] = getattr(options, name)
@@ -1852,8 +1858,6 @@ def _partial_coloring_cmd(options):
             Problem._post_setup_func = None  # avoid recursive loop
 
             prob.run_model()  # get a consistent starting values for inputs and outputs
-
-            print("COLOR DIR:", prob.options['coloring_dir'])
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 if options.system == '':
@@ -2033,9 +2037,9 @@ def _view_coloring_exec(options):
     coloring.summary()
 
 
-def _check_coloring(J, coloring):
+def _check_coloring_pattern(J, coloring):
     """
-    Raise an exception if any problems are found with the coloring info.
+    Raise an exception if any problems are found with the coloring.
 
     Parameters
     ----------

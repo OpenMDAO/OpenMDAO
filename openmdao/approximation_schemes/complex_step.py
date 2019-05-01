@@ -10,8 +10,7 @@ import numpy as np
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
     _gather_jac_results, _get_wrt_subjacs
 from openmdao.utils.general_utils import simple_warning
-from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, \
-    update_sizes, _get_jac_slice_dict
+from openmdao.utils.array_utils import sub2full_indices, update_sizes, _get_jac_slice_dict
 from openmdao.utils.coloring import Coloring
 
 

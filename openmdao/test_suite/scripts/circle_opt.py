@@ -70,5 +70,4 @@ p.model.add_objective('circle.area', ref=-1)
 p.setup(mode='fwd')
 p.run_driver()
 
-
 print(p['circle.area'], np.pi)

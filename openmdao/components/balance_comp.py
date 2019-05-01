@@ -203,17 +203,13 @@ class BalanceComp(ImplicitComponent):
             self._scale_factor = self._scale_factor.real
 
         for name, options in iteritems(self._state_vars):
-            lhs_opt = options['lhs_name']
-            rhs_opt = options['rhs_name']
-            lhs = inputs[lhs_opt]
-            rhs = inputs[rhs_opt]
+            lhs = inputs[options['lhs_name']]
+            rhs = inputs[options['rhs_name']]
 
             if options['normalize']:
                 # Indices where the rhs is near zero or not near zero
-                tmp1 = np.abs(rhs) < 2
-                idxs_nz = np.where(tmp1)[0]
-                tmp2 = np.abs(rhs) >= 2
-                idxs_nnz = np.where(tmp2)[0]
+                idxs_nz = np.where(np.abs(rhs) < 2)[0]
+                idxs_nnz = np.where(np.abs(rhs) >= 2)[0]
 
                 # Compute scaling factors
                 # scale factor that normalizes by the rhs, except near 0

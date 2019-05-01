@@ -257,7 +257,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                         'dependent': True,
                     }
                     self._declare_partials(of=of, wrt=wrt, dct=dct)
-
         else:
             dct = {
                 'value': None,
@@ -275,14 +274,6 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 key for key, dct in iteritems(self._subjacs_info) if 'method' in dct
                 and dct['method']])
 
-            # for of, wrt, method, fd_options in self._approximated_partials:
-            #     pattern_matches = self._find_partial_matches(of, wrt)
-            #     for of_bundle, wrt_bundle in product(*pattern_matches):
-            #         of_pattern, of_matches = of_bundle
-            #         wrt_pattern, wrt_matches = wrt_bundle
-            #         for rel_key in product(of_matches, wrt_matches):
-            #             abs_key = rel_key2abs_key(self, rel_key)
-            #             declared_partials.add(abs_key)
             non_declared_partials = []
             for of, n_of in self._surrogate_output_names:
                 has_derivs = False

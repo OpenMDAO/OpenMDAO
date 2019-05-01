@@ -270,7 +270,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.connect('p2.x2', 'comp.x2')
 
         model.linear_solver = ScipyKrylov()
-        model.approx_totals(method='cs')
+        model.approx_totals()
 
         prob.setup(check=False)
         prob.run_model()
@@ -1633,11 +1633,7 @@ class TestGroupComplexStep(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        # with self.assertRaises(RuntimeError) as cm:
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-
-        msg = "Nested Complex Step is not supported in system 'd1'"
-        #self.assertEqual(str(cm.exception), msg)
 
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)

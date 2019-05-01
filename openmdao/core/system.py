@@ -280,7 +280,8 @@ class System(object):
     _use_derivatives : bool
         If True, perform any memory allocations necessary for derivative computation.
     _coloring_info : tuple
-        Metadata that defines how to perform coloring of this System's approx jacobian.
+        Metadata that defines how to perform coloring of this System's approx jacobian. Not
+        used if this System does no partial or semi-total coloring.
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
     """
@@ -694,7 +695,8 @@ class System(object):
         self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
                     distributed_vector_class=self._distributed_vector_class,
                     local_vector_class=self._local_vector_class,
-                    use_derivatives=self._use_derivatives)
+                    use_derivatives=self._use_derivatives,
+                    prob_options=self._problem_options)
         self._final_setup(self.comm, setup_mode=setup_mode,
                           force_alloc_complex=self._outputs._alloc_complex)
 
@@ -727,9 +729,8 @@ class System(object):
         prob_options : OptionsDictionary
             Problem level options dictionary.
         """
-        # save a ref to the problem level options
-        if prob_options is not None:
-            self._problem_options = prob_options
+        # save a ref to the problem level options.
+        self._problem_options = prob_options
 
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
@@ -888,8 +889,7 @@ class System(object):
 
     def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
                                 repeats=2, perturb_size=1e-9, tol=1e-15, orders=20,
-                                per_instance=False, recurse=False,
-                                show_summary=True, show_sparsity=False):
+                                per_instance=False, recurse=False):
         """
         Compute a coloring of the approximated derivatives.
 
@@ -929,10 +929,6 @@ class System(object):
             is encountered that has specified its coloring metadata, we don't recurse below
             that group unless that group has a subsystem that has a nonlinear solver that uses
             gradients.
-        show_summary : bool
-            If True, display summary information after generating coloring.
-        show_sparsity : bool
-            If True, display sparsity with coloring info after generating coloring.
 
         Returns
         -------
@@ -941,14 +937,16 @@ class System(object):
         """
         if recurse:
             coloring = None
-            for s in self._subsystems_myproc:
-                if not self._coloring_info or s._contains_gradient_nl_solver():
+            my_coloring = self._coloring_info['coloring']
+            grad_systems = self._get_gradient_nl_solver_systems()
+            for s in self.system_iter(recurse=True):
+                if my_coloring is None or s in grad_systems:
                     coloring = s.compute_approx_coloring(wrt=wrt, method=method, form=form,
                                                          step=step, repeats=repeats,
                                                          perturb_size=perturb_size, tol=tol,
                                                          orders=orders, per_instance=per_instance,
                                                          recurse=recurse)
-            if self._coloring_info['coloring'] is None:
+            if my_coloring is None:
                 return coloring
 
         kwargs = {
@@ -961,8 +959,8 @@ class System(object):
             'tol': tol,
             'orders': orders,
             'per_instance': per_instance,
-            'show_summary': show_summary,
-            'show_sparsity': show_sparsity,
+            'show_summary': False,
+            'show_sparsity': False,
         }
 
         # don't override metadata if it's already declared
@@ -1073,7 +1071,7 @@ class System(object):
 
     def get_approx_coloring_fname(self):
         """
-        Return the full pathname to a coloring file, generating a default name if necessary.
+        Return the full pathname to a coloring file.
 
         Parameters
         ----------
@@ -1093,8 +1091,10 @@ class System(object):
         per_instance = self._coloring_info.get('per_instance')
 
         if per_instance:
+            # base the name on the instance pathname
             fname = 'coloring_' + self.pathname.replace('.', '_') + '.pkl'
         else:
+            # base the name on the class name
             fname = 'coloring_' + '_'.join(
                 [self.__class__.__module__.replace('.', '_'), self.__class__.__name__]) + '.pkl'
 
@@ -3474,28 +3474,17 @@ class System(object):
         in_sizes = self._var_sizes['nonlinear']['input'][iproc]
         return out_sizes, np.hstack((out_sizes, in_sizes))
 
-    def _contains_gradient_nl_solver(self, include_self=True):
+    def _get_gradient_nl_solver_systems(self):
         """
-        Return True if this System or any of its descendents has a gradient nonlinear solver.
-
-        Parameters
-        ----------
-        include_self : bool
-            If True, check the current system for a gradient solver, else just check children.
+        Return a set of all Systems, including this one, that have a gradient nonlinear solver.
 
         Returns
         -------
-        bool
-            Whether or not a gradient nonlinear solver was found.
+        set
+            Set of Systems containing nonlinear solvers that compute gradients.
         """
-        if include_self and self.nonlinear_solver and self.nonlinear_solver.supports['gradients']:
-            return True
-
-        for s in self._subsystems_myproc:
-            if s._contains_gradient_nl_solver():
-                return True
-
-        return False
+        return set(s for s in self.system_iter(include_self=True, recurse=True)
+                   if s.nonlinear_solver and s.nonlinear_solver.supports['gradients'])
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

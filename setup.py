@@ -135,7 +135,6 @@ setup(
         'pyparsing',
         'scipy',
         'six',
-        'astunparse',
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""

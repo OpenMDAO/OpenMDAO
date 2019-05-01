@@ -77,8 +77,6 @@ class Driver(object):
         Dict of lists of var names indicating what to record
     _model_viewer_data : dict
         Structure of model, used to make n2 diagram.
-    _total_coloring : tuple of dicts
-        A data structure describing coloring for simultaneous derivs.
     _coloring_info : dict
         Metadata pertaining to total coloring.
     _total_jac_sparsity : dict, str, or None
@@ -278,7 +276,7 @@ class Driver(object):
 
         # set up simultaneous deriv coloring
         if coloring_mod._use_sparsity:
-            coloring = self._get_coloring()
+            coloring = self._get_static_coloring()
             if coloring is not None and self.supports['simultaneous_derivatives']:
                 self._setup_simul_coloring()
 
@@ -996,7 +994,7 @@ class Driver(object):
         self._coloring_info['coloring'] = coloring
         return coloring
 
-    def _get_coloring(self):
+    def _get_static_coloring(self):
         """
         Get the Coloring for this driver.
 
@@ -1043,7 +1041,7 @@ class Driver(object):
             simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
 
-        total_coloring = self._get_coloring()
+        total_coloring = self._get_static_coloring()
 
         if total_coloring._rev and problem._orig_mode not in ('rev', 'auto'):
             revcol = total_coloring._rev[0][0]

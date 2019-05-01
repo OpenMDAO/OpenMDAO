@@ -12,8 +12,8 @@ from contextlib import contextmanager
 
 from openmdao.devtools.iprof_utils import find_qualified_name, func_group, \
      _collect_methods, _setup_func_group, _get_methods, _Options
-from openmdao.devtools.debug import _get_color_printer
 from openmdao.utils.mpi import MPI
+from openmdao.devtools.debug import _get_color_printer
 
 
 _registered = False

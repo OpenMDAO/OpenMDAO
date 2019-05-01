@@ -153,7 +153,7 @@ class pyOptSparseDriver(Driver):
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
         self.options.declare('dynamic_derivs_sparsity', default=False, types=bool,
-                             desc='Compute derivative sparsity dynamically if True (deprecated)')
+                             desc='Compute derivative sparsity dynamically if True.')
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically '
                              'if True (deprecated)')

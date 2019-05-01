@@ -280,46 +280,6 @@ def _global2local_offsets(global_offsets):
     return offsets
 
 
-def local_index_iter(sizes):
-    """
-    Generate local variable indices given an array of variable sizes.
-
-    Parameters
-    ----------
-    sizes : ndarray of int
-        Array of variable sizes.
-
-    Yields
-    ------
-    int
-        local intra-variable indices.
-    """
-    for size in sizes:
-        for i in range(size):
-            yield i
-
-
-def var_name_idx_iter(names, sizes):
-    """
-    Generate variable names that will map to overall array index.
-
-    Parameters
-    ----------
-    names : iter of str
-        Iterator over variable names corresponding to the given sizes.
-    sizes : ndarray of int
-        Array of variable sizes.
-
-    Yields
-    ------
-    str
-        Variable name. Each name will be yielded a number of times equal to the variable size.
-    """
-    for name, size in zip(names, sizes):
-        for i in range(size):
-            yield name
-
-
 def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
     """
     Return the given indices converted into indices into the full vector.
@@ -398,65 +358,6 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
         return [(outputs, full_idxs)]
     else:
         return [(inputs, full_idxs)]
-
-
-def get_index_array_maps(names, sizes):
-    """
-    Given names and sizes, return mappings of names and local indices to array index.
-
-    Parameters
-    ----------
-    names : iter of str
-        Iterator over the names.  (Must be ordered.)
-    sizes : ndarray of int
-        Sizes of variables specified in names.
-
-    Returns
-    -------
-    list
-        list of length sum(sizes) containing corresponding var name in each entry.
-    ndarray
-        Array of length sum(sizes) with var local index in each entry.
-    """
-    tot_size = np.sum(sizes)
-    name_list = [None] * tot_size
-    loc_idxs = np.empty(tot_size, dtype=numpy.uint32)
-
-    start = end = 0
-    for name, size in zip(names, sizes):
-        end += size
-        if size > 0:
-            name_list[start:end] = name
-            loc_idxs[start:end] = np.arange(size, dtype=uint32)
-        start = end
-
-    return name_list, loc_idxs
-
-
-def get_local_offset_map(names, sizes):
-    """
-    Return a mapping of var name to local offset.
-
-    Parameters
-    ----------
-    names : list of str
-        Variable names.
-    sizes : ndarray of int
-        Local variable sizes.
-
-    Returns
-    -------
-    dict
-        Mapping of var name to local offset.
-    """
-    offsets = {}
-    start = end = 0
-    for name, size in zip(names, sizes):
-        end += size
-        if end != start:
-            offsets[name] = start
-        start = end
-    return offsets
 
 
 def update_sizes(names, sizes, index_map):

@@ -194,7 +194,8 @@ def _setup_func_group():
         # NOTE: context managers and other functions that yield instead of return will NOT show
         # up properly in the trace.  For example, our context managers for scaling will show up
         # as a call and immediate return from the context manager, followed by the functions that
-        # should show up as inside of the context manager but don't.
+        # should show up as inside of the context manager but don't.  This is just here to
+        # remind me not to try to create a 'scaling' group again.
         # 'scaling': [
         #     ('*scaled_context*', (System,)),
         #     ('compute*', (Component, ApproximationScheme)),

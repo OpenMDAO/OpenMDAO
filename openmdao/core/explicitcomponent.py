@@ -208,14 +208,7 @@ class ExplicitComponent(Component):
         else:
             wrt_matches = ()
 
-        # TODO: check to see if this entire loop can be skipped if no approximations
-        # are being done.  ImplicitComponent doesn't set value in it's _set_partials_meta,
-        # so either there's a bug there or the code here is doing something unnecessary
         for abs_key, meta in iteritems(self._subjacs_info):
-
-            # if there isn't a declared partial value, set it to a dense matrix
-            if meta['value'] is None:
-                meta['value'] = np.zeros(meta['shape'])
 
             if 'method' in meta and abs_key[1] not in wrt_matches:
                 method = meta['method']

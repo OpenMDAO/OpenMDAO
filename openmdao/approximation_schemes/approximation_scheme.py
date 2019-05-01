@@ -6,8 +6,8 @@ from itertools import groupby
 from collections import defaultdict, OrderedDict
 from scipy.sparse import coo_matrix
 import numpy as np
-from openmdao.utils.array_utils import sub2full_indices, get_local_offset_map, var_name_idx_iter, \
-    update_sizes, get_input_idx_split, _get_jac_slice_dict
+from openmdao.utils.array_utils import sub2full_indices, update_sizes, get_input_idx_split, \
+    _get_jac_slice_dict
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.general_utils import printoptions
 from openmdao.jacobians.jacobian import Jacobian
@@ -416,21 +416,6 @@ class ApproximationScheme(object):
                         jac._override_checks = False
                     else:
                         jac[key] = _from_dense(jacobian, key, oview, rows_reduced, cols_reduced)
-
-    def ncolors(self):
-        """
-        Return number of colors used in simultaneous derivative coloring, or 0 if not used.
-
-        Returns
-        -------
-        int
-            Number of colors used in simultaneous derivative coloring, or 0 if not used.
-        """
-        color_count = 0
-        for approx in self._approx_groups:
-            if approx[0] is None:
-                color_count += 1
-        return color_count
 
 
 def _from_dense(jac, key, subjac, reduced_rows=_full_slice, reduced_cols=_full_slice):

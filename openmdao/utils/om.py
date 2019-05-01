@@ -27,10 +27,6 @@ from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
 from openmdao.utils.coloring import _total_coloring_setup_parser, _total_coloring_cmd, \
     _sparsity_setup_parser, _sparsity_cmd, _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
-try:
-    from openmdao.utils.ad_common import _ad_setup_parser, _ad_cmd, _ad_exec
-except Exception:
-    _ad_setup_parser = _ad_cmd = _ad_exec = None
 
 
 def _view_model_setup_parser(parser):
@@ -495,12 +491,6 @@ _non_post_setup_map = {
 }
 
 
-# functions that can be either post-setup or not go here
-_dual_setup_map = {}
-if _ad_setup_parser is not None:
-    _dual_setup_map['ad'] = (_ad_setup_parser, _ad_cmd, _ad_exec)
-
-
 def openmdao_cmd():
     """
     Wrap a number of Problem viewing/debugging command line functions.
@@ -517,11 +507,6 @@ def openmdao_cmd():
         subp = subs.add_parser(p)
         parser_setup_func(subp)
         subp.set_defaults(executor=cmd)
-
-    for p, (parser_setup_func, cmd, ex) in iteritems(_dual_setup_map):
-        subp = subs.add_parser(p)
-        parser_setup_func(subp)
-        subp.set_defaults(func=cmd, executor=ex)
 
     # handle case where someone just runs `openmdao <script>`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]

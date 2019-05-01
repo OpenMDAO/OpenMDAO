@@ -254,6 +254,21 @@ class Jacobian(object):
         return r
 
     def _get_ranges(self, system, vtype):
+        """
+        Return an ordered dict of ranges for each var of a particular type (input or output).
+
+        Parameters
+        ----------
+        system : System
+            System owning this jacobian.
+        vtype : str
+            Type of variable, must be one of ('input', 'output').
+
+        Returns
+        -------
+        OrderedDict
+            Tuples of the form (start, end) keyed on variable name.
+        """
         iproc = system.comm.rank
         abs2idx = system._var_allprocs_abs2idx['linear']
         sizes = system._var_sizes['linear'][vtype]
@@ -266,6 +281,14 @@ class Jacobian(object):
         return ranges
 
     def _save_sparsity(self, system):
+        """
+        Add the current jacobian to a running absolute summation.
+
+        Parameters
+        ----------
+        system : System
+            System owning this jacobian.
+        """
         subjacs = self._subjacs_info
         if self._jac_summ is None:
             # create _jac_summ structure
@@ -318,8 +341,7 @@ class Jacobian(object):
         subjac_wrts = set(key[1] for key in subjacs)
 
         if system._owns_approx_of or system._owns_approx_wrt:
-            # we're computing totals
-            is_total = True
+            # we're computing totals/semi-totals
             ofs = list(system._owns_approx_of)
             wrts = list(system._owns_approx_wrt)
             if system.pathname:  # doing semitotals
@@ -327,7 +349,6 @@ class Jacobian(object):
             else:
                 wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
         else:
-            is_total = False
             from openmdao.core.explicitcomponent import ExplicitComponent
             ofs = system._var_allprocs_abs_names['output']
             wrts = system._var_allprocs_abs_names['input']
@@ -395,7 +416,7 @@ class Jacobian(object):
         boolJ = np.zeros(J.shape, dtype=bool)
         boolJ[J > good_tol] = True
 
-        if not is_total or (is_total and system.pathname):  # convert to promoted names
+        if system.pathname:  # convert to promoted names
             ordered_ofs = _odict_abs2prom(system, ordered_ofs)
             ordered_wrts = _odict_abs2prom(system, ordered_wrts)
 

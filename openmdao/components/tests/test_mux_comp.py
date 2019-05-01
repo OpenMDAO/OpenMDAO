@@ -154,6 +154,7 @@ class TestMuxComp1D(unittest.TestCase):
         self.p.run_model()
 
     def test_results(self):
+        pass
         for i in range(self.nn):
             out_i = self.p['mux_comp.a'][i, ...]
             in_i = self.p['a_{0}'.format(i)]
