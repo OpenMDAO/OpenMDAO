@@ -26,9 +26,7 @@ from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSqua
 
 try:
     from openmdao.parallel_api import PETScVector
-    vector_class = PETScVector
-except Exception:
-    vector_class = DefaultVector
+except ImportError:
     PETScVector = None
 
 from openmdao.utils.general_utils import set_pyoptsparse_opt
