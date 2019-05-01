@@ -118,7 +118,7 @@ class Coloring(object):
     _meta : dict
         Dictionary of metadata used to create the coloring.
     _writers : dict
-        Mapping of file extension to a tuple (func, open_str), where func writes
+        Mapping of file extension to a tuple (funcname, open_str), where func writes
         the coloring in a specific format, and open_str is the string indicating
         if the file should be ascii ('w') or binary ('wb').
     """
@@ -160,8 +160,8 @@ class Coloring(object):
         self._rev = None
         self._meta = {}
         self._writers = {
-            'json': (self._write_json, 'w'),
-            'pkl': (self._write_pickle, 'wb'),
+            'json': ('_write_json', 'w'),
+            'pkl': ('_write_pickle', 'wb'),
         }
 
     def color_iter(self, direction):
@@ -425,7 +425,7 @@ class Coloring(object):
                 raise RuntimeError("No writer available for format '%s'", fmt)
 
             with open(fname, otype) as f:
-                writer(f)
+                getattr(self, writer)(f)
         else:
             raise TypeError("Can't save coloring.  Expected a string for fname but got a %s" %
                             type(fname).__name__)

@@ -7,6 +7,7 @@ import sys
 import six
 from six.moves import range
 from itertools import product
+from copy import copy
 
 import numpy as np
 
@@ -379,7 +380,7 @@ def update_sizes(names, sizes, index_map):
         Sizes of variables after reducing some due to index_map.
     """
     if index_map:
-        sizes = sizes.copy()
+        sizes = copy(sizes)
         for i, (name, size) in enumerate(zip(names, sizes)):
             if size > 0 and name in index_map:
                 sizes[i] = len(index_map[name])
