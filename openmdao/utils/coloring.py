@@ -2137,8 +2137,8 @@ def _get_color_dir_hash():
             continue
         exclude.add(_file)
 
-    files = set(os.path.abspath(f.filename) for f in inspect.getouterframes(inspect.currentframe())
-                if f.filename.endswith('.py'))
+    files = set(os.path.abspath(f[1]) for f in inspect.getouterframes(inspect.currentframe())
+                if f[1].endswith('.py'))
 
     # add any python files from the command line
     files.update(a for a in sys.argv if a.endswith('.py'))
