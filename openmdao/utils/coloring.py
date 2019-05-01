@@ -2133,7 +2133,7 @@ def _get_color_dir_hash():
             _file = m.__file__
         except AttributeError:
             continue
-        if os.path.basename(_file).startswith('test_'):
+        if _file is None or os.path.basename(_file).startswith('test_'):
             continue
         exclude.add(_file)
 
