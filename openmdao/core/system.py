@@ -932,22 +932,26 @@ class System(object):
 
         Returns
         -------
-        Coloring or None
-            The computed coloring.
+        list of Coloring
+            The computed colorings.
         """
         if recurse:
-            coloring = None
+            colorings = []
             my_coloring = self._coloring_info['coloring']
             grad_systems = self._get_gradient_nl_solver_systems()
-            for s in self.system_iter(recurse=True):
+            for s in self.system_iter(include_self=True, recurse=True):
                 if my_coloring is None or s in grad_systems:
-                    coloring = s.compute_approx_coloring(wrt=wrt, method=method, form=form,
-                                                         step=step, repeats=repeats,
-                                                         perturb_size=perturb_size, tol=tol,
-                                                         orders=orders, per_instance=per_instance,
-                                                         recurse=recurse)
-            if my_coloring is None:
-                return coloring
+                    if s._coloring_info['coloring'] is not None:
+                        colorings.append(s.compute_approx_coloring(wrt=wrt, method=method,
+                                                                   form=form, step=step,
+                                                                   repeats=repeats,
+                                                                   perturb_size=perturb_size,
+                                                                   tol=tol, orders=orders,
+                                                                   per_instance=per_instance,
+                                                                   recurse=False)[0])
+                        colorings[-1]._meta['pathname'] = s.pathname
+                        colorings[-1]._meta['class'] = type(s).__name__
+            return colorings
 
         kwargs = {
             'wrt': wrt,
@@ -1053,6 +1057,9 @@ class System(object):
 
         info['coloring'] = coloring
 
+        if info['show_sparsity'] or info['show_summary']:
+            print("Approx coloring for '%s' (class %s)\n" % (self.pathname, type(self).__name__))
+
         if info['show_sparsity']:
             coloring.display()
         if info['show_summary']:
@@ -1067,7 +1074,7 @@ class System(object):
 
         self._first_call_to_linearize = save_first_call
 
-        return coloring
+        return [coloring]
 
     def get_approx_coloring_fname(self):
         """
@@ -1158,7 +1165,7 @@ class System(object):
         """
         coloring = self._get_static_coloring()
         if coloring is None and self._coloring_info['coloring'] is _DYN_COLORING:
-            self._coloring_info['coloring'] = coloring = self.compute_approx_coloring()
+            self._coloring_info['coloring'] = coloring = self.compute_approx_coloring()[0]
             self._coloring_info.update(coloring._meta)
 
         return coloring

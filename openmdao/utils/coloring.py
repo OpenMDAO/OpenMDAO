@@ -1555,7 +1555,7 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
             if run_model:
                 problem.run_model()
             coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0],
-                                                     repeats=repeats, tol=tol, orders=orders)
+                                                     repeats=repeats, tol=tol, orders=orders)[0]
         else:
             J, sparsity_time = _get_bool_total_jac(problem, repeats=repeats, tol=tol,
                                                    orders=orders, setup=setup,
@@ -1852,6 +1852,22 @@ def _partial_coloring_cmd(options):
 
     _use_sparsity = False
 
+    def _show(system, options, coloring):
+        if options.show_sparsity and not coloring._meta.get('show_sparsity'):
+            coloring.display()
+            print('\n')
+
+        if not coloring._meta.get('show_summary'):
+            print("Approx coloring for '%s' (class %s)\n" % (system.pathname,
+                                                             type(system).__name__))
+            coloring.summary()
+            print('\n')
+
+        if options.compute_decls and isinstance(system, Component):
+            print('    # add the following lines to class %s to declare sparsity' %
+                  type(system).__name__)
+            print(coloring.get_declare_partials_calls())
+
     def _partial_coloring(prob):
         global _use_sparsity
         if prob.model._use_derivatives:
@@ -1879,16 +1895,8 @@ def _partial_coloring_cmd(options):
                             if c == klass or c == '.'.join([mod, klass]):
                                 if c in to_find:
                                     to_find.remove(c)
-                                coloring = s.compute_approx_coloring(**kwargs)
-                                print("Approx coloring for '%s' (class %s)\n" % (s.pathname, klass))
-                                if options.show_sparsity:
-                                    coloring.display()
-                                coloring.summary()
-                                print('\n')
-                                if options.compute_decls and isinstance(s, Component):
-                                    print('    # add the following lines to class %s to declare '
-                                          'sparsity' % klass)
-                                    print(coloring.get_declare_partials_calls())
+                                coloring = s.compute_approx_coloring(**kwargs)[0]
+                                _show(s, options, coloring)
                                 if options.activate:
                                     s._set_coloring(coloring)
                                     s._setup_static_approx_coloring(False)
@@ -1900,21 +1908,18 @@ def _partial_coloring_cmd(options):
                             raise RuntimeError("Failed to find any instance of classes %s" %
                                                sorted(to_find))
                 else:
-                    coloring = system.compute_approx_coloring(**kwargs)
+                    colorings = system.compute_approx_coloring(**kwargs)
 
-                    if coloring is None:
+                    if not colorings:
                         print("No coloring found.")
                     else:
-                        print("Approx coloring for '%s' (class %s)\n" % (system.pathname,
-                                                                         system.__class__.__name__))
-                        if options.show_sparsity:
-                            coloring.display()
-                        coloring.summary()
-                        print('\n')
-
-                        if options.activate:
-                            system._set_coloring(coloring)
-                            system._setup_static_approx_coloring(False)
+                        for c in colorings:
+                            path = c._meta['pathname']
+                            s = prob.model._get_subsystem(path) if path else prob.model
+                            _show(s, options, c)
+                            if options.activate:
+                                s._set_coloring(coloring)
+                                s._setup_static_approx_coloring(False)
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         if options.activate:
