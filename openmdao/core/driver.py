@@ -969,6 +969,9 @@ class Driver(object):
 
         """
         if self.supports['simultaneous_derivatives']:
+            if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:
+                # force the generation of a dynamic coloring this time
+                coloring = coloring_mod._DYN_COLORING
             self._set_coloring(coloring)
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %

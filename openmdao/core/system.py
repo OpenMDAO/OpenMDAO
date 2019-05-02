@@ -30,6 +30,7 @@ from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DYN_COLORING
+import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
     simple_warning
@@ -784,16 +785,21 @@ class System(object):
             If True, set fixed coloring in all subsystems that declare a coloring. Ignored
             if a specific coloring is passed in.
         """
-        if coloring is not _STD_COLORING_FNAME:
+        if coloring not in (_STD_COLORING_FNAME, _DYN_COLORING):
             if recurse:
                 simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
                                "coloring was set, so recurse was ignored." % self.pathname)
             self._set_coloring(coloring)
             return
 
+        if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
+            # force the generation of a dynamic coloring this time
+            coloring = _DYN_COLORING
+
         if self._coloring_info['coloring'] is None:
             if __debug__:
-                print('%s: use_fixed_coloring() ignored because no coloring was declared.')
+                print('%s: use_fixed_coloring() ignored because no coloring was declared.' %
+                      self.pathname)
         else:
             self._set_coloring(coloring)
 

@@ -50,10 +50,13 @@ CITATIONS = """
 # new coloring and/or sparsity.
 _use_sparsity = True
 
-
 # if True, perform check of coloring dir hash at the beginning of setup
 _check_coloring_hash = True
 
+# If True, ignore use_fixed_coloring if the coloring passed to it is _STD_COLORING_FNAME.
+# This is used when the 'openmdao partial_coloring' or 'openmdao total_coloring' commands
+# are running, because the intent there is to generate new coloring files.
+_force_dyn_coloring = False
 
 # used as an indicator that we should automatically name coloring file based on class module
 # path or system pathname
@@ -1848,9 +1851,10 @@ def _partial_coloring_cmd(options):
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context
 
-    global _use_sparsity
+    global _use_sparsity, _force_dyn_coloring
 
     _use_sparsity = False
+    _force_dyn_coloring = True
 
     def _show(system, options, coloring):
         if options.show_sparsity and not coloring._meta.get('show_sparsity'):
@@ -1869,7 +1873,6 @@ def _partial_coloring_cmd(options):
             print(coloring.get_declare_partials_calls())
 
     def _partial_coloring(prob):
-        global _use_sparsity
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
 
