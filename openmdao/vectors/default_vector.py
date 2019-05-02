@@ -345,7 +345,8 @@ class DefaultVector(Vector):
         """
         slices = {}
         start = end = 0
-        for name, arr in iteritems(self._views_flat):
+        for name in self._system._var_abs_names[self._typ]:
+            arr = self._views_flat[name]
             end += arr.size
             slices[name] = slice(start, end)
             start = end
