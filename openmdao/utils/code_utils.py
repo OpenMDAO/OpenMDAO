@@ -13,6 +13,7 @@ from six import iteritems, next
 
 import networkx as nx
 
+
 def _get_long_name(node):
     # If the node is an Attribute or Name node that is composed
     # only of other Attribute or Name nodes, then return the full
