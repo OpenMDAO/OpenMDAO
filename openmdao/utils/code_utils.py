@@ -13,17 +13,6 @@ from six import iteritems, next
 
 import networkx as nx
 
-
-class OrderedDiGraph(nx.DiGraph):
-    """
-    A DiGraph using OrderedDicts for internal storage.
-    """
-
-    node_dict_factory = OrderedDict
-    adjlist_dict_factory = OrderedDict
-    edge_attr_dict_factory = OrderedDict
-
-
 def _get_long_name(node):
     # If the node is an Attribute or Name node that is composed
     # only of other Attribute or Name nodes, then return the full
@@ -176,6 +165,17 @@ def get_nested_calls(class_, method_name, stream=sys.stdout):
     networkx.DiGraph
         A graph containing edges from methods to their sub-methods.
     """
+    # moved this class def in here to keep the numpy doc scraper from barfing due to
+    # stuff in nx.DiGraph.
+    class OrderedDiGraph(nx.DiGraph):
+        """
+        A DiGraph using OrderedDicts for internal storage.
+        """
+
+        node_dict_factory = OrderedDict
+        adjlist_dict_factory = OrderedDict
+        edge_attr_dict_factory = OrderedDict
+
     graph = OrderedDiGraph()
     seen = set()
 
