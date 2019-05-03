@@ -77,10 +77,6 @@ class FiniteDifference(ApproximationScheme):
 
     Attributes
     ----------
-    _exec_list : list
-        A list of which derivatives (in execution order) to compute.
-        The entries are of the form (key, fd_options), where key is (of, wrt) where of and wrt are
-        absolute names and fd_options is a dictionary.
     _starting_outs : ndarray
         A copy of the starting outputs array used to restore the outputs to original values.
     _starting_ins : ndarray
@@ -102,7 +98,6 @@ class FiniteDifference(ApproximationScheme):
         Initialize the ApproximationScheme.
         """
         super(FiniteDifference, self).__init__()
-        self._exec_list = []
         self._starting_ins = self._starting_outs = self._results_tmp = None
 
     def add_approximation(self, abs_key, kwargs):

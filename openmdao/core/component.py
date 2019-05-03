@@ -17,11 +17,10 @@ from openmdao.core.system import System, _supported_methods
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.units import valid_units
+from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, find_matches, simple_warning
-from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
-from openmdao.utils.mpi import MPI
-from openmdao.utils.name_maps import rel_key2abs_key, rel_name2abs_name
 
 
 # the following metadata will be accessible for vars on all procs

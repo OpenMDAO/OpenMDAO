@@ -26,6 +26,10 @@ class ApproximationScheme(object):
     _approx_groups_cached_under_cs : bool
         Flag indicates whether approx_groups was generated under complex step from higher in the
         model hieararchy.
+    _exec_list : list
+        A list of which derivatives (in execution order) to compute.
+        The entries are of the form (key, options), where key is (of, wrt) where of and wrt
+        are absolute names and options is a dictionary.
     """
 
     def __init__(self):
@@ -34,6 +38,7 @@ class ApproximationScheme(object):
         """
         self._approx_groups = None
         self._approx_groups_cached_under_cs = False
+        self._exec_list = []
 
     def _get_approx_groups(self, system, under_cs=False):
         """

@@ -30,12 +30,8 @@ class ComplexStep(ApproximationScheme):
 
     Attributes
     ----------
-    _exec_list : list
-        A list of which derivatives (in execution order) to compute.
-        The entries are of the form (key, options), where key is (of, wrt) where of and wrt
-        are absolute names and options is a dictionary.
     _fd : <FiniteDifference>
-        When nested complex step is detected, we swtich to Finite Difference.
+        When nested complex step is detected, we switch to Finite Difference.
     """
 
     DEFAULT_OPTIONS = {
@@ -48,7 +44,6 @@ class ComplexStep(ApproximationScheme):
         Initialize the ApproximationScheme.
         """
         super(ComplexStep, self).__init__()
-        self._exec_list = []
 
         # Only used when nested under complex step.
         self._fd = None

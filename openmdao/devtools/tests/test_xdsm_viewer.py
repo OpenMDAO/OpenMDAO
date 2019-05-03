@@ -313,7 +313,6 @@ class TestPyXDSMViewer(unittest.TestCase):
             write_xdsm(p, 'xdsm_circuit4', out_format='tex', quiet=QUIET, show_browser=SHOW,
                        recurse=False, model_path='G3')
 
-    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_pyxdsm_solver(self):
         from openmdao.api import NonlinearBlockGS
 
@@ -340,7 +339,6 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
-    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_pyxdsm_mda(self):
         filename = 'pyxdsm_mda'
         out_format = PYXDSM_OUT
@@ -354,7 +352,6 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
-    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_pyxdsm_mdf(self):
         filename = 'pyxdsm_mdf'
         out_format = PYXDSM_OUT
@@ -377,7 +374,6 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
-    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_parallel(self):
         from openmdao.api import ParallelGroup, NonlinearBlockGS
 
@@ -430,7 +426,6 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
-    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_execcomp(self):
         filename = 'pyxdsm_execcomp'
         out_format = PYXDSM_OUT
@@ -451,7 +446,6 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
-    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_doe(self):
         filename = 'pyxdsm_doe'
         out_format = PYXDSM_OUT
@@ -472,7 +466,6 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
-    @unittest.skipUnless(find_executable('pdflatex'), 'pdflatex not found')
     def test_meta_model(self):
         from openmdao.components.tests.test_meta_model_structured_comp import SampleMap
         from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
