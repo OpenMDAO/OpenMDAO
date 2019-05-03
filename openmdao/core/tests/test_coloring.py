@@ -21,7 +21,7 @@ from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
     SqliteRecorder, CaseReader
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.coloring import Coloring, _compute_coloring
+from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
 
@@ -305,7 +305,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
-        
+
         partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info['coloring']
         expected = [
             "self.declare_partials(of='g', wrt='y', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
@@ -314,7 +314,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         decl_partials_calls = partial_coloring.get_declare_partials_calls().strip()
         for i, d in enumerate(decl_partials_calls.split('\n')):
             self.assertEqual(d.strip(), expected[i])
-            
+
         fwd_solves, rev_solves = p_color.driver._coloring_info['coloring'].get_row_var_coloring('delta_theta_con.g')
         self.assertEqual(fwd_solves, 4)
         self.assertEqual(rev_solves, 0)
@@ -647,8 +647,12 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         self.assertEqual((p.model._solve_count - 1) / 22,
                          (p_color.model._solve_count - 1 - 22 * 3) / 11)
 
-        # get coverage for display of rev coloring
-        p_color.driver._coloring_info['coloring'].display()
+        # improve coverage of coloring.py
+        coloring = p_color.driver._coloring_info['coloring']
+        coloring.display()
+        with open(os.devnull, 'w') as f:
+            array_viz(coloring.get_dense_sparsity(), prob=p_color, stream=f)
+            array_viz(coloring.get_dense_sparsity(), stream=f)
 
     def test_simul_coloring_pyoptsparse_slsqp(self):
         try:

@@ -530,6 +530,19 @@ class Coloring(object):
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
                                "colorings overlap!")
 
+    def get_dense_sparsity(self):
+        """
+        Return a dense bool array representing the full sparsity.
+
+        Returns
+        -------
+        ndarray
+            Dense sparsity matrix.
+        """
+        J = np.zeros(self._shape, dtype=bool)
+        J[self._nzrows, self._nzcols] = True
+        return J
+
     def get_subjac_sparsity(self):
         """
         Compute the sparsity structure of each subjacobian based on the full jac sparsity.
@@ -542,8 +555,7 @@ class Coloring(object):
             Mapping of (of, wrt) keys to thier corresponding (nzrows, nzcols, shape).
         """
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
-            J = np.zeros(self._shape, dtype=bool)
-            J[self._nzrows, self._nzcols] = True
+            J = self.get_dense_sparsity()
             return _jac2subjac_sparsity(J, self._row_vars, self._col_vars,
                                         self._row_var_sizes, self._col_var_sizes)
 
@@ -1115,7 +1127,7 @@ def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=20, setup=False, run_
     return boolJ, elapsed
 
 
-def _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes, cvt2json=False):
+def _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes):
     """
     Given a boolean jacobian and variable names and sizes, compute subjac sparsity.
 
@@ -1131,8 +1143,6 @@ def _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes, cvt2json=False):
         Sizes of ofs variables.
     wrt_sizes : ndarray of int
         Sizes of wrts variables.
-    cvt2json : bool
-        If True, perform some data conversions to make data serializable to json.
 
     Returns
     -------
@@ -1151,12 +1161,6 @@ def _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes, cvt2json=False):
 
             # save sparsity structure as  (rows, cols, shape)
             irows, icols = np.nonzero(J[row_start:row_end, col_start:col_end])
-
-            if cvt2json:
-                # convert to make JSON serializable
-                irows = [int(i) for i in irows]
-                icols = [int(i) for i in icols]
-
             sparsity[of][wrt] = (irows, icols, (of_size, wrt_size))
 
             col_start = col_end
@@ -1865,83 +1869,6 @@ def _view_coloring_exec(options):
         pprint(coloring._meta)
 
     coloring.summary()
-
-
-def _check_coloring_pattern(J, coloring):
-    """
-    Raise an exception if any problems are found with the coloring.
-
-    Parameters
-    ----------
-    J : ndarray
-        Jacobian sparsity matrix.
-    coloring : dict
-        Metadata required for coloring.
-    """
-    # check for any overlapping nonzeros
-    fwd_coloring = coloring.get('fwd')
-    rev_coloring = coloring.get('rev')
-
-    if fwd_coloring is not None:
-        col_idx_groups = fwd_coloring[0]
-        all_cols = set()
-        for grp in col_idx_groups:
-            all_cols.update(grp)
-
-        col2row = fwd_coloring[1]
-        fwd_nzs = []
-        for col, rows in enumerate(col2row):
-            if rows is not None:
-                fwd_nzs.extend([(r, col) for r in rows])
-            elif col in all_cols:  # full solve
-                full_nzs = [(r, col) for r in np.nonzero(J[:, col])[0]]
-                fwd_nzs.extend(full_nzs)
-
-        fwd_nz_set = set(fwd_nzs)
-        if len(fwd_nzs) != len(fwd_nz_set):
-            raise RuntimeError("Duplicated nonzeros found in fwd coloring.")
-
-        # find any nonzeros that are left out of any of our columns
-        for c in all_cols:
-            rnz = col2row[c]
-            Jnz = np.nonzero(J[:, c])[0]
-            missing = set(Jnz).difference(rnz)
-            print("missing for col %d" % c, missing)
-
-    if rev_coloring is not None:
-        row_idx_groups = rev_coloring[0]
-        all_rows = set()
-        for grp in row_idx_groups:
-            all_rows.update(grp)
-
-        row2col = rev_coloring[1]
-        rev_nzs = []
-        for row, cols in enumerate(row2col):
-            if cols is not None:
-                rev_nzs.extend([(row, c) for c in cols])
-            elif row in all_rows:  # full solve
-                rev_nzs.extend([(row, c) for c in np.nonzero(J[row])[0]])
-
-        rev_nz_set = set(rev_nzs)
-        if len(rev_nzs) != len(rev_nz_set):
-            raise RuntimeError("Duplicated nonzeros found in rev coloring.")
-
-        # find any nonzeros that are left out of any of our columns
-        for r in all_rows:
-            cnz = row2col[r]
-            Jnz = np.nonzero(J[r])[0]
-            missing = set(Jnz).difference(cnz)
-            print("missing for row %d" % r, missing)
-
-    if fwd_coloring is not None and rev_coloring is not None:
-        common = fwd_nz_set.intersection(rev_nzs)
-        if common:
-            raise RuntimeError("Coloring has overlapping nonzeros: %s" % list(common))
-
-        computed_nzs = len(fwd_nz_set) + len(rev_nz_set)
-        nzs = np.count_nonzero(J)
-        if computed_nzs != nzs:
-            raise RuntimeError("Colored nonzeros (%d) != nonzeros in J (%d)" % (computed_nzs, nzs))
 
 
 def _get_color_dir_hash():

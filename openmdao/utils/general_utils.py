@@ -737,30 +737,6 @@ def str2valid_python_name(s):
     return s.translate(_transtab)
 
 
-def unique_name(name, dct):
-    """
-    Make given name unique within the given dictionary.
-
-    Parameters
-    ----------
-    name : str
-        Name to be made unique.
-    dct : dict
-        Dictionary to search for matching names.
-
-    Returns
-    -------
-    str
-        The unique name.
-    """
-    unique = name
-    for i in range(len(dct) + 1):
-        if unique not in dct:
-            return name
-        unique = name + str(i)
-    return unique
-
-
 def print_line_numbers(s):
     """
     Print the given string, listing line numbers on the left.
