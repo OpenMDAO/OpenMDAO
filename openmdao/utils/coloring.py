@@ -120,10 +120,6 @@ class Coloring(object):
         If True, this coloring was not generated dynamically during the current session.
     _meta : dict
         Dictionary of metadata used to create the coloring.
-    _writers : dict
-        Mapping of file extension to a tuple (funcname, open_str), where func writes
-        the coloring in a specific format, and open_str is the string indicating
-        if the file should be ascii ('w') or binary ('wb').
     """
 
     def __init__(self, sparsity=None, row_vars=None, row_var_sizes=None, col_vars=None,
@@ -162,10 +158,6 @@ class Coloring(object):
         self._fwd = None
         self._rev = None
         self._meta = {}
-        self._writers = {
-            'json': ('_write_json', 'w'),
-            'pkl': ('_write_pickle', 'wb'),
-        }
 
     def color_iter(self, direction):
         """
@@ -339,37 +331,6 @@ class Coloring(object):
     @staticmethod
     def load(fname):
         """
-        Read the coloring object from the given file.
-
-        The format is determined by the file extension.
-
-        Parameters
-        ----------
-        fname : str
-            Name of file to read from.
-
-        Returns
-        -------
-        Coloring
-            See docstring for Coloring class.
-        """
-        tup = fname.rsplit('.', 1)
-        if len(tup) == 1:
-            name = tup[0]
-            fmt = '.pkl'
-        else:
-            name, fmt = tup
-
-        try:
-            loader = _loaders[fmt]
-        except KeyError:
-            raise RuntimeError("Can't find a coloring loader for extension '%s'." % fmt)
-
-        return loader(fname)
-
-    @staticmethod
-    def _load_pickle(fname):
-        """
         Read the coloring object from the given pickle file.
 
         Parameters
@@ -385,24 +346,6 @@ class Coloring(object):
         with open(fname, 'rb') as f:
             return pickle.load(f)
 
-    @staticmethod
-    def _load_json(fname):
-        """
-        Read the coloring object from the given json file.
-
-        Parameters
-        ----------
-        fname : str
-            Name of file to read from.
-
-        Returns
-        -------
-        Coloring
-            See docstring for Coloring class.
-        """
-        with open(fname, 'r') as f:
-            return _json2coloring(json.load(f))
-
     def save(self, fname):
         """
         Write the coloring object to the given stream.
@@ -416,19 +359,8 @@ class Coloring(object):
             return   # don't try to save
 
         if isinstance(fname, string_types):
-            tup = fname.rsplit('.', 1)
-            if len(tup) == 1:
-                name = tup[0]
-                fmt = '.pkl'
-            else:
-                name, fmt = tup
-            try:
-                writer, otype = self._writers[fmt]
-            except KeyError:
-                raise RuntimeError("No writer available for format '%s'", fmt)
-
-            with open(fname, otype) as f:
-                getattr(self, writer)(f)
+            with open(fname, 'wb') as f:
+                pickle.dump(self, f)
         else:
             raise TypeError("Can't save coloring.  Expected a string for fname but got a %s" %
                             type(fname).__name__)
@@ -456,85 +388,6 @@ class Coloring(object):
                 with open(os.path.join(color_dir, 'hash'), 'w') as f:
                     f.write(current_hash)
         self.save(fname)
-
-    def _write_pickle(self, stream):
-        """
-        Write the coloring to the given stream in pickle format.
-
-        Parameters
-        ----------
-        stream : file-like
-            Output stream.
-        """
-        pickle.dump(self, stream)
-
-    def _write_json(self, stream):
-        """
-        Write the coloring to the given stream in json format.
-
-        Parameters
-        ----------
-        stream : file-like
-            Output stream.
-        """
-        tty = stream.isatty()
-        none = 'null'
-        sparsity = self.get_subjac_sparsity()
-        modes = [self._fwd, self._rev]
-
-        stream.write("{\n")
-        for m, mode in enumerate(modes):
-            if mode is None:
-                continue
-
-            name = 'column' if mode is self._fwd else 'row'
-            mode_name = 'fwd' if mode is self._fwd else 'rev'
-            lists, nonzero_entries = mode
-
-            if m > 0:
-                stream.write(",\n")
-
-            stream.write('"%s": [[\n' % mode_name)
-            last_idx = len(lists) - 1
-            for i, lst in enumerate(lists):
-                stream.write("   %s" % lst)
-                if i < last_idx:
-                    stream.write(",")
-
-                if tty:
-                    if i == 0:
-                        stream.write("   # uncolored %ss" % name)
-                    else:
-                        stream.write("   # color %d" % i)
-
-                stream.write("\n")
-
-            stream.write("],\n[\n")
-            last_idx = len(nonzero_entries) - 1
-            for i, nonzeros in enumerate(nonzero_entries):
-                if isinstance(nonzeros, list):
-                    # convert to list to make json serializable
-                    stream.write("   %s" % nonzeros)
-                else:  # a full slice
-                    stream.write("   %s" % none)
-
-                if i < last_idx:
-                    stream.write(",")
-
-                if tty:
-                    stream.write("   # %s %d" % (name, i))
-
-                stream.write("\n")
-
-            stream.write("]]")
-
-        if sparsity:
-            stream.write(',\n"sparsity": ')
-            _write_sparsity(sparsity, stream)
-        else:
-            stream.write(',\n"sparsity": %s' % none)
-
-        stream.write("\n}")
 
     def __repr__(self):
         """
@@ -787,12 +640,6 @@ class Coloring(object):
                         rev_solves += 1
 
         return fwd_solves, rev_solves
-
-
-_loaders = {
-    'json': Coloring._load_json,
-    'pkl': Coloring._load_pickle,
-}
 
 
 def _order_by_ID(col_matrix):
@@ -1358,31 +1205,6 @@ def _write_sparsity(sparsity, stream):
             stream.write(',\n')
 
     stream.write("}")
-
-
-def _json2coloring(coloring):
-    """
-    Convert all of the None entries in rowcol_map to full slices.
-
-    Parameters
-    ----------
-    coloring : dict
-        Dict of coloring metadata.
-
-    Returns
-    -------
-    dict
-        Dict of coloring metadata.
-    """
-    full_slice = slice(None)
-    for mode in ('fwd', 'rev'):
-        if mode in coloring:
-            rcmap = coloring[mode][1]
-            for i, entry in enumerate(rcmap):
-                if entry is None:
-                    rcmap[i] = full_slice
-
-    return coloring
 
 
 def _get_desvar_sizes(driver, names):

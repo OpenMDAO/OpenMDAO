@@ -15,7 +15,7 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
-    ExplicitComponent, NonlinearBlockGS, pyOptSparseDriver
+    ExplicitComponent, NonlinearBlockGS
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import compute_total_coloring
@@ -33,6 +33,8 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 def setup_vars(self, ofs, wrts):
@@ -385,6 +387,7 @@ class TestCSColoring(unittest.TestCase):
         nruns = model._nruns - start_nruns
         self.assertEqual(nruns, 3)
 
+    @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
     def test_totals_over_implicit_comp(self):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
@@ -429,6 +432,7 @@ class TestCSColoring(unittest.TestCase):
         rows = [1,3,4]
         _check_total_matrix(model, derivs, sparsity[rows, :])
 
+    @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
     def test_totals_of_wrt_indices(self):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()

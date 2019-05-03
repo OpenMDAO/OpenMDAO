@@ -305,6 +305,19 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # - where N is 21 for the uncolored case and 21 * 4 for the dynamic colored case.
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
+        
+        partial_coloring = p_color.model._get_subsystem('arctan_yox')._coloring_info['coloring']
+        expected = [
+            "self.declare_partials(of='g', wrt='y', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
+            "self.declare_partials(of='g', wrt='x', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])"
+        ]
+        decl_partials_calls = partial_coloring.get_declare_partials_calls().strip()
+        for i, d in enumerate(decl_partials_calls.split('\n')):
+            self.assertEqual(d.strip(), expected[i])
+            
+        fwd_solves, rev_solves = p_color.driver._coloring_info['coloring'].get_row_var_coloring('delta_theta_con.g')
+        self.assertEqual(fwd_solves, 4)
+        self.assertEqual(rev_solves, 0)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto_dyn_partials_assembled_jac(self):
@@ -490,6 +503,10 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual((p.model._solve_count - 21) / 21,
                          (p_color.model._solve_count - 21 * 4) / 5)
 
+        # test __repr__
+        rep = repr(p_color.driver._coloring_info['coloring'])
+        self.assertEqual(rep, 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
+
 
 @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
 class SimulColoringRecordingTestCase(unittest.TestCase):
@@ -629,6 +646,9 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         # - where N is 1 for the uncolored case and 22 * 3 + 1 for the dynamic colored case.
         self.assertEqual((p.model._solve_count - 1) / 22,
                          (p_color.model._solve_count - 1 - 22 * 3) / 11)
+
+        # get coverage for display of rev coloring
+        p_color.driver._coloring_info['coloring'].display()
 
     def test_simul_coloring_pyoptsparse_slsqp(self):
         try:
