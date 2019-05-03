@@ -60,7 +60,7 @@ class DotProductComp(ExplicitComponent):
                        units=opts['b_units'])
 
         self.add_output(name=opts['c_name'],
-                        val=np.zeros(shape=(vec_size,)),
+                        shape=(vec_size,),
                         units=opts['c_units'])
 
         row_idxs = np.repeat(np.arange(vec_size), m)

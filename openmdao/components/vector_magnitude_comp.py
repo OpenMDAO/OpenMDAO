@@ -47,7 +47,7 @@ class VectorMagnitudeComp(ExplicitComponent):
                        units=opts['units'])
 
         self.add_output(name=opts['mag_name'],
-                        val=np.zeros(shape=(vec_size,)),
+                        shape=(vec_size,),
                         units=opts['units'])
 
         row_idxs = np.repeat(np.arange(vec_size), m)
