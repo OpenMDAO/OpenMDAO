@@ -151,8 +151,6 @@ class Problem(object):
         """
         self.cite = CITATION
 
-        self._color_dir_hash = coloring_mod._get_color_dir_hash()
-
         if comm is None:
             try:
                 from mpi4py import MPI
@@ -789,13 +787,8 @@ class Problem(object):
 
         model_comm = self.driver._setup_comm(comm)
 
-        # copy options dict so we can add stuff the user doesn't see
-        opts = {k: v['value'] for k, v in iteritems(self.options._dict)}
-        opts['coloring_dir_hash'] = self._color_dir_hash
-        opts['coloring_dir_file_hash'] = coloring_mod._get_color_dir_file_hash(opts['coloring_dir'])
-
         model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
-                     derivatives, opts)
+                     derivatives, self.options)
 
         # get set of all vars that we may need to bcast later
         self._remote_var_set = remote_var_set = set()

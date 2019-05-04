@@ -348,7 +348,7 @@ class Coloring(object):
 
     def save(self, fname):
         """
-        Write the coloring object to the given stream.
+        Write the coloring object to the given stream, creating intermediate dirs if needed.
 
         Parameters
         ----------
@@ -359,35 +359,43 @@ class Coloring(object):
             return   # don't try to save
 
         if isinstance(fname, string_types):
+            color_dir = os.path.dirname(os.path.abspath(fname))
+            if not os.path.exists(color_dir):
+                os.makedirs(color_dir)
             with open(fname, 'wb') as f:
                 pickle.dump(self, f)
         else:
             raise TypeError("Can't save coloring.  Expected a string for fname but got a %s" %
                             type(fname).__name__)
 
-    def save_and_write_hash(self, fname, current_hash, file_hash):
+    def _check_config(self, driver, system):
         """
-        Save the coloring and write the color_dir/hash file if it doesn't exist.
+        Check the config of this Coloring vs. the existing model config.
 
         Parameters
         ----------
-        fname : str
-            Name of the coloring file being saved.
-        current_hash : str
-            Value of coloring dir hash for current process.
-        file_hash : str
-            Value of has loaded from has file in coloring directory.
+        driver : Driver or None
+            Current driver object.
+        system : System
+            System being colored.
         """
-        if _check_coloring_hash:
-            color_dir = os.path.dirname(os.path.abspath(fname))
-            _check_color_dir_hash(color_dir, file_hash, current_hash)
-            if file_hash is None:
-                if not os.path.exists(color_dir):
-                    os.mkdir(color_dir)
-                # we need to write the hash file since it doesn't exist yet
-                with open(os.path.join(color_dir, 'hash'), 'w') as f:
-                    f.write(current_hash)
-        self.save(fname)
+        if driver is not None:
+            # coloring is a total coloring
+            ofs = driver._get_ordered_nl_responses()
+            of_sizes = _get_response_sizes(driver, ofs)
+            wrts = list(driver._designvars)
+            wrt_sizes = _get_desvar_sizes(driver, wrts)
+            if (self._row_var_sizes != of_sizes or self._row_vars != ofs
+                    or self._col_var_sizes != wrt_sizes or self._col_vars != wrts):
+                raise RuntimeError("Current total coloring configuration does not match the "
+                                   "configuration of the current driver. Make sure you don't have "
+                                   "different problems that have the same coloring directory.  Set "
+                                   "the coloring directory by setting the value of "
+                                   "`problem.options['coloring_dir']`.")
+
+        # now check the contents (vars and sizes) of the input and output vectors of system
+        wrt_matches = self._meta['wrt_matches']
+        ordered_ofs, ordered_wrts, _, _, _ = system._get_sparsity_vars_and_sizes(wrt_matches)
 
     def __repr__(self):
         """
@@ -1413,12 +1421,7 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
                            "compute_total_coloring().")
 
     if fname is not None:
-        if problem is not None:
-            opts = problem.model._problem_options
-            coloring.save_and_write_hash(fname, opts['coloring_dir_hash'],
-                                         opts['coloring_dir_file_hash'])
-        else:
-            coloring.save(fname)
+        coloring.save(fname)
 
     return coloring
 
@@ -1869,67 +1872,3 @@ def _view_coloring_exec(options):
         pprint(coloring._meta)
 
     coloring.summary()
-
-
-def _get_color_dir_hash():
-    """
-    Return a string that should be unique for each different top level python script.
-
-    Returns
-    -------
-    str
-        A unique string to prevent multiple uses of the same coloring dir by different
-        python scripts.
-    """
-    exclude = set()
-    # we're really just looking for a top level python script, so throw out anything that's
-    # imported (except test files since we want to treat them as top level, even if they're
-    # imported).
-    for m in sys.modules.values():
-        try:
-            _file = m.__file__
-        except AttributeError:
-            continue
-        if _file is None or os.path.basename(_file).startswith('test_'):
-            continue
-        exclude.add(_file)
-
-    files = set(os.path.abspath(f[1]) for f in inspect.getouterframes(inspect.currentframe())
-                if f[1].endswith('.py'))
-
-    # add any python files from the command line
-    files.update(a for a in sys.argv if a.endswith('.py'))
-
-    files = sorted(files - exclude)
-
-    # get rid of any files coming from Wing
-    winghome = os.environ.get('WINGHOME')
-    if winghome:
-        files = [f for f in files if not f.startswith(winghome)]
-
-    return '|'.join(files)
-
-
-def _get_color_dir_file_hash(coloring_dir):
-    hashfile = os.path.join(coloring_dir, 'hash')
-    if os.path.isfile(hashfile):
-        with open(hashfile, 'r') as f:
-            return f.read().strip()
-    return None
-
-
-def _check_color_dir_hash(coloring_dir, file_hash, current_hash):
-    """
-    Check the given coloring dir hash against any existing hash.
-
-    Raises an exception if hashes don't match.
-    """
-    if file_hash is not None and file_hash != current_hash:
-        hashfile = os.path.join(coloring_dir, 'hash')
-        raise Exception("Current coloring dir hash does not match existing hash in directory "
-                        "%s.  If this differece is due to changes in your problem, you can "
-                        "delete the %s file to prevent this error.  If this difference is due "
-                        "to multiple python scripts writing to the same coloring dir, then you "
-                        "should set problem.options['coloring_dir'] to a different directory "
-                        "in each sript in order to prevent coloring files from one script from "
-                        "being overwritten by another." % (coloring_dir, hashfile))

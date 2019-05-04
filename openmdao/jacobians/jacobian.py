@@ -324,75 +324,18 @@ class Jacobian(object):
         -------
         ndarray
             Boolean sparsity matrix.
+        OrderedDict
+            'of' variables keyed to their sizes.
+        OrderedDict
+            'wrt' variables keyed to their sizes.
         """
         from openmdao.utils.coloring import _tol_sweep
 
-        summ = self._jac_summ
         subjacs = self._subjacs_info
+        summ = self._jac_summ
 
-        iproc = system.comm.rank
-        abs2idx = system._var_allprocs_abs2idx['linear']
-        approx_of_idx = system._owns_approx_of_idx
-        approx_wrt_idx = system._owns_approx_wrt_idx
-        ofsizes = system._var_sizes['linear']['output'][iproc]
-        isizes = system._var_sizes['linear']['input'][iproc]
-
-        subjac_ofs = set(key[0] for key in subjacs)
-        subjac_wrts = set(key[1] for key in subjacs)
-
-        if system._owns_approx_of or system._owns_approx_wrt:
-            # we're computing totals/semi-totals
-            ofs = list(system._owns_approx_of)
-            wrts = list(system._owns_approx_wrt)
-            if system.pathname:  # doing semitotals
-                wrt_info = [(ofs, ofsizes, (approx_of_idx)), (wrts, isizes, approx_wrt_idx)]
-            else:
-                wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
-        else:
-            from openmdao.core.explicitcomponent import ExplicitComponent
-            ofs = system._var_allprocs_abs_names['output']
-            wrts = system._var_allprocs_abs_names['input']
-            wrt_info = []
-            if not isinstance(system, ExplicitComponent):
-                wrt_info.append(((ofs, ofsizes, ())))
-            wrt_info.append((wrts, isizes, ()))
-
-        ncols = nrows = 0
-        locs = {}
-        roffset = rend = 0
-        ordered_ofs = OrderedDict()
-        ordered_wrts = OrderedDict()
-        for of in ofs:
-            if of in approx_of_idx:
-                sub_of_idx = approx_of_idx[of]
-                size = len(sub_of_idx)
-            else:
-                size = ofsizes[abs2idx[of]]
-                sub_of_idx = _full_slice
-            rend += size
-            if of in subjac_ofs and of not in ordered_ofs:
-                ordered_ofs[of] = size
-
-            coffset = cend = 0
-            for wrts, sizes, approx_idx in wrt_info:
-                for wrt in wrts:
-                    if wrt in wrt_matches and wrt in subjac_wrts:
-                        if wrt in approx_idx:
-                            sub_wrt_idx = approx_idx[wrt]
-                            size = len(sub_wrt_idx)
-                        else:
-                            size = sizes[abs2idx[wrt]]
-                            sub_wrt_idx = _full_slice
-                        cend += size
-                        if wrt not in ordered_wrts:
-                            ordered_wrts[wrt] = size
-
-                        key = (of, wrt)
-                        if key in subjacs:
-                            locs[key] = ((slice(roffset, rend), slice(coffset, cend)),
-                                         sub_of_idx, sub_wrt_idx)
-                        coffset = cend
-            roffset = rend
+        ordered_ofs, ordered_wrts, locs, rend, cend = \
+            system._get_sparsity_vars_and_sizes(wrt_matches)
 
         J = np.zeros((rend, cend))
 
@@ -415,10 +358,6 @@ class Jacobian(object):
 
         boolJ = np.zeros(J.shape, dtype=bool)
         boolJ[J > good_tol] = True
-
-        if system.pathname:  # convert to promoted names
-            ordered_ofs = _odict_abs2prom(system, ordered_ofs)
-            ordered_wrts = _odict_abs2prom(system, ordered_wrts)
 
         return boolJ, ordered_ofs, ordered_wrts
 
@@ -459,30 +398,3 @@ class Jacobian(object):
                     print(meta['value'])
                 else:
                     print(meta['value'])
-
-
-def _odict_abs2prom(system, odict):
-    """
-    Return a new OrderedDict with keys converted from absolute to promoted names.
-
-    Parameters
-    ----------
-    system : System
-        The system used to compute promoted names.
-    odict : OrderedDict
-        The OrderedDict that uses absolute name keys.
-
-    Returns
-    -------
-    OrderedDict
-        The new OrderedDict with promoted name keys.
-    """
-    new_dict = OrderedDict()
-    abs2prom_in = system._var_allprocs_abs2prom['input']
-    abs2prom_out = system._var_allprocs_abs2prom['output']
-    for abs_name, value in iteritems(odict):
-        if abs_name in abs2prom_out:
-            new_dict[abs2prom_out[abs_name]] = value
-        else:
-            new_dict[abs2prom_in[abs_name]] = value
-    return new_dict

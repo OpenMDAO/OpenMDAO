@@ -65,6 +65,8 @@ _DEFAULT_COLORING_META = {
     'coloring': None,
 }
 
+_full_slice = slice(None)
+
 
 class System(object):
     """
@@ -1082,6 +1084,79 @@ class System(object):
 
         return [coloring]
 
+    def _get_sparsity_vars_and_sizes(self, wrt_matches):
+        subjacs = self._subjacs_info
+
+        iproc = self.comm.rank
+        abs2idx = self._var_allprocs_abs2idx['linear']
+        approx_of_idx = self._owns_approx_of_idx
+        approx_wrt_idx = self._owns_approx_wrt_idx
+        ofsizes = self._var_sizes['linear']['output'][iproc]
+        isizes = self._var_sizes['linear']['input'][iproc]
+
+        subjac_ofs = set(key[0] for key in subjacs)
+        subjac_wrts = set(key[1] for key in subjacs)
+
+        if self._owns_approx_of or self._owns_approx_wrt:
+            # we're computing totals/semi-totals
+            ofs = list(self._owns_approx_of)
+            wrts = list(self._owns_approx_wrt)
+            if self.pathname:  # doing semitotals
+                wrt_info = [(ofs, ofsizes, (approx_of_idx)), (wrts, isizes, approx_wrt_idx)]
+            else:
+                wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
+        else:
+            from openmdao.core.explicitcomponent import ExplicitComponent
+            ofs = self._var_allprocs_abs_names['output']
+            wrts = self._var_allprocs_abs_names['input']
+            wrt_info = []
+            if not isinstance(self, ExplicitComponent):
+                wrt_info.append(((ofs, ofsizes, ())))
+            wrt_info.append((wrts, isizes, ()))
+
+        ncols = nrows = 0
+        locs = {}
+        roffset = rend = 0
+        ordered_ofs = OrderedDict()
+        ordered_wrts = OrderedDict()
+        for of in ofs:
+            if of in approx_of_idx:
+                sub_of_idx = approx_of_idx[of]
+                size = len(sub_of_idx)
+            else:
+                size = ofsizes[abs2idx[of]]
+                sub_of_idx = _full_slice
+            rend += size
+            if of in subjac_ofs and of not in ordered_ofs:
+                ordered_ofs[of] = size
+
+            coffset = cend = 0
+            for wrts, sizes, approx_idx in wrt_info:
+                for wrt in wrts:
+                    if wrt in wrt_matches and wrt in subjac_wrts:
+                        if wrt in approx_idx:
+                            sub_wrt_idx = approx_idx[wrt]
+                            size = len(sub_wrt_idx)
+                        else:
+                            size = sizes[abs2idx[wrt]]
+                            sub_wrt_idx = _full_slice
+                        cend += size
+                        if wrt not in ordered_wrts:
+                            ordered_wrts[wrt] = size
+
+                        key = (of, wrt)
+                        if key in subjacs:
+                            locs[key] = ((slice(roffset, rend), slice(coffset, cend)),
+                                         sub_of_idx, sub_wrt_idx)
+                        coffset = cend
+            roffset = rend
+
+        if self.pathname:  # convert to promoted names
+            ordered_ofs = _odict_abs2prom(self, ordered_ofs)
+            ordered_wrts = _odict_abs2prom(self, ordered_wrts)
+
+        return ordered_ofs, ordered_wrts, locs, rend, cend
+
     def get_approx_coloring_fname(self):
         """
         Return the full pathname to a coloring file.
@@ -1125,9 +1200,7 @@ class System(object):
         # under MPI, only save on proc 0
         if ((self._full_comm is not None and self._full_comm.rank == 0) or
                 (self._full_comm is None and self.comm.rank == 0)):
-            coloring.save_and_write_hash(self.get_approx_coloring_fname(),
-                                         self._problem_options['coloring_dir_hash'],
-                                         self._problem_options['coloring_dir_file_hash'])
+            coloring.save(self.get_approx_coloring_fname())
 
     def _get_static_coloring(self):
         """
@@ -1148,11 +1221,13 @@ class System(object):
             fname = self.get_approx_coloring_fname()
             print("%s: loading coloring from file %s" % (self.pathname, fname))
             info['coloring'] = coloring = Coloring.load(fname)
+            coloring._check_config(None, self)
             info.update(info['coloring']._meta)
         elif isinstance(coloring, string_types):
             print("%s: loading coloring from file %s" % (self.pathname, fname))
             info['coloring'] = coloring = Coloring.load(info['coloring'])
             info.update(info['coloring']._meta)
+            coloring._check_config(None, self)
         elif coloring is _DYN_COLORING:
             coloring = None
 
@@ -3657,3 +3732,30 @@ def get_relevant_vars(connections, desvars, responses, mode):
     relevant['nonlinear'] = relevant['linear']
 
     return relevant
+
+
+def _odict_abs2prom(system, odict):
+    """
+    Return a new OrderedDict with keys converted from absolute to promoted names.
+
+    Parameters
+    ----------
+    system : System
+        The system used to compute promoted names.
+    odict : OrderedDict
+        The OrderedDict that uses absolute name keys.
+
+    Returns
+    -------
+    OrderedDict
+        The new OrderedDict with promoted name keys.
+    """
+    new_dict = OrderedDict()
+    abs2prom_in = system._var_allprocs_abs2prom['input']
+    abs2prom_out = system._var_allprocs_abs2prom['output']
+    for abs_name, value in iteritems(odict):
+        if abs_name in abs2prom_out:
+            new_dict[abs2prom_out[abs_name]] = value
+        else:
+            new_dict[abs2prom_in[abs_name]] = value
+    return new_dict

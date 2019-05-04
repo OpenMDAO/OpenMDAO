@@ -1018,12 +1018,14 @@ class Driver(object):
             fname = os.path.join(self._problem.options['coloring_dir'], 'total_coloring.pkl')
             print("loading total coloring from file %s" % fname)
             coloring = self._set_coloring(Coloring.load(fname))
+            coloring._check_config(self, self._problem.model)
             info.update(coloring._meta)
             return coloring
         elif isinstance(coloring, string_types):
             print("loading total coloring from file %s" % coloring)
-            info['coloring'] = Coloring.load(coloring)
+            info['coloring'] = coloring = Coloring.load(coloring)
             info.update(info['coloring']._meta)
+            coloring._check_config(self, self._problem.model)
             return info['coloring']
 
     def _get_total_coloring_fname(self):
