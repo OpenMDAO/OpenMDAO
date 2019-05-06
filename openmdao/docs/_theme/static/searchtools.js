@@ -79,7 +79,9 @@ var Search = {
 
         if (params.search_source) {
             this._search_source = true
+            $('input[name="search_source"]')[0].checked = true;
         }
+
         if (params.q) {
             var query = params.q[0];
             $('input[name="q"]')[0].value = query;
@@ -235,7 +237,6 @@ var Search = {
                 return !value[0].startsWith("_srcdocs");
             });
         }
-
 
         // let the scorer override scores with a custom scoring function
         if (Scorer.score) {
