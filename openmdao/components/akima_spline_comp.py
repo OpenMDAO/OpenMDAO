@@ -155,8 +155,8 @@ class AkimaSplineComp(ExplicitComponent):
             elif eval_at == 'end':
                 self.x_grid = np.linspace(0., 1., num_points)
 
-            self.add_input(x_name, val=self.x_grid,
-                           units=opts['x_units'])
+            self.add_output(x_name, val=self.x_grid,
+                            units=opts['x_units'])
 
         self.add_input(ycp_name, val=np.random.rand(vec_size, num_control_points),
                        units=units)
