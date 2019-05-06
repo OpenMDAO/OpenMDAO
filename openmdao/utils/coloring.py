@@ -1478,12 +1478,6 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
     driver._total_jac = None
 
-    if driver._coloring_info['coloring'] is not None:
-        # this is not the first time run_driver has been executed.  Go ahead and regen the
-        # coloring just in case something has changed since the first call, but reset anything
-        # that will raise exceptions about multiple definition.
-        driver._total_jac_sparsity = None  # prevent complaints about redefining the sparsity
-
     problem.driver._coloring_info['coloring'] = None
     problem.driver._res_jacs = {}
 
@@ -1498,6 +1492,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
 
     driver._coloring_info['coloring'] = coloring
     driver._setup_simul_coloring()
+    driver._setup_tot_jac_sparsity()
 
     return coloring
 

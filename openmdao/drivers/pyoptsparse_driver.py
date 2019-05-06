@@ -587,15 +587,24 @@ class pyOptSparseDriver(Driver):
         """
         Set up total jacobian subjac sparsity.
         """
-        if self._total_jac_sparsity is None:
+        total_sparsity = None
+        coloring = self._get_static_coloring()
+        if coloring is not None:
+            total_sparsity = coloring.get_subjac_sparsity()
+            if self._total_jac_sparsity is not None:
+                raise RuntimeError("Total jac sparsity was set in both _total_coloring"
+                                   " and _total_jac_sparsity.")
+        elif self._total_jac_sparsity is not None:
+            if isinstance(self._total_jac_sparsity, string_types):
+                with open(self._total_jac_sparsity, 'r') as f:
+                    self._total_jac_sparsity = json.load(f)
+            total_sparsity = self._total_jac_sparsity
+
+        if total_sparsity is None:
             return
 
-        if isinstance(self._total_jac_sparsity, string_types):
-            with open(self._total_jac_sparsity, 'r') as f:
-                self._total_jac_sparsity = json.load(f)
-
         self._res_jacs = {}
-        for res, resdict in iteritems(self._total_jac_sparsity):
+        for res, resdict in iteritems(total_sparsity):
             if res in self._objs:  # skip objectives
                 continue
             self._res_jacs[res] = {}

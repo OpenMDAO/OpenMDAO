@@ -1059,16 +1059,6 @@ class Driver(object):
                 raise RuntimeError("Simultaneous coloring does forward solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
 
-        # _total_coloring can contain data for either fwd, rev, or both, along with
-        # sparsity patterns
-        sparsity = total_coloring.get_subjac_sparsity()
-
-        if sparsity is not None:
-            if self._total_jac_sparsity is not None:
-                raise RuntimeError("Total jac sparsity was set in both _total_coloring"
-                                   " and _total_jac_sparsity.")
-            self._total_jac_sparsity = sparsity
-
     def _pre_run_model_debug_print(self):
         """
         Optionally print some debugging information before the model runs.
