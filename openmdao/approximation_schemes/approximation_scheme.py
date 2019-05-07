@@ -81,12 +81,20 @@ class ApproximationScheme(object):
         """
         new_list = []
         new_entry = None
+        from openmdao.core.group import Group
+        if isinstance(system, Group):
+            keys = list(system._approx_subjac_key_iter())
+        else:
+            keys = None
+
         colored = set()
         wrt_matches = system._coloring_info['wrt_matches']
         if wrt_matches is None:
             wrt_matches = set()
         for tup in self._exec_list:
             key, options = tup
+            if keys is not None and key not in keys:
+                continue
             # if key[0] is None, we've already updated the coloring
             if key[0] is not None and (key[1] in wrt_matches or 'coloring' in options):
                 colored.add(key)
@@ -104,7 +112,8 @@ class ApproximationScheme(object):
 
         # remove entries that have same keys as colored entries
         if colored:
-            new_list.extend([tup for tup in self._exec_list if tup[0] not in colored])
+            new_list.extend([tup for tup in self._exec_list if tup[0] not in colored and
+                             (keys is None or tup[0] in keys)])
 
             self._exec_list = new_list
             self._approx_groups = None  # will force approx_groups to be rebuilt later
@@ -155,6 +164,11 @@ class ApproximationScheme(object):
         is_semi = is_total and system.pathname
         is_implicit = isinstance(system, ImplicitComponent)
 
+        if is_total:
+            keys = list(system._approx_subjac_key_iter())
+        else:
+            keys = None
+
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
         self._exec_list.sort(key=self._key_fun)
@@ -170,6 +184,8 @@ class ApproximationScheme(object):
         inputs = system._inputs
         iproc = system.comm.rank
         abs2meta = system._var_allprocs_abs2meta
+        prom2abs_out = system._var_allprocs_prom2abs_list['output']
+        prom2abs_in = system._var_allprocs_prom2abs_list['input']
 
         out_slices = outputs.get_slice_dict()
         in_slices = inputs.get_slice_dict()
@@ -197,10 +213,9 @@ class ApproximationScheme(object):
                 else:
                     of_names, wrt_names = system._get_partials_varlists()
                     ofsizes, wrtsizes = system._get_partials_var_sizes()
-                    # this is always at Component level, so the promoted name is
-                    # always just the relative name.
-                    wrt_names = [rel_name2abs_name(system, n) for n in wrt_names]
-                    of_names = [rel_name2abs_name(system, n) for n in of_names]
+                    wrt_names = [prom2abs_in[n][0] if n in prom2abs_in else prom2abs_out[n][0]
+                        for n in wrt_names]
+                    of_names = [prom2abs_out[n][0] for n in of_names]
                     full_wrts = wrt_names
 
                 full_sizes = wrtsizes

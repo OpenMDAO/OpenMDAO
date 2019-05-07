@@ -1821,24 +1821,8 @@ class Group(System):
                 subsys._setup_partials(recurse)
                 info.update(subsys._subjacs_info)
 
-    def _setup_approx_partials(self, do_coloring=False):
-        self._jacobian = DictionaryJacobian(system=self)
-
+    def _approx_subjac_key_iter(self):
         pro2abs = self._var_allprocs_prom2abs_list
-        abs2prom = self._var_allprocs_abs2prom
-        abs2meta = self._var_allprocs_abs2meta
-        abs_outs = self._var_allprocs_abs_names['output']
-        abs_ins = self._var_allprocs_abs_names['input']
-        info = self._coloring_info
-        if info['coloring'] is not None and (self._owns_approx_of is None or
-                                             self._owns_approx_wrt is None):
-            method = info['method']
-        else:
-            method = list(self._approx_schemes)[0]
-        approx = self._get_approx_scheme(method)
-        # reset the approx if necessary
-        approx._exec_list = []
-        approx._approx_groups = None
 
         if self._owns_approx_wrt and not self.pathname:
             candidate_wrt = self._owns_approx_wrt
@@ -1872,15 +1856,6 @@ class Group(System):
             # Skip indepvarcomp res wrt other srcs
             of -= ivc
 
-        ofset = set()
-        wrtset = set()
-        wrt_colors_matched = set()
-        if do_coloring and info.get('wrt_patterns') is not None and (self._owns_approx_of or self.pathname):
-            wrt_color_patterns = info['wrt_patterns']
-            color_meta = self._get_approx_coloring_meta()
-        else:
-            wrt_color_patterns = ()
-
         for key in product(of, wrt.union(of)):
             # Create approximations for the ones we need.
 
@@ -1890,6 +1865,81 @@ class Group(System):
                 # Support for specifying a desvar as an obj/con.
                 if key[1] not in wrt or key[0] == key[1]:
                     continue
+
+            yield key
+
+    def _setup_approx_partials(self, do_coloring=False):
+        self._jacobian = DictionaryJacobian(system=self)
+
+        pro2abs = self._var_allprocs_prom2abs_list
+        abs2prom = self._var_allprocs_abs2prom
+        abs2meta = self._var_allprocs_abs2meta
+        abs_outs = self._var_allprocs_abs_names['output']
+        abs_ins = self._var_allprocs_abs_names['input']
+        info = self._coloring_info
+        coloring = self._get_static_coloring()
+
+        if info['coloring'] is not None and (self._owns_approx_of is None or
+                                             self._owns_approx_wrt is None):
+            method = info['method']
+        else:
+            method = list(self._approx_schemes)[0]
+        approx = self._get_approx_scheme(method)
+        # reset the approx if necessary
+        approx._exec_list = []
+        approx._approx_groups = None
+
+        # if self._owns_approx_wrt and not self.pathname:
+        #     candidate_wrt = self._owns_approx_wrt
+        # else:
+        #     candidate_wrt = list(var[0] for var in pro2abs['input'].values())
+
+        # from openmdao.core.indepvarcomp import IndepVarComp
+        # wrt = set()
+        # ivc = set()
+        # if self.pathname:  # get rid of any old stuff in here
+        #     self._owns_approx_of = self._owns_approx_wrt = None
+
+        # for var in candidate_wrt:
+
+        #     # Weed out inputs connected to anything inside our system unless the source is an
+        #     # indepvarcomp.
+        #     if var in self._conn_abs_in2out:
+        #         src = self._conn_abs_in2out[var]
+        #         compname = src.rsplit('.', 1)[0]
+        #         comp = self._get_subsystem(compname)
+        #         if isinstance(comp, IndepVarComp):
+        #             wrt.add(src)
+        #             ivc.add(src)
+        #     else:
+        #         wrt.add(var)
+
+        # if self._owns_approx_of:
+        #     of = self._owns_approx_of
+        # else:
+        #     of = set(var[0] for var in pro2abs['output'].values())
+        #     # Skip indepvarcomp res wrt other srcs
+        #     of -= ivc
+
+        ofset = set()
+        wrtset = set()
+        wrt_colors_matched = set()
+        if do_coloring and info.get('wrt_patterns') is not None and (self._owns_approx_of or self.pathname):
+            wrt_color_patterns = info['wrt_patterns']
+            color_meta = self._get_approx_coloring_meta()
+        else:
+            wrt_color_patterns = ()
+
+        # for key in product(of, wrt.union(of)):
+        for key in self._approx_subjac_key_iter():
+            # Create approximations for the ones we need.
+
+            # # Skip explicit res wrt outputs
+            # if key[1] in of and key[1] not in ivc:
+
+            #     # Support for specifying a desvar as an obj/con.
+            #     if key[1] not in wrt or key[0] == key[1]:
+            #         continue
 
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
@@ -1946,10 +1996,8 @@ class Group(System):
 
         if do_coloring:
             info['wrt_matches'] = wrt_colors_matched
-        coloring = self._get_static_coloring()
         if coloring is not None:
             # static coloring was already defined
-            approx = self._get_approx_scheme(info['method'])
             approx._update_coloring(self, coloring)
         elif self._coloring_info['coloring'] is _DYN_COLORING:
             if self._owns_approx_of:
