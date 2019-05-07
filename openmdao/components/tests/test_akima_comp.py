@@ -81,6 +81,9 @@ class AkimaTestCase(unittest.TestCase):
 
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
+        self.assertTrue('akima.chord:x' in prob.model.akima._outputs._names)
+        self.assertTrue('akima.chord:x_cp' in prob.model.akima._outputs._names)
+
     def test_vectorized(self):
         xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([[5.0, 12.0, 14.0, 16.0, 21.0, 29.0],
