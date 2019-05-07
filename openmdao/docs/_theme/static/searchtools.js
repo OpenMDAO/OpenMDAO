@@ -26,15 +26,12 @@ if (!Scorer) {
             // relevance:  non-source > source > test_suite
             // modifiers:                 -30      -60
             filename = result[0];
-            if (filename.startsWith("_srcdocs")) {
-                return result[4] - 30;
-            }
-            else if (filename.indexOf("test_suite") >= 0) {
+            if (filename.indexOf("test_suite") >= 0)
                 return result[4] - 60;
-            }
-            else {
+            else if (filename.startsWith("_srcdocs"))
+                return result[4] - 30;
+            else
                 return result[4];
-            }
         },
 
         // query matches the full name of an object
@@ -46,7 +43,7 @@ if (!Scorer) {
             0: 15,  // used to be importantResults
             1:  5,  // used to be objectResults
             2: -5   // used to be unimportantResults
-        }, 
+        },
         //  Used when the priority is not in the mapping.
         objPrioDefault: 0,
 

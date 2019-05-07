@@ -123,7 +123,6 @@ packages = [
     'solvers.linear',
     'solvers.nonlinear',
     'solvers.linesearch',
-    'test_suite',
     'test_suite.components',
     'test_suite.scripts',
     'vectors',
