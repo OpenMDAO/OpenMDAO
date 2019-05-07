@@ -7,6 +7,11 @@
  * :copyright: Copyright 2007-2019 by the Sphinx team, see AUTHORS.
  * :license: BSD, see LICENSE for details.
  *
+ * Modified for OpenMDAO:
+ * - option to include/exclude source docs (default is to exclude)
+ * - if source docs are included, sort them to the end of the results with a separator
+ * - if source docs are included, only include one result for each filename
+ *
  */
 if (!Scorer) {
     /**
@@ -18,9 +23,14 @@ if (!Scorer) {
         // and returns the new score.
 
         score: function(result) {
-            // move source code docs to the bottom of the list
-            if (result[0].startsWith("_srcdocs")) {
-                return result[4] - 15;
+            // relevance:  non-source > source > test_suite
+            // modifiers:                 -30      -60
+            filename = result[0];
+            if (filename.startsWith("_srcdocs")) {
+                return result[4] - 30;
+            }
+            else if (filename.indexOf("test_suite") >= 0) {
+                return result[4] - 60;
             }
             else {
                 return result[4];
@@ -176,6 +186,8 @@ var Search = {
         var hlterms = [];
         var tmp = splitQuery(query);
         var objectterms = [];
+        var filenames = [];
+
         for (i = 0; i < tmp.length; i++) {
             if (tmp[i] !== "") {
                 objectterms.push(tmp[i].toLowerCase());
@@ -193,6 +205,7 @@ var Search = {
             if (word.length < 3 && tmp[i].length >= 3) {
                 word = tmp[i];
             }
+
             var toAppend;
             // select the correct list
             if (word[0] == '-') {
@@ -207,6 +220,7 @@ var Search = {
             if (!$u.contains(toAppend, word))
                 toAppend.push(word);
         }
+
         var highlightstring = '?highlight=' + $.urlencode(hlterms.join(" "));
 
         // console.debug('SEARCH: searching for:');
@@ -221,20 +235,34 @@ var Search = {
         var results = [];
         $('#search-progress').empty();
 
-        // lookup as object
-        for (i = 0; i < objectterms.length; i++) {
-            var others = [].concat(objectterms.slice(0, i),
-                objectterms.slice(i + 1, objectterms.length));
-            results = results.concat(this.performObjectSearch(objectterms[i], others));
-        }
-
         // lookup as search terms in fulltext
         results = results.concat(this.performTermsSearch(searchterms, excluded, terms, titleterms));
 
-        // filter out results from the source docs
         if (!this._search_source) {
-            var results = results.filter(function(value, index, arr) {
+            // filter out all results from the source docs
+            results = results.filter(function(value, index, arr) {
                 return !value[0].startsWith("_srcdocs");
+            });
+        }
+
+        // lookup as object (only if search source option is true)
+        if (this._search_source) {
+            for (i = 0; i < objectterms.length; i++) {
+                var others = [].concat(objectterms.slice(0, i),
+                    objectterms.slice(i + 1, objectterms.length));
+                results = results.concat(this.performObjectSearch(objectterms[i], others));
+            }
+
+            // filter results so we only return the first result for each source file
+            results = results.filter(function(value, index, arr) {
+                var filename = value[0];
+                if (filename.startsWith("_srcdocs") && $.inArray(filename, filenames) >= 0) {
+                    return false;
+                }
+                else {
+                    filenames.push(filename);
+                    return true;
+                }
             });
         }
 
@@ -271,10 +299,18 @@ var Search = {
         // print the results
         var resultCount = results.length;
 
+        var sourceResults = false;
+
         function displayNextItem() {
             // results left, load the summary and display it
             if (results.length) {
                 var item = results.pop();
+
+                if (item[0].startsWith("_srcdocs") && !sourceResults) {
+                    sourceResults = true;
+                    Search.output.append($('<br><h2>Source Code Documentation</h2>'));
+                }
+
                 var listItem = $('<li style="display:none"></li>');
                 if (DOCUMENTATION_OPTIONS.FILE_SUFFIX === '') {
                     // dirhtml builder
@@ -359,6 +395,7 @@ var Search = {
                 if (fullname.toLowerCase().indexOf(object) > -1) {
                     var score = 0;
                     var parts = fullname.split('.');
+
                     // check for different match types: exact matches of full name or
                     // "last name" (i.e. last dotted part)
                     if (fullname == object || parts[parts.length - 1] == object) {
@@ -368,9 +405,11 @@ var Search = {
                     else if (parts[parts.length - 1].indexOf(object) > -1) {
                         score += Scorer.objPartialMatch;
                     }
+
                     var match = objects[prefix][name];
                     var objname = objnames[match[1]][2];
                     var title = titles[match[0]];
+
                     // If more than one term searched for, we require other words to be
                     // found in the name/title/description
                     if (otherterms.length > 0) {
@@ -394,6 +433,7 @@ var Search = {
                         anchor = fullname;
                     else if (anchor == '-')
                         anchor = objnames[match[1]][1] + '-' + fullname;
+
                     // add custom score for some objects according to scorer
                     if (Scorer.objPrio.hasOwnProperty(match[2])) {
                         score += Scorer.objPrio[match[2]];

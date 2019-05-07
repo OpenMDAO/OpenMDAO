@@ -40,7 +40,7 @@ model.add_design_var('ground.V')
 model.add_design_var('source.I')
 model.add_objective('circuit.D1.I')
 
-p.setup(check=True)
+p.setup()
 
 # set some initial guesses
 p['circuit.n1.V'] = 10.
