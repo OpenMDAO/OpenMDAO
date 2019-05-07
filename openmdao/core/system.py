@@ -1052,6 +1052,9 @@ class System(object):
         subjac_ofs = set(key[0] for key in subjacs)
         subjac_wrts = set(key[1] for key in subjacs)
 
+        from openmdao.core.explicitcomponent import ExplicitComponent
+        is_explicit = isinstance(self, ExplicitComponent)
+
         if self._owns_approx_of or self._owns_approx_wrt:
             # we're computing totals/semi-totals
             ofs = list(self._owns_approx_of)
@@ -1061,11 +1064,10 @@ class System(object):
             else:
                 wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
         else:
-            from openmdao.core.explicitcomponent import ExplicitComponent
             ofs = self._var_allprocs_abs_names['output']
             wrts = self._var_allprocs_abs_names['input']
             wrt_info = []
-            if not isinstance(self, ExplicitComponent):
+            if not is_explicit:
                 wrt_info.append(((ofs, ofsizes, ())))
             wrt_info.append((wrts, isizes, ()))
 
@@ -1089,6 +1091,8 @@ class System(object):
             for wrts, sizes, approx_idx in wrt_info:
                 for wrt in wrts:
                     if wrt in wrt_matches and wrt in subjac_wrts:
+                        if is_explicit and of == wrt:
+                            continue
                         if wrt in approx_idx:
                             sub_wrt_idx = approx_idx[wrt]
                             size = len(sub_wrt_idx)
