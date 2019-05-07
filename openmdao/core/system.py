@@ -29,7 +29,7 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
-    _STD_COLORING_FNAME, _DYN_COLORING
+    _STD_COLORING_FNAME, _DYN_COLORING, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
@@ -57,13 +57,12 @@ _supported_methods = {
 _DEFAULT_COLORING_META = {
     'wrt_patterns': ('*',),
     'method': 'fd',
-    'repeats': 3,
-    'tol': 1e-15,
-    'orders': 15,
-    'perturb_size': 1e-9,
     'wrt_matches': None,
+    'per_instance': False,
     'coloring': None,
 }
+
+_DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
 
 _full_slice = slice(None)
 
@@ -440,7 +439,7 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         self._lin_vec_names = []
-        self._coloring_info = {'coloring': None, 'show_summary': True, 'show_sparsity': False}
+        self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
     def _declare_options(self):
@@ -453,6 +452,9 @@ class System(object):
         `initialize` method available for user-defined options.
         """
         pass
+
+    def __repr__(self):
+        return "%s: %s" % (type(self).__name__, self.pathname)
 
     def _check_reconf(self):
         """
@@ -813,9 +815,18 @@ class System(object):
         self._coloring_info['coloring'] = coloring
         return coloring
 
-    def declare_coloring(self, wrt=None, method=None, form=None, step=None, per_instance=False,
-                         repeats=None, tol=None, orders=None, perturb_size=None,
-                         show_summary=True, show_sparsity=False):
+    def declare_coloring(self,
+                         wrt=_DEFAULT_COLORING_META['wrt_patterns'],
+                         method=_DEFAULT_COLORING_META['method'],
+                         form=None,
+                         step=None,
+                         per_instance=_DEFAULT_COLORING_META['per_instance'],
+                         repeats=_DEFAULT_COLORING_META['repeats'],
+                         tol=_DEFAULT_COLORING_META['tol'],
+                         orders=_DEFAULT_COLORING_META['orders'],
+                         perturb_size=_DEFAULT_COLORING_META['perturb_size'],
+                         show_summary=_DEFAULT_COLORING_META['show_summary'],
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
@@ -849,12 +860,6 @@ class System(object):
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
         """
-        if method is None:
-            if 'method' not in self._coloring_info:
-                method = 'fd'
-            else:
-                method = self._coloring_info['method']
-
         if method not in ('fd', 'cs'):
             raise RuntimeError("method must be one of ['fd', 'cs'].")
 
@@ -863,41 +868,32 @@ class System(object):
         # start with defaults
         options = _DEFAULT_COLORING_META.copy()
         options.update(approx.DEFAULT_OPTIONS)
-        options['method'] = method
 
-        # overwrite with old values if not None
-        options.update({
-            k: v for k, v in iteritems(self._coloring_info) if v is not None
-        })
-
-        if wrt is not None:
-            wrt_patterns = [wrt] if isinstance(wrt, string_types) else wrt
-        else:
-            wrt_patterns = None
-
-        # finally, overwrite with any new values if not None
-        new_opts = {
-            'wrt_patterns': wrt_patterns,
-            'form': form,
-            'step': step,
-            'per_instance': per_instance,
-            'repeats': repeats,
-            'tol': tol,
-            'orders': orders,
-            'coloring': _DYN_COLORING,
-            'show_summary': show_summary,
-            'show_sparsity': show_sparsity,
-        }
-
-        options.update({k: v for k, v in iteritems(new_opts) if v is not None})
-        if options['coloring'] is None:
+        if self._coloring_info['coloring'] is None:
+            # calling declare_coloring turns on dynamic coloring.  Calling use_fixed_coloring
+            # will switch it to use a static coloring.
             options['coloring'] = _DYN_COLORING
+        else:
+            # this will handle cases where use_fixed_coloring was called before declare_coloring
+            options['coloring'] = self._coloring_info['coloring']
+
+        options['wrt_patterns'] = [wrt] if isinstance(wrt, string_types) else wrt
+        options['method'] = method
+        options['per_instance'] = per_instance
+        options['repeat'] = repeats
+        options['tol'] = tol
+        options['orders'] = orders
+        options['perturb_size'] = perturb_size
+        options['show_summary'] = show_summary
+        options['show_sparsity'] = show_sparsity
+        if form is not None:
+            options['form'] = form
+        if step is not None:
+            options['step'] = step
 
         self._coloring_info = options
 
-    def compute_approx_coloring(self, wrt=None, method=None, form=None, step=None,
-                                repeats=2, perturb_size=1e-9, tol=1e-15, orders=20,
-                                per_instance=False, recurse=False):
+    def _compute_approx_coloring(self, recurse=False, **overrides):
         """
         Compute a coloring of the approximated derivatives.
 
@@ -906,37 +902,14 @@ class System(object):
 
         Parameters
         ----------
-        wrt : str or list of str or None
-            The name or names of the variables that derivatives are taken with respect to.
-            This can contain input names, output names, or glob patterns.
-        method : str or None
-            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
-        form : str or None
-            Finite difference form, can be "forward", "central", or "backward". Leave
-            undeclared to keep unchanged from previous or default value.
-        step : float or None
-            Step size for finite difference. Leave undeclared to keep unchanged from previous
-            or default value.
-        repeats : int
-            Number of times to randomly perturb the inputs while computing the sparsity.
-        perturb_size : float
-            Size of relative random perturbations that will be applied to the inputs during
-            computation of jacobian sparsity.
-        tol : float
-            Tolerance used to determine if an array entry is zero or nonzero when computing
-            sparsity.
-        orders : int
-            Number of orders of magnitude for one direction of the tolerance sweep when determining
-            jacobian sparsity.
-        per_instance : bool
-            If True, a separate coloring will be generated for each instance of a given class.
-            Otherwise, only one coloring for a given class will be generated and all instances
-            of that class will use it.
         recurse : bool
             If True, recurse from this system down the system hierarchy.  Whenever a group
             is encountered that has specified its coloring metadata, we don't recurse below
             that group unless that group has a subsystem that has a nonlinear solver that uses
             gradients.
+        **overrides : dict
+            Any args that will override either default coloring settings or coloring settings
+            resulting from an earlier call to declare_coloring.
 
         Returns
         -------
@@ -950,42 +923,21 @@ class System(object):
             for s in self.system_iter(include_self=True, recurse=True):
                 if my_coloring is None or s in grad_systems:
                     if s._coloring_info['coloring'] is not None:
-                        colorings.append(s.compute_approx_coloring(wrt=wrt, method=method,
-                                                                   form=form, step=step,
-                                                                   repeats=repeats,
-                                                                   perturb_size=perturb_size,
-                                                                   tol=tol, orders=orders,
-                                                                   per_instance=per_instance,
-                                                                   recurse=False)[0])
+                        colorings.append(s._compute_approx_coloring(recurse=False, **overrides)[0])
                         colorings[-1]._meta['pathname'] = s.pathname
                         colorings[-1]._meta['class'] = type(s).__name__
             return colorings
 
-        kwargs = {
-            'wrt': wrt,
-            'method': method,
-            'form': form,
-            'step': step,
-            'repeats': repeats,
-            'perturb_size': perturb_size,
-            'tol': tol,
-            'orders': orders,
-            'per_instance': per_instance,
-            'show_summary': False,
-            'show_sparsity': False,
-        }
-
         # don't override metadata if it's already declared
         info = self._coloring_info
-        for name, val in iteritems(info):
-            if val is not None and name in kwargs:
-                kwargs[name] = val
+        info.update(**overrides)
+        if isinstance(info['wrt_patterns'], string_types):
+            info['wrt_patterns'] = [info['wrt_patterns']]
 
-        if kwargs['method'] is None and self._approx_schemes:
-            method = list(self._approx_schemes)[0]
+        if info['method'] is None and self._approx_schemes:
+            info['method'] = list(self._approx_schemes)[0]
 
         if self._coloring_info['coloring'] is None:
-            self.declare_coloring(**kwargs)
             # check to see if any approx derivs have been declared
             for meta in self._subjacs_info.values():
                 if 'method' in meta and meta['method']:
@@ -997,11 +949,10 @@ class System(object):
                 try:
                     self.declare_partials('*', '*', method=self._coloring_info['method'])
                 except AttributeError:  # this system must be a group
-                    for s in self._subsystems_myproc:
+                    from openmdao.core.component import Component
+                    for s in self.system_iter(recurse=True, typ=Component):
                         s.declare_partials('*', '*', method=self._coloring_info['method'])
                 self._setup_partials(recurse=True)
-        else:
-            self.declare_coloring(**kwargs)
 
         approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
 
@@ -1012,21 +963,23 @@ class System(object):
         starting_inputs = self._inputs._data.copy()
         in_offsets = starting_inputs.copy()
         in_offsets[in_offsets == 0.0] = 1.0
-        in_offsets *= perturb_size
+        in_offsets *= info['perturb_size']
 
         starting_outputs = self._outputs._data.copy()
         out_offsets = starting_outputs.copy()
         out_offsets[out_offsets == 0.0] = 1.0
-        out_offsets *= perturb_size
+        out_offsets *= info['perturb_size']
 
         starting_resids = self._residuals._data.copy()
 
+        if self._coloring_info['coloring'] is None:
+            self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
         self._setup_static_approx_coloring()
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
 
-        for i in range(repeats):
+        for i in range(info['repeats']):
             # randomize inputs (and outputs if implicit)
             if i > 0:
                 self._inputs._data[:] = \
@@ -1048,8 +1001,10 @@ class System(object):
         sparsity_time = time.time() - sparsity_start_time
 
         sparsity, ordered_ofs, ordered_wrts = \
-            self._jacobian._compute_sparsity(self, self._coloring_info['wrt_matches'],
-                                             repeats=repeats, tol=tol, orders=orders)
+            self._jacobian._compute_sparsity(self, info['wrt_matches'],
+                                             repeats=info['repeats'],
+                                             tol=info['tol'],
+                                             orders=info['orders'])
         self._jacobian._jac_summ = None  # reclaim the memory
 
         coloring = _compute_coloring(sparsity, 'fwd')
@@ -1246,7 +1201,7 @@ class System(object):
         """
         coloring = self._get_static_coloring()
         if coloring is None and self._coloring_info['coloring'] is _DYN_COLORING:
-            self._coloring_info['coloring'] = coloring = self.compute_approx_coloring()[0]
+            self._coloring_info['coloring'] = coloring = self._compute_approx_coloring()[0]
             self._coloring_info.update(coloring._meta)
 
         return coloring

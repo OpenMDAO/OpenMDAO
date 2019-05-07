@@ -82,7 +82,9 @@ class ApproximationScheme(object):
         new_list = []
         new_entry = None
         colored = set()
-        wrt_matches = set() if coloring is None else coloring._meta['wrt_matches']
+        wrt_matches = system._coloring_info['wrt_matches']
+        if wrt_matches is None:
+            wrt_matches = set()
         for tup in self._exec_list:
             key, options = tup
             # if key[0] is None, we've already updated the coloring
@@ -401,10 +403,10 @@ class ApproximationScheme(object):
                 for key, slc in iteritems(tmpJ['@jac_slices']):
                     if uses_voi_indices:
                         jac._override_checks = True
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc], None, None)
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
                         jac._override_checks = False
                     else:
-                        jac[key] = _from_dense(jacobian, key, Jcolored[slc], None, None)
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
             else:
                 ofs = tmpJ[wrt]['ofs']
                 for of in ofs:

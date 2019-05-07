@@ -50,9 +50,6 @@ CITATIONS = """
 # new coloring and/or sparsity.
 _use_sparsity = True
 
-# if True, perform check of coloring dir hash at the beginning of setup
-_check_coloring_hash = True
-
 # If True, ignore use_fixed_coloring if the coloring passed to it is _STD_COLORING_FNAME.
 # This is used when the 'openmdao partial_coloring' or 'openmdao total_coloring' commands
 # are running, because the intent there is to generate new coloring files.
@@ -65,6 +62,15 @@ _STD_COLORING_FNAME = object()
 # used to indicate that we should dynamically generate a coloring
 _DYN_COLORING = object()
 
+# default values related to the computation of a sparsity matrix
+_DEF_COMP_SPARSITY_ARGS = {
+    'tol': 1e-15,
+    'orders': 15,
+    'repeats': 3,
+    'perturb_size': 1e-9,
+    'show_summary': True,
+    'show_sparsity': False,
+}
 
 # numpy versions before 1.12 don't use the 'axis' arg passed to count_nonzero and always
 # return an int instead of an array of ints, so create our own function for those versions.
@@ -396,6 +402,13 @@ class Coloring(object):
         # now check the contents (vars and sizes) of the input and output vectors of system
         wrt_matches = self._meta['wrt_matches']
         ordered_ofs, ordered_wrts, _, _, _ = system._get_sparsity_vars_and_sizes(wrt_matches)
+        if (list(ordered_ofs) != self._row_vars or list(ordered_wrts) != self._col_vars):
+            # TODO: add comparison of sizes
+            raise RuntimeError("%s: Current coloring configuration does not match the "
+                                "configuration of the current driver. Make sure you don't have "
+                                "different problems that have the same coloring directory.  Set "
+                                "the coloring directory by setting the value of "
+                                "`problem.options['coloring_dir']`." % system.pathname)
 
     def __repr__(self):
         """
@@ -1007,6 +1020,9 @@ def _tol_sweep(arr, tol=1e-15, orders=20):
     int
         Number of zero entries at chosen tolerance.
     """
+    if orders is None:  # skip the sweep. Just use the tolerance given.
+        return tol, 1, 1, arr[arr <= tol].size
+
     nzeros = defaultdict(list)
     itol = tol * 10.**orders
     smallest = tol / 10.**orders
@@ -1065,7 +1081,9 @@ def _compute_total_coloring_context(top):
             jac._randomize = False
 
 
-def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=20, setup=False, run_model=False):
+def _get_bool_total_jac(prob, repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
+                        tol=_DEF_COMP_SPARSITY_ARGS['tol'],
+                        orders=_DEF_COMP_SPARSITY_ARGS['orders'], setup=False, run_model=False):
     """
     Return a boolean version of the total jacobian.
 
@@ -1099,7 +1117,6 @@ def _get_bool_total_jac(prob, repeats=3, tol=1e-15, orders=20, setup=False, run_
         A boolean composite of 'repeats' total jacobians.
     """
     # clear out any old simul coloring info
-    prob.driver._coloring_info['coloring'] = None
     prob.driver._res_jacs = {}
 
     if setup:
@@ -1229,7 +1246,9 @@ def _get_response_sizes(driver, names):
     return [responses[n]['size'] for n in names]
 
 
-def get_tot_jac_sparsity(problem, mode='fwd', repeats=1, tol=1.e-15,
+def get_tot_jac_sparsity(problem, mode='fwd',
+                         repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
+                         tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                          setup=False, run_model=False):
     """
     Compute derivative sparsity for the given problem.
@@ -1332,8 +1351,11 @@ def _compute_coloring(J, mode):
     return coloring
 
 
-def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20, setup=False,
-                           run_model=False, bool_jac=None, fname=None):
+def compute_total_coloring(problem, mode=None,
+                           repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
+                           tol=_DEF_COMP_SPARSITY_ARGS['tol'],
+                           orders=_DEF_COMP_SPARSITY_ARGS['orders'],
+                           setup=False, run_model=False, bool_jac=None, fname=None):
     """
     Compute simultaneous derivative colorings for the total jacobian of the given problem.
 
@@ -1389,10 +1411,13 @@ def compute_total_coloring(problem, mode=None, repeats=1, tol=1.e-15, orders=20,
                                           "linear constraint derivatives are computed separately "
                                           "from nonlinear ones.")
             _initialize_model_approx(model, driver, ofs, wrts)
+            if model._coloring_info['coloring'] is None:
+                model.declare_coloring(method=list(model._approx_schemes)[0])
             if run_model:
                 problem.run_model()
-            coloring = model.compute_approx_coloring(wrt='*', method=list(model._approx_schemes)[0],
-                                                     repeats=repeats, tol=tol, orders=orders)[0]
+            coloring = model._compute_approx_coloring(wrt_patterns='*',
+                                                      method=list(model._approx_schemes)[0],
+                                                      repeats=repeats, tol=tol, orders=orders)[0]
         else:
             J, sparsity_time = _get_bool_total_jac(problem, repeats=repeats, tol=tol,
                                                    orders=orders, setup=setup,
@@ -1481,9 +1506,12 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     problem.driver._coloring_info['coloring'] = None
     problem.driver._res_jacs = {}
 
-    coloring = compute_total_coloring(problem,
-                                      repeats=driver._coloring_info.get('repeats', 3),
-                                      tol=1.e-15, setup=False, run_model=run_model, fname=fname)
+    repeats = driver._coloring_info.get('repeats', _DEF_COMP_SPARSITY_ARGS['repeats'])
+    tol = driver._coloring_info.get('tol', _DEF_COMP_SPARSITY_ARGS['tol'])
+    orders = driver._coloring_info.get('orders', _DEF_COMP_SPARSITY_ARGS['orders'])
+
+    coloring = compute_total_coloring(problem, repeats=repeats, tol=tol, orders=orders,
+                                      setup=False, run_model=run_model, fname=fname)
 
     if driver._coloring_info['show_sparsity']:
         coloring.display()
@@ -1508,10 +1536,15 @@ def _total_coloring_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file (pickle format)')
-    parser.add_argument('-n', action='store', dest='num_jacs', default=3, type=int,
+    parser.add_argument('-n', action='store', dest='num_jacs',
+                        default=_DEF_COMP_SPARSITY_ARGS['repeats'], type=int,
                         help='number of times to repeat derivative computation when '
                         'computing sparsity')
-    parser.add_argument('-t', '--tol', action='store', dest='tolerance', default=1.e-15, type=float,
+    parser.add_argument('--orders', action='store', dest='orders',
+                        default=_DEF_COMP_SPARSITY_ARGS['orders'], type=int,
+                        help='Number of orders (+/-) used in the tolerance sweep.')
+    parser.add_argument('-t', '--tol', action='store', dest='tolerance',
+                        default=_DEF_COMP_SPARSITY_ARGS['tol'], type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final jacobian used to "
@@ -1542,15 +1575,12 @@ def _total_coloring_cmd(options):
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context
 
-    global _use_sparsity, _check_coloring_hash
+    global _use_sparsity
 
     _use_sparsity = False
 
-    if options.outfile:
-        _check_coloring_hash = False
-
     def _total_coloring(prob):
-        global _use_sparsity, _check_coloring_hash
+        global _use_sparsity
 
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
@@ -1559,18 +1589,13 @@ def _total_coloring_cmd(options):
                 outfile = os.path.abspath(options.outfile)
                 # this will remove any trailing sep
                 cdir = os.path.abspath(prob.options['coloring_dir'])
-
-                # on the off chance they name the file the standard name, check the hash here since
-                # we turned off the earlier check
-                if (cdir == os.path.dirname(outfile) and
-                        os.path.basename(outfile) == 'total_coloring.pkl'):
-                    _check_coloring_hash = True
             else:
                 outfile = os.path.join(prob.options['coloring_dir'], 'total_coloring.pkl')
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 coloring = compute_total_coloring(prob,
                                                   repeats=options.num_jacs, tol=options.tolerance,
+                                                  orders=options.orders,
                                                   setup=False, run_model=True, fname=outfile)
 
             if options.show_sparsity:
@@ -1722,7 +1747,7 @@ def _partial_coloring_cmd(options):
                             if c == klass or c == '.'.join([mod, klass]):
                                 if c in to_find:
                                     to_find.remove(c)
-                                coloring = s.compute_approx_coloring(**kwargs)[0]
+                                coloring = s._compute_approx_coloring(**kwargs)[0]
                                 _show(s, options, coloring)
                                 if options.activate:
                                     s._set_coloring(coloring)
@@ -1735,7 +1760,7 @@ def _partial_coloring_cmd(options):
                             raise RuntimeError("Failed to find any instance of classes %s" %
                                                sorted(to_find))
                 else:
-                    colorings = system.compute_approx_coloring(**kwargs)
+                    colorings = system._compute_approx_coloring(**kwargs)
 
                     if not colorings:
                         print("No coloring found.")

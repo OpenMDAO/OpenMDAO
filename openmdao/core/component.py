@@ -362,6 +362,9 @@ class Component(System):
             self._declare_partials(of, wrt, dct)
 
     def _setup_static_approx_coloring(self):
+        from openmdao.core.explicitcomponent import ExplicitComponent
+        is_explicit = isinstance(self, ExplicitComponent)
+
         if self._jacobian is None:
             self._jacobian = DictionaryJacobian(self)
 
@@ -402,7 +405,8 @@ class Component(System):
             # will be re-initialized to use the coloring info.
             for key in product(abs_ofs, matches):
                 if key in self._subjacs_info:
-                    approx_scheme.add_approximation(key, meta)
+                    if not (is_explicit and key[0] == key[1]):
+                        approx_scheme.add_approximation(key, meta)
         else:  # a static coloring has already been specified
             colmeta = meta.copy()
             colmeta['coloring'] = coloring
@@ -1334,7 +1338,6 @@ class Component(System):
             coloring = self._get_coloring()
             if coloring is not None:
                 self._setup_static_approx_coloring()
-            return coloring
 
 
 class _DictValues(object):

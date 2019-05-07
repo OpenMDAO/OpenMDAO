@@ -929,8 +929,12 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
                                self._get_name())
 
-    def declare_coloring(self, repeats=3, tol=1e-15, orders=15, perturb_size=None,
-                         show_summary=True, show_sparsity=False):
+    def declare_coloring(self, repeats=coloring_mod._DEF_COMP_SPARSITY_ARGS['repeats'],
+                         tol=coloring_mod._DEF_COMP_SPARSITY_ARGS['tol'],
+                         orders=coloring_mod._DEF_COMP_SPARSITY_ARGS['orders'],
+                         perturb_size=coloring_mod._DEF_COMP_SPARSITY_ARGS['perturb_size'],
+                         show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
+                         show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity']):
         """
         Set options for total deriv coloring.
 
@@ -996,6 +1000,14 @@ class Driver(object):
     def _set_coloring(self, coloring):
         self._coloring_info['coloring'] = coloring
         return coloring
+
+    def _setup_tot_jac_sparsity(self):
+        """
+        Set up total jacobian subjac sparsity.
+
+        Drivers that can use subjac sparsity should override this.
+        """
+        pass
 
     def _get_static_coloring(self):
         """

@@ -1821,7 +1821,7 @@ class Group(System):
                 subsys._setup_partials(recurse)
                 info.update(subsys._subjacs_info)
 
-    def _setup_approx_partials(self):
+    def _setup_approx_partials(self, do_coloring=False):
         self._jacobian = DictionaryJacobian(system=self)
 
         pro2abs = self._var_allprocs_prom2abs_list
@@ -1875,7 +1875,7 @@ class Group(System):
         ofset = set()
         wrtset = set()
         wrt_colors_matched = set()
-        if info.get('wrt_patterns') is not None and (self._owns_approx_of or self.pathname):
+        if do_coloring and info.get('wrt_patterns') is not None and (self._owns_approx_of or self.pathname):
             wrt_color_patterns = info['wrt_patterns']
             color_meta = self._get_approx_coloring_meta()
         else:
@@ -1944,6 +1944,8 @@ class Group(System):
             self._owns_approx_wrt = OrderedDict((n, None) for n in chain(abs_outs, abs_ins)
                                                 if n in wrtset)
 
+        if do_coloring:
+            info['wrt_matches'] = wrt_colors_matched
         coloring = self._get_static_coloring()
         if coloring is not None:
             # static coloring was already defined
@@ -1955,15 +1957,14 @@ class Group(System):
                     raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
                                      "partial options on Group "
                                      "'{}': {}.".format(self.pathname, wrt_color_patterns))
-                info['wrt_matches'] = wrt_colors_matched
             approx._update_coloring(self, None)
 
     def _setup_static_approx_coloring(self):
         coloring = self._get_static_coloring()
         if coloring is not None:
-            meta = coloring._meta
-            self.approx_totals(meta['method'], meta['step'], meta.get('form'))
-        self._setup_approx_partials()
+            meta = self._coloring_info
+            self.approx_totals(meta['method'], meta.get('step'), meta.get('form'))
+        self._setup_approx_partials(self._coloring_info['coloring'] is not None)
 
     def _get_approx_coloring_meta(self):
         info = self._coloring_info
