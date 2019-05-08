@@ -453,9 +453,6 @@ class System(object):
         """
         pass
 
-    def __repr__(self):
-        return "%s: %s" % (type(self).__name__, self.pathname)
-
     def _check_reconf(self):
         """
         Check if this systems wants to reconfigure and if so, perform the reconfiguration.
@@ -1091,8 +1088,8 @@ class System(object):
             for wrts, sizes, approx_idx in wrt_info:
                 for wrt in wrts:
                     if wrt in wrt_matches and wrt in subjac_wrts:
-                        if is_explicit and of == wrt:
-                            continue
+                        #if is_explicit and of == wrt:
+                        #    continue
                         if wrt in approx_idx:
                             sub_wrt_idx = approx_idx[wrt]
                             size = len(sub_wrt_idx)

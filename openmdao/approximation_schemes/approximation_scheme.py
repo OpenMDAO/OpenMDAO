@@ -81,11 +81,11 @@ class ApproximationScheme(object):
         """
         new_list = []
         new_entry = None
-        from openmdao.core.group import Group
-        if isinstance(system, Group):
-            keys = list(system._approx_subjac_key_iter())
-        else:
-            keys = None
+        #from openmdao.core.group import Group
+        #if isinstance(system, Group):
+        #    keys = system._get_approx_subjac_keys()
+        #else:
+        keys = None
 
         colored = set()
         wrt_matches = system._coloring_info['wrt_matches']
@@ -93,8 +93,8 @@ class ApproximationScheme(object):
             wrt_matches = set()
         for tup in self._exec_list:
             key, options = tup
-            if keys is not None and key not in keys:
-                continue
+            #if keys is not None and key not in keys:
+            #    continue
             # if key[0] is None, we've already updated the coloring
             if key[0] is not None and (key[1] in wrt_matches or 'coloring' in options):
                 colored.add(key)
@@ -164,10 +164,10 @@ class ApproximationScheme(object):
         is_semi = is_total and system.pathname
         is_implicit = isinstance(system, ImplicitComponent)
 
-        if is_total:
-            keys = list(system._approx_subjac_key_iter())
-        else:
-            keys = None
+        #if is_total:
+        #    keys = system._get_approx_subjac_keys()
+        #else:
+        #    keys = None
 
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
@@ -175,7 +175,7 @@ class ApproximationScheme(object):
 
         # groupby (along with this key function) will group all 'of's that have the same wrt and
         # step size.
-        # Note: Since access to `approximations` is required multiple times, we need to
+        # Note: Since access to `approx` is required multiple times, we need to
         # throw it in a list. The groupby iterator only works once.
         approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
                                                                         self._key_fun)]
@@ -235,6 +235,7 @@ class ApproximationScheme(object):
                     '@nrows': coloring._shape[0],
                     '@ncols': coloring._shape[1],
                     '@out_slices': out_slices,
+                    '@approxs': options['approxs']
                 }
 
                 # FIXME: need to deal with mix of local/remote indices
@@ -415,7 +416,10 @@ class ApproximationScheme(object):
         for wrt, data, _, tmpJ, _, _ in approx_groups:
             if wrt is None:  # colored
                 # TODO: coloring when using parallel FD and/or FD with remote comps
-                for key, slc in iteritems(tmpJ['@jac_slices']):
+                #for key, slc in iteritems(tmpJ['@jac_slices']):
+                for approx in tmpJ['@approxs']:
+                    key = approx[0]
+                    slc = tmpJ['@jac_slices'][key]
                     if uses_voi_indices:
                         jac._override_checks = True
                         jac[key] = _from_dense(jacobian, key, Jcolored[slc])

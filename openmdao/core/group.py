@@ -96,6 +96,7 @@ class Group(System):
         self._conn_discrete_in2out = {}
         self._transfers = {}
         self._discrete_transfers = {}
+        self._approx_subjac_keys = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -328,6 +329,7 @@ class Group(System):
         self._design_vars = OrderedDict()
         self._responses = OrderedDict()
         self._first_call_to_linearize = True
+        self._approx_subjac_keys = None
 
         self._static_mode = False
         self._subsystems_allprocs.extend(self._static_subsystems_allprocs)
@@ -1725,6 +1727,9 @@ class Group(System):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        if self._jacobian is None:
+            self._jacobian = DictionaryJacobian(self)
+
         self._check_first_linearize()
 
         # Group finite difference
@@ -1766,7 +1771,8 @@ class Group(System):
             coloring = self._get_coloring()
             if coloring is not None:
                 self._setup_static_approx_coloring()
-            elif self._approx_schemes:
+            # don't do this for top level FD, because it's already been done
+            elif self._approx_schemes:# and self.pathname:
                 self._setup_approx_partials()
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
@@ -1821,7 +1827,17 @@ class Group(System):
                 subsys._setup_partials(recurse)
                 info.update(subsys._subjacs_info)
 
-    def _approx_subjac_key_iter(self):
+    def _get_approx_subjac_keys(self):
+        """
+        Iterate over (of, wrt) keys for this group
+        """
+        if self._approx_subjac_keys is None:
+            self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
+
+        return self._approx_subjac_keys
+
+
+    def _approx_subjac_keys_iter(self):
         pro2abs = self._var_allprocs_prom2abs_list
 
         if self._owns_approx_wrt and not self.pathname:
@@ -1889,38 +1905,6 @@ class Group(System):
         approx._exec_list = []
         approx._approx_groups = None
 
-        # if self._owns_approx_wrt and not self.pathname:
-        #     candidate_wrt = self._owns_approx_wrt
-        # else:
-        #     candidate_wrt = list(var[0] for var in pro2abs['input'].values())
-
-        # from openmdao.core.indepvarcomp import IndepVarComp
-        # wrt = set()
-        # ivc = set()
-        # if self.pathname:  # get rid of any old stuff in here
-        #     self._owns_approx_of = self._owns_approx_wrt = None
-
-        # for var in candidate_wrt:
-
-        #     # Weed out inputs connected to anything inside our system unless the source is an
-        #     # indepvarcomp.
-        #     if var in self._conn_abs_in2out:
-        #         src = self._conn_abs_in2out[var]
-        #         compname = src.rsplit('.', 1)[0]
-        #         comp = self._get_subsystem(compname)
-        #         if isinstance(comp, IndepVarComp):
-        #             wrt.add(src)
-        #             ivc.add(src)
-        #     else:
-        #         wrt.add(var)
-
-        # if self._owns_approx_of:
-        #     of = self._owns_approx_of
-        # else:
-        #     of = set(var[0] for var in pro2abs['output'].values())
-        #     # Skip indepvarcomp res wrt other srcs
-        #     of -= ivc
-
         ofset = set()
         wrtset = set()
         wrt_colors_matched = set()
@@ -1931,16 +1915,7 @@ class Group(System):
             wrt_color_patterns = ()
 
         # for key in product(of, wrt.union(of)):
-        for key in self._approx_subjac_key_iter():
-            # Create approximations for the ones we need.
-
-            # # Skip explicit res wrt outputs
-            # if key[1] in of and key[1] not in ivc:
-
-            #     # Support for specifying a desvar as an obj/con.
-            #     if key[1] not in wrt or key[0] == key[1]:
-            #         continue
-
+        for key in self._get_approx_subjac_keys():
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
             else:
