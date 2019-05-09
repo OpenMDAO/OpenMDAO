@@ -81,11 +81,6 @@ class ApproximationScheme(object):
         """
         new_list = []
         new_entry = None
-        #from openmdao.core.group import Group
-        #if isinstance(system, Group):
-        #    keys = system._get_approx_subjac_keys()
-        #else:
-        keys = None
 
         colored = set()
         wrt_matches = system._coloring_info['wrt_matches']
@@ -93,9 +88,6 @@ class ApproximationScheme(object):
             wrt_matches = set()
         for tup in self._exec_list:
             key, options = tup
-            #if keys is not None and key not in keys:
-            #    continue
-            # if key[0] is None, we've already updated the coloring
             if key[0] is not None and (key[1] in wrt_matches or 'coloring' in options):
                 colored.add(key)
                 if coloring is None:
@@ -112,9 +104,7 @@ class ApproximationScheme(object):
 
         # remove entries that have same keys as colored entries
         if colored:
-            new_list.extend([tup for tup in self._exec_list if tup[0] not in colored and
-                             (keys is None or tup[0] in keys)])
-
+            new_list.extend([tup for tup in self._exec_list if tup[0] not in colored])
             self._exec_list = new_list
             self._approx_groups = None  # will force approx_groups to be rebuilt later
 
@@ -164,11 +154,6 @@ class ApproximationScheme(object):
         is_semi = is_total and system.pathname
         is_implicit = isinstance(system, ImplicitComponent)
 
-        #if is_total:
-        #    keys = system._get_approx_subjac_keys()
-        #else:
-        #    keys = None
-
         # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
         # group adjacent items with identical keys.
         self._exec_list.sort(key=self._key_fun)
@@ -214,7 +199,7 @@ class ApproximationScheme(object):
                     of_names, wrt_names = system._get_partials_varlists()
                     ofsizes, wrtsizes = system._get_partials_var_sizes()
                     wrt_names = [prom2abs_in[n][0] if n in prom2abs_in else prom2abs_out[n][0]
-                        for n in wrt_names]
+                                 for n in wrt_names]
                     of_names = [prom2abs_out[n][0] for n in of_names]
                     full_wrts = wrt_names
 
@@ -416,7 +401,6 @@ class ApproximationScheme(object):
         for wrt, data, _, tmpJ, _, _ in approx_groups:
             if wrt is None:  # colored
                 # TODO: coloring when using parallel FD and/or FD with remote comps
-                #for key, slc in iteritems(tmpJ['@jac_slices']):
                 for approx in tmpJ['@approxs']:
                     key = approx[0]
                     slc = tmpJ['@jac_slices'][key]

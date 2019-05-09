@@ -71,6 +71,8 @@ class Group(System):
         Key is system pathname or None for the full, simultaneous transfer.
     _loc_subsys_map : dict
         Mapping of local subsystem names to their corresponding System.
+    _approx_subjac_keys : list
+        List of subjacobian keys used for approximated derivatives.
     """
 
     def __init__(self, **kwargs):
@@ -1771,8 +1773,10 @@ class Group(System):
             coloring = self._get_coloring()
             if coloring is not None:
                 self._setup_static_approx_coloring()
-            # don't do this for top level FD, because it's already been done
-            elif self._approx_schemes:# and self.pathname:
+            # TODO: for top level FD, call below is unnecessary, but we need this
+            # for some tests that just call run_linearize directily without calling
+            # compute_totals.
+            elif self._approx_schemes:  # and self.pathname:
                 self._setup_approx_partials()
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
@@ -1829,13 +1833,17 @@ class Group(System):
 
     def _get_approx_subjac_keys(self):
         """
-        Iterate over (of, wrt) keys for this group
+        Return a list of (of, wrt) keys needed for approx derivs for this group.
+
+        Returns
+        -------
+        list
+            List of approx derivative subjacobian keys.
         """
         if self._approx_subjac_keys is None:
             self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
 
         return self._approx_subjac_keys
-
 
     def _approx_subjac_keys_iter(self):
         pro2abs = self._var_allprocs_prom2abs_list
@@ -1908,7 +1916,8 @@ class Group(System):
         ofset = set()
         wrtset = set()
         wrt_colors_matched = set()
-        if do_coloring and info.get('wrt_patterns') is not None and (self._owns_approx_of or self.pathname):
+        if do_coloring and info.get('wrt_patterns') is not None and (self._owns_approx_of or
+                                                                     self.pathname):
             wrt_color_patterns = info['wrt_patterns']
             color_meta = self._get_approx_coloring_meta()
         else:

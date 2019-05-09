@@ -405,10 +405,10 @@ class Coloring(object):
         if (list(ordered_ofs) != self._row_vars or list(ordered_wrts) != self._col_vars):
             # TODO: add comparison of sizes
             raise RuntimeError("%s: Current coloring configuration does not match the "
-                                "configuration of the current driver. Make sure you don't have "
-                                "different problems that have the same coloring directory.  Set "
-                                "the coloring directory by setting the value of "
-                                "`problem.options['coloring_dir']`." % system.pathname)
+                               "configuration of the current driver. Make sure you don't have "
+                               "different problems that have the same coloring directory.  Set "
+                               "the coloring directory by setting the value of "
+                               "`problem.options['coloring_dir']`." % system.pathname)
 
     def __repr__(self):
         """
