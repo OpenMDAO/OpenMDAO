@@ -191,6 +191,16 @@ def _setup_func_group():
             ('*', (DefaultTransfer,)),
             ('_transfer', (System,))
         ],
+        'coloring': [
+            ('*_approx_*', (Driver, System)),
+            ('*color*', (object,)),
+            ('*partials*', (System, Driver)),
+            ('*sparsity*', (Jacobian, System, Driver)),
+            ('*simul*', (Driver, System)),
+            ('*jacobian*', (Driver, System)),
+            ('_setup', (System,)),
+            ('_final_setup', (System,)),
+        ]
         # NOTE: context managers and other functions that yield instead of return will NOT show
         # up properly in the trace.  For example, our context managers for scaling will show up
         # as a call and immediate return from the context manager, followed by the functions that

@@ -419,7 +419,6 @@ class Component(System):
             approx._exec_list = new_list
             approx.add_approximation((None, None), colmeta)
             approx._approx_groups = None  # force a re-init of approximations
-            pathname = self.pathname
 
             # When total coloring is being used in addition to partial coloring,
             # we need to ensure that randomized partial sub-jacobians are represented with the
@@ -429,10 +428,11 @@ class Component(System):
             sparsity = coloring.get_subjac_sparsity()
             # sparsity uses relative names, so we need to convert to absolute
             new_sp = {}
+            pathname = self.pathname
             for of, sub in iteritems(sparsity):
-                of_abs = '.'.join((self.pathname, of)) if self.pathname else of
+                of_abs = '.'.join((pathname, of)) if pathname else of
                 for wrt, tup in iteritems(sub):
-                    wrt_abs = '.'.join((self.pathname, wrt)) if self.pathname else wrt
+                    wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
                     abs_key = (of_abs, wrt_abs)
                     if abs_key in self._subjacs_info:
                         # add sparsity info to existing partial info

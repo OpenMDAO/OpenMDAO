@@ -69,6 +69,18 @@ you can pass the `repeats`, `tol`, and `orders` args. For example:
     prob.driver.declare_coloring(repeats=2, tol=1e-20, orders=20)
 
 
+If you want to set a specific tolerance and skip the tolerance sweep, you can set
+:code:`orders=None`.  This can be useful if you have a very noisy jacobian that contains lots
+of small numbers and the tolerance sweep is unable to pick a tolerance.  You can set the
+tolerance to a small enough value that you're sure that you're not missing any entries that
+should be treated as nonzero.  Here's an example:
+
+
+.. code-block:: python
+
+    prob.driver.declare_coloring(tol=1e-35, orders=None)
+
+
 Whenever a dynamic coloring is computed, the coloring is written to a file called
 *total_coloring.pkl* for later 'static' use.  The file will be written in a directory specified
 in :code:`problem.options['coloring_dir']`. If no value is set into

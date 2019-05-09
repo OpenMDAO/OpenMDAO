@@ -131,7 +131,7 @@ class ExplicitComponent(Component):
         recurse : bool
             If True, setup jacobians in all descendants. (ignored)
         """
-        if self._use_derivatives and self._has_approx:
+        if self._has_approx and self._use_derivatives:
             self._set_approx_partials_meta()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',

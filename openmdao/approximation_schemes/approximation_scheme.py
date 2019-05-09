@@ -239,9 +239,6 @@ class ApproximationScheme(object):
 
                 full_ofs = system._var_allprocs_abs_names['output']
                 if is_total and (approx_of_idx or len(full_ofs) > len(of_names)):
-                    # total_sizes = system._var_sizes['nonlinear']['output'][iproc]
-                    # tmpJ['@row_idx_map'] = sub2full_indices(full_ofs, system._owns_approx_of,
-                    #                                         total_sizes, approx_of_idx)
                     full_idxs = []
                     for sof in of_names:
                         slc = out_slices[sof]

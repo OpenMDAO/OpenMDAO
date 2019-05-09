@@ -1895,7 +1895,52 @@ class Group(System):
 
             yield key
 
+    def _get_wrt_matches(self):
+
+        if not (info.get('wrt_patterns') is not None and (self._owns_approx_of or self.pathname)):
+            return
+
+        abs2prom = self._var_allprocs_abs2prom
+        subjacs_info = self._subjacs_info
+
+        wrtset = set()
+        wrt_colors_matched = set()
+
+        wrt_color_patterns = info['wrt_patterns']
+        color_meta = self._get_approx_coloring_meta()
+
+        for key in self._get_approx_subjac_keys():
+            if self.pathname:
+                wrtset.add(key[1])
+
+            if wrt_color_patterns:
+                if key[1] in abs2prom['output']:
+                    wrtprom = abs2prom['output'][key[1]]
+                else:
+                    wrtprom = abs2prom['input'][key[1]]
+
+                for patt in wrt_color_patterns:
+                    if patt == '*' or fnmatchcase(wrtprom, patt):
+                        # subjac meta is shared among systems. We don't want to pollute it
+                        # with coloring info
+                        meta = meta.copy()
+                        meta.update(color_meta)
+                        wrt_colors_matched.add(key[1])
+                        break
+
+        if self.pathname:
+            # we're taking semi-total derivs for this group. Update _owns_approx_of
+            # and _owns_approx_wrt so we can use the same approx code for totals and
+            # semi-totals.  Also, the order must match order of vars in the output and
+            # input vectors.
+            self._owns_approx_of = OrderedDict((n, None) for n in abs_outs)
+            self._owns_approx_wrt = OrderedDict((n, None) for n in chain(abs_outs, abs_ins)
+                                                if n in wrtset)
+
     def _setup_approx_partials(self, do_coloring=False):
+        """
+        Add approximations for all approx derivs.
+        """
         self._jacobian = DictionaryJacobian(system=self)
 
         pro2abs = self._var_allprocs_prom2abs_list
@@ -1916,7 +1961,6 @@ class Group(System):
         approx._exec_list = []
         approx._approx_groups = None
 
-        ofset = set()
         wrtset = set()
         wrt_colors_matched = set()
         if do_coloring and info.get('wrt_patterns') is not None and (self._owns_approx_of or
@@ -1926,7 +1970,6 @@ class Group(System):
         else:
             wrt_color_patterns = ()
 
-        # for key in product(of, wrt.union(of)):
         for key in self._get_approx_subjac_keys():
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
@@ -1947,7 +1990,6 @@ class Group(System):
             meta.update(self._owns_approx_jac_meta)
 
             if self.pathname:
-                ofset.add(key[0])
                 wrtset.add(key[1])
 
             if meta['value'] is None:
