@@ -258,7 +258,7 @@ class ImplicitComponent(Component):
                     finally:
                         d_outputs.read_only = d_residuals.read_only = False
 
-    def _set_partials_meta(self):
+    def _set_approx_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
         """

@@ -1825,11 +1825,14 @@ class Group(System):
             Whether to call this method in subsystems.
         """
         self._subjacs_info = info = {}
+        self._has_approx = False
 
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_partials(recurse)
                 info.update(subsys._subjacs_info)
+                if subsys._has_approx:
+                    self._has_approx = True
 
     def _get_approx_subjac_keys(self):
         """

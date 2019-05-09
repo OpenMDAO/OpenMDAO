@@ -804,6 +804,7 @@ class Component(System):
             Keyword arguments for controlling the behavior of the approximation.
         """
         pattern_matches = self._find_partial_matches(of, wrt)
+        self._has_approx = True
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -916,6 +917,8 @@ class Component(System):
                                    "%s." % (self.pathname, sorted(dups)))
 
         if method_func is not None:
+            # we're doing approximations
+            self._has_approx = True
             meta['method'] = method
             self._get_approx_scheme(method)
 

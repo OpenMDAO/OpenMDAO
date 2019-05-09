@@ -141,7 +141,7 @@ def _setup_func_group():
             ('_build', (Matrix,)),
             ('_add_submat', (Matrix,)),
             ('_get_maps', (System,)),
-            ('_set_partials_meta', (System,)),
+            ('_set_approx_partials_meta', (System,)),
             ('_init_relevance', (System,)),
             ('_get_initial_*', (System,)),
             ('_initialize_*', (DefaultVector,)),
@@ -160,7 +160,7 @@ def _setup_func_group():
             ('_solve_linear', (System,)),
             ('apply_linear', (System,)),
             ('solve_linear', (System,)),
-            ('_set_partials_meta', (System, Jacobian)),
+            ('_set_approx_partials_meta', (System, Jacobian)),
             ('_linearize', (System, Solver)),
             # include NewtonSolver to provide some context
             ('solve', (LinearSolver, NewtonSolver)),

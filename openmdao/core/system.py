@@ -281,6 +281,9 @@ class System(object):
         ID used to determine which columns in the jacobian will be computed when using parallel FD.
     _use_derivatives : bool
         If True, perform any memory allocations necessary for derivative computation.
+    _has_approx : bool
+        If True, this system or its descendent has declared approximated partial or semi-total
+        derivatives.
     _coloring_info : tuple
         Metadata that defines how to perform coloring of this System's approx jacobian. Not
         used if this System does no partial or semi-total coloring.
@@ -433,6 +436,7 @@ class System(object):
         self._local_vector_class = None
         self._distributed_vector_class = None
         self._use_derivatives = True
+        self._has_approx = False
 
         self._assembled_jac = None
 
@@ -1795,8 +1799,9 @@ class System(object):
             for s in nl_asm_jac_solvers:
                 s._assembled_jac = asm_jac
 
-        # note that for a Group, _set_partials_meta does nothing
-        self._set_partials_meta()
+        # note that for a Group, _set_approx_partials_meta does nothing
+        if self._has_approx:
+            self._set_approx_partials_meta()
 
         # At present, we don't support a AssembledJacobian in a group
         # if any subcomponents are matrix-free.
@@ -2275,7 +2280,7 @@ class System(object):
             if subsys.nonlinear_solver is not None and type_ != 'LN':
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
-    def _set_partials_meta(self):
+    def _set_approx_partials_meta(self):
         """
         Set subjacobian info into our jacobian.
         """
