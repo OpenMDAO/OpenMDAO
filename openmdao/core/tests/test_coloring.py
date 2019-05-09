@@ -1328,7 +1328,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
     def tearDown(self):
         os.chdir(self.startdir)
-        MPI.COMM_WORLD.barrier()
+        junk = MPI.COMM_WORLD.bcast(None, root=0)
         if MPI.COMM_WORLD.rank == 0:
             try:
                 shutil.rmtree(self.tempdir)
