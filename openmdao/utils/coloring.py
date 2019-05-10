@@ -402,6 +402,7 @@ class Coloring(object):
         # now check the contents (vars and sizes) of the input and output vectors of system
         wrt_matches = self._meta['wrt_matches']
         if system.pathname:
+            # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
             ordered_wrt_info = system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
         else:

@@ -84,7 +84,19 @@ class ExplicitComponent(Component):
         in_sizes = self._var_sizes['nonlinear']['input'][iproc]
         return out_sizes, in_sizes
 
-    def _jacobian_wrt_iter(self, wrt_matches):
+    def _jacobian_wrt_iter(self, wrt_matches=None):
+        """
+        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
+
+        Parameters
+        ----------
+        wrt_matches : set or None
+            Only include row vars that are contained in this set.  This will determine what
+            the actual offsets are, i.e. the offsets will be into a reduced jacobian
+            containing only the matching columns.
+        """
+        if wrt_matches is None:
+            wrt_matches = ContainsAll()
         abs2meta = self._var_allprocs_abs2meta
         offset = end = 0
         for wrt in self._var_allprocs_abs_names['input']:

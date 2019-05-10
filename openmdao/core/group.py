@@ -1896,6 +1896,9 @@ class Group(System):
             yield key
 
     def _jacobian_of_iter(self):
+        """
+        Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
+        """
         abs2meta = self._var_allprocs_abs2meta
         approx_of_idx = self._owns_approx_of_idx
 
@@ -1916,8 +1919,20 @@ class Group(System):
             for tup in super(Group, self)._jacobian_of_iter():
                 yield tup
 
-    def _jacobian_wrt_iter(self, wrt_matches):
+    def _jacobian_wrt_iter(self, wrt_matches=None):
+        """
+        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
+
+        Parameters
+        ----------
+        wrt_matches : set or None
+            Only include row vars that are contained in this set.  This will determine what
+            the actual offsets are, i.e. the offsets will be into a reduced jacobian
+            containing only the matching columns.
+        """
         if self._owns_approx_wrt:
+            if wrt_matches is None:
+                wrt_matches = ContainsAll()
             abs2meta = self._var_allprocs_abs2meta
             approx_of_idx = self._owns_approx_of_idx
             approx_wrt_idx = self._owns_approx_wrt_idx
