@@ -1895,16 +1895,18 @@ class Group(System):
 
             yield key
 
-    def _get_wrt_matches(self):
+    def _update_wrt_matches(self):
 
-        if not (info.get('wrt_patterns') is not None and (self._owns_approx_of or self.pathname)):
+        info = self._coloring_info
+        if not (self._owns_approx_of or self.pathname):
             return
 
         abs2prom = self._var_allprocs_abs2prom
-        subjacs_info = self._subjacs_info
+        abs_outs = self._var_allprocs_abs_names['output']
+        abs_ins = self._var_allprocs_abs_names['input']
 
         wrtset = set()
-        wrt_colors_matched = set()
+        info['wrt_matches'] = wrt_colors_matched = set()
 
         wrt_color_patterns = info['wrt_patterns']
         color_meta = self._get_approx_coloring_meta()
@@ -1919,12 +1921,9 @@ class Group(System):
                 else:
                     wrtprom = abs2prom['input'][key[1]]
 
+                meta = self._subjacs_info[key]
                 for patt in wrt_color_patterns:
                     if patt == '*' or fnmatchcase(wrtprom, patt):
-                        # subjac meta is shared among systems. We don't want to pollute it
-                        # with coloring info
-                        meta = meta.copy()
-                        meta.update(color_meta)
                         wrt_colors_matched.add(key[1])
                         break
 
@@ -1937,7 +1936,20 @@ class Group(System):
             self._owns_approx_wrt = OrderedDict((n, None) for n in chain(abs_outs, abs_ins)
                                                 if n in wrtset)
 
-    def _setup_approx_partials(self, do_coloring=False):
+        coloring = self._get_static_coloring()
+        approx = self._get_approx_scheme(info['method'])
+        if coloring is not None:
+            # static coloring was already defined
+            approx._update_coloring(self, coloring)
+        elif self._coloring_info['coloring'] is _DYN_COLORING:
+            if self._owns_approx_of:
+                if not wrt_colors_matched:
+                    raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
+                                     "partial options on Group "
+                                     "'{}': {}.".format(self.pathname, wrt_color_patterns))
+            approx._update_coloring(self, None)
+
+    def _setup_approx_partials(self):
         """
         Add approximations for all approx derivs.
         """
@@ -1949,7 +1961,6 @@ class Group(System):
         abs_outs = self._var_allprocs_abs_names['output']
         abs_ins = self._var_allprocs_abs_names['input']
         info = self._coloring_info
-        coloring = self._get_static_coloring()
 
         if info['coloring'] is not None and (self._owns_approx_of is None or
                                              self._owns_approx_wrt is None):
@@ -1960,15 +1971,6 @@ class Group(System):
         # reset the approx if necessary
         approx._exec_list = []
         approx._approx_groups = None
-
-        wrtset = set()
-        wrt_colors_matched = set()
-        if do_coloring and info.get('wrt_patterns') is not None and (self._owns_approx_of or
-                                                                     self.pathname):
-            wrt_color_patterns = info['wrt_patterns']
-            color_meta = self._get_approx_coloring_meta()
-        else:
-            wrt_color_patterns = ()
 
         for key in self._get_approx_subjac_keys():
             if key in self._subjacs_info:
@@ -1989,59 +1991,21 @@ class Group(System):
 
             meta.update(self._owns_approx_jac_meta)
 
-            if self.pathname:
-                wrtset.add(key[1])
-
             if meta['value'] is None:
                 shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
                 meta['shape'] = shape
                 meta['value'] = np.zeros(shape)
 
-            if wrt_color_patterns:
-                if key[1] in abs2prom['output']:
-                    wrtprom = abs2prom['output'][key[1]]
-                else:
-                    wrtprom = abs2prom['input'][key[1]]
-
-                for patt in wrt_color_patterns:
-                    if patt == '*' or fnmatchcase(wrtprom, patt):
-                        # subjac meta is shared among systems. We don't want to pollute it
-                        # with coloring info
-                        meta = meta.copy()
-                        meta.update(color_meta)
-                        wrt_colors_matched.add(key[1])
-                        break
-
             approx.add_approximation(key, meta)
-
-        if self.pathname:
-            # we're taking semi-total derivs for this group. Update _owns_approx_of
-            # and _owns_approx_wrt so we can use the same approx code for totals and
-            # semi-totals.  Also, the order must match order of vars in the output and
-            # input vectors.
-            self._owns_approx_of = OrderedDict((n, None) for n in abs_outs)
-            self._owns_approx_wrt = OrderedDict((n, None) for n in chain(abs_outs, abs_ins)
-                                                if n in wrtset)
-
-        if do_coloring:
-            info['wrt_matches'] = wrt_colors_matched
-        if coloring is not None:
-            # static coloring was already defined
-            approx._update_coloring(self, coloring)
-        elif self._coloring_info['coloring'] is _DYN_COLORING:
-            if self._owns_approx_of:
-                if not wrt_colors_matched:
-                    raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
-                                     "partial options on Group "
-                                     "'{}': {}.".format(self.pathname, wrt_color_patterns))
-            approx._update_coloring(self, None)
 
     def _setup_static_approx_coloring(self):
         coloring = self._get_static_coloring()
         if coloring is not None:
             meta = self._coloring_info
             self.approx_totals(meta['method'], meta.get('step'), meta.get('form'))
-        self._setup_approx_partials(self._coloring_info['coloring'] is not None)
+        self._setup_approx_partials()
+        if self._coloring_info['coloring'] is not None:
+            self._update_wrt_matches()
 
     def _get_approx_coloring_meta(self):
         info = self._coloring_info

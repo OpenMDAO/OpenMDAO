@@ -1003,6 +1003,9 @@ class System(object):
 
         sparsity_time = time.time() - sparsity_start_time
 
+        if is_total:
+            self._update_wrt_matches()
+
         sparsity, ordered_ofs, ordered_wrts = \
             self._jacobian._compute_sparsity(self, info['wrt_matches'],
                                              repeats=info['repeats'],
