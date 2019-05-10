@@ -56,10 +56,41 @@ if (!Scorer) {
     };
 }
 
-if (!splitQuery) {
-    function splitQuery(query) {
-        return query.split(/\s+/);
+function splitQuery(query) {
+    var result = [];
+    var start = -1;
+    var quote = false;
+
+    for (var i = 0; i < query.length; i++) {
+        if (query.charAt(i) == '"') {
+            if (quote) {
+                // closing quote
+                result.push(query.slice(start+1, i));
+                start = -1;
+                quote = false
+            }
+            else {
+                // opening quote
+                quote = true;
+                start = i;
+           }
+        }
+        else if (!quote && splitChars[query.charCodeAt(i)]) {
+            if (start !== -1) {
+                result.push(query.slice(start, i));
+                start = -1;
+            }
+        }
+        else if (start === -1) {
+            start = i;
+        }
     }
+
+    if (start !== -1) {
+        result.push(query.slice(start));
+    }
+
+    return result;
 }
 
 /**
