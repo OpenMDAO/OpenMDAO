@@ -39,6 +39,7 @@ class ApproximationScheme(object):
         self._approx_groups = None
         self._approx_groups_cached_under_cs = False
         self._exec_list = []
+        self._exec_dict = defaultdict(list)
 
     def _get_approx_groups(self, system, under_cs=False):
         """
@@ -86,6 +87,39 @@ class ApproximationScheme(object):
         wrt_matches = system._coloring_info['wrt_matches']
         if wrt_matches is None:
             wrt_matches = set()
+        for tup in self._exec_list:
+            key, options = tup
+            if key[0] is not None and (key[1] in wrt_matches or 'coloring' in options):
+                colored.add(key)
+                if coloring is None:
+                    new_list.append(tup)
+                else:  # coloring is defined
+                    if new_entry is None:
+                        options = options.copy()
+                        options['coloring'] = coloring
+                        options['approxs'] = [tup]
+                        new_entry = ((None, None), options)
+                        new_list.append(new_entry)
+                    else:
+                        new_entry[1]['approxs'].append(tup)
+
+        # remove entries that have same keys as colored entries
+        if colored:
+            new_list.extend([tup for tup in self._exec_list if tup[0] not in colored])
+            self._exec_list = new_list
+            self._approx_groups = None  # will force approx_groups to be rebuilt later
+
+        # self._update_dict_coloring(system, coloring)
+
+    def _update_dict_coloring(self, system, coloring):
+        new_list = []
+        new_entry = None
+
+        colored = set()
+        wrt_matches = system._coloring_info['wrt_matches']
+        if wrt_matches is None:
+            wrt_matches = set()
+
         for tup in self._exec_list:
             key, options = tup
             if key[0] is not None and (key[1] in wrt_matches or 'coloring' in options):
@@ -164,6 +198,14 @@ class ApproximationScheme(object):
         # throw it in a list. The groupby iterator only works once.
         approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
                                                                         self._key_fun)]
+        approx_groups2 = [tup for tup in sorted(self._exec_dict.items(), key=lambda x: x[0])]
+
+        # assert len(approx_groups) == len(approx_groups2)
+        # for t1, t2 in zip(approx_groups, approx_groups2):
+        #     k1, approxs1 = t1
+        #     k2, approxs2 = t2
+        #     assert k1 == k2
+        #     assert approxs1 == approxs2
 
         outputs = system._outputs
         inputs = system._inputs

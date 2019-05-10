@@ -1045,73 +1045,44 @@ class System(object):
 
         return [coloring]
 
+    def _jacobian_of_iter(self):
+        abs2meta = self._var_allprocs_abs2meta
+        for of in self._var_allprocs_abs_names['output']:
+            yield of, abs2meta[of]['size'], _full_slice
+
+    def _jacobian_wrt_iter(self, wrt_matches):
+        abs2meta = self._var_allprocs_abs2meta
+        for of, size, sub_of_idx in self._jacobian_of_iter():
+            if of in wrt_matches:
+                yield of, size, sub_of_idx
+
+        for wrt in self._var_allprocs_abs_names['input']:
+            if wrt in wrt_matches:
+                yield wrt, abs2meta[wrt]['size'], _full_slice
+
     def _get_sparsity_vars_and_sizes(self, wrt_matches):
         subjacs = self._subjacs_info
-
-        iproc = self.comm.rank
-        abs2idx = self._var_allprocs_abs2idx['linear']
-        approx_of_idx = self._owns_approx_of_idx
-        approx_wrt_idx = self._owns_approx_wrt_idx
-        ofsizes = self._var_sizes['linear']['output'][iproc]
-        isizes = self._var_sizes['linear']['input'][iproc]
-
-        subjac_ofs = set(key[0] for key in subjacs)
-        subjac_wrts = set(key[1] for key in subjacs)
-
-        from openmdao.core.explicitcomponent import ExplicitComponent
-        is_explicit = isinstance(self, ExplicitComponent)
-
-        if self._owns_approx_of or self._owns_approx_wrt:
-            # we're computing totals/semi-totals
-            ofs = list(self._owns_approx_of)
-            wrts = list(self._owns_approx_wrt)
-            if self.pathname:  # doing semitotals
-                wrt_info = [(ofs, ofsizes, (approx_of_idx)), (wrts, isizes, approx_wrt_idx)]
-            else:
-                wrt_info = ((wrts, ofsizes, approx_wrt_idx),)
-        else:
-            ofs = self._var_allprocs_abs_names['output']
-            wrts = self._var_allprocs_abs_names['input']
-            wrt_info = []
-            if not is_explicit:
-                wrt_info.append(((ofs, ofsizes, ())))
-            wrt_info.append((wrts, isizes, ()))
-
-        ncols = nrows = 0
         locs = {}
-        roffset = rend = 0
         ordered_ofs = OrderedDict()
         ordered_wrts = OrderedDict()
-        for of in ofs:
-            if of in approx_of_idx:
-                sub_of_idx = approx_of_idx[of]
-                size = len(sub_of_idx)
-            else:
-                size = ofsizes[abs2idx[of]]
-                sub_of_idx = _full_slice
-            rend += size
-            if of in subjac_ofs and of not in ordered_ofs:
-                ordered_ofs[of] = size
 
+        wrt_info = list(self._jacobian_wrt_iter(wrt_matches))
+        ordered_wrts = OrderedDict([(k, size) for k, size, _ in wrt_info])
+        roffset = rend = 0
+        for of, of_size, sub_of_idx in self._jacobian_of_iter():
+            rend += of_size
+            if of not in ordered_ofs:
+                ordered_ofs[of] = of_size
             coffset = cend = 0
-            for wrts, sizes, approx_idx in wrt_info:
-                for wrt in wrts:
-                    if wrt in wrt_matches and wrt in subjac_wrts:
-                        if wrt in approx_idx:
-                            sub_wrt_idx = approx_idx[wrt]
-                            size = len(sub_wrt_idx)
-                        else:
-                            size = sizes[abs2idx[wrt]]
-                            sub_wrt_idx = _full_slice
-                        cend += size
-                        if wrt not in ordered_wrts:
-                            ordered_wrts[wrt] = size
+            for wrt, wrt_size, sub_wrt_idx in self._jacobian_wrt_iter(wrt_matches):
+                cend += wrt_size
 
-                        key = (of, wrt)
-                        if key in subjacs:
-                            locs[key] = ((slice(roffset, rend), slice(coffset, cend)),
-                                         sub_of_idx, sub_wrt_idx)
-                        coffset = cend
+                key = (of, wrt)
+                if key in subjacs:
+                    locs[key] = ((slice(roffset, rend), slice(coffset, cend)),
+                                 sub_of_idx, sub_wrt_idx)
+                coffset = cend
+
             roffset = rend
 
         if self.pathname:  # convert to promoted names

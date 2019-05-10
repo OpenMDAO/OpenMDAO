@@ -111,19 +111,27 @@ class FiniteDifference(ApproximationScheme):
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
-        fd_options = self.DEFAULT_OPTIONS.copy()
-        fd_options.update(kwargs)
+        options = self.DEFAULT_OPTIONS.copy()
+        options.update(kwargs)
 
-        if fd_options['order'] is None:
-            form = fd_options['form']
+        if options['order'] is None:
+            form = options['form']
             if form in DEFAULT_ORDER:
-                fd_options['order'] = DEFAULT_ORDER[fd_options['form']]
+                options['order'] = DEFAULT_ORDER[options['form']]
             else:
                 msg = "'{}' is not a valid form of finite difference; must be one of {}"
                 raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
 
-        self._exec_list.append((abs_key, fd_options))
-        self._approx_groups = None
+        self._exec_list.append((abs_key, options))
+        if 'coloring' in options and options['coloring'].__class__ is Coloring:
+            # this will only happen after the coloring has been computed
+            key = ('@color', options['form'], options['order'],
+                   options['step'], options['step_calc'], options['directional'])
+        else:
+            key = (abs_key[1], options['form'], options['order'],
+                   options['step'], options['step_calc'], options['directional'])
+        self._exec_dict[key].append((abs_key, options))
+        self._approx_groups = None  # force later regen of approx_groups
 
     @staticmethod
     def _key_fun(approx_tuple):

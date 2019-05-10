@@ -6,7 +6,7 @@ import numpy as np
 from six import itervalues, iteritems
 from six.moves import range
 
-from openmdao.core.component import Component
+from openmdao.core.component import Component, _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
 
@@ -83,6 +83,12 @@ class ExplicitComponent(Component):
         out_sizes = self._var_sizes['nonlinear']['output'][iproc]
         in_sizes = self._var_sizes['nonlinear']['input'][iproc]
         return out_sizes, in_sizes
+
+    def _jacobian_wrt_iter(self, wrt_matches):
+        abs2meta = self._var_allprocs_abs2meta
+        for wrt in self._var_allprocs_abs_names['input']:
+            if wrt in wrt_matches:
+                yield wrt, abs2meta[wrt]['size'], _full_slice
 
     def _setup_partials(self, recurse=True):
         """

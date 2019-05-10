@@ -19,7 +19,7 @@ from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.system import System, INT_DTYPE, get_relevant_vars
-from openmdao.core.component import Component, _DictValues
+from openmdao.core.component import Component, _DictValues, _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
@@ -1895,6 +1895,48 @@ class Group(System):
 
             yield key
 
+    def _jacobian_of_iter(self):
+        abs2meta = self._var_allprocs_abs2meta
+        approx_of_idx = self._owns_approx_of_idx
+
+        if self._owns_approx_of:
+            # we're computing totals/semi-totals
+            for of in self._owns_approx_of:
+                if of in approx_of_idx:
+                    sub_of_idx = approx_of_idx[of]
+                    size = len(sub_of_idx)
+                else:
+                    size = abs2meta[of]['size']
+                    sub_of_idx = _full_slice
+                yield of, size, sub_of_idx
+        else:
+            for of, size, sub_idx in super(Group, self)._jacobian_of_iter():
+                yield of, size, sub_idx
+
+    def _jacobian_wrt_iter(self, wrt_matches):
+        if self._owns_approx_wrt:
+            abs2meta = self._var_allprocs_abs2meta
+            approx_of_idx = self._owns_approx_of_idx
+            approx_wrt_idx = self._owns_approx_wrt_idx
+
+            if self.pathname:  # doing semitotals, so include output columns
+                for of, size, sub_of_idx in self._jacobian_of_iter():
+                    if of in wrt_matches:
+                        yield of, size, sub_of_idx
+
+            for wrt in self._owns_approx_wrt:
+                if wrt in wrt_matches:
+                    if wrt in approx_wrt_idx:
+                        sub_wrt_idx = approx_wrt_idx[wrt]
+                        size = len(sub_wrt_idx)
+                    else:
+                        size = abs2meta[wrt]['size']
+                        sub_wrt_idx = _full_slice
+                    yield wrt, size, sub_wrt_idx
+        else:
+            for wrt, size, sub_idx in super(Group, self)._jacobian_wrt_iter(wrt_matches):
+                yield wrt, size, sub_idx
+
     def _update_wrt_matches(self):
 
         info = self._coloring_info
@@ -1970,6 +2012,7 @@ class Group(System):
         approx = self._get_approx_scheme(method)
         # reset the approx if necessary
         approx._exec_list = []
+        approx._exec_dict = defaultdict(list)
         approx._approx_groups = None
 
         for key in self._get_approx_subjac_keys():

@@ -30,6 +30,8 @@ global_meta_names = {
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper'),
 }
 
+_full_slice = slice(None)
+
 
 def _valid_var_name(name):
     """
