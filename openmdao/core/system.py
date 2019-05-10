@@ -1006,18 +1006,23 @@ class System(object):
         if is_total:
             self._update_wrt_matches()
 
-        sparsity, ordered_ofs, ordered_wrts = \
-            self._jacobian._compute_sparsity(self, info['wrt_matches'],
-                                             repeats=info['repeats'],
-                                             tol=info['tol'],
-                                             orders=info['orders'])
+        ordered_of_info = list(self._jacobian_of_iter())
+        ordered_wrt_info = list(self._jacobian_wrt_iter(info['wrt_matches']))
+        sparsity = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
+                                                    repeats=info['repeats'],
+                                                    tol=info['tol'],
+                                                    orders=info['orders'])
         self._jacobian._jac_summ = None  # reclaim the memory
 
+        if self.pathname:
+            ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
+            ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
+
         coloring = _compute_coloring(sparsity, 'fwd')
-        coloring._row_vars = list(ordered_ofs)
-        coloring._col_vars = list(ordered_wrts)
-        coloring._row_var_sizes = list(ordered_ofs.values())
-        coloring._col_var_sizes = list(ordered_wrts.values())
+        coloring._row_vars = [t[0] for t in ordered_of_info]
+        coloring._col_vars = [t[0] for t in ordered_wrt_info]
+        coloring._row_var_sizes = [t[2] - t[1] for t in ordered_of_info]
+        coloring._col_var_sizes = [t[2] - t[1] for t in ordered_wrt_info]
         coloring._sparsity_time = sparsity_time
 
         info = self._coloring_info
@@ -1067,29 +1072,6 @@ class System(object):
                 end += abs2meta[wrt]['size']
                 yield wrt, offset, end, _full_slice
                 offset = end
-
-    def _get_sparsity_vars_and_sizes(self, wrt_matches):
-        subjacs = self._subjacs_info
-        locs = {}
-        ordered_ofs = OrderedDict()
-        ordered_wrts = OrderedDict()
-
-        wrt_info = list(self._jacobian_wrt_iter(wrt_matches))
-        ordered_wrts = OrderedDict([(k, end - offset) for k, offset, end, _ in wrt_info])
-        for of, roffset, rend, sub_of_idx in self._jacobian_of_iter():
-            ordered_ofs[of] = rend - roffset
-
-            for wrt, coffset, cend, sub_wrt_idx in wrt_info:
-                key = (of, wrt)
-                if key in subjacs:
-                    locs[key] = ((slice(roffset, rend), slice(coffset, cend)),
-                                 sub_of_idx, sub_wrt_idx)
-
-        if self.pathname:  # convert to promoted names
-            ordered_ofs = _odict_abs2prom(self, ordered_ofs)
-            ordered_wrts = _odict_abs2prom(self, ordered_wrts)
-
-        return ordered_ofs, ordered_wrts, locs, rend, cend
 
     def get_approx_coloring_fname(self):
         """
@@ -3509,6 +3491,30 @@ class System(object):
         return set(s for s in self.system_iter(include_self=True, recurse=True)
                    if s.nonlinear_solver and s.nonlinear_solver.supports['gradients'])
 
+    def _jac_var_info_abs2prom(self, var_info):
+        """
+        Return a new list with tuples' [0] entry converted from absolute to promoted names.
+
+        Parameters
+        ----------
+        var_info : list of (name, offset, end, idxs)
+            The list that uses absolute names.
+
+        Returns
+        -------
+        list
+            The new list with promoted names.
+        """
+        new_list = []
+        abs2prom_in = self._var_allprocs_abs2prom['input']
+        abs2prom_out = self._var_allprocs_abs2prom['output']
+        for abs_name, offset, end, idxs in var_info:
+            if abs_name in abs2prom_out:
+                new_list.append((abs2prom_out[abs_name], offset, end, idxs))
+            else:
+                new_list.append((abs2prom_in[abs_name], offset, end, idxs))
+        return new_list
+
 
 def get_relevant_vars(connections, desvars, responses, mode):
     """
@@ -3667,30 +3673,3 @@ def get_relevant_vars(connections, desvars, responses, mode):
     relevant['nonlinear'] = relevant['linear']
 
     return relevant
-
-
-def _odict_abs2prom(system, odict):
-    """
-    Return a new OrderedDict with keys converted from absolute to promoted names.
-
-    Parameters
-    ----------
-    system : System
-        The system used to compute promoted names.
-    odict : OrderedDict
-        The OrderedDict that uses absolute name keys.
-
-    Returns
-    -------
-    OrderedDict
-        The new OrderedDict with promoted name keys.
-    """
-    new_dict = OrderedDict()
-    abs2prom_in = system._var_allprocs_abs2prom['input']
-    abs2prom_out = system._var_allprocs_abs2prom['output']
-    for abs_name, value in iteritems(odict):
-        if abs_name in abs2prom_out:
-            new_dict[abs2prom_out[abs_name]] = value
-        else:
-            new_dict[abs2prom_in[abs_name]] = value
-    return new_dict

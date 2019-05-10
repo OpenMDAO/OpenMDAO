@@ -300,7 +300,7 @@ class Jacobian(object):
             for key in subjacs:
                 summ[key] += np.abs(subjacs[key]['value'])
 
-    def _compute_sparsity(self, system, wrt_matches, repeats, tol, orders):
+    def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, repeats, tol, orders):
         """
         Compute a dense sparsity matrix for this jacobian using saved absolute summations.
 
@@ -309,10 +309,10 @@ class Jacobian(object):
 
         Parameters
         ----------
-        system : System
-            The System containing the jacobian whose sparsity will be computed.
-        wrt_matches : set of str
-            Set of wrt variables to compute sparsity for.
+        ordered_of_info : list of (name, offset, end, idxs)
+            Name, offset, etc. of row variables in the order that they appear in the jacobian.
+        ordered_wrt_info : list of (name, offset, end, idxs)
+            Name, offset, etc. of column variables in the order that they appear in the jacobian.
         repeats : int
             Number of times to compute partial jacobian when computing sparsity.
         tol : float
@@ -324,32 +324,29 @@ class Jacobian(object):
         -------
         ndarray
             Boolean sparsity matrix.
-        OrderedDict
-            'of' variables keyed to their sizes.
-        OrderedDict
-            'wrt' variables keyed to their sizes.
         """
         from openmdao.utils.coloring import _tol_sweep
 
         subjacs = self._subjacs_info
         summ = self._jac_summ
 
-        ordered_ofs, ordered_wrts, locs, rend, cend = \
-            system._get_sparsity_vars_and_sizes(wrt_matches)
-
+        rend = ordered_of_info[-1][2]
+        cend = ordered_wrt_info[-1][2]
         J = np.zeros((rend, cend))
 
-        for key in locs:
-            jslice, _, _ = locs[key]
-            meta = subjacs[key]
-            if meta['rows'] is not None:
-                rows = meta['rows'] + jslice[0].start
-                cols = meta['cols'] + jslice[1].start
-                J[rows, cols] = summ[key]
-            elif issparse(summ[key]):
-                raise NotImplementedError("don't support scipy sparse arrays yet")
-            else:
-                J[jslice] = summ[key]
+        for of, roffset, rend, _ in ordered_of_info:
+            for wrt, coffset, cend, _ in ordered_wrt_info:
+                key = (of, wrt)
+                if key in subjacs:
+                    meta = subjacs[key]
+                    if meta['rows'] is not None:
+                        rows = meta['rows'] + roffset
+                        cols = meta['cols'] + coffset
+                        J[rows, cols] = summ[key]
+                    elif issparse(summ[key]):
+                        raise NotImplementedError("don't support scipy sparse arrays yet")
+                    else:
+                        J[roffset:rend, coffset:cend] = summ[key]
 
         # normalize by number of saved jacs, giving a sort of 'average' jac
         J /= repeats
@@ -359,7 +356,7 @@ class Jacobian(object):
         boolJ = np.zeros(J.shape, dtype=bool)
         boolJ[J > good_tol] = True
 
-        return boolJ, ordered_ofs, ordered_wrts
+        return boolJ
 
     def set_complex_step_mode(self, active):
         """

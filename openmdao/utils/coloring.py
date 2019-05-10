@@ -401,8 +401,15 @@ class Coloring(object):
 
         # now check the contents (vars and sizes) of the input and output vectors of system
         wrt_matches = self._meta['wrt_matches']
-        ordered_ofs, ordered_wrts, _, _, _ = system._get_sparsity_vars_and_sizes(wrt_matches)
-        if (list(ordered_ofs) != self._row_vars or list(ordered_wrts) != self._col_vars):
+        if system.pathname:
+            ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
+            ordered_wrt_info = system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
+        else:
+            ordered_of_info = list(system._jacobian_of_iter())
+            ordered_wrt_info = list(system._jacobian_wrt_iter(wrt_matches))
+        ordered_of_names = [t[0] for t in ordered_of_info]
+        ordered_wrt_names = [t[0] for t in ordered_wrt_info]
+        if (ordered_of_names != self._row_vars or ordered_wrt_names != self._col_vars):
             # TODO: add comparison of sizes
             raise RuntimeError("%s: Current coloring configuration does not match the "
                                "configuration of the current driver. Make sure you don't have "
