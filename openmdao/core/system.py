@@ -1047,18 +1047,26 @@ class System(object):
 
     def _jacobian_of_iter(self):
         abs2meta = self._var_allprocs_abs2meta
+        offset = end = 0
         for of in self._var_allprocs_abs_names['output']:
-            yield of, abs2meta[of]['size'], _full_slice
+            end += abs2meta[of]['size']
+            yield of, offset, end, _full_slice
+            offset = end
 
     def _jacobian_wrt_iter(self, wrt_matches):
         abs2meta = self._var_allprocs_abs2meta
-        for of, size, sub_of_idx in self._jacobian_of_iter():
+        offset = end = 0
+        for of, _offset, _end, sub_of_idx in self._jacobian_of_iter():
             if of in wrt_matches:
-                yield of, size, sub_of_idx
+                end += (_end - _offset)
+                yield of, offset, end, sub_of_idx
+                offset = end
 
         for wrt in self._var_allprocs_abs_names['input']:
             if wrt in wrt_matches:
-                yield wrt, abs2meta[wrt]['size'], _full_slice
+                end += abs2meta[wrt]['size']
+                yield wrt, offset, end, _full_slice
+                offset = end
 
     def _get_sparsity_vars_and_sizes(self, wrt_matches):
         subjacs = self._subjacs_info
@@ -1067,23 +1075,15 @@ class System(object):
         ordered_wrts = OrderedDict()
 
         wrt_info = list(self._jacobian_wrt_iter(wrt_matches))
-        ordered_wrts = OrderedDict([(k, size) for k, size, _ in wrt_info])
-        roffset = rend = 0
-        for of, of_size, sub_of_idx in self._jacobian_of_iter():
-            rend += of_size
-            if of not in ordered_ofs:
-                ordered_ofs[of] = of_size
-            coffset = cend = 0
-            for wrt, wrt_size, sub_wrt_idx in self._jacobian_wrt_iter(wrt_matches):
-                cend += wrt_size
+        ordered_wrts = OrderedDict([(k, end - offset) for k, offset, end, _ in wrt_info])
+        for of, roffset, rend, sub_of_idx in self._jacobian_of_iter():
+            ordered_ofs[of] = rend - roffset
 
+            for wrt, coffset, cend, sub_wrt_idx in wrt_info:
                 key = (of, wrt)
                 if key in subjacs:
                     locs[key] = ((slice(roffset, rend), slice(coffset, cend)),
                                  sub_of_idx, sub_wrt_idx)
-                coffset = cend
-
-            roffset = rend
 
         if self.pathname:  # convert to promoted names
             ordered_ofs = _odict_abs2prom(self, ordered_ofs)

@@ -86,9 +86,12 @@ class ExplicitComponent(Component):
 
     def _jacobian_wrt_iter(self, wrt_matches):
         abs2meta = self._var_allprocs_abs2meta
+        offset = end = 0
         for wrt in self._var_allprocs_abs_names['input']:
             if wrt in wrt_matches:
-                yield wrt, abs2meta[wrt]['size'], _full_slice
+                end += abs2meta[wrt]['size']
+                yield wrt, offset, end, _full_slice
+                offset = end
 
     def _setup_partials(self, recurse=True):
         """

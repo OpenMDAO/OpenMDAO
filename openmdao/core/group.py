@@ -1901,6 +1901,7 @@ class Group(System):
 
         if self._owns_approx_of:
             # we're computing totals/semi-totals
+            offset = end = 0
             for of in self._owns_approx_of:
                 if of in approx_of_idx:
                     sub_of_idx = approx_of_idx[of]
@@ -1908,10 +1909,12 @@ class Group(System):
                 else:
                     size = abs2meta[of]['size']
                     sub_of_idx = _full_slice
-                yield of, size, sub_of_idx
+                end += size
+                yield of, offset, end, sub_of_idx
+                offset = end
         else:
-            for of, size, sub_idx in super(Group, self)._jacobian_of_iter():
-                yield of, size, sub_idx
+            for tup in super(Group, self)._jacobian_of_iter():
+                yield tup
 
     def _jacobian_wrt_iter(self, wrt_matches):
         if self._owns_approx_wrt:
@@ -1919,10 +1922,13 @@ class Group(System):
             approx_of_idx = self._owns_approx_of_idx
             approx_wrt_idx = self._owns_approx_wrt_idx
 
+            offset = end = 0
             if self.pathname:  # doing semitotals, so include output columns
-                for of, size, sub_of_idx in self._jacobian_of_iter():
+                for of, _offset, _end, sub_of_idx in self._jacobian_of_iter():
                     if of in wrt_matches:
-                        yield of, size, sub_of_idx
+                        end += (_end - _offset)
+                        yield of, offset, end, sub_of_idx
+                        offset = end
 
             for wrt in self._owns_approx_wrt:
                 if wrt in wrt_matches:
@@ -1932,10 +1938,12 @@ class Group(System):
                     else:
                         size = abs2meta[wrt]['size']
                         sub_wrt_idx = _full_slice
-                    yield wrt, size, sub_wrt_idx
+                    end += size
+                    yield wrt, offset, end, sub_wrt_idx
+                    offset = end
         else:
-            for wrt, size, sub_idx in super(Group, self)._jacobian_wrt_iter(wrt_matches):
-                yield wrt, size, sub_idx
+            for tup in super(Group, self)._jacobian_wrt_iter(wrt_matches):
+                yield tup
 
     def _update_wrt_matches(self):
 
