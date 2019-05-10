@@ -110,8 +110,6 @@ class Problem(object):
         Dictionary with problem recording options.
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this problem.
-    _vars_to_record: dict
-        Dict of lists of var names indicating what to record
     _remote_var_set : set
         Set of variables (absolute names) that require remote data transfer to reach all procs.
     _check : bool
@@ -197,11 +195,6 @@ class Problem(object):
         self._setup_status = 0
 
         self._rec_mgr = RecordingManager()
-        self._vars_to_record = {
-            'desvarnames': set(),
-            'objectivenames': set(),
-            'constraintnames': set(),
-        }
 
         # General options
         self.options = OptionsDictionary()
@@ -812,7 +805,7 @@ class Problem(object):
                             diff = full.difference(names)
                             remote_discrete.update(diff)
 
-                        junk = model_comm.bcast(remote_discrete, root=0)
+                        model_comm.bcast(remote_discrete, root=0)
                     else:
                         remote_discrete = model_comm.bcast(None, root=0)
 

@@ -737,43 +737,6 @@ def str2valid_python_name(s):
     return s.translate(_transtab)
 
 
-def print_line_numbers(s):
-    """
-    Print the given string, listing line numbers on the left.
-
-    Parameters
-    ----------
-    s : str
-        The string to be printed.
-    """
-    lines = s.splitlines()
-    wid = int(math.log10(len(lines))) + 2
-    for i, l in enumerate(lines):
-        print("{0:{width}}{1}".format(i + 1, l, width=wid))
-
-
-def get_module_attr(mod_obj_path):
-    """
-    Given a full module path, import and return the specified module attribute.
-
-    The module is imported if necessary.
-
-    Parameters
-    ----------
-    mod_obj_path : str
-        Full module path to the attribute, e.g., openmdao.core.system.System
-
-    Returns
-    -------
-    object
-        The specified module attribute.
-    """
-    modpath, attr = mod_obj_path.rsplit('.', 1)
-    importlib.import_module(modpath)
-    mod = sys.modules[modpath]
-    return getattr(mod, attr)
-
-
 def make_serializable(o):
     """
     Recursively convert numpy types to native types for JSON serialization.

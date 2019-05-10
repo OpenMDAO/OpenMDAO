@@ -73,10 +73,6 @@ class Driver(object):
         Contains all response info.
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this driver.
-    _vars_to_record: dict
-        Dict of lists of var names indicating what to record
-    _model_viewer_data : dict
-        Structure of model, used to make n2 diagram.
     _coloring_info : dict
         Metadata pertaining to total coloring.
     _total_jac_sparsity : dict, str, or None
@@ -97,13 +93,6 @@ class Driver(object):
             Keyword arguments that will be mapped into the Driver options.
         """
         self._rec_mgr = RecordingManager()
-        self._vars_to_record = {
-            'desvarnames': set(),
-            'responsenames': set(),
-            'objectivenames': set(),
-            'constraintnames': set(),
-            'sysinclnames': set(),
-        }
 
         self._problem = None
         self._designvars = None
@@ -160,7 +149,6 @@ class Driver(object):
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
 
         self.iter_count = 0
-        self._model_viewer_data = None
         self.cite = ""
 
         self._coloring_info = {'coloring': None, 'show_summary': True, 'show_sparsity': False}

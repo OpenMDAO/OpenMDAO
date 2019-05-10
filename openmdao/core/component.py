@@ -429,7 +429,6 @@ class Component(System):
             # necessary adjustment in _randomize_subjac.
             sparsity = coloring.get_subjac_sparsity()
             # sparsity uses relative names, so we need to convert to absolute
-            new_sp = {}
             pathname = self.pathname
             for of, sub in iteritems(sparsity):
                 of_abs = '.'.join((pathname, of)) if pathname else of
@@ -1259,83 +1258,6 @@ class Component(System):
         Components don't have nested solvers, so do nothing to prevent errors.
         """
         pass
-
-    def compute_approx_partials(self, method='fd', step=None, form='forward', step_calc='abs'):
-        """
-        Compute partial derivatives for this Component using finite FD or CS.
-
-        Parameters
-        ----------
-        method : str
-            Method, 'fd' for finite difference or 'cs' for complex step. Default is 'fd'.
-        step : float
-            Step size for approximation. Default is None, which means 1e-6 for 'fd' and 1e-40 for
-            'cs'.
-        form : string
-            Form for finite difference, can be 'forward', 'backward', or 'central'. Default
-            'forward'.
-        step_calc : string
-            Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
-            Default is 'abs'.
-
-        Returns
-        -------
-        dict, dict, bool
-            Approx. partial jacobian, component FD options, could_not_cs
-        """
-        alloc_complex = self._outputs._alloc_complex
-        approximations = {'fd': FiniteDifference(), 'cs': ComplexStep()}
-
-        of, wrt = self._get_partials_varlists()
-
-        # Load up approximation objects with the requested settings.
-        local_opts = self._get_check_partial_options()
-        for rel_key in product(of, wrt):
-            abs_key = rel_key2abs_key(self, rel_key)
-            local_wrt = rel_key[1]
-
-            # Determine if fd or cs.
-            if local_wrt in local_opts:
-                local_method = local_opts[local_wrt]['method']
-                if local_method:
-                    method = local_method
-
-            # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
-            if method == 'cs' and not alloc_complex:
-                method = 'fd'
-
-            fd_options = {'order': None, 'method': method}
-            approx_scheme = approximations[method]
-
-            if method == 'cs':
-                fd_options['form'] = None
-                fd_options['step_calc'] = None
-                if not step:
-                    step = approx_scheme.DEFAULT_OPTIONS['step']
-
-            elif method == 'fd':
-                fd_options['form'] = form
-                fd_options['step_calc'] = step_calc
-                if not step:
-                    step = approx_scheme.DEFAULT_OPTIONS['step']
-
-            fd_options['step'] = step
-
-            # Precedence: component options > global options > defaults
-            if local_wrt in local_opts:
-                for name in ['form', 'step', 'step_calc', 'directional']:
-                    value = local_opts[local_wrt][name]
-                    if value is not None:
-                        fd_options[name] = value
-
-            approx_scheme.add_approximation(abs_key, fd_options)
-
-        approx_jac = {}
-        for approximation in itervalues(approximations):
-            # Perform the FD here.
-            approximation.compute_approximations(self, jac=approx_jac)
-
-        return approx_jac
 
     def _check_first_linearize(self):
         if self._first_call_to_linearize:

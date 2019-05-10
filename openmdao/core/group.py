@@ -1974,7 +1974,6 @@ class Group(System):
         info['wrt_matches'] = wrt_colors_matched = set()
 
         wrt_color_patterns = info['wrt_patterns']
-        color_meta = self._get_approx_coloring_meta()
 
         for key in self._get_approx_subjac_keys():
             if self.pathname:
