@@ -481,6 +481,22 @@ class Driver(object):
         else:
             if name in self._designvars_discrete:
                 val = model._discrete_outputs[name]
+
+                # At present, only integers are supported by OpenMDAO drivers.
+                # We check the values here.
+                valid = True
+                msg = "Only integer scalars or ndarrays are supported as values for " + \
+                      "discrete variables when used as a design variable. "
+                if np.isscalar(val) and not isinstance(val, int):
+                    msg += "A value of type {} was specified.".format(type(val))
+                    valid = False
+                elif isinstance(val, np.ndarray) and val.dtype != np.int:
+                    msg += "An array of type {} was specified.".format(val.dtype)
+                    valid = False
+
+                if valid is False:
+                    raise ValueError(msg)
+
             elif indices is None or ignore_indices:
                 val = vec[name].copy()
             else:
