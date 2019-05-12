@@ -169,6 +169,7 @@ class TestBsplinesCompFeature(unittest.TestCase):
                 0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
             ]), 1e-5)
 
+
 @unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestBsplinesCompFeatureWithPlotting(unittest.TestCase):
 
