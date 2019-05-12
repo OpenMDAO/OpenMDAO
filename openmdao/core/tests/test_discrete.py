@@ -289,7 +289,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         msg = "Only integer scalars or ndarrays are supported as values for " + \
               "discrete variables when used as a design variable. "
-        msg += "A value of type <class 'float'> was specified."
+        msg += "A value of type 'float' was specified."
 
         self.assertEqual(str(ctx.exception), msg)
 
@@ -301,7 +301,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         msg = "Only integer scalars or ndarrays are supported as values for " + \
               "discrete variables when used as a design variable. "
-        msg += "An array of type float64 was specified."
+        msg += "An array of type 'float64' was specified."
 
         self.assertEqual(str(ctx.exception), msg)
 

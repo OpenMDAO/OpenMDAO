@@ -488,10 +488,10 @@ class Driver(object):
                 msg = "Only integer scalars or ndarrays are supported as values for " + \
                       "discrete variables when used as a design variable. "
                 if np.isscalar(val) and not isinstance(val, int):
-                    msg += "A value of type {} was specified.".format(type(val))
+                    msg += "A value of type '{}' was specified.".format(val.__class__.__name__)
                     valid = False
                 elif isinstance(val, np.ndarray) and val.dtype != np.int:
-                    msg += "An array of type {} was specified.".format(val.dtype)
+                    msg += "An array of type '{}' was specified.".format(val.dtype)
                     valid = False
 
                 if valid is False:
