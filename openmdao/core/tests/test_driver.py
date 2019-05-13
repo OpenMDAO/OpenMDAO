@@ -383,5 +383,24 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(output[3], "{'con.c': array([ 1.])}")
         self.assertEqual(output[6], "{'comp.f_xy': array([ 7622.])}")
 
+    def test_unsupported_discrete_desvar(self):
+        prob = Problem()
+
+        indep = IndepVarComp()
+        indep.add_discrete_output('xI', val=0)
+        prob.model.add_subsystem('p', indep)
+
+        prob.model.add_design_var('p.xI')
+
+        prob.driver = ScipyOptimizeDriver()
+
+        prob.setup(check=False)
+
+        with self.assertRaises(RuntimeError) as context:
+            prob.final_setup()
+
+        msg = "Discrete design variables are not supported by this driver: p.xI"
+        self.assertEqual(str(context.exception), msg)
+
 if __name__ == "__main__":
     unittest.main()

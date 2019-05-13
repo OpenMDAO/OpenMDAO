@@ -65,12 +65,23 @@ class Driver(object):
         Provides a consistent way for drivers to declare what features they support.
     _designvars : dict
         Contains all design variable info.
+    _designvars_discrete : list
+        List of design variables that are discrete.
     _cons : dict
         Contains all constraint info.
     _objs : dict
         Contains all objective info.
     _responses : dict
         Contains all response info.
+    _remote_dvs : dict
+        Dict of design variables that are remote on at least one proc. Values are
+        (owning rank, size).
+    _remote_cons : dict
+        Dict of constraints that are remote on at least one proc. Values are
+        (owning rank, size).
+    _remote_objs : dict
+        Dict of objectives that are remote on at least one proc. Values are
+        (owning rank, size).
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this driver.
     _coloring_info : dict
@@ -96,6 +107,7 @@ class Driver(object):
 
         self._problem = None
         self._designvars = None
+        self._designvars_discrete = []
         self._cons = None
         self._objs = None
         self._responses = None
@@ -224,6 +236,14 @@ class Driver(object):
             np.any([r['scaler'] is not None for r in itervalues(self._responses)]) or
             np.any([dv['scaler'] is not None for dv in itervalues(self._designvars)])
         )
+
+        # Determine if any design variables are discrete.
+        self._designvars_discrete = [dv for dv in self._designvars
+                                     if dv in model._discrete_outputs]
+        if not self.supports['integer_design_vars'] and len(self._designvars_discrete) > 0:
+            msg = "Discrete design variables are not supported by this driver: "
+            msg += '.'.join(self._designvars_discrete)
+            raise RuntimeError(msg)
 
         con_set = set()
         obj_set = set()
@@ -449,7 +469,25 @@ class Driver(object):
 
             comm.Bcast(val, root=owner)
         else:
-            if indices is None or ignore_indices:
+            if name in self._designvars_discrete:
+                val = model._discrete_outputs[name]
+
+                # At present, only integers are supported by OpenMDAO drivers.
+                # We check the values here.
+                valid = True
+                msg = "Only integer scalars or ndarrays are supported as values for " + \
+                      "discrete variables when used as a design variable. "
+                if np.isscalar(val) and not isinstance(val, int):
+                    msg += "A value of type '{}' was specified.".format(val.__class__.__name__)
+                    valid = False
+                elif isinstance(val, np.ndarray) and not np.issubdtype(val[0], int):
+                    msg += "An array of type '{}' was specified.".format(val[0].__class__.__name__)
+                    valid = False
+
+                if valid is False:
+                    raise ValueError(msg)
+
+            elif indices is None or ignore_indices:
                 val = vec[name].copy()
             else:
                 val = vec[name][indices]
@@ -517,18 +555,22 @@ class Driver(object):
         if indices is None:
             indices = slice(None)
 
-        desvar = problem.model._outputs._views_flat[name]
-        desvar[indices] = value
+        if name in self._designvars_discrete:
+            problem.model._discrete_outputs[name] = int(value)
 
-        if self._has_scaling:
-            # Scale design variable values
-            scaler = meta['scaler']
-            if scaler is not None:
-                desvar[indices] *= 1.0 / scaler
+        else:
+            desvar = problem.model._outputs._views_flat[name]
+            desvar[indices] = value
 
-            adder = meta['adder']
-            if adder is not None:
-                desvar[indices] -= adder
+            if self._has_scaling:
+                # Scale design variable values
+                scaler = meta['scaler']
+                if scaler is not None:
+                    desvar[indices] *= 1.0 / scaler
+
+                adder = meta['adder']
+                if adder is not None:
+                    desvar[indices] -= adder
 
     def get_response_values(self, filter=None):
         """
