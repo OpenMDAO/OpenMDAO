@@ -107,39 +107,6 @@ class ApproximationScheme(object):
             self._exec_list = new_list
             self._approx_groups = None  # will force approx_groups to be rebuilt later
 
-        # self._update_dict_coloring(system, coloring)
-
-    def _update_dict_coloring(self, system, coloring):
-        new_list = []
-        new_entry = None
-
-        colored = set()
-        wrt_matches = system._coloring_info['wrt_matches']
-        if wrt_matches is None:
-            wrt_matches = set()
-
-        for tup in self._exec_list:
-            key, options = tup
-            if key[0] is not None and (key[1] in wrt_matches or 'coloring' in options):
-                colored.add(key)
-                if coloring is None:
-                    new_list.append(tup)
-                else:  # coloring is defined
-                    if new_entry is None:
-                        options = options.copy()
-                        options['coloring'] = coloring
-                        options['approxs'] = [tup]
-                        new_entry = ((None, None), options)
-                        new_list.append(new_entry)
-                    else:
-                        new_entry[1]['approxs'].append(tup)
-
-        # remove entries that have same keys as colored entries
-        if colored:
-            new_list.extend([tup for tup in self._exec_list if tup[0] not in colored])
-            self._exec_list = new_list
-            self._approx_groups = None  # will force approx_groups to be rebuilt later
-
     def add_approximation(self, abs_key, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
@@ -217,34 +184,24 @@ class ApproximationScheme(object):
 
             if wrt == '@color':   # use coloring (there should be only 1 of these)
                 wrt_matches = system._coloring_info['wrt_matches']
-                options = approx[0][1]
+                meta = approx[0][1]
                 if is_total and system.pathname == '':  # top level approx totals
                     of_names = system._owns_approx_of
                     full_wrts = system._var_allprocs_abs_names['output'] + \
                         system._var_allprocs_abs_names['input']
                     wrt_names = system._owns_approx_wrt
-                    wrtsizes = [abs2meta[wrt]['size'] for wrt in wrt_names]
                 else:
                     of_names, wrt_names = system._get_partials_varlists()
-                    _, wrtsizes = system._get_partials_var_sizes()
                     wrt_names = [prom2abs_in[n][0] if n in prom2abs_in else prom2abs_out[n][0]
                                  for n in wrt_names]
                     full_wrts = wrt_names
 
-                full_sizes = wrtsizes
-
-                if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
-                    # need mapping from coloring jac columns (subset) to full jac columns
-                    col_map = sub2full_indices(full_wrts, wrt_matches, full_sizes, approx_wrt_idx)
-                else:
-                    col_map = None
-
-                coloring = options['coloring']
+                coloring = meta['coloring']
                 tmpJ = {
                     '@nrows': coloring._shape[0],
                     '@ncols': coloring._shape[1],
                     '@out_slices': out_slices,
-                    '@approxs': options['approxs'],
+                    '@approxs': meta['approxs'],
                     '@jac_slices': {},
                 }
 
@@ -269,11 +226,24 @@ class ApproximationScheme(object):
                 if full_idxs:
                     tmpJ['@row_idx_map'] = np.hstack(full_idxs)
 
+                if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
+                    if is_total and system.pathname == '':  # top level approx totals
+                        full_wrt_sizes = [abs2meta[wrt]['size'] for wrt in wrt_names]
+                    else:
+                        _, full_wrt_sizes = system._get_partials_var_sizes()
+
+                    # need mapping from coloring jac columns (subset) to full jac columns
+                    col_map = sub2full_indices(full_wrts, wrt_matches, full_wrt_sizes,
+                                               approx_wrt_idx)
+                else:
+                    col_map = None
+
                 # get groups of columns from the coloring and compute proper indices into
                 # the inputs and outputs vectors.
+                use_full_cols = is_implicit or is_semi
                 for cols, nzrows in coloring.color_nonzero_iter('fwd'):
                     ccols = cols if col_map is None else col_map[cols]
-                    idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit or is_semi,
+                    idx_info = get_input_idx_split(ccols, inputs, outputs, use_full_cols,
                                                    is_total)
                     self._approx_groups.append((None, data, cols, tmpJ, idx_info, nzrows))
             else:

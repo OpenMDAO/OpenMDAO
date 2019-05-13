@@ -400,14 +400,14 @@ class Coloring(object):
                                    "`problem.options['coloring_dir']`.")
 
         # now check the contents (vars and sizes) of the input and output vectors of system
-        wrt_matches = self._meta['wrt_matches']
         if system.pathname:
+            wrt_matches = ['.'.join((system.pathname, n)) for n in self._meta['wrt_matches_prom']]
             # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
             ordered_wrt_info = system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
         else:
             ordered_of_info = list(system._jacobian_of_iter())
-            ordered_wrt_info = list(system._jacobian_wrt_iter(wrt_matches))
+            ordered_wrt_info = list(system._jacobian_wrt_iter(self._meta['wrt_matches']))
         ordered_of_names = [t[0] for t in ordered_of_info]
         ordered_wrt_names = [t[0] for t in ordered_wrt_info]
         if (ordered_of_names != self._row_vars or ordered_wrt_names != self._col_vars):

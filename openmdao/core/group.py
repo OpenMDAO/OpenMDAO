@@ -1997,6 +1997,9 @@ class Group(System):
                         wrt_colors_matched.add(key[1])
                         break
 
+        baselen = len(self.pathname) + 1 if self.pathname else 0
+        info['wrt_matches_prom'] = [n[baselen:] for n in wrt_colors_matched]
+
         if self.pathname:
             # we're taking semi-total derivs for this group. Update _owns_approx_of
             # and _owns_approx_wrt so we can use the same approx code for totals and

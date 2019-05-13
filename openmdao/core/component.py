@@ -371,7 +371,6 @@ class Component(System):
             self._jacobian = DictionaryJacobian(self)
 
         info = self._coloring_info
-        ofs, allwrt = self._get_partials_varlists()
         meta = {}
 
         if 'form' in info:
@@ -379,22 +378,24 @@ class Component(System):
         if 'step' in info:
             meta['step'] = info['step']
 
-        abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
         coloring = self._get_static_coloring()
 
+        ofs, allwrt = self._get_partials_varlists()
+        abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
         if coloring is None:
             wrt_patterns = info['wrt_patterns']
-            matches = set()
+            matches_prom = set()
             for w in wrt_patterns:
-                matches.update(rel_name2abs_name(self, n) for n in find_matches(w, allwrt))
+                matches_prom.update(find_matches(w, allwrt))
 
             # error if nothing matched
-            if not matches:
+            if not matches_prom:
                 raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
                                  "options on Component '{}': {}.".format(self.pathname,
                                                                          wrt_patterns))
 
-            info['wrt_matches'] = matches
+            info['wrt_matches_prom'] = matches_prom
+            info['wrt_matches'] = matches = [rel_name2abs_name(self, n) for n in matches_prom]
             approx_scheme = self._get_approx_scheme(info['method'])
 
             # set a coloring placeholder for later replacement of approximations

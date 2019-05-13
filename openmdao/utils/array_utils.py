@@ -344,16 +344,14 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
     assert len(full_idxs) > 0, "Empty index array passed to get_input_idx_split."
     full_idxs = np.asarray(full_idxs)
     if use_full_cols:
-        full_size = inputs._data.size
         out_size = outputs._data.size
-        full_size += out_size
         out_idxs = full_idxs[full_idxs < out_size]
         in_idxs = full_idxs[full_idxs >= out_size]
         if out_idxs.size > 0 and in_idxs.size > 0:
             return [(inputs, in_idxs - out_size), (outputs, out_idxs)]
         elif in_idxs.size > 0:
             return [(inputs, in_idxs - out_size)]
-        else:  # out_idxs.size > 0
+        else:
             return [(outputs, out_idxs)]
     elif is_total:
         return [(outputs, full_idxs)]
