@@ -6,8 +6,7 @@ from itertools import groupby
 from collections import defaultdict, OrderedDict
 from scipy.sparse import coo_matrix
 import numpy as np
-from openmdao.utils.array_utils import sub2full_indices, update_sizes, get_input_idx_split, \
-    _get_jac_slice_dict
+from openmdao.utils.array_utils import sub2full_indices, update_sizes, get_input_idx_split
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.general_utils import printoptions
 from openmdao.jacobians.jacobian import Jacobian
@@ -39,7 +38,6 @@ class ApproximationScheme(object):
         self._approx_groups = None
         self._approx_groups_cached_under_cs = False
         self._exec_list = []
-        self._exec_dict = defaultdict(list)
 
     def _get_approx_groups(self, system, under_cs=False):
         """
@@ -198,18 +196,9 @@ class ApproximationScheme(object):
         # throw it in a list. The groupby iterator only works once.
         approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
                                                                         self._key_fun)]
-        approx_groups2 = [tup for tup in sorted(self._exec_dict.items(), key=lambda x: x[0])]
-
-        # assert len(approx_groups) == len(approx_groups2)
-        # for t1, t2 in zip(approx_groups, approx_groups2):
-        #     k1, approxs1 = t1
-        #     k2, approxs2 = t2
-        #     assert k1 == k2
-        #     assert approxs1 == approxs2
 
         outputs = system._outputs
         inputs = system._inputs
-        iproc = system.comm.rank
         abs2meta = system._var_allprocs_abs2meta
         prom2abs_out = system._var_allprocs_prom2abs_list['output']
         prom2abs_in = system._var_allprocs_prom2abs_list['input']
@@ -217,12 +206,10 @@ class ApproximationScheme(object):
         out_slices = outputs.get_slice_dict()
         in_slices = inputs.get_slice_dict()
 
-        approx_of_idx = system._owns_approx_of_idx
         approx_wrt_idx = system._owns_approx_wrt_idx
 
         self._approx_groups = []
-        all_wrt_names = system._var_allprocs_abs_names['output'] + \
-            system._var_allprocs_abs_names['input']
+
         for key, approx in approx_groups:
             wrt = key[0]
             directional = key[-1]
@@ -232,46 +219,19 @@ class ApproximationScheme(object):
                 wrt_matches = system._coloring_info['wrt_matches']
                 options = approx[0][1]
                 if is_total and system.pathname == '':  # top level approx totals
-                    of_names = list(system._owns_approx_of)
-                    full_wrts = all_wrt_names
-                    wrt_names = list(system._owns_approx_wrt)
-                    ofsizes = [abs2meta[of]['size'] for of in of_names]
+                    of_names = system._owns_approx_of
+                    full_wrts = system._var_allprocs_abs_names['output'] + \
+                        system._var_allprocs_abs_names['input']
+                    wrt_names = system._owns_approx_wrt
                     wrtsizes = [abs2meta[wrt]['size'] for wrt in wrt_names]
                 else:
                     of_names, wrt_names = system._get_partials_varlists()
-                    ofsizes, wrtsizes = system._get_partials_var_sizes()
+                    _, wrtsizes = system._get_partials_var_sizes()
                     wrt_names = [prom2abs_in[n][0] if n in prom2abs_in else prom2abs_out[n][0]
                                  for n in wrt_names]
-                    of_names = [prom2abs_out[n][0] for n in of_names]
                     full_wrts = wrt_names
 
                 full_sizes = wrtsizes
-
-                if len(wrt_names) != len(wrt_matches):
-                    new_names = []
-                    new_sizes = []
-                    for name, size in zip(wrt_names, wrtsizes):
-                        if name in wrt_matches:
-                            new_names.append(name)
-                            new_sizes.append(size)
-                    wrt_names = new_names
-                    wrtsizes = new_sizes
-
-                coloring = options['coloring']
-                tmpJ = {
-                    '@nrows': coloring._shape[0],
-                    '@ncols': coloring._shape[1],
-                    '@out_slices': out_slices,
-                    '@approxs': options['approxs']
-                }
-
-                # FIXME: need to deal with mix of local/remote indices
-
-                reduced_wrt_sizes = update_sizes(wrt_names, wrtsizes, approx_wrt_idx)
-                reduced_of_sizes = update_sizes(of_names, ofsizes, approx_of_idx)
-                # get slices into colored jac (which is some subset of the full jac)
-                tmpJ['@jac_slices'] = _get_jac_slice_dict(of_names, reduced_of_sizes,
-                                                          wrt_names, reduced_wrt_sizes)
 
                 if len(full_wrts) != len(wrt_matches) or approx_wrt_idx:
                     # need mapping from coloring jac columns (subset) to full jac columns
@@ -279,17 +239,38 @@ class ApproximationScheme(object):
                 else:
                     col_map = None
 
-                full_ofs = system._var_allprocs_abs_names['output']
-                if is_total and (approx_of_idx or len(full_ofs) > len(of_names)):
-                    full_idxs = []
-                    for sof in of_names:
-                        slc = out_slices[sof]
-                        if sof in approx_of_idx:
-                            full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[sof]])
+                coloring = options['coloring']
+                tmpJ = {
+                    '@nrows': coloring._shape[0],
+                    '@ncols': coloring._shape[1],
+                    '@out_slices': out_slices,
+                    '@approxs': options['approxs'],
+                    '@jac_slices': {},
+                }
+
+                # FIXME: need to deal with mix of local/remote indices
+
+                len_full_ofs = len(system._var_allprocs_abs_names['output'])
+
+                full_idxs = []
+                approx_of_idx = system._owns_approx_of_idx
+                jac_slices = tmpJ['@jac_slices']
+                for abs_of, roffset, rend, ridxs in system._jacobian_of_iter():
+                    rslice = slice(roffset, rend)
+                    for abs_wrt, coffset, cend, cidxs in system._jacobian_wrt_iter(wrt_matches):
+                        jac_slices[(abs_of, abs_wrt)] = (rslice, slice(coffset, cend))
+
+                    if is_total and (approx_of_idx or len_full_ofs > len(of_names)):
+                        slc = out_slices[abs_of]
+                        if abs_of in approx_of_idx:
+                            full_idxs.append(np.arange(slc.start, slc.stop)[approx_of_idx[abs_of]])
                         else:
                             full_idxs.append(range(slc.start, slc.stop))
+                if full_idxs:
                     tmpJ['@row_idx_map'] = np.hstack(full_idxs)
 
+                # get groups of columns from the coloring and compute proper indices into
+                # the inputs and outputs vectors.
                 for cols, nzrows in coloring.color_nonzero_iter('fwd'):
                     ccols = cols if col_map is None else col_map[cols]
                     idx_info = get_input_idx_split(ccols, inputs, outputs, is_implicit or is_semi,
@@ -305,8 +286,8 @@ class ApproximationScheme(object):
                 else:  # wrt is remote
                     arr = None
 
-                if wrt in system._owns_approx_wrt_idx:
-                    in_idx = np.array(system._owns_approx_wrt_idx[wrt], dtype=int)
+                if wrt in approx_wrt_idx:
+                    in_idx = np.array(approx_wrt_idx[wrt], dtype=int)
                     if arr is not None:
                         in_idx += slices[wrt].start
                 else:
@@ -623,21 +604,14 @@ def _initialize_model_approx(model, driver, of=None, wrt=None):
     if of is None:
         of = driver._get_ordered_nl_responses()
     if wrt is None:
-        wrt = driver._designvars
-
-    of_dict = OrderedDict()
-    for vname in of:
-        of_dict[vname] = None
-    wrt_dict = OrderedDict()
-    for vname in wrt:
-        wrt_dict[vname] = None
+        wrt = list(driver._designvars)
 
     # Initialization based on driver (or user) -requested "of" and "wrt".
     if (not model._owns_approx_jac or model._owns_approx_of is None or
-            model._owns_approx_of.keys() != of_dict.keys() or model._owns_approx_wrt is None or
-            model._owns_approx_wrt.keys() != wrt_dict.keys()):
-        model._owns_approx_of = of_dict
-        model._owns_approx_wrt = wrt_dict
+            model._owns_approx_of != of or model._owns_approx_wrt is None or
+            model._owns_approx_wrt != wrt):
+        model._owns_approx_of = of
+        model._owns_approx_wrt = wrt
 
         # Support for indices defined on driver vars.
         model._owns_approx_of_idx = {

@@ -388,23 +388,6 @@ def update_sizes(names, sizes, index_map):
     return sizes
 
 
-def _get_jac_slice_dict(of_names, of_sizes, wrt_names, wrt_sizes):
-    """
-    Return a dict of (of,wrt) pairs mapped to slices of a dense matrix.
-    """
-    dct = {}
-    rstart = rend = 0
-    for ofname, ofsize in zip(of_names, of_sizes):
-        rend += ofsize
-        cstart = cend = 0
-        for wrtname, wrtsize in zip(wrt_names, wrt_sizes):
-            cend += wrtsize
-            dct[(ofname, wrtname)] = (slice(rstart, rend), slice(cstart, cend))
-            cstart = cend
-        rstart = rend
-    return dct
-
-
 def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
     """
     Convert src_indices into a flat, non-negative form.

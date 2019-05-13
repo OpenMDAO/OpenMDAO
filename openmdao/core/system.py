@@ -197,7 +197,7 @@ class System(object):
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
         Stores approximation metadata (e.g., step_size) from calls to approx_totals
-    _owns_approx_of : set or None
+    _owns_approx_of : list or None
         Overrides aproximation outputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's output quantities to the approximation objects so that
         we only take derivatives of variables that the driver needs.
@@ -206,7 +206,7 @@ class System(object):
         or `add_constraint`, they may optionally specify an "indices" argument. This argument must
         also be communicated to the approximations when they are set up so that 1) the Jacobian is
         the correct size, and 2) we don't perform any extra unnecessary calculations.
-    _owns_approx_wrt : set or None
+    _owns_approx_wrt : list or None
         Overrides aproximation inputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's input quantities to the approximation objects so that
         we only take derivatives with respect to variables that the driver needs.

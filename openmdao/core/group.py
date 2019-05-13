@@ -1877,7 +1877,7 @@ class Group(System):
                 wrt.add(var)
 
         if self._owns_approx_of:
-            of = self._owns_approx_of
+            of = set(self._owns_approx_of)
         else:
             of = set(var[0] for var in pro2abs['output'].values())
             # Skip indepvarcomp res wrt other srcs
@@ -1898,6 +1898,9 @@ class Group(System):
     def _jacobian_of_iter(self):
         """
         Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
+
+        idxs will usually be a full slice, except in cases where _owns_approx__idx has
+        a value for that variable.
         """
         abs2meta = self._var_allprocs_abs2meta
         approx_of_idx = self._owns_approx_of_idx
@@ -1922,6 +1925,9 @@ class Group(System):
     def _jacobian_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
+
+        idxs will usually be a full slice, except in cases where _owns_approx_wrt_idx has
+        a value for that variable.
 
         Parameters
         ----------
@@ -1996,9 +2002,8 @@ class Group(System):
             # and _owns_approx_wrt so we can use the same approx code for totals and
             # semi-totals.  Also, the order must match order of vars in the output and
             # input vectors.
-            self._owns_approx_of = OrderedDict((n, None) for n in abs_outs)
-            self._owns_approx_wrt = OrderedDict((n, None) for n in chain(abs_outs, abs_ins)
-                                                if n in wrtset)
+            self._owns_approx_of = list(abs_outs)
+            self._owns_approx_wrt = [n for n in chain(abs_outs, abs_ins) if n in wrtset]
 
         coloring = self._get_static_coloring()
         approx = self._get_approx_scheme(info['method'])
@@ -2034,7 +2039,6 @@ class Group(System):
         approx = self._get_approx_scheme(method)
         # reset the approx if necessary
         approx._exec_list = []
-        approx._exec_dict = defaultdict(list)
         approx._approx_groups = None
 
         for key in self._get_approx_subjac_keys():

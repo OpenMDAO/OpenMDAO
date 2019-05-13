@@ -409,6 +409,7 @@ class Component(System):
                 if key in self._subjacs_info:
                     if not (is_explicit and key[0] == key[1]):
                         approx_scheme.add_approximation(key, meta)
+
         else:  # a static coloring has already been specified
             colmeta = meta.copy()
             colmeta['coloring'] = coloring

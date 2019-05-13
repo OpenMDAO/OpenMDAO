@@ -130,7 +130,6 @@ class FiniteDifference(ApproximationScheme):
         else:
             key = (abs_key[1], options['form'], options['order'],
                    options['step'], options['step_calc'], options['directional'])
-        self._exec_dict[key].append((abs_key, options))
         self._approx_groups = None  # force later regen of approx_groups
 
     @staticmethod

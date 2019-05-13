@@ -1306,9 +1306,10 @@ def _get_mat(rows, cols):
     if MPI:
         if MPI.COMM_WORLD.rank == 0:
             mat = np.random.random(rows * cols).reshape((rows, cols)) - 0.5
+            MPI.COMM_WORLD.bcast(mat, root=0)
+            return mat
         else:
-            mat = None
-        return MPI.COMM_WORLD.bcast(mat, root=0)
+            return MPI.COMM_WORLD.bcast(None, root=0)
     else:
         return np.random.random(rows * cols).reshape((rows, cols)) - 0.5
 
@@ -1328,7 +1329,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
     def tearDown(self):
         os.chdir(self.startdir)
-        junk = MPI.COMM_WORLD.bcast(None, root=0)
+        MPI.COMM_WORLD.bcast(None, root=0)
         if MPI.COMM_WORLD.rank == 0:
             try:
                 shutil.rmtree(self.tempdir)
@@ -1379,22 +1380,25 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         model.add_objective('obj.y')
 
-        p.setup()
-
-        p.run_driver()
-
-        J = p.compute_totals()
-
-        for i in range(num_pts):
-            vname = 'par2.comp%d.A' % i
-            if vname in model._var_abs_names['input']:
-                norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
-                                      getattr(par2, 'comp%d'%i)._inputs['A'].dot(getattr(par1, 'comp%d'%i)._inputs['A']))
-                self.assertLess(norm, 1.e-7)
-            elif vname not in model._var_allprocs_abs_names['input']:
-                self.fail("Can't find variable par2.comp%d.A" % i)
-
-        # print("final obj:", p['obj.y'])
+        try:
+            p.setup()
+    
+            p.run_driver()
+    
+            J = p.compute_totals()
+    
+            for i in range(num_pts):
+                vname = 'par2.comp%d.A' % i
+                if vname in model._var_abs_names['input']:
+                    norm = np.linalg.norm(J['par2.comp%d.y'%i,'indep%d.x'%i] -
+                                          getattr(par2, 'comp%d'%i)._inputs['A'].dot(getattr(par1, 'comp%d'%i)._inputs['A']))
+                    self.assertLess(norm, 1.e-7)
+                elif vname not in model._var_allprocs_abs_names['input']:
+                    self.fail("Can't find variable par2.comp%d.A" % i)
+    
+            print("final obj:", p['obj.y'])
+        except Exception as err:
+            print(str(err))
 
 
 if __name__ == '__main__':

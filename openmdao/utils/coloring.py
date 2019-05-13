@@ -25,7 +25,7 @@ from scipy.sparse import coo_matrix
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.matrix import sparse_types
-from openmdao.utils.array_utils import array_viz, _get_jac_slice_dict
+from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 from openmdao.approximation_schemes.approximation_scheme import _initialize_model_approx
@@ -1442,6 +1442,12 @@ def compute_total_coloring(problem, mode=None,
 
             driver._total_jac = None
 
+            system = problem.model
+            if fname is not None:
+                if ((system._full_comm is not None and system._full_comm.rank == 0) or
+                        (system._full_comm is None and system.comm.rank == 0)):
+                    coloring.save(fname)
+
     elif bool_jac is not None:
         J = bool_jac
         time_sparsity = 0.
@@ -1449,12 +1455,11 @@ def compute_total_coloring(problem, mode=None,
             mode = 'auto'
         driver = None
         coloring = _compute_coloring(J, mode)
+        if fname is not None:
+            coloring.save(fname)
     else:
         raise RuntimeError("You must supply either problem or bool_jac to "
                            "compute_total_coloring().")
-
-    if fname is not None:
-        coloring.save(fname)
 
     return coloring
 
