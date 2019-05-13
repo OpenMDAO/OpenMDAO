@@ -1051,6 +1051,12 @@ class Driver(object):
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Design Vars")
                 if desvar_vals:
+
+                    # Print desvars in non_flattened state.
+                    meta = self._problem.model._var_allprocs_abs2meta
+                    for name in desvar_vals:
+                        shape = meta[name]['shape']
+                        desvar_vals[name] = desvar_vals[name].reshape(shape)
                     pprint.pprint(desvar_vals)
                 else:
                     print("None")

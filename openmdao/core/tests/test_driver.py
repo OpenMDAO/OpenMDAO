@@ -383,5 +383,39 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(output[3], "{'con.c': array([ 1.])}")
         self.assertEqual(output[6], "{'comp.f_xy': array([ 7622.])}")
 
+    def test_debug_desvar_shape(self):
+        # Desvar should always be printed un-flattened.
+
+        prob = Problem()
+        model = prob.model
+
+        model.add_subsystem('p', IndepVarComp('x', val=np.array([[1.0, 3, 4], [7, 2, 5]])))
+
+        model.add_design_var('p.x', np.array([[1.0, 3, 4], [7, 2, 5]]))
+        prob.driver.options['debug_print'] = ['desvars']
+
+        prob.setup()
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+
+        try:
+            # formatting has changed in numpy 1.14 and beyond.
+            if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+                with printoptions(precision=2, legacy="1.13"):
+                    prob.run_driver()
+            else:
+                with printoptions(precision=2):
+                    prob.run_driver()
+        finally:
+            sys.stdout = stdout
+
+
+        output = strout.getvalue().split('\n')
+
+        self.assertEqual(output[3], "{'p.x': array([[ 1.,  3.,  4.],")
+        self.assertEqual(output[4], '       [ 7.,  2.,  5.]])}')
+
 if __name__ == "__main__":
     unittest.main()
