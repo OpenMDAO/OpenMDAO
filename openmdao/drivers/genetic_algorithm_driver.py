@@ -223,9 +223,18 @@ class SimpleGADriver(Driver):
 
         # Size design variables.
         desvars = self._designvars
+        desvar_vals = self.get_design_var_values()
+
         count = 0
         for name, meta in iteritems(desvars):
-            size = meta['size']
+            if name in self._designvars_discrete:
+                val = desvar_vals[name]
+                if np.isscalar(val):
+                    size = 1
+                else:
+                    size = len(val)
+            else:
+                size = meta['size']
             self._desvar_idx[name] = (count, count + size)
             count += size
 
@@ -234,8 +243,6 @@ class SimpleGADriver(Driver):
         outer_bound = np.full((count, ), np.inf)
         bits = np.empty((count, ), dtype=np.int)
         x0 = np.empty(count)
-
-        desvar_vals = self.get_design_var_values()
 
         # Figure out bounds vectors and initial design vars
         for name, meta in iteritems(desvars):
@@ -249,7 +256,11 @@ class SimpleGADriver(Driver):
 
         for name, meta in iteritems(desvars):
             i, j = self._desvar_idx[name]
-            prom_name = abs2prom[name]
+
+            if name in self._designvars_discrete:
+                prom_name = name
+            else:
+                prom_name = abs2prom[name]
 
             if name in user_bits:
                 val = user_bits[name]
