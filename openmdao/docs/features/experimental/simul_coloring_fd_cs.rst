@@ -88,4 +88,7 @@ calling :code:`declare_coloring`.
 Generally, no arg will be passed to :code:`use_fixed_coloring`, and OpenMDAO will automatically
 determine the location and name of the appropriate coloring file, but it is possible to pass
 the name of a coloring file into :code:`use_fixed_coloring`, and in that case the given
-coloring file will be used.
+coloring file will be used.  Note that if a coloring filename is passed into :code:`use_fixed_coloring`,
+it is assumed that the coloring in that file should *never* be regenerated, even if the user
+calls :code:`openmdao total_coloring` or :code:`openmdao partial_coloring` from the command line.
+

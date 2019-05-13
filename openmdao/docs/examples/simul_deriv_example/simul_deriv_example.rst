@@ -16,7 +16,6 @@ determined by the values of the *x* and *y* arrays defined in our problem.
     :imports-not-required:
 
 
-
 Total derivatives with respect to *x* and *y* will be solved for simultaneously based on the
 color of the points shown below.  Note that we have two colors and our *x* and *y* design
 variables are of size 10. We have a third design variable, *r*, that is size 1.

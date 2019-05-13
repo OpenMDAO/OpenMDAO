@@ -49,7 +49,8 @@ Dynamic Coloring
 Dynamic coloring computes the derivative colors at runtime, shortly after the driver begins the
 optimization.  This has the advantage of simplicity and robustness to changes in the model, but
 adds the cost of the coloring computation to the run time of the optimization.  Generally, however,
-this cost will be small unless your total jacobian is very large.
+this cost will be small relative to the cost of the full optimization unless your total jacobian
+is very large.
 
 Activating dynamic coloring is simple.  Just call the `declare_coloring` function on the driver.
 For example:
@@ -128,6 +129,10 @@ following command:
     openmdao total_coloring <your_script_name>
 
 
+Note that if you have passed a coloring filename into :code:`use_fixed_coloring` instead of
+letting the framework determine the filename automatically, the framework will not update
+the contents of the coloring file even if you run :code:`openmdao total_coloring` from the
+command line.
 
 The total_coloring command also generates summary information that can sometimes be useful.
 The tolerance that was actually used to determine if an entry in the total jacobian is
