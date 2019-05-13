@@ -411,7 +411,6 @@ class TestDriver(unittest.TestCase):
         finally:
             sys.stdout = stdout
 
-
         output = strout.getvalue().split('\n')
 
         self.assertEqual(output[3], "{'p.x': array([[ 1.,  3.,  4.],")
