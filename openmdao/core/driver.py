@@ -490,8 +490,8 @@ class Driver(object):
                 if np.isscalar(val) and not isinstance(val, int):
                     msg += "A value of type '{}' was specified.".format(val.__class__.__name__)
                     valid = False
-                elif isinstance(val, np.ndarray) and val.dtype != np.int:
-                    msg += "An array of type '{}' was specified.".format(val.dtype)
+                elif isinstance(val, np.ndarray) and not np.issubdtype(val[0], int):
+                    msg += "An array of type '{}' was specified.".format(val[0].__class__.__name__)
                     valid = False
 
                 if valid is False:
