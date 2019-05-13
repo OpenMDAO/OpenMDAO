@@ -76,7 +76,7 @@ class CompDiscWDerivsImplicit(StateConnection):
     def solve_nonlinear(self, inputs, outputs, discrete_inputs, discrete_outputs):
         super(CompDiscWDerivsImplicit, self).solve_nonlinear(inputs, outputs)
         discrete_outputs['Nout'] = discrete_inputs['N'] * 2
-        
+
     def linearize(self, inputs, outputs, J, discrets_inputs, discrete_outputs):
         super(CompDiscWDerivsImplicit, self).linearize(inputs, outputs, J)
 
@@ -115,6 +115,16 @@ class InternalDiscreteGroup(Group):
         self.add_subsystem('C1', MixedCompDiscOut(1), promotes_inputs=['x'])
         self.add_subsystem('C2', MixedCompDiscIn(1), promotes_outputs=['y'])
         self.connect('C1.y', 'C2.x')
+
+
+class DiscreteDriver(Driver):
+
+    def __init__(self):
+        super(DiscreteDriver, self).__init__()
+        self.supports.declare('integer_design_vars', types=bool, default=True)
+
+    def run(self):
+        self.get_design_var_values()
 
 
 class _DiscreteVal(object):
@@ -255,6 +265,53 @@ class DiscreteTestCase(unittest.TestCase):
             prob.setup()
         self.assertEqual(str(ctx.exception),
                          "Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+
+    def test_driver_discrete_enforce_int(self):
+        # Drivers require discrete vars to be int or ndarrays of int.
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_discrete_output('x', 11)
+        model.add_subsystem('comp', ModCompIm(3))
+
+        model.connect('indep.x', 'comp.x')
+
+        model.add_design_var('indep.x', 11)
+        prob.driver = DiscreteDriver()
+        prob.setup()
+
+        # Insert a non integer
+        prob['indep.x'] = 3.7
+
+        with self.assertRaises(Exception) as ctx:
+            prob.run_driver()
+
+        msg = "Only integer scalars or ndarrays are supported as values for " + \
+              "discrete variables when used as a design variable. "
+        msg += "A value of type 'float' was specified."
+
+        self.assertEqual(str(ctx.exception), msg)
+
+        # Insert a float ndarray
+        prob['indep.x'] = np.array([3.0])
+
+        with self.assertRaises(Exception) as ctx:
+            prob.run_driver()
+
+        msg = "Only integer scalars or ndarrays are supported as values for " + \
+              "discrete variables when used as a design variable. "
+        msg += "An array of type 'float64' was specified."
+
+        self.assertEqual(str(ctx.exception), msg)
+
+        # Make sure these work.
+
+        prob['indep.x'] = np.array([3.0], dtype=np.int64)
+        prob.run_driver()
+
+        prob['indep.x'] = 5
+        prob.run_driver()
 
     def test_discrete_deriv_explicit(self):
         prob = Problem()
