@@ -379,13 +379,15 @@ class Solver(object):
             prefix = self._solver_info.prefix + self.SOLVER
             if np.isinf(norm) or np.isnan(norm) or (norm > atol and norm / norm0 > rtol):
                 if iprint > -1:
-                    msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
-                    print(prefix + msg)
+                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+                    print(prefix + msg.format(self.SOLVER, self._system.pathname,
+                                              self._iter_count))
 
                 # Raise AnalysisError if requested.
                 if self.options['err_on_maxiter']:
-                    msg = "Solver '{}' on system '{}' failed to converge."
-                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname))
+                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname,
+                                                   self._iter_count))
 
             elif iprint == 1:
                 print(prefix + ' Converged in {} iterations'.format(self._iter_count))
