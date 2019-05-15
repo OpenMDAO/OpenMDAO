@@ -1770,7 +1770,16 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             derivative_info['magnitude'] = magnitude = MagnitudeTuple(fwd_norm, rev_norm, fd_norm)
 
             if fd_norm == 0.:
-                derivative_info['rel error'] = rel_err = ErrorTuple(nan, nan, nan)
+                if fwd_norm == 0.:
+                    derivative_info['rel error'] = rel_err = ErrorTuple(nan, nan, nan)
+
+                else:
+                    # If fd_norm is zero, let's use fwd_norm as the divisor for relative
+                    # check. That way we don't accidentally squelch a legitimate problem.
+                    derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fwd_norm,
+                                                                        rev_error / fwd_norm,
+                                                                        fwd_rev_error / fwd_norm)
+
             else:
                 if totals:
                     derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
