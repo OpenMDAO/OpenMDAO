@@ -797,6 +797,11 @@ class System(object):
                 simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
                                "coloring was set, so recurse was ignored." % self.pathname)
             self._set_coloring(coloring)
+            if isinstance(coloring, Coloring):
+                approx = self._get_approx_scheme(coloring._meta['method'])
+                # force regen of approx groups on next call to compute_approximations
+                approx._colored_approx_groups = None
+                approx._approx_groups = None
             return
 
         if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
@@ -804,9 +809,8 @@ class System(object):
             coloring = _DYN_COLORING
 
         if self._coloring_info['coloring'] is None:
-            if __debug__:
-                print('%s: use_fixed_coloring() ignored because no coloring was declared.' %
-                      self.pathname)
+            simple_warning('%s: use_fixed_coloring() ignored because no coloring was declared.' %
+                           self.pathname)
         else:
             self._set_coloring(coloring)
 
@@ -926,9 +930,10 @@ class System(object):
             for s in self.system_iter(include_self=True, recurse=True):
                 if my_coloring is None or s in grad_systems:
                     if s._coloring_info['coloring'] is not None:
-                        colorings.append(s._compute_approx_coloring(recurse=False, **overrides)[0])
-                        colorings[-1]._meta['pathname'] = s.pathname
-                        colorings[-1]._meta['class'] = type(s).__name__
+                        coloring = s._compute_approx_coloring(recurse=False, **overrides)[0]
+                        colorings.append(coloring)
+                        coloring._meta['pathname'] = s.pathname
+                        coloring._meta['class'] = type(s).__name__
             return colorings
 
         # don't override metadata if it's already declared
@@ -977,7 +982,9 @@ class System(object):
 
         if self._coloring_info['coloring'] is None:
             self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
-        self._setup_static_approx_coloring()
+
+        self._setup_approx_coloring()
+
         save_first_call = self._first_call_to_linearize
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
@@ -1003,8 +1010,7 @@ class System(object):
 
         sparsity_time = time.time() - sparsity_start_time
 
-        if is_total:
-            self._update_wrt_matches()
+        self._update_wrt_matches()
 
         ordered_of_info = list(self._jacobian_of_iter())
         ordered_wrt_info = list(self._jacobian_wrt_iter(info['wrt_matches']))
@@ -1013,7 +1019,6 @@ class System(object):
                                                     tol=info['tol'],
                                                     orders=info['orders'])
         self._jacobian._jac_summ = None  # reclaim the memory
-
         if self.pathname:
             ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
             ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
@@ -1030,6 +1035,11 @@ class System(object):
         del coloring._meta['coloring']
 
         info['coloring'] = coloring
+
+        approx = self._get_approx_scheme(coloring._meta['method'])
+        # force regen of approx groups during next compute_approximations
+        approx._colored_approx_groups = None
+        approx._approx_groups = None
 
         if info['show_sparsity'] or info['show_summary']:
             print("Approx coloring for '%s' (class %s)\n" % (self.pathname, type(self).__name__))
@@ -1049,6 +1059,9 @@ class System(object):
         self._first_call_to_linearize = save_first_call
 
         return [coloring]
+
+    def _setup_approx_coloring(self):
+        pass
 
     def _jacobian_of_iter(self):
         """
@@ -1147,20 +1160,25 @@ class System(object):
         info = self._coloring_info
         coloring = info['coloring']
 
-        if coloring is _STD_COLORING_FNAME:
-            # load the coloring file now that we have enough info
-            fname = self.get_approx_coloring_fname()
+        if coloring is _DYN_COLORING:
+            return None
+
+        if coloring is _STD_COLORING_FNAME or isinstance(coloring, string_types):
+            if coloring is _STD_COLORING_FNAME:
+                fname = self.get_approx_coloring_fname()
+            else:
+                fname = coloring
             print("%s: loading coloring from file %s" % (self.pathname, fname))
             info['coloring'] = coloring = Coloring.load(fname)
-            coloring._check_config(None, self)
+            if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
+                raise RuntimeError("Loaded coloring has different wrt_patterns (%s) than "
+                                   "declared ones (%s)." % (coloring._meta['wrt_patterns'],
+                                                            info['wrt_patterns']))
             info.update(info['coloring']._meta)
-        elif isinstance(coloring, string_types):
-            print("%s: loading coloring from file %s" % (self.pathname, fname))
-            info['coloring'] = coloring = Coloring.load(info['coloring'])
-            info.update(info['coloring']._meta)
-            coloring._check_config(None, self)
-        elif coloring is _DYN_COLORING:
-            coloring = None
+            approx = self._get_approx_scheme(info['method'])
+            # force regen of approx groups during next compute_approximations
+            approx._colored_approx_groups = None
+            approx._approx_groups = None
 
         return coloring
 
@@ -1770,7 +1788,6 @@ class System(object):
             for s in nl_asm_jac_solvers:
                 s._assembled_jac = asm_jac
 
-        # note that for a Group, _set_approx_partials_meta does nothing
         if self._has_approx:
             self._set_approx_partials_meta()
 
@@ -2252,10 +2269,30 @@ class System(object):
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
     def _set_approx_partials_meta(self):
+        # this will load a static coloring (if any) and will populate wrt_matches if
+        # there is any coloring (static or dynamic).
+        self._get_static_wrt_matches()
+
+    def _get_static_wrt_matches(self):
         """
-        Set subjacobian info into our jacobian.
+        Return wrt_matches for static coloring if there is one.
+
+        Returns
+        -------
+        list of str or ()
+            List of wrt_matches for a static coloring or () if there isn't one.
         """
-        pass
+        if (self._coloring_info['coloring'] is not None and
+                self._coloring_info['wrt_matches'] is None):
+            self._update_wrt_matches()
+
+        # if coloring has been specified, we don't want to have multiple
+        # approximations for the same subjac, so don't register any new
+        # approximations when the wrt matches those used in the coloring.
+        if self._get_static_coloring() is not None:  # static coloring has been specified
+            return self._coloring_info['wrt_matches']
+
+        return ()  # for dynamic coloring or no coloring
 
     def system_iter(self, include_self=False, recurse=True, typ=None):
         """

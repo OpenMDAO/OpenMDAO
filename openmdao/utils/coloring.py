@@ -28,7 +28,6 @@ from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
-from openmdao.approximation_schemes.approximation_scheme import _initialize_model_approx
 
 
 CITATIONS = """
@@ -400,23 +399,28 @@ class Coloring(object):
                                    "`problem.options['coloring_dir']`.")
 
         # now check the contents (vars and sizes) of the input and output vectors of system
-        if system.pathname:
-            wrt_matches = ['.'.join((system.pathname, n)) for n in self._meta['wrt_matches_prom']]
-            # for partial and semi-total derivs, convert to promoted names
-            ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
-            ordered_wrt_info = system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
-        else:
-            ordered_of_info = list(system._jacobian_of_iter())
-            ordered_wrt_info = list(system._jacobian_wrt_iter(self._meta['wrt_matches']))
-        ordered_of_names = [t[0] for t in ordered_of_info]
-        ordered_wrt_names = [t[0] for t in ordered_wrt_info]
-        if (ordered_of_names != self._row_vars or ordered_wrt_names != self._col_vars):
-            # TODO: add comparison of sizes
-            raise RuntimeError("%s: Current coloring configuration does not match the "
-                               "configuration of the current driver. Make sure you don't have "
-                               "different problems that have the same coloring directory.  Set "
-                               "the coloring directory by setting the value of "
-                               "`problem.options['coloring_dir']`." % system.pathname)
+        if system is not None:
+            if system.pathname:
+                wrt_matches = ['.'.join((system.pathname, n))
+                               for n in self._meta['wrt_matches_prom']]
+                # for partial and semi-total derivs, convert to promoted names
+                ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
+                ordered_wrt_info = \
+                    system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
+            else:
+                ordered_of_info = list(system._jacobian_of_iter())
+                ordered_wrt_info = list(system._jacobian_wrt_iter(self._meta['wrt_matches']))
+
+            ordered_of_names = [t[0] for t in ordered_of_info]
+            ordered_wrt_names = [t[0] for t in ordered_wrt_info]
+
+            if (ordered_of_names != self._row_vars or ordered_wrt_names != self._col_vars):
+                # TODO: add comparison of sizes
+                raise RuntimeError("%s: Current coloring configuration does not match the "
+                                   "configuration of the current driver. Make sure you don't have "
+                                   "different problems that have the same coloring directory.  Set "
+                                   "the coloring directory by setting the value of "
+                                   "`problem.options['coloring_dir']`." % system.pathname)
 
     def __repr__(self):
         """
@@ -1562,8 +1566,6 @@ def _total_coloring_setup_parser(parser):
     parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final jacobian used to "
                         "compute the coloring.")
-    parser.add_argument('--activate', action='store_true', dest='activate',
-                        help="Activate the computed coloring and continue running the script.")
     parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
                         help="Exclude the sparsity structure from the coloring data structure.")
     parser.add_argument('--profile', action='store_true', dest='profile',
@@ -1614,18 +1616,9 @@ def _total_coloring_cmd(options):
             if options.show_sparsity:
                 coloring.display()
             coloring.summary()
-            if options.activate:
-                prob.driver._set_coloring(coloring)
-                prob.driver._setup_simul_coloring()
-                if do_sparsity:
-                    prob.driver._setup_tot_jac_sparsity()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
-            exit()
-        if options.activate:
-            _use_sparsity = True
-        else:
-            exit()
+        exit()
     return _total_coloring
 
 
@@ -1650,8 +1643,6 @@ def _partial_coloring_setup_parser(parser):
     parser.add_argument('--first_only', action='store_true', dest='first_only',
                         help="If using the --class option, only generate coloring for the first "
                         "instance found for each class.")
-    parser.add_argument('--activate', action='store_true', dest='activate',
-                        help="Activate the computed coloring(s) and continue running the script.")
     parser.add_argument('--compute_decl_partials', action='store_true', dest='compute_decls',
                         help="Display declare_partials() calls required to specify computed "
                         "sparsity.")
@@ -1762,9 +1753,6 @@ def _partial_coloring_cmd(options):
                                     to_find.remove(c)
                                 coloring = s._compute_approx_coloring(**kwargs)[0]
                                 _show(s, options, coloring)
-                                if options.activate:
-                                    s._set_coloring(coloring)
-                                    s._setup_static_approx_coloring(False)
                                 break
                         if not to_find and options.first_only:
                             break
@@ -1782,16 +1770,9 @@ def _partial_coloring_cmd(options):
                             path = c._meta['pathname']
                             s = prob.model._get_subsystem(path) if path else prob.model
                             _show(s, options, c)
-                            if options.activate:
-                                s._set_coloring(coloring)
-                                s._setup_static_approx_coloring(False)
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
-        if options.activate:
-            # instead of exiting, keep running using the computed coloring(s)
-            _use_sparsity = True
-        else:
-            exit()
+        exit()
     return _partial_coloring
 
 
@@ -1905,3 +1886,30 @@ def _view_coloring_exec(options):
         pprint(coloring._meta)
 
     coloring.summary()
+
+
+def _initialize_model_approx(model, driver, of=None, wrt=None):
+    """
+    Set up internal data structures needed for computing approx totals.
+    """
+    if of is None:
+        of = driver._get_ordered_nl_responses()
+    if wrt is None:
+        wrt = list(driver._designvars)
+
+    # Initialization based on driver (or user) -requested "of" and "wrt".
+    if (not model._owns_approx_jac or model._owns_approx_of is None or
+            model._owns_approx_of != of or model._owns_approx_wrt is None or
+            model._owns_approx_wrt != wrt):
+        model._owns_approx_of = of
+        model._owns_approx_wrt = wrt
+
+        # Support for indices defined on driver vars.
+        model._owns_approx_of_idx = {
+            key: val['indices'] for key, val in iteritems(driver._responses)
+            if val['indices'] is not None
+        }
+        model._owns_approx_wrt_idx = {
+            key: val['indices'] for key, val in iteritems(driver._designvars)
+            if val['indices'] is not None
+        }

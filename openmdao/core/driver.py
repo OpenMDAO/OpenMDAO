@@ -286,6 +286,10 @@ class Driver(object):
         if coloring_mod._use_sparsity:
             coloring = self._get_static_coloring()
             if coloring is not None and self.supports['simultaneous_derivatives']:
+                if model._owns_approx_jac:
+                    coloring._check_config(None, model)
+                else:
+                    coloring._check_config(self, None)
                 self._setup_simul_coloring()
 
     def _get_vars_to_record(self, recording_options):
@@ -1060,15 +1064,13 @@ class Driver(object):
             fname = os.path.join(self._problem.options['coloring_dir'], 'total_coloring.pkl')
             print("loading total coloring from file %s" % fname)
             coloring = self._set_coloring(Coloring.load(fname))
-            coloring._check_config(self, self._problem.model)
             info.update(coloring._meta)
             return coloring
         elif isinstance(coloring, string_types):
             print("loading total coloring from file %s" % coloring)
-            info['coloring'] = coloring = Coloring.load(coloring)
-            info.update(info['coloring']._meta)
-            coloring._check_config(self, self._problem.model)
-            return info['coloring']
+            coloring = self._set_coloring(Coloring.load(coloring))
+            info.update(coloring._meta)
+            return coloring
 
     def _get_total_coloring_fname(self):
         return os.path.join(self._problem.options['coloring_dir'], 'total_coloring.pkl')

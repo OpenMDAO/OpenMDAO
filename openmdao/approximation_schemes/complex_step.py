@@ -63,11 +63,8 @@ class ComplexStep(ApproximationScheme):
         options.update(kwargs)
         self._exec_list.append((abs_key, options))
 
-        if 'coloring' in options and options['coloring'].__class__ is Coloring:
-            # this will only happen after the coloring has been computed
-            key = ('@color', options['step'], options['directional'])
-        else:
-            key = (abs_key[1], options['step'], options['directional'])
+        key = (abs_key[1], options['step'], options['directional'])
+        self._exec_dict[key].append((abs_key, options))
         self._approx_groups = None  # force later regen of approx_groups
 
     @staticmethod
@@ -87,11 +84,11 @@ class ComplexStep(ApproximationScheme):
 
         """
         options = approx_tuple[1]
-        if 'coloring' in options and options['coloring'].__class__ is Coloring:
-            # this will only happen after the coloring has been computed
-            return ('@color', options['step'], options['directional'])
-        else:
-            return (approx_tuple[0][1], options['step'], options['directional'])
+        # if 'coloring' in options and options['coloring'].__class__ is Coloring:
+        #     # this will only happen after the coloring has been computed
+        #     return ('@color', options['step'], options['directional'])
+        # else:
+        return (approx_tuple[0][1], options['step'], options['directional'])
 
     def _get_approx_data(self, system, data):
         """

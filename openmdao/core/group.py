@@ -1770,9 +1770,12 @@ class Group(System):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
+            is_dynamic = self._coloring_info['coloring'] is _DYN_COLORING
             coloring = self._get_coloring()
             if coloring is not None:
-                self._setup_static_approx_coloring()
+                if not is_dynamic:
+                    coloring._check_config(None, self)
+                self._setup_approx_coloring()
             # TODO: for top level FD, call below is unnecessary, but we need this
             # for some tests that just call run_linearize directily without calling
             # compute_totals.
@@ -1967,7 +1970,9 @@ class Group(System):
                 yield tup
 
     def _update_wrt_matches(self):
-
+        """
+        Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
+        """
         info = self._coloring_info
         if not (self._owns_approx_of or self.pathname):
             return
@@ -1976,22 +1981,17 @@ class Group(System):
         abs_outs = self._var_allprocs_abs_names['output']
         abs_ins = self._var_allprocs_abs_names['input']
 
-        wrtset = set()
         info['wrt_matches'] = wrt_colors_matched = set()
 
         wrt_color_patterns = info['wrt_patterns']
 
         for key in self._get_approx_subjac_keys():
-            if self.pathname:
-                wrtset.add(key[1])
-
             if wrt_color_patterns:
                 if key[1] in abs2prom['output']:
                     wrtprom = abs2prom['output'][key[1]]
                 else:
                     wrtprom = abs2prom['input'][key[1]]
 
-                meta = self._subjacs_info[key]
                 for patt in wrt_color_patterns:
                     if patt == '*' or fnmatchcase(wrtprom, patt):
                         wrt_colors_matched.add(key[1])
@@ -2000,26 +2000,11 @@ class Group(System):
         baselen = len(self.pathname) + 1 if self.pathname else 0
         info['wrt_matches_prom'] = [n[baselen:] for n in wrt_colors_matched]
 
-        if self.pathname:
-            # we're taking semi-total derivs for this group. Update _owns_approx_of
-            # and _owns_approx_wrt so we can use the same approx code for totals and
-            # semi-totals.  Also, the order must match order of vars in the output and
-            # input vectors.
-            self._owns_approx_of = list(abs_outs)
-            self._owns_approx_wrt = [n for n in chain(abs_outs, abs_ins) if n in wrtset]
-
-        coloring = self._get_static_coloring()
-        approx = self._get_approx_scheme(info['method'])
-        if coloring is not None:
-            # static coloring was already defined
-            approx._update_coloring(self, coloring)
-        elif self._coloring_info['coloring'] is _DYN_COLORING:
-            if self._owns_approx_of:
-                if not wrt_colors_matched:
-                    raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
-                                     "partial options on Group "
-                                     "'{}': {}.".format(self.pathname, wrt_color_patterns))
-            approx._update_coloring(self, None)
+        if self._coloring_info['coloring'] is _DYN_COLORING and self._owns_approx_of:
+            if not wrt_colors_matched:
+                raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
+                                 "partial options on Group "
+                                 "'{}': {}.".format(self.pathname, wrt_color_patterns))
 
     def _setup_approx_partials(self):
         """
@@ -2039,12 +2024,19 @@ class Group(System):
             method = info['method']
         else:
             method = list(self._approx_schemes)[0]
+
+        wrt_matches = self._get_static_wrt_matches()
+
         approx = self._get_approx_scheme(method)
         # reset the approx if necessary
         approx._exec_list = []
         approx._approx_groups = None
+        if wrt_matches:
+            # if coloring is active, force regen of coloring approxs
+            approx._colored_approx_groups = None
 
-        for key in self._get_approx_subjac_keys():
+        approx_keys = self._get_approx_subjac_keys()
+        for key in approx_keys:
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
             else:
@@ -2059,9 +2051,10 @@ class Group(System):
 
             meta['method'] = method
 
-            # TODO: Maybe just need a subset of keys (those that go to the boundaries.)
-
             meta.update(self._owns_approx_jac_meta)
+
+            if key[1] in wrt_matches:
+                self._update_approx_coloring_meta(meta)
 
             if meta['value'] is None:
                 shape = (abs2meta[key[0]]['size'], abs2meta[key[1]]['size'])
@@ -2070,14 +2063,20 @@ class Group(System):
 
             approx.add_approximation(key, meta)
 
-    def _setup_static_approx_coloring(self):
-        coloring = self._get_static_coloring()
-        if coloring is not None:
+        if self.pathname:
+            # we're taking semi-total derivs for this group. Update _owns_approx_of
+            # and _owns_approx_wrt so we can use the same approx code for totals and
+            # semi-totals.  Also, the order must match order of vars in the output and
+            # input vectors.
+            wrtset = set([k[1] for k in approx_keys])
+            self._owns_approx_of = list(abs_outs)
+            self._owns_approx_wrt = [n for n in chain(abs_outs, abs_ins) if n in wrtset]
+
+    def _setup_approx_coloring(self):
+        if self._coloring_info['coloring'] is not None:
             meta = self._coloring_info
             self.approx_totals(meta['method'], meta.get('step'), meta.get('form'))
         self._setup_approx_partials()
-        if self._coloring_info['coloring'] is not None:
-            self._update_wrt_matches()
 
     def _get_approx_coloring_meta(self):
         info = self._coloring_info
@@ -2146,3 +2145,10 @@ class Group(System):
             graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
+
+    def _update_approx_coloring_meta(self, meta):
+        info = self._coloring_info
+        meta['coloring'] = True
+        for name in ('method', 'step', 'form'):
+            if name in info:
+                meta[name] = info[name]

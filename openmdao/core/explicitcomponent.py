@@ -8,6 +8,7 @@ from six.moves import range
 
 from openmdao.core.component import Component, _full_slice
 from openmdao.utils.class_util import overrides_method
+from openmdao.utils.general_utils import ContainsAll
 from openmdao.recorders.recording_iteration_stack import Recording
 
 _inst_functs = ['compute_jacvec_product', 'compute_multi_jacvec_product']
@@ -214,29 +215,13 @@ class ExplicitComponent(Component):
                                                          lower=lower, upper=upper,
                                                          ref=ref, ref0=ref0, res_ref=res_ref)
 
-    def _set_approx_partials_meta(self):
-        """
-        Set subjacobian info into our jacobian.
-        """
-        coloring = self._get_static_coloring()
-        # if coloring has been specified, we don't want to have multiple
-        # approximations for the same subjac, so don't register any new
-        # approximations when the wrt matches those used in the coloring.
-        if coloring is not None:
-            info = self._coloring_info
-            # static coloring has been specified
-            wrt_matches = info['wrt_matches']
-        else:
-            wrt_matches = ()
-
+    def _approx_subjac_keys_iter(self):
         for abs_key, meta in iteritems(self._subjacs_info):
-
-            if 'method' in meta and abs_key[1] not in wrt_matches:
+            if 'method' in meta:
                 method = meta['method']
-                # Don't approximate output wrt output.``
                 if (method is not None and method in self._approx_schemes and abs_key[1]
                         not in self._outputs._views_flat):
-                    self._approx_schemes[method].add_approximation(abs_key, meta)
+                    yield abs_key
 
     def _apply_nonlinear(self):
         """

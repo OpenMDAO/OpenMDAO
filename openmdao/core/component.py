@@ -11,9 +11,9 @@ import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse
 
+from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System, _supported_methods
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.units import valid_units
@@ -21,6 +21,7 @@ from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, find_matches, simple_warning
+from openmdao.utils.coloring import _DYN_COLORING
 
 
 # the following metadata will be accessible for vars on all procs
@@ -363,83 +364,45 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
-    def _setup_static_approx_coloring(self):
-        from openmdao.core.explicitcomponent import ExplicitComponent
-        is_explicit = isinstance(self, ExplicitComponent)
-
-        if self._jacobian is None:
-            self._jacobian = DictionaryJacobian(self)
-
+    def _update_wrt_matches(self):
+        """
+        Update wrt_matches in the coloring metadata.
+        """
         info = self._coloring_info
-        meta = {}
-
-        if 'form' in info:
-            meta['form'] = info['form']
-        if 'step' in info:
-            meta['step'] = info['step']
-
-        coloring = self._get_static_coloring()
-
         ofs, allwrt = self._get_partials_varlists()
         abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
-        if coloring is None:
-            wrt_patterns = info['wrt_patterns']
-            matches_prom = set()
-            for w in wrt_patterns:
-                matches_prom.update(find_matches(w, allwrt))
+        wrt_patterns = info['wrt_patterns']
+        matches_prom = set()
+        for w in wrt_patterns:
+            matches_prom.update(find_matches(w, allwrt))
 
-            # error if nothing matched
-            if not matches_prom:
-                raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
-                                 "options on Component '{}': {}.".format(self.pathname,
-                                                                         wrt_patterns))
+        # error if nothing matched
+        if not matches_prom:
+            raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
+                             "options on Component '{}': {}.".format(self.pathname, wrt_patterns))
 
-            info['wrt_matches_prom'] = matches_prom
-            info['wrt_matches'] = matches = [rel_name2abs_name(self, n) for n in matches_prom]
-            approx_scheme = self._get_approx_scheme(info['method'])
+        info['wrt_matches_prom'] = matches_prom
+        info['wrt_matches'] = [rel_name2abs_name(self, n) for n in matches_prom]
 
-            # set a coloring placeholder for later replacement of approximations
-            meta['coloring'] = None
+    def _update_subjac_sparsity(self, sparsity):
+        """
+        Update subjac sparsity info based on the given coloring.
 
-            # if coloring is not initially activated (because it must be computed dynamically)
-            # then we need to specify active subjacs that will be approximated using normal
-            # FD or CS.  These will be computed normally until enough jacobians have been
-            # computed to calculate the coloring.  Once the coloring exists, the approximations
-            # will be re-initialized to use the coloring info.
-            for key in product(abs_ofs, matches):
-                if key in self._subjacs_info:
-                    if not (is_explicit and key[0] == key[1]):
-                        approx_scheme.add_approximation(key, meta)
-
-        else:  # a static coloring has already been specified
-            colmeta = meta.copy()
-            colmeta['coloring'] = coloring
-            wrt_matches = info['wrt_matches']
-            colmeta['approxs'] = list((k, meta) for k in product(abs_ofs, wrt_matches)
-                                      if k in self._subjacs_info)
-            approx = self._get_approx_scheme(info['method'])
-            # remove any uncolored matching approximations
-            new_list = [tup for tup in approx._exec_list if tup[0][1] not in wrt_matches]
-            approx._exec_list = new_list
-            approx.add_approximation((None, None), colmeta)
-            approx._approx_groups = None  # force a re-init of approximations
-
-            # When total coloring is being used in addition to partial coloring,
-            # we need to ensure that randomized partial sub-jacobians are represented with the
-            # proper sparsity so that the resulting total jacobian will also have the proper
-            # sparsity, so we make the Jacobian aware of the sparsity so it can make the
-            # necessary adjustment in _randomize_subjac.
-            sparsity = coloring.get_subjac_sparsity()
-            # sparsity uses relative names, so we need to convert to absolute
-            pathname = self.pathname
-            for of, sub in iteritems(sparsity):
-                of_abs = '.'.join((pathname, of)) if pathname else of
-                for wrt, tup in iteritems(sub):
-                    wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
-                    abs_key = (of_abs, wrt_abs)
-                    if abs_key in self._subjacs_info:
-                        # add sparsity info to existing partial info
-                        self._subjacs_info[abs_key]['sparsity'] = tup
+        Parameters
+        ----------
+        sparsity : dict
+            A nested dict of the form dct[of][wrt] = (rows, cols, shape)
+        """
+        # sparsity uses relative names, so we need to convert to absolute
+        pathname = self.pathname
+        for of, sub in iteritems(sparsity):
+            of_abs = '.'.join((pathname, of)) if pathname else of
+            for wrt, tup in iteritems(sub):
+                wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
+                abs_key = (of_abs, wrt_abs)
+                if abs_key in self._subjacs_info:
+                    # add sparsity info to existing partial info
+                    self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):
@@ -869,6 +832,11 @@ class Component(System):
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. Defaults to None, in which case the approximation method provides
             its default value.
+
+        Returns
+        -------
+        dict
+            Metadata dict for the specified partial(s).
         """
         try:
             method_func = _supported_methods[method]
@@ -948,6 +916,60 @@ class Component(System):
                 meta['step_calc'] = step_calc
             else:
                 raise RuntimeError("'step_calc' is not a valid option for '%s'" % method)
+
+        return meta
+
+    def declare_coloring(self,
+                         wrt=_DEFAULT_COLORING_META['wrt_patterns'],
+                         method=_DEFAULT_COLORING_META['method'],
+                         form=None,
+                         step=None,
+                         per_instance=_DEFAULT_COLORING_META['per_instance'],
+                         repeats=_DEFAULT_COLORING_META['repeats'],
+                         tol=_DEFAULT_COLORING_META['tol'],
+                         orders=_DEFAULT_COLORING_META['orders'],
+                         perturb_size=_DEFAULT_COLORING_META['perturb_size'],
+                         show_summary=_DEFAULT_COLORING_META['show_summary'],
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+        """
+        Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain input names, output names, or glob patterns.
+        method : str
+            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference. Leave undeclared to keep unchanged from previous
+            or default value.
+        per_instance : bool
+            If True, a separate coloring will be generated for each instance of a given class.
+            Otherwise, only one coloring for a given class will be generated and all instances
+            of that class will use it.
+        repeats : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination.
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep.
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity.
+        show_summary : bool
+            If True, display summary information after generating coloring.
+        show_sparsity : bool
+            If True, display sparsity with coloring info after generating coloring.
+        """
+        super(Component, self).declare_coloring(wrt, method, form, step, per_instance, repeats,
+                                                tol, orders, perturb_size,
+                                                show_summary, show_sparsity)
+        # create approx partials for all matches
+        meta = self.declare_partials('*', wrt, method=method, step=step, form=form)
+        meta['coloring'] = True
 
     def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
                                   directional=False):
@@ -1245,6 +1267,16 @@ class Component(System):
                 raise ValueError(msg.format(self.pathname, of, wrt, out_size, in_size,
                                             val_out, val_in))
 
+    def _set_approx_partials_meta(self):
+        """
+        Add approximations for those partials registered with method=fd or method=cs.
+        """
+        self._get_static_wrt_matches()
+        subjacs = self._subjacs_info
+        for key in self._approx_subjac_keys_iter():
+            meta = subjacs[key]
+            self._approx_schemes[meta['method']].add_approximation(key, meta)
+
     def _guess_nonlinear(self):
         """
         Provide initial guess for states.
@@ -1264,9 +1296,12 @@ class Component(System):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
+            is_dynamic = self._coloring_info['coloring'] is _DYN_COLORING
             coloring = self._get_coloring()
             if coloring is not None:
-                self._setup_static_approx_coloring()
+                if not is_dynamic:
+                    coloring._check_config(None, self)
+                self._update_subjac_sparsity(coloring.get_subjac_sparsity())
 
 
 class _DictValues(object):

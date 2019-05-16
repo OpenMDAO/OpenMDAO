@@ -258,25 +258,12 @@ class ImplicitComponent(Component):
                     finally:
                         d_outputs.read_only = d_residuals.read_only = False
 
-    def _set_approx_partials_meta(self):
-        """
-        Set subjacobian info into our jacobian.
-        """
-        coloring = self._get_static_coloring()  # this will load coloring file if needed
-
-        # if coloring has been specified, we don't want to have multiple
-        # approximations for the same subjac, so don't register any new
-        # approximations when the wrt matches those used in the coloring.
-        if coloring is None:
-            wrt_matches = ()
-        else:
-            wrt_matches = coloring._meta['wrt_matches']
-
-        for key, meta in iteritems(self._subjacs_info):
-            if 'method' in meta and key[1] not in wrt_matches:
+    def _approx_subjac_keys_iter(self):
+        for abs_key, meta in iteritems(self._subjacs_info):
+            if 'method' in meta:
                 method = meta['method']
                 if method is not None and method in self._approx_schemes:
-                    self._approx_schemes[method].add_approximation(key, meta)
+                    yield abs_key
 
     def _linearize(self, jac=None, sub_do_ln=True):
         """

@@ -123,13 +123,9 @@ class FiniteDifference(ApproximationScheme):
                 raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
 
         self._exec_list.append((abs_key, options))
-        if 'coloring' in options and options['coloring'].__class__ is Coloring:
-            # this will only happen after the coloring has been computed
-            key = ('@color', options['form'], options['order'],
-                   options['step'], options['step_calc'], options['directional'])
-        else:
-            key = (abs_key[1], options['form'], options['order'],
-                   options['step'], options['step_calc'], options['directional'])
+        key = (abs_key[1], options['form'], options['order'],
+               options['step'], options['step_calc'], options['directional'])
+        self._exec_dict[key].append((abs_key, options))
         self._approx_groups = None  # force later regen of approx_groups
 
     @staticmethod
@@ -148,14 +144,9 @@ class FiniteDifference(ApproximationScheme):
             Sorting key (wrt, form, step_size, order, step_calc, directional)
 
         """
-        options = approx_tuple[1]
-        if 'coloring' in options and options['coloring'].__class__ is Coloring:
-            # this will only happen after the coloring has been computed
-            return ('@color', options['form'], options['order'],
-                    options['step'], options['step_calc'], options['directional'])
-        else:
-            return (approx_tuple[0][1], options['form'], options['order'],
-                    options['step'], options['step_calc'], options['directional'])
+        key, options = approx_tuple
+        return (key[1], options['form'], options['order'],
+                options['step'], options['step_calc'], options['directional'])
 
     def _get_approx_data(self, system, data):
         """

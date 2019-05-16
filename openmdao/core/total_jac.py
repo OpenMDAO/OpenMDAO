@@ -24,7 +24,7 @@ from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, simple_warning
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.mpi import MPI
-from openmdao.approximation_schemes.approximation_scheme import _initialize_model_approx
+from openmdao.utils.coloring import _initialize_model_approx
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 
 

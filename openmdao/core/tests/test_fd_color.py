@@ -539,7 +539,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        comp.declare_coloring(wrt='*', method=self.FD_METHOD)
+        comp.declare_coloring(wrt='x*', method=self.FD_METHOD)
         comp.use_fixed_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -594,7 +594,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        comp.declare_coloring(wrt='*', method=self.FD_METHOD)
+        comp.declare_coloring(wrt='x*', method=self.FD_METHOD)
         comp.use_fixed_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -708,7 +708,7 @@ class TestCSStaticColoring(unittest.TestCase):
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
 
-        sub.declare_coloring(wrt='*', method=self.FD_METHOD)
+        sub.declare_coloring(wrt='comp.x*', method=self.FD_METHOD)
         sub.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
@@ -751,7 +751,9 @@ class TestCSStaticColoring(unittest.TestCase):
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-        model._save_coloring(compute_total_coloring(prob))
+        # try just manually computing the coloring here instead of using declare_coloring
+        coloring = compute_total_coloring(prob)
+        model._save_coloring(coloring)
 
         # new Problem, loading the coloring we just computed
         prob = Problem(coloring_dir=self.tempdir)
@@ -1111,6 +1113,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         model.sub.comp.add_constraint('y1')
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
+
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -1203,7 +1206,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         # make sure coloring file exists by the time we try to load the spec
         MPI.COMM_WORLD.barrier()
 
-        comp.declare_coloring(wrt='*', method=self.FD_METHOD)
+        comp.declare_coloring(wrt='x*', method=self.FD_METHOD)
         comp.use_fixed_coloring()
 
         prob.setup(check=False, mode='fwd')
@@ -1268,7 +1271,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         # make sure coloring file exists by the time we try to load the spec
         MPI.COMM_WORLD.barrier()
 
-        comp.declare_coloring(wrt='*', method=self.FD_METHOD)
+        comp.declare_coloring(wrt='x*', method=self.FD_METHOD)
         comp.use_fixed_coloring()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
