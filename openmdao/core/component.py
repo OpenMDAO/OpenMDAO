@@ -1300,7 +1300,7 @@ class Component(System):
             coloring = self._get_coloring()
             if coloring is not None:
                 if not is_dynamic:
-                    coloring._check_config(None, self)
+                    coloring._check_config_partial(self)
                 self._update_subjac_sparsity(coloring.get_subjac_sparsity())
 
 

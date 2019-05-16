@@ -232,6 +232,7 @@ class ApproximationScheme(object):
 
         self._approx_groups = []
 
+        # must sort _exec_dict keys here or have ordering issues when using MPI
         for key in sorted(self._exec_dict):
             approx = self._exec_dict[key]
             meta = approx[0][1]

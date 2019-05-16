@@ -1774,7 +1774,7 @@ class Group(System):
             coloring = self._get_coloring()
             if coloring is not None:
                 if not is_dynamic:
-                    coloring._check_config(None, self)
+                    coloring._check_config_partial(self)
                 self._setup_approx_coloring()
             # TODO: for top level FD, call below is unnecessary, but we need this
             # for some tests that just call run_linearize directily without calling

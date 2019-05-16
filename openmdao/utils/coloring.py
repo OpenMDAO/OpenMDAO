@@ -373,54 +373,58 @@ class Coloring(object):
             raise TypeError("Can't save coloring.  Expected a string for fname but got a %s" %
                             type(fname).__name__)
 
-    def _check_config(self, driver, system):
+    def _check_config_total(self, driver):
         """
-        Check the config of this Coloring vs. the existing model config.
+        Check the config of this total Coloring vs. the existing driver config.
 
         Parameters
         ----------
-        driver : Driver or None
+        driver : Driver
             Current driver object.
+        """
+        ofs = driver._get_ordered_nl_responses()
+        of_sizes = _get_response_sizes(driver, ofs)
+        wrts = list(driver._designvars)
+        wrt_sizes = _get_desvar_sizes(driver, wrts)
+        if (self._row_var_sizes != of_sizes or self._row_vars != ofs
+                or self._col_var_sizes != wrt_sizes or self._col_vars != wrts):
+            raise RuntimeError("Current total coloring configuration does not match the "
+                               "configuration of the current driver. Make sure you don't have "
+                               "different problems that have the same coloring directory.  Set "
+                               "the coloring directory by setting the value of "
+                               "`problem.options['coloring_dir']`.")
+
+    def _check_config_partial(self, system):
+        """
+        Check the config of this partial (or semi-total) Coloring vs. the existing model config.
+
+        Parameters
+        ----------
         system : System
             System being colored.
         """
-        if driver is not None:
-            # coloring is a total coloring
-            ofs = driver._get_ordered_nl_responses()
-            of_sizes = _get_response_sizes(driver, ofs)
-            wrts = list(driver._designvars)
-            wrt_sizes = _get_desvar_sizes(driver, wrts)
-            if (self._row_var_sizes != of_sizes or self._row_vars != ofs
-                    or self._col_var_sizes != wrt_sizes or self._col_vars != wrts):
-                raise RuntimeError("Current total coloring configuration does not match the "
-                                   "configuration of the current driver. Make sure you don't have "
-                                   "different problems that have the same coloring directory.  Set "
-                                   "the coloring directory by setting the value of "
-                                   "`problem.options['coloring_dir']`.")
+        # check the contents (vars and sizes) of the input and output vectors of system
+        if system.pathname:
+            wrt_matches = ['.'.join((system.pathname, n))
+                           for n in self._meta['wrt_matches_prom']]
+            # for partial and semi-total derivs, convert to promoted names
+            ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
+            ordered_wrt_info = \
+                system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
+        else:
+            ordered_of_info = list(system._jacobian_of_iter())
+            ordered_wrt_info = list(system._jacobian_wrt_iter(self._meta['wrt_matches']))
 
-        # now check the contents (vars and sizes) of the input and output vectors of system
-        if system is not None:
-            if system.pathname:
-                wrt_matches = ['.'.join((system.pathname, n))
-                               for n in self._meta['wrt_matches_prom']]
-                # for partial and semi-total derivs, convert to promoted names
-                ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
-                ordered_wrt_info = \
-                    system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
-            else:
-                ordered_of_info = list(system._jacobian_of_iter())
-                ordered_wrt_info = list(system._jacobian_wrt_iter(self._meta['wrt_matches']))
+        ordered_of_names = [t[0] for t in ordered_of_info]
+        ordered_wrt_names = [t[0] for t in ordered_wrt_info]
 
-            ordered_of_names = [t[0] for t in ordered_of_info]
-            ordered_wrt_names = [t[0] for t in ordered_wrt_info]
-
-            if (ordered_of_names != self._row_vars or ordered_wrt_names != self._col_vars):
-                # TODO: add comparison of sizes
-                raise RuntimeError("%s: Current coloring configuration does not match the "
-                                   "configuration of the current driver. Make sure you don't have "
-                                   "different problems that have the same coloring directory.  Set "
-                                   "the coloring directory by setting the value of "
-                                   "`problem.options['coloring_dir']`." % system.pathname)
+        if (ordered_of_names != self._row_vars or ordered_wrt_names != self._col_vars):
+            # TODO: add comparison of sizes
+            raise RuntimeError("%s: Current coloring configuration does not match the "
+                               "configuration of the current driver. Make sure you don't have "
+                               "different problems that have the same coloring directory.  Set "
+                               "the coloring directory by setting the value of "
+                               "`problem.options['coloring_dir']`." % system.pathname)
 
     def __repr__(self):
         """

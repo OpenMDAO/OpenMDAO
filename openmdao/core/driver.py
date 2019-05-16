@@ -287,9 +287,9 @@ class Driver(object):
             coloring = self._get_static_coloring()
             if coloring is not None and self.supports['simultaneous_derivatives']:
                 if model._owns_approx_jac:
-                    coloring._check_config(None, model)
+                    coloring._check_config_partial(model)
                 else:
-                    coloring._check_config(self, None)
+                    coloring._check_config_total(self)
                 self._setup_simul_coloring()
 
     def _get_vars_to_record(self, recording_options):
