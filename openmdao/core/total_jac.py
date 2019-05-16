@@ -24,7 +24,7 @@ from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.general_utils import ContainsAll, simple_warning
 from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.mpi import MPI
-from openmdao.utils.coloring import _initialize_model_approx
+from openmdao.utils.coloring import _initialize_model_approx, Coloring
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 
 
@@ -79,7 +79,7 @@ class _TotalJacInfo(object):
     return_format : str
         Indicates the desired return format of the total jacobian. Can have value of
         'array', 'dict', or 'flat_dict'.
-    simul_coloring : tuple of the form (column_lists, row_map, sparsity) or None
+    simul_coloring : Coloring or None
         Contains all data necessary to simultaneously solve for groups of total derivatives.
     """
 
@@ -209,6 +209,9 @@ class _TotalJacInfo(object):
                            (driver_wrt, wrt, driver_of, of))
                     simple_warning(msg)
                     self.simul_coloring = None
+
+            if not isinstance(self.simul_coloring, Coloring):
+                self.simul_coloring = None
 
             if self.simul_coloring is None:
                 modes = [self.mode]
