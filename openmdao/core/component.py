@@ -366,7 +366,7 @@ class Component(System):
 
     def _update_wrt_matches(self):
         """
-        Update wrt_matches in the coloring metadata.
+        Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
         """
         info = self._coloring_info
         ofs, allwrt = self._get_partials_varlists()
@@ -387,6 +387,11 @@ class Component(System):
     def _update_subjac_sparsity(self, sparsity):
         """
         Update subjac sparsity info based on the given coloring.
+
+        The sparsity of the partial derivatives in this component will be used when computing
+        the sparsity of the total jacobian for the entire model.  Without this, all of this
+        component's partials would be treated as dense, resulting in an overly conservative
+        coloring of the total jacobian.
 
         Parameters
         ----------
@@ -1094,18 +1099,9 @@ class Component(System):
             Metadata dict specifying shape, and/or approx properties.
         """
         val = dct['value'] if 'value' in dct else None
-        method = dct['method'] if 'method' in dct else None
         is_scalar = isscalar(val)
         dependent = dct['dependent']
 
-        # If dependent is False, specifies no dependence between the output(s) and the
-        # input(s). This is only necessary in the case of a sparse global
-        # jacobian, because if 'dependent=False' is not specified and
-        # declare_partials is not called for a given pair, then a dense
-        # matrix of zeros will be allocated in the sparse global jacobian
-        # for that pair.  In the case of a dense global jacobian it doesn't
-        # matter because the space for a dense subjac will always be
-        # allocated for every pair.
         if dependent:
             if 'rows' in dct and dct['rows'] is not None:  # sparse list format
                 rows = dct['rows']

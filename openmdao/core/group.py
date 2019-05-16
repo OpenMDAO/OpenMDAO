@@ -1779,7 +1779,7 @@ class Group(System):
             # TODO: for top level FD, call below is unnecessary, but we need this
             # for some tests that just call run_linearize directily without calling
             # compute_totals.
-            elif self._approx_schemes:  # and self.pathname:
+            elif self._approx_schemes:
                 self._setup_approx_partials()
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
@@ -2073,25 +2073,28 @@ class Group(System):
             self._owns_approx_wrt = [n for n in chain(abs_outs, abs_ins) if n in wrtset]
 
     def _setup_approx_coloring(self):
+        """
+        Ensure that if coloring is declared, approximations will be set up.
+        """
         if self._coloring_info['coloring'] is not None:
             meta = self._coloring_info
             self.approx_totals(meta['method'], meta.get('step'), meta.get('form'))
         self._setup_approx_partials()
 
-    def _get_approx_coloring_meta(self):
+    def _update_approx_coloring_meta(self, meta):
+        """
+        Update metadata for a subjac based on coloring metadata.
+
+        Parameters
+        ----------
+        meta : dict
+            Metadata for a subjac.
+        """
         info = self._coloring_info
-        method = info['method']
-        approx_scheme = self._get_approx_scheme(method)
-
-        meta = approx_scheme.DEFAULT_OPTIONS.copy()
-        meta['coloring'] = info['coloring']
-
-        if 'form' in info:
-            meta['form'] = info['form']
-        if 'step' in info:
-            meta['step'] = info['step']
-
-        return meta
+        meta['coloring'] = True
+        for name in ('method', 'step', 'form'):
+            if name in info:
+                meta[name] = info[name]
 
     def compute_sys_graph(self, comps_only=False):
         """
@@ -2145,10 +2148,3 @@ class Group(System):
             graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
-
-    def _update_approx_coloring_meta(self, meta):
-        info = self._coloring_info
-        meta['coloring'] = True
-        for name in ('method', 'step', 'form'):
-            if name in info:
-                meta[name] = info[name]

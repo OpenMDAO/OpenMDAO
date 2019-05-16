@@ -1010,7 +1010,7 @@ class Driver(object):
             if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:
                 # force the generation of a dynamic coloring this time
                 coloring = coloring_mod._DYN_COLORING
-            self._set_coloring(coloring)
+            self._coloring_info['coloring'] = coloring
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
@@ -1030,10 +1030,6 @@ class Driver(object):
         """
         warn_deprecation("set_simul_deriv_color is deprecated.  Use use_fixed_coloring instead.")
         self.use_fixed_coloring(coloring)
-
-    def _set_coloring(self, coloring):
-        self._coloring_info['coloring'] = coloring
-        return coloring
 
     def _setup_tot_jac_sparsity(self):
         """
@@ -1056,19 +1052,17 @@ class Driver(object):
         """
         info = self._coloring_info
         coloring = info['coloring']
-        assert not isinstance(coloring, string_types)
 
         if isinstance(coloring, coloring_mod.Coloring):
             return coloring
-        elif coloring is coloring_mod._STD_COLORING_FNAME:
-            fname = os.path.join(self._problem.options['coloring_dir'], 'total_coloring.pkl')
+
+        if coloring is coloring_mod._STD_COLORING_FNAME or isinstance(coloring, string_types):
+            if coloring is _STD_COLORING_FNAME:
+                fname = self._get_total_coloring_fname()
+            else:
+                fname = coloring
             print("loading total coloring from file %s" % fname)
-            coloring = self._set_coloring(Coloring.load(fname))
-            info.update(coloring._meta)
-            return coloring
-        elif isinstance(coloring, string_types):
-            print("loading total coloring from file %s" % coloring)
-            coloring = self._set_coloring(Coloring.load(coloring))
+            coloring = info['coloring'] = Coloring.load(fname)
             info.update(coloring._meta)
             return coloring
 

@@ -312,9 +312,6 @@ class System(object):
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
                              desc='Linear solver(s) in this group, if using an assembled '
                                   'jacobian, will use this type.')
-        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
-                             desc='Number of _linearize calls during dynamic computation of '
-                                  'simultaneous derivative coloring or derivatives sparsity')
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -796,7 +793,7 @@ class System(object):
             if recurse:
                 simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
                                "coloring was set, so recurse was ignored." % self.pathname)
-            self._set_coloring(coloring)
+            self._coloring_info['coloring'] = coloring
             if isinstance(coloring, Coloring):
                 approx = self._get_approx_scheme(coloring._meta['method'])
                 # force regen of approx groups on next call to compute_approximations
@@ -812,15 +809,11 @@ class System(object):
             simple_warning('%s: use_fixed_coloring() ignored because no coloring was declared.' %
                            self.pathname)
         else:
-            self._set_coloring(coloring)
+            self._coloring_info['coloring'] = coloring
 
         if recurse:
             for s in self._subsystems_myproc:
                 s.use_fixed_coloring(coloring, recurse)
-
-    def _set_coloring(self, coloring):
-        self._coloring_info['coloring'] = coloring
-        return coloring
 
     def declare_coloring(self,
                          wrt=_DEFAULT_COLORING_META['wrt_patterns'],
@@ -983,6 +976,7 @@ class System(object):
         if self._coloring_info['coloring'] is None:
             self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
 
+        # for groups, this does some setup of approximations
         self._setup_approx_coloring()
 
         save_first_call = self._first_call_to_linearize
