@@ -122,31 +122,10 @@ class FiniteDifference(ApproximationScheme):
                 msg = "'{}' is not a valid form of finite difference; must be one of {}"
                 raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
 
-        self._exec_list.append((abs_key, options))
         key = (abs_key[1], options['form'], options['order'],
                options['step'], options['step_calc'], options['directional'])
         self._exec_dict[key].append((abs_key, options))
         self._approx_groups = None  # force later regen of approx_groups
-
-    @staticmethod
-    def _key_fun(approx_tuple):
-        """
-        Compute the sorting key for an approximation tuple.
-
-        Parameters
-        ----------
-        approx_tuple : tuple(str, str, dict)
-            A given approximated derivative (of, wrt, fd_options)
-
-        Returns
-        -------
-        tuple(str, str, float, int, str)
-            Sorting key (wrt, form, step_size, order, step_calc, directional)
-
-        """
-        key, options = approx_tuple
-        return (key[1], options['form'], options['order'],
-                options['step'], options['step_calc'], options['directional'])
 
     def _get_approx_data(self, system, data):
         """
@@ -202,7 +181,7 @@ class FiniteDifference(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
-        if len(self._exec_list) == 0:
+        if not self._exec_dict:
             return
 
         if jac is None:

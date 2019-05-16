@@ -2029,7 +2029,7 @@ class Group(System):
 
         approx = self._get_approx_scheme(method)
         # reset the approx if necessary
-        approx._exec_list = []
+        approx._exec_dict = defaultdict(list)
         approx._approx_groups = None
         if wrt_matches:
             # if coloring is active, force regen of coloring approxs

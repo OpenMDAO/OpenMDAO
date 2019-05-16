@@ -1,7 +1,7 @@
 """Complex Step derivative approximations."""
 from __future__ import division, print_function
 
-from six import iteritems
+from six import iteritems, itervalues
 from six.moves import range
 from collections import defaultdict
 
@@ -61,34 +61,10 @@ class ComplexStep(ApproximationScheme):
         """
         options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)
-        self._exec_list.append((abs_key, options))
 
         key = (abs_key[1], options['step'], options['directional'])
         self._exec_dict[key].append((abs_key, options))
         self._approx_groups = None  # force later regen of approx_groups
-
-    @staticmethod
-    def _key_fun(approx_tuple):
-        """
-        Compute the sorting key for an approximation tuple.
-
-        Parameters
-        ----------
-        approx_tuple : tuple(str, str, dict)
-            A given approximated derivative (of, wrt, options)
-
-        Returns
-        -------
-        tuple(str, str, float)
-            Sorting key (wrt, step_size, directional)
-
-        """
-        options = approx_tuple[1]
-        # if 'coloring' in options and options['coloring'].__class__ is Coloring:
-        #     # this will only happen after the coloring has been computed
-        #     return ('@color', options['step'], options['directional'])
-        # else:
-        return (approx_tuple[0][1], options['step'], options['directional'])
 
     def _get_approx_data(self, system, data):
         """
@@ -123,7 +99,7 @@ class ComplexStep(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
-        if len(self._exec_list) == 0:
+        if not self._exec_dict:
             return
 
         if system.under_complex_step:
@@ -137,8 +113,9 @@ class ComplexStep(ApproximationScheme):
 
                 fd = self._fd = FiniteDifference()
                 empty = {}
-                for item in self._exec_list:
-                    fd.add_approximation(item[0], empty)
+                for lst in itervalues(self._exec_dict):
+                    for apprx in lst:
+                        fd.add_approximation(apprx[0], empty)
 
             self._fd.compute_approximations(system, jac, total=total)
             return

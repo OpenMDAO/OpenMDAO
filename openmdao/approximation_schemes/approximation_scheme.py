@@ -28,10 +28,6 @@ class ApproximationScheme(object):
     _approx_groups_cached_under_cs : bool
         Flag indicates whether approx_groups was generated under complex step from higher in the
         model hieararchy.
-    _exec_list : list
-        A list of which derivatives (in execution order) to compute.
-        The entries are of the form (key, options), where key is (of, wrt) where of and wrt
-        are absolute names and options is a dictionary.
     _exec_dict : defaultdict(list)
         A dict that keeps derivatives in execution order. The key is a combination of wrt and
         various metadata that differs by approximation scheme.
@@ -44,7 +40,6 @@ class ApproximationScheme(object):
         self._approx_groups = None
         self._colored_approx_groups = []
         self._approx_groups_cached_under_cs = False
-        self._exec_list = []
         self._exec_dict = defaultdict(list)
 
     def _get_approx_groups(self, system, under_cs=False):
@@ -138,15 +133,14 @@ class ApproximationScheme(object):
 
         data = None
         keys = set()
-        for key in self._exec_dict:
+        for key, apprx in iteritems(self._exec_dict):
             if key[0] in wrt_matches:
-                options = self._exec_dict[key][0][1]
+                options = apprx[0][1]
                 if 'coloring' in options:
                     if data is None:
                         # data is the same for all colored approxs so we only need the first
                         data = self._get_approx_data(system, key)
-                    for app in self._exec_dict[key]:
-                        keys.add(app[0])
+                    keys.update(a[0] for a in apprx)
 
         if is_total and system.pathname == '':  # top level approx totals
             of_names = system._owns_approx_of
@@ -224,17 +218,6 @@ class ApproximationScheme(object):
         is_semi = is_total and system.pathname
         is_implicit = isinstance(system, ImplicitComponent)
 
-        # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
-        # group adjacent items with identical keys.
-        self._exec_list.sort(key=self._key_fun)
-
-        # groupby (along with this key function) will group all 'of's that have the same wrt and
-        # step size.
-        # Note: Since access to `approx` is required multiple times, we need to
-        # throw it in a list. The groupby iterator only works once.
-        approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
-                                                                        self._key_fun)]
-
         outputs = system._outputs
         inputs = system._inputs
         abs2meta = system._var_allprocs_abs2meta
@@ -249,7 +232,8 @@ class ApproximationScheme(object):
 
         self._approx_groups = []
 
-        for key, approx in approx_groups:
+        for key in sorted(self._exec_dict):
+            approx = self._exec_dict[key]
             meta = approx[0][1]
             if coloring is not None and 'coloring' in meta:
                 continue
@@ -359,7 +343,6 @@ class ApproximationScheme(object):
             out_slices = tmpJ['@out_slices']
             for i_count, idxs in enumerate(col_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
-                    # Run the complex step
                     result = self._run_point(system, ((idx_info[0][0], idxs),),
                                              data, results_array, total)
 
