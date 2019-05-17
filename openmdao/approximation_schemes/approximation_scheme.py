@@ -369,8 +369,6 @@ class ApproximationScheme(object):
                 else:
                     mycomm.Allgatherv(jdata, [self._j_colored.data, self._j_data_sizes,
                                               self._j_data_offsets, MPI.DOUBLE])
-                    # data_colored = mycomm.allgather(jdata)
-                    # self._j_colored.data = np.hstack(dat for dat in data_colored if dat)
 
             elif is_parallel:
                 raise NotImplementedError("colored FD/CS over parallel groups not supported yet")
@@ -462,8 +460,7 @@ def _gather_jac_results(comm, results):
     new_results = defaultdict(list)
 
     # create full results list
-    all_results = comm.allgather(results)
-    for proc_results in all_results:
+    for proc_results in comm.allgather(results):
         for key in proc_results:
             new_results[key].extend(proc_results[key])
 
@@ -484,12 +481,12 @@ def _get_wrt_subjacs(system, approxs):
     approx_of_idx = system._owns_approx_of_idx
     approx_wrt_idx = system._owns_approx_wrt_idx
     approx_of = system._owns_approx_of
-    iproc = system.comm.rank
 
     J = {}
     ofdict = {}
     nondense = {}
     slicedict = system._outputs.get_slice_dict()
+    out_views = system._outputs._views
     abs_out_names = [n for n in system._var_allprocs_abs_names['output'] if n in slicedict]
 
     for key, options in approxs:

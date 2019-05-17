@@ -882,15 +882,6 @@ class Component(System):
                                        "that specify the following duplicate subjacobian entries: "
                                        "%s." % (self.pathname, sorted(dups)))
 
-        if rows is not None:
-            # check for repeated rows/cols indices
-            idxset = set(zip(rows, cols))
-            if len(rows) - len(idxset) > 0:
-                dups = [n for n, val in iteritems(Counter(zip(rows, cols))) if val > 1]
-                raise RuntimeError("%s: declare_partials has been called with rows and cols "
-                                   "that specify the following duplicate subjacobian entries: "
-                                   "%s." % (self.pathname, sorted(dups)))
-
         if method_func is not None:
             # we're doing approximations
             self._has_approx = True
