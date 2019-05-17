@@ -8,7 +8,7 @@ from six import iteritems, itervalues
 
 import numpy as np
 
-from openmdao.jacobians.jacobian import Jacobian, SUBJAC_META_DEFAULTS
+from openmdao.jacobians.jacobian import Jacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
@@ -43,9 +43,6 @@ class AssembledJacobian(Jacobian):
         Column ranges for inputs.
     _out_ranges : dict
         Row ranges for outputs.
-    _has_overlapping_partials : bool
-        If True, this jacobian contains subjacobians that overlap, which happens when a single
-        source connects to multiple inputs on the same component.
     """
 
     def __init__(self, matrix_class, system):
@@ -71,7 +68,6 @@ class AssembledJacobian(Jacobian):
         self._matrix_class = matrix_class
         self._in_ranges = None
         self._out_ranges = None
-        self._has_overlapping_partials = False
 
         self._subjac_iters = defaultdict(lambda: None)
         self._init_ranges(system)

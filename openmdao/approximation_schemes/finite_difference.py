@@ -2,7 +2,6 @@
 from __future__ import division, print_function
 
 from collections import namedtuple, defaultdict
-from itertools import groupby
 from six import iteritems
 from six.moves import range, zip
 
@@ -10,9 +9,7 @@ import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
     _gather_jac_results
-from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.utils.array_utils import sub2full_indices
-from openmdao.utils.general_utils import printoptions
 from openmdao.utils.coloring import Coloring
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])

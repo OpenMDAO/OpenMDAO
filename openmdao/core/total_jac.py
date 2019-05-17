@@ -3,7 +3,6 @@ Helper class for total jacobian computation.
 """
 from __future__ import print_function, division
 
-import warnings
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 import pprint
@@ -579,7 +578,6 @@ class _TotalJacInfo(object):
         idxs = {}
         jac_idxs = {}
         model = self.model
-        myproc = model.comm.rank
         owners = model._owning_rank
         fwd = mode == 'fwd'
         missing = False

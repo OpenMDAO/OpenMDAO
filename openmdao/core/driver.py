@@ -1,7 +1,6 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
 
-import json
 from collections import OrderedDict
 import pprint
 import sys

@@ -2,13 +2,10 @@
 from __future__ import print_function, division
 
 from six import iteritems
-from itertools import groupby
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from scipy.sparse import coo_matrix
 import numpy as np
 from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
-from openmdao.utils.name_maps import rel_name2abs_name
-from openmdao.utils.general_utils import printoptions
 from openmdao.utils.coloring import Coloring
 from openmdao.jacobians.jacobian import Jacobian
 
@@ -110,8 +107,8 @@ class ApproximationScheme(object):
 
         self._colored_approx_groups = []
 
-        coloring = system._coloring_info['coloring']
         # don't do anything if the coloring doesn't exist yet
+        coloring = system._coloring_info['coloring']
         if not isinstance(coloring, Coloring):
             return
 
@@ -126,8 +123,6 @@ class ApproximationScheme(object):
         in_slices = inputs.get_slice_dict()
 
         is_total = isinstance(system, Group)
-        is_semi = is_total and system.pathname
-        is_implicit = isinstance(system, ImplicitComponent)
 
         system._update_wrt_matches()
         wrt_matches = system._coloring_info['wrt_matches']
@@ -169,9 +164,9 @@ class ApproximationScheme(object):
         full_idxs = []
         approx_of_idx = system._owns_approx_of_idx
         jac_slices = tmpJ['@jac_slices']
-        for abs_of, roffset, rend, ridxs in system._jacobian_of_iter():
+        for abs_of, roffset, rend, _ in system._jacobian_of_iter():
             rslice = slice(roffset, rend)
-            for abs_wrt, coffset, cend, cidxs in system._jacobian_wrt_iter(wrt_matches):
+            for abs_wrt, coffset, cend, _ in system._jacobian_wrt_iter(wrt_matches):
                 jac_slices[(abs_of, abs_wrt)] = (rslice, slice(coffset, cend))
 
             if is_total and (approx_of_idx or len_full_ofs > len(of_names)):
@@ -196,7 +191,8 @@ class ApproximationScheme(object):
 
         # get groups of columns from the coloring and compute proper indices into
         # the inputs and outputs vectors.
-        use_full_cols = is_implicit or is_semi
+        is_semi = is_total and system.pathname
+        use_full_cols = isinstance(system, ImplicitComponent) or is_semi
         for cols, nzrows in coloring.color_nonzero_iter('fwd'):
             ccols = cols if col_map is None else col_map[cols]
             idx_info = get_input_idx_split(ccols, inputs, outputs, use_full_cols, is_total)
@@ -211,19 +207,9 @@ class ApproximationScheme(object):
         system : System
             The system having its derivs approximated.
         """
-        global _full_slice
-        from openmdao.core.group import Group
-        from openmdao.core.implicitcomponent import ImplicitComponent
-
-        is_total = isinstance(system, Group)
-        is_semi = is_total and system.pathname
-        is_implicit = isinstance(system, ImplicitComponent)
-
         outputs = system._outputs
         inputs = system._inputs
         abs2meta = system._var_allprocs_abs2meta
-        prom2abs_out = system._var_allprocs_prom2abs_list['output']
-        prom2abs_in = system._var_allprocs_prom2abs_list['input']
 
         out_slices = outputs.get_slice_dict()
         in_slices = inputs.get_slice_dict()
@@ -257,7 +243,7 @@ class ApproximationScheme(object):
                     in_idx += slices[wrt].start
             else:
                 if arr is None:
-                    in_idx = range(system._var_allprocs_abs2meta[wrt]['size'])
+                    in_idx = range(abs2meta[wrt]['size'])
                 else:
                     in_idx = range(slices[wrt].start, slices[wrt].stop)
 
@@ -386,7 +372,7 @@ class ApproximationScheme(object):
         elif is_parallel:  # uncolored with parallel systems
             results = _gather_jac_results(mycomm, results)
 
-        for data, _, tmpJ, _, _ in colored_approx_groups:
+        for _, _, tmpJ, _, _ in colored_approx_groups:
             # TODO: coloring when using parallel FD and/or FD with remote comps
             for key in tmpJ['@approxs']:
                 slc = tmpJ['@jac_slices'][key]
@@ -397,7 +383,7 @@ class ApproximationScheme(object):
                 else:
                     jac[key] = _from_dense(jacobian, key, Jcolored[slc])
 
-        for wrt, data, _, tmpJ, _, _ in approx_groups:
+        for wrt, _, _, tmpJ, _, _ in approx_groups:
             ofs = tmpJ[wrt]['ofs']
             for of in ofs:
                 key = (of, wrt)

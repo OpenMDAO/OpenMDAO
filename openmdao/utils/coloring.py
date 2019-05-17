@@ -21,10 +21,8 @@ from six.moves import range
 
 import numpy as np
 from scipy.sparse.compressed import get_index_dtype
-from scipy.sparse import coo_matrix
 
 from openmdao.jacobians.jacobian import Jacobian
-from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
@@ -533,7 +531,7 @@ class Coloring(object):
                 rowend += rvsize
                 for r in range(rowstart, rowend):
                     colstart = colend = 0
-                    for cv, cvsize in zip(self._col_vars, self._col_var_sizes):
+                    for _, cvsize in zip(self._col_vars, self._col_var_sizes):
                         colend += cvsize
                         for c in range(colstart, colend):
                             print(charr[r, c], end='')

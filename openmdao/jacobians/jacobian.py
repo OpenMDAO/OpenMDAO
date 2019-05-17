@@ -9,7 +9,6 @@ from six import itervalues, iteritems
 
 from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
 from openmdao.matrices.matrix import sparse_types
-from openmdao.utils.general_utils import printoptions
 
 SUBJAC_META_DEFAULTS = {
     'rows': None,
@@ -351,7 +350,7 @@ class Jacobian(object):
         # normalize by number of saved jacs, giving a sort of 'average' jac
         J /= repeats
 
-        good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(J, tol, orders)
+        good_tol, _, _, _ = _tol_sweep(J, tol, orders)
 
         boolJ = np.zeros(J.shape, dtype=bool)
         boolJ[J > good_tol] = True
@@ -377,21 +376,3 @@ class Jacobian(object):
                 meta['value'] = meta['value'].real
 
         self._under_complex_step = active
-
-    def dump(self):
-        """
-        Print out subjacobian keys and values.
-        """
-        with printoptions(linewidth=9999, threshold=999):
-            for k, meta in iteritems(self._subjacs_info):
-                print()
-                print(k)
-                if meta['rows'] is not None:
-                    print('rows:')
-                    print(meta['rows'])
-                    print('cols:')
-                    print(meta['cols'])
-                    print('data:')
-                    print(meta['value'])
-                else:
-                    print(meta['value'])
