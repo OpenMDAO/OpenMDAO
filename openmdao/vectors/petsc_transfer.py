@@ -19,7 +19,41 @@ _empty_idx_array = np.array([], dtype=INT_DTYPE)
 class PETScTransfer(DefaultTransfer):
     """
     PETSc Transfer implementation for running in parallel.
+
+    Attributes
+    ----------
+    _scatter : method
+        Method that performs a PETSc scatter.
+    transfer : method
+        Method that performs either a normal transfer or a multi-transfer.
     """
+
+    def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        in_vec : <Vector>
+            pointer to the input vector.
+        out_vec : <Vector>
+            pointer to the output vector.
+        in_inds : int ndarray
+            input indices for the transfer.
+        out_inds : int ndarray
+            output indices for the transfer.
+        comm : MPI.Comm or <FakeComm>
+            communicator of the system that owns this transfer.
+        """
+        super(PETScTransfer, self).__init__(in_vec, out_vec, in_inds, out_inds, comm)
+        in_indexset = PETSc.IS().createGeneral(self._in_inds, comm=self._comm)
+        out_indexset = PETSc.IS().createGeneral(self._out_inds, comm=self._comm)
+
+        self._scatter = PETSc.Scatter().create(out_vec._petsc, out_indexset, in_vec._petsc,
+                                               in_indexset).scatter
+
+        if in_vec._ncol > 1:
+            self.transfer = self.multi_transfer
 
     @staticmethod
     def _setup_transfers(group, recurse=True):
@@ -33,7 +67,6 @@ class PETScTransfer(DefaultTransfer):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        group._transfers = {}
         rev = group._mode == 'rev' or group._mode == 'auto'
 
         def merge(indices_list):
@@ -57,7 +90,7 @@ class PETScTransfer(DefaultTransfer):
         allprocs_abs2meta = group._var_allprocs_abs2meta
         myproc = group.comm.rank
 
-        transfers = group._transfers
+        transfers = group._transfers = {}
         vectors = group._vectors
         offsets = group._get_var_offsets()
 
@@ -261,28 +294,6 @@ class PETScTransfer(DefaultTransfer):
             # and get rid of recv list because allprocs_recv has the necessary info.
             transfers[tgt_sys] = (xfers, send.intersection(allprocs_recv[tgt_sys]))
 
-    def _initialize_transfer(self, in_vec, out_vec):
-        """
-        Set up the transfer; do any necessary pre-computation.
-
-        Optionally implemented by the subclass.
-
-        Parameters
-        ----------
-        in_vec : <Vector>
-            reference to the input vector.
-        out_vec : <Vector>
-            reference to the output vector.
-        """
-        in_indexset = PETSc.IS().createGeneral(self._in_inds, comm=self._comm)
-        out_indexset = PETSc.IS().createGeneral(self._out_inds, comm=self._comm)
-
-        self._transfer = PETSc.Scatter().create(out_vec._petsc, out_indexset, in_vec._petsc,
-                                                in_indexset)
-
-        if in_vec._ncol > 1:
-            self.transfer = self.multi_transfer
-
     def transfer(self, in_vec, out_vec, mode='fwd'):
         """
         Perform transfer.
@@ -311,14 +322,14 @@ class PETScTransfer(DefaultTransfer):
             # Real
             in_petsc.array = in_vec._data.real
             out_petsc.array = out_vec._data.real
-            self._transfer.scatter(out_petsc, in_petsc, addv=flag, mode=flag)
+            self._scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
             # Imaginary
             in_petsc_imag = in_vec._imag_petsc
             out_petsc_imag = out_vec._imag_petsc
             in_petsc_imag.array = in_vec._data.imag
             out_petsc_imag.array = out_vec._data.imag
-            self._transfer.scatter(out_petsc_imag, in_petsc_imag, addv=flag, mode=flag)
+            self._scatter(out_petsc_imag, in_petsc_imag, addv=flag, mode=flag)
 
             in_vec._data[:] = in_petsc.array + in_petsc_imag.array * 1j
 
@@ -333,7 +344,7 @@ class PETScTransfer(DefaultTransfer):
             if out_vec._alloc_complex:
                 out_petsc.array = out_vec._data
 
-            self._transfer.scatter(out_petsc, in_petsc, addv=flag, mode=flag)
+            self._scatter(out_petsc, in_petsc, addv=flag, mode=flag)
 
             if in_vec._alloc_complex:
                 in_vec._data[:] = in_petsc.array
@@ -365,12 +376,12 @@ class PETScTransfer(DefaultTransfer):
                     # Real
                     in_petsc.array = in_vec._data[:, i].real
                     out_petsc.array = out_vec._data[:, i].real
-                    self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
+                    self._scatter(out_petsc, in_petsc, addv=False, mode=False)
 
                     # Imaginary
                     in_petsc_imag.array = in_vec._data[:, i].imag
                     out_petsc_imag.array = out_vec._data[:, i].imag
-                    self._transfer.scatter(out_petsc_imag, in_petsc_imag, addv=False, mode=False)
+                    self._scatter(out_petsc_imag, in_petsc_imag, addv=False, mode=False)
 
                     in_vec._data[:, i] = in_petsc.array + in_petsc_imag.array * 1j
 
@@ -378,7 +389,7 @@ class PETScTransfer(DefaultTransfer):
                 for i in range(in_vec._ncol):
                     in_petsc.array = in_vec._data[:, i]
                     out_petsc.array = out_vec._data[:, i]
-                    self._transfer.scatter(out_petsc, in_petsc, addv=False, mode=False)
+                    self._scatter(out_petsc, in_petsc, addv=False, mode=False)
                     in_vec._data[:, i] = in_petsc.array
 
         elif mode == 'rev':
@@ -387,5 +398,5 @@ class PETScTransfer(DefaultTransfer):
             for i in range(in_vec._ncol):
                 in_petsc.array = in_vec._data[:, i]
                 out_petsc.array = out_vec._data[:, i]
-                self._transfer.scatter(in_petsc, out_petsc, addv=True, mode=True)
+                self._scatter(in_petsc, out_petsc, addv=True, mode=True)
                 out_vec._data[:, i] = out_petsc.array

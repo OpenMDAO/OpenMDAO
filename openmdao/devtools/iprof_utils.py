@@ -4,7 +4,7 @@ import os
 import sys
 import ast
 
-from inspect import getmembers, iscode
+from inspect import getmembers
 from fnmatch import fnmatchcase
 from collections import defaultdict
 from six import string_types

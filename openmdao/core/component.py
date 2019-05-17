@@ -370,7 +370,6 @@ class Component(System):
         """
         info = self._coloring_info
         ofs, allwrt = self._get_partials_varlists()
-        abs_ofs = [rel_name2abs_name(self, n) for n in ofs]
         wrt_patterns = info['wrt_patterns']
         matches_prom = set()
         for w in wrt_patterns:

@@ -97,21 +97,21 @@ class Coloring(object):
 
     Attributes
     ----------
-    _shape : tuple of int (nrows, ncols) or None
+    _shape : tuple of int (nrows, ncols)
         Tuple describing the shape of the sparsity matrix.
-    _nzrows : ndarray of int or None
+    _nzrows : ndarray of int
         Row indices of nonzero entries in the full jac sparsity matrix.
-    _nzcols : ndarray of int or None
+    _nzcols : ndarray of int
         Column indices of nonzero entries in the full jac sparsity matrix.
     _coloring_time : float or None
         If known, the time it took to compute the coloring.
     _sparsity_time : float or None
         If known, the time it took to compute the sparsity.
-    _pct_nonzero : float or None
+    _pct_nonzero : float
         If known, percentage of nonzero vs total array entries.
-    _fwd : tuple (col_lists, row_maps)
+    _fwd : tuple (col_lists, row_maps) or None
         Contains lists of grouped columns and nonzero rows for each column for forward coloring.
-    _rev : tuple (col_lists, row_maps)
+    _rev : tuple (col_lists, row_maps) or None
         Contains lists of grouped columns and nonzero rows for each column for reverse coloring.
     _col_vars : list of str or None
         Names of variables corresponding to columns.
@@ -121,20 +121,18 @@ class Coloring(object):
         Names of variables corresponding to rows.
     _row_var_sizes : ndarray or None
         Sizes of row variables.
-    _static : bool
-        If True, this coloring was not generated dynamically during the current session.
     _meta : dict
         Dictionary of metadata used to create the coloring.
     """
 
-    def __init__(self, sparsity=None, row_vars=None, row_var_sizes=None, col_vars=None,
+    def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
                  col_var_sizes=None):
         """
         Initialize data structures.
 
         Parameters
         ----------
-        sparsity : ndarray or None
+        sparsity : ndarray
             Full jacobian sparsity matrix (dense bool form).
         row_vars : list of str or None
             Names of variables corresponding to rows.
@@ -146,12 +144,9 @@ class Coloring(object):
             Sizes of column variables.
         """
         # store the nonzero row and column indices if jac sparsity is provided
-        if sparsity is not None:
-            self._nzrows, self._nzcols = np.nonzero(sparsity)
-            self._shape = sparsity.shape
-            self._pct_nonzero = np.count_nonzero(sparsity) / (self._shape[0] * self._shape[1]) * 100
-        else:
-            self._nzrows = self._nzcols = self._shape = self._pct_nonzero = None
+        self._nzrows, self._nzcols = np.nonzero(sparsity)
+        self._shape = sparsity.shape
+        self._pct_nonzero = np.count_nonzero(sparsity) / (self._shape[0] * self._shape[1]) * 100
 
         self._row_vars = row_vars
         self._row_var_sizes = row_var_sizes
@@ -360,9 +355,6 @@ class Coloring(object):
         fname : str
             File to save to.
         """
-        if fname is None:
-            return   # don't try to save
-
         if isinstance(fname, string_types):
             color_dir = os.path.dirname(os.path.abspath(fname))
             if not os.path.exists(color_dir):
@@ -435,10 +427,8 @@ class Coloring(object):
         str
             Brief summary.
         """
-        if self._shape:
-            shape = self._shape
-        else:
-            shape = '?'
+        shape = self._shape
+
         if self._fwd and self._rev:
             direction = 'bidirectional'
         elif self._fwd:
@@ -460,11 +450,7 @@ class Coloring(object):
         nrows = self._shape[0] if self._shape else -1
         ncols = self._shape[1] if self._shape else -1
 
-        if self._pct_nonzero is None:
-            print("\nJacobian shape: (%d, %d)" % (nrows, ncols))
-        else:
-            print("\nJacobian shape: (%d, %d)  (%5.2f%% nonzero)" % (nrows, ncols,
-                                                                     self._pct_nonzero))
+        print("\nJacobian shape: (%d, %d)  (%5.2f%% nonzero)" % (nrows, ncols, self._pct_nonzero))
         if self._fwd is None and self._rev is None:
             tot_size = min(nrows, ncols)
             if tot_size < 0:
@@ -1458,7 +1444,6 @@ def compute_total_coloring(problem, mode=None,
 
     elif bool_jac is not None:
         J = bool_jac
-        time_sparsity = 0.
         if mode is None:
             mode = 'auto'
         driver = None
@@ -1603,11 +1588,8 @@ def _total_coloring_cmd(options):
 
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
-            do_sparsity = not options.no_sparsity
             if options.outfile:
                 outfile = os.path.abspath(options.outfile)
-                # this will remove any trailing sep
-                cdir = os.path.abspath(prob.options['coloring_dir'])
             else:
                 outfile = os.path.join(prob.options['coloring_dir'], 'total_coloring.pkl')
 

@@ -863,6 +863,7 @@ class System(object):
         if method not in ('fd', 'cs'):
             raise RuntimeError("method must be one of ['fd', 'cs'].")
 
+        self._has_approx = True
         approx = self._get_approx_scheme(method)
 
         # start with defaults

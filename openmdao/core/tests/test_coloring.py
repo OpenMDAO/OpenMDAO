@@ -1,12 +1,15 @@
 from __future__ import print_function
 
 import os
+import sys
 import shutil
 import tempfile
 
 import unittest
 import numpy as np
 import math
+
+from six import StringIO
 
 from distutils.version import LooseVersion
 from numpy.testing import assert_array_almost_equal, assert_almost_equal
@@ -470,7 +473,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
     def test_bad_mode(self):
         p_color_fwd = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color_fwd.driver._coloring_info['coloring']
-        
+
         with self.assertRaises(Exception) as context:
             p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info=coloring, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
@@ -703,10 +706,53 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         except OSError:
             pass
 
+    def test_summary(self):
+        p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
+        coloring = p_color.driver._coloring_info['coloring']
+        save_out = sys.stdout
+        sys.stdout = StringIO()
+        try:
+            coloring.summary()
+            summary = sys.stdout.getvalue()
+        finally:
+            sys.stdout = save_out
+
+        self.assertTrue('Jacobian shape: (22, 21)  (13.42% nonzero)' in summary)
+        self.assertTrue('FWD solves: 5   REV solves: 0' in summary)
+        self.assertTrue('Total colors vs. total size: 5 vs 21  (76.2% improvement)' in summary)
+        self.assertTrue('Time to compute sparsity:' in summary)
+        self.assertTrue('Time to compute coloring:' in summary)
+
+        dense_J = np.ones((50, 50), dtype=bool)
+        coloring = _compute_coloring(dense_J, 'auto')
+        sys.stdout = StringIO()
+        try:
+            coloring.summary()
+            summary = sys.stdout.getvalue()
+        finally:
+            sys.stdout = save_out
+
+        self.assertTrue('Jacobian shape: (50, 50)  (100.00% nonzero)' in summary)
+        self.assertTrue('FWD solves: 0   REV solves: 50' in summary)
+        self.assertTrue('Total colors vs. total size: 50 vs 50  (0.0% improvement)' in summary)
+        self.assertFalse('Time to compute sparsity:' in summary)
+        self.assertTrue('Time to compute coloring:' in summary)
+
+    def test_repr(self):
+        p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
+        coloring = p_color.driver._coloring_info['coloring']
+        rep = repr(coloring)
+        self.assertEqual(rep, 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
+
+        dense_J = np.ones((50, 50), dtype=bool)
+        coloring = _compute_coloring(dense_J, 'auto')
+        rep = repr(coloring)
+        self.assertEqual(rep, 'Coloring (direction: rev, ncolors: 50, shape: (50, 50)')
+
     def test_bad_mode(self):
         p_color_rev = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color_rev.driver._coloring_info['coloring']
-        
+
         with self.assertRaises(Exception) as context:
             p_color = run_opt(ScipyOptimizeDriver, 'fwd', color_info=coloring, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
@@ -964,11 +1010,11 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         try:
             p.setup()
-    
+
             p.run_driver()
-    
+
             J = p.compute_totals()
-    
+
             for i in range(num_pts):
                 vname = 'par2.comp%d.A' % i
                 if vname in model._var_abs_names['input']:
@@ -977,7 +1023,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
                     self.assertLess(norm, 1.e-7)
                 elif vname not in model._var_allprocs_abs_names['input']:
                     self.fail("Can't find variable par2.comp%d.A" % i)
-    
+
             print("final obj:", p['obj.y'])
         except Exception as err:
             print(str(err))

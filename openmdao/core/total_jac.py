@@ -119,11 +119,12 @@ class _TotalJacInfo(object):
         self.has_scaling = driver._has_scaling and driver_scaling
         self.return_format = return_format
         self.lin_sol_cache = {}
-        self.design_vars = design_vars = driver._designvars
-        self.responses = responses = driver._responses
         self.debug_print = debug_print
         self.par_deriv = {}
         self._recording_iter = driver._recording_iter
+
+        design_vars = driver._designvars
+        responses = driver._responses
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "

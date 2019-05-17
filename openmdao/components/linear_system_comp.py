@@ -57,7 +57,6 @@ class LinearSystemComp(ImplicitComponent):
 
         self._lup = []
         shape = (vec_size, size) if vec_size > 1 else (size, )
-        shape_A = (vec_size_A, size, size) if vec_size_A > 1 else (size, size)
 
         init_A = np.eye(size)
         if vec_size_A > 1:

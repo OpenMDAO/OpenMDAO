@@ -184,21 +184,6 @@ class DefaultTransfer(Transfer):
             transfers[tgt_sys].append(xfer)
             transfers[None].append(xfer)
 
-    def _initialize_transfer(self, in_vec, out_vec):
-        """
-        Set up the transfer; do any necessary pre-computation.
-
-        Optionally implemented by the subclass.
-
-        Parameters
-        ----------
-        in_vec : <Vector>
-            reference to the input vector.
-        out_vec : <Vector>
-            reference to the output vector.
-        """
-        pass
-
     def transfer(self, in_vec, out_vec, mode='fwd'):
         """
         Perform transfer.

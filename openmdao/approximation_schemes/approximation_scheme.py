@@ -6,7 +6,7 @@ from itertools import groupby
 from collections import defaultdict, OrderedDict
 from scipy.sparse import coo_matrix
 import numpy as np
-from openmdao.utils.array_utils import sub2full_indices, update_sizes, get_input_idx_split
+from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.coloring import Coloring

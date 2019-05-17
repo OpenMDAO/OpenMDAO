@@ -359,33 +359,6 @@ def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
         return [(inputs, full_idxs)]
 
 
-def update_sizes(names, sizes, index_map):
-    """
-    Return a sizes array, with possibly some sizes reduced to agree with index_map.
-
-    Parameters
-    ----------
-    names : list of str
-        Names of variables associated with sizes.
-    sizes : ndarray
-        Array of sizes of each variable.
-    index_map : dict
-        Mapping of variable name to some subset of indices.
-
-    Returns
-    -------
-    ndarray
-        Sizes of variables after reducing some due to index_map.
-    """
-    if index_map:
-        sizes = copy(sizes)
-        for i, (name, size) in enumerate(zip(names, sizes)):
-            if size > 0 and name in index_map:
-                sizes[i] = len(index_map[name])
-
-    return sizes
-
-
 def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
     """
     Convert src_indices into a flat, non-negative form.

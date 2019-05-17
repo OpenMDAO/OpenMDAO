@@ -308,7 +308,6 @@ class AssembledJacobian(Jacobian):
                         mapped = keymap[abs_key]
                         if mapped in seen:
                             iters.append(abs_key)
-                            self._has_overlapping_partials = True
                         else:
                             iters.append(abs_key)
                             seen.add(mapped)

@@ -173,7 +173,6 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
             tab += 1
         top = top.model
 
-    seenJacs = set()
     for s in top.system_iter(include_self=True, recurse=True):
         if filter is None:
             ret = ()

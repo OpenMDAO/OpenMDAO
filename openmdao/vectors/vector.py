@@ -558,19 +558,6 @@ class Vector(object):
         """
         pass
 
-    def print_variables(self):
-        """
-        Print the names and values of all variables in this vector, one per line.
-        """
-        abs2prom = self._system._var_abs2prom[self._typ]
-        print('-' * 35)
-        print('   Vector %s, type %s' % (self._name, self._typ))
-        for abs_name, view in iteritems(self._views):
-            prom_name = abs2prom[abs_name]
-            print(' ' * 3, prom_name, view)
-        print('-' * 35)
-        print()
-
     def set_complex_step_mode(self, active, keep_real=False):
         """
         Turn on or off complex stepping mode.
