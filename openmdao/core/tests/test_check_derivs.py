@@ -1485,6 +1485,39 @@ class TestProblemCheckPartials(unittest.TestCase):
         for key, val in iteritems(data['comp3']):
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
 
+    def test_rel_error_fd_zero(self):
+        # When the fd turns out to be zero, test that we switch the definition of relative
+        # to divide by the forward derivative instead of reporting NaN.
+
+        class SimpleComp2(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=3.0)
+                self.add_output('y', val=4.0)
+
+                self.declare_partials(of='y', wrt='x')
+
+            def compute(self, inputs, outputs):
+                # Mimics forgetting to set a variable.
+                pass
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 3.0
+
+        prob = Problem()
+        prob.model = Group()
+
+        prob.model.add_subsystem('p1', IndepVarComp('x', 3.5))
+        prob.model.add_subsystem('comp', SimpleComp2())
+        prob.model.connect('p1.x', 'comp.x')
+
+        prob.setup(check=False)
+
+        stream = cStringIO()
+        data = prob.check_partials(out_stream=stream)
+        lines = stream.getvalue().splitlines()
+
+        self.assertTrue("Relative Error (Jfor  - Jfd) : 1." in lines[8])
+
 
 class TestCheckPartialsFeature(unittest.TestCase):
 

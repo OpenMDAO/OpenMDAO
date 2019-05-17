@@ -273,7 +273,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         try:
             prob.run_model()
         except AnalysisError as err:
-            self.assertEqual(str(err), "Solver 'NL: NLBGS' on system '' failed to converge.")
+            self.assertEqual(str(err), "Solver 'NL: NLBGS' on system '' failed to converge in 2 iterations.")
         else:
             self.fail("expected AnalysisError")
 

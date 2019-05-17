@@ -750,7 +750,7 @@ class TestNewton(unittest.TestCase):
         with self.assertRaises(AnalysisError) as context:
             prob.run_driver()
 
-        msg = "Solver 'NL: Newton' on system '' failed to converge."
+        msg = "Solver 'NL: Newton' on system '' failed to converge in 1 iterations."
         self.assertEqual(str(context.exception), msg)
 
     def test_relevancy_for_newton(self):
