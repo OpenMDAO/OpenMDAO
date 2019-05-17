@@ -28,6 +28,12 @@ class ApproximationScheme(object):
     _exec_dict : defaultdict(list)
         A dict that keeps derivatives in execution order. The key is a combination of wrt and
         various metadata that differs by approximation scheme.
+    _j_colored : coo_matrix
+        If coloring is active, cached COO jacobian.
+    _j_data_sizes : ndarray of int
+        Array of sizes of data chunks that make up _j_colored. (Used for MPI Allgatherv)
+    _j_data_offsets : ndarray of int
+        Array of offsets of each data chunk that makes up _j_colored. (Used for MPI Allgatherv)
     """
 
     def __init__(self):
@@ -36,6 +42,9 @@ class ApproximationScheme(object):
         """
         self._approx_groups = None
         self._colored_approx_groups = []
+        self._j_colored = None
+        self._j_data_sizes = None
+        self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._exec_dict = defaultdict(list)
 
@@ -106,6 +115,9 @@ class ApproximationScheme(object):
         from openmdao.core.implicitcomponent import ImplicitComponent
 
         self._colored_approx_groups = []
+        self._j_colored = None
+        self._j_data_sizes = None
+        self._j_data_offsets = None
 
         # don't do anything if the coloring doesn't exist yet
         coloring = system._coloring_info['coloring']
@@ -286,6 +298,7 @@ class ApproximationScheme(object):
 
         # This will either generate new approx groups or use cached ones
         approx_groups, colored_approx_groups = self._get_approx_groups(system, under_cs)
+        do_rows_cols = self._j_colored is None
 
         # do colored solves first
         for data, col_idxs, tmpJ, idx_info, nz_rows in colored_approx_groups:
@@ -296,27 +309,21 @@ class ApproximationScheme(object):
                 if par_fd_w_serial_model or not is_parallel:
                     rowmap = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
                     if rowmap is not None:
-                        if nz_rows is None:  # uncolored column
-                            nrows = tmpJ['@nrows']
-                            jrows.extend(range(nrows))
-                            jcols.extend(col_idxs * nrows)  # col_idxs is size 1 here
-                            jdata.extend(self._transform_result(result[rowmap]))
-                        else:
-                            for i, col in enumerate(col_idxs):
-                                jrows.extend(nz_rows[i])
-                                jcols.extend([col] * len(nz_rows[i]))
-                                jdata.extend(self._transform_result(result[rowmap[nz_rows[i]]]))
-                    else:
-                        if nz_rows is None:  # uncolored column
+                        result = result[rowmap]
+                    result = self._transform_result(result)
+
+                    if nz_rows is None:  # uncolored column
+                        if do_rows_cols:
                             nrows = tmpJ['@nrows']
                             jrows.extend(range(nrows))
                             jcols.extend(col_idxs * nrows)
-                            jdata.extend(self._transform_result(result))
-                        else:
-                            for i, col in enumerate(col_idxs):
+                        jdata.extend(result)
+                    else:
+                        for i, col in enumerate(col_idxs):
+                            if do_rows_cols:
                                 jrows.extend(nz_rows[i])
                                 jcols.extend([col] * len(nz_rows[i]))
-                                jdata.extend(self._transform_result(result[nz_rows[i]]))
+                            jdata.extend(result[nz_rows[i]])
                 else:  # parallel model (some vars are remote)
                     raise NotImplementedError("simul approx coloring with parallel FD/CS is "
                                               "only supported currently when using "
@@ -349,25 +356,35 @@ class ApproximationScheme(object):
         mult = self._get_multiplier(data)
         if colored_shape is not None:  # coloring is active
             if par_fd_w_serial_model:
-                # TODO: should really only have to transfer rows and cols once.  Only data
-                # needs to be transferred each time
-                Jcolored = mycomm.allgather((jrows, jcols, jdata))
-                allrows = np.hstack(rows for rows, _, _ in Jcolored if rows)
-                allcols = np.hstack(cols for _, cols, _ in Jcolored if cols)
-                alldata = np.hstack(dat for _, _, dat in Jcolored if dat)
-
-                Jcolored = coo_matrix((alldata, (allrows, allcols)), shape=colored_shape)
+                if self._j_colored is None:
+                    jstuff = mycomm.allgather((jrows, jcols, jdata))
+                    rowlist = [rows for rows, _, _ in jstuff if rows]
+                    allrows = np.hstack(rowlist)
+                    allcols = np.hstack(cols for _, cols, _ in jstuff if cols)
+                    alldata = np.hstack(dat for _, _, dat in jstuff if dat)
+                    self._j_colored = coo_matrix((alldata, (allrows, allcols)), shape=colored_shape)
+                    self._j_data_sizes = sizes = np.array([len(x) for x, _, _ in jstuff])
+                    self._j_data_offsets = offsets = np.zeros(mycomm.size)
+                    offsets[1:] = np.cumsum(sizes)[:-1]
+                else:
+                    mycomm.Allgatherv(jdata, [self._j_colored.data, self._j_data_sizes,
+                                              self._j_data_offsets, MPI.DOUBLE])
+                    # data_colored = mycomm.allgather(jdata)
+                    # self._j_colored.data = np.hstack(dat for dat in data_colored if dat)
 
             elif is_parallel:
                 raise NotImplementedError("colored FD/CS over parallel groups not supported yet")
             else:  # serial colored
-                Jcolored = coo_matrix((jdata, (jrows, jcols)), shape=colored_shape)
+                if do_rows_cols:
+                    self._j_colored = coo_matrix((jdata, (jrows, jcols)), shape=colored_shape)
+                else:
+                    self._j_colored.data[:] = jdata
 
             if mult != 1.0:
-                Jcolored.data *= mult
+                self._j_colored.data *= mult
 
             # convert COO matrix to dense for easier slicing
-            Jcolored = Jcolored.toarray()
+            Jcolored = self._j_colored.toarray()
 
         elif is_parallel:  # uncolored with parallel systems
             results = _gather_jac_results(mycomm, results)
@@ -382,6 +399,8 @@ class ApproximationScheme(object):
                     jac._override_checks = False
                 else:
                     jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+
+        Jcolored = None  # clean up memory
 
         for wrt, _, _, tmpJ, _, _ in approx_groups:
             ofs = tmpJ[wrt]['ofs']
