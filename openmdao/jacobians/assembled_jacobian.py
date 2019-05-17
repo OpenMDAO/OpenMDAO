@@ -31,9 +31,6 @@ class AssembledJacobian(Jacobian):
         Global internal Jacobian.
     _ext_mtx : {str: <Matrix>, ...}
         External Jacobian for each viewing subsystem.
-    _keymap : dict
-        Mapping of original (output, input) key to (output, source) in cases
-        where the input has src_indices.
     _mask_caches : dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
@@ -70,7 +67,6 @@ class AssembledJacobian(Jacobian):
         self._view_ranges = {}
         self._int_mtx = None
         self._ext_mtx = {}
-        self._keymap = {}
         self._mask_caches = {}
         self._matrix_class = matrix_class
         self._in_ranges = None
@@ -119,7 +115,6 @@ class AssembledJacobian(Jacobian):
 
         abs2prom_out = system._var_abs2prom['output']
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
-        keymap = self._keymap
         abs_key2shape = self._abs_key2shape
 
         # create the matrix subjacs
@@ -137,7 +132,6 @@ class AssembledJacobian(Jacobian):
                 out_size = out_end - out_offset
                 shape = (res_size, out_size)
                 int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
-                keymap[abs_key] = abs_key
             elif wrt_abs_name in in_ranges:
                 if wrt_abs_name in conns:  # connected input
                     out_abs_name = conns[wrt_abs_name]
@@ -161,7 +155,6 @@ class AssembledJacobian(Jacobian):
                     # need to add an entry for d(output)/d(source)
                     # instead of d(output)/d(input)
                     abs_key2 = (res_abs_name, out_abs_name)
-                    keymap[abs_key] = abs_key2
 
                     if src_indices is not None:
                         shape = abs_key2shape(abs_key2)
@@ -265,11 +258,9 @@ class AssembledJacobian(Jacobian):
 
         subjac_iters = self._subjac_iters[system.pathname]
         if subjac_iters is None:
-            keymap = self._keymap
             int_mtx = self._int_mtx
             ext_mtx = self._ext_mtx[system.pathname]
             subjacs = system._subjacs_info
-            seen = set()
 
             if isinstance(system, Component):
                 global_conns = _empty_dict
@@ -305,12 +296,7 @@ class AssembledJacobian(Jacobian):
                                     break
                 else:  # wrt is an input
                     if wrtname in global_conns:
-                        mapped = keymap[abs_key]
-                        if mapped in seen:
-                            iters.append(abs_key)
-                        else:
-                            iters.append(abs_key)
-                            seen.add(mapped)
+                        iters.append(abs_key)
                     elif ext_mtx is not None:
                         iters_in_ext.append(abs_key)
 
