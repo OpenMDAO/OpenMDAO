@@ -1155,28 +1155,28 @@ class Group(System):
         if mode == 'fwd':
             if self._has_input_scaling:
                 vec_inputs.scale('norm')
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
+                self._transfers[vec_name][mode, isub]._transfer(vec_inputs,
+                                                                self._vectors['output'][vec_name],
+                                                                mode)
                 vec_inputs.scale('phys')
             else:
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
+                self._transfers[vec_name][mode, isub]._transfer(vec_inputs,
+                                                                self._vectors['output'][vec_name],
+                                                                mode)
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(isub)
 
         else:  # rev
             if self._has_input_scaling:
                 vec_inputs.scale('phys')
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
+                self._transfers[vec_name][mode, isub]._transfer(vec_inputs,
+                                                                self._vectors['output'][vec_name],
+                                                                mode)
                 vec_inputs.scale('norm')
             else:
-                self._transfers[vec_name][mode, isub].transfer(vec_inputs,
-                                                               self._vectors['output'][vec_name],
-                                                               mode)
+                self._transfers[vec_name][mode, isub]._transfer(vec_inputs,
+                                                                self._vectors['output'][vec_name],
+                                                                mode)
 
     def _discrete_transfer(self, isub):
         """

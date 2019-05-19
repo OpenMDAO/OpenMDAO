@@ -24,7 +24,7 @@ class PETScTransfer(DefaultTransfer):
     ----------
     _scatter : method
         Method that performs a PETSc scatter.
-    transfer : method
+    _transfer : method
         Method that performs either a normal transfer or a multi-transfer.
     """
 
@@ -53,7 +53,7 @@ class PETScTransfer(DefaultTransfer):
                                                in_indexset).scatter
 
         if in_vec._ncol > 1:
-            self.transfer = self.multi_transfer
+            self._transfer = self._multi_transfer
 
     @staticmethod
     def _setup_transfers(group, recurse=True):
@@ -294,7 +294,7 @@ class PETScTransfer(DefaultTransfer):
             # and get rid of recv list because allprocs_recv has the necessary info.
             transfers[tgt_sys] = (xfers, send.intersection(allprocs_recv[tgt_sys]))
 
-    def transfer(self, in_vec, out_vec, mode='fwd'):
+    def _transfer(self, in_vec, out_vec, mode='fwd'):
         """
         Perform transfer.
 
@@ -349,7 +349,7 @@ class PETScTransfer(DefaultTransfer):
             if in_vec._alloc_complex:
                 in_vec._data[:] = in_petsc.array
 
-    def multi_transfer(self, in_vec, out_vec, mode='fwd'):
+    def _multi_transfer(self, in_vec, out_vec, mode='fwd'):
         """
         Perform transfer.
 

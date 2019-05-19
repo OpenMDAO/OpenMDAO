@@ -184,7 +184,7 @@ class DefaultTransfer(Transfer):
             transfers[tgt_sys].append(xfer)
             transfers[None].append(xfer)
 
-    def transfer(self, in_vec, out_vec, mode='fwd'):
+    def _transfer(self, in_vec, out_vec, mode='fwd'):
         """
         Perform transfer.
 
