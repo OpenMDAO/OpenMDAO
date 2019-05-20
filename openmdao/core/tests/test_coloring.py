@@ -351,7 +351,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         # test __repr__
         rep = repr(p_color.driver._coloring_info['coloring'])
-        self.assertEqual(rep, 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
 
 
 @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
