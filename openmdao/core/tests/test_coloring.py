@@ -742,12 +742,12 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color.driver._coloring_info['coloring']
         rep = repr(coloring)
-        self.assertEqual(rep, 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
 
         dense_J = np.ones((50, 50), dtype=bool)
         coloring = _compute_coloring(dense_J, 'auto')
         rep = repr(coloring)
-        self.assertEqual(rep, 'Coloring (direction: rev, ncolors: 50, shape: (50, 50)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: rev, ncolors: 50, shape: (50, 50)')
 
     def test_bad_mode(self):
         p_color_rev = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
