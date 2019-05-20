@@ -405,6 +405,24 @@ class System(object):
         """
         pass
 
+    def _relative_name(self, abs_name):
+        """
+        Return part of abs_name relative to this System or None.
+
+        Parameters
+        ----------
+        abs_name : str
+            Absolute name of a variable or subsystem.
+
+        Returns
+        -------
+        str or None
+            Given name relative to this System or None.
+        """
+        pathdot = self.pathname + '.' if self.pathname else ''
+        if abs_name[:len(pathdot)] == pathdot:
+            return abs_name[len(pathdot):]
+
     def _check_reconf(self):
         """
         Check if this systems wants to reconfigure and if so, perform the reconfiguration.
@@ -1407,7 +1425,7 @@ class System(object):
             resolve(self._var_promotes['input'], ('input',), maps, prom_names)
             resolve(self._var_promotes['output'], ('output',), maps, prom_names)
         else:
-            resolve(self._var_promotes['any'], ('input', 'output',), maps, prom_names)
+            resolve(self._var_promotes['any'], ('input', 'output'), maps, prom_names)
 
         return maps
 

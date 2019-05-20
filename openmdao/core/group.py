@@ -906,6 +906,14 @@ class Group(System):
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_connections(recurse)
+                if isinstance(subsys, Group):
+                    for inp in subsys._conn_abs_in2out:
+                        if inp != self._var_abs2prom['input'][inp]:
+                            raise RuntimeError("Input variable '%s', which was connected in system "
+                                            "'%s', was also promoted out of system '%s'." %
+                                            (inp, subsys.pathname, subsys.pathname))
+
+
 
         if MPI:
             # collect set of local (not remote, not distributed) subsystems so we can
@@ -918,7 +926,8 @@ class Group(System):
                 elif not s.options['distributed']:
                     self._local_system_set.add(s.pathname)
 
-        path_len = len(pathname) + 1 if pathname else 0
+        path_dot = pathname + '.' if pathname else ''
+        path_len = len(path_dot)
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
 
@@ -930,7 +939,7 @@ class Group(System):
         for abs_in, abs_out in iteritems(global_abs_in2out):
 
             # First, check that this system owns both the input and output.
-            if abs_in[:len(pathname)] == pathname and abs_out[:len(pathname)] == pathname:
+            if abs_in[:path_len] == path_dot and abs_out[:path_len] == path_dot:
                 # Second, check that they are in different subsystems of this system.
                 out_subsys = abs_out[path_len:].split('.', 1)[0]
                 in_subsys = abs_in[path_len:].split('.', 1)[0]
