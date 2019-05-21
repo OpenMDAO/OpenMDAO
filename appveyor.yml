@@ -20,7 +20,7 @@ environment:
 
     - APPVEYOR_BUILD_WORKER_IMAGE: Previous Ubuntu
       PYTHON: 2.7
-      NUMPY: 1.14
+      NUMPY: 1.13
       SCIPY: 1.0.1
       PETSc: 3.9.1    # 3.9.1  released 2018-05-02
 
