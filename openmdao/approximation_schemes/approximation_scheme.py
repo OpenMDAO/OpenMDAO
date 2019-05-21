@@ -305,6 +305,7 @@ class ApproximationScheme(object):
             colored_shape = (tmpJ['@nrows'], tmpJ['@ncols'])
 
             if fd_count % num_par_fd == system._par_fd_id:
+                # run the finite difference
                 result = self._run_point(system, idx_info, data, results_array, total)
                 if par_fd_w_serial_model or not is_parallel:
                     rowmap = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
@@ -338,6 +339,7 @@ class ApproximationScheme(object):
             out_slices = tmpJ['@out_slices']
             for i_count, idxs in enumerate(col_idxs):
                 if fd_count % num_par_fd == system._par_fd_id:
+                    # run the finite difference
                     result = self._run_point(system, ((idx_info[0][0], idxs),),
                                              data, results_array, total)
 
@@ -409,7 +411,9 @@ class ApproximationScheme(object):
                     for i, result in results[key]:
                         oview[:, i] = result
 
-                oview *= mult
+                if mult != 1.0:
+                    oview *= mult
+
                 if uses_voi_indices:
                     jac._override_checks = True
                     jac[key] = _from_dense(jacobian, key, oview, rows_reduced, cols_reduced)

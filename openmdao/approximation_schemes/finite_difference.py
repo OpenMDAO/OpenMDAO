@@ -198,9 +198,35 @@ class FiniteDifference(ApproximationScheme):
         self._starting_ins = self._starting_outs = self._results_tmp = None
 
     def _get_multiplier(self, data):
+        """
+        Always returns 1.0 for finite difference.
+
+        Parameters
+        ----------
+        data :  tuple
+            Not used.
+
+        Returns
+        -------
+        float
+            1.0
+        """
         return 1.0
 
     def _transform_result(self, array):
+        """
+        Return the given array.
+
+        Parameters
+        ----------
+        array : ndarray
+            Result array after doing a finite difference.
+
+        Returns
+        -------
+        array
+            The givan array, unchanged.
+        """
         return array
 
     def _run_point(self, system, idx_info, data, results_array, total):

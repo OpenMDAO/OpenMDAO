@@ -129,9 +129,35 @@ class ComplexStep(ApproximationScheme):
         system._set_complex_step_mode(False)
 
     def _get_multiplier(self, delta):
+        """
+        Return a multiplier to be applied to the jacobian.
+
+        Parameters
+        ----------
+        delta :  complex
+            Complex number used to compute the multiplier.
+
+        Returns
+        -------
+        float
+            multiplier to apply to the jacobian.
+        """
         return (1.0 / delta * 1j).real
 
     def _transform_result(self, array):
+        """
+        Return the imaginary part of the given array.
+
+        Parameters
+        ----------
+        array : ndarray of complex
+            Result array after doing a complex step.
+
+        Returns
+        -------
+        ndarray
+            Imaginary part of the result array.
+        """
         return array.imag
 
     def _run_point(self, system, idx_info, delta, result_array, total):
