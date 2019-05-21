@@ -199,6 +199,8 @@ class FiniteDifference(ApproximationScheme):
 
     def _get_multiplier(self, data):
         """
+        Return a multiplier to be applied to the jacobian.
+
         Always returns 1.0 for finite difference.
 
         Parameters

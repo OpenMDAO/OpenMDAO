@@ -1,6 +1,8 @@
 """Define the base System class."""
 from __future__ import division
 
+import sys
+import os
 from contextlib import contextmanager
 from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
@@ -1741,6 +1743,14 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
+        # remove old solver error files if they exist
+        if self.pathname == '':
+            rank = MPI.COMM_WORLD.rank if MPI is not None else 0
+            if rank == 0:
+                for f in os.listdir('.'):
+                    if fnmatchcase(f, 'solver_errors.*.out'):
+                        os.remove(file)
+
         if self._nonlinear_solver is not None:
             self._nonlinear_solver._setup_solvers(self, 0)
         if self._linear_solver is not None:
