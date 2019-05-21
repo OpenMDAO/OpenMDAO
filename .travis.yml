@@ -50,16 +50,17 @@ notifications:
     secure: Dd+tpZkz48Q47Y+PtdL4b+KAs55PsvWjt9ybhip6xljhA5kVsba9oZS+KsAC8RLWSzVJLOSjz3Cu3MsRym4sTd/g4Pbqyh0ldK2Xnl+n2JOgpPFSXtFuH4Ln3uWB6kYtUK6+aGIC8qhbvEt8tukTBT0RduEmdRyVIZ3oN7YjETPSZXvujeiUFLssfpZW2mqoA/tIgJHFSlySAp6J5694t2Z/p8sHOrK8G/Nm+qlk4xqXHvJ3xablcSBG4BZCrpqmMMdTLXBt2E2K9Rc1P2ZBIrSHVWfSLx+4n79U2385+og7miN1Zuf3gY3YuGKIwnBTtEzTu20905idkr4QdKELCBEcU4azdznwjvUkXWkiFAJII9UELTluSQmZX602zWk4AgJNeHxhN3EbBSMezfYVZjprhlAlwnZZv6t4qAkvuzb7KOA4s679xWzWOBOn1wkynfIF8A66APqssveyz/PvZHSjnHQoLgMU+kwzoX759o0Z/HuRlhCcjv0W9DWxU2bFNi/zVh9YyvR8fG15biGthzOyuf+CHjxohw+J6M+YdR1RIf1g/60nGUPHx4j4SN3kEFPmEDxzZT/f349gvaZGOmKXBi0wH8iY/i9RinM9LJB4t6chj2MkKwUA26bYaVaIO6FYPfE7r+tTG6OXdck4voCs/s4aa9VKEX97yhh0i9g=
 
 before_install:
+# When building master (e.g. after a merge), we will create a fresh env as a thorough test.
+# For other builds (e.g. pull requests), try to use cached env for faster testing.
+# Need to check for existence of files to determine if cache exists.
+# If the dir doesn't exist, but is slated to be cached later,
+# Travis unhelpfully creates it, which then causes "dir already exists"
+# errors when you go to actually install the thing, so we must non-intuitively
+# delete the file before re-creating it later.
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
-    # When building master (e.g. after a merge), we will create a fresh env as a thorough test.
+    echo "building master";
     MASTER_BUILD=1;
   elif [ -d $HOME/miniconda/envs/PY$PY ]; then
-    # For other builds (e.g. pull requests), try to use cached env for faster testing.
-    # Need to check for existence of files to determine if cache exists.
-    # If the dir doesn't exist, but is slated to be cached later,
-    # Travis unhelpfully creates it, which then causes "dir already exists"
-    # errors when you go to actually install the thing, so we must non-intuitively
-    # delete the file before re-creating it later.
     echo "cached miniconda environment found";
     CACHED_ENV=1;
   else

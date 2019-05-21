@@ -18,6 +18,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 
+
 class ModCompEx(ExplicitComponent):
     def __init__(self, modval, **kwargs):
         super(ModCompEx, self).__init__(**kwargs)
@@ -76,7 +77,7 @@ class CompDiscWDerivsImplicit(StateConnection):
     def solve_nonlinear(self, inputs, outputs, discrete_inputs, discrete_outputs):
         super(CompDiscWDerivsImplicit, self).solve_nonlinear(inputs, outputs)
         discrete_outputs['Nout'] = discrete_inputs['N'] * 2
-        
+
     def linearize(self, inputs, outputs, J, discrets_inputs, discrete_outputs):
         super(CompDiscWDerivsImplicit, self).linearize(inputs, outputs, J)
 
@@ -337,6 +338,7 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(str(ctx.exception),
                          "Total derivative with respect to 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
 
+
 class SolverDiscreteTestCase(unittest.TestCase):
     def _setup_model(self, solver_class):
         prob = Problem()
@@ -509,6 +511,7 @@ class DiscreteFeatureTestCase(unittest.TestCase):
 
         # minimum value
         assert_rel_error(self, prob['SolidityComp.blade_solidity'], 0.02984155, 1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()
