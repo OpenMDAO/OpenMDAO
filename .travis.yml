@@ -60,6 +60,7 @@ before_install:
 - if  [ "$TRAVIS_REPO_SLUG" = "OpenMDAO/OpenMDAO" ] && [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
     echo "building master";
     MASTER_BUILD=1;
+    rm -rf $HOME/miniconda;
   elif [ -d $HOME/miniconda/envs/PY$PY ]; then
     echo "cached miniconda environment found";
     CACHED_ENV=1;
