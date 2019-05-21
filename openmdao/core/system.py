@@ -821,7 +821,7 @@ class System(object):
                          form=None,
                          step=None,
                          per_instance=_DEFAULT_COLORING_META['per_instance'],
-                         repeats=_DEFAULT_COLORING_META['repeats'],
+                         num_full_jacs=_DEFAULT_COLORING_META['num_full_jacs'],
                          tol=_DEFAULT_COLORING_META['tol'],
                          orders=_DEFAULT_COLORING_META['orders'],
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
@@ -847,7 +847,7 @@ class System(object):
             If True, a separate coloring will be generated for each instance of a given class.
             Otherwise, only one coloring for a given class will be generated and all instances
             of that class will use it.
-        repeats : int
+        num_full_jacs : int
             Number of times to repeat partial jacobian computation when computing sparsity.
         tol : float
             Tolerance used to determine if an array entry is nonzero during sparsity determination.
@@ -881,7 +881,7 @@ class System(object):
         options['wrt_patterns'] = [wrt] if isinstance(wrt, string_types) else wrt
         options['method'] = method
         options['per_instance'] = per_instance
-        options['repeat'] = repeats
+        options['repeat'] = num_full_jacs
         options['tol'] = tol
         options['orders'] = orders
         options['perturb_size'] = perturb_size
@@ -984,7 +984,7 @@ class System(object):
         self._first_call_to_linearize = False
         sparsity_start_time = time.time()
 
-        for i in range(info['repeats']):
+        for i in range(info['num_full_jacs']):
             # randomize inputs (and outputs if implicit)
             if i > 0:
                 self._inputs._data[:] = \
@@ -1010,7 +1010,7 @@ class System(object):
         ordered_of_info = list(self._jacobian_of_iter())
         ordered_wrt_info = list(self._jacobian_wrt_iter(info['wrt_matches']))
         sparsity = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
-                                                    repeats=info['repeats'],
+                                                    num_full_jacs=info['num_full_jacs'],
                                                     tol=info['tol'],
                                                     orders=info['orders'])
         self._jacobian._jac_summ = None  # reclaim the memory

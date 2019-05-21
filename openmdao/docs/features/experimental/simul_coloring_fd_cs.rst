@@ -37,17 +37,17 @@ outputs (states) of `comp`.
 .. code-block:: python
 
     comp = prob.model.add_subsystem('comp', MyComp())
-    comp.declare_coloring('x*', method='cs', repeats=2)
+    comp.declare_coloring('x*', method='cs', num_full_jacs=2)
 
 
-Note that in the call to :code:`declare_coloring`, we also set :code:`repeats` to 2.  This means
+Note that in the call to :code:`declare_coloring`, we also set :code:`num_full_jacs` to 2.  This means
 that the first 2 times that a partial jacobian is computed for 'comp', it's values will be computed
 without coloring and stored.  Just prior to the 3rd time, the coloring will be computed and used for
 the rest of the run.
 
 Semi-total derivative coloring can be performed in a similar way, except that
 :code:`declare_coloring` would be called on a :code:`Group` instead of a :code:`Component`.
-:code:`repeats` can also be passed as an arg to :code:`declare_coloring` on the :code:`Group`.
+:code:`num_full_jacs` can also be passed as an arg to :code:`declare_coloring` on the :code:`Group`.
 
 The purpose of :code:`declare_coloring` is to provide all of the necessary information to allow
 OpenMDAO to generate a coloring, either dynamically or manually using :code:`openmdao partial_coloring`.

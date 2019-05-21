@@ -207,13 +207,15 @@ class TestCSColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
-        sparsity = np.array(
+        mask = np.array(
                 [[1, 0, 0, 1, 1, 1, 0],
                  [0, 1, 0, 1, 0, 1, 1],
                  [0, 1, 0, 1, 1, 1, 0],
                  [1, 0, 0, 0, 0, 1, 0],
-                 [0, 1, 1, 0, 1, 1, 1]], dtype=float
+                 [0, 1, 1, 0, 1, 1, 1]]
             )
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.random.random(4))
@@ -244,13 +246,16 @@ class TestCSColoring(unittest.TestCase):
 
         # create sparsity with last row and col all zeros.
         # bug happened when we created a COO matrix without supplying shape
-        sparsity = np.array(
+        mask = np.array(
                 [[1, 0, 0, 1, 1, 1, 0],
                  [0, 1, 0, 1, 0, 1, 0],
                  [0, 1, 0, 1, 1, 1, 0],
                  [1, 0, 0, 0, 0, 1, 0],
-                 [0, 0, 0, 0, 0, 0, 0]], dtype=float
+                 [0, 0, 0, 0, 0, 0, 0]]
             )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.random.random(4))
@@ -269,18 +274,23 @@ class TestCSColoring(unittest.TestCase):
         prob.run_model()
 
         comp._linearize()
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity)
 
     def test_simple_partials_implicit(self):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1, 1, 0],
              [0, 1, 0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1, 1, 0],
              [1, 0, 0, 0, 0, 1, 0],
-             [0, 1, 1, 0, 1, 1, 1]], dtype=float
+             [0, 1, 1, 0, 1, 1, 1]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(4))
@@ -310,13 +320,16 @@ class TestCSColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -351,13 +364,16 @@ class TestCSColoring(unittest.TestCase):
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         prob.driver.declare_coloring()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -393,13 +409,16 @@ class TestCSColoring(unittest.TestCase):
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         prob.driver.declare_coloring()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -438,13 +457,16 @@ class TestCSColoring(unittest.TestCase):
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
         prob.driver.declare_coloring()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -502,13 +524,16 @@ class TestCSStaticColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
-        sparsity = np.array(
+        mask = np.array(
                 [[1, 0, 0, 1, 1, 1, 0],
                  [0, 1, 0, 1, 0, 1, 1],
                  [0, 1, 0, 1, 1, 1, 0],
                  [1, 0, 0, 0, 0, 1, 0],
-                 [0, 1, 1, 0, 1, 1, 1]], dtype=float
+                 [0, 1, 1, 0, 1, 1, 1]]
             )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.random.random(4))
@@ -557,13 +582,16 @@ class TestCSStaticColoring(unittest.TestCase):
 
         # create sparsity with last row and col all zeros.
         # bug happened when we created a COO matrix without supplying shape
-        sparsity = np.array(
+        mask = np.array(
                 [[1, 0, 0, 1, 1, 1, 0],
                  [0, 1, 0, 1, 0, 1, 0],
                  [0, 1, 0, 1, 1, 1, 0],
                  [1, 0, 0, 0, 0, 1, 0],
-                 [0, 0, 0, 0, 0, 0, 0]], dtype=float
+                 [0, 0, 0, 0, 0, 0, 0]]
             )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.random.random(4))
@@ -606,13 +634,16 @@ class TestCSStaticColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1, 1, 0],
              [0, 1, 0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1, 1, 0],
              [1, 0, 0, 0, 0, 1, 0],
-             [0, 1, 1, 0, 1, 1, 1]], dtype=float
+             [0, 1, 1, 0, 1, 1, 1]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(4))
@@ -661,13 +692,16 @@ class TestCSStaticColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -726,13 +760,16 @@ class TestCSStaticColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -792,13 +829,16 @@ class TestCSStaticColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -858,13 +898,16 @@ class TestCSStaticColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -924,13 +967,16 @@ class TestCSStaticColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -993,13 +1039,16 @@ class TestCSStaticColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
-        sparsity = np.array(
+        mask = np.array(
             [[1, 0, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [0, 1, 0, 1, 1],
              [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
+             [0, 1, 1, 0, 0]]
         )
+
+        sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+        sparsity = sparsity * mask
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -1090,13 +1139,20 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = Group()
 
-        sparsity = np.array(
-            [[1, 0, 0, 1, 1],
-             [0, 1, 0, 1, 1],
-             [0, 1, 0, 1, 1],
-             [1, 0, 0, 0, 0],
-             [0, 1, 1, 0, 0]], dtype=float
-        )
+        if MPI.COMM_WORLD.rank == 0:
+            mask = np.array(
+                [[1, 0, 0, 1, 1],
+                 [0, 1, 0, 1, 1],
+                 [0, 1, 0, 1, 1],
+                 [1, 0, 0, 0, 0],
+                 [0, 1, 1, 0, 0]]
+            )
+
+            sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+            sparsity = sparsity * mask
+            MPI.COMM_WORLD.bcast(sparsity, root=0)
+        else:
+            sparsity = MPI.COMM_WORLD.bcast(None, root=0)
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(3))
@@ -1164,13 +1220,20 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
-        sparsity = np.array(
-            [[1, 0, 0, 1, 1, 1, 0],
-             [0, 1, 0, 1, 0, 1, 1],
-             [0, 1, 0, 1, 1, 1, 0],
-             [1, 0, 0, 0, 0, 1, 0],
-             [0, 1, 1, 0, 1, 1, 1]], dtype=float
-        )
+        if MPI.COMM_WORLD.rank == 0:
+            mask = np.array(
+                [[1, 0, 0, 1, 1, 1, 0],
+                 [0, 1, 0, 1, 0, 1, 1],
+                 [0, 1, 0, 1, 1, 1, 0],
+                 [1, 0, 0, 0, 0, 1, 0],
+                 [0, 1, 1, 0, 1, 1, 1]]
+            )
+
+            sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+            sparsity = sparsity * mask
+            MPI.COMM_WORLD.bcast(sparsity, root=0)
+        else:
+            sparsity = MPI.COMM_WORLD.bcast(None, root=0)
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(4))
@@ -1228,13 +1291,20 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
-        sparsity = np.array(
-                [[1, 0, 0, 1, 1, 1, 0],
-                 [0, 1, 0, 1, 0, 1, 1],
-                 [0, 1, 0, 1, 1, 1, 0],
-                 [1, 0, 0, 0, 0, 1, 0],
-                 [0, 1, 1, 0, 1, 1, 1]], dtype=float
-            )
+        if MPI.COMM_WORLD.rank == 0:
+            mask = np.array(
+                    [[1, 0, 0, 1, 1, 1, 0],
+                     [0, 1, 0, 1, 0, 1, 1],
+                     [0, 1, 0, 1, 1, 1, 0],
+                     [1, 0, 0, 0, 0, 1, 0],
+                     [0, 1, 1, 0, 1, 1, 1]]
+                )
+
+            sparsity = np.random.random(np.product(mask.shape)).reshape(*mask.shape)
+            sparsity = sparsity * mask
+            MPI.COMM_WORLD.bcast(sparsity, root=0)
+        else:
+            sparsity = MPI.COMM_WORLD.bcast(None, root=0)
 
         indeps = IndepVarComp()
         indeps.add_output('x0', np.ones(4))

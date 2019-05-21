@@ -63,7 +63,7 @@ _DYN_COLORING = object()
 _DEF_COMP_SPARSITY_ARGS = {
     'tol': 1e-15,
     'orders': 15,
-    'repeats': 3,
+    'num_full_jacs': 3,
     'perturb_size': 1e-9,
     'show_summary': True,
     'show_sparsity': False,
@@ -1081,14 +1081,14 @@ def _compute_total_coloring_context(top):
             jac._randomize = False
 
 
-def _get_bool_total_jac(prob, repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
+def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                         tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                         orders=_DEF_COMP_SPARSITY_ARGS['orders'], setup=False, run_model=False):
     """
     Return a boolean version of the total jacobian.
 
-    The jacobian is computed by calculating a total jacobian using _compute_totals 'repeats'
-    times and adding the absolute values of those together, then dividing by 'repeats',
+    The jacobian is computed by calculating a total jacobian using _compute_totals 'num_full_jacs'
+    times and adding the absolute values of those together, then dividing by 'num_full_jacs',
     then converting to a boolean array, specifying all entries below a tolerance as False and all
     others as True.  Prior to calling _compute_totals, all of the partial jacobians in the
     model are modified so that when any of their subjacobians are assigned a value, that
@@ -1098,7 +1098,7 @@ def _get_bool_total_jac(prob, repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
     ----------
     prob : Problem
         The Problem being analyzed.
-    repeats : int
+    num_full_jacs : int
         Number of times to repeat total jacobian computation.
     tol : float
         Starting tolerance on values in jacobian.  Actual tolerance is computed based on
@@ -1114,7 +1114,7 @@ def _get_bool_total_jac(prob, repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
     Returns
     -------
     ndarray
-        A boolean composite of 'repeats' total jacobians.
+        A boolean composite of 'num_full_jacs' total jacobians.
     """
     # clear out any old simul coloring info
     prob.driver._res_jacs = {}
@@ -1128,7 +1128,7 @@ def _get_bool_total_jac(prob, repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
     with _compute_total_coloring_context(prob.model):
         start_time = time.time()
         fullJ = None
-        for i in range(repeats):
+        for i in range(num_full_jacs):
             J = prob.driver._compute_totals(return_format='array')
             if fullJ is None:
                 fullJ = np.abs(J)
@@ -1136,14 +1136,15 @@ def _get_bool_total_jac(prob, repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
                 fullJ += np.abs(J)
         elapsed = time.time() - start_time
 
-    fullJ /= repeats
+    fullJ /= num_full_jacs
 
     good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(fullJ, tol, orders)
 
     print("\nUsing tolerance: %g" % good_tol)
     print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
           "tested.\n" % (zero_entries, fullJ.size, nz_matches, n_tested))
-    print("Full total jacobian was computed %d times, taking %f seconds." % (repeats, elapsed))
+    print("Full total jacobian was computed %d times, taking %f seconds." % (num_full_jacs,
+                                                                             elapsed))
     print("Total jacobian shape:", fullJ.shape, "\n")
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
@@ -1247,7 +1248,7 @@ def _get_response_sizes(driver, names):
 
 
 def get_tot_jac_sparsity(problem, mode='fwd',
-                         repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
+                         num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                          tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                          setup=False, run_model=False):
     """
@@ -1259,7 +1260,7 @@ def get_tot_jac_sparsity(problem, mode='fwd',
         The Problem being analyzed.
     mode : str
         Derivative direction.
-    repeats : int
+    num_full_jacs : int
         Number of times to repeat total jacobian computation.
     tol : float
         Tolerance used to determine if an array entry is nonzero.
@@ -1277,7 +1278,8 @@ def get_tot_jac_sparsity(problem, mode='fwd',
     """
     driver = problem.driver
 
-    J, _ = _get_bool_total_jac(problem, repeats=repeats, tol=tol, setup=setup, run_model=run_model)
+    J, _ = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol, setup=setup,
+                               run_model=run_model)
 
     ofs = driver._get_ordered_nl_responses()
     wrts = list(driver._designvars)
@@ -1352,7 +1354,7 @@ def _compute_coloring(J, mode):
 
 
 def compute_total_coloring(problem, mode=None,
-                           repeats=_DEF_COMP_SPARSITY_ARGS['repeats'],
+                           num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                            tol=_DEF_COMP_SPARSITY_ARGS['tol'],
                            orders=_DEF_COMP_SPARSITY_ARGS['orders'],
                            setup=False, run_model=False, bool_jac=None, fname=None):
@@ -1365,7 +1367,7 @@ def compute_total_coloring(problem, mode=None,
         The Problem being analyzed.
     mode : str or None
         The direction for computing derivatives.  If None, use problem._mode.
-    repeats : int
+    num_full_jacs : int
         Number of times to repeat total jacobian computation.
     tol : float
         Tolerance used to determine if an array entry is nonzero.
@@ -1417,9 +1419,10 @@ def compute_total_coloring(problem, mode=None,
                 problem.run_model()
             coloring = model._compute_approx_coloring(wrt_patterns='*',
                                                       method=list(model._approx_schemes)[0],
-                                                      repeats=repeats, tol=tol, orders=orders)[0]
+                                                      num_full_jacs=num_full_jacs, tol=tol,
+                                                      orders=orders)[0]
         else:
-            J, sparsity_time = _get_bool_total_jac(problem, repeats=repeats, tol=tol,
+            J, sparsity_time = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                    orders=orders, setup=setup,
                                                    run_model=run_model)
             coloring = _compute_coloring(J, mode)
@@ -1430,7 +1433,7 @@ def compute_total_coloring(problem, mode=None,
             coloring._sparsity_time = sparsity_time
 
             # save metadata we used to create the coloring
-            coloring._meta = {'repeats': repeats, 'tol': tol, 'orders': orders}
+            coloring._meta = {'num_full_jacs': num_full_jacs, 'tol': tol, 'orders': orders}
 
             driver._total_jac = None
 
@@ -1470,10 +1473,10 @@ def dynamic_derivs_sparsity(driver):
         return
 
     driver._total_jac = None
-    repeats = driver.options['dynamic_derivs_repeats']
+    num_full_jacs = driver.options['dynamic_derivs_repeats']
 
     # save the total_sparsity.json file for later inspection
-    sparsity, _ = get_tot_jac_sparsity(problem, mode=problem._mode, repeats=repeats)
+    sparsity, _ = get_tot_jac_sparsity(problem, mode=problem._mode, num_full_jacs=num_full_jacs)
 
     with open("total_sparsity.json", "w") as f:
         _write_sparsity(sparsity, f)
@@ -1510,11 +1513,12 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     problem.driver._coloring_info['coloring'] = None
     problem.driver._res_jacs = {}
 
-    repeats = driver._coloring_info.get('repeats', _DEF_COMP_SPARSITY_ARGS['repeats'])
+    num_full_jacs = driver._coloring_info.get('num_full_jacs',
+                                              _DEF_COMP_SPARSITY_ARGS['num_full_jacs'])
     tol = driver._coloring_info.get('tol', _DEF_COMP_SPARSITY_ARGS['tol'])
     orders = driver._coloring_info.get('orders', _DEF_COMP_SPARSITY_ARGS['orders'])
 
-    coloring = compute_total_coloring(problem, repeats=repeats, tol=tol, orders=orders,
+    coloring = compute_total_coloring(problem, num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                                       setup=False, run_model=run_model, fname=fname)
 
     if driver._coloring_info['show_sparsity']:
@@ -1541,7 +1545,7 @@ def _total_coloring_setup_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file (pickle format)')
     parser.add_argument('-n', action='store', dest='num_jacs',
-                        default=_DEF_COMP_SPARSITY_ARGS['repeats'], type=int,
+                        default=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'], type=int,
                         help='number of times to repeat derivative computation when '
                         'computing sparsity')
     parser.add_argument('--orders', action='store', dest='orders',
@@ -1593,7 +1597,8 @@ def _total_coloring_cmd(options):
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 coloring = compute_total_coloring(prob,
-                                                  repeats=options.num_jacs, tol=options.tolerance,
+                                                  num_full_jacs=options.num_jacs,
+                                                  tol=options.tolerance,
                                                   orders=options.orders,
                                                   setup=False, run_model=True, fname=outfile)
 
@@ -1639,7 +1644,7 @@ def _partial_coloring_setup_parser(parser):
                         'to "fd" method.')
     parser.add_argument('--perturbation', action='store', dest='perturb_size', default=1e-3,
                         type=float, help='random perturbation size used when computing sparsity.')
-    parser.add_argument('-n', action='store', dest='repeats', default=3, type=int,
+    parser.add_argument('-n', action='store', dest='num_full_jacs', default=3, type=int,
                         help='number of times to repeat derivative computation when '
                         'computing sparsity')
     parser.add_argument('--tol', action='store', dest='tol', default=1.e-15, type=float,
@@ -1659,7 +1664,7 @@ def _get_partial_coloring_kwargs(options):
             raise RuntimeError("Can't specify --class if recurse option is set.")
 
     kwargs = {}
-    names = ('method', 'form', 'step', 'repeats', 'perturb_size', 'tol')
+    names = ('method', 'form', 'step', 'num_full_jacs', 'perturb_size', 'tol')
     for name in names:
         if getattr(options, name):
             kwargs[name] = getattr(options, name)
@@ -1801,7 +1806,8 @@ def _sparsity_cmd(options):
 
     def _sparsity(prob):
         Problem._post_setup_func = None  # avoid recursive loop
-        sparsity, J = get_tot_jac_sparsity(prob, repeats=options.num_jacs, tol=options.tolerance,
+        sparsity, J = get_tot_jac_sparsity(prob, num_full_jacs=options.num_jacs,
+                                           tol=options.tolerance,
                                            mode=prob._mode, setup=True, run_model=True)
 
         if options.outfile is None:

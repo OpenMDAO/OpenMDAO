@@ -63,11 +63,11 @@ For example:
 If you want to change the number of `compute_totals` calls that the coloring algorithm uses to
 compute the jacobian sparsity (default is 3), the tolerance used to determine nonzeros
 (default is 1e-15), or the number of orders to use for the tolerance sweep (default is 15),
-you can pass the `repeats`, `tol`, and `orders` args. For example:
+you can pass the `num_full_jacs`, `tol`, and `orders` args. For example:
 
 .. code-block:: python
 
-    prob.driver.declare_coloring(repeats=2, tol=1e-20, orders=20)
+    prob.driver.declare_coloring(num_full_jacs=2, tol=1e-20, orders=20)
 
 
 If you want to set a specific tolerance and skip the tolerance sweep, you can set
@@ -242,7 +242,7 @@ For example:
 .. code-block:: none
 
     Coloring metadata:
-    {'orders': 20, 'repeats': 3, 'tol': 1e-15}
+    {'orders': 20, 'num_full_jacs': 3, 'tol': 1e-15}
 
     Jacobian shape: (22, 21)  (13.42% nonzero)
 

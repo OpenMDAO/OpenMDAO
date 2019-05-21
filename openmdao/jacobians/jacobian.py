@@ -299,7 +299,7 @@ class Jacobian(object):
             for key in subjacs:
                 summ[key] += np.abs(subjacs[key]['value'])
 
-    def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, repeats, tol, orders):
+    def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, num_full_jacs, tol, orders):
         """
         Compute a dense sparsity matrix for this jacobian using saved absolute summations.
 
@@ -312,7 +312,7 @@ class Jacobian(object):
             Name, offset, etc. of row variables in the order that they appear in the jacobian.
         ordered_wrt_info : list of (name, offset, end, idxs)
             Name, offset, etc. of column variables in the order that they appear in the jacobian.
-        repeats : int
+        num_full_jacs : int
             Number of times to compute partial jacobian when computing sparsity.
         tol : float
             Tolerance used to determine if an array entry is zero or nonzero.
@@ -348,7 +348,7 @@ class Jacobian(object):
                         J[roffset:rend, coffset:cend] = summ[key]
 
         # normalize by number of saved jacs, giving a sort of 'average' jac
-        J /= repeats
+        J /= num_full_jacs
 
         good_tol, _, _, _ = _tol_sweep(J, tol, orders)
 

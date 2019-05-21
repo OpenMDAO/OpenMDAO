@@ -962,7 +962,7 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
                                self._get_name())
 
-    def declare_coloring(self, repeats=coloring_mod._DEF_COMP_SPARSITY_ARGS['repeats'],
+    def declare_coloring(self, num_full_jacs=coloring_mod._DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                          tol=coloring_mod._DEF_COMP_SPARSITY_ARGS['tol'],
                          orders=coloring_mod._DEF_COMP_SPARSITY_ARGS['orders'],
                          perturb_size=coloring_mod._DEF_COMP_SPARSITY_ARGS['perturb_size'],
@@ -973,7 +973,7 @@ class Driver(object):
 
         Parameters
         ----------
-        repeats : int
+        num_full_jacs : int
             Number of times to repeat partial jacobian computation when computing sparsity.
         tol : float
             Tolerance used to determine if an array entry is nonzero during sparsity determination.
@@ -986,7 +986,7 @@ class Driver(object):
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
         """
-        self._coloring_info['repeats'] = repeats
+        self._coloring_info['num_full_jacs'] = num_full_jacs
         self._coloring_info['tol'] = tol
         self._coloring_info['orders'] = orders
         self._coloring_info['perturb_size'] = perturb_size

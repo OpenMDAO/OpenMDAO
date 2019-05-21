@@ -920,7 +920,7 @@ class Component(System):
                          form=None,
                          step=None,
                          per_instance=_DEFAULT_COLORING_META['per_instance'],
-                         repeats=_DEFAULT_COLORING_META['repeats'],
+                         num_full_jacs=_DEFAULT_COLORING_META['num_full_jacs'],
                          tol=_DEFAULT_COLORING_META['tol'],
                          orders=_DEFAULT_COLORING_META['orders'],
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
@@ -946,7 +946,7 @@ class Component(System):
             If True, a separate coloring will be generated for each instance of a given class.
             Otherwise, only one coloring for a given class will be generated and all instances
             of that class will use it.
-        repeats : int
+        num_full_jacs : int
             Number of times to repeat partial jacobian computation when computing sparsity.
         tol : float
             Tolerance used to determine if an array entry is nonzero during sparsity determination.
@@ -959,7 +959,8 @@ class Component(System):
         show_sparsity : bool
             If True, display sparsity with coloring info after generating coloring.
         """
-        super(Component, self).declare_coloring(wrt, method, form, step, per_instance, repeats,
+        super(Component, self).declare_coloring(wrt, method, form, step, per_instance,
+                                                num_full_jacs,
                                                 tol, orders, perturb_size,
                                                 show_summary, show_sparsity)
         # create approx partials for all matches

@@ -78,7 +78,7 @@ class DynPartialsComp(ExplicitComponent):
         self.add_output('g', np.ones(self.size))
 
         # turn on dynamic partial coloring
-        self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, repeats=2, tol=1e-20,
+        self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
                               orders=20)
 
     def compute(self, inputs, outputs):
@@ -297,7 +297,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
 
         # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
-        # - dynamic coloring takes 66 nonlinear solves (22 each for 3 repeats)
+        # - dynamic coloring takes 66 nonlinear solves (22 each for 3 full jacs)
         # - (total_solves - 2) / (solves_per_iter) should be equal to
         #       (total_color_solves - 2 - dyn_solves) / color_solves_per_iter
         self.assertEqual((p.model._solve_nl_count - 2) / 22,
@@ -316,7 +316,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
 
         # - fwd coloring saves 16 nonlinear solves per driver iter  (6 vs 22).
-        # - dynamic coloring takes 66 nonlinear solves (22 each for 3 repeats)
+        # - dynamic coloring takes 66 nonlinear solves (22 each for 3 full jacs)
         # - (total_solves - 2) / (solves_per_iter) should be equal to
         #       (total_color_solves - 2 - dyn_solves) / color_solves_per_iter
         self.assertEqual((p.model._solve_nl_count - 2) / 22,
@@ -594,7 +594,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                 self.declare_partials('*', '*', method='cs')
 
                 # turn on dynamic partial coloring
-                self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, repeats=2, tol=1e-20,
+                self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20,
                                       orders=20, show_summary=True, show_sparsity=True)
 
             def compute(self, inputs, outputs):
