@@ -126,6 +126,7 @@ packages = [
     'test_suite.components',
     'test_suite.scripts',
     'vectors',
+    'utils',
 ]
 
 if os.path.isfile("make_sourcedocs"):

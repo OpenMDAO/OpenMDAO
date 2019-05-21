@@ -1,6 +1,7 @@
 """ Testing for group finite differencing."""
 from six.moves import range
 import unittest
+import os
 import itertools
 from six import iterkeys
 
@@ -56,7 +57,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(model._approx_schemes['fd']._exec_list), 2)
+        self.assertEqual(len(model._approx_schemes['fd']._exec_dict), 2)
 
     def test_fd_count(self):
         # Make sure we aren't doing extra FD steps.
@@ -99,7 +100,8 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         prob.setup(check=False)
         prob.run_model()
-        print(prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y']))
+        J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
+        # print(J)
 
         # 1. run_model; 2. step x; 3. step y
         self.assertEqual(model.parab.count, 3)
@@ -176,7 +178,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
+        self.assertEqual(len(sub._approx_schemes['fd']._exec_dict), 2)
 
     def test_paraboloid_subbed_in_setup(self):
         class MyModel(Group):
@@ -210,7 +212,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 2)
+        self.assertEqual(len(sub._approx_schemes['fd']._exec_dict), 2)
 
     def test_paraboloid_subbed_with_connections(self):
         prob = Problem()
@@ -246,7 +248,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[8.0]], 1e-6)
 
         # 3 outputs x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['fd']._exec_list), 6)
+        n_entries = 0
+        for k, v in sub._approx_schemes['fd']._exec_dict.items():
+            n_entries += len(v)
+        self.assertEqual(n_entries, 6)
 
     def test_array_comp(self):
 
@@ -788,7 +793,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy', 'y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(model._approx_schemes['cs']._exec_list), 2)
+        self.assertEqual(len(model._approx_schemes['cs']._exec_dict), 2)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
@@ -824,7 +829,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.comp.y'], [[8.0]], 1e-6)
 
         # 1 output x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 2)
+        self.assertEqual(len(sub._approx_schemes['cs']._exec_dict), 2)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
@@ -867,7 +872,10 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, Jfd['sub.comp.f_xy', 'sub.by.yin'], [[8.0]], 1e-6)
 
         # 3 outputs x 2 inputs
-        self.assertEqual(len(sub._approx_schemes['cs']._exec_list), 6)
+        n_entries = 0
+        for k, v in sub._approx_schemes['cs']._exec_dict.items():
+            n_entries += len(v)
+        self.assertEqual(n_entries, 6)
 
     @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
@@ -1631,11 +1639,7 @@ class TestGroupComplexStep(unittest.TestCase):
         wrt = ['z']
         of = ['obj']
 
-        #with self.assertRaises(RuntimeError) as cm:
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
-
-        msg = "Nested Complex Step is not supported in system 'd1'"
-        #self.assertEqual(str(cm.exception), msg)
 
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)

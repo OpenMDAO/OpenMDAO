@@ -7,6 +7,9 @@ from six.moves import range
 from openmdao.jacobians.jacobian import Jacobian
 
 
+_full_slice = slice(None)
+
+
 class DictionaryJacobian(Jacobian):
     """
     No global <Jacobian>; use dictionary of user-supplied sub-Jacobians.
@@ -30,7 +33,6 @@ class DictionaryJacobian(Jacobian):
             options dictionary.
         """
         super(DictionaryJacobian, self).__init__(system, **kwargs)
-
         self._iter_keys = {}
 
     def _iter_abs_keys(self, system, vec_name):
@@ -88,7 +90,6 @@ class DictionaryJacobian(Jacobian):
         from openmdao.core.explicitcomponent import ExplicitComponent
 
         fwd = mode == 'fwd'
-        system = self._system
         d_res_names = d_residuals._names
         d_out_names = d_outputs._names
         d_inp_names = d_inputs._names
@@ -96,14 +97,14 @@ class DictionaryJacobian(Jacobian):
         oflat = d_outputs._views_flat
         iflat = d_inputs._views_flat
         np_add_at = np.add.at
+        ncol = d_residuals._ncol
+        subjacs_info = self._subjacs_info
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-            ncol = d_residuals._ncol
-            subjacs_info = self._subjacs_info
             for abs_key in self._iter_abs_keys(system, d_residuals._name):
                 subjac_info = subjacs_info[abs_key]
                 if self._randomize:
-                    subjac = self._randomize_subjac(subjac_info['value'])
+                    subjac = self._randomize_subjac(subjac_info['value'], abs_key)
                 else:
                     subjac = subjac_info['value']
                 res_name, other_name = abs_key

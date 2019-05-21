@@ -6,17 +6,21 @@ import os
 from contextlib import contextmanager
 from collections import OrderedDict, Iterable, defaultdict
 from fnmatch import fnmatchcase
+import sys
+import os
+import time
 from numbers import Integral
+import itertools
+from pprint import pprint
 
-from six import iteritems, string_types
+from six import iteritems, itervalues, string_types
 
 import numpy as np
 import networkx as nx
 
 import openmdao
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
-from openmdao.utils.general_utils import determine_adder_scaler, \
-    format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
@@ -25,6 +29,15 @@ from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.write_outputs import write_outputs
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
+from openmdao.utils.name_maps import rel_name2abs_name
+from openmdao.utils.coloring import _compute_coloring, Coloring, \
+    _STD_COLORING_FNAME, _DYN_COLORING, _DEF_COMP_SPARSITY_ARGS
+import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
+    format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
+    simple_warning
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -35,6 +48,25 @@ _asm_jac_types = {
     'csc': CSCJacobian,
     'dense': DenseJacobian,
 }
+
+# Suppored methods for derivatives
+_supported_methods = {
+    'fd': FiniteDifference,
+    'cs': ComplexStep,
+    'exact': None
+}
+
+_DEFAULT_COLORING_META = {
+    'wrt_patterns': ('*',),
+    'method': 'fd',
+    'wrt_matches': None,
+    'per_instance': False,
+    'coloring': None,
+}
+
+_DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
+
+_full_slice = slice(None)
 
 
 class System(object):
@@ -64,6 +96,8 @@ class System(object):
         options dictionary
     recording_options : OptionsDictionary
         Recording options dictionary
+    _problem_options : OptionsDictionary
+        Problem level options.
     under_complex_step : bool
         When True, this system is undergoing complex step.
     force_alloc_complex : bool
@@ -97,6 +131,8 @@ class System(object):
         For outputs, the list will have length one since promoted output names are unique.
     _var_abs2prom : {'input': dict, 'output': dict}
         Dictionary mapping absolute names to promoted names, on current proc.
+    _var_allprocs_abs2prom : {'input': dict, 'output': dict}
+        Dictionary mapping absolute names to promoted names, on all procs.
     _var_allprocs_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for allprocs variables.
         The keys are
@@ -115,11 +151,11 @@ class System(object):
     _var_allprocs_abs2idx : dict
         Dictionary mapping absolute names to their indices among this system's allprocs variables.
         Therefore, the indices range from 0 to the total number of this system's variables.
-    _var_sizes : {'input': ndarray, 'output': ndarray}
+    _var_sizes : {<vecname>: {'input': ndarray, 'output': ndarray}, ...}
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
-    _var_offsets : {'input': dict of ndarray, 'output': dict of ndarray} or None
+    _var_offsets : {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
         Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
         in this System's communicator and num_var is the number of allprocs variables
@@ -163,7 +199,7 @@ class System(object):
         If True, this system approximated its Jacobian
     _owns_approx_jac_meta : dict
         Stores approximation metadata (e.g., step_size) from calls to approx_totals
-    _owns_approx_of : set or None
+    _owns_approx_of : list or None
         Overrides aproximation outputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's output quantities to the approximation objects so that
         we only take derivatives of variables that the driver needs.
@@ -172,7 +208,7 @@ class System(object):
         or `add_constraint`, they may optionally specify an "indices" argument. This argument must
         also be communicated to the approximations when they are set up so that 1) the Jacobian is
         the correct size, and 2) we don't perform any extra unnecessary calculations.
-    _owns_approx_wrt : set or None
+    _owns_approx_wrt : list or None
         Overrides aproximation inputs. This is set when calculating system derivatives, and serves
         as a way to communicate the driver's input quantities to the approximation objects so that
         we only take derivatives with respect to variables that the driver needs.
@@ -247,6 +283,14 @@ class System(object):
         ID used to determine which columns in the jacobian will be computed when using parallel FD.
     _use_derivatives : bool
         If True, perform any memory allocations necessary for derivative computation.
+    _has_approx : bool
+        If True, this system or its descendent has declared approximated partial or semi-total
+        derivatives.
+    _coloring_info : tuple
+        Metadata that defines how to perform coloring of this System's approx jacobian. Not
+        used if this System does no partial or semi-total coloring.
+    _first_call_to_linearize : bool
+        If True, this is the first call to _linearize.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -292,6 +336,8 @@ class System(object):
         self.recording_options.declare('options_excludes', types=list, default=[],
                                        desc='User-defined metadata to exclude in recording')
 
+        self._problem_options = None
+
         # Case recording related
         self.iter_count = 0
 
@@ -307,6 +353,7 @@ class System(object):
         self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
         self._var_discrete = {'input': {}, 'output': {}}
@@ -327,6 +374,8 @@ class System(object):
         self._inputs = None
         self._outputs = None
         self._residuals = None
+        self._discrete_inputs = None
+        self._discrete_outputs = None
 
         self._lower_bounds = None
         self._upper_bounds = None
@@ -386,6 +435,7 @@ class System(object):
         self._local_vector_class = None
         self._distributed_vector_class = None
         self._use_derivatives = True
+        self._has_approx = False
 
         self._assembled_jac = None
 
@@ -394,6 +444,8 @@ class System(object):
         self._filtered_vars_to_record = {}
         self._owning_rank = None
         self._lin_vec_names = []
+        self._coloring_info = _DEFAULT_COLORING_META.copy()
+        self._first_call_to_linearize = True   # will check in first call to _linearize
 
     def _declare_options(self):
         """
@@ -588,6 +640,29 @@ class System(object):
 
         return root_vectors
 
+    def _get_approx_scheme(self, method):
+        """
+        Return the approximation scheme associated with the given method, creating one if needed.
+
+        Parameters
+        ----------
+        method : str
+            Name of the type of approxmation scheme.
+
+        Returns
+        -------
+        ApproximationScheme
+            The ApproximationScheme associated with the given method.
+        """
+        if method == 'exact':
+            return None
+        if method not in _supported_methods:
+            msg = 'Method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(method, [m for m in _supported_methods if m != 'exact']))
+        if method not in self._approx_schemes:
+            self._approx_schemes[method] = _supported_methods[method]()
+        return self._approx_schemes[method]
+
     def _get_bounds_root_vectors(self, vector_class, initial):
         """
         Get the root vectors for the lower and upper bounds vectors.
@@ -627,12 +702,13 @@ class System(object):
         self._setup(self.comm, setup_mode=setup_mode, mode=self._mode,
                     distributed_vector_class=self._distributed_vector_class,
                     local_vector_class=self._local_vector_class,
-                    use_derivatives=self._use_derivatives)
+                    use_derivatives=self._use_derivatives,
+                    prob_options=self._problem_options)
         self._final_setup(self.comm, setup_mode=setup_mode,
                           force_alloc_complex=self._outputs._alloc_complex)
 
     def _setup(self, comm, setup_mode, mode, distributed_vector_class, local_vector_class,
-               use_derivatives):
+               use_derivatives, prob_options=None):
         """
         Perform setup for this system and its descendant systems.
 
@@ -657,7 +733,12 @@ class System(object):
             and associated transfers involved in intraprocess communication.
         use_derivatives : bool
             If True, perform any memory allocations necessary for derivative computation.
+        prob_options : OptionsDictionary
+            Problem level options dictionary.
         """
+        # save a ref to the problem level options.
+        self._problem_options = prob_options
+
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
             recurse = True
@@ -680,7 +761,7 @@ class System(object):
         # If we're only updating and not recursing, processors don't need to be redistributed.
         if recurse:
             # Besides setting up the processors, this method also builds the model hierarchy.
-            self._setup_procs(self.pathname, comm, mode)
+            self._setup_procs(self.pathname, comm, mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
         self._configure()
@@ -696,6 +777,425 @@ class System(object):
         self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
+        """
+        Use a precomputed coloring for this System.
+
+        Parameters
+        ----------
+        coloring : str
+            A coloring filename.  If no arg is passed, filename will be determined
+            automatically.
+        recurse : bool
+            If True, set fixed coloring in all subsystems that declare a coloring. Ignored
+            if a specific coloring is passed in.
+        """
+        if coloring not in (_STD_COLORING_FNAME, _DYN_COLORING):
+            if recurse:
+                simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
+                               "coloring was set, so recurse was ignored." % self.pathname)
+            self._coloring_info['coloring'] = coloring
+            if isinstance(coloring, Coloring):
+                approx = self._get_approx_scheme(coloring._meta['method'])
+                # force regen of approx groups on next call to compute_approximations
+                approx._colored_approx_groups = None
+                approx._approx_groups = None
+            return
+
+        if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
+            # force the generation of a dynamic coloring this time
+            coloring = _DYN_COLORING
+
+        if self._coloring_info['coloring'] is None:
+            simple_warning('%s: use_fixed_coloring() ignored because no coloring was declared.' %
+                           self.pathname)
+        else:
+            self._coloring_info['coloring'] = coloring
+
+        if recurse:
+            for s in self._subsystems_myproc:
+                s.use_fixed_coloring(coloring, recurse)
+
+    def declare_coloring(self,
+                         wrt=_DEFAULT_COLORING_META['wrt_patterns'],
+                         method=_DEFAULT_COLORING_META['method'],
+                         form=None,
+                         step=None,
+                         per_instance=_DEFAULT_COLORING_META['per_instance'],
+                         num_full_jacs=_DEFAULT_COLORING_META['num_full_jacs'],
+                         tol=_DEFAULT_COLORING_META['tol'],
+                         orders=_DEFAULT_COLORING_META['orders'],
+                         perturb_size=_DEFAULT_COLORING_META['perturb_size'],
+                         show_summary=_DEFAULT_COLORING_META['show_summary'],
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+        """
+        Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain input names, output names, or glob patterns.
+        method : str
+            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference. Leave undeclared to keep unchanged from previous
+            or default value.
+        per_instance : bool
+            If True, a separate coloring will be generated for each instance of a given class.
+            Otherwise, only one coloring for a given class will be generated and all instances
+            of that class will use it.
+        num_full_jacs : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination.
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep.
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity.
+        show_summary : bool
+            If True, display summary information after generating coloring.
+        show_sparsity : bool
+            If True, display sparsity with coloring info after generating coloring.
+        """
+        if method not in ('fd', 'cs'):
+            raise RuntimeError("method must be one of ['fd', 'cs'].")
+
+        self._has_approx = True
+        approx = self._get_approx_scheme(method)
+
+        # start with defaults
+        options = _DEFAULT_COLORING_META.copy()
+        options.update(approx.DEFAULT_OPTIONS)
+
+        if self._coloring_info['coloring'] is None:
+            # calling declare_coloring turns on dynamic coloring.  Calling use_fixed_coloring
+            # will switch it to use a static coloring.
+            options['coloring'] = _DYN_COLORING
+        else:
+            # this will handle cases where use_fixed_coloring was called before declare_coloring
+            options['coloring'] = self._coloring_info['coloring']
+
+        options['wrt_patterns'] = [wrt] if isinstance(wrt, string_types) else wrt
+        options['method'] = method
+        options['per_instance'] = per_instance
+        options['repeat'] = num_full_jacs
+        options['tol'] = tol
+        options['orders'] = orders
+        options['perturb_size'] = perturb_size
+        options['show_summary'] = show_summary
+        options['show_sparsity'] = show_sparsity
+        if form is not None:
+            options['form'] = form
+        if step is not None:
+            options['step'] = step
+
+        self._coloring_info = options
+
+    def _compute_approx_coloring(self, recurse=False, **overrides):
+        """
+        Compute a coloring of the approximated derivatives.
+
+        This assumes that the current System is in a proper state for computing approximated
+        derivatives.
+
+        Parameters
+        ----------
+        recurse : bool
+            If True, recurse from this system down the system hierarchy.  Whenever a group
+            is encountered that has specified its coloring metadata, we don't recurse below
+            that group unless that group has a subsystem that has a nonlinear solver that uses
+            gradients.
+        **overrides : dict
+            Any args that will override either default coloring settings or coloring settings
+            resulting from an earlier call to declare_coloring.
+
+        Returns
+        -------
+        list of Coloring
+            The computed colorings.
+        """
+        if recurse:
+            colorings = []
+            my_coloring = self._coloring_info['coloring']
+            grad_systems = self._get_gradient_nl_solver_systems()
+            for s in self.system_iter(include_self=True, recurse=True):
+                if my_coloring is None or s in grad_systems:
+                    if s._coloring_info['coloring'] is not None:
+                        coloring = s._compute_approx_coloring(recurse=False, **overrides)[0]
+                        colorings.append(coloring)
+                        coloring._meta['pathname'] = s.pathname
+                        coloring._meta['class'] = type(s).__name__
+            return colorings
+
+        # don't override metadata if it's already declared
+        info = self._coloring_info
+        info.update(**overrides)
+        if isinstance(info['wrt_patterns'], string_types):
+            info['wrt_patterns'] = [info['wrt_patterns']]
+
+        if info['method'] is None and self._approx_schemes:
+            info['method'] = list(self._approx_schemes)[0]
+
+        if self._coloring_info['coloring'] is None:
+            # check to see if any approx derivs have been declared
+            for meta in self._subjacs_info.values():
+                if 'method' in meta and meta['method']:
+                    break
+            else:  # no approx derivs found
+                simple_warning("%s: No approx partials found but coloring was requested.  "
+                               "Declaring ALL partials as approx (method='%s')" %
+                               (self.pathname, self._coloring_info['method']))
+                try:
+                    self.declare_partials('*', '*', method=self._coloring_info['method'])
+                except AttributeError:  # this system must be a group
+                    from openmdao.core.component import Component
+                    for s in self.system_iter(recurse=True, typ=Component):
+                        s.declare_partials('*', '*', method=self._coloring_info['method'])
+                self._setup_partials(recurse=True)
+
+        approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
+
+        from openmdao.core.group import Group
+        is_total = isinstance(self, Group)
+
+        # compute perturbations
+        starting_inputs = self._inputs._data.copy()
+        in_offsets = starting_inputs.copy()
+        in_offsets[in_offsets == 0.0] = 1.0
+        in_offsets *= info['perturb_size']
+
+        starting_outputs = self._outputs._data.copy()
+        out_offsets = starting_outputs.copy()
+        out_offsets[out_offsets == 0.0] = 1.0
+        out_offsets *= info['perturb_size']
+
+        starting_resids = self._residuals._data.copy()
+
+        if self._coloring_info['coloring'] is None:
+            self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
+
+        # for groups, this does some setup of approximations
+        self._setup_approx_coloring()
+
+        save_first_call = self._first_call_to_linearize
+        self._first_call_to_linearize = False
+        sparsity_start_time = time.time()
+
+        for i in range(info['num_full_jacs']):
+            # randomize inputs (and outputs if implicit)
+            if i > 0:
+                self._inputs._data[:] = \
+                    starting_inputs + in_offsets * np.random.random(in_offsets.size)
+                self._outputs._data[:] = \
+                    starting_outputs + out_offsets * np.random.random(out_offsets.size)
+
+                if is_total:
+                    self._solve_nonlinear()
+                else:
+                    self._apply_nonlinear()
+
+                for scheme in self._approx_schemes.values():
+                    scheme._approx_groups = None  # force a re-initialization of approx
+
+            self.run_linearize()
+            self._jacobian._save_sparsity(self)
+
+        sparsity_time = time.time() - sparsity_start_time
+
+        self._update_wrt_matches()
+
+        ordered_of_info = list(self._jacobian_of_iter())
+        ordered_wrt_info = list(self._jacobian_wrt_iter(info['wrt_matches']))
+        sparsity = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
+                                                    num_full_jacs=info['num_full_jacs'],
+                                                    tol=info['tol'],
+                                                    orders=info['orders'])
+        self._jacobian._jac_summ = None  # reclaim the memory
+        if self.pathname:
+            ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
+            ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
+
+        coloring = _compute_coloring(sparsity, 'fwd')
+        coloring._row_vars = [t[0] for t in ordered_of_info]
+        coloring._col_vars = [t[0] for t in ordered_wrt_info]
+        coloring._row_var_sizes = [t[2] - t[1] for t in ordered_of_info]
+        coloring._col_var_sizes = [t[2] - t[1] for t in ordered_wrt_info]
+        coloring._sparsity_time = sparsity_time
+
+        info = self._coloring_info
+        coloring._meta = info.copy()  # save metadata we used to create the coloring
+        del coloring._meta['coloring']
+
+        info['coloring'] = coloring
+
+        approx = self._get_approx_scheme(coloring._meta['method'])
+        # force regen of approx groups during next compute_approximations
+        approx._colored_approx_groups = None
+        approx._approx_groups = None
+
+        if info['show_sparsity'] or info['show_summary']:
+            print("Approx coloring for '%s' (class %s)\n" % (self.pathname, type(self).__name__))
+
+        if info['show_sparsity']:
+            coloring.display()
+        if info['show_summary']:
+            coloring.summary()
+
+        self._save_coloring(coloring)
+
+        # restore original inputs/outputs
+        self._inputs._data[:] = starting_inputs
+        self._outputs._data[:] = starting_outputs
+        self._residuals._data[:] = starting_resids
+
+        self._first_call_to_linearize = save_first_call
+
+        return [coloring]
+
+    def _setup_approx_coloring(self):
+        pass
+
+    def _jacobian_of_iter(self):
+        """
+        Iterate over (name, offset, end, idxs) for each row var in the systems's jacobian.
+        """
+        abs2meta = self._var_allprocs_abs2meta
+        offset = end = 0
+        for of in self._var_allprocs_abs_names['output']:
+            end += abs2meta[of]['size']
+            yield of, offset, end, _full_slice
+            offset = end
+
+    def _jacobian_wrt_iter(self, wrt_matches=None):
+        """
+        Iterate over (name, offset, end, idxs) for each column var in the systems's jacobian.
+
+        Parameters
+        ----------
+        wrt_matches : set or None
+            Only include row vars that are contained in this set.  This will determine what
+            the actual offsets are, i.e. the offsets will be into a reduced jacobian
+            containing only the matching columns.
+        """
+        if wrt_matches is None:
+            wrt_matches = ContainsAll()
+        abs2meta = self._var_allprocs_abs2meta
+        offset = end = 0
+        for of, _offset, _end, sub_of_idx in self._jacobian_of_iter():
+            if of in wrt_matches:
+                end += (_end - _offset)
+                yield of, offset, end, sub_of_idx
+                offset = end
+
+        for wrt in self._var_allprocs_abs_names['input']:
+            if wrt in wrt_matches:
+                end += abs2meta[wrt]['size']
+                yield wrt, offset, end, _full_slice
+                offset = end
+
+    def get_approx_coloring_fname(self):
+        """
+        Return the full pathname to a coloring file.
+
+        Parameters
+        ----------
+        system : System
+            The System having its coloring saved or loaded.
+
+        Returns
+        -------
+        str
+            Full pathname of the coloring file.
+        """
+        directory = self._problem_options['coloring_dir']
+        if not self.pathname:
+            # total coloring
+            return os.path.join(directory, 'total_coloring.pkl')
+
+        per_instance = self._coloring_info.get('per_instance')
+
+        if per_instance:
+            # base the name on the instance pathname
+            fname = 'coloring_' + self.pathname.replace('.', '_') + '.pkl'
+        else:
+            # base the name on the class name
+            fname = 'coloring_' + '_'.join(
+                [self.__class__.__module__.replace('.', '_'), self.__class__.__name__]) + '.pkl'
+
+        return os.path.join(directory, fname)
+
+    def _save_coloring(self, coloring):
+        """
+        Save the coloring to a file based on this system's class or pathname.
+
+        Parameters
+        ----------
+        coloring : Coloring
+            See Coloring class docstring.
+        """
+        # under MPI, only save on proc 0
+        if ((self._full_comm is not None and self._full_comm.rank == 0) or
+                (self._full_comm is None and self.comm.rank == 0)):
+            coloring.save(self.get_approx_coloring_fname())
+
+    def _get_static_coloring(self):
+        """
+        Get the Coloring for this system.
+
+        If necessary, load the Coloring from a file.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possible loaded from a file, or None
+        """
+        info = self._coloring_info
+        coloring = info['coloring']
+
+        if coloring is _DYN_COLORING:
+            return None
+
+        if coloring is _STD_COLORING_FNAME or isinstance(coloring, string_types):
+            if coloring is _STD_COLORING_FNAME:
+                fname = self.get_approx_coloring_fname()
+            else:
+                fname = coloring
+            print("%s: loading coloring from file %s" % (self.pathname, fname))
+            info['coloring'] = coloring = Coloring.load(fname)
+            if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
+                raise RuntimeError("Loaded coloring has different wrt_patterns (%s) than "
+                                   "declared ones (%s)." % (coloring._meta['wrt_patterns'],
+                                                            info['wrt_patterns']))
+            info.update(info['coloring']._meta)
+            approx = self._get_approx_scheme(info['method'])
+            # force regen of approx groups during next compute_approximations
+            approx._colored_approx_groups = None
+            approx._approx_groups = None
+
+        return coloring
+
+    def _get_coloring(self):
+        """
+        Get the Coloring for this system.
+
+        If necessary, load the Coloring from a file or dynamically generate it.
+
+        Returns
+        -------
+        Coloring or None
+            Coloring object, possible loaded from a file or dynamically generated, or None
+        """
+        coloring = self._get_static_coloring()
+        if coloring is None and self._coloring_info['coloring'] is _DYN_COLORING:
+            self._coloring_info['coloring'] = coloring = self._compute_approx_coloring()[0]
+            self._coloring_info.update(coloring._meta)
+
+        return coloring
 
     def _setup_par_fd_procs(self, comm):
         """
@@ -1074,7 +1574,7 @@ class System(object):
 
     def _setup_connections(self, recurse=True):
         """
-        Compute dict of all implicit and explicit connections owned by this system.
+        Compute dict of all connections owned by this system.
 
         Parameters
         ----------
@@ -1293,8 +1793,8 @@ class System(object):
             for s in nl_asm_jac_solvers:
                 s._assembled_jac = asm_jac
 
-        # note that for a Group, _set_partials_meta does nothing
-        self._set_partials_meta()
+        if self._has_approx:
+            self._set_approx_partials_meta()
 
         # At present, we don't support a AssembledJacobian in a group
         # if any subcomponents are matrix-free.
@@ -1306,11 +1806,6 @@ class System(object):
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_jacobians()
-
-        # allocate internal matrices now that we have all of the subjac metadata
-        if asm_jac is not None:
-            asm_jac._initialize(self)
-            asm_jac._init_view(self)
 
     def set_initial_values(self):
         """
@@ -1477,7 +1972,7 @@ class System(object):
         return self.options
 
     @contextmanager
-    def _unscaled_context(self, outputs=[], residuals=[]):
+    def _unscaled_context(self, outputs=(), residuals=()):
         """
         Context manager for units and scaling for vectors.
 
@@ -1500,12 +1995,12 @@ class System(object):
 
         yield
 
-        for vec in outputs:
-            if self._has_output_scaling:
+        if self._has_output_scaling:
+            for vec in outputs:
                 vec.scale('norm')
 
-        for vec in residuals:
-            if self._has_resid_scaling:
+        if self._has_resid_scaling:
+            for vec in residuals:
                 vec.scale('norm')
 
     @contextmanager
@@ -1778,16 +2273,33 @@ class System(object):
             if subsys.nonlinear_solver is not None and type_ != 'LN':
                 subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
 
-    def _set_partials_meta(self):
-        """
-        Set subjacobian info into our jacobian.
+    def _set_approx_partials_meta(self):
+        # this will load a static coloring (if any) and will populate wrt_matches if
+        # there is any coloring (static or dynamic).
+        self._get_static_wrt_matches()
 
-        Overridden in <Component>.
+    def _get_static_wrt_matches(self):
         """
-        pass
+        Return wrt_matches for static coloring if there is one.
 
-    def system_iter(self, include_self=False, recurse=True,
-                    typ=None):
+        Returns
+        -------
+        list of str or ()
+            List of wrt_matches for a static coloring or () if there isn't one.
+        """
+        if (self._coloring_info['coloring'] is not None and
+                self._coloring_info['wrt_matches'] is None):
+            self._update_wrt_matches()
+
+        # if coloring has been specified, we don't want to have multiple
+        # approximations for the same subjac, so don't register any new
+        # approximations when the wrt matches those used in the coloring.
+        if self._get_static_coloring() is not None:  # static coloring has been specified
+            return self._coloring_info['wrt_matches']
+
+        return ()  # for dynamic coloring or no coloring
+
+    def system_iter(self, include_self=False, recurse=True, typ=None):
         """
         Yield a generator of local subsystems of this system.
 
@@ -2245,7 +2757,7 @@ class System(object):
             If True, recurse through the subsystems and return the path of
             all design vars relative to the this system.
         get_sizes : bool, optional
-            If True, compute the size of each response.
+            If True, compute the size of each design variable.
 
         Returns
         -------
@@ -2994,6 +3506,71 @@ class System(object):
             self._nonlinear_solver.cleanup()
         if self._linear_solver:
             self._linear_solver.cleanup()
+
+    def _get_partials_varlists(self):
+        """
+        Get lists of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(list, list)
+            'of' and 'wrt' variable lists.
+        """
+        of = list(self._var_allprocs_prom2abs_list['output'])
+        wrt = list(self._var_allprocs_prom2abs_list['input'])
+
+        # wrt should include implicit states
+        return of, of + wrt
+
+    def _get_partials_var_sizes(self):
+        """
+        Get sizes of 'of' and 'wrt' variables that form the partial jacobian.
+
+        Returns
+        -------
+        tuple(ndarray, ndarray, is_implicit)
+            'of' and 'wrt' variable sizes.
+        """
+        iproc = self.comm.rank
+        out_sizes = self._var_sizes['nonlinear']['output'][iproc]
+        in_sizes = self._var_sizes['nonlinear']['input'][iproc]
+        return out_sizes, np.hstack((out_sizes, in_sizes))
+
+    def _get_gradient_nl_solver_systems(self):
+        """
+        Return a set of all Systems, including this one, that have a gradient nonlinear solver.
+
+        Returns
+        -------
+        set
+            Set of Systems containing nonlinear solvers that compute gradients.
+        """
+        return set(s for s in self.system_iter(include_self=True, recurse=True)
+                   if s.nonlinear_solver and s.nonlinear_solver.supports['gradients'])
+
+    def _jac_var_info_abs2prom(self, var_info):
+        """
+        Return a new list with tuples' [0] entry converted from absolute to promoted names.
+
+        Parameters
+        ----------
+        var_info : list of (name, offset, end, idxs)
+            The list that uses absolute names.
+
+        Returns
+        -------
+        list
+            The new list with promoted names.
+        """
+        new_list = []
+        abs2prom_in = self._var_allprocs_abs2prom['input']
+        abs2prom_out = self._var_allprocs_abs2prom['output']
+        for abs_name, offset, end, idxs in var_info:
+            if abs_name in abs2prom_out:
+                new_list.append((abs2prom_out[abs_name], offset, end, idxs))
+            else:
+                new_list.append((abs2prom_in[abs_name], offset, end, idxs))
+        return new_list
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

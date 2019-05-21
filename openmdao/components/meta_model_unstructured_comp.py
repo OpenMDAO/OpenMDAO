@@ -1,11 +1,11 @@
 """MetaModel provides basic meta modeling capability."""
+from six import iteritems
 from six.moves import range
 from copy import deepcopy
 from itertools import chain, product
 
 import numpy as np
 
-from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
@@ -72,7 +72,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._static_surrogate_output_names = []
         self._static_input_size = 0
 
-    def _setup_procs(self, pathname, comm, mode):
+    def _setup_procs(self, pathname, comm, mode, prob_options):
         self._surrogate_input_names = []
         self._surrogate_output_names = []
 
@@ -80,7 +80,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         self._surrogate_output_names.extend(self._static_surrogate_output_names)
         self._input_size = self._static_input_size
 
-        super(MetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode)
+        super(MetaModelUnStructuredComp, self)._setup_procs(pathname, comm, mode, prob_options)
 
     def initialize(self):
         """
@@ -239,36 +239,41 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
         vec_size = self.options['vec_size']
         if vec_size > 1:
+            vec_arange = np.arange(vec_size)
+
             # Sparse specification of partials for vectorized models.
             for wrt, n_wrt in self._surrogate_input_names:
                 for of, shape_of in self._surrogate_output_names:
-
                     n_of = np.prod(shape_of)
                     rows = np.repeat(np.arange(n_of), n_wrt)
                     cols = np.tile(np.arange(n_wrt), n_of)
-                    nnz = len(rows)
-                    rows = np.tile(rows, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_of
-                    cols = np.tile(cols, vec_size) + np.repeat(np.arange(vec_size), nnz) * n_wrt
+                    repeat = np.repeat(vec_arange, len(rows))
+                    rows = np.tile(rows, vec_size) + repeat * n_of
+                    cols = np.tile(cols, vec_size) + repeat * n_wrt
 
-                    self._declare_partials(of=of, wrt=wrt, rows=rows, cols=cols)
-
+                    dct = {
+                        'rows': rows,
+                        'cols': cols,
+                        'dependent': True,
+                    }
+                    self._declare_partials(of=of, wrt=wrt, dct=dct)
         else:
+            dct = {
+                'value': None,
+                'dependent': True,
+            }
             # Dense specification of partials for non-vectorized models.
-            self._declare_partials(of=[name[0] for name in self._surrogate_output_names],
-                                   wrt=[name[0] for name in self._surrogate_input_names])
+            self._declare_partials(of=tuple([name[0] for name in self._surrogate_output_names]),
+                                   wrt=tuple([name[0] for name in self._surrogate_input_names]),
+                                   dct=dct)
 
             # warn the user that if they don't explicitly set options for fd,
             #   the defaults will be used
             # get a list of approximated partials
-            declared_partials = set()
-            for of, wrt, method, fd_options in self._approximated_partials:
-                pattern_matches = self._find_partial_matches(of, wrt)
-                for of_bundle, wrt_bundle in product(*pattern_matches):
-                    of_pattern, of_matches = of_bundle
-                    wrt_pattern, wrt_matches = wrt_bundle
-                    for rel_key in product(of_matches, wrt_matches):
-                        abs_key = rel_key2abs_key(self, rel_key)
-                        declared_partials.add(abs_key)
+            declared_partials = set([
+                key for key, dct in iteritems(self._subjacs_info) if 'method' in dct
+                and dct['method']])
+
             non_declared_partials = []
             for of, n_of in self._surrogate_output_names:
                 has_derivs = False
@@ -297,8 +302,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                     self._approx_partials(of=out_name,
                                           wrt=[name[0] for name in self._surrogate_input_names],
                                           method='fd')
-                    if "fd" not in self._approx_schemes:
-                        self._approx_schemes['fd'] = FiniteDifference()
+                    self._get_approx_scheme('fd')
 
     def check_config(self, logger):
         """

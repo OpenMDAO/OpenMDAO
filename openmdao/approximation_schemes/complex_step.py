@@ -1,22 +1,18 @@
 """Complex Step derivative approximations."""
 from __future__ import division, print_function
 
-from itertools import groupby
+from six import iteritems, itervalues
 from six.moves import range
 from collections import defaultdict
 
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
-    _gather_jac_results
+    _gather_jac_results, _get_wrt_subjacs
 from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.array_utils import sub2full_indices
+from openmdao.utils.coloring import Coloring
 
-
-DEFAULT_CS_OPTIONS = {
-    'step': 1e-40,
-    'form': 'forward',
-    'directional': False,
-}
 
 _full_slice = slice(None)
 
@@ -34,20 +30,20 @@ class ComplexStep(ApproximationScheme):
 
     Attributes
     ----------
-    _exec_list : list
-        A list of which derivatives (in execution order) to compute.
-        The entries are of the form (of, wrt, options), where of and wrt are absolute names
-        and options is a dictionary.
     _fd : <FiniteDifference>
-        When nested complex step is detected, we swtich to Finite Difference.
+        When nested complex step is detected, we switch to Finite Difference.
     """
+
+    DEFAULT_OPTIONS = {
+        'step': 1e-40,
+        'directional': False,
+    }
 
     def __init__(self):
         """
         Initialize the ApproximationScheme.
         """
         super(ComplexStep, self).__init__()
-        self._exec_list = []
 
         # Only used when nested under complex step.
         self._fd = None
@@ -63,89 +59,32 @@ class ComplexStep(ApproximationScheme):
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
-        of, wrt = abs_key
-        options = DEFAULT_CS_OPTIONS.copy()
+        options = self.DEFAULT_OPTIONS.copy()
         options.update(kwargs)
-        self._exec_list.append((of, wrt, options))
-        self._approx_groups = None
 
-    @staticmethod
-    def _key_fun(approx_tuple):
+        key = (abs_key[1], options['step'], options['directional'])
+        self._exec_dict[key].append((abs_key, options))
+        self._approx_groups = None  # force later regen of approx_groups
+
+    def _get_approx_data(self, system, data):
         """
-        Compute the sorting key for an approximation tuple.
-
-        Parameters
-        ----------
-        approx_tuple : tuple(str, str, dict)
-            A given approximated derivative (of, wrt, options)
-
-        Returns
-        -------
-        tuple(str, str, float)
-            Sorting key (wrt, form, step_size, directional)
-
-        """
-        options = approx_tuple[2]
-        return (approx_tuple[1], options['form'], options['step'], options['directional'])
-
-    def _init_approximations(self, system):
-        """
-        Prepare for later approximations.
+        Given approximation metadata, compute necessary delta for complex step.
 
         Parameters
         ----------
         system : System
-            The system having its derivs approximated.
+            System whose derivatives are being approximated.
+        data : tuple
+            Tuple of the form (wrt, delta, directional)
+
+        Returns
+        -------
+        float
+            Delta needed for complex step perturbation.
         """
-        global _full_slice
-
-        # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
-        # group adjacent items with identical keys.
-        self._exec_list.sort(key=self._key_fun)
-
-        # groupby (along with this key function) will group all 'of's that have the same wrt and
-        # step size.
-        # Note: Since access to `approximations` is required multiple times, we need to
-        # throw it in a list. The groupby iterator only works once.
-        approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
-                                                                        self._key_fun)]
-
-        self._approx_groups = [None] * len(approx_groups)
-        for i, (key, approx) in enumerate(approx_groups):
-            wrt, form, delta, directional = key
-            if form == 'reverse':
-                delta *= -1.0
-            fact = 1.0 / delta
-            delta *= 1j
-
-            if wrt in system._owns_approx_wrt_idx:
-                in_idx = system._owns_approx_wrt_idx[wrt]
-                in_size = len(in_idx)
-            else:
-                in_size = system._var_allprocs_abs2meta[wrt]['size']
-                in_idx = range(in_size)
-
-            outputs = []
-
-            # Directional derivatives for quick partial checking.
-            # We place the indices in a list so that they are all stepped at the same time.
-            if directional:
-                in_idx = [in_idx]
-                in_size = 1
-
-            for approx_tuple in approx:
-                of = approx_tuple[0]
-                # TODO: Sparse derivatives
-                if of in system._owns_approx_of_idx:
-                    out_idx = system._owns_approx_of_idx[of]
-                    out_size = len(out_idx)
-                else:
-                    out_size = system._var_allprocs_abs2meta[of]['size']
-                    out_idx = _full_slice
-
-                outputs.append((of, np.zeros((out_size, in_size)), out_idx))
-
-            self._approx_groups[i] = (wrt, delta, fact, in_idx, in_size, outputs)
+        _, delta, _ = data
+        delta *= 1j
+        return delta
 
     def compute_approximations(self, system, jac, total=False):
         """
@@ -160,7 +99,7 @@ class ComplexStep(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
-        if len(self._exec_list) == 0:
+        if not self._exec_dict:
             return
 
         if system.under_complex_step:
@@ -173,96 +112,68 @@ class ComplexStep(ApproximationScheme):
                 simple_warning(msg % system.pathname)
 
                 fd = self._fd = FiniteDifference()
-                for item in self._exec_list:
-                    fd.add_approximation(item[0:2], {})
+                empty = {}
+                for lst in itervalues(self._exec_dict):
+                    for apprx in lst:
+                        fd.add_approximation(apprx[0], empty)
 
             self._fd.compute_approximations(system, jac, total=total)
             return
 
-        if total:
-            current_vec = system._outputs
-        else:
-            current_vec = system._residuals
-
-        # Clean vector for results
-        results_clone = current_vec._clone(True)
-
         # Turn on complex step.
         system._set_complex_step_mode(True)
-        results_clone.set_complex_step_mode(True)
 
-        # To support driver src_indices, we need to override some checks in Jacobian, but do it
-        # selectively.
-        uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
-            not isinstance(jac, dict)
-
-        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
-                                                      system._full_comm.size > 1)
-        num_par_fd = system._num_par_fd if use_parallel_fd else 1
-        is_parallel = use_parallel_fd or system.comm.size > 1
-
-        results = defaultdict(list)
-        iproc = system.comm.rank
-        owns = system._owning_rank
-        mycomm = system._full_comm if use_parallel_fd else system.comm
-
-        fd_count = 0
-        approx_groups = self._get_approx_groups(system)
-        for tup in approx_groups:
-            wrt, delta, fact, in_idx, in_size, outputs = tup
-            for i_count, idx in enumerate(in_idx):
-                if fd_count % num_par_fd == system._par_fd_id:
-                    # Run the Finite Difference
-                    result = self._run_point_complex(system, wrt, idx, delta, results_clone, total)
-
-                    if is_parallel:
-                        for of, _, out_idx in outputs:
-                            if owns[of] == iproc:
-                                results[(of, wrt)].append(
-                                    (i_count, result._views_flat[of][out_idx].imag.copy()))
-                    else:
-                        for of, subjac, out_idx in outputs:
-                            subjac[:, i_count] = result._views_flat[of][out_idx].imag
-
-                fd_count += 1
-
-        if is_parallel:
-            results = _gather_jac_results(mycomm, results)
-
-        for wrt, _, fact, _, _, outputs in approx_groups:
-            for of, subjac, _ in outputs:
-                key = (of, wrt)
-                if is_parallel:
-                    for i, result in results[key]:
-                        subjac[:, i] = result
-
-                subjac *= fact
-                if uses_src_indices:
-                    jac._override_checks = True
-                    jac[key] = subjac
-                    jac._override_checks = False
-                else:
-                    jac[key] = subjac
+        self._compute_approximations(system, jac, total, under_cs=True)
 
         # Turn off complex step.
         system._set_complex_step_mode(False)
 
-    def _run_point_complex(self, system, in_name, idxs, delta, result_clone, total=False):
+    def _get_multiplier(self, delta):
         """
-        Perturb the system inputs with a complex step, runs, and returns the results.
+        Return a multiplier to be applied to the jacobian.
+
+        Parameters
+        ----------
+        delta :  complex
+            Complex number used to compute the multiplier.
+
+        Returns
+        -------
+        float
+            multiplier to apply to the jacobian.
+        """
+        return (1.0 / delta * 1j).real
+
+    def _transform_result(self, array):
+        """
+        Return the imaginary part of the given array.
+
+        Parameters
+        ----------
+        array : ndarray of complex
+            Result array after doing a complex step.
+
+        Returns
+        -------
+        ndarray
+            Imaginary part of the result array.
+        """
+        return array.imag
+
+    def _run_point(self, system, idx_info, delta, result_array, total):
+        """
+        Perturb the system inputs with a complex step, run, and return the results.
 
         Parameters
         ----------
         system : System
             The system having its derivs approximated.
-        in_name : str
-            Input name.
-        idxs : ndarray
-            Input indices.
+        idx_info : tuple of (ndarray of int, ndarray of float)
+            Tuple of wrt indices and corresponding data array to perturb.
         delta : complex
             Perturbation amount.
-        result_clone : Vector
-            A vector cloned from the outputs vector. Used to store the results.
+        result_array : ndarray
+            An array used to store the results.
         total : bool
             If True total derivatives are being approximated, else partials.
 
@@ -271,28 +182,21 @@ class ComplexStep(ApproximationScheme):
         Vector
             Copy of the results from running the perturbed system.
         """
-        inputs = system._inputs
-        outputs = system._outputs
+        for arr, idxs in idx_info:
+            if arr is not None:
+                arr._data[idxs] += delta
 
         if total:
-            run_model = system.run_solve_nonlinear
-            results_vec = outputs
+            system.run_solve_nonlinear()
+            results_vec = system._outputs
         else:
-            run_model = system.run_apply_nonlinear
+            system.run_apply_nonlinear()
             results_vec = system._residuals
 
-        if in_name in outputs._views_flat:
-            outputs._views_flat[in_name][idxs] += delta
-        elif in_name in inputs._views_flat:
-            inputs._views_flat[in_name][idxs] += delta
+        result_array[:] = results_vec._data
 
-        run_model()
+        for arr, idxs in idx_info:
+            if arr is not None:
+                arr._data[idxs] -= delta
 
-        result_clone.set_vec(results_vec)
-
-        if in_name in outputs._views_flat:
-            outputs._views_flat[in_name][idxs] -= delta
-        elif in_name in inputs._views_flat:
-            inputs._views_flat[in_name][idxs] -= delta
-
-        return result_clone
+        return result_array

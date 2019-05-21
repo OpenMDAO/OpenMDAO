@@ -298,7 +298,7 @@ def stop():
 
 
 @contextmanager
-def tracing(methods=None, verbose=False, memory=False, leaks=False, filters=None, show_ptrs=False):
+def tracing(methods=None, verbose=False, memory=False, leaks=False, show_ptrs=False):
     """
     Turn on call tracing within a certain context.
 
@@ -313,14 +313,10 @@ def tracing(methods=None, verbose=False, memory=False, leaks=False, filters=None
         If True, show functions that increase memory usage.
     leaks : bool
         If True, show objects that are created within a function and not garbage collected.
-    filters : list of str or None
-        If not None, evaluate as an expression in the frame of matching trace functions. If
-        True, include the function in the trace.  Up to one expression per class.
     show_ptrs : bool
         If True, show addresses of printed objects.
     """
-    setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks, filters=filters,
-          show_ptrs=show_ptrs)
+    setup(methods=methods, verbose=verbose, memory=memory, leaks=leaks, show_ptrs=show_ptrs)
     start()
     yield
     stop()
