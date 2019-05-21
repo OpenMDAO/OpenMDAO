@@ -1,4 +1,4 @@
-""" Unit tests for the problem interface."""
+""" Unit tests for discrete variables."""
 
 import sys
 import unittest
@@ -467,7 +467,6 @@ class DiscretePromTestCase(unittest.TestCase):
 
         self.assertEqual(prob['C3.y'].getval(), 40)
         self.assertEqual(prob['C4.y'].getval(), 52)
-
 
 
 class DiscreteFeatureTestCase(unittest.TestCase):
