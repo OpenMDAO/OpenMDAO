@@ -314,7 +314,13 @@ class LintTestCase(unittest.TestCase):
         dedented_src = textwrap.dedent(method_src)
 
         f = ReturnFinder()
-        f.visit(ast.parse(dedented_src))
+        try:
+            f.visit(ast.parse(dedented_src))
+        except SyntaxError:
+            # ast.parse in python 2 will fail if we use certain print function syntax in
+            # our function.
+            dedented_src = 'from __future__ import print_function\n' + dedented_src
+            f.visit(ast.parse(dedented_src))
 
         # If the function does nothing but pass, return
         if f.passes:

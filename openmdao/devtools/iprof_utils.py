@@ -4,7 +4,7 @@ import os
 import sys
 import ast
 
-from inspect import getmembers, iscode
+from inspect import getmembers
 from fnmatch import fnmatchcase
 from collections import defaultdict
 from six import string_types
@@ -104,6 +104,7 @@ def _setup_func_group():
     global func_group, base_classes
 
     from openmdao.core.system import System
+    from openmdao.core.component import Component
     from openmdao.core.explicitcomponent import ExplicitComponent
     from openmdao.core.problem import Problem
     from openmdao.core.driver import Driver
@@ -114,10 +115,12 @@ def _setup_func_group():
     from openmdao.jacobians.jacobian import Jacobian
     from openmdao.matrices.matrix import Matrix
     from openmdao.vectors.default_vector import DefaultVector, DefaultTransfer
+    from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 
     for class_ in [System, ExplicitComponent, Problem, Driver, _TotalJacInfo, Solver, LinearSolver,
                    NewtonSolver, Jacobian, Matrix, DefaultVector, DefaultTransfer]:
         base_classes[class_.__name__] = class_
+
 
     func_group.update({
         'openmdao': [
@@ -138,7 +141,7 @@ def _setup_func_group():
             ('_build', (Matrix,)),
             ('_add_submat', (Matrix,)),
             ('_get_maps', (System,)),
-            ('_set_partials_meta', (System,)),
+            ('_set_approx_partials_meta', (System,)),
             ('_init_relevance', (System,)),
             ('_get_initial_*', (System,)),
             ('_initialize_*', (DefaultVector,)),
@@ -157,7 +160,7 @@ def _setup_func_group():
             ('_solve_linear', (System,)),
             ('apply_linear', (System,)),
             ('solve_linear', (System,)),
-            ('_set_partials_meta', (System, Jacobian)),
+            ('_set_approx_partials_meta', (System, Jacobian)),
             ('_linearize', (System, Solver)),
             # include NewtonSolver to provide some context
             ('solve', (LinearSolver, NewtonSolver)),
@@ -187,7 +190,33 @@ def _setup_func_group():
         'transfer': [
             ('*', (DefaultTransfer,)),
             ('_transfer', (System,))
+        ],
+        'coloring': [
+            ('*_approx_*', (Driver, System)),
+            ('*color*', (object,)),
+            ('*partials*', (System, Driver)),
+            ('*sparsity*', (Jacobian, System, Driver)),
+            ('*simul*', (Driver, System)),
+            ('*jacobian*', (Driver, System)),
+            ('_setup', (System,)),
+            ('_final_setup', (System,)),
         ]
+        # NOTE: context managers and other functions that yield instead of return will NOT show
+        # up properly in the trace.  For example, our context managers for scaling will show up
+        # as a call and immediate return from the context manager, followed by the functions that
+        # should show up as inside of the context manager but don't.  This is just here to
+        # remind me not to try to create a 'scaling' group again.
+        # 'scaling': [
+        #     ('*scaled_context*', (System,)),
+        #     ('compute*', (Component, ApproximationScheme)),
+        #     ('_solve*', (System,)),
+        #     ('solve_*', (System,)),
+        #     ('run_*', (System,)),
+        #     ('guess_*', (System,)),
+        #     ('*apply*', (System,)),
+        #     ('_apply', (Jacobian,)),
+        #     ('*linearize', (System,)),
+        # ],
     })
 
     try:

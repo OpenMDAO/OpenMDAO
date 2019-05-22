@@ -54,8 +54,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         # iteration coordinate, file name and variable data are common for all tests
         coord = 'rank0:root._solve_nonlinear|0|NLRunOnce|0|circuit._solve_nonlinear|0'
-        filename = coord.replace('._solve_nonlinear', '')
-        self.filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
+        self.filename = 'solver_errors.0.out'
 
         self.expected_data = '\n'.join([
             "",
@@ -191,7 +190,7 @@ class TestNonlinearSolvers(unittest.TestCase):
             except AnalysisError:
                 pass
 
-        with open('rank0_root_0_NLRunOnce_0_circuit_0.dat', 'r') as f:
+        with open(self.filename, 'r') as f:
             self.assertEqual(f.read(), self.expected_data)
 
 

@@ -2,32 +2,26 @@
 
 from __future__ import division
 
-from collections import OrderedDict, Iterable, Counter
+from collections import OrderedDict, Iterable, Counter, defaultdict
 from itertools import product
-from six import string_types, iteritems
+from six import string_types, iteritems, itervalues
 import copy
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
 from scipy.sparse import issparse
 
-from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
-from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
-from openmdao.core.system import System
-from openmdao.jacobians.assembled_jacobian import SUBJAC_META_DEFAULTS
+from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.units import valid_units
+from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
+from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, find_matches, simple_warning
-from openmdao.vectors.vector import INT_DTYPE
-from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key
-from openmdao.utils.mpi import MPI
-
-
-# Suppored methods for derivatives
-_supported_methods = {'fd': (FiniteDifference, DEFAULT_FD_OPTIONS),
-                      'cs': (ComplexStep, DEFAULT_CS_OPTIONS),
-                      'exact': (None, {})}
+from openmdao.utils.coloring import _DYN_COLORING
 
 
 # the following metadata will be accessible for vars on all procs
@@ -36,6 +30,8 @@ global_meta_names = {
     'output': ('units', 'shape', 'size',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper'),
 }
+
+_full_slice = slice(None)
 
 
 def _valid_var_name(name):
@@ -77,10 +73,8 @@ class Component(System):
         determine the list of absolute names.
     _static_var_rel_names : dict
         Static version of above - stores names of variables added outside of setup.
-    _declared_partials : list
+    _declared_partials : dict
         Cached storage of user-declared partials.
-    _approximated_partials : list
-        Cached storage of user-declared approximations.
     _declared_partial_checks : list
         Cached storage of user-declared check partial options.
     """
@@ -96,16 +90,13 @@ class Component(System):
         """
         super(Component, self).__init__(**kwargs)
 
-        self._approx_schemes = OrderedDict()
-
         self._var_rel_names = {'input': [], 'output': []}
         self._var_rel2meta = {}
 
         self._static_var_rel_names = {'input': [], 'output': []}
         self._static_var_rel2meta = {}
 
-        self._declared_partials = []
-        self._approximated_partials = []
+        self._declared_partials = defaultdict(dict)
         self._declared_partial_checks = []
 
     def _declare_options(self):
@@ -158,7 +149,7 @@ class Component(System):
         """
         pass
 
-    def _setup_procs(self, pathname, comm, mode):
+    def _setup_procs(self, pathname, comm, mode, prob_options):
         """
         Execute first phase of the setup process.
 
@@ -173,8 +164,11 @@ class Component(System):
         mode : string
             Derivatives calculation mode, 'fwd' for forward, and 'rev' for
             reverse (adjoint). Default is 'rev'.
+        prob_options : OptionsDictionary
+            Problem level options.
         """
         self.pathname = pathname
+        self._problem_options = prob_options
 
         orig_comm = comm
         if self._num_par_fd > 1:
@@ -188,6 +182,7 @@ class Component(System):
         self.comm = comm
         self._mode = mode
         self._subsystems_proc_range = []
+        self._first_call_to_linearize = True
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}
@@ -209,8 +204,22 @@ class Component(System):
         # resetting the value of num_par_fd (because the comm has already been split and possibly
         # used by the system setup).
         if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
-                                                                self._approximated_partials):
+                                                                self._approx_schemes):
             raise RuntimeError("'%s': num_par_fd is > 1 but no FD is active." % self.pathname)
+
+        # check here if declare_coloring was called during setup but declare_partials
+        # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
+        # have something to color.
+        if self._coloring_info['coloring'] is not None:
+            for key, meta in iteritems(self._declared_partials):
+                if 'method' in meta and meta['method'] is not None:
+                    break
+            else:
+                method = self._coloring_info['method']
+                simple_warning("%s: declare_coloring or use_fixed_coloring was called but no approx"
+                               " partials were declared.  Declaring all partials as approximated "
+                               "using default metadata and method='%s'." % (self.pathname, method))
+                self.declare_partials('*', '*', method=method)
 
         self._static_mode = True
 
@@ -271,6 +280,8 @@ class Component(System):
                 abs_name = prefix + prom_name
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
                 self._var_allprocs_discrete[type_][abs_name] = val
+
+        self._var_allprocs_abs2prom = self._var_abs2prom
 
         self._var_abs_names = self._var_allprocs_abs_names
         if self._var_discrete['input'] or self._var_discrete['output']:
@@ -349,11 +360,53 @@ class Component(System):
         self._subjacs_info = {}
         self._jacobian = DictionaryJacobian(system=self)
 
-        for of, wrt, dependent, rows, cols, val in self._declared_partials:
-            self._declare_partials(of, wrt, dependent=dependent, rows=rows, cols=cols, val=val)
+        for key, dct in iteritems(self._declared_partials):
+            of, wrt = key
+            self._declare_partials(of, wrt, dct)
 
-        for of, wrt, method, kwargs in self._approximated_partials:
-            self._approx_partials(of, wrt, method=method, **kwargs)
+    def _update_wrt_matches(self):
+        """
+        Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
+        """
+        info = self._coloring_info
+        ofs, allwrt = self._get_partials_varlists()
+        wrt_patterns = info['wrt_patterns']
+        matches_prom = set()
+        for w in wrt_patterns:
+            matches_prom.update(find_matches(w, allwrt))
+
+        # error if nothing matched
+        if not matches_prom:
+            raise ValueError("Invalid 'wrt' variable(s) specified for colored approx partial "
+                             "options on Component '{}': {}.".format(self.pathname, wrt_patterns))
+
+        info['wrt_matches_prom'] = matches_prom
+        info['wrt_matches'] = [rel_name2abs_name(self, n) for n in matches_prom]
+
+    def _update_subjac_sparsity(self, sparsity):
+        """
+        Update subjac sparsity info based on the given coloring.
+
+        The sparsity of the partial derivatives in this component will be used when computing
+        the sparsity of the total jacobian for the entire model.  Without this, all of this
+        component's partials would be treated as dense, resulting in an overly conservative
+        coloring of the total jacobian.
+
+        Parameters
+        ----------
+        sparsity : dict
+            A nested dict of the form dct[of][wrt] = (rows, cols, shape)
+        """
+        # sparsity uses relative names, so we need to convert to absolute
+        pathname = self.pathname
+        for of, sub in iteritems(sparsity):
+            of_abs = '.'.join((pathname, of)) if pathname else of
+            for wrt, tup in iteritems(sub):
+                wrt_abs = '.'.join((pathname, wrt)) if pathname else wrt
+                abs_key = (of_abs, wrt_abs)
+                if abs_key in self._subjacs_info:
+                    # add sparsity info to existing partial info
+                    self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
                   units=None, desc=''):
@@ -721,6 +774,7 @@ class Component(System):
             Keyword arguments for controlling the behavior of the approximation.
         """
         pattern_matches = self._find_partial_matches(of, wrt)
+        self._has_approx = True
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -733,10 +787,7 @@ class Component(System):
             info = self._subjacs_info
             for rel_key in product(of_matches, wrt_matches):
                 abs_key = rel_key2abs_key(self, rel_key)
-                if abs_key in info:
-                    meta = info[abs_key]
-                else:
-                    meta = SUBJAC_META_DEFAULTS.copy()
+                meta = info[abs_key]
                 meta['method'] = method
                 meta.update(kwargs)
                 info[abs_key] = meta
@@ -785,21 +836,35 @@ class Component(System):
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for
             relative. Defaults to None, in which case the approximation method provides
             its default value.
+
+        Returns
+        -------
+        dict
+            Metadata dict for the specified partial(s).
         """
         try:
-            method_func, default_opts = _supported_methods[method]
+            method_func = _supported_methods[method]
         except KeyError:
             msg = 'Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(method, _supported_methods.keys()))
+            raise ValueError(msg.format(method, list(_supported_methods)))
 
-        # Analytic Derivative for this Jacobian pair
-        if method_func is None:  # exact
+        if isinstance(of, list):
+            of = tuple(of)
+        if isinstance(wrt, list):
+            wrt = tuple(wrt)
 
-            # If only one of rows/cols is specified
-            if (rows is None) ^ (cols is None):
-                raise ValueError('If one of rows/cols is specified, then both must be specified')
+        meta = self._declared_partials[of, wrt]
+        meta['dependent'] = dependent
 
+        # If only one of rows/cols is specified
+        if (rows is None) ^ (cols is None):
+            raise ValueError('If one of rows/cols is specified, then both must be specified')
+
+        if dependent:
+            meta['value'] = val
             if rows is not None:
+                meta['rows'] = rows
+                meta['cols'] = cols
 
                 # First, check the length of rows and cols to catch this easy mistake and give a
                 # clear message.
@@ -817,39 +882,90 @@ class Component(System):
                                        "that specify the following duplicate subjacobian entries: "
                                        "%s." % (self.pathname, sorted(dups)))
 
-            self._declared_partials.append((of, wrt, dependent, rows, cols, val))
+        if method_func is not None:
+            # we're doing approximations
+            self._has_approx = True
+            meta['method'] = method
+            self._get_approx_scheme(method)
 
-        # Approximation of the derivative, former API call approx_partials.
-        else:
-
-            if method not in self._approx_schemes:
-                self._approx_schemes[method] = method_func()
+            default_opts = method_func.DEFAULT_OPTIONS
 
             # If rows/cols is specified
             if rows is not None or cols is not None:
                 raise ValueError('Sparse FD specification not supported yet.')
+        else:
+            default_opts = ()
 
-            # Need to declare the Jacobian element too.
-            self._declared_partials.append((of, wrt, True, rows, cols, val))
+        if step:
+            if 'step' in default_opts:
+                meta['step'] = step
+            else:
+                raise RuntimeError("'step' is not a valid option for '%s'" % method)
+        if form:
+            if 'form' in default_opts:
+                meta['form'] = form
+            else:
+                raise RuntimeError("'form' is not a valid option for '%s'" % method)
+        if step_calc:
+            if 'step_calc' in default_opts:
+                meta['step_calc'] = step_calc
+            else:
+                raise RuntimeError("'step_calc' is not a valid option for '%s'" % method)
 
-            kwargs = {}
-            if step:
-                if 'step' in default_opts:
-                    kwargs['step'] = step
-                else:
-                    raise RuntimeError("'step' is not a valid option for '%s'" % method)
-            if form:
-                if 'form' in default_opts:
-                    kwargs['form'] = form
-                else:
-                    raise RuntimeError("'form' is not a valid option for '%s'" % method)
-            if step_calc:
-                if 'step_calc' in default_opts:
-                    kwargs['step_calc'] = step_calc
-                else:
-                    raise RuntimeError("'step_calc' is not a valid option for '%s'" % method)
+        return meta
 
-            self._approximated_partials.append((of, wrt, method, kwargs))
+    def declare_coloring(self,
+                         wrt=_DEFAULT_COLORING_META['wrt_patterns'],
+                         method=_DEFAULT_COLORING_META['method'],
+                         form=None,
+                         step=None,
+                         per_instance=_DEFAULT_COLORING_META['per_instance'],
+                         num_full_jacs=_DEFAULT_COLORING_META['num_full_jacs'],
+                         tol=_DEFAULT_COLORING_META['tol'],
+                         orders=_DEFAULT_COLORING_META['orders'],
+                         perturb_size=_DEFAULT_COLORING_META['perturb_size'],
+                         show_summary=_DEFAULT_COLORING_META['show_summary'],
+                         show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
+        """
+        Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
+
+        Parameters
+        ----------
+        wrt : str or list of str
+            The name or names of the variables that derivatives are taken with respect to.
+            This can contain input names, output names, or glob patterns.
+        method : str
+            Method used to compute derivative: "fd" for finite difference, "cs" for complex step.
+        form : str
+            Finite difference form, can be "forward", "central", or "backward". Leave
+            undeclared to keep unchanged from previous or default value.
+        step : float
+            Step size for finite difference. Leave undeclared to keep unchanged from previous
+            or default value.
+        per_instance : bool
+            If True, a separate coloring will be generated for each instance of a given class.
+            Otherwise, only one coloring for a given class will be generated and all instances
+            of that class will use it.
+        num_full_jacs : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination.
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep.
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity.
+        show_summary : bool
+            If True, display summary information after generating coloring.
+        show_sparsity : bool
+            If True, display sparsity with coloring info after generating coloring.
+        """
+        super(Component, self).declare_coloring(wrt, method, form, step, per_instance,
+                                                num_full_jacs,
+                                                tol, orders, perturb_size,
+                                                show_summary, show_sparsity)
+        # create approx partials for all matches
+        meta = self.declare_partials('*', wrt, method=method, step=step, form=form)
+        meta['coloring'] = True
 
     def set_check_partial_options(self, wrt, method='fd', form=None, step=None, step_calc=None,
                                   directional=False):
@@ -957,45 +1073,31 @@ class Component(System):
 
         return opts
 
-    def _declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None):
+    def _declare_partials(self, of, wrt, dct):
         """
         Store subjacobian metadata for later use.
 
         Parameters
         ----------
-        of : str or list of str
-            The name of the residual(s) that derivatives are being computed for.
-            May also contain a glob pattern.
-        wrt : str or list of str
-            The name of the variables that derivatives are taken with respect to.
+        of : tuple of str
+            The names of the residuals that derivatives are being computed for.
+            May also contain glob patterns.
+        wrt : tuple of str
+            The names of the variables that derivatives are taken with respect to.
             This can contain the name of any input or output variable.
-            May also contain a glob pattern.
-        dependent : bool(True)
-            If False, specifies no dependence between the output(s) and the
-            input(s). This is only necessary in the case of a sparse global
-            jacobian, because if 'dependent=False' is not specified and
-            declare_partials is not called for a given pair, then a dense
-            matrix of zeros will be allocated in the sparse global jacobian
-            for that pair.  In the case of a dense global jacobian it doesn't
-            matter because the space for a dense subjac will always be
-            allocated for every pair.
-        rows : ndarray of int or None
-            Row indices for each nonzero entry.  For sparse subjacobians only.
-        cols : ndarray of int or None
-            Column indices for each nonzero entry.  For sparse subjacobians only.
-        val : float or ndarray of float or scipy.sparse
-            Value of subjacobian.  If rows and cols are not None, this will
-            contain the values found at each (row, col) location in the subjac.
+            May also contain glob patterns.
+        dct : dict
+            Metadata dict specifying shape, and/or approx properties.
         """
+        val = dct['value'] if 'value' in dct else None
         is_scalar = isscalar(val)
+        dependent = dct['dependent']
 
         if dependent:
-            if rows is None:
-                if val is not None and not is_scalar and not issparse(val):
-                    val = atleast_2d(val)
-                    val = val.astype(promote_types(val.dtype, float), copy=False)
-                rows_max = cols_max = 0
-            else:  # sparse list format
+            if 'rows' in dct and dct['rows'] is not None:  # sparse list format
+                rows = dct['rows']
+                cols = dct['cols']
+
                 rows = np.array(rows, dtype=INT_DTYPE, copy=False)
                 cols = np.array(cols, dtype=INT_DTYPE, copy=False)
 
@@ -1031,11 +1133,19 @@ class Component(System):
                     cols_max = cols.max()
                 else:
                     rows_max = cols_max = 0
+            else:
+                if val is not None and not is_scalar and not issparse(val):
+                    val = atleast_2d(val)
+                    val = val.astype(promote_types(val.dtype, float), copy=False)
+                rows_max = cols_max = 0
+                rows = None
+                cols = None
 
         pattern_matches = self._find_partial_matches(of, wrt)
         abs2meta = self._var_abs2meta
 
         is_array = isinstance(val, ndarray)
+        patmeta = dict(dct)
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -1055,11 +1165,10 @@ class Component(System):
                 if abs_key in self._subjacs_info:
                     meta = self._subjacs_info[abs_key]
                 else:
-                    meta = SUBJAC_META_DEFAULTS.copy()
+                    meta = patmeta.copy()
 
                 meta['rows'] = rows
                 meta['cols'] = cols
-                meta['dependent'] = dependent
                 meta['shape'] = shape = (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
 
                 if val is None:
@@ -1076,13 +1185,14 @@ class Component(System):
                     meta['value'] = val
 
                 if rows_max >= shape[0] or cols_max >= shape[1]:
-                    of, wrt = abs_key2rel_key(self, abs_key)
+                    of, wrt = rel_key
                     msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
                     raise ValueError(msg.format(self.pathname, of, wrt, shape[0], shape[1],
                                                 rows_max + 1, cols_max + 1))
 
                 self._check_partials_meta(abs_key, meta['value'],
                                           shape if rows is None else (rows.shape[0], 1))
+
                 self._subjacs_info[abs_key] = meta
 
     def _find_partial_matches(self, of, wrt):
@@ -1144,16 +1254,15 @@ class Component(System):
                 raise ValueError(msg.format(self.pathname, of, wrt, out_size, in_size,
                                             val_out, val_in))
 
-    def _set_partials_meta(self):
+    def _set_approx_partials_meta(self):
         """
-        Set subjacobian info into our jacobian.
+        Add approximations for those partials registered with method=fd or method=cs.
         """
-        for key, meta in iteritems(self._subjacs_info):
-
-            if 'method' in meta:
-                method = meta['method']
-                if method is not None and method in self._approx_schemes:
-                    self._approx_schemes[method].add_approximation(key, meta)
+        self._get_static_wrt_matches()
+        subjacs = self._subjacs_info
+        for key in self._approx_subjac_keys_iter():
+            meta = subjacs[key]
+            self._approx_schemes[meta['method']].add_approximation(key, meta)
 
     def _guess_nonlinear(self):
         """
@@ -1170,6 +1279,16 @@ class Component(System):
         Components don't have nested solvers, so do nothing to prevent errors.
         """
         pass
+
+    def _check_first_linearize(self):
+        if self._first_call_to_linearize:
+            self._first_call_to_linearize = False  # only do this once
+            is_dynamic = self._coloring_info['coloring'] is _DYN_COLORING
+            coloring = self._get_coloring()
+            if coloring is not None:
+                if not is_dynamic:
+                    coloring._check_config_partial(self)
+                self._update_subjac_sparsity(coloring.get_subjac_sparsity())
 
 
 class _DictValues(object):

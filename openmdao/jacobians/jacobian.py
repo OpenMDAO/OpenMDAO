@@ -7,8 +7,17 @@ from collections import OrderedDict, defaultdict
 from scipy.sparse import issparse
 from six import itervalues, iteritems
 
-from openmdao.utils.name_maps import key2abs_key
+from openmdao.utils.name_maps import key2abs_key, rel_name2abs_name
 from openmdao.matrices.matrix import sparse_types
+
+SUBJAC_META_DEFAULTS = {
+    'rows': None,
+    'cols': None,
+    'value': None,
+    'dependent': False,
+}
+
+_full_slice = slice(None)
 
 
 class Jacobian(object):
@@ -34,6 +43,9 @@ class Jacobian(object):
         A cache dict for key to absolute key.
     _randomize : bool
         If True, sparsity is being computed for simultaneous derivative coloring.
+    _jac_summ : dict or None
+        A dict containing a summation of some number of instantaneous absolute values of this
+        jacobian, for use later to determine jacobian sparsity and simultaneous coloring.
     """
 
     def __init__(self, system):
@@ -51,6 +63,7 @@ class Jacobian(object):
         self._under_complex_step = False
         self._abs_keys = defaultdict(bool)
         self._randomize = False
+        self._jac_summ = None
 
     def _get_abs_key(self, key):
         abskey = self._abs_keys[key]
@@ -133,59 +146,42 @@ class Jacobian(object):
                 msg = 'Variable name pair ("{}", "{}") must first be declared.'
                 raise KeyError(msg.format(key[0], key[1]))
 
-            self._set_abs(abs_key, subjac)
+            subjacs_info = self._subjacs_info[abs_key]
+
+            if issparse(subjac):
+                subjacs_info['value'] = subjac
+            else:
+                # np.promote_types will choose the smallest dtype that can contain both arguments
+                subjac = np.atleast_1d(subjac)
+                safe_dtype = np.promote_types(subjac.dtype, float)
+                subjac = subjac.astype(safe_dtype, copy=False)
+
+                # Bail here so that we allow top level jacobians to be of reduced size when indices
+                # are specified on driver vars.
+                if self._override_checks:
+                    subjacs_info['value'] = subjac
+                    return
+
+                rows = subjacs_info['rows']
+
+                if rows is None:
+                    # Dense subjac
+                    subjac = np.atleast_2d(subjac)
+                    if subjac.shape != (1, 1):
+                        shape = self._abs_key2shape(abs_key)
+                        subjac = subjac.reshape(shape)
+                else:
+                    # Sparse subjac
+                    if subjac.shape != (1,) and subjac.shape != rows.shape:
+                        raise ValueError("Sub-jacobian for key %s has "
+                                         "the wrong shape (%s), expected (%s)." %
+                                         (abs_key, subjac.shape, rows.shape))
+
+                subjacs_info['value'][:] = subjac
+
         else:
             msg = 'Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(key[0], key[1]))
-
-    def _set_abs(self, abs_key, subjac):
-        """
-        Set sub-Jacobian.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-        subjac : int or float or ndarray or sparse matrix
-            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
-        """
-        subjacs_info = self._subjacs_info[abs_key]
-
-        if not issparse(subjac):
-            # np.promote_types will choose the smallest dtype that can contain both arguments
-            subjac = np.atleast_1d(subjac)
-            safe_dtype = np.promote_types(subjac.dtype, float)
-            subjac = subjac.astype(safe_dtype, copy=False)
-
-            # Bail here so that we allow top level jacobians to be of reduced size when indices are
-            # specified on driver vars.
-            if self._override_checks:
-                subjacs_info['value'] = subjac
-                return
-
-            rows = subjacs_info['rows']
-
-            if rows is None:
-                # Dense subjac
-                shape = self._abs_key2shape(abs_key)
-                subjac = np.atleast_2d(subjac)
-                if subjac.shape == (1, 1):
-                    subjac = subjac[0, 0] * np.ones(shape, dtype=safe_dtype)
-                else:
-                    subjac = subjac.reshape(shape)
-            else:
-                # Sparse subjac
-                if subjac.shape == (1,):
-                    subjac = subjac[0] * np.ones(rows.shape, dtype=safe_dtype)
-
-                if subjac.shape != rows.shape:
-                    raise ValueError("Sub-jacobian for key %s has "
-                                     "the wrong shape (%s), expected (%s)." %
-                                     (abs_key, subjac.shape, rows.shape))
-
-            np.copyto(subjacs_info['value'], subjac)
-        else:
-            subjacs_info['value'] = subjac
 
     def _update(self, system):
         """
@@ -217,7 +213,7 @@ class Jacobian(object):
         """
         pass
 
-    def _randomize_subjac(self, subjac):
+    def _randomize_subjac(self, subjac, key):
         """
         Return a subjac that is the given subjac filled with random values.
 
@@ -225,6 +221,8 @@ class Jacobian(object):
         ----------
         subjac : ndarray or csc_matrix
             Sub-jacobian to be randomized.
+        key : tuple (of, wrt)
+            Key for subjac within the jacobian.
 
         Returns
         -------
@@ -233,10 +231,131 @@ class Jacobian(object):
         """
         if isinstance(subjac, sparse_types):  # sparse
             sparse = subjac.copy()
-            sparse.data = rand(sparse.data.size) + 1.0
+            sparse.data = rand(sparse.data.size)
+            sparse.data += 1.0
             return sparse
 
-        return rand(*subjac.shape) + 1.0
+        # if a subsystem has computed a dynamic partial or semi-total coloring,
+        # we use that sparsity information to set the sparsity of the randomized
+        # subjac.  Otherwise all subjacs that didn't have sparsity declared by the
+        # user will appear completely dense, which will lead to a total jacobian that
+        # is more dense than it should be, causing any total coloring that we compute
+        # to be overly conservative.
+        subjac_info = self._subjacs_info[key]
+        if 'sparsity' in subjac_info:
+            assert subjac_info['rows'] is None
+            rows, cols, shape = subjac_info['sparsity']
+            r = np.zeros(shape)
+            r[rows, cols] = rand(len(rows)) + 1.0
+        else:
+            r = rand(*subjac.shape)
+            r += 1.0
+        return r
+
+    def _get_ranges(self, system, vtype):
+        """
+        Return an ordered dict of ranges for each var of a particular type (input or output).
+
+        Parameters
+        ----------
+        system : System
+            System owning this jacobian.
+        vtype : str
+            Type of variable, must be one of ('input', 'output').
+
+        Returns
+        -------
+        OrderedDict
+            Tuples of the form (start, end) keyed on variable name.
+        """
+        iproc = system.comm.rank
+        abs2idx = system._var_allprocs_abs2idx['linear']
+        sizes = system._var_sizes['linear'][vtype]
+        start = end = 0
+        ranges = OrderedDict()
+        for name in system._var_allprocs_abs_names[vtype]:
+            end += sizes[iproc, abs2idx[name]]
+            ranges[name] = (start, end)
+            start = end
+        return ranges
+
+    def _save_sparsity(self, system):
+        """
+        Add the current jacobian to a running absolute summation.
+
+        Parameters
+        ----------
+        system : System
+            System owning this jacobian.
+        """
+        subjacs = self._subjacs_info
+        if self._jac_summ is None:
+            # create _jac_summ structure
+            self._jac_summ = summ = {}
+            for key in subjacs:
+                summ[key] = np.abs(subjacs[key]['value'])
+        else:
+            summ = self._jac_summ
+            for key in subjacs:
+                summ[key] += np.abs(subjacs[key]['value'])
+
+    def _compute_sparsity(self, ordered_of_info, ordered_wrt_info, num_full_jacs, tol, orders):
+        """
+        Compute a dense sparsity matrix for this jacobian using saved absolute summations.
+
+        The sparsity matrix will contain only those columns that match the wrt variables in
+        wrt_matches, but will contain rows for all outputs in the given system.
+
+        Parameters
+        ----------
+        ordered_of_info : list of (name, offset, end, idxs)
+            Name, offset, etc. of row variables in the order that they appear in the jacobian.
+        ordered_wrt_info : list of (name, offset, end, idxs)
+            Name, offset, etc. of column variables in the order that they appear in the jacobian.
+        num_full_jacs : int
+            Number of times to compute partial jacobian when computing sparsity.
+        tol : float
+            Tolerance used to determine if an array entry is zero or nonzero.
+        orders : int
+            Number of orders +/- for the tolerance sweep.
+
+        Returns
+        -------
+        ndarray
+            Boolean sparsity matrix.
+        """
+        from openmdao.utils.coloring import _tol_sweep
+
+        subjacs = self._subjacs_info
+        summ = self._jac_summ
+
+        rend = ordered_of_info[-1][2]
+        cend = ordered_wrt_info[-1][2]
+        J = np.zeros((rend, cend))
+
+        for of, roffset, rend, _ in ordered_of_info:
+            for wrt, coffset, cend, _ in ordered_wrt_info:
+                key = (of, wrt)
+                if key in subjacs:
+                    meta = subjacs[key]
+                    if meta['rows'] is not None:
+                        rows = meta['rows'] + roffset
+                        cols = meta['cols'] + coffset
+                        J[rows, cols] = summ[key]
+                    elif issparse(summ[key]):
+                        raise NotImplementedError("don't support scipy sparse arrays yet")
+                    else:
+                        J[roffset:rend, coffset:cend] = summ[key]
+
+        # normalize by number of saved jacs, giving a sort of 'average' jac
+        J /= num_full_jacs
+
+        good_tol, _, _, _ = _tol_sweep(J, tol, orders)
+
+        boolJ = np.zeros(J.shape, dtype=bool)
+        boolJ[J > good_tol] = True
+
+        return boolJ
 
     def set_complex_step_mode(self, active):
         """
@@ -250,7 +369,7 @@ class Jacobian(object):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for key, meta in iteritems(self._subjacs_info):
+        for meta in itervalues(self._subjacs_info):
             if active:
                 meta['value'] = meta['value'].astype(np.complex)
             else:

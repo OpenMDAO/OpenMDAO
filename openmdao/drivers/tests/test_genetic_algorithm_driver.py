@@ -8,7 +8,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent, ExecCo
     PETScVector, ParallelGroup
 from openmdao.drivers.genetic_algorithm_driver import SimpleGADriver,\
     GeneticAlgorithm
-from openmdao.test_suite.components.branin import Branin
+from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
@@ -97,6 +97,39 @@ class TestSimpleGA(unittest.TestCase):
         # Optimal solution
         assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
+
+    def test_mixed_integer_branin_discrete(self):
+        np.random.seed(1)
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        indep = IndepVarComp()
+        indep.add_output('xC', val=7.5)
+        indep.add_discrete_output('xI', val=0)
+
+        model.add_subsystem('p', indep)
+        model.add_subsystem('comp', BraninDiscrete())
+
+        model.connect('p.xI', 'comp.x0')
+        model.connect('p.xC', 'comp.x1')
+
+        model.add_design_var('p.xI', lower=-5, upper=10)
+        model.add_design_var('p.xC', lower=0.0, upper=15.0)
+        model.add_objective('comp.f')
+
+        prob.driver = SimpleGADriver(max_gen=75, pop_size=25)
+        prob.driver.options['bits'] = {'p.xC': 8}
+
+        prob.driver._randomstate = 1
+
+        prob.setup(check=False)
+        prob.run_driver()
+
+        # Optimal solution
+        assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
+        self.assertTrue(prob['p.xI'] in [3, -3])
+        self.assertTrue(isinstance(prob['p.xI'], int))
 
     def test_mixed_integer_3bar(self):
         np.random.seed(1)
@@ -302,7 +335,7 @@ class TestSimpleGA(unittest.TestCase):
         prob.model.add_objective('paraboloid2.f')
         prob.setup()
         prob.run_driver()
-        
+
         np.testing.assert_array_almost_equal(prob['indeps.x'], -5)
         np.testing.assert_array_almost_equal(prob['indeps.y'], [3, 1])
 

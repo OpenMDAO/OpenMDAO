@@ -22,6 +22,7 @@ from pyoptsparse import Optimization
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.general_utils import warn_deprecation
 
 
 # names of optimizers that use gradients
@@ -152,9 +153,10 @@ class pyOptSparseDriver(Driver):
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
         self.options.declare('dynamic_derivs_sparsity', default=False, types=bool,
-                             desc='Compute derivative sparsity dynamically if True')
+                             desc='Compute derivative sparsity dynamically if True.')
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
-                             desc='Compute simultaneous derivative coloring dynamically if True')
+                             desc='Compute simultaneous derivative coloring dynamically '
+                             'if True (deprecated)')
         self.options.declare('dynamic_derivs_repeats', default=3, types=int,
                              desc='Number of compute_totals calls during dynamic computation of '
                                   'simultaneous derivative coloring or derivatives sparsity')
@@ -217,11 +219,18 @@ class pyOptSparseDriver(Driver):
 
         # compute dynamic simul deriv coloring or just sparsity if option is set
         if coloring_mod._use_sparsity:
-            if self.options['dynamic_simul_derivs']:
-                coloring_mod.dynamic_simul_coloring(self, run_model=not model_ran,
-                                                    do_sparsity=True)
+            if self._coloring_info['coloring'] is coloring_mod._DYN_COLORING:
+                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
+                                                    fname=self._get_total_coloring_fname())
+                self._setup_tot_jac_sparsity()
+            elif self.options['dynamic_simul_derivs']:
+                warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
+                                 "the 'declare_coloring' function instead.")
+                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
+                                                    fname=self._get_total_coloring_fname())
+                self._setup_tot_jac_sparsity()
             elif self.options['dynamic_derivs_sparsity']:
-                coloring_mod.dynamic_sparsity(self)
+                coloring_mod.dynamic_derivs_sparsity(self)
 
         opt_prob = Optimization(self.options['title'], self._objfunc)
 
@@ -520,7 +529,7 @@ class pyOptSparseDriver(Driver):
                             row, col, data = coo['coo']
                             coo['coo'][2] = arr[row, col].flatten()
                             newdv[ikey] = coo
-                        else:
+                        elif okey in sens_dict:
                             newdv[ikey] = sens_dict[okey][ikey]
                 sens_dict = new_sens
 
@@ -578,15 +587,24 @@ class pyOptSparseDriver(Driver):
         """
         Set up total jacobian subjac sparsity.
         """
-        if self._total_jac_sparsity is None:
+        total_sparsity = None
+        coloring = self._get_static_coloring()
+        if coloring is not None:
+            total_sparsity = coloring.get_subjac_sparsity()
+            if self._total_jac_sparsity is not None:
+                raise RuntimeError("Total jac sparsity was set in both _total_coloring"
+                                   " and _total_jac_sparsity.")
+        elif self._total_jac_sparsity is not None:
+            if isinstance(self._total_jac_sparsity, string_types):
+                with open(self._total_jac_sparsity, 'r') as f:
+                    self._total_jac_sparsity = json.load(f)
+            total_sparsity = self._total_jac_sparsity
+
+        if total_sparsity is None:
             return
 
-        if isinstance(self._total_jac_sparsity, string_types):
-            with open(self._total_jac_sparsity, 'r') as f:
-                self._total_jac_sparsity = json.load(f)
-
         self._res_jacs = {}
-        for res, resdict in iteritems(self._total_jac_sparsity):
+        for res, resdict in iteritems(total_sparsity):
             if res in self._objs:  # skip objectives
                 continue
             self._res_jacs[res] = {}

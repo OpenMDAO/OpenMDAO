@@ -7,6 +7,7 @@ import sys
 import six
 from six.moves import range
 from itertools import product
+from copy import copy
 
 import numpy as np
 
@@ -208,7 +209,10 @@ def array_connection_compatible(shape1, shape2):
 
 def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     """
-    Assemble a sprase csr jacobian for a vectorized component.
+    Assemble arrays necessary to define a COO sparse jacobian for a vectorized component.
+
+    These arrays can also be passed to csc_matrix or csr_matrix to create CSC and CSR sparse
+    matrices.
 
     Parameters
     ----------
@@ -228,7 +232,7 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     Returns
     -------
     ndarray, ndarray, ndarray
-        CSR Sparse jacobian of size num_nodes*nrow by num_nodes*ncol
+        Arrays to define a COO sparse jacobian of size num_nodes*nrow by num_nodes*ncol
     """
     nnz = len(rows)
 
@@ -241,9 +245,11 @@ def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):
     if not np.isscalar(ncol):
         ncol = np.prod(ncol)
 
+    repeat_arr = np.repeat(np.arange(num_nodes), nnz)
+
     data = np.tile(data, num_nodes)
-    rows = np.tile(rows, num_nodes) + np.repeat(np.arange(num_nodes), nnz) * nrow
-    cols = np.tile(cols, num_nodes) + np.repeat(np.arange(num_nodes), nnz) * ncol
+    rows = np.tile(rows, num_nodes) + repeat_arr * nrow
+    cols = np.tile(cols, num_nodes) + repeat_arr * ncol
 
     return data, rows, cols
 
@@ -273,6 +279,84 @@ def _global2local_offsets(global_offsets):
                 off_vn[type_] -= goff[:, 0].reshape((goff.shape[0], 1))
 
     return offsets
+
+
+def sub2full_indices(all_names, matching_names, sizes, idx_map=()):
+    """
+    Return the given indices converted into indices into the full vector.
+
+    This routine is used to compute how column indices computed during coloring of a subset
+    of the jacobian map to column indices corresponding to the full jacobian.
+
+    Parameters
+    ----------
+    all_names : ordered iter of str
+        An ordered list of variable names containing all variables of the appropriate type.
+    matching_names : set of str
+        Subset of all_names that make up the reduced index set.
+    sizes : ndarray of int
+        Array of variable sizes.
+    idx_map : dict
+        Mapping of var name to some subset of its full indices.
+
+    Returns
+    -------
+    ndarray
+        Full array indices that map to the provided subset of variables.
+    """
+    global_idxs = []
+    start = end = 0
+    for name, size in zip(all_names, sizes):
+        end += size
+        if size > 0 and (matching_names is None or name in matching_names):
+            if name in idx_map:
+                global_idxs.append(np.arange(start, end)[idx_map[name]])
+            else:
+                global_idxs.append(np.arange(start, end))
+        start = end
+
+    if global_idxs:
+        return np.hstack(global_idxs)
+
+
+def get_input_idx_split(full_idxs, inputs, outputs, use_full_cols, is_total):
+    """
+    Split an array of indices into vec outs + ins into two arrays of indices into outs and ins.
+
+    Parameters
+    ----------
+    full_idxs : ndarray
+        Indices into the full array (which could be outs + ins or just ins)
+    inputs : Vector
+        Inputs vector.
+    outputs : Vector
+        Outputs vector.
+    use_full_cols : bool
+        If True,  full idxs are into the full outs + ins vector.
+    is_total : bool
+        If True, total derivatives are being computed and wrt vector is the outputs vector.
+
+    Returns
+    -------
+    list of tuples
+        Each tuple is of the form (array, idxs).
+    """
+    assert len(full_idxs) > 0, "Empty index array passed to get_input_idx_split."
+    full_idxs = np.asarray(full_idxs)
+    if use_full_cols:
+        out_size = outputs._data.size
+        out_idxs = full_idxs[full_idxs < out_size]
+        in_idxs = full_idxs[full_idxs >= out_size]
+        if out_idxs.size > 0 and in_idxs.size > 0:
+            return [(inputs, in_idxs - out_size), (outputs, out_idxs)]
+        elif in_idxs.size > 0:
+            return [(inputs, in_idxs - out_size)]
+        else:
+            return [(outputs, out_idxs)]
+    elif is_total:
+        return [(outputs, full_idxs)]
+    else:
+        return [(inputs, full_idxs)]
 
 
 def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):

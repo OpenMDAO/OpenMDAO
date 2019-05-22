@@ -46,7 +46,6 @@ class Branin(ExplicitComponent):
         """
         x0 = inputs['x0']
         x1 = inputs['x1']
-        print(x0, x1)
 
         a = 1.0
         b = 5.1/(4.0*np.pi**2)
@@ -73,3 +72,59 @@ class Branin(ExplicitComponent):
 
         partials['f', 'x1'] = 2.0*a*(x1 - b*x0**2 + c*x0 - d)
         partials['f', 'x0'] = 2.0*a*(x1 - b*x0**2 + c*x0 - d)*(-2.*b*x0 + c) - e*(1.-f)*np.sin(x0)
+
+
+class BraninDiscrete(ExplicitComponent):
+    """
+    The Branin test problem. This version defines a Discrete Variable in OpenMDAO.
+
+    X0 is integer.
+    """
+
+    def setup(self):
+        """
+        Define the independent variables, output variables, and partials.
+        """
+        # Inputs
+        self.add_discrete_input('x0', 0)
+        self.add_input('x1', 0.0)
+
+        # Outputs
+        self.add_output('f', val=0.0)
+
+        self.declare_partials(of='f', wrt=['x1'])
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        """
+        Define the function f(xI, xC).
+
+        Here, x0 is integer and x1 is continuous.
+        """
+        x0 = discrete_inputs['x0']
+        x1 = inputs['x1']
+
+        a = 1.0
+        b = 5.1/(4.0*np.pi**2)
+        c = 5.0/np.pi
+        d = 6.0
+        e = 10.0
+        f = 1.0/(8.0*np.pi)
+
+        outputs['f'] = a*(x1 - b*x0**2 + c*x0 - d)**2 + e*(1-f)*np.cos(x0) + e
+
+    def compute_partials(self, inputs, partials, discrete_inputs):
+        """
+        Provide the Jacobian.
+        """
+        x0 = discrete_inputs['x0']
+        x1 = inputs['x1']
+
+        a = 1.0
+        b = 5.1/(4.0*np.pi**2)
+        c = 5.0/np.pi
+        d = 6.0
+        e = 10.0
+        f = 1.0/(8.0*np.pi)
+
+        partials['f', 'x1'] = 2.0*a*(x1 - b*x0**2 + c*x0 - d)
+        #partials['f', 'x0'] = 2.0*a*(x1 - b*x0**2 + c*x0 - d)*(-2.*b*x0 + c) - e*(1.-f)*np.sin(x0)

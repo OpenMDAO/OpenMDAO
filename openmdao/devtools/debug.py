@@ -4,15 +4,21 @@ from __future__ import print_function
 
 import sys
 import os
+from itertools import product
 
 import numpy as np
 import cProfile
 from contextlib import contextmanager
+from six import iteritems, iterkeys, itervalues
 
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
+from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.mpi import MPI
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.utils.name_maps import abs_key2rel_key, rel_key2abs_key
 
 # an object used to detect when a named value isn't found
 _notfound = object()
@@ -125,7 +131,7 @@ def _get_color_printer(stream=sys.stdout, colors=True, rank=0):
     return color_print, Fore, Back, Style
 
 
-def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
+def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=True,
          filter=None, max_depth=0, rank=0, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.
@@ -143,6 +149,8 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
         If True, include jacobian types in the tree.
     show_colors : bool
         If True and stream is a terminal that supports it, display in color.
+    show_approx : bool
+        If True, mark systems that are approximating their derivatives.
     filter : function(System)
         A function taking a System arg and returning None or an iter of (name, value) tuples.
         If None is returned, that system will not be displayed.  Otherwise, the system will
@@ -165,7 +173,6 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
             tab += 1
         top = top.model
 
-    seenJacs = set()
     for s in top.system_iter(include_self=True, recurse=True):
         if filter is None:
             ret = ()
@@ -210,6 +217,18 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True,
                     cprint(" NL_jac: ")
                     cprint(type(jacsolvers[0]._assembled_jac).__name__,
                            color=Fore.MAGENTA + Style.BRIGHT)
+
+        if show_approx and s._approx_schemes:
+            approx_keys = set()
+            keys = set()
+            for k, sjac in iteritems(s._subjacs_info):
+                if 'method' in sjac and sjac['method']:
+                    approx_keys.add(k)
+                else:
+                    keys.add(k)
+            diff = approx_keys - keys
+            cprint("  APPROX: ", color=Fore.MAGENTA + Style.BRIGHT)
+            cprint("%s (%d of %d)" % (list(s._approx_schemes), len(diff), len(s._subjacs_info)))
 
         cprint('', end='\n')
 
@@ -342,3 +361,38 @@ def profiling(outname='prof.out'):
 
     prof.disable()
     prof.dump_stats(outname)
+
+
+def compare_jacs(Jref, J, rel_trigger=1.0):
+    results = []
+
+    for key in set(J).union(Jref):
+        if key in J:
+            subJ = J[key]
+        else:
+            subJ = np.zeros(Jref[key].shape)
+
+        if key in Jref:
+            subJref = Jref[key]
+        else:
+            subJref = np.zeros(J[key].shape)
+
+        diff = np.abs(subJ - subJref)
+        absref = np.abs(subJref)
+        rel_idxs = np.nonzero(absref > rel_trigger)
+        diff[rel_idxs] /= absref[rel_idxs]
+
+        max_diff_idx = np.argmax(diff)
+        max_diff = diff.flatten()[max_diff_idx]
+
+        # now determine if max diff is abs or rel
+        diff[:] = 0.0
+        diff[rel_idxs] = 1.0
+        if diff.flatten()[max_diff_idx] > 0.0:
+            results.append((key, max_diff, 'rel'))
+        else:
+            results.append((key, max_diff, 'abs'))
+
+    return results
+
+

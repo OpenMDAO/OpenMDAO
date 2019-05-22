@@ -236,6 +236,17 @@ class Vector(object):
         """
         return self.__iter__() if PY3 else list(self.__iter__())
 
+    def values(self):
+        """
+        Return values of variables contained in this vector.
+
+        Returns
+        -------
+        list
+            the variable values.
+        """
+        return [v for n, v in iteritems(self._views) if n in self._names]
+
     def __iter__(self):
         """
         Yield an iterator over variables involved in the current mat-vec product (relative names).
@@ -546,19 +557,6 @@ class Vector(object):
             Upper bounds vector.
         """
         pass
-
-    def print_variables(self):
-        """
-        Print the names and values of all variables in this vector, one per line.
-        """
-        abs2prom = self._system._var_abs2prom[self._typ]
-        print('-' * 35)
-        print('   Vector %s, type %s' % (self._name, self._typ))
-        for abs_name, view in iteritems(self._views):
-            prom_name = abs2prom[abs_name]
-            print(' ' * 3, prom_name, view)
-        print('-' * 35)
-        print()
 
     def set_complex_step_mode(self, active, keep_real=False):
         """

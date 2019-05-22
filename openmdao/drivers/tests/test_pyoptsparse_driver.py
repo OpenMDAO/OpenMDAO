@@ -1819,7 +1819,8 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
 
-        prob.driver.opt_settings['Major iterations limit'] = 4
+        # after upgrading to SNOPT 7.5-1.1, this test failed unless iter limit raised from 4 to 5
+        prob.driver.opt_settings['Major iterations limit'] = 5
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
