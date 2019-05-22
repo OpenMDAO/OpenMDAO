@@ -380,7 +380,7 @@ class ArcLengthQuadrature(ExplicitComponent):
 
         da_df = np.atleast_2d(self.w_lgl*np.pi*self._mask)
 
-        self.declare_partials(of='arclength', wrt='f_arclength', dependent=True, val=da_df)
+        self.declare_partials(of='arclength', wrt='f_arclength', val=da_df)
 
     def compute(self, inputs, outputs):
         n = self.options['num_nodes']
