@@ -143,6 +143,33 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['a'], 3.0)
         self.assertEqual(p['comp1.b'], 6.0)
 
+    def test_inner_connect_w_extern_promote(self):
+        p = Problem()
+        g = p.model.add_subsystem('g', Group(), promotes_inputs=['c0.x'])
+        g.add_subsystem('ivc', IndepVarComp('x', 2.))
+        g.add_subsystem('c0', ExecComp('y = 2*x'))
+        g.connect('ivc.x', 'c0.x')
+
+        p.setup()
+        p.final_setup()
+
+        from openmdao.error_checking.check_config import _check_explicitly_connected_promoted_inputs
+        from openmdao.utils.logger_utils import get_logger
+        
+        inps = _check_explicitly_connected_promoted_inputs(p, get_logger('check_config', use_format=True))
+        print('inps', inps)
+        
+        
+    def test_inner_implicit_connect_w_extern_promote(self):
+
+        p = Problem()
+        g = p.model.add_subsystem('g', Group(), promotes_inputs=['x'])
+        g.add_subsystem('ivc', IndepVarComp('x', 2.), promotes_outputs=['x'])
+        g.add_subsystem('c0', ExecComp('y = 2*x'), promotes_inputs=['x'])
+
+        p.setup()
+        p.final_setup()
+
     def test_group_rename_connect(self):
         from openmdao.api import Problem, IndepVarComp, ExecComp
 

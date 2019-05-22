@@ -348,6 +348,56 @@ def _check_missing_recorders(problem, logger):
     logger.warning(msg)
 
 
+def _explicit_conns_iter(group):
+    """
+    Iterator over explicit connections owned by the given group.
+
+    Yields
+    ------
+    (str, str)
+        Connection tuple (src, target).
+    """
+    abs2prom_in = group._var_abs2prom['input']
+    abs2prom_out = group._var_abs2prom['output']
+    for tup in iteritems(group._conn_abs_in2out):
+        inp, out = tup
+        # if promoted names differ, must be an explicit connection
+        if abs2prom_in[inp] != abs2prom_out[out]:
+            yield tup
+
+
+def _check_explicitly_connected_promoted_inputs(problem, logger):
+    """
+    Check for any inputs that are explicitly connected AND promoted above their connection group.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    # get set of all explicitly conected inputs below the top level group
+    exp_conn_ins = set()
+    for g in problem.model.system_iter(recurse=True, typ=Group):
+        exp_conn_ins.update(t[0] for t in _explicit_conns_iter(g))
+
+    inps = []
+    for g in problem.model.system_iter(include_self=True, recurse=True, typ=Group):
+        abs2prom_in = g._var_abs2prom['input']
+        for subsys in g._subgroups_myproc:
+            sub_abs2prom_in = subsys._var_abs2prom['input']
+            sub_abs2prom_out = subsys._var_abs2prom['output']
+            for inp, sub_prom_inp in iteritems(sub_abs2prom_in):
+                if abs2prom_in[inp] == sub_prom_inp:
+                    # input has been promoted from subsys, so check
+                    # if it's part of an explicit connection at this level or below
+                    if inp in subsys._conn_global_abs_in2out and inp in exp_conn_ins:
+                        inps.append((inp, subsys.pathname))
+
+    return inps
+
+
 # Dict of all checks by name, mapped to the corresponding function that performs the check
 # Each function must be of the form  f(problem, logger).
 _checks = {
@@ -358,6 +408,7 @@ _checks = {
     'dup_inputs': _check_dup_comp_inputs,
     'missing_recorders': _check_missing_recorders,
     'comp_has_no_outputs': _check_comp_has_no_outputs,
+    'promoted_connected': _check_explicitly_connected_promoted_inputs,
 }
 
 

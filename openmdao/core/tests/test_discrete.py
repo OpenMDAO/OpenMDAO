@@ -402,7 +402,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-        proms = ['x', 'z', 'y1', 'state_eq.y2_actual', 'state_eq.y2_command', 'd1.y2', 'd2.y2']
+        proms = ['x', 'z', 'y1', 'state_eq.y2_command', 'd2.y2']
         sub = model.add_subsystem('sub', Group(), promotes=proms)
 
         subgrp = sub.add_subsystem('state_eq_group', Group(),
@@ -412,8 +412,8 @@ class SolverDiscreteTestCase(unittest.TestCase):
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1'])
 
-        model.connect('state_eq.y2_command', 'd1.y2')
-        model.connect('d2.y2', 'state_eq.y2_actual')
+        model.connect('state_eq.y2_command', 'sub.d1.y2')
+        model.connect('d2.y2', 'sub.state_eq.y2_actual')
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),

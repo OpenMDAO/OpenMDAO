@@ -901,19 +901,12 @@ class Group(System):
         pathname = self.pathname
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
+        abs2prom_in = self._var_abs2prom['input']
 
         # Recursion
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_connections(recurse)
-                if isinstance(subsys, Group):
-                    for inp in subsys._conn_abs_in2out:
-                        if inp != self._var_abs2prom['input'][inp]:
-                            raise RuntimeError("Input variable '%s', which was connected in system "
-                                            "'%s', was also promoted out of system '%s'." %
-                                            (inp, subsys.pathname, subsys.pathname))
-
-
 
         if MPI:
             # collect set of local (not remote, not distributed) subsystems so we can
