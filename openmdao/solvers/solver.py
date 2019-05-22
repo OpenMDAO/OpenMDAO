@@ -379,13 +379,15 @@ class Solver(object):
             prefix = self._solver_info.prefix + self.SOLVER
             if np.isinf(norm) or np.isnan(norm) or (norm > atol and norm / norm0 > rtol):
                 if iprint > -1:
-                    msg = ' Failed to Converge in {} iterations'.format(self._iter_count)
-                    print(prefix + msg)
+                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+                    print(prefix + msg.format(self.SOLVER, self._system.pathname,
+                                              self._iter_count))
 
                 # Raise AnalysisError if requested.
                 if self.options['err_on_maxiter']:
-                    msg = "Solver '{}' on system '{}' failed to converge."
-                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname))
+                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname,
+                                                   self._iter_count))
 
             elif iprint == 1:
                 print(prefix + ' Converged in {} iterations'.format(self._iter_count))
@@ -631,18 +633,19 @@ class NonlinearSolver(Solver):
     def _print_exc_debug_info(self):
         coord = self._recording_iter.get_formatted_iteration_coordinate()
 
-        out_str = "\n# Inputs and outputs at start of iteration '%s':\n" % coord
+        out_strs = ["\n# Inputs and outputs at start of iteration '%s':\n" % coord]
         for vec_type, views in iteritems(self._err_cache):
-            out_str += '\n'
-            out_str += '# nonlinear %s\n' % vec_type
-            out_str += pprint.pformat(views)
-            out_str += '\n'
+            out_strs.append('\n# nonlinear %s\n' % vec_type)
+            out_strs.append(pprint.pformat(views))
+            out_strs.append('\n')
 
+        out_str = ''.join(out_strs)
         print(out_str)
 
-        filename = coord.replace('._solve_nonlinear', '')
-        filename = re.sub('[^0-9a-zA-Z]', '_', filename) + '.dat'
-        with open(filename, 'w') as f:
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
+        filename = 'solver_errors.%d.out' % rank
+
+        with open(filename, 'a') as f:
             f.write(out_str)
             print("Inputs and outputs at start of iteration have been "
                   "saved to '%s'." % filename)

@@ -12,4 +12,5 @@ Anything documented here is functional but not fully tested.
 
    discrete_vars.rst
    xdsm_visualization.rst
+   simul_coloring_fd_cs.rst
 

@@ -1939,10 +1939,9 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # declare two options
         d1 = prob.model.d1
         d1.options.declare('options value 1', 1)
-        d1.options.declare('options value to ignore', 2)
 
-        # don't record the second option on d1
-        d1.recording_options['options_excludes'] = ['options value to ignore']
+        # don't record the dynamic_derivs_repeats option on d1
+        d1.recording_options['options_excludes'] = ['dynamic_derivs_repeats']
 
         # create recorder and attach to driver and d1
         recorder = SqliteRecorder("cases.sql")
@@ -1961,17 +1960,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
                          sorted(['root', 'px', 'pz', 'd1', 'd2', 'obj_cmp', 'con_cmp1', 'con_cmp2']))
 
         # options for system 'd1', with second option excluded
-        self.assertEqual(str(metadata['d1']['component_options']),
-            "=============== ======= ================= ================ =========================================\n"
-            "Option          Default Acceptable Values Acceptable Types Description                              \n"
-            "=============== ======= ================= ================ =========================================\n"
-            "distributed     False   [True, False]     ['bool']         True if the component has variables that \n"
-            "                                                           are distributed across multiple processes\n"
-            "                                                           .\n"
-            "options value 1 1       N/A               N/A                                                       \n"
-            "=============== ======= ================= ================ =========================================")
-
         self.assertEqual(metadata['d1']['component_options']['distributed'], False)
+        self.assertEqual(metadata['d1']['component_options']['options value 1'], 1)
 
     def test_feature_system_options(self):
         from openmdao.api import Problem, SqliteRecorder, CaseReader

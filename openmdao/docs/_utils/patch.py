@@ -1,5 +1,5 @@
 from numpydoc.docscrape_sphinx import SphinxDocString
-from numpydoc.docscrape import NumpyDocString, Reader
+from numpydoc.docscrape import NumpyDocString, Reader, ParseError
 import textwrap
 
 # start off running the monkeypatch to keep options/parameters
@@ -10,6 +10,7 @@ def __init__(self, docstring, config={}):
     """
     init
     """
+    orig_docstring = docstring
     docstring = textwrap.dedent(docstring).split('\n')
 
     self._doc = Reader(docstring)

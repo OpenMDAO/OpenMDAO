@@ -2,25 +2,17 @@
 from __future__ import division, print_function
 
 from collections import namedtuple, defaultdict
-from itertools import groupby
+from six import iteritems
 from six.moves import range, zip
 
 import numpy as np
 
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, \
     _gather_jac_results
-from openmdao.utils.name_maps import abs_key2rel_key
-
+from openmdao.utils.array_utils import sub2full_indices
+from openmdao.utils.coloring import Coloring
 
 FDForm = namedtuple('FDForm', ['deltas', 'coeffs', 'current_coeff'])
-
-DEFAULT_FD_OPTIONS = {
-    'step': 1e-6,
-    'form': 'forward',
-    'order': None,
-    'step_calc': 'abs',
-    'directional': False,
-}
 
 DEFAULT_ORDER = {
     'forward': 1,
@@ -60,8 +52,9 @@ def _generate_fd_coeff(form, order):
         namedtuple containing the 'deltas', 'coeffs', and 'current_coeff'. These deltas and
         coefficients need to be scaled by the step size.
     """
-    fd_form = FD_COEFFS.get((form, order))
-    if fd_form is None:
+    try:
+        fd_form = FD_COEFFS[form, order]
+    except KeyError:
         # TODO: Automatically generate requested form and store in dict.
         msg = 'Finite Difference form="{}" and order={} are not supported'
         raise ValueError(msg.format(form, order))
@@ -81,18 +74,28 @@ class FiniteDifference(ApproximationScheme):
 
     Attributes
     ----------
-    _exec_list : list
-        A list of which derivatives (in execution order) to compute.
-        The entries are of the form (of, wrt, fd_options), where of and wrt are absolute names
-        and fd_options is a dictionary.
+    _starting_outs : ndarray
+        A copy of the starting outputs array used to restore the outputs to original values.
+    _starting_ins : ndarray
+        A copy of the starting inputs array used to restore the inputs to original values.
+    _results_tmp : ndarray
+        An array the same size as the system outputs. Used to store the results temporarily.
     """
+
+    DEFAULT_OPTIONS = {
+        'step': 1e-6,
+        'form': 'forward',
+        'order': None,
+        'step_calc': 'abs',
+        'directional': False,
+    }
 
     def __init__(self):
         """
         Initialize the ApproximationScheme.
         """
         super(FiniteDifference, self).__init__()
-        self._exec_list = []
+        self._starting_ins = self._starting_outs = self._results_tmp = None
 
     def add_approximation(self, abs_key, kwargs):
         """
@@ -105,115 +108,61 @@ class FiniteDifference(ApproximationScheme):
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
-        of, wrt = abs_key
-        fd_options = DEFAULT_FD_OPTIONS.copy()
-        fd_options.update(kwargs)
+        options = self.DEFAULT_OPTIONS.copy()
+        options.update(kwargs)
 
-        if fd_options['order'] is None:
-            form = fd_options['form']
+        if options['order'] is None:
+            form = options['form']
             if form in DEFAULT_ORDER:
-                fd_options['order'] = DEFAULT_ORDER[fd_options['form']]
+                options['order'] = DEFAULT_ORDER[options['form']]
             else:
                 msg = "'{}' is not a valid form of finite difference; must be one of {}"
                 raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
 
-        self._exec_list.append((of, wrt, fd_options))
-        self._approx_groups = None
+        key = (abs_key[1], options['form'], options['order'],
+               options['step'], options['step_calc'], options['directional'])
+        self._exec_dict[key].append((abs_key, options))
+        self._approx_groups = None  # force later regen of approx_groups
 
-    @staticmethod
-    def _key_fun(approx_tuple):
+    def _get_approx_data(self, system, data):
         """
-        Compute the sorting key for an approximation tuple.
-
-        Parameters
-        ----------
-        approx_tuple : tuple(str, str, dict)
-            A given approximated derivative (of, wrt, fd_options)
-
-        Returns
-        -------
-        tuple(str, str, float, int, str)
-            Sorting key (wrt, form, step_size, order, step_calc, directional)
-
-        """
-        fd_options = approx_tuple[2]
-        return (approx_tuple[1], fd_options['form'], fd_options['order'],
-                fd_options['step'], fd_options['step_calc'], fd_options['directional'])
-
-    def _init_approximations(self, system):
-        """
-        Prepare for later approximations.
+        Given approximation metadata, compute necessary deltas and coefficients.
 
         Parameters
         ----------
         system : System
-            The system having its derivs approximated.
+            System whose derivatives are being approximated.
+        data : tuple
+            Tuple of the form (wrt, form, order, step, step_calc, directional)
+
+        Returns
+        -------
+        tuple
+            Tuple of the form (deltas, coeffs, current_coeff)
         """
-        # itertools.groupby works like `uniq` rather than the SQL query, meaning that it will only
-        # group adjacent items with identical keys.
-        self._exec_list.sort(key=self._key_fun)
+        wrt, form, order, step, step_calc, _ = data
 
-        dtype = system._outputs._data.dtype
+        # FD forms are written as a collection of changes to inputs (deltas) and the associated
+        # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
+        # coefficient is stored seperately (current_coeff). For example,
+        # f'(x) = (f(x+h) - f(x))/h + O(h) = 1/h * f(x+h) + (-1/h) * f(x) + O(h)
+        # would be stored as deltas = [h], coeffs = [1/h], and current_coeff = -1/h.
+        # A central second order accurate approximation for the first derivative would be stored
+        # as deltas = [-2, -1, 1, 2] * h, coeffs = [1/12, -2/3, 2/3 , -1/12] * 1/h,
+        # current_coeff = 0.
+        fd_form = _generate_fd_coeff(form, order)
 
-        # groupby (along with this key function) will group all 'of's that have the same wrt and
-        # step size.
-        # Note: Since access to `approximations` is required multiple times, we need to
-        # throw it in a list. The groupby iterator only works once.
-        approx_groups = [(key, list(approx)) for key, approx in groupby(self._exec_list,
-                                                                        self._key_fun)]
+        if step_calc == 'rel':
+            if wrt in system._outputs._views_flat:
+                step *= np.linalg.norm(system._outputs._views_flat[wrt])
+            elif wrt in system._inputs._views_flat:
+                step *= np.linalg.norm(system._inputs._views_flat[wrt])
 
-        self._approx_groups = [None] * len(approx_groups)
-        for i, (key, approximations) in enumerate(approx_groups):
-            wrt, form, order, step, step_calc, directional = key
+        deltas = fd_form.deltas * step
+        coeffs = fd_form.coeffs / step
+        current_coeff = fd_form.current_coeff / step
 
-            # FD forms are written as a collection of changes to inputs (deltas) and the associated
-            # coefficients (coeffs). Since we do not need to (re)evaluate the current step, its
-            # coefficient is stored seperately (current_coeff). For example,
-            # f'(x) = (f(x+h) - f(x))/h + O(h) = 1/h * f(x+h) + (-1/h) * f(x) + O(h)
-            # would be stored as deltas = [h], coeffs = [1/h], and current_coeff = -1/h.
-            # A central second order accurate approximation for the first derivative would be stored
-            # as deltas = [-2, -1, 1, 2] * h, coeffs = [1/12, -2/3, 2/3 , -1/12] * 1/h,
-            # current_coeff = 0.
-            fd_form = _generate_fd_coeff(form, order)
-
-            if step_calc == 'rel':
-                if wrt in system._outputs._views_flat:
-                    step *= np.linalg.norm(system._outputs._views_flat[wrt])
-                elif wrt in system._inputs._views_flat:
-                    step *= np.linalg.norm(system._inputs._views_flat[wrt])
-
-            deltas = fd_form.deltas * step
-            coeffs = fd_form.coeffs / step
-            current_coeff = fd_form.current_coeff / step
-
-            if wrt in system._owns_approx_wrt_idx:
-                in_idx = system._owns_approx_wrt_idx[wrt]
-                in_size = len(in_idx)
-            else:
-                in_size = system._var_allprocs_abs2meta[wrt]['size']
-                in_idx = range(in_size)
-
-            outputs = []
-
-            # Directional derivatives for quick partial checking.
-            # We place the indices in a list so that they are all stepped at the same time.
-            if directional:
-                in_idx = [in_idx]
-                in_size = 1
-
-            for approx_tuple in approximations:
-                of = approx_tuple[0]
-                # TODO: Sparse derivatives
-                if of in system._owns_approx_of_idx:
-                    out_idx = system._owns_approx_of_idx[of]
-                    out_size = len(out_idx)
-                else:
-                    out_size = system._var_allprocs_abs2meta[of]['size']
-                    out_idx = _full_slice
-
-                outputs.append((of, np.zeros((out_size, in_size), dtype=dtype), out_idx))
-
-            self._approx_groups[i] = (wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs)
+        return deltas, coeffs, current_coeff
 
     def compute_approximations(self, system, jac=None, total=False):
         """
@@ -229,109 +178,73 @@ class FiniteDifference(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         """
-        if len(self._exec_list) == 0:
+        if not self._exec_dict:
             return
 
         if jac is None:
             jac = system._jacobian
 
+        self._starting_outs = system._outputs._data.copy()
+        self._starting_resids = system._residuals._data.copy()
+        self._starting_ins = system._inputs._data.copy()
         if total:
-            current_vec = system._outputs
+            self._results_tmp = self._starting_outs.copy()
         else:
-            current_vec = system._residuals
+            self._results_tmp = self._starting_resids.copy()
 
-        result = system._outputs._clone(True)
+        self._compute_approximations(system, jac, total, system._outputs._under_complex_step)
 
-        cs_active = system._outputs._under_complex_step
-        if cs_active:
-            result.set_complex_step_mode(cs_active)
+        # reclaim some memory
+        self._starting_ins = self._starting_outs = self._results_tmp = None
 
-        result_array = result._data.copy()
-        out_tmp = current_vec._data.copy()
-        in_tmp = system._inputs._data.copy()
-
-        # To support driver src_indices, we need to override some checks in Jacobian, but do it
-        # selectively.
-        uses_src_indices = (system._owns_approx_of_idx or system._owns_approx_wrt_idx) and \
-            not isinstance(jac, dict)
-
-        use_parallel_fd = system._num_par_fd > 1 and (system._full_comm is not None and
-                                                      system._full_comm.size > 1)
-        num_par_fd = system._num_par_fd if use_parallel_fd else 1
-        is_parallel = use_parallel_fd or system.comm.size > 1
-
-        results = defaultdict(list)
-        iproc = system.comm.rank
-        owns = system._owning_rank
-        mycomm = system._full_comm if use_parallel_fd else system.comm
-
-        fd_count = 0
-        approx_groups = self._get_approx_groups(system, under_cs=cs_active)
-        for wrt, deltas, coeffs, current_coeff, in_idx, in_size, outputs in approx_groups:
-
-            for i_count, idx in enumerate(in_idx):
-                if fd_count % num_par_fd == system._par_fd_id:
-                    if current_coeff:
-                        result._data[:] = current_vec._data
-                        result._data *= current_coeff
-                    else:
-                        result._data[:] = 0.
-
-                    # Run the Finite Difference
-                    for delta, coeff in zip(deltas, coeffs):
-                        self._run_point(system, wrt, idx, delta, out_tmp, in_tmp, result_array,
-                                        total)
-                        result_array *= coeff
-                        result._data += result_array
-
-                    if is_parallel:
-                        for of, _, out_idx in outputs:
-                            if owns[of] == iproc:
-                                results[(of, wrt)].append(
-                                    (i_count, result._views_flat[of][out_idx].copy()))
-                    else:
-                        for of, subjac, out_idx in outputs:
-                            subjac[:, i_count] = result._views_flat[of][out_idx]
-
-                fd_count += 1
-
-        if is_parallel:
-            results = _gather_jac_results(mycomm, results)
-
-        for wrt, _, _, _, _, _, outputs in approx_groups:
-            for of, subjac, _ in outputs:
-                key = (of, wrt)
-                if is_parallel:
-                    for i, result in results[key]:
-                        subjac[:, i] = result
-
-                if uses_src_indices:
-                    jac._override_checks = True
-                    jac[key] = subjac
-                    jac._override_checks = False
-                else:
-                    jac[key] = subjac
-
-    def _run_point(self, system, in_name, idxs, delta, out_tmp, in_tmp, result_array, total=False):
+    def _get_multiplier(self, data):
         """
-        Alter the specified inputs by the given deltas, runs the system, and returns the results.
+        Return a multiplier to be applied to the jacobian.
+
+        Always returns 1.0 for finite difference.
+
+        Parameters
+        ----------
+        data :  tuple
+            Not used.
+
+        Returns
+        -------
+        float
+            1.0
+        """
+        return 1.0
+
+    def _transform_result(self, array):
+        """
+        Return the given array.
+
+        Parameters
+        ----------
+        array : ndarray
+            Result array after doing a finite difference.
+
+        Returns
+        -------
+        array
+            The givan array, unchanged.
+        """
+        return array
+
+    def _run_point(self, system, idx_info, data, results_array, total):
+        """
+        Alter the specified inputs by the given deltas, run the system, and return the results.
 
         Parameters
         ----------
         system : System
             The system having its derivs approximated.
-        in_name : str
-            Input name.
-        idxs : ndarray
-            Input indices.
-        delta : float
-            Perturbation amount.
-        out_tmp : ndarray
-            A copy of the starting outputs array used to restore the outputs to original values.
-        in_tmp : ndarray
-            A copy of the starting inputs array used to restore the inputs to original values.
-        result_array : ndarray
-            An array the same size as the system outputs. Used to store the results.
+        idx_info : tuple of (ndarray of int, ndarray of float)
+            Tuple of wrt indices and corresponding data array to perturb.
+        data : tuple of float
+            Tuple of the form (deltas, coeffs, current_coeff)
+        results_array : ndarray
+            Where the results will be stored.
         total : bool
             If True total derivatives are being approximated, else partials.
 
@@ -340,32 +253,65 @@ class FiniteDifference(ApproximationScheme):
         ndarray
             The results from running the perturbed system.
         """
-        inputs = system._inputs
-        outputs = system._outputs
+        deltas, coeffs, current_coeff = data
+
+        if current_coeff:
+            current_vec = system._outputs if total else system._residuals
+            # copy data from outputs (if doing total derivs) or residuals (if doing partials)
+            results_array[:] = current_vec._data
+            results_array *= current_coeff
+        else:
+            results_array[:] = 0.
+
+        # Run the Finite Difference
+        for delta, coeff in zip(deltas, coeffs):
+            results = self._run_sub_point(system, idx_info, delta, total)
+            results *= coeff
+            results_array += results
+
+        return results_array
+
+    def _run_sub_point(self, system, idx_info, delta, total):
+        """
+        Alter the specified inputs by the given delta, run the system, and return the results.
+
+        Parameters
+        ----------
+        system : System
+            The system having its derivs approximated.
+        idx_info : tuple of (ndarray of int, ndarray of float)
+            Tuple of wrt indices and corresponding data array to perturb.
+        delta : float
+            Perturbation amount.
+        total : bool
+            If True total derivatives are being approximated, else partials.
+
+        Returns
+        -------
+        ndarray
+            The results from running the perturbed system.
+        """
+        for arr, idxs in idx_info:
+            if arr is not None:
+                arr._data[idxs] += delta
 
         if total:
-            run_model = system.run_solve_nonlinear
-            results_vec = outputs
+            system.run_solve_nonlinear()
+            self._results_tmp[:] = system._outputs._data
+            system._outputs._data[:] = self._starting_outs
         else:
-            run_model = system.run_apply_nonlinear
-            results_vec = system._residuals
+            system.run_apply_nonlinear()
+            self._results_tmp[:] = system._residuals._data
+        system._residuals._data[:] = self._starting_resids
 
-        if in_name in outputs._views_flat:
-            outputs._views_flat[in_name][idxs] += delta
-        elif in_name in inputs._views_flat:
-            inputs._views_flat[in_name][idxs] += delta
-        else:
-            # If we make it here, this variable is remote, so don't increment by any delta.
-            pass
+        # save results and restore starting inputs/outputs
+        system._inputs._data[:] = self._starting_ins
 
-        run_model()
+        # if results_vec are the residuals then we need to remove the delta's we added earlier
+        # to the outputs
+        if not total:
+            for arr, idxs in idx_info:
+                if arr is system._outputs:
+                    arr._data[idxs] -= delta
 
-        result_array[:] = results_vec._data
-        results_vec._data[:] = out_tmp
-        inputs._data[:] = in_tmp
-
-        # if results_vec are the residuals then we need to remove the delta's we added earlier.
-        if results_vec is not outputs and in_name in outputs._views_flat:
-            outputs._views_flat[in_name][idxs] -= delta
-
-        return result_array
+        return self._results_tmp

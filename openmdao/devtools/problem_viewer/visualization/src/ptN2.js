@@ -62,6 +62,19 @@ function PtN2Diagram(parentDiv, modelData) {
     var pTreeGroup = svg.append("g").attr("id", "tree"); // id given just so it is easier to see in Chrome dev tools when debugging
     var pSolverTreeGroup = svg.append("g").attr("id", "solver_tree");
 
+    function InitSubSystemChildren(d){
+        for (var i = 0; i < d.children.length; ++i) {
+            var child = d.children[i];
+            if (child.type === "subsystem"){
+                if (!d.hasOwnProperty("subsystem_children")) {
+                    d.subsystem_children = [];
+                }
+                d.subsystem_children.push(child);
+                InitSubSystemChildren(child);
+            }
+        }
+    }
+
     function updateRootTypes() {
         if (!showParams) return;
 
@@ -211,6 +224,7 @@ function PtN2Diagram(parentDiv, modelData) {
     FlattenColonGroups(root);
     InitTree(root, null, 1);
     updateRootTypes();
+    InitSubSystemChildren(root);
     ComputeLayout();
     ComputeConnections();
     ComputeMatrixN2();
@@ -997,21 +1011,6 @@ function PtN2Diagram(parentDiv, modelData) {
         d3SolverRightTextNodesArrayZoomed = [];
 
         ComputeColumnWidths(zoomedElement);
-
-        function InitSubSystemChildren(d){
-            for (var i = 0; i < d.children.length; ++i) {
-                var child = d.children[i];
-                if (child.type === "subsystem"){
-                    if (!d.hasOwnProperty("subsystem_children")) {
-                        d.subsystem_children = [];
-                    }
-                    d.subsystem_children.push(child);
-                    InitSubSystemChildren(child);
-                }
-            }
-        }
-
-        InitSubSystemChildren(root);
 
         ComputeSolverColumnWidths(zoomedElement);
 

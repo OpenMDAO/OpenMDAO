@@ -56,12 +56,11 @@ class COOMatrix(Matrix):
         (ndarray, ndarray, ndarray)
             data, rows, cols that can be used to construct a sparse matrix.
         """
-        counter = 0
-
         submats = self._submats
         metadata = self._metadata
         pre_metadata = self._key_ranges = OrderedDict()
 
+        start = end = 0
         for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
             val = info['value']
             rows = info['rows']
@@ -78,17 +77,15 @@ class COOMatrix(Matrix):
             else:  # list sparse format
                 delta = len(rows)
 
-            ind1 = counter
-            counter += delta
-            ind2 = counter
+            end += delta
+            pre_metadata[key] = (start, end, dense, rows)
+            start = end
 
-            pre_metadata[key] = (ind1, ind2, dense, rows)
+        data = np.zeros(end)
+        rows = np.empty(end, dtype=int)
+        cols = np.empty(end, dtype=int)
 
-        data = np.zeros(counter)
-        rows = np.empty(counter, dtype=int)
-        cols = np.empty(counter, dtype=int)
-
-        for key, (ind1, ind2, dense, jrows) in iteritems(pre_metadata):
+        for key, (start, end, dense, jrows) in iteritems(pre_metadata):
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['value']
@@ -103,8 +100,8 @@ class COOMatrix(Matrix):
                     colrange = src_indices
 
                 ncols = colrange.size
-                subrows = rows[ind1:ind2]
-                subcols = cols[ind1:ind2]
+                subrows = rows[start:end]
+                subcols = cols[start:end]
 
                 for i in range(shape[0]):
                     subrows[i * ncols: (i + 1) * ncols] = i
@@ -124,16 +121,16 @@ class COOMatrix(Matrix):
                     jcols = info['cols']
 
                 if src_indices is None:
-                    rows[ind1:ind2] = jrows + irow
-                    cols[ind1:ind2] = jcols + icol
+                    rows[start:end] = jrows + irow
+                    cols[start:end] = jcols + icol
                 else:
                     irows, icols, idxs = _compute_index_map(jrows, jcols,
                                                             irow, icol,
                                                             src_indices)
-                    rows[ind1:ind2] = irows
-                    cols[ind1:ind2] = icols
+                    rows[start:end] = irows
+                    cols[start:end] = icols
 
-            metadata[key] = (ind1, ind2, idxs, jac_type, factor)
+            metadata[key] = (start, end, idxs, jac_type, factor)
 
         return data, rows, cols
 
@@ -155,13 +152,13 @@ class COOMatrix(Matrix):
         data, rows, cols = self._build_sparse(num_rows, num_cols)
 
         metadata = self._metadata
-        for key, (ind1, ind2, idxs, jac_type, factor) in iteritems(metadata):
+        for key, (start, end, idxs, jac_type, factor) in iteritems(metadata):
             if idxs is None:
-                metadata[key] = (slice(ind1, ind2), jac_type, factor)
+                metadata[key] = (slice(start, end), jac_type, factor)
             else:
                 # store reverse indices to avoid copying subjac data during
                 # update_submat.
-                metadata[key] = (np.argsort(idxs) + ind1, jac_type, factor)
+                metadata[key] = (np.argsort(idxs) + start, jac_type, factor)
 
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 

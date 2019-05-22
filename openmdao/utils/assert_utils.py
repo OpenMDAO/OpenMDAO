@@ -3,7 +3,7 @@ Functions for making assertions about OpenMDAO Systems.
 """
 import numpy as np
 from math import isnan
-from six import raise_from
+from six import raise_from, iteritems
 from six.moves import zip
 
 import warnings
@@ -163,16 +163,20 @@ def assert_no_approx_partials(system, include_self=True, recurse=True):
     AssertionError
         If a subsystem of group is found to be using approximated partials.
     """
-    approximated_partials = {}
+    has_approx_partials = False
     msg = 'The following components use approximated partials:\n'
     for s in system.system_iter(include_self=include_self, recurse=recurse):
         if isinstance(s, Component):
-            if s._approximated_partials:
-                approximated_partials[s.pathname] = s._approximated_partials
+            if s._approx_schemes:
+                has_approx_partials = True
+                approx_partials = [(k, v['method']) for k, v in iteritems(s._declared_partials)
+                                   if 'method' in v and v['method']]
                 msg += '    ' + s.pathname + '\n'
-                for partial in s._approximated_partials:
-                    msg += '        of={0:12s}    wrt={1:12s}    method={2:2s}\n'.format(*partial)
-    if approximated_partials:
+                for key, method in approx_partials:
+                    msg += '        of={0:12s}    wrt={1:12s}    method={2:2s}\n'.format(key[0],
+                                                                                         key[1],
+                                                                                         method)
+    if has_approx_partials:
         raise AssertionError(msg)
 
 

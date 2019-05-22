@@ -3,6 +3,7 @@
 from __future__ import division, print_function
 
 import sys
+import os
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -14,16 +15,16 @@ from six.moves import range, cStringIO
 import numpy as np
 import scipy.sparse as sparse
 
-from openmdao.approximation_schemes.complex_step import ComplexStep, DEFAULT_CS_OPTIONS
-from openmdao.approximation_schemes.finite_difference import FiniteDifference, DEFAULT_FD_OPTIONS
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver
-from openmdao.solvers.solver import SolverInfo
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.group import System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
+from openmdao.approximation_schemes.complex_step import ComplexStep
+from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.solvers.solver import SolverInfo
 from openmdao.error_checking.check_config import check_config
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
@@ -34,9 +35,10 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
-from openmdao.utils import coloring
-from openmdao.vectors.default_vector import DefaultVector
+from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
+from openmdao.vectors.default_vector import DefaultVector
+import openmdao.utils.coloring as coloring_mod
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -85,6 +87,10 @@ class Problem(object):
     _mode : 'fwd' or 'rev'
         Derivatives calculation mode, 'fwd' for forward, and 'rev' for
         reverse (adjoint).
+    _orig_mode : 'fwd', 'rev', or 'auto'
+        Derivatives calculation mode assigned by the user.  If set to 'auto', _mode will be
+        automatically assigned to 'fwd' or 'rev' based on relative sizes of design variables vs.
+        responses.
     _solver_print_cache : list
         Allows solver iprints to be set to requested values after setup calls.
     _initial_condition_cache : dict
@@ -98,19 +104,33 @@ class Problem(object):
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
+    options : <OptionsDictionary>
+        Dictionary with general options for the problem.
     recording_options : <OptionsDictionary>
         Dictionary with problem recording options.
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this problem.
-    _vars_to_record: dict
-        Dict of lists of var names indicating what to record
     _remote_var_set : set
         Set of variables (absolute names) that require remote data transfer to reach all procs.
+    _check : bool
+        If True, call check_config at the end of final_setup.
+    _recording_iter : _RecIteration
+        Manages recording of iterations.
+    _filtered_vars_to_record : dict
+        Dictionary of lists of design vars, constraints, etc. to record.
+    _logger : object or None
+        Object for logging config checks if _check is True.
+    _force_alloc_complex : bool
+        Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+        detect when you need to do this, but in some cases (e.g., complex step is used
+        after a reconfiguration) you may need to set this to True.
+    _color_dir_hash : str
+        Hash used to detect collisions of coloring files.
     """
 
     _post_setup_func = None
 
-    def __init__(self, model=None, driver=None, comm=None, root=None):
+    def __init__(self, model=None, driver=None, comm=None, root=None, **options):
         """
         Initialize attributes.
 
@@ -124,6 +144,8 @@ class Problem(object):
             The global communicator.
         root : <System> or None
             Deprecated kwarg for `model`.
+        **options : named args
+            All remaining named args are converted to options.
         """
         self.cite = CITATION
 
@@ -173,11 +195,13 @@ class Problem(object):
         self._setup_status = 0
 
         self._rec_mgr = RecordingManager()
-        self._vars_to_record = {
-            'desvarnames': set(),
-            'objectivenames': set(),
-            'constraintnames': set(),
-        }
+
+        # General options
+        self.options = OptionsDictionary()
+        self.options.declare('coloring_dir', types=str,
+                             default=os.path.join(os.getcwd(), 'coloring_files'),
+                             desc='Directory containing coloring files (if any) for this Problem.')
+        self.options.update(options)
 
         # Case recording options
         self.recording_options = OptionsDictionary()
@@ -757,7 +781,7 @@ class Problem(object):
         model_comm = self.driver._setup_comm(comm)
 
         model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
-                     derivatives)
+                     derivatives, self.options)
 
         # get set of all vars that we may need to bcast later
         self._remote_var_set = remote_var_set = set()
@@ -781,7 +805,7 @@ class Problem(object):
                             diff = full.difference(names)
                             remote_discrete.update(diff)
 
-                        junk = model_comm.bcast(remote_discrete, root=0)
+                        model_comm.bcast(remote_discrete, root=0)
                     else:
                         remote_discrete = model_comm.bcast(None, root=0)
 
@@ -823,21 +847,18 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        coloring_info = driver._simul_coloring_info
-        if coloring_info and coloring._use_sparsity:
-            # if we're using simultaneous derivatives then our effective size is less
+        coloring = driver._coloring_info['coloring']
+        if coloring is coloring_mod._STD_COLORING_FNAME:
+            coloring = driver._get_static_coloring()
+        if coloring and coloring is not coloring_mod._DYN_COLORING and coloring_mod._use_sparsity:
+            # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
-            if 'fwd' in coloring_info and 'rev' in coloring_info:
+            if coloring._fwd and coloring._rev:
                 pass  # we're doing both!
-            elif mode in coloring_info:
-                lists = coloring_info[mode][0]
-                if lists:
-                    size = len(lists[0])  # lists[0] is the uncolored row/col indices
-                    size += len(lists) - 1
-                if mode == 'fwd':
-                    desvar_size = size
-                else:  # rev
-                    response_size = size
+            elif mode == 'fwd' and coloring._fwd:
+                desvar_size = coloring.total_solves()
+            elif mode == 'rev' and coloring._rev:
+                response_size = coloring.total_solves()
 
         if ((mode == 'fwd' and desvar_size > response_size) or
                 (mode == 'rev' and response_size > desvar_size)):
@@ -1169,13 +1190,13 @@ class Problem(object):
                               'method': method}
 
                 if method == 'cs':
-                    defaults = DEFAULT_CS_OPTIONS
+                    defaults = ComplexStep.DEFAULT_OPTIONS
 
                     fd_options['form'] = None
                     fd_options['step_calc'] = None
 
                 elif method == 'fd':
-                    defaults = DEFAULT_FD_OPTIONS
+                    defaults = FiniteDifference.DEFAULT_OPTIONS
 
                     fd_options['form'] = form
                     fd_options['step_calc'] = step_calc
@@ -1235,7 +1256,7 @@ class Problem(object):
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
-                     method='fd', step=None, form='forward', step_calc='abs'):
+                     method='fd', step=None, form=None, step_calc='abs'):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1269,7 +1290,7 @@ class Problem(object):
             'cs'.
         form : string
             Form for finite difference, can be 'forward', 'backward', or 'central'. Default
-            'forward'.
+            None, which defaults to 'forward' for FD.
         step_calc : string
             Step type for finite difference, can be 'abs' for absolute', or 'rel' for relative.
             Default is 'abs'.
@@ -1305,9 +1326,9 @@ class Problem(object):
 
         if step is None:
             if method == 'cs':
-                step = DEFAULT_CS_OPTIONS['step']
+                step = ComplexStep.DEFAULT_OPTIONS['step']
             else:
-                step = DEFAULT_FD_OPTIONS['step']
+                step = FiniteDifference.DEFAULT_OPTIONS['step']
 
         # Approximate FD
         fd_args = {
@@ -1770,7 +1791,16 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             derivative_info['magnitude'] = magnitude = MagnitudeTuple(fwd_norm, rev_norm, fd_norm)
 
             if fd_norm == 0.:
-                derivative_info['rel error'] = rel_err = ErrorTuple(nan, nan, nan)
+                if fwd_norm == 0.:
+                    derivative_info['rel error'] = rel_err = ErrorTuple(nan, nan, nan)
+
+                else:
+                    # If fd_norm is zero, let's use fwd_norm as the divisor for relative
+                    # check. That way we don't accidentally squelch a legitimate problem.
+                    derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fwd_norm,
+                                                                        rev_error / fwd_norm,
+                                                                        fwd_rev_error / fwd_norm)
+
             else:
                 if totals:
                     derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fd_norm,
