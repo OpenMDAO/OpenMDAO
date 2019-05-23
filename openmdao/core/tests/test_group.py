@@ -159,8 +159,7 @@ class TestGroup(unittest.TestCase):
         inp, tup = list(ins.items())[0]
         in_proms, mans = tup
         self.assertEqual(inp, 'g.c0.x')
-        self.assertEqual(len(in_proms), 1)
-        self.assertEqual(in_proms[0], 'g')
+        self.assertEqual(in_proms, ['g'])
         self.assertEqual(mans, [('c0.x', 'g')])
 
     def test_inner_connect_w_2extern_promotes(self):
@@ -180,7 +179,6 @@ class TestGroup(unittest.TestCase):
         inp, tup = list(ins.items())[0]
         in_proms, mans = tup
         self.assertEqual(inp, 'g0.g.c0.x')
-        self.assertEqual(len(in_proms), 2)
         self.assertEqual(list(sorted(in_proms)), ['g0', 'g0.g'])
         self.assertEqual(mans, [('c0.x', 'g0.g')])
 
