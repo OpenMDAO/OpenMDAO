@@ -378,7 +378,6 @@ def _get_promoted_connected_ins(g):
             mytup[1].extend(mans)
 
         sub_abs2prom_in = subsys._var_abs2prom['input']
-        sub_abs2prom_out = subsys._var_abs2prom['output']
 
         for inp, sub_prom_inp in iteritems(sub_abs2prom_in):
             if abs2prom_in[inp] == sub_prom_inp:  # inp is promoted up from sub
