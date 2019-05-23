@@ -458,24 +458,6 @@ class System(object):
         """
         pass
 
-    def _relative_name(self, abs_name):
-        """
-        Return part of abs_name relative to this System or None.
-
-        Parameters
-        ----------
-        abs_name : str
-            Absolute name of a variable or subsystem.
-
-        Returns
-        -------
-        str or None
-            Given name relative to this System or None.
-        """
-        pathdot = self.pathname + '.' if self.pathname else ''
-        if abs_name[:len(pathdot)] == pathdot:
-            return abs_name[len(pathdot):]
-
     def _check_reconf(self):
         """
         Check if this systems wants to reconfigure and if so, perform the reconfiguration.
