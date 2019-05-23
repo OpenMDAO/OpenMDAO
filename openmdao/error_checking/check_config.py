@@ -348,6 +348,72 @@ def _check_missing_recorders(problem, logger):
     logger.warning(msg)
 
 
+def _get_promoted_connected_ins(g):
+    """
+    Find all inputs that are promoted above the level where they are explicitly connected.
+
+    Parameters
+    ----------
+    g : Group
+        Starting Group.
+
+    Returns
+    -------
+    defaultdict
+        Absolute input name keyed to [promoting_groups, manually_connecting_groups]
+    """
+    prom2abs_list = g._var_allprocs_prom2abs_list['input']
+    abs2prom_in = g._var_abs2prom['input']
+    prom_conn_ins = defaultdict(lambda: ([], []))
+    for prom_in in g._manual_connections:
+        for abs_in in prom2abs_list[prom_in]:
+            prom_conn_ins[abs_in][1].append((prom_in, g.pathname))
+
+    for subsys in g._subgroups_myproc:
+        sub_prom_conn_ins = _get_promoted_connected_ins(subsys)
+        for n, tup in iteritems(sub_prom_conn_ins):
+            proms, mans = tup
+            mytup = prom_conn_ins[n]
+            mytup[0].extend(proms)
+            mytup[1].extend(mans)
+
+        sub_abs2prom_in = subsys._var_abs2prom['input']
+
+        for inp, sub_prom_inp in iteritems(sub_abs2prom_in):
+            if abs2prom_in[inp] == sub_prom_inp:  # inp is promoted up from sub
+                if inp in sub_prom_conn_ins and len(sub_prom_conn_ins[inp][1]) > 0:
+                    prom_conn_ins[inp][0].append(subsys.pathname)
+
+    return prom_conn_ins
+
+
+def _check_explicitly_connected_promoted_inputs(problem, logger):
+    """
+    Check for any inputs that are explicitly connected AND promoted above their connection group.
+
+    Parameters
+    ----------
+    problem : <Problem>
+        The problem being checked.
+    logger : object
+        The object that manages logging output.
+    """
+    prom_conn_ins = _get_promoted_connected_ins(problem.model)
+
+    for inp, lst in iteritems(prom_conn_ins):
+        proms, mans = lst
+        if proms:
+            # there can only be one manual connection (else an exception would've been raised)
+            man_prom, man_group = mans[0]
+            if len(proms) > 1:
+                lst = [p for p in proms if p == man_group or man_group.startswith(p + '.')]
+                s = "groups %s" % sorted(lst)
+            else:
+                s = "group '%s'" % proms[0]
+            logger.warning("Input '%s' was explicitly connected in group '%s' as '%s', but was "
+                           "promoted up from %s." % (inp, man_group, man_prom, s))
+
+
 # Dict of all checks by name, mapped to the corresponding function that performs the check
 # Each function must be of the form  f(problem, logger).
 _checks = {
@@ -358,6 +424,7 @@ _checks = {
     'dup_inputs': _check_dup_comp_inputs,
     'missing_recorders': _check_missing_recorders,
     'comp_has_no_outputs': _check_comp_has_no_outputs,
+    'promoted_connected': _check_explicitly_connected_promoted_inputs,
 }
 
 

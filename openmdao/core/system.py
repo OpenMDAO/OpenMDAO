@@ -1911,7 +1911,7 @@ class System(object):
             resolve(self._var_promotes['input'], ('input',), maps, prom_names)
             resolve(self._var_promotes['output'], ('output',), maps, prom_names)
         else:
-            resolve(self._var_promotes['any'], ('input', 'output',), maps, prom_names)
+            resolve(self._var_promotes['any'], ('input', 'output'), maps, prom_names)
 
         return maps
 
