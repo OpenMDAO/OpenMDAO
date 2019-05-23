@@ -11,6 +11,7 @@ import numpy as np
 from openmdao.utils.general_utils import printoptions
 
 if __name__ == '__main__':
+    import openmdao.utils.mpi  # this will activate use_proc_files
     try:
         module_path = os.environ.get("OPENMDAO_CURRENT_MODULE", "").strip()
         if module_path:
@@ -25,10 +26,6 @@ if __name__ == '__main__':
             sys.stdout = stdout_save
         else:
             raise RuntimeError("OPENMDAO_CURRENT_MODULE was not specified.")
-
-        if os.environ.get("USE_PROC_FILES"):
-            from openmdao.utils.mpi import use_proc_files
-            use_proc_files()
 
         code_to_run = os.environ.get("OPENMDAO_CODE_TO_RUN", "").strip()
         if not code_to_run:

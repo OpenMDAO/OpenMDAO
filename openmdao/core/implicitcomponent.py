@@ -3,7 +3,7 @@
 from __future__ import division
 
 import numpy as np
-from six import itervalues
+from six import itervalues, iteritems
 from six.moves import range
 
 from openmdao.core.component import Component
@@ -258,6 +258,13 @@ class ImplicitComponent(Component):
                     finally:
                         d_outputs.read_only = d_residuals.read_only = False
 
+    def _approx_subjac_keys_iter(self):
+        for abs_key, meta in iteritems(self._subjacs_info):
+            if 'method' in meta:
+                method = meta['method']
+                if method is not None and method in self._approx_schemes:
+                    yield abs_key
+
     def _linearize(self, jac=None, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
@@ -269,6 +276,8 @@ class ImplicitComponent(Component):
         sub_do_ln : boolean
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        self._check_first_linearize()
+
         with self._unscaled_context(outputs=[self._outputs]):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.

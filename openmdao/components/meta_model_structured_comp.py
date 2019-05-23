@@ -716,13 +716,18 @@ class MetaModelStructuredComp(ExplicitComponent):
             Whether to call this method in subsystems.
         """
         super(MetaModelStructuredComp, self)._setup_partials()
-        n = self.options['vec_size']
+        arange = np.arange(self.options['vec_size'])
+        pnames = tuple(self.pnames)
+        dct = {
+            'rows': arange,
+            'cols': arange,
+            'dependent': True,
+        }
 
         for name in self._outputs:
-            arange = np.arange(n)
-            self._declare_partials(of=name, wrt=self.pnames, rows=arange, cols=arange)
+            self._declare_partials(of=name, wrt=pnames, dct=dct)
             if self.options['training_data_gradients']:
-                self._declare_partials(of=name, wrt="%s_train" % name)
+                self._declare_partials(of=name, wrt="%s_train" % name, dct={'dependent': True})
 
         # MetaModelStructuredComp does not support complex step.
         self.set_check_partial_options('*', method='fd')

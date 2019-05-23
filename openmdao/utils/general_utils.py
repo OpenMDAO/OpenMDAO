@@ -5,6 +5,7 @@ from contextlib import contextmanager
 import os
 import re
 import sys
+import math
 import warnings
 import unittest
 from fnmatch import fnmatchcase
@@ -13,6 +14,7 @@ from six.moves import range, cStringIO as StringIO
 from collections import Iterable
 import numbers
 import json
+import importlib
 
 import numpy as np
 import openmdao
@@ -708,6 +710,31 @@ def json_loads_byteified(json_str):
         return _byteify(json.loads(json_str, object_hook=_byteify), ignore_dicts=True)
     else:
         return json.loads(json_str)
+
+
+_badtab = r'`~@#$%^&*()[]{}-+=|\/?<>,.:;'
+if PY2:
+    import string
+    _transtab = string.maketrans(_badtab, '_' * len(_badtab))
+else:
+    _transtab = str.maketrans(_badtab, '_' * len(_badtab))
+
+
+def str2valid_python_name(s):
+    """
+    Translate a given string into a valid python variable name.
+
+    Parameters
+    ----------
+    s : str
+        The string to be translated.
+
+    Returns
+    -------
+    str
+        The valid python name string.
+    """
+    return s.translate(_transtab)
 
 
 def make_serializable(o):

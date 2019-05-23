@@ -348,22 +348,44 @@ def _check_missing_recorders(problem, logger):
     logger.warning(msg)
 
 
-def _explicit_conns_iter(group):
+def _get_promoted_connected_ins(g):
     """
-    Iterator over explicit connections owned by the given group.
+    Find all inputs that are promoted above the level where they are explicitly connected.
 
-    Yields
-    ------
-    (str, str)
-        Connection tuple (src, target).
+    Parameters
+    ----------
+    g : Group
+        Starting Group.
+
+    Returns
+    -------
+    defaultdict
+        Absolute input name keyed to [promoting_groups, manually_connecting_groups]
     """
-    abs2prom_in = group._var_abs2prom['input']
-    abs2prom_out = group._var_abs2prom['output']
-    for tup in iteritems(group._conn_abs_in2out):
-        inp, out = tup
-        # if promoted names differ, must be an explicit connection
-        if abs2prom_in[inp] != abs2prom_out[out]:
-            yield tup
+    prom2abs_list = g._var_allprocs_prom2abs_list['input']
+    abs2prom_in = g._var_abs2prom['input']
+    prom_conn_ins = defaultdict(lambda: [[], []])
+    for prom_in in g._manual_connections:
+        for abs_in in prom2abs_list[prom_in]:
+            prom_conn_ins[abs_in][1].append(g.pathname)
+
+    for subsys in g._subgroups_myproc:
+        sub_prom_conn_ins = _get_promoted_connected_ins(subsys)
+        for n, lst in iteritems(sub_prom_conn_ins):
+            proms, mans = lst
+            mylst = prom_conn_ins[n]
+            mylst[0].extend(proms)
+            mylst[1].extend(mans)
+
+        sub_abs2prom_in = subsys._var_abs2prom['input']
+        sub_abs2prom_out = subsys._var_abs2prom['output']
+
+        for inp, sub_prom_inp in iteritems(sub_abs2prom_in):
+            if abs2prom_in[inp] == sub_prom_inp:  # inp is promoted up from sub
+                if inp in sub_prom_conn_ins and len(sub_prom_conn_ins[inp][1]) > 0:
+                    prom_conn_ins[inp][0].append(subsys.pathname)
+
+    return prom_conn_ins
 
 
 def _check_explicitly_connected_promoted_inputs(problem, logger):
@@ -377,25 +399,17 @@ def _check_explicitly_connected_promoted_inputs(problem, logger):
     logger : object
         The object that manages logging output.
     """
-    # get set of all explicitly conected inputs below the top level group
-    exp_conn_ins = set()
-    for g in problem.model.system_iter(recurse=True, typ=Group):
-        exp_conn_ins.update(t[0] for t in _explicit_conns_iter(g))
+    prom_conn_ins = _get_promoted_connected_ins(problem.model)
 
-    inps = []
-    for g in problem.model.system_iter(include_self=True, recurse=True, typ=Group):
-        abs2prom_in = g._var_abs2prom['input']
-        for subsys in g._subgroups_myproc:
-            sub_abs2prom_in = subsys._var_abs2prom['input']
-            sub_abs2prom_out = subsys._var_abs2prom['output']
-            for inp, sub_prom_inp in iteritems(sub_abs2prom_in):
-                if abs2prom_in[inp] == sub_prom_inp:
-                    # input has been promoted from subsys, so check
-                    # if it's part of an explicit connection at this level or below
-                    if inp in subsys._conn_global_abs_in2out and inp in exp_conn_ins:
-                        inps.append((inp, subsys.pathname))
-
-    return inps
+    for inp, lst in iteritems(prom_conn_ins):
+        proms, mans = lst
+        if proms:
+            if len(mans) > 1:
+                s = "groups %s" % mans[inp]
+            else:
+                s = "group '%s'" % list(mans)[0]
+            logger.warning("Input '%s' was explicitly connected in group '%s' but was promoted up "
+                        "from %s." % (inp, lst[0], s))
 
 
 # Dict of all checks by name, mapped to the corresponding function that performs the check

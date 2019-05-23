@@ -6,9 +6,8 @@ from __future__ import print_function
 import sys
 import numpy as np
 
-from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.coloring import get_simul_meta, simul_coloring_summary
+from openmdao.utils.coloring import compute_total_coloring
 
 class TotJacBuilder(object):
     def __init__(self, rows, cols):
@@ -61,23 +60,23 @@ class TotJacBuilder(object):
             row_idx += shape[0]
             col_idx += shape[1]
 
-    def color(self, mode='auto', stream=sys.stdout):
-        self.coloring = get_simul_meta(None, mode, include_sparsity=False, setup=False,
-                                       run_model=False, bool_jac=self.J,
-                                       stream=stream)
+    def color(self, mode='auto', fname=None):
+        self.coloring = compute_total_coloring(None, mode, setup=False,
+                                               run_model=False, bool_jac=self.J,
+                                               fname=fname)
         return self.coloring
 
-    def show(self, stream=sys.stdout):
-        array_viz(self.J)
+    def show(self):
+        self.coloring.display()
 
         maxdeg_fwd = np.max(np.count_nonzero(self.J, axis=1))
         maxdeg_rev = np.max(np.count_nonzero(self.J, axis=0))
 
-        print("Shape:", self.J.shape, file=stream)
+        print("Shape:", self.J.shape)
         print("Density:", np.count_nonzero(self.J) / self.J.size)
         print("Max degree (fwd, rev):", maxdeg_fwd, maxdeg_rev)
 
-        simul_coloring_summary(self.J, self.coloring, stream=stream)
+        self.coloring.summary()
 
     def shuffle_rows(self):
         np.random.shuffle(self.J)
@@ -190,12 +189,12 @@ if __name__ == '__main__':
                         help="Build an Eisenstat's example matrix of size n+1 x n.",
                         action="store", type=int, default=-1, dest="eisenstat")
     parser.add_argument("-m", "--mode", type=str, dest="mode",
-                        help="Direction of coloring (default is auto). Only used with -e.", 
+                        help="Direction of coloring (default is auto). Only used with -e.",
                         default="auto")
-    parser.add_argument('-s', '--save', dest="save", default=None, 
+    parser.add_argument('-s', '--save', dest="save", default=None,
                         help="Output file for jacobian so it can be reloaded and colored using"
                         " various methods for comparison.")
-    parser.add_argument('-l', '--load', dest="load", default=None, 
+    parser.add_argument('-l', '--load', dest="load", default=None,
                         help="Input file for jacobian so it can be reloaded and colored using"
                         " various methods for comparison.")
 
@@ -208,7 +207,7 @@ if __name__ == '__main__':
         builder = TotJacBuilder.eisenstat(options.eisenstat)
     else:  # just do a random matrix
         builder = rand_jac()
- 
+
     builder.color(options.mode)
     builder.show()
 

@@ -29,7 +29,6 @@ class ScalableComp(ExplicitComponent):
         self._mult = mult
         self._add = add
 
-
     def setup(self):
         self._ncalls = 0
 

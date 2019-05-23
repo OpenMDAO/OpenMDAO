@@ -1,10 +1,10 @@
 """Define a base class for all Drivers in OpenMDAO."""
 from __future__ import print_function
 
-import json
 from collections import OrderedDict
 import pprint
 import sys
+import os
 
 from six import iteritems, itervalues, string_types
 
@@ -14,7 +14,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import simple_warning, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -83,12 +83,8 @@ class Driver(object):
         (owning rank, size).
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this driver.
-    _vars_to_record: dict
-        Dict of lists of var names indicating what to record
-    _model_viewer_data : dict
-        Structure of model, used to make n2 diagram.
-    _simul_coloring_info : tuple of dicts
-        A data structure describing coloring for simultaneous derivs.
+    _coloring_info : dict
+        Metadata pertaining to total coloring.
     _total_jac_sparsity : dict, str, or None
         Specifies sparsity of sub-jacobians of the total jacobian. Only used by pyOptSparseDriver.
     _res_jacs : dict
@@ -107,13 +103,6 @@ class Driver(object):
             Keyword arguments that will be mapped into the Driver options.
         """
         self._rec_mgr = RecordingManager()
-        self._vars_to_record = {
-            'desvarnames': set(),
-            'responsenames': set(),
-            'objectivenames': set(),
-            'constraintnames': set(),
-            'sysinclnames': set(),
-        }
 
         self._problem = None
         self._designvars = None
@@ -171,10 +160,9 @@ class Driver(object):
         self.supports.declare('total_jac_sparsity', types=bool, default=False)
 
         self.iter_count = 0
-        self._model_viewer_data = None
         self.cite = ""
 
-        self._simul_coloring_info = None
+        self._coloring_info = {'coloring': None, 'show_summary': True, 'show_sparsity': False}
         self._total_jac_sparsity = None
         self._res_jacs = {}
         self._total_jac = None
@@ -294,9 +282,14 @@ class Driver(object):
         self._remote_responses.update(self._remote_objs)
 
         # set up simultaneous deriv coloring
-        if (coloring_mod._use_sparsity and self._simul_coloring_info and
-                self.supports['simultaneous_derivatives']):
-            self._setup_simul_coloring()
+        if coloring_mod._use_sparsity:
+            coloring = self._get_static_coloring()
+            if coloring is not None and self.supports['simultaneous_derivatives']:
+                if model._owns_approx_jac:
+                    coloring._check_config_partial(model)
+                else:
+                    coloring._check_config_total(self)
+                self._setup_simul_coloring()
 
     def _get_vars_to_record(self, recording_options):
         """
@@ -936,70 +929,6 @@ class Driver(object):
         """
         return "Driver"
 
-    def set_simul_deriv_color(self, simul_info):
-        """
-        Set the coloring (and possibly the sub-jac sparsity) for simultaneous total derivatives.
-
-        Parameters
-        ----------
-        simul_info : str or dict
-
-            ::
-
-                # Information about simultaneous coloring for design vars and responses.  If a
-                # string, then simul_info is assumed to be the name of a file that contains the
-                # coloring information in JSON format.  If a dict, the structure looks like this:
-
-                {
-                "fwd": [
-                    # First, a list of column index lists, each index list representing columns
-                    # having the same color, except for the very first index list, which contains
-                    # indices of all columns that are not colored.
-                    [
-                        [i1, i2, i3, ...]    # list of non-colored columns
-                        [ia, ib, ...]    # list of columns in first color
-                        [ic, id, ...]    # list of columns in second color
-                           ...           # remaining color lists, one list of columns per color
-                    ],
-
-                    # Next is a list of lists, one for each column, containing the nonzero rows for
-                    # that column.  If a column is not colored, then it will have a None entry
-                    # instead of a list.
-                    [
-                        [r1, rn, ...]   # list of nonzero rows for column 0
-                        None,           # column 1 is not colored
-                        [ra, rb, ...]   # list of nonzero rows for column 2
-                            ...
-                    ],
-                ],
-                # This example is not a bidirectional coloring, so the opposite direction, "rev"
-                # in this case, has an empty row index list.  It could also be removed entirely.
-                "rev": [[[]], []],
-                "sparsity":
-                    # The sparsity entry can be absent, indicating that no sparsity structure is
-                    # specified, or it can be a nested dictionary where the outer keys are response
-                    # names, the inner keys are design variable names, and the value is a tuple of
-                    # the form (row_list, col_list, shape).
-                    {
-                        resp1_name: {
-                            dv1_name: (rows, cols, shape),  # for sub-jac d_resp1/d_dv1
-                            dv2_name: (rows, cols, shape),
-                              ...
-                        },
-                        resp2_name: {
-                            ...
-                        }
-                        ...
-                    }
-                }
-
-        """
-        if self.supports['simultaneous_derivatives']:
-            self._simul_coloring_info = simul_info
-        else:
-            raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
-                               self._get_name())
-
     def set_total_jac_sparsity(self, sparsity):
         """
         Set the sparsity of sub-jacobians of the total jacobian.
@@ -1033,9 +962,117 @@ class Driver(object):
             raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
                                self._get_name())
 
+    def declare_coloring(self, num_full_jacs=coloring_mod._DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
+                         tol=coloring_mod._DEF_COMP_SPARSITY_ARGS['tol'],
+                         orders=coloring_mod._DEF_COMP_SPARSITY_ARGS['orders'],
+                         perturb_size=coloring_mod._DEF_COMP_SPARSITY_ARGS['perturb_size'],
+                         show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
+                         show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity']):
+        """
+        Set options for total deriv coloring.
+
+        Parameters
+        ----------
+        num_full_jacs : int
+            Number of times to repeat partial jacobian computation when computing sparsity.
+        tol : float
+            Tolerance used to determine if an array entry is nonzero during sparsity determination.
+        orders : int
+            Number of orders above and below the tolerance to check during the tolerance sweep.
+        perturb_size : float
+            Size of input/output perturbation during generation of sparsity.
+        show_summary : bool
+            If True, display summary information after generating coloring.
+        show_sparsity : bool
+            If True, display sparsity with coloring info after generating coloring.
+        """
+        self._coloring_info['num_full_jacs'] = num_full_jacs
+        self._coloring_info['tol'] = tol
+        self._coloring_info['orders'] = orders
+        self._coloring_info['perturb_size'] = perturb_size
+        self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
+        self._coloring_info['show_summary'] = show_summary
+        self._coloring_info['show_sparsity'] = show_sparsity
+
+    def use_fixed_coloring(self, coloring=coloring_mod._STD_COLORING_FNAME):
+        """
+        Tell the driver to use a precomputed coloring.
+
+        Parameters
+        ----------
+        coloring : str
+            A coloring filename.  If no arg is passed, filename will be determined
+            automatically.
+
+        """
+        if self.supports['simultaneous_derivatives']:
+            if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:
+                # force the generation of a dynamic coloring this time
+                coloring = coloring_mod._DYN_COLORING
+            self._coloring_info['coloring'] = coloring
+        else:
+            raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
+                               self._get_name())
+
+    def set_simul_deriv_color(self, coloring):
+        """
+        See use_fixed_coloring. This method is deprecated.
+
+        Parameters
+        ----------
+        coloring : str or Coloring
+            Information about simultaneous coloring for design vars and responses.  If a
+            string, then coloring is assumed to be the name of a file that contains the
+            coloring information in pickle format. Otherwise it must be a Coloring object.
+            See the docstring for Coloring for details.
+
+        """
+        warn_deprecation("set_simul_deriv_color is deprecated.  Use use_fixed_coloring instead.")
+        self.use_fixed_coloring(coloring)
+
+    def _setup_tot_jac_sparsity(self):
+        """
+        Set up total jacobian subjac sparsity.
+
+        Drivers that can use subjac sparsity should override this.
+        """
+        pass
+
+    def _get_static_coloring(self):
+        """
+        Get the Coloring for this driver.
+
+        If necessary, load the Coloring from a file.
+
+        Returns
+        -------
+        Coloring or None
+            The pre-existing or loaded Coloring, or None
+        """
+        info = self._coloring_info
+        coloring = info['coloring']
+
+        if isinstance(coloring, coloring_mod.Coloring):
+            return coloring
+
+        if coloring is coloring_mod._STD_COLORING_FNAME or isinstance(coloring, string_types):
+            if coloring is _STD_COLORING_FNAME:
+                fname = self._get_total_coloring_fname()
+            else:
+                fname = coloring
+            print("loading total coloring from file %s" % fname)
+            coloring = info['coloring'] = Coloring.load(fname)
+            info.update(coloring._meta)
+            return coloring
+
+    def _get_total_coloring_fname(self):
+        return os.path.join(self._problem.options['coloring_dir'], 'total_coloring.pkl')
+
     def _setup_simul_coloring(self):
         """
-        Set up metadata for simultaneous derivative solution.
+        Set up metadata for coloring of total derivative solution.
+
+        If set_coloring was called with a filename, load the coloring file.
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
         if not coloring_mod._use_sparsity:
@@ -1046,33 +1083,18 @@ class Driver(object):
             simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
 
-        if isinstance(self._simul_coloring_info, string_types):
-            with open(self._simul_coloring_info, 'r') as f:
-                self._simul_coloring_info = coloring_mod._json2coloring(json.load(f))
+        total_coloring = self._get_static_coloring()
 
-        if 'rev' in self._simul_coloring_info and problem._orig_mode not in ('rev', 'auto'):
-            revcol = self._simul_coloring_info['rev'][0][0]
+        if total_coloring._rev and problem._orig_mode not in ('rev', 'auto'):
+            revcol = total_coloring._rev[0][0]
             if revcol:
                 raise RuntimeError("Simultaneous coloring does reverse solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
-        if 'fwd' in self._simul_coloring_info and problem._orig_mode not in ('fwd', 'auto'):
-            fwdcol = self._simul_coloring_info['fwd'][0][0]
+        if total_coloring._fwd and problem._orig_mode not in ('fwd', 'auto'):
+            fwdcol = total_coloring._fwd[0][0]
             if fwdcol:
                 raise RuntimeError("Simultaneous coloring does forward solves but mode has "
                                    "been set to '%s'" % problem._orig_mode)
-
-        # simul_coloring_info can contain data for either fwd, rev, or both, along with optional
-        # sparsity patterns
-        if 'sparsity' in self._simul_coloring_info:
-            sparsity = self._simul_coloring_info['sparsity']
-            del self._simul_coloring_info['sparsity']
-        else:
-            sparsity = None
-
-        if sparsity is not None and self._total_jac_sparsity is not None:
-            raise RuntimeError("Total jac sparsity was set in both _simul_coloring_info"
-                               " and _total_jac_sparsity.")
-        self._total_jac_sparsity = sparsity
 
     def _pre_run_model_debug_print(self):
         """

@@ -152,13 +152,6 @@ class TestGroup(unittest.TestCase):
 
         p.setup()
         p.final_setup()
-
-        from openmdao.error_checking.check_config import _check_explicitly_connected_promoted_inputs
-        from openmdao.utils.logger_utils import get_logger
-        
-        inps = _check_explicitly_connected_promoted_inputs(p, get_logger('check_config', use_format=True))
-        print('inps', inps)
-        
         
     def test_inner_implicit_connect_w_extern_promote(self):
 
