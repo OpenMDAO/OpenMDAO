@@ -53,16 +53,15 @@ class Test(unittest.TestCase):
         prob['x0'] = 6.
         prob['x1'] = 4.
         prob.run_model()
-        assert_rel_error(self, prob['C1.z'], 8.0)
-        assert_rel_error(self, prob['C2.z'], 6.0)
+        assert_rel_error(self, prob.get_val('C1.z', get_remote=True), 8.0)
+        assert_rel_error(self, prob.get_val('C2.z', get_remote=True), 6.0)
 
         # Now, reconfigure so ReconfGroup is not parallel, and x0, x1 should be preserved
         prob.model.g.resetup('reconf')
         prob.model.resetup('update')
         prob.run_model()
-        assert_rel_error(self, prob['C1.z'], 8.0, 1e-8)
-        assert_rel_error(self, prob['C2.z'], 6.0, 1e-8)
-        print(prob['C1.z'], prob['C2.z'])
+        assert_rel_error(self, prob.get_val('C1.z', get_remote=True), 8.0, 1e-8)
+        assert_rel_error(self, prob.get_val('C2.z', get_remote=True), 6.0, 1e-8)
 
 
 if __name__ == '__main__':

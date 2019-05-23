@@ -37,8 +37,8 @@ class ProbRemoteTestCase(unittest.TestCase):
 
         prob.run_model()
 
-        np.testing.assert_almost_equal(prob['group.comp1.f'], 42., decimal=5)
-        np.testing.assert_almost_equal(prob['group.comp2.g'], 10., decimal=5)
+        np.testing.assert_almost_equal(prob.get_val('group.comp1.f', get_remote=True), 42., decimal=5)
+        np.testing.assert_almost_equal(prob.get_val('group.comp2.g', get_remote=True), 10., decimal=5)
 
     def test_remote_var_access_prom(self):
         prob = Problem()

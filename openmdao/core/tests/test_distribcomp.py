@@ -567,19 +567,19 @@ class ProbRemoteTests(unittest.TestCase):
 
         # test that getitem from Problem on a distrib var raises an exception
         with self.assertRaises(Exception) as context:
-            ans = p['par.C2.invec']
+            ans = p.get_val('par.C2.invec', get_remote=True)
         self.assertEqual(str(context.exception),
                          "Retrieval of the full distributed variable 'par.C2.invec' is not supported.")
         with self.assertRaises(Exception) as context:
-            ans = p['par.C2.outvec']
+            ans = p.get_val('par.C2.outvec', get_remote=True)
         self.assertEqual(str(context.exception),
                          "Retrieval of the full distributed variable 'par.C2.outvec' is not supported.")
         with self.assertRaises(Exception) as context:
-            ans = p['par.C1.invec']
+            ans = p.get_val('par.C1.invec', get_remote=True)
         self.assertEqual(str(context.exception),
                          "Retrieval of the full distributed variable 'par.C1.invec' is not supported.")
         with self.assertRaises(Exception) as context:
-            ans = p['par.C1.outvec']
+            ans = p.get_val('par.C1.outvec', get_remote=True)
         self.assertEqual(str(context.exception),
                          "Retrieval of the full distributed variable 'par.C1.outvec' is not supported.")
 

@@ -126,6 +126,8 @@ class Problem(object):
         after a reconfiguration) you may need to set this to True.
     _color_dir_hash : str
         Hash used to detect collisions of coloring files.
+    __get_remote : bool
+        Flag used to determine when __getitem__ will retrieve remote variables.
     """
 
     _post_setup_func = None
@@ -147,6 +149,9 @@ class Problem(object):
         **options : named args
             All remaining named args are converted to options.
         """
+        # used by the get_val function when get_remote is True
+        self.__get_remote = False
+
         self.cite = CITATION
 
         if comm is None:
@@ -313,7 +318,7 @@ class Problem(object):
             elif name in proms['input']:
                 abs_name = proms['input'][name][0]
 
-            if abs_name in self._remote_var_set:
+            if abs_name in self._remote_var_set and self.__get_remote:
                 if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
                     raise RuntimeError("Retrieval of the full distributed variable '%s' is not "
                                        "supported." % abs_name)
@@ -336,7 +341,7 @@ class Problem(object):
 
         return val
 
-    def get_val(self, name, units=None, indices=None):
+    def get_val(self, name, units=None, indices=None, get_remote=False):
         """
         Get an output/input variable.
 
@@ -350,13 +355,24 @@ class Problem(object):
             Units to convert to before upon return.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to return.
+        get_remote : bool
+            If True, retrieve the value even if it is on a remote process.  Note that if the
+            variable is remote on ANY process, this function must be called on EVERY process
+            in the Problem's MPI communicator.
 
         Returns
         -------
         float or ndarray
             The requested output/input variable.
         """
-        val = self[name]
+        if get_remote:
+            self.__get_remote = True
+            try:
+                val = self[name]
+            finally:
+                self.__get_remote = False
+        else:
+            val = self[name]
 
         if indices is not None:
             val = val[indices]
