@@ -409,7 +409,7 @@ def _check_explicitly_connected_promoted_inputs(problem, logger):
             else:
                 s = "group '%s'" % list(mans)[0]
             logger.warning("Input '%s' was explicitly connected in group '%s' but was promoted up "
-                        "from %s." % (inp, lst[0], s))
+                           "from %s." % (inp, lst[0], s))
 
 
 # Dict of all checks by name, mapped to the corresponding function that performs the check

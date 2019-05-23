@@ -349,7 +349,7 @@ class SellarDerivativesGrouped(Group):
         self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-        self.mda = mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1'])
+        self.mda = mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 

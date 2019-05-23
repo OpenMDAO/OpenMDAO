@@ -921,7 +921,6 @@ class Group(System):
         pathname = self.pathname
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
-        abs2prom_in = self._var_abs2prom['input']
 
         # Recursion
         if recurse:
