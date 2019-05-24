@@ -225,6 +225,53 @@ class Problem(object):
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes)')
 
+    def _get_var_abs_name(self, name):
+        if name in self.model._var_allprocs_abs2meta:
+            return name
+        elif name in self.model._var_allprocs_prom2abs_list['output']:
+            return self.model._var_allprocs_prom2abs_list['output'][name][0]
+        elif name in self.model._var_allprocs_prom2abs_list['input']:
+            abs_names = self.model._var_allprocs_prom2abs_list['input'][name]
+            if len(abs_names) == 1:
+                return abs_names[0]
+            else:
+                raise RuntimeError("Using promoted name `{}' is ambiguous and matches unconnected "
+                                   "inputs %s. Use absolute name to "
+                                   "disambiguate.".format(name, abs_names))
+
+        raise KeyError("Variable '{}' not found.".format(name))
+
+    def is_local(self, name):
+        """
+        Return True if the named variable or system is local to the current process.
+
+        Parameters
+        ----------
+        name : str
+            Name of a variable or system.
+
+        Returns
+        -------
+        bool
+            True if the named system or variable is local to this process.
+        """
+        if self._setup_status < 1:
+            raise RuntimeError("is_local('{}') was called before setup() completed.".format(name))
+
+        try:
+            abs_name = self._get_var_abs_name(name)
+        except Exception:
+            sub = self.model._get_subsystem(name)
+            if sub is None:  # either the sub is remote or there is no sub by that name
+                # TODO: raise exception if sub does not exist
+                return False
+            else:
+                # if system has been set up, _var_sizes will be initialized
+                return sub._var_sizes is not None
+
+        # variable exists, but may be remote
+        return abs_name in self.model._var_abs2meta
+
     def __getitem__(self, name):
         """
         Get an output/input variable.

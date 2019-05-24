@@ -61,4 +61,50 @@ class ProbRemoteTestCase(unittest.TestCase):
         np.testing.assert_almost_equal(prob['summ.z'], 9., decimal=5)
         np.testing.assert_almost_equal(prob['prod.z'], 20., decimal=5)
 
+    def test_is_local(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', 1.0))
+        par = p.model.add_subsystem('par', ParallelGroup())
+        par.add_subsystem('C1', ExecComp('y=2*x'))
+        par.add_subsystem('C2', ExecComp('y=3*x'))
+        p.model.connect('indep.x', ['par.C1.x', 'par.C2.x'])
+
+        with self.assertRaises(RuntimeError) as cm:
+            loc = p.is_local('indep.x')
+        self.assertEqual(str(cm.exception), "is_local('indep.x') was called before setup() completed.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            loc = p.is_local('par.C1')
+        self.assertEqual(str(cm.exception), "is_local('par.C1') was called before setup() completed.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            loc = p.is_local('par.C1.y')
+        self.assertEqual(str(cm.exception), "is_local('par.C1.y') was called before setup() completed.")
+
+        with self.assertRaises(RuntimeError) as cm:
+            loc = p.is_local('par.C1.x')
+        self.assertEqual(str(cm.exception), "is_local('par.C1.x') was called before setup() completed.")
+
+        p.setup()
+        p.final_setup()
+
+        self.assertTrue(p.is_local('indep'), 'indep should be local')
+        self.assertTrue(p.is_local('indep.x'), 'indep.x should be local')
+
+        if p.comm.rank == 0:
+            self.assertTrue(p.is_local('par.C1'), 'par.C1 should be local')
+            self.assertTrue(p.is_local('par.C1.x'), 'par.C1.x should be local')
+            self.assertTrue(p.is_local('par.C1.y'), 'par.C1.y should be local')
+
+            self.assertFalse(p.is_local('par.C2'), 'par.C1 should be remote')
+            self.assertFalse(p.is_local('par.C2.x'), 'par.C1.x should be remote')
+            self.assertFalse(p.is_local('par.C2.y'), 'par.C1.y should be remote')
+        else:
+            self.assertFalse(p.is_local('par.C1'), 'par.C1 should be remote')
+            self.assertFalse(p.is_local('par.C1.x'), 'par.C1.x should be remote')
+            self.assertFalse(p.is_local('par.C1.y'), 'par.C1.y should be remote')
+
+            self.assertTrue(p.is_local('par.C2'), 'par.C2 should be local')
+            self.assertTrue(p.is_local('par.C2.x'), 'par.C2.x should be local')
+            self.assertTrue(p.is_local('par.C2.y'), 'par.C2.y should be local')
 
