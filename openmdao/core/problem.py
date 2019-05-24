@@ -235,9 +235,9 @@ class Problem(object):
             if len(abs_names) == 1:
                 return abs_names[0]
             else:
-                raise RuntimeError("Using promoted name `{}' is ambiguous and matches unconnected "
-                                   "inputs %s. Use absolute name to "
-                                   "disambiguate.".format(name, abs_names))
+                raise KeyError("Using promoted name `{}' is ambiguous and matches unconnected "
+                               "inputs %s. Use absolute name to disambiguate.".format(name,
+                                                                                      abs_names))
 
         raise KeyError("Variable '{}' not found.".format(name))
 
@@ -260,7 +260,7 @@ class Problem(object):
 
         try:
             abs_name = self._get_var_abs_name(name)
-        except Exception:
+        except KeyError:
             sub = self.model._get_subsystem(name)
             if sub is None:  # either the sub is remote or there is no sub by that name
                 # TODO: raise exception if sub does not exist
