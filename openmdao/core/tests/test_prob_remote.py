@@ -84,7 +84,7 @@ class ProbRemote4TestCase(unittest.TestCase):
 
         comm = MPI.COMM_WORLD.Split(colors[MPI.COMM_WORLD.rank])
 
-        # split the siz 4 comm into 2 size 2 comms
+        # split the size 4 comm into 2 size 2 comms
         self.assertEqual(comm.size, 2)
 
         prob = Problem(comm=comm)
