@@ -23,6 +23,7 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import FakeComm
 
 
 # names of optimizers that use gradients
@@ -232,7 +233,8 @@ class pyOptSparseDriver(Driver):
             elif self.options['dynamic_derivs_sparsity']:
                 coloring_mod.dynamic_derivs_sparsity(self)
 
-        opt_prob = Optimization(self.options['title'], self._objfunc)
+        comm = None if isinstance(problem.comm, FakeComm) else problem.comm
+        opt_prob = Optimization(self.options['title'], self._objfunc, comm=comm)
 
         # Add all design variables
         param_meta = self._designvars
