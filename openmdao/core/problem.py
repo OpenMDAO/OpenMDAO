@@ -318,23 +318,29 @@ class Problem(object):
             elif name in proms['input']:
                 abs_name = proms['input'][name][0]
 
-            if abs_name in self._remote_var_set and self.__get_remote:
-                if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
-                    raise RuntimeError("Retrieval of the full distributed variable '%s' is not "
-                                       "supported." % abs_name)
-                loc_val = val
-                owner = self.model._owning_rank[abs_name]
-                if owner != self.model.comm.rank:
-                    val = None
-                else:
+            if abs_name in self._remote_var_set:
+                if self.__get_remote:
+                    if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
+                        raise RuntimeError("Retrieval of the full distributed variable '%s' is not "
+                                           "supported." % abs_name)
+                    loc_val = val
                     owner = self.model._owning_rank[abs_name]
-                    if val is _undefined:
+                    if owner != self.model.comm.rank:
                         val = None
-                new_val = self.model.comm.bcast(val, root=owner)
-                if loc_val is not None and loc_val is not _undefined:
-                    val = loc_val
-                else:
-                    val = new_val
+                    else:
+                        owner = self.model._owning_rank[abs_name]
+                        if val is _undefined:
+                            val = None
+                    new_val = self.model.comm.bcast(val, root=owner)
+                    if loc_val is not None and loc_val is not _undefined:
+                        val = loc_val
+                    else:
+                        val = new_val
+                elif val is _undefined:
+                    raise RuntimeError(
+                        "Variable '{}' is not local to rank {}. You can retrieve values from "
+                        "other processes using "
+                        "`problem.get_val(<name>, get_remote=True)`.".format(name, self.comm.rank))
 
         if val is _undefined:
             raise KeyError('Variable name "{}" not found.'.format(name))
@@ -460,8 +466,10 @@ class Problem(object):
                 self.model._discrete_inputs[abs_name] = value
             else:
                 # might be a remote var.  If so, just do nothing on this proc
-                if not (name in all_proms['input'] or name in all_proms['output'] or
-                        name in self.model._var_allprocs_abs2meta):
+                if abs_name in self.model._var_allprocs_abs2meta:
+                    print("Variable '{}' is remote on rank {}.  "
+                          "Local assignment ignored.".format(name, self.comm.rank))
+                else:
                     raise KeyError('Variable name "{}" not found.'.format(name))
 
     def set_val(self, name, value, units=None, indices=None):
