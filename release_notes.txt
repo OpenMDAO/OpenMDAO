@@ -1,4 +1,66 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.7.0
+
+April 23, 2019
+
+New Features: 
+-------------
+
+- You can now define guess_nonlinear method at the group level
+- New documentation added about the N2 diagram usage
+- Significant improvement to documentation search functionality
+  (by default, only searches the feature docs and user guide now)
+- Improvements to support for complex-step across a full model 
+  (specifically when guess_nonlinear is implemented)
+
+- Derivatives: 
+    - Improved support for full-model complex-step when models have guess_nonlinear methods defined
+    - **Experimental** FD and CS based coloring methods for partial derivative approximation 
+      Valuable for efficiently using FD/CS on vectorized (or very sparse) components
+
+- Solvers: 
+    - `Solver failed to converge` message now includes solver path name to make it more clear what failed
+    - Improved pathname information in the singular matrix error from DirectSolver
+    - Directsolver has an improved error message when it detects identical rows or columns in Jacobian
+    - NonlinearGaussSeidel solver now accounts for residual scaling in its convergence criterion
+    - New naming scheme for solver debug print files (the old scheme was making names so long it caused OSErrors)
+
+- Components: 
+    - ExecComp now allows unit=<something> and shape=<something> arguments that apply to all variables in the expression
+    - New AkimaSpline component with derivatives with respect to training data inputs
+
+- Visualization
+    - Several improvements for the N2 diagram for large models
+    - N2 diagram html files have been reduced in size significantly
+    - `openmdao view_model` command line utility now supports case record database files
+
+- (Experimental) Automatic XDSM generator (using either Latex with pyXDSM or html with XDSMjs) 
+  *** contributed by Peter Onodi ***
+
+Backwards Incompatible API Changes: 
+-----------------------------------
+- New APIs for total derivative coloring that are more consistent with partial derivative coloring
+  (previous APIs are deprecated and coloring files generated with the previous API will not work)
+- The API for providing a guess function to the BalanceComp has changed. 
+  guess_function is now passed into BalanceComp as an init argument
+- Changed the N2 diagram json data formatting to make the file size smaller 
+  You can't use older case record databases to generate an N2 diagram with latest version
+- the problem level `record_iteration` method was not properly respecting the `includes` specification
+- All component methods related to execution now include `discrete_inputs` and `discrete_outputs` arguments 
+  when a component is defined with discrete i/o. (if no discrete i/o is defined, the API remains unchanged)
+  (includes `solve_nonlinear`, `apply_nonlinear`, `linearize`, `apply_linear`, `compute`, `compute_jac_vec_product`, `guess_nonlinear`) 
+- The internal Driver API has changed, a driver should execute the model with `run_solve_nonlinear` to ensure that proper scaling operations occur 
+
+Bug Fixes: 
+----------
+- CaseRecorder was reporting incorrect values of scaled variables (analysis was correct, only case record output was wrong)
+- ExecComp problem when vectorize=True, but only shape was defined. 
+- Incorrect memory allocation in parallel components when local size of output went to 0
+- Multidimensional `src_indices` were not working correctly with assembled Jacobians
+- Fixed problem with genetic algorithm not working with vector design variables *** contributed by jennirinker ***
+- Fixed incompatibility with mpich mpi library causing "PMPI_Allgather(945).: Buffers must not be aliased" error *** fzhale and nbons ***
+
+################################################################################################
 Release Notes for OpenMDAO 2.6.0
 
 February 22, 2018
