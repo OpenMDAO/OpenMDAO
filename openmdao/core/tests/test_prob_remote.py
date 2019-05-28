@@ -80,8 +80,6 @@ class ProbRemote4TestCase(unittest.TestCase):
 
     def test_prob_split_comm(self):
         colors = [0, 0, 1, 1]
-        alloc = DefaultAllocator(parallel=True)
-
         comm = MPI.COMM_WORLD.Split(colors[MPI.COMM_WORLD.rank])
 
         # split the size 4 comm into 2 size 2 comms
@@ -115,8 +113,15 @@ class ProbRemote4TestCase(unittest.TestCase):
         prob.run_model()
 
         failed = prob.run_driver()
+        
+        all_failed = comm.allgather(failed)
+        if any(all_failed):
+            all_msgs = comm.allgather(str(prob.driver.pyopt_solution.optInform))
+            for i, tup in enumerate(zip(all_failed, all_msgs)):
+                failed, msg = tup
+                if failed:
+                    self.fail("Optimization failed on rank %d: %s" % (i, msg))
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
-
-        assert_rel_error(self, prob['obj.o'], 2.0, 1e-6)
+        objs = comm.allgather(prob['obj.o'])
+        for i, obj in enumerate(objs):
+            assert_rel_error(self, obj, 2.0, 1e-6)
