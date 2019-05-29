@@ -205,6 +205,12 @@ class ScipyOptimizeDriver(Driver):
             msg = '{} currently does not support multiple objectives.'
             raise RuntimeError(msg.format(self.__class__.__name__))
 
+        if len(self._objs) == 0:
+            msg = "ScipyOptimizeDriver requires objective to be declared"
+            raise RuntimeError(msg)
+
+
+
         # Since COBYLA does not support bounds, we
         #   need to add to the _cons metadata for any bounds that
         #   need to be translated into a constraint

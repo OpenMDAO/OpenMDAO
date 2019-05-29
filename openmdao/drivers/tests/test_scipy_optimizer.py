@@ -345,6 +345,34 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertEqual(exception.args[0], msg)
 
+    def test_scipy_missing_objective(self):
+
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('x', IndepVarComp('x', 2.0), promotes=['*'])
+        model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('x', lower=0)
+        prob.model.add_constraint('x', lower=0)
+
+        prob.setup(check=False)
+
+
+        with self.assertRaises(Exception) as raises_msg:
+            prob.run_driver()
+
+        exception = raises_msg.exception
+
+        msg = "ScipyOptimizeDriver requires objective to be declared"
+
+        self.assertEqual(exception.args[0], msg)
+
+
+
     def test_simple_paraboloid_double_sided_low(self):
 
         prob = Problem()
