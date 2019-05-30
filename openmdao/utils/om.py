@@ -47,6 +47,9 @@ def _view_model_setup_parser(parser):
                         help="create embeddable version.")
     parser.add_argument('--title', default=None,
                         action='store', dest='title', help='diagram title.')
+    parser.add_argument('--use_declare_partial_info', action='store_true',
+                        dest='use_declare_partial_info',
+                        help="use declare partial info for internal connectivity.")
 
 
 def _view_model_cmd(options):
@@ -66,7 +69,9 @@ def _view_model_cmd(options):
             view_model(prob, outfile=options.outfile,
                        show_browser=not options.no_browser,
                        title=options.title,
-                       embeddable=options.embeddable)
+                       embeddable=options.embeddable,
+                       use_declare_partial_info=options.use_declare_partial_info
+                       )
             exit()  # could make this command line selectable later
 
         options.func = lambda options: _viewmod
@@ -77,7 +82,9 @@ def _view_model_cmd(options):
         view_model(filename, outfile=options.outfile,
                    title=options.title,
                    show_browser=not options.no_browser,
-                   embeddable=options.embeddable)
+                   embeddable=options.embeddable,
+                   use_declare_partial_info=options.use_declare_partial_info
+                   )
 
 
 def _xdsm_setup_parser(parser):

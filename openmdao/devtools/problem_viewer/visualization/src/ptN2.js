@@ -1357,6 +1357,10 @@ function PtN2Diagram(parentDiv, modelData) {
         symbols_vectorGroup = [];
         symbols_groupVector = [];
         symbols_groupGroup = [];
+        symbols_vectorVector_declared_partials = [] ;
+        symbols_scalarScalar_declared_partials = [] ;
+        symbols_vectorScalar_declared_partials = [] ;
+        symbols_scalarVector_declared_partials = [] ;
 
         for (var key in matrix) {
             var d = matrix[key];
@@ -1392,10 +1396,19 @@ function PtN2Diagram(parentDiv, modelData) {
                     if (tgtObj.type === "unknown" || (showParams && (tgtObj.type === "param" || tgtObj.type === "unconnected_param"))) {
                         if (tgtObj.dtype === "ndarray" || (showParams && (tgtObj.type === "param" || tgtObj.type === "unconnected_param"))) {//vectorVector
                             symbols_vectorVector.push(d);
+                            var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
+                            if (modelData.declare_partials_list.includes(partials_string)){
+                                symbols_vectorVector_declared_partials.push(d);
+                            }
+
                         }
                         else {//vectorScalar
                             symbols_vectorScalar.push(d);
-                        }
+                            var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
+                            if (modelData.declare_partials_list.includes(partials_string)){
+                                symbols_vectorScalar_declared_partials.push(d);
+                            }
+                       }
 
                     }
                     else if (tgtObj.type === "subsystem") { //vectorGroup
@@ -1406,17 +1419,23 @@ function PtN2Diagram(parentDiv, modelData) {
                     if (tgtObj.type === "unknown" || (showParams && (tgtObj.type === "param" || tgtObj.type === "unconnected_param"))) {
                         if (tgtObj.dtype === "ndarray") {//scalarVector
                             symbols_scalarVector.push(d);
+                            var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
+                            if (modelData.declare_partials_list.includes(partials_string)) {
+                                symbols_scalarVector_declared_partials.push(d);
+                            }
                         }
                         else {//scalarScalar
                             symbols_scalarScalar.push(d);
+                            var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
+                            if (modelData.declare_partials_list.includes(partials_string)){
+                                symbols_scalarScalar_declared_partials.push(d);
+                            }
                         }
-
                     }
                     else if (tgtObj.type === "subsystem") { //scalarGroup
                         symbols_scalarGroup.push(d);
                     }
                 }
-
             }
         }
 
