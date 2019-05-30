@@ -391,7 +391,7 @@ def assertViewerDataRecorded(test, expected):
         # primary keys
         test.assertEqual(set(model_viewer_data.keys()), {
             'tree', 'sys_pathnames_list', 'connections_list', 'abs2prom',
-            'driver', 'design_vars', 'responses'
+            'driver', 'design_vars', 'responses', 'declare_partials_list'
         })
 
         # system pathnames
