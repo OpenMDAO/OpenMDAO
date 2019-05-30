@@ -1,7 +1,14 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.7.1
+
+May 30, 2019
+
+2.7.1 is a quick patch release to correct/update the 2.7.0 release notes.
+
+################################################################################################
 Release Notes for OpenMDAO 2.7.0
 
-April 23, 2019
+May 28, 2019
 
 New Features: 
 -------------
@@ -10,8 +17,6 @@ New Features:
 - New documentation added about the N2 diagram usage
 - Significant improvement to documentation search functionality
   (by default, only searches the feature docs and user guide now)
-- Improvements to support for complex-step across a full model 
-  (specifically when guess_nonlinear is implemented)
 
 - Derivatives: 
     - Improved support for full-model complex-step when models have guess_nonlinear methods defined
@@ -45,7 +50,6 @@ Backwards Incompatible API Changes:
   guess_function is now passed into BalanceComp as an init argument
 - Changed the N2 diagram json data formatting to make the file size smaller 
   You can't use older case record databases to generate an N2 diagram with latest version
-- the problem level `record_iteration` method was not properly respecting the `includes` specification
 - All component methods related to execution now include `discrete_inputs` and `discrete_outputs` arguments 
   when a component is defined with discrete i/o. (if no discrete i/o is defined, the API remains unchanged)
   (includes `solve_nonlinear`, `apply_nonlinear`, `linearize`, `apply_linear`, `compute`, `compute_jac_vec_product`, `guess_nonlinear`) 
@@ -54,6 +58,7 @@ Backwards Incompatible API Changes:
 Bug Fixes: 
 ----------
 - CaseRecorder was reporting incorrect values of scaled variables (analysis was correct, only case record output was wrong)
+- the problem level `record_iteration` method was not properly respecting the `includes` specification
 - ExecComp problem when vectorize=True, but only shape was defined. 
 - Incorrect memory allocation in parallel components when local size of output went to 0
 - Multidimensional `src_indices` were not working correctly with assembled Jacobians
