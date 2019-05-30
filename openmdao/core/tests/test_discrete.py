@@ -1,4 +1,4 @@
-""" Unit tests for the problem interface."""
+""" Unit tests for discrete variables."""
 
 import sys
 import unittest
@@ -17,6 +17,7 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
+
 
 class ModCompEx(ExplicitComponent):
     def __init__(self, modval, **kwargs):
@@ -394,6 +395,7 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(str(ctx.exception),
                          "Total derivative with respect to 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
 
+
 class SolverDiscreteTestCase(unittest.TestCase):
     def _setup_model(self, solver_class):
         prob = Problem()
@@ -524,7 +526,6 @@ class DiscretePromTestCase(unittest.TestCase):
         self.assertEqual(prob['C4.y'].getval(), 52)
 
 
-
 class DiscreteFeatureTestCase(unittest.TestCase):
     def test_feature_discrete(self):
         import numpy as np
@@ -566,6 +567,7 @@ class DiscreteFeatureTestCase(unittest.TestCase):
 
         # minimum value
         assert_rel_error(self, prob['SolidityComp.blade_solidity'], 0.02984155, 1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,14 +13,14 @@ optional_dependencies = {
     'docs': [
         'matplotlib',
         'mock',
-        'numpydoc',
+        'numpydoc>=0.9.1',
         'redbaron',
-        'sphinx',
+        'sphinx>=1.8.5',
     ],
     'test': [
         'coverage',
         'parameterized',
-        'numpydoc',
+        'numpydoc>=0.9.1',
         'pycodestyle==2.3.1',
         'pydocstyle==2.0.0',
         'testflo>=1.3.4',
