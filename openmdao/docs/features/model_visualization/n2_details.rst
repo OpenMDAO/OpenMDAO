@@ -272,6 +272,12 @@ a search for `V_in` would find `R1.V_in`, `R2.V_in`, and `D1.V_in`.
 To return to a view that is not filtered by the variable search, clear the search box and hit the Enter key or the
 Search button.
 
+Displayed Component Connectivity
+--------------------------------
+
+Between the search bar and the N2 diagram, there is a note about how the internal connectivity of components is
+controlled. This is controlled from a script using the `use_declare_partial_info` option to the `view_model` function.
+A similar option exists when generating N2 diagrams from the command line.
 
 Legend
 ------

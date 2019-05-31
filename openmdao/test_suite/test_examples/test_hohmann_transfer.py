@@ -36,8 +36,8 @@ class VCircComp(ExplicitComponent):
                              'and gravitational parameter',
                         units='km/s')
 
-        self.declare_partials(of='vcirc', wrt='r', dependent=True)
-        self.declare_partials(of='vcirc', wrt='mu', dependent=True)
+        self.declare_partials(of='vcirc', wrt='r')
+        self.declare_partials(of='vcirc', wrt='mu')
 
     def compute(self, inputs, outputs):
         r = inputs['r']
@@ -72,9 +72,9 @@ class DeltaVComp(ExplicitComponent):
 
         self.add_output('delta_v', val=0.0, desc='Delta-V', units='km/s')
 
-        self.declare_partials(of='delta_v', wrt='v1', dependent=True)
-        self.declare_partials(of='delta_v', wrt='v2', dependent=True)
-        self.declare_partials(of='delta_v', wrt='dinc', dependent=True)
+        self.declare_partials(of='delta_v', wrt='v1')
+        self.declare_partials(of='delta_v', wrt='v2')
+        self.declare_partials(of='delta_v', wrt='dinc')
 
     def compute(self, inputs, outputs):
         v1 = inputs['v1']

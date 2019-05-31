@@ -17,6 +17,7 @@ var CONNECTION_COLOR = "black",
    RED_ARROW_COLOR = "salmon",
    GREEN_ARROW_COLOR = "seagreen";
 
+
 // This is how we want to map solvers to colors and CSS classes
 //    Linear             Nonlinear
 //    ---------          ---------

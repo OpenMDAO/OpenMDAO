@@ -20,6 +20,7 @@ from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.group import Group
 from openmdao.core.problem import Problem
+from openmdao.core.component import Component
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.devtools.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.class_util import overrides_method
@@ -126,6 +127,38 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         tree_dict['type'] = 'root'
 
     return tree_dict
+
+def _get_declare_partials(system):
+    """
+    Get a list of the declared partials.
+
+    Parameters
+    ----------
+    system : <System>
+        A System in the model.
+
+    Returns
+    -------
+    list
+        A list containing all the declared partials (strings in the form "of > wrt" )
+        beginning from the given system on down.
+    """
+
+    declare_partials_list = []
+
+    def recurse_get_partials(system, dpl):
+
+        if isinstance(system, Component):
+            subjacs = system._subjacs_info
+            for abs_key, meta in iteritems(subjacs):
+                dpl.append( "{} > {}".format(abs_key[0], abs_key[1]))
+        elif isinstance(system, Group):
+            for s in system._subsystems_myproc:
+                recurse_get_partials(s, dpl)
+        return
+
+    recurse_get_partials(system, declare_partials_list)
+    return declare_partials_list
 
 
 def _get_viewer_data(data_source):
@@ -248,6 +281,8 @@ def _get_viewer_data(data_source):
     data_dict['design_vars'] = root_group.get_design_vars()
     data_dict['responses'] = root_group.get_responses()
 
+    data_dict['declare_partials_list'] = _get_declare_partials(root_group)
+
     return data_dict
 
 
@@ -260,7 +295,7 @@ def view_tree(*args, **kwargs):
 
 
 def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False,
-               title=None):
+               title=None, use_declare_partial_info=False):
     """
     Generates an HTML file containing a tree viewer.
 
@@ -285,9 +320,18 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
     title : str, optional
         The title for the diagram. Used in the HTML title and also shown on the page.
 
+    use_declare_partial_info: bool, optional
+        If True, in the N2 matrix, component internal connectivity computed using derivative
+        declarations, otherwise, derivative declarations ignored, so dense component connectivity
+        is assumed.
+
     """
     # grab the model viewer data
     model_data = _get_viewer_data(data_source)
+    options = {}
+    options['use_declare_partial_info'] = use_declare_partial_info
+    model_data['options'] = options
+
     model_data = 'var modelData = %s' % json.dumps(model_data, default=make_serializable)
 
     # if MPI is active only display one copy of the viewer
@@ -376,6 +420,13 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
                 'A click on any element in the N^2 diagram will allow those arrows to persist.')
 
     h.add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
+
+    if use_declare_partial_info:
+        h.insert( '{{component_connectivity}}',
+                  'Note: Component internal connectivity computed using derivative declarations')
+    else:
+        h.insert( '{{component_connectivity}}',
+                  'Note: Derivative declarations ignored, so dense component connectivity is assumed')
 
     # Write output file
     h.write(outfile)

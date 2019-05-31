@@ -209,11 +209,23 @@ function DrawMatrix() {
         return (rt.implicit) ? UNKNOWN_IMPLICIT_COLOR : UNKNOWN_EXPLICIT_COLOR;
     }
 
+    if ( modelData.options.use_declare_partial_info)
+    {
+        symbols_scalarScalar_data = symbols_scalarScalar_declared_partials;
+        symbols_vectorVector_data = symbols_vectorVector_declared_partials;
+        symbols_vectorScalar_data = symbols_vectorScalar_declared_partials;
+        symbols_scalarVector_data = symbols_scalarVector_declared_partials;
+    } else {
+        symbols_scalarScalar_data = symbols_scalarScalar;
+        symbols_vectorVector_data = symbols_vectorVector;
+        symbols_vectorScalar_data = symbols_vectorScalar;
+        symbols_scalarVector_data = symbols_scalarVector;
+    }
     var classes = ["cell_scalar", "cell_vector", "cell_group", "cell_scalarScalar", "cell_scalarVector", "cell_vectorScalar",
         "cell_vectorVector", "cell_scalarGroup", "cell_groupScalar", "cell_vectorGroup", "cell_groupVector", "cell_groupGroup"
     ];
-    var datas = [symbols_scalar, symbols_vector, symbols_group, symbols_scalarScalar, symbols_scalarVector, symbols_vectorScalar,
-        symbols_vectorVector, symbols_scalarGroup, symbols_groupScalar, symbols_vectorGroup, symbols_groupVector, symbols_groupGroup
+    var datas = [symbols_scalar, symbols_vector, symbols_group, symbols_scalarScalar_data, symbols_scalarVector_data, symbols_vectorScalar_data,
+                 symbols_vectorVector_data, symbols_scalarGroup, symbols_groupScalar, symbols_vectorGroup, symbols_groupVector, symbols_groupGroup
     ];
     var drawFunctions = [DrawScalar, DrawVector, DrawGroup, DrawScalar, DrawVector, DrawVector,
         DrawVector, DrawGroup, DrawGroup, DrawGroup, DrawGroup, DrawGroup
