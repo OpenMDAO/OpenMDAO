@@ -489,6 +489,8 @@ else:
             self._comps = []
             # Index of last components in a process
             self._loop_ends = []
+            # Styles in use (needed for legend)
+            self._styles_used = set()
 
         def write(self, filename=None, **kwargs):
             """
@@ -553,6 +555,8 @@ else:
         def _add_system(self, node_name, style, label, stack=False, faded=False):
             # Adds a system dictionary to the components.
             # This dictionary can be modified by other methods.
+            self._styles_used.add(style)
+
             if label is None:
                 label = node_name
             self._comp_indices[node_name] = self._nr_comps
@@ -763,11 +767,19 @@ else:
             else:
                 return txt
 
+        def make_legend(self):
+            print("making legend")
+            for i, style in enumerate(self._styles_used):
+                print("adding ", style)
+                super(XDSMWriter, self).add_system(node_name="style{}".format(i), style=style,
+                                                   label=style)
+
 
 def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
-               add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE, **kwargs):
+               add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE,
+               legend=False, **kwargs):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -848,6 +860,9 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
         Left or right, or a dictionary with component types as keys. Component type key can
         be 'optimization', 'doe' or 'default'.
         Defaults to "left".
+    legend : bool, optional
+        If true, it adds a legend to the diagram.
+        Defaults to False.
     kwargs : dict
         Keyword arguments
     Returns
@@ -932,7 +947,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, build_pdf=build_pdf,
                        show_parallel=show_parallel, driver_type=driver_type,
-                       output_side=output_side, **kwargs)
+                       output_side=output_side, legend=legend, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanup=True,
@@ -995,6 +1010,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         Optimization or DOE.
         Defaults to "optimization".
     legend : bool, optional
+        If true, it adds a legend to the diagram.
+        Defaults to False.
     kwargs : dict
         Keyword arguments
 
@@ -1185,6 +1202,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             else:  # Source or target missing
                 msg = 'External output "{conn}" from "{src}" ignored.'
                 simple_warning(msg.format(src=src, conn=output_vars))
+
+    if legend and isinstance(x, XDSMWriter):
+        x.make_legend()
 
     x.write(filename, cleanup=cleanup, quiet=quiet, build=build_pdf, **kwargs)
 
