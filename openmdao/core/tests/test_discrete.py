@@ -17,6 +17,7 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
+from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
 
 
 class ModCompEx(ExplicitComponent):
@@ -524,6 +525,38 @@ class DiscretePromTestCase(unittest.TestCase):
 
         self.assertEqual(prob['C3.y'].getval(), 40)
         self.assertEqual(prob['C4.y'].getval(), 52)
+
+        def _var_iter(obj):
+            name = obj['name']
+            if 'children' in obj:
+                for c in obj['children']:
+                    for vname in _var_iter(c):
+                        if name:
+                            yield '.'.join((name, vname))
+                        else:
+                            yield vname
+            else:
+                yield name
+
+        # add a test to see if discrete vars show up in view_model
+        data = _get_viewer_data(prob)
+        findvars = [
+            'indep.x',
+            'G.G1.C1_1.x',
+            'G.G1.C1_1.y',
+            'G.G1.C1_2.x',
+            'G.G1.C1_2.y',
+            'G.G2.C2_1.x',
+            'G.G2.C2_1.y',
+            'G.G2.C2_2.x',
+            'G.G2.C2_2.y',
+            'C3.x',
+            'C3.y',
+            'C4.x',
+            'C4.y',
+        ]
+        vnames = list(_var_iter(data['tree']))
+        self.assertTrue(sorted(findvars), sorted(vnames))
 
 
 class DiscreteFeatureTestCase(unittest.TestCase):

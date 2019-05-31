@@ -36,6 +36,27 @@ _MODEL_HEIGHTS = [600, 650, 700, 750, 800, 850, 900, 950, 1000, 2000, 3000, 4000
 _IND = 4  # HTML indentation (spaces)
 
 
+def _get_var_dict(system, typ, name):
+    if name in system._var_discrete[typ]:
+        meta = system._var_discrete[typ][name]
+    else:
+        meta = system._var_abs2meta[name]
+        name = system._var_abs2prom[typ][name]
+
+    var_dict = OrderedDict()
+    var_dict['name'] = name
+    if typ == 'input':
+        var_dict['type'] = 'param'
+    elif typ == 'output':
+        isimplicit = isinstance(system, ImplicitComponent)
+        var_dict['type'] = 'unknown'
+        var_dict['implicit'] = isimplicit
+
+    var_dict['dtype'] = type(meta['value']).__name__
+
+    return var_dict
+
+
 def _get_tree_dict(system, component_execution_orders, component_execution_index, is_parallel=False):
     """Get a dictionary representation of the system hierarchy."""
     tree_dict = OrderedDict()
@@ -63,21 +84,12 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         children = []
         for typ in ['input', 'output']:
-            for ind, abs_name in enumerate(system._var_abs_names[typ]):
-                meta = system._var_abs2meta[abs_name]
-                name = system._var_abs2prom[typ][abs_name]
+            for abs_name in system._var_abs_names[typ]:
+                children.append(_get_var_dict(system, typ, abs_name))
 
-                var_dict = OrderedDict()
-                var_dict['name'] = name
-                if typ == 'input':
-                    var_dict['type'] = 'param'
-                elif typ == 'output':
-                    isimplicit = isinstance(system, ImplicitComponent)
-                    var_dict['type'] = 'unknown'
-                    var_dict['implicit'] = isimplicit
+            for prom_name in system._var_discrete[typ]:
+                children.append(_get_var_dict(system, typ, prom_name))
 
-                var_dict['dtype'] = type(meta['value']).__name__
-                children.append(var_dict)
     else:
         if isinstance(system, ParallelGroup):
             is_parallel = True
@@ -155,7 +167,7 @@ def _get_viewer_data(data_source):
         driver_options = {k: driver.options[k] for k in driver.options}
         driver_opt_settings = None
         if driver_type is 'optimization' and 'opt_settings' in dir(driver):
-            driver_opt_settings = driver.opt_settings   
+            driver_opt_settings = driver.opt_settings
 
     elif isinstance(data_source, Group):
         if not data_source.pathname:  # root group
@@ -243,8 +255,8 @@ def _get_viewer_data(data_source):
     data_dict['connections_list'] = connections_list
     data_dict['abs2prom'] = root_group._var_abs2prom
 
-    data_dict['driver'] = {'name': driver_name, 'type': driver_type, 
-                           'options': driver_options, 'opt_settings': driver_opt_settings} 
+    data_dict['driver'] = {'name': driver_name, 'type': driver_type,
+                           'options': driver_options, 'opt_settings': driver_opt_settings}
     data_dict['design_vars'] = root_group.get_design_vars()
     data_dict['responses'] = root_group.get_responses()
 
