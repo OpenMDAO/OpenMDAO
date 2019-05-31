@@ -63,7 +63,7 @@ _DEFAULT_WRITER = 'pyxdsm'
 _COMPONENT_TYPE_MAP = {
     'pyxdsm': {
         'indep': 'Function',
-        'explicit': 'Analysis',
+        'explicit': 'Function',
         'implicit': 'ImplicitAnalysis',
         'exec': 'Function',
         'metamodel': 'Metamodel',
@@ -73,7 +73,7 @@ _COMPONENT_TYPE_MAP = {
     },
     'xdsmjs': {
         'indep': 'function',
-        'explicit': 'analysis',
+        'explicit': 'function',
         'implicit': 'analysis',
         'exec': 'function',
         'metamodel': 'metamodel',
@@ -466,9 +466,11 @@ else:
         """
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
-                     number_alignment=_DEFAULT_NUMBER_ALIGNMENT, add_component_indices=True):
+                     number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False,
+                     add_component_indices=True):
             super(XDSMWriter, self).__init__()
             self.name = name
+            self.has_legend = legend
             # Formatting options
             self.box_stacking = box_stacking
             self.number_alignment = number_alignment
@@ -767,12 +769,36 @@ else:
             else:
                 return txt
 
-        def make_legend(self):
-            print("making legend")
-            for i, style in enumerate(self._styles_used):
-                print("adding ", style)
+        def _make_legend(self, title="Legend"):
+            """
+            Adds a legend row to the matrix. The labels of this row show the used component types.
+
+            Parameters
+            ----------
+            title : str, optional
+                Defaults to "Legend".
+
+            Returns
+            -------
+                str
+            """
+            node_str = r'\node [{style}] ({name}) {{{label}}};'
+            styles = sorted(self._styles_used)  # Alphabetical sort
+            for i, style in enumerate(styles):
                 super(XDSMWriter, self).add_system(node_name="style{}".format(i), style=style,
                                                    label=style)
+            style_strs = [node_str.format(name="style{}".format(i), style=style, label=style)
+                          for i, style in enumerate(styles)]
+            # return '};\n\\matrix[MatrixSetup, below left]{' + '  &\n'.join(style_strs) + r'\\'
+            title_str = r'\node (legend_title) {{\LARGE \textbf{{{title}}}}};\\'
+            return title_str.format(title=title) + '  &\n'.join(style_strs) + r'\\'
+
+        def _build_node_grid(self):
+            """Optionally appends the legend to the node grid."""
+            node_grid = super(XDSMWriter, self)._build_node_grid()
+            if self.has_legend:
+                node_grid += self._make_legend()
+            return node_grid
 
 
 def write_xdsm(data_source, filename, model_path=None, recurse=True,
@@ -1035,7 +1061,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         if writer.lower() == 'pyxdsm':  # pyXDSM
             x = XDSMWriter(box_stacking=box_stacking,
                            number_alignment=number_alignment,
-                           add_component_indices=add_component_indices)
+                           add_component_indices=add_component_indices,
+                           legend=legend)
         elif writer.lower() == 'xdsmjs':  # XDSMjs
             x = XDSMjsWriter()
         else:
@@ -1202,9 +1229,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             else:  # Source or target missing
                 msg = 'External output "{conn}" from "{src}" ignored.'
                 simple_warning(msg.format(src=src, conn=output_vars))
-
-    if legend and isinstance(x, XDSMWriter):
-        x.make_legend()
 
     x.write(filename, cleanup=cleanup, quiet=quiet, build=build_pdf, **kwargs)
 
