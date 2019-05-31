@@ -73,8 +73,8 @@ class ProbRemoteTestCase(unittest.TestCase):
         np.testing.assert_almost_equal(prob['prod.z'], 20., decimal=5)
 
 
-# @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
-@unittest.skip("FIXME: test is unreliable on CI... (timeout)")
+#@unittest.skip("FIXME: test is unreliable on CI... (timeout)")
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class ProbRemote4TestCase(unittest.TestCase):
 
     N_PROCS = 4
@@ -114,7 +114,7 @@ class ProbRemote4TestCase(unittest.TestCase):
         prob.run_model()
 
         failed = prob.run_driver()
-        
+
         all_failed = comm.allgather(failed)
         if any(all_failed):
             all_msgs = comm.allgather(str(prob.driver.pyopt_solution.optInform))
