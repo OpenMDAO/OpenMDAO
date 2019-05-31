@@ -119,16 +119,14 @@ class ProbRemoteTestCase(unittest.TestCase):
             self.assertTrue(p.is_local('par.C2.x'), 'par.C2.x should be local')
             self.assertTrue(p.is_local('par.C2.y'), 'par.C2.y should be local')
 
-# @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
-@unittest.skip("FIXME: test is unreliable on CI... (timeout)")
+#@unittest.skip("FIXME: test is unreliable on CI... (timeout)")
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class ProbRemote4TestCase(unittest.TestCase):
 
     N_PROCS = 4
 
     def test_prob_split_comm(self):
         colors = [0, 0, 1, 1]
-        alloc = DefaultAllocator(parallel=True)
-
         comm = MPI.COMM_WORLD.Split(colors[MPI.COMM_WORLD.rank])
 
         # split the size 4 comm into 2 size 2 comms
@@ -163,7 +161,14 @@ class ProbRemote4TestCase(unittest.TestCase):
 
         failed = prob.run_driver()
 
-        self.assertFalse(failed, "Optimization failed, info = " +
-                                 str(prob.driver.pyopt_solution.optInform))
+        all_failed = comm.allgather(failed)
+        if any(all_failed):
+            all_msgs = comm.allgather(str(prob.driver.pyopt_solution.optInform))
+            for i, tup in enumerate(zip(all_failed, all_msgs)):
+                failed, msg = tup
+                if failed:
+                    self.fail("Optimization failed on rank %d: %s" % (i, msg))
 
-        assert_rel_error(self, prob['obj.o'], 2.0, 1e-6)
+        objs = comm.allgather(prob['obj.o'])
+        for i, obj in enumerate(objs):
+            assert_rel_error(self, obj, 2.0, 1e-6)
