@@ -939,7 +939,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
-                output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', **kwargs):
+                output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', legend=False,
+                **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -983,15 +984,17 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         Defaults to True.
     quiet : bool
         Set to True to suppress output from pdflatex
-    build_pdf : bool
+    build_pdf : bool, optional
         If True and a .tex file is generated, create a .pdf file from the .tex.
-    output_side : str or dict(str, str)
+        Defaults to False.
+    output_side : str or dict(str, str), optional
         Left or right, or a dictionary with component types as keys. Component type key can
         be 'optimization', 'doe' or 'default'.
         Defaults to "left".
-    driver_type : str
+    driver_type : str, optional
         Optimization or DOE.
         Defaults to "optimization".
+    legend : bool, optional
     kwargs : dict
         Keyword arguments
 
@@ -1048,9 +1051,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse, include_solver=include_solver)
     if include_solver:
-        msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
-        simple_warning(msg)
-
         # Add the top level solver
         top_level_solver = dict(tree)
         top_level_solver.update({'comps': list(comps), 'abs_name': 'root@solver', 'index': 0,
