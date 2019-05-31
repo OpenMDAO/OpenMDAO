@@ -938,8 +938,8 @@ class Group(System):
                 elif not s.options['distributed']:
                     self._local_system_set.add(s.pathname)
 
-        path_len = len(pathname) + 1 if pathname else 0
         path_dot = pathname + '.' if pathname else ''
+        path_len = len(path_dot)
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
 

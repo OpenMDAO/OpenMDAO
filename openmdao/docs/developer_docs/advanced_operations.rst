@@ -116,7 +116,7 @@ The commands to do the above look something like this:
                         -in travis deploy.rsa.enc -out /tmp/travis_deploy.rsa -d;
                   fi
 
-    C. Finally, the command is supposed to create and assign two environment variables in the the Travis CI settings for the repository in question.  This was a big stumbling block for me, and it is why I added the `—debug` arg to the `travis encrypt-file` command.
+    C. Finally, the command is supposed to create and assign two environment variables in the Travis CI settings for the repository in question.  This was a big stumbling block for me, and it is why I added the `—debug` arg to the `travis encrypt-file` command.
        I was executing the correct command, but the identity I was signed in as (me) and the identity of the repo (OpenMDAO) didn’t match and so those env vars were never created.  Going to the travis-ci.org webpage for OpenMDAO and going into Settings and using
        the web interface to add two new env vars is the way around this problem.  But what are the env vars called, and what will their values be?  That’s where —debug comes in (actual values redacted):
 
