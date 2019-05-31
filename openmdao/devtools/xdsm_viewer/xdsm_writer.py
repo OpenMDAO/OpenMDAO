@@ -470,11 +470,11 @@ else:
                      add_component_indices=True):
             super(XDSMWriter, self).__init__()
             self.name = name
-            self.has_legend = legend
             # Formatting options
             self.box_stacking = box_stacking
             self.number_alignment = number_alignment
             self.add_component_indices = add_component_indices
+            self.has_legend = legend  # If true, a legend will be added to the diagram
             # Output file saved with this extension
             self.extension = 'pdf'
             if self.name in _COMPONENT_TYPE_MAP:
