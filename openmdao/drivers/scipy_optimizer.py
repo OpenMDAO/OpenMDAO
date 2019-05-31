@@ -209,8 +209,6 @@ class ScipyOptimizeDriver(Driver):
             msg = "ScipyOptimizeDriver requires objective to be declared"
             raise RuntimeError(msg)
 
-
-
         # Since COBYLA does not support bounds, we
         #   need to add to the _cons metadata for any bounds that
         #   need to be translated into a constraint
