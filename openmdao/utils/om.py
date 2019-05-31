@@ -130,6 +130,9 @@ def _xdsm_setup_parser(parser):
                         help='Position of the outputs on the diagram. Left or right, or a '
                              'dictionary with component types as keys. Component type key can be '
                              '"optimization", "doe" or "default".')
+    parser.add_argument('--legend', action='store_true', dest='legend',
+                        help='Position of the outputs on the diagram. Left or right, or a '
+                             'Show legend.')
 
 
 def _xdsm_cmd(options):
@@ -160,6 +163,7 @@ def _xdsm_cmd(options):
                        show_browser=not options.no_browser, show_parallel=not options.no_parallel,
                        add_process_conns=not options.no_process_conns,
                        output_side=options.output_side,
+                       legend=options.legend,
                        **kwargs)
             exit()
 

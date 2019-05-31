@@ -533,7 +533,7 @@ else:
 
             super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
 
-        def add_system(self, node_name, style, label, stack=False, faded=False):
+        def add_system(self, node_name, style, label, stack=False, faded=False, **kwargs):
             """
             Add a system.
 
@@ -549,6 +549,8 @@ else:
                 Defaults to False.
             faded : bool
                 Defaults to False.
+            kwargs : dict
+                Keyword arguments.
             """
             super(XDSMWriter, self).add_system(node_name=node_name, style=style, label=label,
                                                stack=stack, faded=faded)
