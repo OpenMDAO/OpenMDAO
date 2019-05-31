@@ -126,6 +126,8 @@ class Problem(object):
         after a reconfiguration) you may need to set this to True.
     _color_dir_hash : str
         Hash used to detect collisions of coloring files.
+    __get_remote : bool
+        Flag used to determine when __getitem__ will retrieve remote variables.
     """
 
     _post_setup_func = None
@@ -147,6 +149,9 @@ class Problem(object):
         **options : named args
             All remaining named args are converted to options.
         """
+        # used by the get_val function when get_remote is True
+        self.__get_remote = False
+
         self.cite = CITATION
 
         if comm is None:
@@ -219,6 +224,53 @@ class Problem(object):
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes)')
+
+    def _get_var_abs_name(self, name):
+        if name in self.model._var_allprocs_abs2meta:
+            return name
+        elif name in self.model._var_allprocs_prom2abs_list['output']:
+            return self.model._var_allprocs_prom2abs_list['output'][name][0]
+        elif name in self.model._var_allprocs_prom2abs_list['input']:
+            abs_names = self.model._var_allprocs_prom2abs_list['input'][name]
+            if len(abs_names) == 1:
+                return abs_names[0]
+            else:
+                raise KeyError("Using promoted name `{}' is ambiguous and matches unconnected "
+                               "inputs %s. Use absolute name to disambiguate.".format(name,
+                                                                                      abs_names))
+
+        raise KeyError("Variable '{}' not found.".format(name))
+
+    def is_local(self, name):
+        """
+        Return True if the named variable or system is local to the current process.
+
+        Parameters
+        ----------
+        name : str
+            Name of a variable or system.
+
+        Returns
+        -------
+        bool
+            True if the named system or variable is local to this process.
+        """
+        if self._setup_status < 1:
+            raise RuntimeError("is_local('{}') was called before setup() completed.".format(name))
+
+        try:
+            abs_name = self._get_var_abs_name(name)
+        except KeyError:
+            sub = self.model._get_subsystem(name)
+            if sub is None:  # either the sub is remote or there is no sub by that name
+                # TODO: raise exception if sub does not exist
+                return False
+            else:
+                # if system has been set up, _var_sizes will be initialized
+                return sub._var_sizes is not None
+
+        # variable exists, but may be remote
+        return abs_name in self.model._var_abs2meta
 
     def __getitem__(self, name):
         """
@@ -314,29 +366,35 @@ class Problem(object):
                 abs_name = proms['input'][name][0]
 
             if abs_name in self._remote_var_set:
-                if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
-                    raise RuntimeError("Retrieval of the full distributed variable '%s' is not "
-                                       "supported." % abs_name)
-                loc_val = val
-                owner = self.model._owning_rank[abs_name]
-                if owner != self.model.comm.rank:
-                    val = None
-                else:
+                if self.__get_remote:
+                    if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
+                        raise RuntimeError("Retrieval of the full distributed variable '%s' is not "
+                                           "supported." % abs_name)
+                    loc_val = val
                     owner = self.model._owning_rank[abs_name]
-                    if val is _undefined:
+                    if owner != self.model.comm.rank:
                         val = None
-                new_val = self.model.comm.bcast(val, root=owner)
-                if loc_val is not None and loc_val is not _undefined:
-                    val = loc_val
-                else:
-                    val = new_val
+                    else:
+                        owner = self.model._owning_rank[abs_name]
+                        if val is _undefined:
+                            val = None
+                    new_val = self.model.comm.bcast(val, root=owner)
+                    if loc_val is not None and loc_val is not _undefined:
+                        val = loc_val
+                    else:
+                        val = new_val
+                elif val is _undefined:
+                    raise RuntimeError(
+                        "Variable '{}' is not local to rank {}. You can retrieve values from "
+                        "other processes using "
+                        "`problem.get_val(<name>, get_remote=True)`.".format(name, self.comm.rank))
 
         if val is _undefined:
             raise KeyError('Variable name "{}" not found.'.format(name))
 
         return val
 
-    def get_val(self, name, units=None, indices=None):
+    def get_val(self, name, units=None, indices=None, get_remote=False):
         """
         Get an output/input variable.
 
@@ -350,13 +408,24 @@ class Problem(object):
             Units to convert to before upon return.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to return.
+        get_remote : bool
+            If True, retrieve the value even if it is on a remote process.  Note that if the
+            variable is remote on ANY process, this function must be called on EVERY process
+            in the Problem's MPI communicator.
 
         Returns
         -------
         float or ndarray
             The requested output/input variable.
         """
-        val = self[name]
+        if get_remote:
+            self.__get_remote = True
+            try:
+                val = self[name]
+            finally:
+                self.__get_remote = False
+        else:
+            val = self[name]
 
         if indices is not None:
             val = val[indices]
@@ -444,8 +513,10 @@ class Problem(object):
                 self.model._discrete_inputs[abs_name] = value
             else:
                 # might be a remote var.  If so, just do nothing on this proc
-                if not (name in all_proms['input'] or name in all_proms['output'] or
-                        name in self.model._var_allprocs_abs2meta):
+                if abs_name in self.model._var_allprocs_abs2meta:
+                    print("Variable '{}' is remote on rank {}.  "
+                          "Local assignment ignored.".format(name, self.comm.rank))
+                else:
                     raise KeyError('Variable name "{}" not found.'.format(name))
 
     def set_val(self, name, value, units=None, indices=None):

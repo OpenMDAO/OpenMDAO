@@ -102,4 +102,38 @@ When dealing with arrays, you can set or get specific indices or index ranges by
     :layout: interleave
 
 
+Retrieving Remote Variables
+---------------------------
+
+If you're running under MPI, the `Problem.get_val` method also has a *get_remote* arg that allows
+you to get the value of a variable even if it's not local to the current MPI process.  For example,
+the code below will retrieve the value of `foo.bar.x` in all processes, whether the variable is
+local or not.
+
+
+.. code-block:: python
+
+    val = prob.get_val('foo.bar.x', get_remote=True)
+
+
+.. warning::
+
+    If `get_remote` is True, `get_val` makes a collective MPI call, so make sure to call it
+    in *all* ranks of the Problem's MPI communicator.  Otherwise, collective calls made
+    in different ranks will get out of sync and result in cryptic MPI errors.
+
+
+
+Testing if a Variable or System is Local
+----------------------------------------
+
+If you want to know if a given variable or system is local to the current process, the
+`Problem.is_local` method will tell you.  For example:
+
+.. code-block:: python
+
+    if prob.is_local('foo.bar.x'):
+        print("foo.bar.x is local!")
+
+
 .. tags:: SetGet
