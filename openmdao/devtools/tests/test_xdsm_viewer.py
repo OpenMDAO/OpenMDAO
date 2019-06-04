@@ -932,6 +932,35 @@ class TestXDSMjsViewer(unittest.TestCase):
                    recurse=True)
         self.assertTrue(os.path.isfile('.'.join(['xdsmjs_circuit', 'html'])))
 
+    def test_legend(self):
+        from openmdao.api import Problem, IndepVarComp
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        model.add_design_var('ground.V')
+        model.add_design_var('source.I')
+        model.add_objective('circuit.D1.I')
+
+        p.setup(check=False)
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.run_model()
+
+        write_xdsm(p, 'xdsmjs_circuit_legend', out_format='html', quiet=QUIET, show_browser=SHOW,
+                   recurse=True, legend=True)
+        self.assertTrue(os.path.isfile('.'.join(['xdsmjs_circuit_legend', 'html'])))
+
     def test_xdsmjs_right_outputs(self):
         """Makes XDSM for the Sellar problem"""
         filename = 'xdsmjs_outputs_on_the_right'
