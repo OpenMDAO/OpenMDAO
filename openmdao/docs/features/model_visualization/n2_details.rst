@@ -206,10 +206,6 @@ The buttons in the remaining part of the toolbar offer a variety of other option
    :align: middle
    :scale: 60 %
 
-.. |toggle_inputs| image:: images/exchange.png
-   :align: middle
-   :scale: 60 %
-
 .. |toggle_solver_names| image:: images/minus.png
    :align: middle
    :scale: 60 %
@@ -238,8 +234,6 @@ The buttons in the remaining part of the toolbar offer a variety of other option
 | |show_path|           | Show Path                       | Show the full path to the System at the top of the view           |
 +-----------------------+---------------------------------+-------------------------------------------------------------------+
 | |show_legend|         | Show Legend                     | Show the legend explaining the colors and icons in the diagram    |
-+-----------------------+---------------------------------+-------------------------------------------------------------------+
-| |toggle_inputs|       | Toggle Inputs                   | Toggle between hiding and showing the inputs                      |
 +-----------------------+---------------------------------+-------------------------------------------------------------------+
 | |toggle_solver_names| | Toggle Solver Names             | Toggle between showing linear and nonlinear solvers               |
 +-----------------------+---------------------------------+-------------------------------------------------------------------+

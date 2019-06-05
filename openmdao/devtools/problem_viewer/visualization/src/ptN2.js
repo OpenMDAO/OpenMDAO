@@ -76,7 +76,6 @@ function PtN2Diagram(parentDiv, modelData) {
     }
 
     function updateRootTypes() {
-        if (!showParams) return;
 
         var stack = []
         for (var i = 0; i < root.children.length; ++i) {
@@ -142,7 +141,6 @@ function PtN2Diagram(parentDiv, modelData) {
         .attr("width", WIDTH_N2_PX)
         .attr("height", HEIGHT_PX)
         .on("click", function () {
-            if (!showParams) return;
             var coords = d3.mouse(this);
             var c = Math.floor(coords[0] * d3RightTextNodesArrayZoomed.length / WIDTH_N2_PX);
             var r = Math.floor(coords[1] * d3RightTextNodesArrayZoomed.length / HEIGHT_PX);
@@ -179,7 +177,6 @@ function PtN2Diagram(parentDiv, modelData) {
             PrintConnects();
         })
         .on("mousemove", function () {
-            if (!showParams) return;
             var coords = d3.mouse(this);
             var c = Math.floor(coords[0] * d3RightTextNodesArrayZoomed.length / WIDTH_N2_PX);
             var r = Math.floor(coords[1] * d3RightTextNodesArrayZoomed.length / HEIGHT_PX);
@@ -738,7 +735,6 @@ function PtN2Diagram(parentDiv, modelData) {
                 }
             }
             if (d === zoomedElement) return;
-            if (!showParams && (d.type === "param" || d.type === "unconnected_param")) return;
 
             var n = d.name;
             if (d.splitByColon && d.children && d.children.length > 0) n += ":";
@@ -775,7 +771,7 @@ function PtN2Diagram(parentDiv, modelData) {
         }
 
         function UpdateTextWidths(d) {
-            if ((!showParams && (d.type === "param" || d.type === "unconnected_param")) || d.varIsHidden) return;
+            if (d.varIsHidden) return;
             d.nameWidthPx = GetTextWidth(GetText(d)) + 2 * RIGHT_TEXT_MARGIN_PX;
             if (d.children) {
                 for (var i = 0; i < d.children.length; ++i) {
@@ -799,7 +795,7 @@ function PtN2Diagram(parentDiv, modelData) {
             var leafWidthsPx = new Array(maxDepth + 1).fill(0.0);
 
             function DoComputeColumnWidths(d) {
-                if ((!showParams && (d.type === "param" || d.type === "unconnected_param")) || d.varIsHidden) return;
+                if (d.varIsHidden) return;
 
                 var heightPx = HEIGHT_PX * d.numLeaves / zoomedElement.numLeaves;
                 d.textOpacity0 = d.hasOwnProperty('textOpacity') ? d.textOpacity : 0;
@@ -880,7 +876,7 @@ function PtN2Diagram(parentDiv, modelData) {
 
 
         function ComputeLeaves(d) {
-            if ((!showParams && (d.type === "param" || d.type === "unconnected_params")) || d.varIsHidden) {
+            if (d.varIsHidden) {
                 d.numLeaves = 0;
                 return;
             }
@@ -895,7 +891,7 @@ function PtN2Diagram(parentDiv, modelData) {
         }
 
         function ComputeSolverLeaves(d) {
-            if ((!showParams && (d.type === "param" || d.type === "unconnected_params")) || d.varIsHidden) {
+            if (d.varIsHidden) {
                 d.numSolverLeaves = 0;
                 return;
             }
@@ -913,9 +909,9 @@ function PtN2Diagram(parentDiv, modelData) {
         function ComputeNormalizedPositions(d, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
             isChildOfZoomed = (isChildOfZoomed) ? true : (d === zoomedElement);
             if (earliestMinimizedParent == null && isChildOfZoomed) {
-                if ((showParams || (d.type !== "param" && d.type !== "unconnected_param")) && !d.varIsHidden) d3NodesArray.push(d);
+                if (!d.varIsHidden) d3NodesArray.push(d);
                 if (!d.children || d.isMinimized) { //at a "leaf" node
-                    if ((showParams || (d.type !== "param" && d.type !== "unconnected_param")) && !d.varIsHidden) d3RightTextNodesArrayZoomed.push(d);
+                    if (!d.varIsHidden) d3RightTextNodesArrayZoomed.push(d);
                     earliestMinimizedParent = d;
                 }
             }
@@ -930,7 +926,7 @@ function PtN2Diagram(parentDiv, modelData) {
             d.y = leafCounter / root.numLeaves;
             d.width = (d.children && !d.isMinimized) ? (columnWidthsPx[node.depth] / widthPTreePx) : 1 - node.x;//1-d.x;
             d.height = node.numLeaves / root.numLeaves;
-            if ((!showParams && (d.type === "param" || d.type === "unconnected_param")) || d.varIsHidden) { //param or hidden leaf leaving
+            if (d.varIsHidden) { //param or hidden leaf leaving
                 d.x = columnLocationsPx[d.parentComponent.depth + 1] / widthPTreePx;
                 d.y = d.parentComponent.y;
                 d.width = 1e-6;
@@ -969,22 +965,12 @@ function PtN2Diagram(parentDiv, modelData) {
 
             d.heightSolver = node.numSolverLeaves / root.numSolverLeaves; 111
 
-
-
-
-
-
-            if ((!showParams && (d.type === "param" || d.type === "unconnected_param")) || d.varIsHidden) { //param or hidden leaf leaving
+            if (d.varIsHidden) { //param or hidden leaf leaving
                 d.xSolver = columnLocationsPx[d.parentComponent.depthqqq + 1] / widthPTreePx;
                 d.ySolver = d.parentComponent.y;
                 d.widthSolver = 1e-6;
                 d.heightSolver = 1e-6;
             }
-
-
-
-
-
 
             if (d.children) {
                 for (var i = 0; i < d.children.length; ++i) {
@@ -1320,14 +1306,14 @@ function PtN2Diagram(parentDiv, modelData) {
             for (var si = 0; si < d3RightTextNodesArrayZoomed.length; ++si) {
                 var srcObj = d3RightTextNodesArrayZoomed[si];
                 matrix[si + "_" + si] = { "r": si, "c": si, "obj": srcObj, "id": srcObj.id + "_" + srcObj.id };
-                var targets = (showParams) ? srcObj.targetsParamView : srcObj.targetsHideParams;
+                var targets = srcObj.targetsParamView;
                 for (let tgtObj of targets) {
                     var ti = d3RightTextNodesArrayZoomed.indexOf(tgtObj);
                     if (ti != -1) {
                         matrix[si + "_" + ti] = { "r": si, "c": ti, "obj": srcObj, "id": srcObj.id + "_" + tgtObj.id }; //matrix[si][ti].z = 1;
                     }
                 }
-                if (showParams && (srcObj.type === "param" || srcObj.type === "unconnected_param")) {
+                if (srcObj.type === "param" || srcObj.type === "unconnected_param") {
                     for (var j = si + 1; j < d3RightTextNodesArrayZoomed.length; ++j) {
                         var tgtObj = d3RightTextNodesArrayZoomed[j];
                         if (srcObj.parentComponent !== tgtObj.parentComponent) break;
@@ -1369,7 +1355,7 @@ function PtN2Diagram(parentDiv, modelData) {
             if (d.c == d.r) { //on diagonal
                 if (srcObj.type === "subsystem") { //group
                     symbols_group.push(d);
-                } else if (srcObj.type === "unknown" || (showParams && (srcObj.type === "param" || srcObj.type === "unconnected_param"))) {
+                } else if (srcObj.type === "unknown" || (srcObj.type === "param" || srcObj.type === "unconnected_param")) {
                     if (srcObj.dtype === "ndarray") { //vector
                         symbols_vector.push(d);
                     } else { //scalar
@@ -1382,7 +1368,7 @@ function PtN2Diagram(parentDiv, modelData) {
                 if (tgtObj.type === "subsystem") { //groupGroup
                     symbols_groupGroup.push(d);
                 }
-                else if (tgtObj.type === "unknown" || (showParams && (tgtObj.type === "param" || tgtObj.type === "unconnected_param"))) {
+                else if (tgtObj.type === "unknown" || (tgtObj.type === "param" || tgtObj.type === "unconnected_param")) {
                     if (tgtObj.dtype === "ndarray") {//groupVector
                         symbols_groupVector.push(d);
                     }
@@ -1391,10 +1377,10 @@ function PtN2Diagram(parentDiv, modelData) {
                     }
                 }
             }
-            else if (srcObj.type === "unknown" || (showParams && (srcObj.type === "param" || srcObj.type === "unconnected_param"))) {
+            else if (srcObj.type === "unknown" || (srcObj.type === "param" || srcObj.type === "unconnected_param")) {
                 if (srcObj.dtype === "ndarray") {
-                    if (tgtObj.type === "unknown" || (showParams && (tgtObj.type === "param" || tgtObj.type === "unconnected_param"))) {
-                        if (tgtObj.dtype === "ndarray" || (showParams && (tgtObj.type === "param" || tgtObj.type === "unconnected_param"))) {//vectorVector
+                    if (tgtObj.type === "unknown" || (tgtObj.type === "param" || tgtObj.type === "unconnected_param")) {
+                        if (tgtObj.dtype === "ndarray" || (tgtObj.type === "param" || tgtObj.type === "unconnected_param")) {//vectorVector
                             symbols_vectorVector.push(d);
                             var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
                             if (modelData.declare_partials_list.includes(partials_string)){
@@ -1416,7 +1402,7 @@ function PtN2Diagram(parentDiv, modelData) {
                     }
                 }
                 else { //if (srcObj.dtype !== "ndarray"){
-                    if (tgtObj.type === "unknown" || (showParams && (tgtObj.type === "param" || tgtObj.type === "unconnected_param"))) {
+                    if (tgtObj.type === "unknown" || (tgtObj.type === "param" || tgtObj.type === "unconnected_param")) {
                         if (tgtObj.dtype === "ndarray") {//scalarVector
                             symbols_scalarVector.push(d);
                             var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
@@ -1475,12 +1461,6 @@ function PtN2Diagram(parentDiv, modelData) {
             }
         }
     }
-
-
-    function FindRootOfChangeForShowParams(d) {
-        return (d.hasOwnProperty("parentComponent")) ? d.parentComponent : d;
-    }
-
     function FindRootOfChangeForRightClick(d) {
         return lastRightClickedElement;
     }
@@ -1551,7 +1531,7 @@ function PtN2Diagram(parentDiv, modelData) {
                 n2Dx * d.c + n2Dx * .5, //left x2
                 n2Dy * d.r + n2Dy * .5, //left y2
                 n2Dx * d.c + n2Dx * .5, //up x3
-                (showParams) ? n2Dy * d.c + n2Dy - 1e-2 : n2Dy * (boxEnd.stopI) + n2Dy - 1e-2, //up y3
+                n2Dy * d.c + n2Dy - 1e-2, //up y3
                 RED_ARROW_COLOR, lineWidth, true);
 
             var targetsWithCycleArrows = [];
@@ -1594,12 +1574,7 @@ function PtN2Diagram(parentDiv, modelData) {
                             }
 
                             if (firstBeginIndex != firstEndIndex) {
-                                if (showParams) {
-                                    DrawArrowsParamView(firstBeginIndex, firstEndIndex);
-                                }
-                                else {
-                                    DrawArrows(firstBeginIndex, firstEndIndex);
-                                }
+                                DrawArrowsParamView(firstBeginIndex, firstEndIndex);
                             }
                         }
                     }
@@ -1613,7 +1588,7 @@ function PtN2Diagram(parentDiv, modelData) {
                 n2Dx * d.c + n2Dx * .5, //right x2
                 n2Dy * d.r + n2Dy * .5, //right y2
                 n2Dx * d.c + n2Dx * .5, //down x3
-                (showParams) ? n2Dy * d.c + 1e-2 : n2Dy * boxEnd.startI + 1e-2, //down y3
+                n2Dy * d.c + 1e-2, //down y3
                 RED_ARROW_COLOR, lineWidth, true);
         }
         var leftTextWidthR = d3RightTextNodesArrayZoomed[d.r].nameWidthPx,
@@ -1637,49 +1612,25 @@ function PtN2Diagram(parentDiv, modelData) {
             var box = d3RightTextNodesArrayZoomedBoxInfo[i];
             if (matrix[hoveredIndexRC + "_" + i] !== undefined) { //if (matrix[hoveredIndexRC][i].z > 0) { //i is column here
                 if (i < hoveredIndexRC) { //column less than hovered
-                    if (showParams) {
-                        DrawPathTwoLines(
-                            n2Dx * hoveredIndexRC, //x1
-                            n2Dy * (hoveredIndexRC + .5), //y1
-                            (i + .5) * n2Dx, //left x2
-                            n2Dy * (hoveredIndexRC + .5), //left y2
-                            (i + .5) * n2Dx, //up x3
-                            (i + 1) * n2Dy, //up y3
-                            GREEN_ARROW_COLOR, lineWidth, true);
-                    }
-                    else if (i == box.startI) {
-                        DrawPathTwoLines(
-                            n2Dx * hoveredIndexRC, //x1
-                            n2Dy * hoveredIndexRC + n2Dy * .5, //y1
-                            (box.startI + (box.stopI - box.startI) * .5) * n2Dx + n2Dx * .5, //left x2
-                            n2Dy * hoveredIndexRC + n2Dy * .5, //left y2
-                            (box.startI + (box.stopI - box.startI) * .5) * n2Dx + n2Dx * .5, //up x3
-                            n2Dy * box.stopI + n2Dy, //up y3
-                            GREEN_ARROW_COLOR, lineWidth, true);
-                    }
+                    DrawPathTwoLines(
+                        n2Dx * hoveredIndexRC, //x1
+                        n2Dy * (hoveredIndexRC + .5), //y1
+                        (i + .5) * n2Dx, //left x2
+                        n2Dy * (hoveredIndexRC + .5), //left y2
+                        (i + .5) * n2Dx, //up x3
+                        (i + 1) * n2Dy, //up y3
+                        GREEN_ARROW_COLOR, lineWidth, true);
                     DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, GREEN_ARROW_COLOR); //highlight var name
 
                 } else if (i > hoveredIndexRC) { //column greater than hovered
-                    if (showParams) {
-                        DrawPathTwoLines(
-                            n2Dx * hoveredIndexRC + n2Dx, //x1
-                            n2Dy * (hoveredIndexRC + .5), //y1
-                            (i + .5) * n2Dx, //right x2
-                            n2Dy * (hoveredIndexRC + .5), //right y2
-                            (i + .5) * n2Dx, //down x3
-                            n2Dy * i, //down y3
-                            GREEN_ARROW_COLOR, lineWidth, true); //vertical down
-                    }
-                    else if (i == box.startI) {
-                        DrawPathTwoLines(
-                            n2Dx * hoveredIndexRC + n2Dx, //x1
-                            n2Dy * hoveredIndexRC + n2Dy * .5, //y1
-                            (box.startI + (box.stopI - box.startI) * .5) * n2Dx + n2Dx * .5, //right x2
-                            n2Dy * hoveredIndexRC + n2Dy * .5, //right y2
-                            (box.startI + (box.stopI - box.startI) * .5) * n2Dx + n2Dx * .5, //down x3
-                            n2Dy * box.startI, //down y3
-                            GREEN_ARROW_COLOR, lineWidth, true); //vertical down
-                    }
+                    DrawPathTwoLines(
+                        n2Dx * hoveredIndexRC + n2Dx, //x1
+                        n2Dy * (hoveredIndexRC + .5), //y1
+                        (i + .5) * n2Dx, //right x2
+                        n2Dy * (hoveredIndexRC + .5), //right y2
+                        (i + .5) * n2Dx, //down x3
+                        n2Dy * i, //down y3
+                        GREEN_ARROW_COLOR, lineWidth, true); //vertical down
                     DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, GREEN_ARROW_COLOR); //highlight var name
                 }
             }
@@ -1834,19 +1785,6 @@ function PtN2Diagram(parentDiv, modelData) {
         Update();
     }
 
-    function ShowParamsCheckboxChange() {
-        if (zoomedElement.type === "param" || zoomedElement.type === "unconnected_param") return;
-        showParams = !showParams;
-        parentDiv.querySelector("#showParamsButtonId").className = !showParams ? "myButton myButtonToggledOn" : "myButton";
-
-        FindRootOfChangeFunction = FindRootOfChangeForShowParams;
-        lastClickWasLeft = false;
-        TRANSITION_DURATION = TRANSITION_DURATION_SLOW;
-        transitionStartDelay = 500;
-        SetupLegend(d3, d3ContentDiv);
-        Update();
-    }
-
     function ToggleSolverNamesCheckboxChange() {
         showLinearSolverNames = !showLinearSolverNames;
         parentDiv.querySelector("#toggleSolverNamesButtonId").className = !showLinearSolverNames ? "myButton myButtonToggledOn" : "myButton";
@@ -1883,7 +1821,6 @@ function PtN2Diagram(parentDiv, modelData) {
         div.querySelector("#clearArrowsAndConnectsButtonId").onclick = ClearArrowsAndConnects;
         div.querySelector("#showCurrentPathButtonId").onclick = ShowPathCheckboxChange;
         div.querySelector("#showLegendButtonId").onclick = ToggleLegend;
-        div.querySelector("#showParamsButtonId").onclick = ShowParamsCheckboxChange;
 
         div.querySelector("#toggleSolverNamesButtonId").onclick = ToggleSolverNamesCheckboxChange;
 
