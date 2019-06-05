@@ -411,7 +411,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
                       content="icon-eraser")
     group3.add_button("Show Path", uid="showCurrentPathButtonId", content="icon-terminal")
     group3.add_button("Show Legend", uid="showLegendButtonId", content="icon-map-signs")
-    # group3.add_button("Show Params", uid="showParamsButtonId", content="icon-exchange")
     group3.add_button("Toggle Solver Names", uid="toggleSolverNamesButtonId", content="icon-minus")
     group3.add_dropdown("Font Size", id_naming="idFontSize", options=_FONT_SIZES,
                         option_formatter=lambda x: '{}px'.format(x),
