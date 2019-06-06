@@ -1011,10 +1011,16 @@ class System(object):
 
         ordered_of_info = list(self._jacobian_of_iter())
         ordered_wrt_info = list(self._jacobian_wrt_iter(info['wrt_matches']))
-        sparsity = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
-                                                    num_full_jacs=info['num_full_jacs'],
-                                                    tol=info['tol'],
-                                                    orders=info['orders'])
+        sparsity, sp_info = self._jacobian._compute_sparsity(ordered_of_info, ordered_wrt_info,
+                                                             num_full_jacs=info['num_full_jacs'],
+                                                             tol=info['tol'],
+                                                             orders=info['orders'])
+        sp_info['sparsity_time'] = sparsity_time
+        sp_info['pathname'] = self.pathname
+        sp_info['class'] = type(self).__name__
+
+        info = self._coloring_info
+
         self._jacobian._jac_summ = None  # reclaim the memory
         if self.pathname:
             ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
@@ -1025,11 +1031,10 @@ class System(object):
         coloring._col_vars = [t[0] for t in ordered_wrt_info]
         coloring._row_var_sizes = [t[2] - t[1] for t in ordered_of_info]
         coloring._col_var_sizes = [t[2] - t[1] for t in ordered_wrt_info]
-        coloring._sparsity_time = sparsity_time
 
-        info = self._coloring_info
-        coloring._meta = info.copy()  # save metadata we used to create the coloring
+        coloring._meta.update(info)  # save metadata we used to create the coloring
         del coloring._meta['coloring']
+        coloring._meta.update(sp_info)
 
         info['coloring'] = coloring
 
@@ -1039,7 +1044,7 @@ class System(object):
         approx._approx_groups = None
 
         if info['show_sparsity'] or info['show_summary']:
-            print("Approx coloring for '%s' (class %s)\n" % (self.pathname, type(self).__name__))
+            print("\nApprox coloring for '%s' (class %s)\n" % (self.pathname, type(self).__name__))
 
         if info['show_sparsity']:
             coloring.display()

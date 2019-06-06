@@ -282,7 +282,7 @@ class Driver(object):
         self._remote_responses.update(self._remote_objs)
 
         # set up simultaneous deriv coloring
-        if coloring_mod._use_sparsity:
+        if coloring_mod._use_total_sparsity:
             coloring = self._get_static_coloring()
             if coloring is not None and self.supports['simultaneous_derivatives']:
                 if model._owns_approx_jac:
@@ -1056,12 +1056,12 @@ class Driver(object):
             return coloring
 
         if coloring is coloring_mod._STD_COLORING_FNAME or isinstance(coloring, string_types):
-            if coloring is _STD_COLORING_FNAME:
+            if coloring is coloring_mod._STD_COLORING_FNAME:
                 fname = self._get_total_coloring_fname()
             else:
                 fname = coloring
             print("loading total coloring from file %s" % fname)
-            coloring = info['coloring'] = Coloring.load(fname)
+            coloring = info['coloring'] = coloring_mod.Coloring.load(fname)
             info.update(coloring._meta)
             return coloring
 
@@ -1075,7 +1075,7 @@ class Driver(object):
         If set_coloring was called with a filename, load the coloring file.
         """
         # command line simul_coloring uses this env var to turn pre-existing coloring off
-        if not coloring_mod._use_sparsity:
+        if not coloring_mod._use_total_sparsity:
             return
 
         problem = self._problem

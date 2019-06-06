@@ -32,6 +32,7 @@ from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ance
 from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME, _DYN_COLORING
+import openmdao.utils.coloring as coloring_mod
 
 # regex to check for valid names.
 import re
@@ -1770,8 +1771,11 @@ class Group(System):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
-            is_dynamic = self._coloring_info['coloring'] is _DYN_COLORING
-            coloring = self._get_coloring()
+            if coloring_mod._use_partial_sparsity:
+                is_dynamic = self._coloring_info['coloring'] is _DYN_COLORING
+                coloring = self._get_coloring()
+            else:
+                coloring = None
             if coloring is not None:
                 if not is_dynamic:
                     coloring._check_config_partial(self)

@@ -21,7 +21,7 @@ from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, find_matches, simple_warning
-from openmdao.utils.coloring import _DYN_COLORING
+import openmdao.utils.coloring as coloring_mod
 
 
 # the following metadata will be accessible for vars on all procs
@@ -1146,6 +1146,7 @@ class Component(System):
 
         is_array = isinstance(val, ndarray)
         patmeta = dict(dct)
+        patmeta_not_none = {k: v for k, v in dct.items() if v is not None}
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -1164,6 +1165,7 @@ class Component(System):
 
                 if abs_key in self._subjacs_info:
                     meta = self._subjacs_info[abs_key]
+                    meta.update(patmeta_not_none)
                 else:
                     meta = patmeta.copy()
 
@@ -1283,12 +1285,13 @@ class Component(System):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
-            is_dynamic = self._coloring_info['coloring'] is _DYN_COLORING
-            coloring = self._get_coloring()
-            if coloring is not None:
-                if not is_dynamic:
-                    coloring._check_config_partial(self)
-                self._update_subjac_sparsity(coloring.get_subjac_sparsity())
+            if coloring_mod._use_partial_sparsity:
+                is_dynamic = self._coloring_info['coloring'] is coloring_mod._DYN_COLORING
+                coloring = self._get_coloring()
+                if coloring is not None:
+                    if not is_dynamic:
+                        coloring._check_config_partial(self)
+                    self._update_subjac_sparsity(coloring.get_subjac_sparsity())
 
 
 class _DictValues(object):

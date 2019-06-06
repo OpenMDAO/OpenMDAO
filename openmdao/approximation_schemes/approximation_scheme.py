@@ -6,7 +6,7 @@ from collections import defaultdict
 from scipy.sparse import coo_matrix
 import numpy as np
 from openmdao.utils.array_utils import sub2full_indices, get_input_idx_split
-from openmdao.utils.coloring import Coloring
+import openmdao.utils.coloring as coloring_mod
 from openmdao.jacobians.jacobian import Jacobian
 
 _full_slice = slice(None)
@@ -69,10 +69,11 @@ class ApproximationScheme(object):
             Each colored_approx_groups entry contains data for a group of columns.
         """
         if under_cs != self._approx_groups_cached_under_cs:
-            self._init_colored_approximations(system)
+            if coloring_mod._use_partial_sparsity:
+                self._init_colored_approximations(system)
             self._init_approximations(system)
         else:
-            if self._colored_approx_groups is None:
+            if self._colored_approx_groups is None and coloring_mod._use_partial_sparsity:
                 self._init_colored_approximations(system)
             if self._approx_groups is None:
                 self._init_approximations(system)
@@ -121,7 +122,7 @@ class ApproximationScheme(object):
 
         # don't do anything if the coloring doesn't exist yet
         coloring = system._coloring_info['coloring']
-        if not isinstance(coloring, Coloring):
+        if not isinstance(coloring, coloring_mod.Coloring):
             return
 
         outputs = system._outputs
