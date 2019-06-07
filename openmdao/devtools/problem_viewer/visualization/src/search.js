@@ -8,7 +8,6 @@ var callSearchFromEnterKeyPressed = false;
 var autoCompleteListNames = [], autoCompleteListPathNames = [];
 var searchCollapsedUndo = [];        
 var autoCompleteSetNames = {}, autoCompleteSetPathNames = {};
-var showParams = true; //default off
 
 window.addEventListener("awesomplete-selectcomplete", function (e) {
     // User made a selection from dropdown.
@@ -27,7 +26,6 @@ function DoSearch(d, regexMatch, undoList) {
         }
     }
     if (d === zoomedElement) return didMatch;
-    if (!showParams && d.type === "param") return didMatch;
     if (!didMatch && !d.children && (d.type === "param" || d.type === "unknown")) {
         didMatch = regexMatch.test(d.absPathName);
         if (didMatch) {
@@ -208,7 +206,6 @@ function PopulateAutoCompleteList(d) {
         }
     }
     if (d === zoomedElement) return;
-    if (!showParams && d.type === "param") return;
 
     var n = d.name;
     if (d.splitByColon && d.children && d.children.length > 0) n += ":";

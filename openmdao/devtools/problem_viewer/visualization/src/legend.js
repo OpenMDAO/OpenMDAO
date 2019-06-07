@@ -76,12 +76,10 @@ function SetupLegend(d3, d3ContentDiv) {
     {
         var text = ["Group", "Component", "Output Explicit", "Output Implicit", "Collapsed", "Connection"];
         var colors = [GROUP_COLOR, COMPONENT_COLOR, UNKNOWN_EXPLICIT_COLOR, UNKNOWN_IMPLICIT_COLOR, COLLAPSED_COLOR, CONNECTION_COLOR];
-        if (showParams) {
-            text.splice(2, 0, "Input");
-            colors.splice(2, 0, PARAM_COLOR);
-            text.splice(3, 0, "Unconnected Input")
-            colors.splice(3, 0, UNCONNECTED_PARAM_COLOR)
-        }
+        text.splice(2, 0, "Input");
+        colors.splice(2, 0, PARAM_COLOR);
+        text.splice(3, 0, "Unconnected Input")
+        colors.splice(3, 0, UNCONNECTED_PARAM_COLOR)
         for (var i = 0; i < text.length; ++i) {
             var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 0 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
             DrawLegendColor(el, u, v, colors[i], false);
