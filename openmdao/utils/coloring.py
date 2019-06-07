@@ -1033,7 +1033,7 @@ def _tol_sweep(arr, tol=1e-15, orders=20):
         nz_matches = n_tested = 1
     else:
         last_rows = last_cols = None
-        nzeros =[]
+        nzeros = []
         itol = tol * 10.**orders
         smallest = tol / 10.**orders
         n_tested = 0
@@ -1065,11 +1065,12 @@ def _tol_sweep(arr, tol=1e-15, orders=20):
                     entry = "[%s]" % entry
                 lst.append("(%s, %d)" % (entry, nz))
 
-            raise RuntimeError("Could not find more than 1 tolerance to match any number of nonzeros. "
-                               "This indicates that your tolerance sweep of +- %d orders, starting "
-                               "from %s is not big enough.  To get a 'stable' sparsity pattern, "
-                               "try re-running with a larger tolerance sweep.\nNonzeros found for "
-                               "each tolerance: [%s]" % (orders, tol, ", ".join(lst)))
+            raise RuntimeError("Could not find more than 1 tolerance to match any number of "
+                               "nonzeros. This indicates that your tolerance sweep of +- %d "
+                               "orders, starting from %s is not big enough.  To get a 'stable' "
+                               "sparsity pattern, try re-running with a larger tolerance sweep.\n"
+                               "Nonzeros found for each tolerance: [%s]" %
+                               (orders, tol, ", ".join(lst)))
 
         good_tol = sorted_items[0][0][-1]
 
@@ -1737,7 +1738,7 @@ def _partial_coloring_cmd(options):
 
         if not coloring._meta.get('show_summary'):
             print("\nApprox coloring for '%s' (class %s)\n" % (system.pathname,
-                                                             type(system).__name__))
+                                                               type(system).__name__))
             coloring.summary()
             print('\n')
 
@@ -1779,8 +1780,8 @@ def _partial_coloring_cmd(options):
                                     coloring = s._compute_approx_coloring(**kwargs)[0]
                                 except Exception:
                                     tb = traceback.format_exc()
-                                    print("The following error occurred while attempting to compute "
-                                          "coloring for %s:\n %s" % (s.pathname, tb))
+                                    print("The following error occurred while attempting to "
+                                          "compute coloring for %s:\n %s" % (s.pathname, tb))
                                 else:
                                     _show(s, options, coloring)
                                 if options.norecurse:

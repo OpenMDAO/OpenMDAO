@@ -2,6 +2,7 @@ import base64
 import json
 import os
 from collections import OrderedDict
+from itertools import chain
 
 import networkx as nx
 from six import iteritems, itervalues
@@ -228,26 +229,20 @@ def _get_viewer_data(data_source):
     sys_pathnames_list = []  # list of pathnames of systems found in cycles
     sys_pathnames_dict = {}  # map of pathnames to index of pathname in list
 
-    # sort to make deterministic for testing
-    # sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items()))
-    # root_group._conn_global_abs_in2out = sorted_abs_input2src
-
     G = root_group.compute_sys_graph(comps_only=True)
 
     scc = nx.strongly_connected_components(G)
-    #scc_list = [set(s) for s in scc if len(s) > 1]
-    #strong_nodes = set().union(*scc_list)
-    #strong_edges = [e for e in G.subgraph(strong_nodes).edges()]
 
     seen = set()
     for strong_comp in scc:
         if len(strong_comp) > 1:
+            strongset = set(strong_comp)
             sys_pathnames_list.extend(strong_comp)
             for name in strong_comp:
                 sys_pathnames_dict[name] = len(sys_pathnames_dict)
 
             edge_orders = [(u, orders[u], v, orders[v]) for u, v in G.edges(strong_comp)
-                           if u in sys_pathnames_dict and v in sys_pathnames_dict]
+                           if u in strongset and v in strongset]
             for src, exe_src, tgt, exe_tgt in edge_orders:
                 if exe_tgt < exe_src:
                     exe_low = exe_tgt
@@ -262,73 +257,29 @@ def _get_viewer_data(data_source):
                               and exe_low <= order_t <= exe_high and not (s == src and t == tgt)]
 
                 if edges_list:
-                    edges_list.sort()  # make deterministic so same .html file will be produced each run
                     for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
-                        connections_list.extend({'src': vsrc, 'tgt': vtgt, 'cycle_arrows': edges_list} for vtgt in vtgtlist)
+                        for vtgt in vtgtlist:
+                            conn = (vsrc, vtgt)
+                            if conn not in seen:
+                                connections_list.append({'src': vsrc, 'tgt': vtgt,
+                                                         'cycle_arrows': edges_list})
+                                seen.add(conn)
                 else:
                     for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
-                        connections_list.extend({'src': vsrc, 'tgt': vtgt} for vtgt in vtgtlist)
+                        for vtgt in vtgtlist:
+                            conn = (vsrc, vtgt)
+                            if conn not in seen:
+                                connections_list.append({'src': vsrc, 'tgt': vtgt})
+                                seen.add(conn)
         else:
-            for edge in G.edges(strong_comp):
+            for edge in chain(G.edges(strong_comp), G.in_edges(strong_comp)):
                 for vsrc, vtgtlist in iteritems(G.get_edge_data(edge[0], edge[1])['conns']):
-                    connections_list.extend({'src': vsrc, 'tgt': vtgt} for vtgt in vtgtlist)
-            for edge in G.in_edges(strong_comp):
-                for vsrc, vtgtlist in iteritems(G.get_edge_data(edge[0], edge[1])['conns']):
-                    connections_list.extend({'src': vsrc, 'tgt': vtgt} for vtgt in vtgtlist)
+                    for vtgt in vtgtlist:
+                        conn = (vsrc, vtgt)
+                        if conn not in seen:
+                            connections_list.append({'src': vsrc, 'tgt': vtgt})
+                            seen.add(conn)
 
-    #     if edges_list:
-    #         edges_list.sort()  # make deterministic so same .html file will be produced each run
-    #         connections_list.append({'src': out_abs, 'tgt': in_abs, 'cycle_arrows': edges_list})
-    #     else:
-    #         connections_list.append({'src': out_abs, 'tgt': in_abs})
-
-
-    # for in_abs, out_abs in iteritems(sorted_abs_input2src):
-    #     if out_abs is None:
-    #         continue
-
-    #     src_subsystem = out_abs.rsplit('.', 1)[0]
-    #     if src_subsystem not in strong_nodes:
-    #         continue
-    #     tgt_subsystem = in_abs.rsplit('.', 1)[0]
-    #     if tgt_subsystem not in strong_nodes:
-    #         continue
-
-    #     exe_tgt = orders[tgt_subsystem]
-    #     exe_src = orders[src_subsystem]
-    #     if exe_tgt < exe_src:
-    #         exe_low = exe_tgt
-    #         exe_high = exe_src
-    #     else:
-    #         exe_low = exe_src
-    #         exe_high = exe_tgt
-
-    #     src_to_tgt = (src_subsystem, tgt_subsystem)
-    #     edges = [e for e in strong_edges if e != src_to_tgt and exe_low <= orders[e[0]] <= exe_high
-    #              and exe_low <= orders[e[1]] <= exe_high]
-
-    #     edges_list = []
-
-    #     for strong_comp in scc_list:
-    #         if src_subsystem in strong_comp and tgt_subsystem in strong_comp:
-
-    #             for edge in edges:
-    #                 src, tgt = edge
-
-    #                 # add src & tgt to pathnames list & dict if not already there
-    #                 for pathname in edge:
-    #                     if pathname not in sys_pathnames_dict:
-    #                         sys_pathnames_list.append(pathname)
-    #                         sys_pathnames_dict[pathname] = len(sys_pathnames_list) - 1
-
-    #                 # replace src & tgt pathnames with indices into pathname list
-    #                 edges_list.append([sys_pathnames_dict[src], sys_pathnames_dict[tgt]])
-
-    #     if edges_list:
-    #         edges_list.sort()  # make deterministic so same .html file will be produced each run
-    #         connections_list.append({'src': out_abs, 'tgt': in_abs, 'cycle_arrows': edges_list})
-    #     else:
-    #         connections_list.append({'src': out_abs, 'tgt': in_abs})
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list
