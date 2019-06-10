@@ -2970,6 +2970,15 @@ class System(object):
                 var_meta['shape'] = val.shape
             inputs.append((var_name, var_meta))
 
+        if self._discrete_inputs:
+            for var_name, val in iteritems(self._discrete_inputs):
+                var_meta = {}
+                if values:
+                    var_meta['value'] = val
+                if prom_name:
+                    var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                inputs.append((var_name, var_meta))
+
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
@@ -3077,16 +3086,28 @@ class System(object):
             else:
                 expl_outputs.append((var_name, var_meta))
 
+        if self._discrete_outputs:
+            for var_name, val in iteritems(self._var_discrete['output']):
+                var_meta = {}
+                if values:
+                    var_meta['value'] = val
+                if prom_name:
+                    var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
+            if var_name in states:
+                impl_outputs.append((var_name, var_meta))
+            else:
+                expl_outputs.append((var_name, var_meta))
+
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
             if explicit:
                 self._write_table('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
-                                    out_stream, meta)
+                                  out_stream, meta)
             if implicit:
                 self._write_table('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
-                                    out_stream, meta)
+                                  out_stream, meta)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -3131,7 +3152,6 @@ class System(object):
         var_dict = OrderedDict()
         for name, vals in outputs:
             var_dict[name] = vals
-        pprint(var_dict)
 
         # If parallel, gather up the outputs. All procs must call this
         if MPI:
@@ -3171,8 +3191,18 @@ class System(object):
                                     np.append(var_dict[name]['resids'],
                                               proc_vars[name]['resids'])
 
+        # get list of var names in execution order
+        var_list = []
+        for subsys in self._subsystems_allprocs:
+            for n in self._var_allprocs_abs_names[in_or_out]:
+                if n in var_dict and n.startswith(subsys.pathname):
+                    var_list.append(n)
+            for n in self._var_allprocs_discrete[in_or_out]:
+                if n in var_dict and n.startswith(subsys.pathname):
+                    var_list.append(n)
+
         write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays, out_stream,
-                        self.pathname, self._var_allprocs_abs_names)
+                        self.pathname, var_list)
 
     def run_solve_nonlinear(self):
         """

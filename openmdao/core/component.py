@@ -1310,3 +1310,6 @@ class _DictValues(object):
 
     def __len__(self):
         return len(self._dict)
+
+    def items(self):
+        return self._dict.items()

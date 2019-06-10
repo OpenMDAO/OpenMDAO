@@ -21,7 +21,7 @@ indent_inc = 2
 
 
 def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
-                  out_stream, pathname, var_allprocs_abs_names):
+                    out_stream, pathname, var_list):
     """
     Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -46,8 +46,8 @@ def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
         Set to None to suppress.
     pathname : str
         pathname to be printed. If None, defaults to 'model'
-    var_allprocs_abs_names : {'input': [], 'output': []}
-        set of variable names across all processes
+    var_list : list of str
+        list of variable names in the order they are to be written
     """
     count = len(var_dict)
 
@@ -99,17 +99,16 @@ def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
     for column_name in column_names:
         column_widths[column_name] = len(
             column_name)  # has to be able to display name!
-    for name in var_allprocs_abs_names[in_or_out]:
-        if name in var_dict:
-            for column_name in column_names:
-                if isinstance(var_dict[name][column_name], np.ndarray) and \
-                        var_dict[name][column_name].size > 1:
-                    out = '|{}|'.format(
-                        str(np.linalg.norm(var_dict[name][column_name])))
-                else:
-                    out = str(var_dict[name][column_name])
-                column_widths[column_name] = max(column_widths[column_name],
-                                                 len(str(out)))
+    for name in var_list:
+        for column_name in column_names:
+            if isinstance(var_dict[name][column_name], np.ndarray) and \
+                    var_dict[name][column_name].size > 1:
+                out = '|{}|'.format(
+                    str(np.linalg.norm(var_dict[name][column_name])))
+            else:
+                out = str(var_dict[name][column_name])
+            column_widths[column_name] = max(column_widths[column_name],
+                                             len(str(out)))
 
     # Write out the column headers
     column_header = '{:{align}{width}}'.format('varname', align=align,
@@ -129,12 +128,8 @@ def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
         out_stream.write(top_level_system_name + '\n')
 
         cur_sys_names = []
-        # _var_allprocs_abs_names has all the vars across all procs in execution order
-        #   But not all the values need to be written since, at least for output vars,
-        #      the output var lists are divided into explicit and implicit
-        for varname in var_allprocs_abs_names[in_or_out]:
-            if varname not in var_dict:
-                continue
+
+        for varname in var_list:
 
             # For hierarchical, need to display system levels in the rows above the
             #   actual row containing the var name and values. Want to make use
@@ -165,12 +160,9 @@ def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
             _write_variable(out_stream, row, column_names, var_dict[varname],
                             print_arrays)
     else:
-        print
-        for name in var_allprocs_abs_names[in_or_out]:
-            print(name)
-            if name in var_dict:
-                row = '{:{align}{width}}'.format(name, align=align, width=max_varname_len)
-                _write_variable(out_stream, row, column_names, var_dict[name],
+        for name in var_list:
+            row = '{:{align}{width}}'.format(name, align=align, width=max_varname_len)
+            _write_variable(out_stream, row, column_names, var_dict[name],
                                 print_arrays)
     out_stream.write(2 * '\n')
 
