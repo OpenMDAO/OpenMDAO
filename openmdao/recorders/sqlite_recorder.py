@@ -4,14 +4,17 @@ Class definition for SqliteRecorder, which provides dictionary backed by SQLite.
 
 from copy import deepcopy
 from io import BytesIO
+from collections import OrderedDict
 
 import os
 import sqlite3
+from itertools import chain
 
 import json
 import numpy as np
 
 from six.moves import cPickle as pickle
+from six import iteritems
 
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
@@ -259,42 +262,59 @@ class SqliteRecorder(CaseRecorder):
         if not self._database_initialized:
             self._initialize_database()
 
+        driver = None
+
         # grab the system
         if isinstance(recording_requester, Driver):
             system = recording_requester._problem.model
+            driver = recording_requester
         elif isinstance(recording_requester, System):
             system = recording_requester
         elif isinstance(recording_requester, Problem):
             system = recording_requester.model
+            driver = recording_requester.driver
         elif isinstance(recording_requester, Solver):
             system = recording_requester._system
         else:
             raise ValueError('Driver encountered a recording_requester it cannot handle'
                              ': {0}'.format(recording_requester))
 
-        # grab all of the units and type (collective calls)
         states = system._list_states_allprocs()
-        desvars = system.get_design_vars(True)
-        responses = system.get_responses(True)
-        objectives = system.get_objectives(True)
-        constraints = system.get_constraints(True)
-        inputs = system._var_allprocs_abs_names['input']
-        outputs = system._var_allprocs_abs_names['output']
-        full_var_set = [(inputs, 'input'), (outputs, 'output'),
-                        (desvars, 'desvar'), (responses, 'response'),
-                        (objectives, 'objective'), (constraints, 'constraint')]
 
         if self.connection:
+
+            if driver is None:
+                desvars = system.get_design_vars(True, get_sizes=False)
+                responses = system.get_responses(True, get_sizes=False)
+                objectives = OrderedDict()
+                constraints = OrderedDict()
+                for name, data in iteritems(responses):
+                    if data['type'] == 'con':
+                        constraints[name] = data
+                    else:
+                        objectives[name] = data
+            else:
+                desvars = driver._designvars
+                constraints = driver._cons
+                objectives = driver._objs
+                responses = driver._responses
+
+            inputs = system._var_allprocs_abs_names['input']
+            outputs = system._var_allprocs_abs_names['output']
+            full_var_set = [(outputs, 'output'),
+                            (desvars, 'desvar'), (responses, 'response'),
+                            (objectives, 'objective'), (constraints, 'constraint')]
+
             # merge current abs2prom and prom2abs with this system's version
             for io in ['input', 'output']:
-                for v in system._var_abs2prom[io]:
-                    self._abs2prom[io][v] = system._var_abs2prom[io][v]
+                self._abs2prom[io].update(system._var_abs2prom[io])
                 for v in system._var_allprocs_prom2abs_list[io]:
                     if v not in self._prom2abs[io]:
                         self._prom2abs[io][v] = system._var_allprocs_prom2abs_list[io][v]
                     else:
-                        self._prom2abs[io][v] = list(set(self._prom2abs[io][v]) |
-                                                     set(system._var_allprocs_prom2abs_list[io][v]))
+                        self._prom2abs[io][v] = list(
+                            set(chain(self._prom2abs[io][v],
+                                system._var_allprocs_prom2abs_list[io][v])))
 
             for var_set, var_type in full_var_set:
                 for name in var_set:
@@ -310,8 +330,7 @@ class SqliteRecorder(CaseRecorder):
 
             for name in inputs:
                 self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
-                self._abs2meta[name]['type'] = []
-                self._abs2meta[name]['type'].append('input')
+                self._abs2meta[name]['type'] = ['input']
                 self._abs2meta[name]['explicit'] = True
                 if name in states:
                     self._abs2meta[name]['explicit'] = False

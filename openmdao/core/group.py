@@ -478,10 +478,9 @@ class Group(System):
             byproc = self.comm.allgather(self._list_states())
             for proc_states in byproc:
                 all_states.update(proc_states)
+            return sorted(all_states)
         else:
-            all_states = self._list_states()
-
-        return sorted(all_states)
+            return self._list_states()
 
     def _setup_var_index_ranges(self, recurse=True):
         """

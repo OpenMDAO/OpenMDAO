@@ -1339,15 +1339,16 @@ class System(object):
         if setup_mode in ('full', 'reconf'):
             self.set_initial_values()
 
+        rec_model_meta = self.recording_options['record_model_metadata']
+
         # Tell all subsystems to record their metadata if they have recorders attached
         for sub in self.system_iter(recurse=True, include_self=True):
             if sub.recording_options['record_metadata']:
                 sub._rec_mgr.record_metadata(sub)
 
-        # Also, optionally, record to the recorders attached to this System,
-        #   the system metadata for all the subsystems
-        if self.recording_options['record_model_metadata']:
-            for sub in self.system_iter(recurse=True, include_self=True):
+            # Also, optionally, record to the recorders attached to this System,
+            #   the system metadata for all the subsystems
+            if rec_model_meta:
                 self._rec_mgr.record_metadata(sub)
 
     def _setup_var_index_ranges(self, recurse=True):
@@ -2799,7 +2800,7 @@ class System(object):
             if self.comm.size > 1 and self._subsystems_allprocs:
                 allouts = self.comm.allgather(out)
                 out = OrderedDict()
-                for rank, all_out in enumerate(allouts):
+                for all_out in allouts:
                     out.update(all_out)
 
         return out
