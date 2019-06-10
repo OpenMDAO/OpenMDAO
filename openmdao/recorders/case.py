@@ -13,7 +13,7 @@ import numpy as np
 from openmdao.utils.record_util import json_to_np_array
 from openmdao.recorders.sqlite_recorder import blob_to_array
 
-from openmdao.utils.write_outputs import write_outputs
+from openmdao.utils.write_outputs import write_var_table
 
 _DEFAULT_OUT_STREAM = object()
 
@@ -338,7 +338,7 @@ class Case(object):
                 out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
                                  'settings have record_inputs set to True\n')
 
-            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
+            self._write_table('input', None, inputs, hierarchical, print_arrays, out_stream)
 
         return inputs
 
@@ -452,12 +452,12 @@ class Case(object):
                                  'settings have record_outputs set to True\n')
 
             if explicit:
-                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
-                                    out_stream)
+                self._write_table('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
+                                  out_stream)
 
             if implicit:
-                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
-                                    out_stream)
+                self._write_table('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
+                                  out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -468,7 +468,7 @@ class Case(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_outputs(self, in_out, comp_type, outputs, hierarchical, print_arrays, out_stream):
+    def _write_table(self, in_out, comp_type, outputs, hierarchical, print_arrays, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -508,8 +508,8 @@ class Case(object):
             'output': dict_of_outputs.keys()
         }
 
-        write_outputs(in_out, comp_type, dict_of_outputs, hierarchical, print_arrays, out_stream,
-                      'model', allprocs_abs_names)
+        write_var_table(in_out, comp_type, dict_of_outputs, hierarchical, print_arrays, out_stream,
+                        'model', allprocs_abs_names)
 
     def _get_variables_of_type(self, var_type):
         """
