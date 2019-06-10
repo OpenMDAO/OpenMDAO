@@ -184,6 +184,10 @@ class pyOptSparseDriver(Driver):
 
         self._setup_tot_jac_sparsity()
 
+        if len(self._objs) == 0:
+            msg = "pyOptSparseDriver requires objective to be declared"
+            raise RuntimeError(msg)
+
     def run(self):
         """
         Excute pyOptsparse.

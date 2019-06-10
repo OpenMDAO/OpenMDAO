@@ -1855,7 +1855,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                 break
 
                         if error_string:  # Any error string indicates that at least one of the
-                                            # derivative calcs is greater than the rel tolerance
+                            #  derivative calcs is greater than the rel tolerance
                             num_bad_jacs += 1
 
                         if out_stream:

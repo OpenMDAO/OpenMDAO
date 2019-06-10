@@ -241,7 +241,8 @@ class TestPyXDSMViewer(unittest.TestCase):
         p.model.add_subsystem('extra_phase', systems_phase)
         p.model.add_design_var('orbit_phase.t_initial')
         p.model.add_design_var('orbit_phase.t_duration')
-        p.setup(check=True)
+        p.model.add_objective('systems_phase.time.time')
+        p.setup(check=False)
 
         p.run_model()
 
@@ -321,6 +322,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.model = model = SellarNoDerivatives()
         model.nonlinear_solver = NonlinearBlockGS()
         prob.driver = ScipyOptimizeDriver()
+        prob.model.add_objective('obj')
 
         prob.setup(check=False)
         prob.run_model()
@@ -358,8 +360,6 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob = Problem(model=SellarMDA())
         model = prob.model
         prob.driver = ScipyOptimizeDriver()
-        prob.setup(check=False)
-        prob.final_setup()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
                              upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
@@ -367,6 +367,9 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.add_objective('obj')
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
 
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET,

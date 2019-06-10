@@ -12,6 +12,7 @@ from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
+from openmdao.test_suite.components.paraboloid import Paraboloid
 
 
 class TestSimpleGA(unittest.TestCase):
@@ -338,6 +339,29 @@ class TestSimpleGA(unittest.TestCase):
 
         np.testing.assert_array_almost_equal(prob['indeps.x'], -5)
         np.testing.assert_array_almost_equal(prob['indeps.y'], [3, 1])
+
+    def test_SimpleGADriver_missing_objective(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('x', IndepVarComp('x', 2.0), promotes=['*'])
+        model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
+
+        prob.driver = SimpleGADriver()
+
+        prob.model.add_design_var('x', lower=0)
+        prob.model.add_constraint('x', lower=0)
+
+        prob.setup(check=False)
+
+        with self.assertRaises(Exception) as raises_msg:
+            prob.run_driver()
+
+        exception = raises_msg.exception
+
+        msg = "SimpleGADriver requires objective to be declared"
+
+        self.assertEqual(exception.args[0], msg)
 
 
 class TestDriverOptionsSimpleGA(unittest.TestCase):
