@@ -243,6 +243,7 @@ def _get_viewer_data(data_source):
 
             edge_orders = [(u, orders[u], v, orders[v]) for u, v in G.edges(strong_comp)
                            if u in strongset and v in strongset]
+
             for src, exe_src, tgt, exe_tgt in edge_orders:
                 if exe_tgt < exe_src:
                     exe_low = exe_tgt
@@ -279,7 +280,6 @@ def _get_viewer_data(data_source):
                         if conn not in seen:
                             connections_list.append({'src': vsrc, 'tgt': vtgt})
                             seen.add(conn)
-
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list

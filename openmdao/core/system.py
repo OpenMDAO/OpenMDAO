@@ -2152,7 +2152,7 @@ class System(object):
 
     def _get_var_offsets(self):
         """
-        Compute offsets for variables.
+        Compute global offsets for variables.
 
         Returns
         -------

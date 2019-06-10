@@ -11,6 +11,7 @@ import numpy as np
 
 from openmdao.vectors.vector import Vector, INT_DTYPE
 from openmdao.vectors.default_transfer import DefaultTransfer
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
 
 class DefaultVector(Vector):
@@ -177,11 +178,21 @@ class DefaultVector(Vector):
 
         allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name]
         sizes_t = system._var_sizes[self._name][type_]
+        offs = system._get_var_offsets()[self._name][type_]
+        if offs.size > 0:
+            offs = offs[iproc].copy()
+            # turn global offset into local offset
+            start = offs[0]
+            offs -= start
+        else:
+            offs = offs[0].copy()
+        offsets_t = offs
+
         abs2meta = system._var_abs2meta
         for abs_name in system._var_relevant_names[self._name][type_]:
             idx = allprocs_abs2idx_t[abs_name]
 
-            ind1 = np.sum(sizes_t[iproc, :idx])
+            ind1 = offsets_t[idx]
             ind2 = ind1 + sizes_t[iproc, idx]
             shape = abs2meta[abs_name]['shape']
             if ncol > 1:
