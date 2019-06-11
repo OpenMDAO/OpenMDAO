@@ -641,6 +641,10 @@ class System(object):
                 for vec_name, vec in iteritems(vardict):
                     root_vectors[key][vec_name] = vec._root_vector
 
+        lower, upper = self._get_bounds_root_vectors(self._local_vector_class, initial)
+        root_vectors['lower'] = lower
+        root_vectors['upper'] = upper
+
         return root_vectors
 
     def _get_approx_scheme(self, method):
@@ -685,13 +689,13 @@ class System(object):
             Root vector for the upper bounds vector.
         """
         if not initial:
-            lower = self._lower_bounds._root_vector
-            upper = self._upper_bounds._root_vector
+            return self._lower_bounds._root_vector, self._upper_bounds._root_vector
         else:
             lower = vector_class('nonlinear', 'output', self)
             upper = vector_class('nonlinear', 'output', self)
-
-        return lower, upper
+            lower._data[:] = -np.inf
+            upper._data[:] = np.inf
+            return lower, upper
 
     def resetup(self, setup_mode='full'):
         """
@@ -1323,8 +1327,6 @@ class System(object):
         self._setup_global(ext_num_vars, ext_sizes)
         root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
         self._setup_vectors(root_vectors, resize=resize)
-        self._setup_bounds(*self._get_bounds_root_vectors(self._local_vector_class, initial),
-                           resize=resize)
 
         # Transfers do not require recursion, but they have to be set up after the vector setup.
         self._setup_transfers(recurse=recurse)
@@ -1651,6 +1653,8 @@ class System(object):
         self._outputs = vectors['output']['nonlinear']
         self._residuals = vectors['residual']['nonlinear']
 
+        self._setup_bounds(root_vectors['lower'], root_vectors['upper'], resize=resize)
+
         for subsys in self._subsystems_myproc:
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(root_vectors, alloc_complex=alloc_complex)
@@ -1689,21 +1693,11 @@ class System(object):
                 if not np.isscalar(ref):
                     ref = ref.reshape(meta['shape'])
 
-                if var_lower is None:
-                    lower._views[abs_name][:] = -np.inf
-                else:
+                if var_lower is not None:
                     lower._views[abs_name][:] = (var_lower - ref0) / (ref - ref0)
 
-                if var_upper is None:
-                    upper._views[abs_name][:] = np.inf
-                else:
+                if var_upper is not None:
                     upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
-        else:
-            lower._data[:] = -np.inf
-            upper._data[:] = np.inf
-
-        for subsys in self._subsystems_myproc:
-            subsys._setup_bounds(root_lower, root_upper)
 
     def _compute_root_scale_factors(self):
         """
