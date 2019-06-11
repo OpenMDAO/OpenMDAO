@@ -1668,32 +1668,32 @@ class System(object):
         vector_class = root_lower.__class__
         self._lower_bounds = lower = vector_class(
             'nonlinear', 'output', self, root_lower, resize=resize)
+        lower._data[:] = -np.inf
+
         self._upper_bounds = upper = vector_class(
             'nonlinear', 'output', self, root_upper, resize=resize)
+        upper._data[:] = np.inf
 
         abs2meta = self._var_abs2meta
         for abs_name in self._var_abs_names['output']:
             meta = abs2meta[abs_name]
-            shape = meta['shape']
-            ref0 = meta['ref0']
-            ref = meta['ref']
             var_lower = meta['lower']
             var_upper = meta['upper']
 
-            if not np.isscalar(ref0):
-                ref0 = ref0.reshape(shape)
-            if not np.isscalar(ref):
-                ref = ref.reshape(shape)
+            if var_lower is not None or var_upper is not None:
+                ref0 = meta['ref0']
+                ref = meta['ref']
 
-            if var_lower is None:
-                lower._views[abs_name][:] = -np.inf
-            else:
-                lower._views[abs_name][:] = (var_lower - ref0) / (ref - ref0)
+                if not np.isscalar(ref0):
+                    ref0 = ref0.reshape(meta['shape'])
+                if not np.isscalar(ref):
+                    ref = ref.reshape(meta['shape'])
 
-            if var_upper is None:
-                upper._views[abs_name][:] = np.inf
-            else:
-                upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
+                if var_lower is not None:
+                    lower._views[abs_name][:] = (var_lower - ref0) / (ref - ref0)
+
+                if var_upper is not None:
+                    upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
 
         for subsys in self._subsystems_myproc:
             subsys._setup_bounds(root_lower, root_upper)

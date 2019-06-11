@@ -163,8 +163,6 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(system._var_sizes[name][self._typ][self._iproc, :])
-
         self.read_only = False
 
     def __str__(self):
@@ -190,7 +188,7 @@ class Vector(object):
         int
             Total flattened length of this vector.
         """
-        return self._length
+        return self._data.size
 
     def _clone(self, initialize_views=False):
         """
