@@ -1312,7 +1312,7 @@ class _DictValues(object):
         return len(self._dict)
 
     def items(self):
-        return list(self.iteritems())
+        return [(key, self._dict[key]['value']) for key in self._dict]
 
     def iteritems(self):
         for key, val in self._dict.iteritems():
