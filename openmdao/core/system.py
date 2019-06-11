@@ -26,7 +26,7 @@ from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.write_outputs import write_var_table
+from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
@@ -2968,6 +2968,7 @@ class System(object):
                 var_meta['units'] = meta[var_name]['units']
             if shape:
                 var_meta['shape'] = val.shape
+
             inputs.append((var_name, var_meta))
 
         if self._discrete_inputs:
@@ -2977,10 +2978,12 @@ class System(object):
                     var_meta['value'] = val
                 if prom_name:
                     var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                # remaining items do not apply for discrete vars
                 if units:
                     var_meta['units'] = ''
                 if shape:
                     var_meta['shape'] = ''
+
                 inputs.append((var_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
@@ -3067,6 +3070,7 @@ class System(object):
         for var_name, val in iteritems(self._outputs._views):
             if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
                 continue
+
             var_meta = {}
             if values:
                 var_meta['value'] = val
@@ -3085,18 +3089,20 @@ class System(object):
                 var_meta['ref'] = meta[var_name]['ref']
                 var_meta['ref0'] = meta[var_name]['ref0']
                 var_meta['res_ref'] = meta[var_name]['res_ref']
+
             if var_name in states:
                 impl_outputs.append((var_name, var_meta))
             else:
                 expl_outputs.append((var_name, var_meta))
 
-        if self._discrete_outputs:
+        if self._discrete_outputs and not residuals_tol:
             for var_name, val in iteritems(self._discrete_outputs):
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
                 if prom_name:
                     var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
+                # remaining items do not apply for discrete vars
                 if residuals:
                     var_meta['resids'] = ''
                 if units:
@@ -3110,6 +3116,7 @@ class System(object):
                     var_meta['ref'] = ''
                     var_meta['ref0'] = ''
                     var_meta['res_ref'] = ''
+
                 if var_name in states:
                     impl_outputs.append((var_name, var_meta))
                 else:
@@ -3135,7 +3142,7 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_table(self, var_type, vars, hierarchical, print_arrays,
+    def _write_table(self, var_type, var_data, hierarchical, print_arrays,
                      out_stream, meta):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
@@ -3144,7 +3151,7 @@ class System(object):
         ----------
         var_type : 'input', 'explicit' or 'implicit'
             Indicates type of variables, input or explicit/implicit output.
-        vars : list
+        var_data : list
             List of (name, dict of vals and metadata) tuples.
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
@@ -3165,7 +3172,7 @@ class System(object):
 
         # Make a dict of variables. Makes it easier to work with in this method
         var_dict = OrderedDict()
-        for name, vals in vars:
+        for name, vals in var_data:
             var_dict[name] = vals
 
         # If parallel, gather up the vars. All procs must call this
