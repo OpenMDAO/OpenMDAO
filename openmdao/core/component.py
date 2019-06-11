@@ -652,8 +652,10 @@ class Component(System):
 
         if lower is not None:
             lower = ensure_compatible(name, lower, metadata['shape'])[0]
+            self._has_bounds = True
         if upper is not None:
             upper = ensure_compatible(name, upper, metadata['shape'])[0]
+            self._has_bounds = True
 
         metadata['lower'] = lower
         metadata['upper'] = upper

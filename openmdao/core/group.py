@@ -282,6 +282,8 @@ class Group(System):
 
             if subsys._has_guess:
                 self._has_guess = True
+            if subsys._has_bounds:
+                self._has_bounds = True
             if subsys.matrix_free:
                 self.matrix_free = True
 
@@ -1269,14 +1271,13 @@ class Group(System):
                 sub_ext_sizes[vec_name] = {}
 
                 for type_ in ['input', 'output']:
-                    num = len(relnames[vec_name][type_])
                     idx1, idx2 = subsystems_var_range[type_][subsys.name]
                     size1 = np.sum(sizes[type_][iproc, :idx1])
                     size2 = np.sum(sizes[type_][iproc, idx2:])
 
                     sub_ext_num_vars[vec_name][type_] = (
                         ext_num_vars[vec_name][type_][0] + idx1,
-                        ext_num_vars[vec_name][type_][1] + num - idx2,
+                        ext_num_vars[vec_name][type_][1] + len(relnames[vec_name][type_]) - idx2,
                     )
                     sub_ext_sizes[vec_name][type_] = (
                         ext_sizes[vec_name][type_][0] + size1,

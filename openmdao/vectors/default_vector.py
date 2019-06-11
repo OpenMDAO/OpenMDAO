@@ -75,7 +75,7 @@ class DefaultVector(Vector):
 
         root_vec._initialize_views()
 
-    def _extract_data(self):
+    def _extract_root_data(self):
         """
         Extract views of arrays from root_vector.
 
@@ -148,7 +148,7 @@ class DefaultVector(Vector):
                 self._cplx_data = np.zeros(self._data.shape, dtype=np.complex)
 
         else:
-            self._data, self._cplx_data, self._scaling = self._extract_data()
+            self._data, self._cplx_data, self._scaling = self._extract_root_data()
 
     def _initialize_views(self):
         """

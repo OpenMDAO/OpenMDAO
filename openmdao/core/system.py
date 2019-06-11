@@ -263,6 +263,8 @@ class System(object):
         True if this system has resid scaling.
     _has_input_scaling : bool
         True if this system has input scaling.
+    _has_bounds: bool
+        True if this system has upper or lower bounds on outputs.
     _owning_rank : dict
         Dict mapping var name to the lowest rank where that variable is local.
     _filtered_vars_to_record: Dict
@@ -430,6 +432,7 @@ class System(object):
         self._has_output_scaling = False
         self._has_resid_scaling = False
         self._has_input_scaling = False
+        self._has_bounds = False
 
         self._vector_class = None
         self._local_vector_class = None
@@ -1668,19 +1671,16 @@ class System(object):
         vector_class = root_lower.__class__
         self._lower_bounds = lower = vector_class(
             'nonlinear', 'output', self, root_lower, resize=resize)
-        lower._data[:] = -np.inf
 
         self._upper_bounds = upper = vector_class(
             'nonlinear', 'output', self, root_upper, resize=resize)
-        upper._data[:] = np.inf
 
-        abs2meta = self._var_abs2meta
-        for abs_name in self._var_abs_names['output']:
-            meta = abs2meta[abs_name]
-            var_lower = meta['lower']
-            var_upper = meta['upper']
-
-            if var_lower is not None or var_upper is not None:
+        if self._has_bounds:
+            abs2meta = self._var_abs2meta
+            for abs_name in self._var_abs_names['output']:
+                meta = abs2meta[abs_name]
+                var_lower = meta['lower']
+                var_upper = meta['upper']
                 ref0 = meta['ref0']
                 ref = meta['ref']
 
@@ -1689,11 +1689,18 @@ class System(object):
                 if not np.isscalar(ref):
                     ref = ref.reshape(meta['shape'])
 
-                if var_lower is not None:
+                if var_lower is None:
+                    lower._views[abs_name][:] = -np.inf
+                else:
                     lower._views[abs_name][:] = (var_lower - ref0) / (ref - ref0)
 
-                if var_upper is not None:
+                if var_upper is None:
+                    upper._views[abs_name][:] = np.inf
+                else:
                     upper._views[abs_name][:] = (var_upper - ref0) / (ref - ref0)
+        else:
+            lower._data[:] = -np.inf
+            upper._data[:] = np.inf
 
         for subsys in self._subsystems_myproc:
             subsys._setup_bounds(root_lower, root_upper)
