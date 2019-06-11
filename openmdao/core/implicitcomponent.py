@@ -434,7 +434,8 @@ class ImplicitComponent(Component):
         list
             List of all states.
         """
-        return [name for name in self._outputs._names]
+        return [name for name in self._outputs._names] + \
+               [name for name in self._var_allprocs_discrete['output']]
 
     def _list_states_allprocs(self):
         """

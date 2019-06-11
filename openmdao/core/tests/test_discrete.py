@@ -26,10 +26,13 @@ class ModCompEx(ExplicitComponent):
         self.modval = modval
 
     def setup(self):
+        self.add_input('a', val=10.)
+        self.add_output('b', val=0.)
         self.add_discrete_input('x', val=10)
         self.add_discrete_output('y', val=0)
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        outputs['b'] = inputs['a']*2.
         discrete_outputs['y'] = discrete_inputs['x'] % self.modval
 
 
@@ -238,100 +241,64 @@ class DiscreteTestCase(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        # logging inputs
-        # out_stream - not hierarchical - extras - no print_arrays
+        #
+        # list inputs, not hierarchical
+        #
         stream = StringIO()
-        prob.model.list_inputs(values=True,
-                               units=True,
-                               hierarchical=False,
-                               print_arrays=False,
-                               out_stream=stream)
+        prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
 
         print(text)
 
-        self.assertEqual(1, text.count("2 Input(s) in 'model'"))
+        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
 
         # make sure they are in the correct order
-        self.assertTrue(text.find("sub1.sub2.g1.d1.z") <
-                        text.find('sub1.sub2.g1.d1.x') <
-                        text.find('sub1.sub2.g1.d1.y2') <
-                        text.find('sub1.sub2.g1.d2.z') <
-                        text.find('sub1.sub2.g1.d2.y1') <
-                        text.find('g2.d1.z') <
-                        text.find('g2.d1.x') <
-                        text.find('g2.d1.y2') <
-                        text.find('g2.d2.z') <
-                        text.find('g2.d2.y1'))
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(14, num_non_empty_lines)
+        self.assertTrue(text.find('expl.a') < text.find('expl.x') < text.find('impl.x'))
 
-        # out_stream - hierarchical - extras - no print_arrays
-        stream = cStringIO()
-        prob.model.list_inputs(values=True,
-                               units=True,
-                               hierarchical=True,
-                               print_arrays=False,
-                               out_stream=stream)
+        #
+        # list inputs, hierarchical
+        #
+        stream = StringIO()
+        prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
         print(text)
 
-        self.assertEqual(1, text.count("10 Input(s) in 'model'"))
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(23, num_non_empty_lines)
+        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
         self.assertEqual(1, text.count('top'))
-        self.assertEqual(1, text.count('  sub1'))
-        self.assertEqual(1, text.count('    sub2'))
-        self.assertEqual(1, text.count('      g1'))
-        self.assertEqual(1, text.count('        d1'))
-        self.assertEqual(2, text.count('          z'))
+        self.assertEqual(1, text.count('  expl'))
+        self.assertEqual(1, text.count('    a'))
+        self.assertEqual(1, text.count('  impl'))
+        self.assertEqual(2, text.count('    x'))
 
-        # logging outputs
-        # out_stream - not hierarchical - extras - no print_arrays
-        stream = cStringIO()
-        prob.model.list_outputs(values=True,
-                                units=True,
-                                shape=True,
-                                bounds=True,
-                                residuals=True,
-                                scaling=True,
-                                hierarchical=False,
-                                print_arrays=False,
-                                out_stream=stream)
+        #
+        # list outputs, not hierarchical
+        #
+        stream = StringIO()
+        prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
 
         print(text)
 
-        self.assertEqual(text.count('5 Explicit Output'), 1)
+        self.assertEqual(text.count('3 Explicit Output'), 1)
+        self.assertEqual(text.count('1 Implicit Output'), 1)
 
-        # make sure they are in the correct order
-        self.assertTrue(text.find("pz.z") < text.find('sub1.sub2.g1.d1.y1') <
-                        text.find('sub1.sub2.g1.d2.y2') <
-                        text.find('g2.d1.y1') < text.find('g2.d2.y2'))
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(11, num_non_empty_lines)
-
-        # Hierarchical
-        stream = cStringIO()
-        prob.model.list_outputs(values=True,
-                                units=True,
-                                shape=True,
-                                bounds=True,
-                                residuals=True,
-                                scaling=True,
-                                hierarchical=True,
-                                print_arrays=False,
-                                out_stream=stream)
+        #
+        # list outputs, hierarchical
+        #
+        stream = StringIO()
+        prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
         print(text)
 
-        self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('          y1'), 1)
-        self.assertEqual(text.count('  g2'), 1)
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 21)
+        self.assertEqual(text.count('top'), 2)        # implicit & explicit
+        self.assertEqual(text.count('  indep'), 1)
+        self.assertEqual(text.count('    x'), 1)
+        self.assertEqual(text.count('  expl'), 1)
+        self.assertEqual(text.count('    b'), 1)
+        self.assertEqual(text.count('  impl'), 1)
+        self.assertEqual(text.count('    y'), 2)      # implicit & explicit
 
     def test_float_to_discrete_error(self):
         prob = Problem()

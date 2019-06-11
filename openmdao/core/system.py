@@ -2977,13 +2977,17 @@ class System(object):
                     var_meta['value'] = val
                 if prom_name:
                     var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                if units:
+                    var_meta['units'] = ''
+                if shape:
+                    var_meta['shape'] = ''
                 inputs.append((var_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
-            self._write_table('input', None, inputs, hierarchical, print_arrays, out_stream, meta)
+            self._write_table('input', inputs, hierarchical, print_arrays, out_stream, meta)
 
         return inputs
 
@@ -3087,26 +3091,39 @@ class System(object):
                 expl_outputs.append((var_name, var_meta))
 
         if self._discrete_outputs:
-            for var_name, val in iteritems(self._var_discrete['output']):
+            for var_name, val in iteritems(self._discrete_outputs):
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
                 if prom_name:
                     var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
-            if var_name in states:
-                impl_outputs.append((var_name, var_meta))
-            else:
-                expl_outputs.append((var_name, var_meta))
+                if residuals:
+                    var_meta['resids'] = ''
+                if units:
+                    var_meta['units'] = ''
+                if shape:
+                    var_meta['shape'] = ''
+                if bounds:
+                    var_meta['lower'] = ''
+                    var_meta['upper'] = ''
+                if scaling:
+                    var_meta['ref'] = ''
+                    var_meta['ref0'] = ''
+                    var_meta['res_ref'] = ''
+                if var_name in states:
+                    impl_outputs.append((var_name, var_meta))
+                else:
+                    expl_outputs.append((var_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
             if explicit:
-                self._write_table('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
                                   out_stream, meta)
             if implicit:
-                self._write_table('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
                                   out_stream, meta)
 
         if explicit and implicit:
@@ -3118,19 +3135,17 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_table(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
+    def _write_table(self, var_type, vars, hierarchical, print_arrays,
                      out_stream, meta):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
         Parameters
         ----------
-        in_or_out : str, 'input' or 'output'
-            indicates whether the values passed in are from inputs or output variables.
-        comp_type : str, 'Explicit' or 'Implicit'
-            the type of component with the output values.
-        outputs : list
-            list of (name, dict of vals and metadata) tuples.
+        var_type : 'input', 'explicit' or 'implicit'
+            Indicates type of variables, input or explicit/implicit output.
+        vars : list
+            List of (name, dict of vals and metadata) tuples.
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool
@@ -3150,10 +3165,10 @@ class System(object):
 
         # Make a dict of variables. Makes it easier to work with in this method
         var_dict = OrderedDict()
-        for name, vals in outputs:
+        for name, vals in vars:
             var_dict[name] = vals
 
-        # If parallel, gather up the outputs. All procs must call this
+        # If parallel, gather up the vars. All procs must call this
         if MPI:
             # returns a list, one per proc
             all_var_dict = self.comm.gather(var_dict, root=0)
@@ -3191,8 +3206,9 @@ class System(object):
                                     np.append(var_dict[name]['resids'],
                                               proc_vars[name]['resids'])
 
-        # get list of var names in execution order
+        # get list of var names in execution order, based on the order subsystems were setup
         var_list = []
+        in_or_out = 'input' if var_type is 'input' else 'output'
         for subsys in self._subsystems_allprocs:
             for n in self._var_allprocs_abs_names[in_or_out]:
                 if n in var_dict and n.startswith(subsys.pathname):
@@ -3201,8 +3217,8 @@ class System(object):
                 if n in var_dict and n.startswith(subsys.pathname):
                     var_list.append(n)
 
-        write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays, out_stream,
-                        self.pathname, var_list)
+        write_var_table(self.pathname, var_list, var_type, var_dict,
+                        hierarchical, print_arrays, out_stream)
 
     def run_solve_nonlinear(self):
         """

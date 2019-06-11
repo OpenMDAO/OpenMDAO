@@ -20,17 +20,19 @@ column_spacing = 2
 indent_inc = 2
 
 
-def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
-                    out_stream, pathname, var_list):
+def write_var_table(pathname, var_list, var_type, var_dict,
+                    hierarchical, print_arrays, out_stream):
     """
     Write table of variable names, values, residuals, and metadata to out_stream.
 
     Parameters
     ----------
-    in_or_out : str, 'input' or 'output'
-        indicates whether the values passed in are from inputs or output variables.
-    comp_type : str, 'Explicit' or 'Implicit'
-        the type of component with the output values.
+    pathname : str
+        pathname to be printed. If None, defaults to 'model'
+    var_list : list of str
+        List of variable names in the order they are to be written.
+    var_type : 'input', 'explicit' or 'implicit'
+        Indicates type of variables, input or explicit/implicit output.
     var_dict : dict
         dict storing vals and metadata for each var name
     hierarchical : bool
@@ -44,21 +46,17 @@ def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
     out_stream : file-like object
         Where to send human readable output.
         Set to None to suppress.
-    pathname : str
-        pathname to be printed. If None, defaults to 'model'
-    var_list : list of str
-        list of variable names in the order they are to be written
     """
     count = len(var_dict)
 
     # Write header
     pathname = pathname if pathname else 'model'
-    header_name = 'Input' if in_or_out == 'input' else 'Output'
-    if in_or_out == 'input':
-        header = "%d %s(s) in '%s'" % (count, header_name, pathname)
+
+    if var_type is 'input':
+        header = "%d Input(s) in '%s'" % (count, pathname)
     else:
-        header = "%d %s %s(s) in '%s'" % (
-            count, comp_type, header_name, pathname)
+        header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
+
     out_stream.write(header + '\n')
     out_stream.write('-' * len(header) + '\n' + '\n')
 
@@ -67,7 +65,7 @@ def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
 
     # Need an ordered list of possible output values for the two cases: inputs and outputs
     #  so that we do the column output in the correct order
-    if in_or_out == 'input':
+    if var_type is 'input':
         out_types = ('value', 'units', 'shape', 'prom_name')
     else:
         out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref',
@@ -97,8 +95,7 @@ def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
 
     # Determine the column widths of the data fields by finding the max width for all rows
     for column_name in column_names:
-        column_widths[column_name] = len(
-            column_name)  # has to be able to display name!
+        column_widths[column_name] = len(column_name)  # has to be able to display name!
     for name in var_list:
         for column_name in column_names:
             if isinstance(var_dict[name][column_name], np.ndarray) and \
@@ -163,7 +160,7 @@ def write_var_table(in_or_out, comp_type, var_dict, hierarchical, print_arrays,
         for name in var_list:
             row = '{:{align}{width}}'.format(name, align=align, width=max_varname_len)
             _write_variable(out_stream, row, column_names, var_dict[name],
-                                print_arrays)
+                            print_arrays)
     out_stream.write(2 * '\n')
 
 
