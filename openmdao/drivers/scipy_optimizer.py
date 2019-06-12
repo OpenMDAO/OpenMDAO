@@ -240,6 +240,8 @@ class ScipyOptimizeDriver(Driver):
         self.iter_count = 0
         self._total_jac = None
 
+        self._check_for_missing_objective()
+
         # Initial Run
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             model.run_solve_nonlinear()

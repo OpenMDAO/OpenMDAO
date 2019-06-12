@@ -221,6 +221,8 @@ class SimpleGADriver(Driver):
         Pm = self.options['Pm']  # if None, it will be calculated in execute_ga()
         Pc = self.options['Pc']
 
+        self._check_for_missing_objective()
+
         # Size design variables.
         desvars = self._designvars
         desvar_vals = self.get_design_var_values()

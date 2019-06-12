@@ -1394,9 +1394,8 @@ class Group(System):
         if isinstance(promotes, string_types) or \
            isinstance(promotes_inputs, string_types) or \
            isinstance(promotes_outputs, string_types):
-                raise RuntimeError("%s: promotes"
-                                   " must be an iterator of strings and/or tuples." %
-                                   self.name)
+            raise RuntimeError("%s: promotes must be an iterator of strings and/or tuples."
+                               % self.name)
         if promotes:
             subsys._var_promotes['any'] = promotes
         if promotes_inputs:
