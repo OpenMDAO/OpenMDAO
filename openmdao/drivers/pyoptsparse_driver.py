@@ -184,10 +184,6 @@ class pyOptSparseDriver(Driver):
 
         self._setup_tot_jac_sparsity()
 
-        if len(self._objs) == 0:
-            msg = "pyOptSparseDriver requires objective to be declared"
-            raise RuntimeError(msg)
-
     def run(self):
         """
         Excute pyOptsparse.
@@ -208,6 +204,9 @@ class pyOptSparseDriver(Driver):
         self.iter_count = 0
         fwd = problem._mode == 'fwd'
         optimizer = self.options['optimizer']
+
+        # Check for missing objective
+        self._check_for_missing_objective()
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that
         # doesn't perform one initially.

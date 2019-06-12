@@ -1674,7 +1674,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         exception = raises_msg.exception
 
-        msg = "pyOptSparseDriver requires objective to be declared"
+        msg = "Driver requires objective to be declared"
 
         self.assertEqual(exception.args[0], msg)
 

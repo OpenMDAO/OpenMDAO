@@ -359,7 +359,7 @@ class TestSimpleGA(unittest.TestCase):
 
         exception = raises_msg.exception
 
-        msg = "SimpleGADriver requires objective to be declared"
+        msg = "Driver requires objective to be declared"
 
         self.assertEqual(exception.args[0], msg)
 

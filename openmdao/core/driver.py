@@ -9,6 +9,7 @@ import os
 from six import iteritems, itervalues, string_types
 
 import numpy as np
+import re
 
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
@@ -290,6 +291,14 @@ class Driver(object):
                 else:
                     coloring._check_config_total(self)
                 self._setup_simul_coloring()
+
+    def _check_for_missing_objective(self):
+        """
+        Check for missing objective and raise error if no objectives found.
+        """
+        if len(self._objs) == 0:
+            msg = "Driver requires objective to be declared"
+            raise RuntimeError(msg)
 
     def _get_vars_to_record(self, recording_options):
         """

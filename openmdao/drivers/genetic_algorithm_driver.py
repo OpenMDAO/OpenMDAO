@@ -149,10 +149,6 @@ class SimpleGADriver(Driver):
         elif not self.options['run_parallel']:
             comm = None
 
-        if len(self._objs) == 0:
-            msg = "SimpleGADriver requires objective to be declared"
-            raise RuntimeError(msg)
-
         self._ga = GeneticAlgorithm(self.objective_callback, comm=comm, model_mpi=model_mpi)
 
     def _setup_comm(self, comm):
@@ -224,6 +220,9 @@ class SimpleGADriver(Driver):
         user_bits = self.options['bits']
         Pm = self.options['Pm']  # if None, it will be calculated in execute_ga()
         Pc = self.options['Pc']
+
+        # Check for missing objective
+        self._check_for_missing_objective()
 
         # Size design variables.
         desvars = self._designvars
