@@ -62,7 +62,7 @@ class TestNonlinearCircuit(unittest.TestCase):
                 deltaV = inputs['V_in'] - inputs['V_out']
                 Is = self.options['Is']
                 Vt = self.options['Vt']
-                I = Is * (np.exp(deltaV / Vt) - 1)
+                I = Is * np.exp(deltaV / Vt)
 
                 J['I', 'V_in'] = I/Vt
                 J['I', 'V_out'] = -I/Vt
