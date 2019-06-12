@@ -9,7 +9,6 @@ import os
 from six import iteritems, itervalues, string_types
 
 import numpy as np
-import re
 
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager

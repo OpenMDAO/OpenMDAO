@@ -221,7 +221,6 @@ class SimpleGADriver(Driver):
         Pm = self.options['Pm']  # if None, it will be calculated in execute_ga()
         Pc = self.options['Pc']
 
-        # Check for missing objective
         self._check_for_missing_objective()
 
         # Size design variables.

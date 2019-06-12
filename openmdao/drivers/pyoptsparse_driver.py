@@ -205,7 +205,6 @@ class pyOptSparseDriver(Driver):
         fwd = problem._mode == 'fwd'
         optimizer = self.options['optimizer']
 
-        # Check for missing objective
         self._check_for_missing_objective()
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that

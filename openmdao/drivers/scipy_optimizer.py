@@ -240,7 +240,6 @@ class ScipyOptimizeDriver(Driver):
         self.iter_count = 0
         self._total_jac = None
 
-        # Check for missing objective
         self._check_for_missing_objective()
 
         # Initial Run
