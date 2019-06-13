@@ -2990,7 +2990,7 @@ class System(object):
             out_stream = sys.stdout
 
         if out_stream:
-            self._write_table('input', inputs, hierarchical, print_arrays, out_stream, meta)
+            self._write_table('input', inputs, hierarchical, print_arrays, out_stream)
 
         return inputs
 
@@ -3127,11 +3127,9 @@ class System(object):
 
         if out_stream:
             if explicit:
-                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
-                                  out_stream, meta)
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays, out_stream)
             if implicit:
-                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
-                                  out_stream, meta)
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays, out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -3142,8 +3140,7 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_table(self, var_type, var_data, hierarchical, print_arrays,
-                     out_stream, meta):
+    def _write_table(self, var_type, var_data, hierarchical, print_arrays, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -3164,8 +3161,6 @@ class System(object):
         out_stream : file-like object
             Where to send human readable output.
             Set to None to suppress.
-        meta : dict
-            Dictionary mapping absolute names to metadata dictionaries for myproc variables.
         """
         if out_stream is None:
             return
@@ -3184,6 +3179,8 @@ class System(object):
                 return
 
             # rest of this only done on rank 0
+            meta = self._var_abs2meta
+
             var_dict = all_var_dict[0]  # start with rank 0
 
             for proc_vars in all_var_dict[1:]:  # In rank order go thru rest of the procs
