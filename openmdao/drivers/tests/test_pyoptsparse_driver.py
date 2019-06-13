@@ -1654,6 +1654,30 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertEqual(comp.visited_points[0], 1.0)
         self.assertNotEqual(comp.visited_points[1], 1.0)
 
+    def test_pyoptsparse_missing_objective(self):
+        prob = Problem()
+        model = prob.model = Group()
+
+        model.add_subsystem('x', IndepVarComp('x', 2.0), promotes=['*'])
+        model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('x', lower=0)
+        prob.model.add_constraint('x', lower=0)
+
+        prob.setup(check=False)
+
+        with self.assertRaises(Exception) as raises_msg:
+            prob.run_driver()
+
+        exception = raises_msg.exception
+
+        msg = "Driver requires objective to be declared"
+
+        self.assertEqual(exception.args[0], msg)
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 class TestPyoptSparseFeature(unittest.TestCase):
