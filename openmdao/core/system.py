@@ -3220,7 +3220,8 @@ class System(object):
         for subsys in self._subsystems_allprocs:
             # subsys.pathname will only be defined properly if a subsystem is local,
             # but subsys.name will be properly defined.
-            path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name + '.'
+            path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name
+            path += '.'
             for var_name in real_vars:
                 if var_name in var_dict and var_name.startswith(path):
                     var_list.append(var_name)
