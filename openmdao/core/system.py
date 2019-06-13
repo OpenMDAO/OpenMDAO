@@ -3180,12 +3180,12 @@ class System(object):
             # returns a list, one per proc
             all_var_dict = self.comm.gather(var_dict, root=0)
 
-        if MPI and MPI.COMM_WORLD.rank > 0:  # If MPI, only the root process should print
-            return
+            if MPI.COMM_WORLD.rank > 0:  # only the root process should print
+                return
 
-        # If MPI, and on rank 0, need to gather up all the variables
-        if MPI:  # rest of this only done on rank 0
+            # rest of this only done on rank 0
             var_dict = all_var_dict[0]  # start with rank 0
+
             for proc_vars in all_var_dict[1:]:  # In rank order go thru rest of the procs
                 for name, vals in iteritems(proc_vars):
                     if name not in var_dict:  # If not in the merged dict, add it
@@ -3193,7 +3193,7 @@ class System(object):
                     else:
                         # In there already, only need to deal with it if it is a distributed array
                         # Checking to see if distributed depends on if it is an input or output
-                        if in_or_out == 'input':
+                        if var_type == 'input':
                             is_distributed = meta[name]['src_indices'] is not None
                         else:
                             is_distributed = meta[name]['distributed']

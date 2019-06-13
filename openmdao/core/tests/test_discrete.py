@@ -248,8 +248,6 @@ class DiscreteTestCase(unittest.TestCase):
         prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
 
-        print(text)
-
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
 
         # make sure they are in the correct order
@@ -262,14 +260,12 @@ class DiscreteTestCase(unittest.TestCase):
         prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
-        print(text)
-
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
         self.assertEqual(1, text.count('top'))
         self.assertEqual(1, text.count('  expl'))
         self.assertEqual(1, text.count('    a'))
         self.assertEqual(1, text.count('  impl'))
-        self.assertEqual(2, text.count('    x'))
+        self.assertEqual(2, text.count('    x'))      # both implicit & explicit
 
         #
         # list outputs, not hierarchical
@@ -277,8 +273,6 @@ class DiscreteTestCase(unittest.TestCase):
         stream = StringIO()
         prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
-
-        print(text)
 
         self.assertEqual(text.count('3 Explicit Output'), 1)
         self.assertEqual(text.count('1 Implicit Output'), 1)
@@ -290,15 +284,13 @@ class DiscreteTestCase(unittest.TestCase):
         prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
-        print(text)
-
-        self.assertEqual(text.count('top'), 2)        # implicit & explicit
+        self.assertEqual(text.count('top'), 2)        # both implicit & explicit
         self.assertEqual(text.count('  indep'), 1)
         self.assertEqual(text.count('    x'), 1)
         self.assertEqual(text.count('  expl'), 1)
         self.assertEqual(text.count('    b'), 1)
         self.assertEqual(text.count('  impl'), 1)
-        self.assertEqual(text.count('    y'), 2)      # implicit & explicit
+        self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
 
     def test_float_to_discrete_error(self):
         prob = Problem()
@@ -496,8 +488,8 @@ class SolverDiscreteTestCase(unittest.TestCase):
         model.connect('d2.y2', 'state_eq.y2_actual')
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
-                           promotes=['x', 'z', 'y1', 'obj'])
+                                                z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                            promotes=['x', 'z', 'y1', 'obj'])
         model.connect('d2.y2', 'obj_cmp.y2')
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
