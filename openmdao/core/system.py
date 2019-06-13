@@ -3170,10 +3170,10 @@ class System(object):
         for name, vals in var_data:
             var_dict[name] = vals
 
-        # If parallel, gather up the vars. All procs must call this
+        # If parallel, gather up the vars.
         if MPI:
-            # returns a list, one per proc
-            all_var_dict = self.comm.gather(var_dict, root=0)
+            # All procs must call this. Returns a list, one per proc.
+            all_var_dicts = self.comm.gather(var_dict, root=0)
 
             if MPI.COMM_WORLD.rank > 0:  # only the root process should print
                 return
@@ -3181,11 +3181,11 @@ class System(object):
             # rest of this only done on rank 0
             meta = self._var_abs2meta
 
-            var_dict = all_var_dict[0]  # start with rank 0
+            var_dict = all_var_dicts[0]  # start with rank 0
 
-            for proc_vars in all_var_dict[1:]:  # In rank order go thru rest of the procs
+            for proc_vars in all_var_dicts[1:]:  # In rank order go through rest of the procs
                 for name, vals in iteritems(proc_vars):
-                    if name not in var_dict:  # If not in the merged dict, add it
+                    if name not in var_dict:     # If not in the merged dict, add it
                         var_dict[name] = proc_vars[name]
                     else:
                         # In there already, only need to deal with it if it is a distributed array
@@ -3212,14 +3212,21 @@ class System(object):
 
         # get list of var names in execution order, based on the order subsystems were setup
         var_list = []
+
         in_or_out = 'input' if var_type is 'input' else 'output'
+        real_vars = self._var_allprocs_abs_names[in_or_out]
+        disc_vars = self._var_allprocs_discrete[in_or_out]
+
         for subsys in self._subsystems_allprocs:
-            for n in self._var_allprocs_abs_names[in_or_out]:
-                if n in var_dict and n.startswith(subsys.pathname):
-                    var_list.append(n)
-            for n in self._var_allprocs_discrete[in_or_out]:
-                if n in var_dict and n.startswith(subsys.pathname):
-                    var_list.append(n)
+            # subsys.pathname will only be defined properly if a subsystem is local,
+            # but subsys.name will be properly defined.
+            path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name + '.'
+            for var_name in real_vars:
+                if var_name in var_dict and var_name.startswith(path):
+                    var_list.append(var_name)
+            for var_name in disc_vars:
+                if var_name in var_dict and var_name.startswith(path):
+                    var_list.append(var_name)
 
         write_var_table(self.pathname, var_list, var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
