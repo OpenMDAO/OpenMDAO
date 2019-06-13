@@ -277,6 +277,10 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(text.count('3 Explicit Output'), 1)
         self.assertEqual(text.count('1 Implicit Output'), 1)
 
+        # make sure they are in the correct order
+        self.assertTrue(text.find('indep.x') < text.find('expl.b') <
+                        text.find('expl.y') < text.find('impl.y'))
+
         #
         # list outputs, hierarchical
         #
