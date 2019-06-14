@@ -1324,13 +1324,14 @@ class _TotalJacInfo(object):
 
         of_idx = model._owns_approx_of_idx
         wrt_idx = model._owns_approx_wrt_idx
+        wrt_meta = self.wrt_meta
 
         totals = self.J_dict
         if return_format == 'flat_dict':
             for prom_out, output_name in zip(self.prom_of, of):
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
 
-                    if output_name in wrt and output_name != input_name:
+                    if output_name in wrt_meta and output_name != input_name:
                         # Special case where we constrain an input, and need derivatives of that
                         # constraint wrt all other inputs.
                         continue
@@ -1343,7 +1344,7 @@ class _TotalJacInfo(object):
                 tot = totals[prom_out]
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
 
-                    if output_name in wrt and output_name != input_name:
+                    if output_name in wrt_meta and output_name != input_name:
                         # Special case where we constrain an input, and need derivatives of that
                         # constraint wrt all other inputs.
                         continue
