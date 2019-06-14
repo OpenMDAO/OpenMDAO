@@ -4,9 +4,11 @@ import unittest
 import numpy as np
 from six.moves import cStringIO
 
-from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
+from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp, ExecComp
 
 from openmdao.utils.array_utils import evenly_distrib_idxs
+
+from openmdao.test_suite.groups.parallel_groups import FanOutGrouped
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -268,6 +270,153 @@ class DistributedListVarsTest(unittest.TestCase):
             self.assertEqual(2, text.count('        c'))
             self.assertEqual(1, text.count('  Obj'))
             self.assertEqual(1, text.count('    obj'))
+
+    def test_parallel_list_vars(self):
+        prob = Problem(FanOutGrouped())
+
+        # add another subsystem with similar prefix
+        prob.model.add_subsystem('sub2', ExecComp(['y=x']))
+        prob.model.connect('iv.x', 'sub2.x')
+
+        prob.setup()
+        prob.run_model()
+
+        #
+        # list inputs, not hierarchical
+        #
+        stream = cStringIO()
+        prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
+
+        if prob.comm.rank == 0:  # Only rank 0 prints
+            text = stream.getvalue().split('\n')
+
+            expected = [
+                "6 Input(s) in 'model'",
+                '---------------------',
+                '',
+                'varname   value',
+                '--------  -----',
+                'c1.x',
+                'sub.c2.x',
+                'sub.c3.x',
+                'c2.x',
+                'c3.x',
+                'sub2.x'
+            ]
+
+            for i in range(len(expected)):
+                self.assertTrue(text[i].startswith(expected[i]),
+                               '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
+            self.assertEqual(1, text.count("6 Input(s) in 'model'"))
+
+        #
+        # list inputs, hierarchical
+        #
+        stream = cStringIO()
+        prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
+
+        if prob.comm.rank == 0:
+            text = stream.getvalue().split('\n')
+
+            expected = [
+                "6 Input(s) in 'model'",
+                '---------------------',
+                '',
+                'varname  value',
+                '-------  -----',
+                'top',
+                '  c1',
+                '    x',
+                '  sub',
+                '    c2',
+                '      x',
+                '    c3',
+                '      x',
+                '  c2',
+                '    x',
+                '  c3',
+                '    x',
+                '  sub2',
+                '    x'
+            ]
+
+            for i in range(len(expected)):
+                self.assertTrue(text[i].startswith(expected[i]),
+                               '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
+
+        #
+        # list outputs, not hierarchical
+        #
+        stream = cStringIO()
+        prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
+        text = stream.getvalue()
+
+        if prob.comm.rank == 0:
+            text = stream.getvalue().split('\n')
+
+            expected = [
+                "7 Explicit Output(s) in 'model'",
+                '-------------------------------',
+                '',
+                'varname   value  resids',
+                '--------  -----  ------',
+                'iv.x',
+                'c1.y',
+                'sub.c2.y',
+                'sub.c3.y',
+                'c2.y',
+                'c3.y',
+                'sub2.y',
+                '',
+                '',
+                "0 Implicit Output(s) in 'model'",
+                '-------------------------------',
+            ]
+
+            for i in range(len(expected)):
+                self.assertTrue(text[i].startswith(expected[i]),
+                               '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
+
+        #
+        # list outputs, hierarchical
+        #
+        stream = cStringIO()
+        prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
+
+        if prob.comm.rank == 0:
+            text = stream.getvalue().split('\n')
+
+            expected = [
+                "7 Explicit Output(s) in 'model'",
+                '-------------------------------',
+                '',
+                'varname  value  resids',
+                '-------  -----  ------',
+                'top',
+                '  iv',
+                '    x',
+                '  c1',
+                '    y',
+                '  sub',
+                '    c2',
+                '      y',
+                '    c3',
+                '      y',
+                '  c2',
+                '    y',
+                '  c3',
+                '    y',
+                '  sub2',
+                '    y',
+                '',
+                '',
+                "0 Implicit Output(s) in 'model'",
+                '-------------------------------',
+            ]
+
+            for i in range(len(expected)):
+                self.assertTrue(text[i].startswith(expected[i]),
+                               '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
 
 
 if __name__ == "__main__":
