@@ -799,7 +799,7 @@ class TestBryodenFeature(unittest.TestCase):
         p.set_solver_print(level=2)
         p.run_model()
 
-        assert_rel_error(self, p['circuit.n1.V'], 9.90830282, 1e-5)
+        assert_rel_error(self, p['circuit.n1.V'], 9.90804735, 1e-5)
         assert_rel_error(self, p['circuit.n2.V'], 0.73858486, 1e-5)
 
         # sanity check: should sum to .1 Amps
