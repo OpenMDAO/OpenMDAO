@@ -306,8 +306,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
             for i in range(len(expected)):
                 self.assertTrue(text[i].startswith(expected[i]),
-                               '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
-            self.assertEqual(1, text.count("6 Input(s) in 'model'"))
+                                '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
 
         #
         # list inputs, hierarchical
@@ -342,14 +341,13 @@ class DistributedListVarsTest(unittest.TestCase):
 
             for i in range(len(expected)):
                 self.assertTrue(text[i].startswith(expected[i]),
-                               '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
+                                '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
 
         #
         # list outputs, not hierarchical
         #
         stream = cStringIO()
         prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
-        text = stream.getvalue()
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -375,7 +373,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
             for i in range(len(expected)):
                 self.assertTrue(text[i].startswith(expected[i]),
-                               '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
+                                '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
 
         #
         # list outputs, hierarchical
@@ -416,7 +414,7 @@ class DistributedListVarsTest(unittest.TestCase):
 
             for i in range(len(expected)):
                 self.assertTrue(text[i].startswith(expected[i]),
-                               '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
+                                '\nExpected: %s\nReceived: %s\n' % (expected[i], text[i]))
 
 
 if __name__ == "__main__":
