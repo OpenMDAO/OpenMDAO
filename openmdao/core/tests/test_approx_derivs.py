@@ -719,7 +719,6 @@ class TestGroupFiniteDifference(unittest.TestCase):
         p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
                                                 g=np.ones(10), x=np.ones(10), y=np.ones(10)))
 
-
         p.model.connect('r', ('circle.r', 'r_con.r'))
         p.model.connect('x', ['r_con.x', 'arctan_yox.x'])
         p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
