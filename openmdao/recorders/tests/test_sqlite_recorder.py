@@ -2123,7 +2123,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         first_driver_case = cr.get_case(driver_cases[0])
 
         self.assertAlmostEqual(first_driver_case.inputs['circuit.R1.V_in'][0], 9.90804734)
-        self.assertAlmostEqual(first_driver_case.outputs['circuit.R1.I'][0], 0.09908303)
+        self.assertAlmostEqual(first_driver_case.outputs['circuit.R1.I'][0], 0.09908047)
 
     def test_feature_load_system_case_for_restart(self):
         #######################################################################
