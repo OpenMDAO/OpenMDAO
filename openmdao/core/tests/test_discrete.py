@@ -26,10 +26,13 @@ class ModCompEx(ExplicitComponent):
         self.modval = modval
 
     def setup(self):
+        self.add_input('a', val=10.)
+        self.add_output('b', val=0.)
         self.add_discrete_input('x', val=10)
         self.add_discrete_output('y', val=0)
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        outputs['b'] = inputs['a']*2.
         discrete_outputs['y'] = discrete_inputs['x'] % self.modval
 
 
@@ -222,6 +225,76 @@ class DiscreteTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_rel_error(self, prob['comp.y'], 2)
+
+    def test_list_inputs_outputs(self):
+        prob = Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', IndepVarComp())
+        indep.add_discrete_output('x', 11)
+
+        model.add_subsystem('expl', ModCompEx(3))
+        model.add_subsystem('impl', ModCompIm(3))
+
+        model.connect('indep.x', ['expl.x', 'impl.x'])
+
+        prob.setup()
+        prob.run_model()
+
+        #
+        # list inputs, not hierarchical
+        #
+        stream = StringIO()
+        prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
+        text = stream.getvalue()
+
+        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
+
+        # make sure they are in the correct order
+        self.assertTrue(text.find('expl.a') < text.find('expl.x') < text.find('impl.x'))
+
+        #
+        # list inputs, hierarchical
+        #
+        stream = StringIO()
+        prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
+        text = stream.getvalue()
+
+        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
+        self.assertEqual(1, text.count('top'))
+        self.assertEqual(1, text.count('  expl'))
+        self.assertEqual(1, text.count('    a'))
+        self.assertEqual(1, text.count('  impl'))
+        self.assertEqual(2, text.count('    x'))      # both implicit & explicit
+
+        #
+        # list outputs, not hierarchical
+        #
+        stream = StringIO()
+        prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
+        text = stream.getvalue()
+
+        self.assertEqual(text.count('3 Explicit Output'), 1)
+        self.assertEqual(text.count('1 Implicit Output'), 1)
+
+        # make sure they are in the correct order
+        self.assertTrue(text.find('indep.x') < text.find('expl.b') <
+                        text.find('expl.y') < text.find('impl.y'))
+
+        #
+        # list outputs, hierarchical
+        #
+        stream = StringIO()
+        prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
+        text = stream.getvalue()
+
+        self.assertEqual(text.count('top'), 2)        # both implicit & explicit
+        self.assertEqual(text.count('  indep'), 1)
+        self.assertEqual(text.count('    x'), 1)
+        self.assertEqual(text.count('  expl'), 1)
+        self.assertEqual(text.count('    b'), 1)
+        self.assertEqual(text.count('  impl'), 1)
+        self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
 
     def test_float_to_discrete_error(self):
         prob = Problem()
@@ -419,8 +492,8 @@ class SolverDiscreteTestCase(unittest.TestCase):
         model.connect('d2.y2', 'state_eq.y2_actual')
 
         model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
-                           promotes=['x', 'z', 'y1', 'obj'])
+                                                z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                            promotes=['x', 'z', 'y1', 'obj'])
         model.connect('d2.y2', 'obj_cmp.y2')
 
         model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])

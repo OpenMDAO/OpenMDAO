@@ -26,7 +26,7 @@ from openmdao.vectors.vector import INT_DTYPE
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.write_outputs import write_outputs
+from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
@@ -2958,23 +2958,39 @@ class System(object):
         meta = self._var_abs2meta
         inputs = []
 
-        for name, val in iteritems(self._inputs._views):  # This is only over the locals
-            outs = {}
+        for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
+            var_meta = {}
             if values:
-                outs['value'] = val
+                var_meta['value'] = val
             if prom_name:
-                outs['prom_name'] = self._var_abs2prom['input'][name]
+                var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
             if units:
-                outs['units'] = meta[name]['units']
+                var_meta['units'] = meta[var_name]['units']
             if shape:
-                outs['shape'] = val.shape
-            inputs.append((name, outs))
+                var_meta['shape'] = val.shape
+
+            inputs.append((var_name, var_meta))
+
+        if self._discrete_inputs:
+            for var_name, val in iteritems(self._discrete_inputs):
+                var_meta = {}
+                if values:
+                    var_meta['value'] = val
+                if prom_name:
+                    var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                # remaining items do not apply for discrete vars
+                if units:
+                    var_meta['units'] = ''
+                if shape:
+                    var_meta['shape'] = ''
+
+                inputs.append((var_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
-            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream, meta)
+            self._write_table('input', inputs, hierarchical, print_arrays, out_stream)
 
         return inputs
 
@@ -3051,42 +3067,69 @@ class System(object):
         # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
-        for name, val in iteritems(self._outputs._views):
-            if residuals_tol and np.linalg.norm(self._residuals._views[name]) < residuals_tol:
+        for var_name, val in iteritems(self._outputs._views):
+            if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
                 continue
-            outs = {}
+
+            var_meta = {}
             if values:
-                outs['value'] = val
+                var_meta['value'] = val
             if prom_name:
-                outs['prom_name'] = self._var_abs2prom['output'][name]
+                var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
             if residuals:
-                outs['resids'] = self._residuals._views[name]
+                var_meta['resids'] = self._residuals._views[var_name]
             if units:
-                outs['units'] = meta[name]['units']
+                var_meta['units'] = meta[var_name]['units']
             if shape:
-                outs['shape'] = val.shape
+                var_meta['shape'] = val.shape
             if bounds:
-                outs['lower'] = meta[name]['lower']
-                outs['upper'] = meta[name]['upper']
+                var_meta['lower'] = meta[var_name]['lower']
+                var_meta['upper'] = meta[var_name]['upper']
             if scaling:
-                outs['ref'] = meta[name]['ref']
-                outs['ref0'] = meta[name]['ref0']
-                outs['res_ref'] = meta[name]['res_ref']
-            if name in states:
-                impl_outputs.append((name, outs))
+                var_meta['ref'] = meta[var_name]['ref']
+                var_meta['ref0'] = meta[var_name]['ref0']
+                var_meta['res_ref'] = meta[var_name]['res_ref']
+
+            if var_name in states:
+                impl_outputs.append((var_name, var_meta))
             else:
-                expl_outputs.append((name, outs))
+                expl_outputs.append((var_name, var_meta))
+
+        if self._discrete_outputs and not residuals_tol:
+            for var_name, val in iteritems(self._discrete_outputs):
+                var_meta = {}
+                if values:
+                    var_meta['value'] = val
+                if prom_name:
+                    var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
+                # remaining items do not apply for discrete vars
+                if residuals:
+                    var_meta['resids'] = ''
+                if units:
+                    var_meta['units'] = ''
+                if shape:
+                    var_meta['shape'] = ''
+                if bounds:
+                    var_meta['lower'] = ''
+                    var_meta['upper'] = ''
+                if scaling:
+                    var_meta['ref'] = ''
+                    var_meta['ref0'] = ''
+                    var_meta['res_ref'] = ''
+
+                if var_name in states:
+                    impl_outputs.append((var_name, var_meta))
+                else:
+                    expl_outputs.append((var_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
             if explicit:
-                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
-                                    out_stream, meta)
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays, out_stream)
             if implicit:
-                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
-                                    out_stream, meta)
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays, out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -3097,22 +3140,16 @@ class System(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_outputs(self, in_or_out, comp_type, outputs, hierarchical, print_arrays,
-                       out_stream, meta):
+    def _write_table(self, var_type, var_data, hierarchical, print_arrays, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
-        The output values could actually represent input variables.
-        In this context, outputs refers to the data that is being logged to an output stream.
-
         Parameters
         ----------
-        in_or_out : str, 'input' or 'output'
-            indicates whether the values passed in are from inputs or output variables.
-        comp_type : str, 'Explicit' or 'Implicit'
-            the type of component with the output values.
-        outputs : list
-            list of (name, dict of vals and metadata) tuples.
+        var_type : 'input', 'explicit' or 'implicit'
+            Indicates type of variables, input or explicit/implicit output.
+        var_data : list
+            List of (name, dict of vals and metadata) tuples.
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool
@@ -3124,57 +3161,76 @@ class System(object):
         out_stream : file-like object
             Where to send human readable output.
             Set to None to suppress.
-        meta : dict
-            Dictionary mapping absolute names to metadata dictionaries for myproc variables.
         """
         if out_stream is None:
             return
 
-        # Make a dict of outputs. Makes it easier to work with in this method
-        dict_of_outputs = OrderedDict()
-        for name, vals in outputs:
-            dict_of_outputs[name] = vals
+        # Make a dict of variables. Makes it easier to work with in this method
+        var_dict = OrderedDict()
+        for name, vals in var_data:
+            var_dict[name] = vals
 
-        # If parallel, gather up the outputs. All procs must call this
+        # If parallel, gather up the vars.
         if MPI:
-            # returns a list, one per proc
-            all_dict_of_outputs = self.comm.gather(dict_of_outputs, root=0)
+            # All procs must call this. Returns a list, one per proc.
+            all_var_dicts = self.comm.gather(var_dict, root=0)
 
-        if MPI and MPI.COMM_WORLD.rank > 0:  # If MPI, only the root process should print
-            return
+            if MPI.COMM_WORLD.rank > 0:  # only the root process should print
+                return
 
-        # If MPI, and on rank 0, need to gather up all the variables
-        if MPI:  # rest of this only done on rank 0
-            dict_of_outputs = all_dict_of_outputs[0]  # start with rank 0
-            for proc_outputs in all_dict_of_outputs[1:]:  # In rank order go thru rest of the procs
-                for name, vals in iteritems(proc_outputs):
-                    if name not in dict_of_outputs:  # If not in the merged dict, add it
-                        dict_of_outputs[name] = proc_outputs[name]
-                    else:  # If in there already, only need to deal with it if it is a
-                        # distributed array.
-                        # Checking to see if  distributed depends on if it is an input or output
-                        if in_or_out == 'input':
+            # rest of this only done on rank 0
+            meta = self._var_abs2meta
+
+            var_dict = all_var_dicts[0]  # start with rank 0
+
+            for proc_vars in all_var_dicts[1:]:  # In rank order go through rest of the procs
+                for name, vals in iteritems(proc_vars):
+                    if name not in var_dict:     # If not in the merged dict, add it
+                        var_dict[name] = proc_vars[name]
+                    else:
+                        # In there already, only need to deal with it if it is a distributed array
+                        # Checking to see if distributed depends on if it is an input or output
+                        if var_type == 'input':
                             is_distributed = meta[name]['src_indices'] is not None
                         else:
                             is_distributed = meta[name]['distributed']
                         if is_distributed:
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
-                            if 'value' in dict_of_outputs[name]:
-                                dict_of_outputs[name]['value'] = \
-                                    np.append(dict_of_outputs[name]['value'],
-                                              proc_outputs[name]['value'])
-                            if 'shape' in dict_of_outputs[name]:
+                            if 'value' in var_dict[name]:
+                                var_dict[name]['value'] = \
+                                    np.append(var_dict[name]['value'],
+                                              proc_vars[name]['value'])
+                            if 'shape' in var_dict[name]:
                                 # TODO might want to use allprocs_abs2meta_out[name]['global_shape']
-                                dict_of_outputs[name]['shape'] = \
-                                    dict_of_outputs[name]['value'].shape
-                            if 'resids' in dict_of_outputs[name]:
-                                dict_of_outputs[name]['resids'] = \
-                                    np.append(dict_of_outputs[name]['resids'],
-                                              proc_outputs[name]['resids'])
+                                var_dict[name]['shape'] = \
+                                    var_dict[name]['value'].shape
+                            if 'resids' in var_dict[name]:
+                                var_dict[name]['resids'] = \
+                                    np.append(var_dict[name]['resids'],
+                                              proc_vars[name]['resids'])
 
-        write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arrays, out_stream,
-                      self.pathname, self._var_allprocs_abs_names)
+        # get list of var names in execution order, based on the order subsystems were setup
+        var_list = []
+
+        in_or_out = 'input' if var_type is 'input' else 'output'
+        real_vars = self._var_allprocs_abs_names[in_or_out]
+        disc_vars = self._var_allprocs_discrete[in_or_out]
+
+        for subsys in self._subsystems_allprocs:
+            # subsys.pathname will only be defined properly if a subsystem is local,
+            # but subsys.name will be properly defined.
+            path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name
+            path += '.'
+            for var_name in real_vars:
+                if var_name in var_dict and var_name.startswith(path):
+                    var_list.append(var_name)
+            for var_name in disc_vars:
+                if var_name in var_dict and var_name.startswith(path):
+                    var_list.append(var_name)
+
+        write_var_table(self.pathname, var_list, var_type, var_dict,
+                        hierarchical, print_arrays, out_stream)
 
     def run_solve_nonlinear(self):
         """

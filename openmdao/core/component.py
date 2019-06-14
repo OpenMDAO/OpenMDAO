@@ -1310,3 +1310,10 @@ class _DictValues(object):
 
     def __len__(self):
         return len(self._dict)
+
+    def items(self):
+        return [(key, self._dict[key]['value']) for key in self._dict]
+
+    def iteritems(self):
+        for key, val in self._dict.iteritems():
+            yield key, val['value']
