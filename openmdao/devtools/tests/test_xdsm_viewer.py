@@ -60,7 +60,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output (outputs on the left)
@@ -109,7 +109,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         recorder = SqliteRecorder(case_recording_filename)
         prob.driver.add_recorder(recorder)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -136,7 +136,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -181,7 +181,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.model.add_objective('f')
         prob.model.add_constraint('c', lower=1.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # requesting 'pdf', but if 'pdflatex' is not found we will only get 'tex'
@@ -242,7 +242,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         p.model.add_design_var('orbit_phase.t_initial')
         p.model.add_design_var('orbit_phase.t_duration')
         p.model.add_objective('systems_phase.time.time')
-        p.setup(check=False)
+        p.setup()
 
         p.run_model()
 
@@ -286,7 +286,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.add_design_var('source.I')
         model.add_objective('circuit.D1.I')
 
-        p.setup(check=False)
+        p.setup()
 
         # set some initial guesses
         p['circuit.n1.V'] = 10.
@@ -324,7 +324,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.driver = ScipyOptimizeDriver()
         prob.model.add_objective('obj')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         filename = 'pyxdsm_solver'
@@ -345,7 +345,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         filename = 'pyxdsm_mda'
         out_format = PYXDSM_OUT
         prob = Problem(model=SellarMDA())
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -368,7 +368,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -420,7 +420,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -439,7 +439,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.driver = ScipyOptimizeDriver()
         prob.model.add_design_var('x', lower=0.0, upper=10.0)
         prob.model.add_objective('y')
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -459,7 +459,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.driver = DOEDriver()
         prob.model.add_design_var('x', lower=0.0, upper=10.0)
         prob.model.add_objective('y')
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -500,7 +500,7 @@ class TestPyXDSMViewer(unittest.TestCase):
 
         model.add_subsystem('comp', comp, promotes=["*"])
         prob = Problem(model)
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
@@ -542,7 +542,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -570,7 +570,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -597,7 +597,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -714,7 +714,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         p.model.add_design_var('orbit_phase.t_initial')
         p.model.add_design_var('orbit_phase.t_duration')
         p.model.add_objective('systems_phase.time.time')
-        p.setup(check=False)
+        p.setup()
 
         p.run_model()
 
@@ -725,7 +725,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         filename = 'xdsmjs_mda'
         out_format = 'html'
         prob = Problem(model=SellarMDA())
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -748,7 +748,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -767,7 +767,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.driver = ScipyOptimizeDriver()
         prob.model.add_objective('obj')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         # Write output
@@ -819,7 +819,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # Write output
@@ -838,7 +838,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.driver = ScipyOptimizeDriver()
         prob.model.add_design_var('x', lower=0.0, upper=10.0)
         prob.model.add_objective('y')
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -858,7 +858,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob.driver = DOEDriver()
         prob.model.add_design_var('x', lower=0.0, upper=10.0)
         prob.model.add_objective('y')
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -899,7 +899,7 @@ class TestXDSMjsViewer(unittest.TestCase):
 
         model.add_subsystem('comp', comp, promotes=["*"])
         prob = Problem(model)
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET, show_browser=SHOW,
@@ -926,7 +926,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         model.add_design_var('source.I')
         model.add_objective('circuit.D1.I')
 
-        p.setup(check=False)
+        p.setup()
 
         # set some initial guesses
         p['circuit.n1.V'] = 10.
@@ -955,7 +955,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         model.add_design_var('source.I')
         model.add_objective('circuit.D1.I')
 
-        p.setup(check=False)
+        p.setup()
 
         # set some initial guesses
         p['circuit.n1.V'] = 10.
@@ -979,7 +979,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         msg = 'Right side outputs not implemented for XDSMjs.'
@@ -999,7 +999,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob = Problem()
         prob.model = SellarNoDerivatives()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # no output checking, just make sure no exceptions raised
@@ -1031,7 +1031,7 @@ class TestCustomXDSMViewer(unittest.TestCase):
         prob = Problem()
         prob.model = SellarNoDerivatives()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         my_writer = CustomWriter()

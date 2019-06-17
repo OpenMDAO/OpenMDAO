@@ -133,7 +133,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.connect('comp1.c', 'comp3.c')
 
         prob = Problem(model=group)
-        prob.setup(check=False)
+        prob.setup()
 
         self.prob = prob
 
@@ -306,7 +306,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         group.nonlinear_solver.options['max_sub_solves'] = 1
         group.linear_solver = ScipyKrylov()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['pa.a'] = 1.
         prob['pb.b'] = -4.
@@ -362,7 +362,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 outputs['x'] = 5.0
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         indep = IndepVarComp()
         indep.add_output('a', 1.0)
@@ -428,7 +428,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
         assert_rel_error(self, prob['comp2.y'], 77., 1e-5)
@@ -471,7 +471,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
         assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
@@ -514,7 +514,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
         assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
@@ -560,7 +560,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 outputs['x'] = 5.0
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('comp', ImpWithInitial())
 
@@ -596,7 +596,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
@@ -628,7 +628,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(AnalysisError):
             prob.run_model()
@@ -660,7 +660,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         prob = Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
@@ -1201,7 +1201,7 @@ class ListFeatureTestCase(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
         from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, LinearBlockGS
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 1.0))
         model.add_subsystem('d1', SellarImplicitDis1())
@@ -1214,7 +1214,7 @@ class ListFeatureTestCase(unittest.TestCase):
         model.linear_solver = ScipyKrylov()
         model.linear_solver.precon = LinearBlockGS()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=-1)
 
         prob.run_model()

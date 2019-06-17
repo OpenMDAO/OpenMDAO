@@ -139,7 +139,7 @@ class TestLinearSystemComp(unittest.TestCase):
         prob.model.connect('p1.A', 'lin.A')
         prob.model.connect('p2.b', 'lin.b')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob.run_model()
@@ -200,7 +200,7 @@ class TestLinearSystemComp(unittest.TestCase):
         prob.model.connect('p1.A', 'lin.A')
         prob.model.connect('p2.b', 'lin.b')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob.run_model()
@@ -262,7 +262,7 @@ class TestLinearSystemComp(unittest.TestCase):
         prob.model.connect('p1.A', 'lin.A')
         prob.model.connect('p2.b', 'lin.b')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob.run_model()

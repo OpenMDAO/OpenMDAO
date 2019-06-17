@@ -87,13 +87,12 @@ class DistributedListVarsTest(unittest.TestCase):
         size = 100  # how many items in the array
 
         prob = Problem()
-        prob.model = Group()
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size=size), promotes=['x', 'y'])
         prob.model.add_subsystem('summer', Summer(size=size), promotes=['y', 'sum'])
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['x'] = np.arange(size)
 

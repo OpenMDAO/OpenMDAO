@@ -263,7 +263,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('C1', ExecComp())
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: No valid expressions provided to ExecComp(): [].")
 
@@ -271,7 +271,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('y=foo:bar+1.'))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: failed to compile expression 'y=foo:bar+1.'.")
 
@@ -279,7 +279,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('y=x+1.', xx=2.0))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: arg 'xx' in call to ExecComp() does not refer to any variable "
                          "in the expressions ['y=x+1.']")
@@ -289,7 +289,7 @@ class TestExecComp(unittest.TestCase):
         prob.model.add_subsystem('C1', ExecComp('y=x+1.',
                                                 x={'val': 2, 'low': 0, 'high': 10, 'units': 'ft'}))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: the following metadata names were not recognized for "
                          "variable 'x': ['high', 'low', 'val']")
@@ -298,7 +298,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('e=x+1.'))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: cannot assign to variable 'e' because it's already defined "
                          "as an internal function or constant.")
@@ -307,7 +307,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('sin=x+1.'))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: cannot assign to variable 'sin' because it's already defined "
                          "as an internal function or constant.")
@@ -316,7 +316,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('y=sin+1.'))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: cannot use 'sin' as a variable because it's already defined "
                          "as an internal function.")
@@ -325,7 +325,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=sum(x)',
                                                      x=np.arange(10, dtype=float)))
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -342,7 +342,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=x+1.', x=2.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -359,7 +359,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y = pi * x', x=2.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -382,7 +382,7 @@ class TestExecComp(unittest.TestCase):
                                                      z=2.0))
         prob.model.connect('indep.x', 'C1.x')
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -422,7 +422,7 @@ class TestExecComp(unittest.TestCase):
         prob.model.connect('indep.x', 'C1.x')
 
         with self.assertRaises(NameError) as cm:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(cm.exception),
                          "C1: cannot use variable name 'units' because it's a reserved keyword.")
@@ -465,7 +465,7 @@ class TestExecComp(unittest.TestCase):
         prob.model.connect('indep.x', 'C1.x')
 
         with self.assertRaises(RuntimeError) as cm:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(cm.exception),
                          "C1: units of 'km' have been specified for variable 'x', but "
@@ -579,7 +579,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=sin(x)', x=2.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -598,7 +598,7 @@ class TestExecComp(unittest.TestCase):
                                                      x=np.array([1., 2., 3.]),
                                                      y=0.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -617,7 +617,7 @@ class TestExecComp(unittest.TestCase):
                                                      x=np.array([1., 2., 3.]),
                                                      y=np.array([0., 0.])))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -632,7 +632,6 @@ class TestExecComp(unittest.TestCase):
 
     def test_simple_array_model(self):
         prob = Problem()
-        prob.model = Group()
         prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
         prob.model.add_subsystem('comp', ExecComp(['y[0]=2.0*x[0]+7.0*x[1]',
                                                    'y[1]=5.0*x[0]-3.0*x[1]'],
@@ -640,7 +639,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.model.connect('p1.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -655,7 +654,6 @@ class TestExecComp(unittest.TestCase):
 
     def test_simple_array_model2(self):
         prob = Problem()
-        prob.model = Group()
         prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
         prob.model.add_subsystem('comp', ExecComp('y = mat.dot(x)',
                                                   x=np.zeros((2,)), y=np.zeros((2,)),
@@ -663,7 +661,7 @@ class TestExecComp(unittest.TestCase):
 
         prob.model.connect('p1.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -680,7 +678,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -720,7 +718,7 @@ class TestExecComp(unittest.TestCase):
         prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=2.0*abs(x)', x=-2.0))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -744,7 +742,7 @@ class TestExecComp(unittest.TestCase):
         C1 = prob.model.add_subsystem('C1', ExecComp('y=2.0*abs(x)',
                                                      x=np.ones(3)*-2.0, y=np.zeros(3)))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 

@@ -44,7 +44,7 @@ class TestPETScKrylov(unittest.TestCase):
             group = TestImplicitGroup(lnSolverClass=PetscKSP)
 
         p = Problem(group)
-        p.setup(check=False)
+        p.setup()
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -75,7 +75,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['ksp_type'] = 'gmres'
 
         p = Problem(group)
-        p.setup(check=False)
+        p.setup()
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -106,7 +106,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['maxiter'] = 2
 
         p = Problem(group)
-        p.setup(check=False)
+        p.setup()
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -135,7 +135,7 @@ class TestPETScKrylov(unittest.TestCase):
         precon = group.linear_solver.precon = LinearBlockGS()
 
         p = Problem(group)
-        p.setup(check=False)
+        p.setup()
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -165,7 +165,7 @@ class TestPETScKrylov(unittest.TestCase):
 
         # test the direct solver and make sure KSP correctly recurses for _linearize
         precon = group.linear_solver.precon = DirectSolver(assemble_jac=False)
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -199,7 +199,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['ksp_type'] = 'richardson'
 
         p = Problem(group)
-        p.setup(check=False)
+        p.setup()
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -230,7 +230,7 @@ class TestPETScKrylov(unittest.TestCase):
         group.linear_solver.options['precon_side'] = 'left'
         group.linear_solver.options['ksp_type'] = 'richardson'
 
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -281,7 +281,7 @@ class TestPETScKrylov(unittest.TestCase):
 
         g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=PETScKrylov))
 
-        p.setup(check=False)
+        p.setup()
 
         p.set_solver_print(level=0)
 
@@ -372,7 +372,7 @@ class TestPETScKrylov(unittest.TestCase):
     def test_error_under_cs(self):
         """Verify that PETScKrylov abides by the 'maxiter' option."""
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -413,7 +413,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -451,7 +451,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
              SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -488,7 +488,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -525,7 +525,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -562,7 +562,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -601,7 +601,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
              SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -637,7 +637,7 @@ class TestPETScKrylovSolverFeature(unittest.TestCase):
              SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])

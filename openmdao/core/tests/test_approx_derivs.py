@@ -1,9 +1,8 @@
 """ Testing for group finite differencing."""
-from six.moves import range
-import unittest
-import os
 import itertools
+import unittest
 from six import iterkeys
+from six.moves import range
 
 try:
     from parameterized import parameterized
@@ -12,13 +11,7 @@ except ImportError:
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExecComp, NewtonSolver, \
-    ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DirectSolver, LinearBlockGS, \
-    ScipyOptimizeDriver
-from openmdao.core.tests.test_coloring import CounterGroup
-from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.general_utils import set_pyoptsparse_opt
-from openmdao.utils.mpi import MPI
+import openmdao.api as om
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
@@ -27,12 +20,15 @@ from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompC, TgtCompF, TgtCompK
 from openmdao.test_suite.groups.parallel_groups import FanInSubbedIDVC
 from openmdao.test_suite.parametric_suite import parametric_suite
+from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.parallel_api import PETScVector
     vector_class = PETScVector
 except ImportError:
-    vector_class = DefaultVector
+    vector_class = om.DefaultVector
     PETScVector = None
 
 # check that pyoptsparse is installed
@@ -46,13 +42,13 @@ if OPTIMIZER:
 class TestGroupFiniteDifference(unittest.TestCase):
 
     def test_paraboloid(self):
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         model.approx_totals()
 
         prob.setup(check=False, mode='fwd')
@@ -72,7 +68,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
     def test_fd_count(self):
         # Make sure we aren't doing extra FD steps.
 
-        class ParaboloidA(ExplicitComponent):
+        class ParaboloidA(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_input('y', val=0.0)
@@ -95,10 +91,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
                 self.count += 1
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('px', IndepVarComp('x', val=3.0))
-        model.add_subsystem('py', IndepVarComp('y', val=5.0))
+        model.add_subsystem('px', om.IndepVarComp('x', val=3.0))
+        model.add_subsystem('py', om.IndepVarComp('y', val=5.0))
         model.add_subsystem('parab', ParaboloidA())
 
         model.connect('px.x', 'parab.x')
@@ -108,7 +104,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.add_design_var('py.y', lower=-50, upper=50)
         model.add_objective('parab.f_xy')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         J = prob.compute_totals(of=['parab.f_xy'], wrt=['px.x', 'py.y'])
         # print(J)
@@ -119,7 +115,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
     def test_fd_count_driver(self):
         # Make sure we aren't doing FD wrt any var that isn't in the driver desvar set.
 
-        class ParaboloidA(ExplicitComponent):
+        class ParaboloidA(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_input('y', val=0.0)
@@ -139,10 +135,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
                 self.count += 1
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('px', IndepVarComp('x', val=3.0))
-        model.add_subsystem('py', IndepVarComp('y', val=5.0))
+        model.add_subsystem('px', om.IndepVarComp('x', val=3.0))
+        model.add_subsystem('py', om.IndepVarComp('y', val=5.0))
         model.add_subsystem('parab', ParaboloidA())
 
         model.connect('px.x', 'parab.x')
@@ -153,7 +149,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         model.approx_totals(method='fd')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         prob.driver._compute_totals(of=['parab.f_xy'], wrt=['px.x'], global_names=True)
@@ -162,14 +158,14 @@ class TestGroupFiniteDifference(unittest.TestCase):
         self.assertEqual(model.parab.count, 2)
 
     def test_paraboloid_subbed(self):
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        sub = model.add_subsystem('sub', Group(), promotes=['x', 'y', 'f_xy'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['x', 'y', 'f_xy'])
         sub.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         sub.approx_totals()
 
         prob.setup(check=False, mode='fwd')
@@ -191,20 +187,20 @@ class TestGroupFiniteDifference(unittest.TestCase):
         self.assertEqual(len(sub._approx_schemes['fd']._exec_dict), 2)
 
     def test_paraboloid_subbed_in_setup(self):
-        class MyModel(Group):
+        class MyModel(om.Group):
 
             def setup(self):
                 self.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
                 self.approx_totals()
 
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         sub = model.add_subsystem('sub', MyModel(), promotes=['x', 'y', 'f_xy'])
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -225,13 +221,13 @@ class TestGroupFiniteDifference(unittest.TestCase):
         self.assertEqual(len(sub._approx_schemes['fd']._exec_dict), 2)
 
     def test_paraboloid_subbed_with_connections(self):
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0))
-        model.add_subsystem('p2', IndepVarComp('y', 0.0))
-        sub = model.add_subsystem('sub', Group())
-        sub.add_subsystem('bx', ExecComp('xout = xin'))
-        sub.add_subsystem('by', ExecComp('yout = yin'))
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0))
+        sub = model.add_subsystem('sub', om.Group())
+        sub.add_subsystem('bx', om.ExecComp('xout = xin'))
+        sub.add_subsystem('by', om.ExecComp('yout = yin'))
         sub.add_subsystem('comp', Paraboloid())
 
         model.connect('p1.x', 'sub.bx.xin')
@@ -239,7 +235,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         model.connect('p2.y', 'sub.by.yin')
         model.connect('sub.by.yout', 'sub.comp.y')
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         sub.approx_totals()
 
         prob.setup(check=False, mode='fwd')
@@ -273,19 +269,19 @@ class TestGroupFiniteDifference(unittest.TestCase):
                 """
                 pass
 
-        prob = Problem()
-        model = prob.model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x1', val=np.ones(2)))
-        model.add_subsystem('p2', IndepVarComp('x2', val=np.ones(2)))
+        model.add_subsystem('p1', om.IndepVarComp('x1', val=np.ones(2)))
+        model.add_subsystem('p2', om.IndepVarComp('x2', val=np.ones(2)))
         comp = model.add_subsystem('comp', DoubleArrayFD())
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         model.approx_totals()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         model.run_linearize()
 
@@ -304,17 +300,17 @@ class TestGroupFiniteDifference(unittest.TestCase):
                 super(TestImplCompArrayDense, self).setup()
                 self.declare_partials('*', '*', method='fd')
 
-        prob = Problem()
-        model = prob.model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p_rhs', IndepVarComp('rhs', val=np.ones(2)))
-        sub = model.add_subsystem('sub', Group())
+        model.add_subsystem('p_rhs', om.IndepVarComp('rhs', val=np.ones(2)))
+        sub = model.add_subsystem('sub', om.Group())
         comp = sub.add_subsystem('comp', TestImplCompArrayDense())
         model.connect('p_rhs.rhs', 'sub.comp.rhs')
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         model.run_linearize()
 
@@ -331,18 +327,18 @@ class TestGroupFiniteDifference(unittest.TestCase):
                 """ Disable local solve."""
                 pass
 
-        prob = Problem()
-        model = prob.model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p_rhs', IndepVarComp('rhs', val=np.array([2, 4])))
+        model.add_subsystem('p_rhs', om.IndepVarComp('rhs', val=np.array([2, 4])))
         model.add_subsystem('comp', TestImplCompArrayDenseNoSolve())
         model.connect('p_rhs.rhs', 'comp.rhs')
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.ScipyKrylov()
         model.approx_totals()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         model.approx_totals()
         assert_rel_error(self, prob['comp.x'], [1.97959184, 4.02040816], 1e-5)
@@ -358,13 +354,13 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
     def test_step_size(self):
         # Test makes sure option metadata propagates to the fd function
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
 
         # Worse step so that our answer will be off a wee bit.
         model.approx_totals(step=1e-2)
@@ -382,11 +378,10 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
     def test_unit_conv_group(self):
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        sub1 = prob.model.add_subsystem('sub1', Group())
-        sub2 = prob.model.add_subsystem('sub2', Group())
+        prob = om.Problem()
+        prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
+        sub1 = prob.model.add_subsystem('sub1', om.Group())
+        sub2 = prob.model.add_subsystem('sub2', om.Group())
 
         sub1.add_subsystem('src', SrcComp())
         sub2.add_subsystem('tgtF', TgtCompF())
@@ -400,7 +395,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         sub2.approx_totals(method='fd')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['sub1.src.x2'], 100.0, 1e-6)
@@ -428,27 +423,27 @@ class TestGroupFiniteDifference(unittest.TestCase):
     def test_sellar(self):
         # Basic sellar test.
 
-        prob = Problem()
-        model = prob.model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
                                                 z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         model.approx_totals(method='fd', step=1e-5)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -465,7 +460,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
     def test_desvar_with_indices(self):
         # Just desvars on this one to cover code missed by desvar+response test.
 
-        class ArrayComp2D(ExplicitComponent):
+        class ArrayComp2D(om.ExplicitComponent):
             """
             A fairly simple array component.
             """
@@ -498,9 +493,9 @@ class TestGroupFiniteDifference(unittest.TestCase):
                 """
                 partials[('y1', 'x1')] = self.JJ
 
-        prob = Problem()
-        prob.model = model = Group()
-        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
         mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
@@ -525,7 +520,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
     def test_desvar_and_response_with_indices(self):
 
-        class ArrayComp2D(ExplicitComponent):
+        class ArrayComp2D(om.ExplicitComponent):
             """
             A fairly simple array component.
             """
@@ -557,9 +552,9 @@ class TestGroupFiniteDifference(unittest.TestCase):
                 """
                 partials[('y1', 'x1')] = self.JJ
 
-        prob = Problem()
-        prob.model = model = Group()
-        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
         mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
@@ -584,11 +579,11 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
     def test_full_model_fd(self):
 
-        class DontCall(LinearRunOnce):
+        class DontCall(om.LinearRunOnce):
             def solve(self, vec_names, mode, rel_systems=None):
                 raise RuntimeError("This solver should be ignored!")
 
-        class Simple(ExplicitComponent):
+        class Simple(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', val=0.0)
                 self.add_output('y', val=0.0)
@@ -599,9 +594,9 @@ class TestGroupFiniteDifference(unittest.TestCase):
                 x = inputs['x']
                 outputs['y'] = 4.0*x
 
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('comp', Simple(), promotes=['x', 'y'])
 
         model.linear_solver = DontCall()
@@ -623,29 +618,29 @@ class TestGroupFiniteDifference(unittest.TestCase):
     def test_newton_with_densejac_under_full_model_fd(self):
         # Basic sellar test.
 
-        prob = Problem()
-        model = prob.model = Group(assembled_jac_type='dense')
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        prob = om.Problem()
+        model = prob.model = om.Group(assembled_jac_type='dense')
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = ScipyKrylov(assemble_jac=True)
+        sub.nonlinear_solver = om.NewtonSolver()
+        sub.linear_solver = om.ScipyKrylov(assemble_jac=True)
 
         model.approx_totals(method='fd', step=1e-5)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -662,29 +657,29 @@ class TestGroupFiniteDifference(unittest.TestCase):
     def test_newton_with_cscjac_under_full_model_fd(self):
         # Basic sellar test.
 
-        prob = Problem()
-        model = prob.model = Group()
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = ScipyKrylov(assemble_jac=True)
+        sub.nonlinear_solver = om.NewtonSolver()
+        sub.linear_solver = om.ScipyKrylov(assemble_jac=True)
 
         model.approx_totals(method='fd', step=1e-5)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -699,9 +694,9 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_approx_totals_multi_input_constrained_desvar(self):
-        p = Problem()
+        p = om.Problem()
 
-        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
 
         indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
                                           0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
@@ -709,15 +704,15 @@ class TestGroupFiniteDifference(unittest.TestCase):
                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
         indeps.add_output('r', .7)
 
-        arctan_yox = ExecComp('g=arctan(y/x)', vectorize=True,
-                              g=np.ones(10), x=np.ones(10), y=np.ones(10))
+        arctan_yox = om.ExecComp('g=arctan(y/x)', vectorize=True,
+                                 g=np.ones(10), x=np.ones(10), y=np.ones(10))
 
         p.model.add_subsystem('arctan_yox', arctan_yox)
 
-        p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
+        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-        p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
-                                                g=np.ones(10), x=np.ones(10), y=np.ones(10)))
+        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+                                                   g=np.ones(10), x=np.ones(10), y=np.ones(10)))
 
         p.model.connect('r', ('circle.r', 'r_con.r'))
         p.model.connect('x', ['r_con.x', 'arctan_yox.x'])
@@ -751,9 +746,9 @@ class TestGroupFiniteDifference(unittest.TestCase):
         if OPTIMIZER is None:
             raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
-        p = Problem()
+        p = om.Problem()
 
-        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
 
         indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
                                           0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
@@ -761,25 +756,25 @@ class TestGroupFiniteDifference(unittest.TestCase):
                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
         indeps.add_output('r', .7)
 
-        arctan_yox = ExecComp('g=arctan(y/x)', vectorize=True,
-                              g=np.ones(10), x=np.ones(10), y=np.ones(10))
+        arctan_yox = om.ExecComp('g=arctan(y/x)', vectorize=True,
+                                 g=np.ones(10), x=np.ones(10), y=np.ones(10))
 
         p.model.add_subsystem('arctan_yox', arctan_yox)
 
-        p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
+        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-        p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
-                                                g=np.ones(10), x=np.ones(10), y=np.ones(10)))
+        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+                                                   g=np.ones(10), x=np.ones(10), y=np.ones(10)))
 
         thetas = np.linspace(0, np.pi/4, 10)
-        p.model.add_subsystem('theta_con', ExecComp('g = x - theta', vectorize=True,
-                                                    g=np.ones(10), x=np.ones(10),
-                                                    theta=thetas))
-        p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd', vectorize=True,
-                                                          g=np.ones(10//2), even=np.ones(10//2),
-                                                          odd=np.ones(10//2)))
+        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=True,
+                                                       g=np.ones(10), x=np.ones(10),
+                                                       theta=thetas))
+        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=True,
+                                                             g=np.ones(10//2), even=np.ones(10//2),
+                                                             odd=np.ones(10//2)))
 
-        p.model.add_subsystem('l_conx', ExecComp('g=x-1', vectorize=True, g=np.ones(10), x=np.ones(10)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=True, g=np.ones(10), x=np.ones(10)))
 
         IND = np.arange(10, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
@@ -823,7 +818,7 @@ class TestGroupFiniteDifferenceMPI(unittest.TestCase):
     N_PROCS = 2
 
     def test_indepvarcomp_under_par_sys(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanInSubbedIDVC()
 
         prob.setup(local_vector_class=vector_class, check=False, mode='rev')
@@ -842,7 +837,7 @@ class TestGroupCSMPI(unittest.TestCase):
     N_PROCS = 2
 
     def test_indepvarcomp_under_par_sys_par_cs(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanInSubbedIDVC(num_par_fd=2)
         prob.model.approx_totals(method='cs')
 
@@ -861,7 +856,7 @@ class TestGroupFDMPI(unittest.TestCase):
     N_PROCS = 2
 
     def test_indepvarcomp_under_par_sys_par_fd(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanInSubbedIDVC(num_par_fd=2)
 
         prob.model.approx_totals(method='fd')
@@ -883,7 +878,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
     def setUp(self):
 
-        self.prob = Problem()
+        self.prob = om.Problem()
 
     def tearDown(self):
         # Global stuff seems to not get cleaned up if test fails.
@@ -892,7 +887,7 @@ class TestGroupComplexStep(unittest.TestCase):
         except Exception:
             pass
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_paraboloid_'+'_'.join(title(a) for a in p.args))
     def test_paraboloid(self, vec_class):
@@ -901,12 +896,12 @@ class TestGroupComplexStep(unittest.TestCase):
             raise unittest.SkipTest("PETSc is not installed")
 
         prob = self.prob
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         model.approx_totals(method='cs')
 
         prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
@@ -923,7 +918,7 @@ class TestGroupComplexStep(unittest.TestCase):
         # 1 output x 2 inputs
         self.assertEqual(len(model._approx_schemes['cs']._exec_dict), 2)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_paraboloid_subbed_'+'_'.join(title(a) for a in p.args))
     def test_paraboloid_subbed(self, vec_class):
@@ -932,13 +927,13 @@ class TestGroupComplexStep(unittest.TestCase):
             raise unittest.SkipTest("PETSc is not installed")
 
         prob = self.prob
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
-        sub = model.add_subsystem('sub', Group(), promotes=['x', 'y', 'f_xy'])
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['x', 'y', 'f_xy'])
         sub.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         sub.approx_totals(method='cs')
 
         prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
@@ -959,7 +954,7 @@ class TestGroupComplexStep(unittest.TestCase):
         # 1 output x 2 inputs
         self.assertEqual(len(sub._approx_schemes['cs']._exec_dict), 2)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_parab_subbed_with_connections_'+'_'.join(title(a) for a in p.args))
     def test_paraboloid_subbed_with_connections(self, vec_class):
@@ -968,12 +963,12 @@ class TestGroupComplexStep(unittest.TestCase):
             raise unittest.SkipTest("PETSc is not installed")
 
         prob = self.prob
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0))
-        model.add_subsystem('p2', IndepVarComp('y', 0.0))
-        sub = model.add_subsystem('sub', Group())
-        sub.add_subsystem('bx', ExecComp('xout = xin'))
-        sub.add_subsystem('by', ExecComp('yout = yin'))
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0))
+        sub = model.add_subsystem('sub', om.Group())
+        sub.add_subsystem('bx', om.ExecComp('xout = xin'))
+        sub.add_subsystem('by', om.ExecComp('yout = yin'))
         sub.add_subsystem('comp', Paraboloid())
 
         model.connect('p1.x', 'sub.bx.xin')
@@ -981,7 +976,7 @@ class TestGroupComplexStep(unittest.TestCase):
         model.connect('p2.y', 'sub.by.yin')
         model.connect('sub.by.yout', 'sub.comp.y')
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         sub.approx_totals(method='cs')
 
         prob.setup(check=False, mode='fwd', local_vector_class=vec_class)
@@ -1005,7 +1000,7 @@ class TestGroupComplexStep(unittest.TestCase):
             n_entries += len(v)
         self.assertEqual(n_entries, 6)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_array_comp_'+'_'.join(title(a) for a in p.args))
     def test_array_comp(self, vec_class):
@@ -1022,15 +1017,15 @@ class TestGroupComplexStep(unittest.TestCase):
                 pass
 
         prob = self.prob
-        model = prob.model = Group()
+        model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x1', val=np.ones(2)))
-        model.add_subsystem('p2', IndepVarComp('x2', val=np.ones(2)))
+        model.add_subsystem('p1', om.IndepVarComp('x1', val=np.ones(2)))
+        model.add_subsystem('p2', om.IndepVarComp('x2', val=np.ones(2)))
         comp = model.add_subsystem('comp', DoubleArrayFD())
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         model.approx_totals(method='cs')
 
         prob.setup(check=False, local_vector_class=vec_class)
@@ -1043,7 +1038,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, Jfd['comp.y2', 'p1.x1'], comp.JJ[2:4, 0:2], 1e-6)
         assert_rel_error(self, Jfd['comp.y2', 'p2.x2'], comp.JJ[2:4, 2:4], 1e-6)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_unit_conv_group_'+'_'.join(title(a) for a in p.args))
     def test_unit_conv_group(self, vec_class):
@@ -1052,10 +1047,9 @@ class TestGroupComplexStep(unittest.TestCase):
             raise unittest.SkipTest("PETSc is not installed")
 
         prob = self.prob
-        prob.model = Group()
-        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        sub1 = prob.model.add_subsystem('sub1', Group())
-        sub2 = prob.model.add_subsystem('sub2', Group())
+        prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
+        sub1 = prob.model.add_subsystem('sub1', om.Group())
+        sub2 = prob.model.add_subsystem('sub2', om.Group())
 
         sub1.add_subsystem('src', SrcComp())
         sub2.add_subsystem('tgtF', TgtCompF())
@@ -1094,7 +1088,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['sub2.tgtC.x3']['x1'][0][0], 1.0, 1e-6)
         assert_rel_error(self, J['sub2.tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_sellar_'+'_'.join(title(a) for a in p.args))
     def test_sellar(self, vec_class):
@@ -1104,22 +1098,22 @@ class TestGroupComplexStep(unittest.TestCase):
             raise unittest.SkipTest("PETSc is not installed")
 
         prob = self.prob
-        model = prob.model = Group()
+        model = prob.model
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
         prob.model.nonlinear_solver.options['atol'] = 1e-50
         prob.model.nonlinear_solver.options['rtol'] = 1e-50
 
@@ -1144,7 +1138,7 @@ class TestGroupComplexStep(unittest.TestCase):
 
     def test_desvar_and_response_with_indices(self):
 
-        class ArrayComp2D(ExplicitComponent):
+        class ArrayComp2D(om.ExplicitComponent):
             """
             A fairly simple array component.
             """
@@ -1176,9 +1170,9 @@ class TestGroupComplexStep(unittest.TestCase):
                 """
                 partials[('y1', 'x1')] = self.JJ
 
-        prob = Problem()
-        prob.model = model = Group()
-        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
         mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
@@ -1204,7 +1198,7 @@ class TestGroupComplexStep(unittest.TestCase):
     def test_desvar_with_indices(self):
         # Just desvars on this one to cover code missed by desvar+response test.
 
-        class ArrayComp2D(ExplicitComponent):
+        class ArrayComp2D(om.ExplicitComponent):
             """
             A fairly simple array component.
             """
@@ -1236,9 +1230,9 @@ class TestGroupComplexStep(unittest.TestCase):
                 """
                 partials[('y1', 'x1')] = self.JJ
 
-        prob = Problem()
-        prob.model = model = Group()
-        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
         mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
@@ -1261,7 +1255,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['y1', 'x1'][2][0], Jbase[2, 1], 1e-8)
         assert_rel_error(self, J['y1', 'x1'][2][1], Jbase[2, 3], 1e-8)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_newton_with_direct_solver_'+'_'.join(title(a) for a in p.args))
     def test_newton_with_direct_solver(self, vec_class):
@@ -1270,25 +1264,25 @@ class TestGroupComplexStep(unittest.TestCase):
         if not vec_class:
             raise unittest.SkipTest("PETSc is not installed")
 
-        prob = Problem()
-        model = prob.model = Group()
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = DirectSolver(assemble_jac=False)
+        sub.nonlinear_solver = om.NewtonSolver()
+        sub.linear_solver = om.DirectSolver(assemble_jac=False)
         sub.nonlinear_solver.options['atol'] = 1e-10
         sub.nonlinear_solver.options['rtol'] = 1e-10
 
@@ -1312,7 +1306,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_newton_with_direct_solver_dense_'+'_'.join(title(a) for a in p.args))
     def test_newton_with_direct_solver_dense(self, vec_class):
@@ -1321,25 +1315,25 @@ class TestGroupComplexStep(unittest.TestCase):
         if not vec_class:
             raise unittest.SkipTest("PETSc is not installed")
 
-        prob = Problem()
-        model = prob.model = Group()
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = DirectSolver()
+        sub.nonlinear_solver = om.NewtonSolver()
+        sub.linear_solver = om.DirectSolver()
         sub.options['assembled_jac_type'] = 'dense'
 
         sub.nonlinear_solver.options['atol'] = 1e-10
@@ -1365,7 +1359,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_newton_with_direct_solver_csc_'+'_'.join(title(a) for a in p.args))
     def test_newton_with_direct_solver_csc(self, vec_class):
@@ -1374,25 +1368,25 @@ class TestGroupComplexStep(unittest.TestCase):
         if not vec_class:
             raise unittest.SkipTest("PETSc is not installed")
 
-        prob = Problem()
-        model = prob.model = Group()
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = DirectSolver()
+        sub.nonlinear_solver = om.NewtonSolver()
+        sub.linear_solver = om.DirectSolver()
         sub.options['assembled_jac_type'] = 'csc'
 
         sub.nonlinear_solver.options['atol'] = 1e-10
@@ -1418,7 +1412,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_subbed_newton_gs_'+'_'.join(title(a) for a in p.args))
     def test_subbed_newton_gs(self, vec_class):
@@ -1427,37 +1421,37 @@ class TestGroupComplexStep(unittest.TestCase):
             raise unittest.SkipTest("PETSc is not installed")
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-        class SellarDerivatives(Group):
+        class SellarDerivatives(om.Group):
 
             def setup(self):
-                self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-                self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+                self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+                self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
                 self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
                 self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-                sub = self.add_subsystem('sub', Group(), promotes=['*'])
+                sub = self.add_subsystem('sub', om.Group(), promotes=['*'])
 
-                sub.linear_solver = DirectSolver(assemble_jac=True)
+                sub.linear_solver = om.DirectSolver(assemble_jac=True)
                 sub.options['assembled_jac_type'] = 'csc'
 
-                sub.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
-                                                       x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
+                sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+                                                         x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
                                   promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-                sub.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+                sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
                                   promotes=['con1', 'y1'])
-                sub.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+                sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                                   promotes=['con2', 'y2'])
 
-                self.nonlinear_solver = NewtonSolver()
-                self.linear_solver = LinearBlockGS()
+                self.nonlinear_solver = om.NewtonSolver()
+                self.linear_solver = om.LinearBlockGS()
                 self.linear_solver.options['maxiter'] = 25
                 self.linear_solver.options['atol'] = 1e-16
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.model.approx_totals(method='cs')
 
@@ -1474,7 +1468,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_subbed_newton_gs_csc_external_mtx_'+'_'.join(title(a) for a in p.args))
     def test_subbed_newton_gs_csc_external_mtx(self, vec_class):
@@ -1483,37 +1477,37 @@ class TestGroupComplexStep(unittest.TestCase):
             raise unittest.SkipTest("PETSc is not installed")
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-        class SellarDerivatives(Group):
+        class SellarDerivatives(om.Group):
 
             def setup(self):
-                self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-                self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+                self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+                self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
                 self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
                 self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-                sub = self.add_subsystem('sub', Group(), promotes=['*'])
+                sub = self.add_subsystem('sub', om.Group(), promotes=['*'])
 
-                sub.linear_solver = DirectSolver(assemble_jac=True)
+                sub.linear_solver = om.DirectSolver(assemble_jac=True)
                 sub.options['assembled_jac_type'] = 'csc'
 
-                sub.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
-                                                       x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
+                sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+                                                         x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
                                   promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-                sub.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+                sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
                                   promotes=['con1', 'y1'])
-                sub.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+                sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                                   promotes=['con2', 'y2'])
 
-                self.nonlinear_solver = NewtonSolver()
-                self.linear_solver = LinearBlockGS()
+                self.nonlinear_solver = om.NewtonSolver()
+                self.linear_solver = om.LinearBlockGS()
                 self.linear_solver.options['maxiter'] = 25
                 self.linear_solver.options['atol'] = 1e-16
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.model.approx_totals(method='cs')
 
@@ -1530,7 +1524,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_subbed_newton_gs_dense_external_mtx_'+'_'.join(title(a) for a in p.args))
     def test_subbed_newton_gs_dense_external_mtx(self, vec_class):
@@ -1539,37 +1533,37 @@ class TestGroupComplexStep(unittest.TestCase):
             raise unittest.SkipTest("PETSc is not installed")
 
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
-        class SellarDerivatives(Group):
+        class SellarDerivatives(om.Group):
 
             def setup(self):
-                self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-                self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+                self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+                self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
                 self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
                 self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
-                sub = self.add_subsystem('sub', Group(), promotes=['*'])
+                sub = self.add_subsystem('sub', om.Group(), promotes=['*'])
 
-                sub.linear_solver = DirectSolver(assemble_jac=True)
+                sub.linear_solver = om.DirectSolver(assemble_jac=True)
                 sub.options['assembled_jac_type'] = 'dense'
 
-                sub.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
-                                                       x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
+                sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+                                                         x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
                                   promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-                sub.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+                sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
                                   promotes=['con1', 'y1'])
-                sub.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+                sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                                   promotes=['con2', 'y2'])
 
-                self.nonlinear_solver = NewtonSolver()
-                self.linear_solver = LinearBlockGS()
+                self.nonlinear_solver = om.NewtonSolver()
+                self.linear_solver = om.LinearBlockGS()
                 self.linear_solver.options['maxiter'] = 25
                 self.linear_solver.options['atol'] = 1e-16
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.model.approx_totals(method='cs')
 
@@ -1586,7 +1580,7 @@ class TestGroupComplexStep(unittest.TestCase):
         assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
         assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
-    @parameterized.expand(itertools.product([DefaultVector, PETScVector]),
+    @parameterized.expand(itertools.product([om.DefaultVector, PETScVector]),
                           name_func=lambda f, n, p:
                           'test_newton_with_krylov_solver_'+'_'.join(title(a) for a in p.args))
     def test_newton_with_krylov_solver(self, vec_class):
@@ -1595,25 +1589,25 @@ class TestGroupComplexStep(unittest.TestCase):
         if not vec_class:
             raise unittest.SkipTest("PETSc is not installed")
 
-        prob = Problem()
-        model = prob.model = Group()
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = ScipyKrylov()
+        sub.nonlinear_solver = om.NewtonSolver()
+        sub.linear_solver = om.ScipyKrylov()
         sub.nonlinear_solver.options['atol'] = 1e-10
         sub.nonlinear_solver.options['rtol'] = 1e-10
         sub.linear_solver.options['atol'] = 1e-15
@@ -1641,31 +1635,31 @@ class TestGroupComplexStep(unittest.TestCase):
     def test_newton_with_cscjac_under_cs(self):
         # Basic sellar test.
 
-        prob = Problem()
-        model = prob.model = Group()
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = ScipyKrylov(assemble_jac=True)
+        sub.nonlinear_solver = om.NewtonSolver()
+        sub.linear_solver = om.ScipyKrylov(assemble_jac=True)
         sub.nonlinear_solver.options['atol'] = 1e-20
         sub.nonlinear_solver.options['rtol'] = 1e-20
 
         model.approx_totals(method='cs', step=1e-12)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1686,37 +1680,37 @@ class TestGroupComplexStep(unittest.TestCase):
     def test_newton_with_fd_group(self):
         # Basic sellar test.
 
-        prob = Problem()
-        model = prob.model = Group()
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
-        subfd = sub.add_subsystem('subfd', Group(), promotes=['*'])
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+        subfd = sub.add_subsystem('subfd', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         subfd.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         subfd.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         # Finite difference for the Newton linear solve only
         subfd.approx_totals(method='fd')
 
-        sub.nonlinear_solver = NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver()
         sub.nonlinear_solver.options['maxiter'] = 12
-        sub.linear_solver = DirectSolver(assemble_jac=False)
+        sub.linear_solver = om.DirectSolver(assemble_jac=False)
         sub.nonlinear_solver.options['atol'] = 1e-20
         sub.nonlinear_solver.options['rtol'] = 1e-20
 
         # Complex Step for top derivatives
         model.approx_totals(method='cs', step=1e-14)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1737,27 +1731,27 @@ class TestGroupComplexStep(unittest.TestCase):
     def test_nested_complex_step_unsupported(self):
         # Basic sellar test.
 
-        prob = self.prob = Problem()
-        model = prob.model = Group()
+        prob = self.prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1CS(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2CS(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = DirectSolver(assemble_jac=False)
+        prob.model.nonlinear_solver = om.NewtonSolver()
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=False)
 
         prob.model.approx_totals(method='cs')
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1788,17 +1782,17 @@ class TestComponentComplexStep(unittest.TestCase):
                 super(TestImplCompArrayDense, self).setup()
                 self.declare_partials('*', '*', method='cs')
 
-        prob = self.prob = Problem()
-        model = prob.model = Group()
+        prob = self.prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p_rhs', IndepVarComp('rhs', val=np.ones(2)))
-        sub = model.add_subsystem('sub', Group())
+        model.add_subsystem('p_rhs', om.IndepVarComp('rhs', val=np.ones(2)))
+        sub = model.add_subsystem('sub', om.Group())
         comp = sub.add_subsystem('comp', TestImplCompArrayDense())
         model.connect('p_rhs.rhs', 'sub.comp.rhs')
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         model.run_linearize()
 
@@ -1826,17 +1820,17 @@ class TestComponentComplexStep(unittest.TestCase):
                     self.declare_partials('*', '*', method='fd')
                 self.count += 1
 
-        prob = self.prob = Problem()
-        model = prob.model = Group()
+        prob = self.prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p_rhs', IndepVarComp('rhs', val=np.ones(2)))
-        sub = model.add_subsystem('sub', Group())
+        model.add_subsystem('p_rhs', om.IndepVarComp('rhs', val=np.ones(2)))
+        sub = model.add_subsystem('sub', om.Group())
         comp = sub.add_subsystem('comp', TestImplCompArrayDense())
         model.connect('p_rhs.rhs', 'sub.comp.rhs')
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         with self.assertRaises(RuntimeError) as context:
@@ -1860,7 +1854,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
     def test_vector_methods(self):
 
-        class KenComp(ExplicitComponent):
+        class KenComp(om.ExplicitComponent):
 
             def setup(self):
 
@@ -1882,14 +1876,14 @@ class TestComponentComplexStep(unittest.TestCase):
 
                 outputs['y1'] *= 1.0
 
-        prob = self.prob = Problem()
-        model = prob.model = Group()
+        prob = self.prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('px', IndepVarComp('x', val=np.array([[7.0, 3.0], [2.4, 3.33]])))
+        model.add_subsystem('px', om.IndepVarComp('x', val=np.array([[7.0, 3.0], [2.4, 3.33]])))
         model.add_subsystem('comp', KenComp())
         model.connect('px.x', 'comp.x1')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         of = ['comp.y1']
@@ -1904,26 +1898,26 @@ class TestComponentComplexStep(unittest.TestCase):
     def test_sellar_comp_cs(self):
         # Basic sellar test.
 
-        prob = self.prob = Problem()
-        model = prob.model = Group()
+        prob = self.prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         model.add_subsystem('d1', SellarDis1CS(), promotes=['x', 'z', 'y1', 'y2'])
         model.add_subsystem('d2', SellarDis2CS(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob.model.nonlinear_solver = NonlinearBlockGS()
-        prob.model.linear_solver = DirectSolver(assemble_jac=False)
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=False)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -1943,9 +1937,9 @@ class TestComponentComplexStep(unittest.TestCase):
             self.assertLess(val, 1e-8, msg="Check if CS cleans up after itself.")
 
     def test_stepsizes_under_complex_step(self):
-        from openmdao.api import Problem, ExplicitComponent
+        import openmdao.api as om
 
-        class SimpleComp(ExplicitComponent):
+        class SimpleComp(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('x', val=1.0)
@@ -1999,9 +1993,8 @@ class TestComponentComplexStep(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('px', om.IndepVarComp('x', val=1.0))
         prob.model.add_subsystem('comp', SimpleComp())
         prob.model.connect('px.x', 'comp.x')
 
@@ -2021,9 +2014,9 @@ class TestComponentComplexStep(unittest.TestCase):
         prob.check_partials(method='cs', step=1e-14, out_stream=None)
 
     def test_feature_under_complex_step(self):
-        from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
+        import openmdao.api as om
 
-        class SimpleComp(ExplicitComponent):
+        class SimpleComp(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('x', val=1.0)
@@ -2039,9 +2032,8 @@ class TestComponentComplexStep(unittest.TestCase):
                     print("x", inputs['x'])
                     print("y", outputs['y'])
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('px', om.IndepVarComp('x', val=1.0))
         prob.model.add_subsystem('comp', SimpleComp())
         prob.model.connect('px.x', 'comp.x')
 
@@ -2060,9 +2052,9 @@ class ApproxTotalsFeature(unittest.TestCase):
     def test_basic(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExplicitComponent
+        import openmdao.api as om
 
-        class CompOne(ExplicitComponent):
+        class CompOne(om.ExplicitComponent):
 
                 def setup(self):
                     self.add_input('x', val=0.0)
@@ -2074,7 +2066,7 @@ class ApproxTotalsFeature(unittest.TestCase):
                     outputs['y'] = np.arange(25) * x
                     self._exec_count += 1
 
-        class CompTwo(ExplicitComponent):
+        class CompTwo(om.ExplicitComponent):
 
                 def setup(self):
                     self.add_input('y', val=np.zeros(25))
@@ -2086,13 +2078,13 @@ class ApproxTotalsFeature(unittest.TestCase):
                     outputs['z'] = np.sum(y)
                     self._exec_count += 1
 
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         comp2 = model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         model.approx_totals()
 
         prob.setup()
@@ -2108,9 +2100,9 @@ class ApproxTotalsFeature(unittest.TestCase):
     def test_basic_cs(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExplicitComponent
+        import openmdao.api as om
 
-        class CompOne(ExplicitComponent):
+        class CompOne(om.ExplicitComponent):
 
                 def setup(self):
                     self.add_input('x', val=0.0)
@@ -2122,7 +2114,7 @@ class ApproxTotalsFeature(unittest.TestCase):
                     outputs['y'] = np.arange(25) * x
                     self._exec_count += 1
 
-        class CompTwo(ExplicitComponent):
+        class CompTwo(om.ExplicitComponent):
 
                 def setup(self):
                     self.add_input('y', val=np.zeros(25))
@@ -2134,13 +2126,13 @@ class ApproxTotalsFeature(unittest.TestCase):
                     outputs['z'] = np.sum(y)
                     self._exec_count += 1
 
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         model.approx_totals(method='cs')
 
         prob.setup()
@@ -2155,9 +2147,9 @@ class ApproxTotalsFeature(unittest.TestCase):
     def test_arguments(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExplicitComponent
+        import openmdao.api as om
 
-        class CompOne(ExplicitComponent):
+        class CompOne(om.ExplicitComponent):
 
                 def setup(self):
                     self.add_input('x', val=0.0)
@@ -2169,7 +2161,7 @@ class ApproxTotalsFeature(unittest.TestCase):
                     outputs['y'] = np.arange(25) * x
                     self._exec_count += 1
 
-        class CompTwo(ExplicitComponent):
+        class CompTwo(om.ExplicitComponent):
 
                 def setup(self):
                     self.add_input('y', val=np.zeros(25))
@@ -2181,13 +2173,13 @@ class ApproxTotalsFeature(unittest.TestCase):
                     outputs['z'] = np.sum(y)
                     self._exec_count += 1
 
-        prob = Problem()
-        model = prob.model = Group()
-        model.add_subsystem('p1', IndepVarComp('x', 1.0), promotes=['x'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('comp1', CompOne(), promotes=['x', 'y'])
         model.add_subsystem('comp2', CompTwo(), promotes=['y', 'z'])
 
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
         model.approx_totals(method='fd', step=1e-7, form='central', step_calc='rel')
 
         prob.setup()
@@ -2201,13 +2193,13 @@ class ApproxTotalsFeature(unittest.TestCase):
 
     def test_sellarCS(self):
         # Just tests Newton on Sellar with FD derivs.
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarNoDerivativesCS()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -2230,7 +2222,7 @@ class ParallelFDParametricTestCase(unittest.TestCase):
         run_by_default=True,
     )
     def test_subset(self, param_instance):
-        param_instance.linear_solver_class = DirectSolver
+        param_instance.linear_solver_class = om.DirectSolver
         param_instance.linear_solver_options = {}  # defaults not valid for DirectSolver
 
         param_instance.setup()

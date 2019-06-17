@@ -99,7 +99,7 @@ class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
 
         prob.driver = AEDriver()
 
-        prob.setup(check=False)
+        prob.setup()
 
         handled = prob.run_driver()
         self.assertTrue(handled)

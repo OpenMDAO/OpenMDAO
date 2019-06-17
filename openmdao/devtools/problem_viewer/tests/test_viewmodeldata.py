@@ -94,7 +94,7 @@ class TestViewModelData(unittest.TestCase):
         to the expected structure, using the SellarStateConnection model.
         """
         p = Problem(model=SellarStateConnection())
-        p.setup(check=False)
+        p.setup()
 
         model_viewer_data = _get_viewer_data(p)
 
@@ -129,7 +129,7 @@ class TestViewModelData(unittest.TestCase):
         r = SqliteRecorder(self.sqlite_db_filename)
         p.driver.add_recorder(r)
 
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
         r.shutdown()
 
@@ -161,7 +161,7 @@ class TestViewModelData(unittest.TestCase):
         """
         p = Problem()
         p.model = SellarStateConnection()
-        p.setup(check=False)
+        p.setup()
         view_model(p, outfile=self.problem_html_filename, show_browser=DEBUG)
 
         # Check that the html file has been created and has something in it.
@@ -177,7 +177,7 @@ class TestViewModelData(unittest.TestCase):
         p.model = SellarStateConnection()
         r = SqliteRecorder(self.sqlite_db_filename2)
         p.driver.add_recorder(r)
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
         r.shutdown()
         view_model(self.sqlite_db_filename2, outfile=self.sqlite_html_filename, show_browser=DEBUG)
@@ -204,7 +204,7 @@ class TestViewModelData(unittest.TestCase):
         """
         p = Problem()
         p.model = SellarStateConnection()
-        p.setup(check=False)
+        p.setup()
         view_model(p, outfile=self.problem_html_filename, show_browser=DEBUG,
                    title="Sellar State Connection")
 

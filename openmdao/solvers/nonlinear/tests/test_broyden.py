@@ -134,7 +134,7 @@ class TestBryoden(unittest.TestCase):
         model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
                                                    linear_solver=LinearRunOnce())
 
-        prob.setup(check=False)
+        prob.setup()
 
         model.nonlinear_solver.options['state_vars'] = ['junk']
 
@@ -151,7 +151,7 @@ class TestBryoden(unittest.TestCase):
         model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
                                                    linear_solver=LinearRunOnce())
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(ValueError) as context:
             prob.run_model()
@@ -166,7 +166,7 @@ class TestBryoden(unittest.TestCase):
         model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
                                                    linear_solver=LinearRunOnce())
 
-        prob.setup(check=False)
+        prob.setup()
 
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
         model.nonlinear_solver.options['compute_jacobian'] = False
@@ -183,7 +183,7 @@ class TestBryoden(unittest.TestCase):
         model = prob.model = SellarDerivatives(nonlinear_solver=BroydenSolver(),
                                                linear_solver=LinearRunOnce())
 
-        prob.setup(check=False)
+        prob.setup()
 
         model.nonlinear_solver.options['state_vars'] = ['y1']
         model.nonlinear_solver.options['compute_jacobian'] = True
@@ -203,7 +203,7 @@ class TestBryoden(unittest.TestCase):
                                                    linear_solver=LinearRunOnce())
         prob.model.approx_totals(method='fd')
 
-        prob.setup(check=False)
+        prob.setup()
 
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
         model.nonlinear_solver.options['compute_jacobian'] = False
@@ -232,7 +232,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver.options['maxiter'] = 15
         model.nonlinear_solver.options['compute_jacobian'] = False
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
 
@@ -254,7 +254,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver.options['maxiter'] = 15
         model.nonlinear_solver.options['compute_jacobian'] = False
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
 
@@ -278,7 +278,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver.options['maxiter'] = 15
         model.nonlinear_solver.options['compute_jacobian'] = False
 
-        prob.setup(check=False)
+        prob.setup()
 
         msg = "The following states are not covered by a solver, and may have been " \
               "omitted from the BroydenSolver 'state_vars': mixed.x3, mixed.x45"
@@ -300,7 +300,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver.options['maxiter'] = 15
         model.nonlinear_solver.options['compute_jacobian'] = False
 
-        prob.setup(check=False)
+        prob.setup()
 
         msg = "The following states are not covered by a solver, and may have been " \
               "omitted from the BroydenSolver 'state_vars': x3, x45"
@@ -324,7 +324,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver.options['maxiter'] = 15
         model.nonlinear_solver.options['compute_jacobian'] = False
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
 
@@ -348,7 +348,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver.options['maxiter'] = 15
         model.nonlinear_solver.linear_solver = DirectSolver()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
 
@@ -367,7 +367,7 @@ class TestBryoden(unittest.TestCase):
         model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
                                                    linear_solver=LinearRunOnce())
 
-        prob.setup(check=False)
+        prob.setup()
 
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
         model.nonlinear_solver.linear_solver = DirectSolver(assemble_jac=False)
@@ -388,7 +388,7 @@ class TestBryoden(unittest.TestCase):
         model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
                                                    linear_solver=LinearRunOnce())
 
-        prob.setup(check=False)
+        prob.setup()
 
         model.nonlinear_solver.linear_solver = DirectSolver(assemble_jac=True)
 
@@ -408,7 +408,7 @@ class TestBryoden(unittest.TestCase):
         model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
                                                    linear_solver=LinearRunOnce())
 
-        prob.setup(check=False)
+        prob.setup()
 
         model.options['assembled_jac_type'] = 'dense'
         model.nonlinear_solver.linear_solver = DirectSolver(assemble_jac=True)
@@ -429,7 +429,7 @@ class TestBryoden(unittest.TestCase):
         model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
                                                    linear_solver=LinearRunOnce())
 
-        prob.setup(check=False)
+        prob.setup()
 
         model.nonlinear_solver.linear_solver = DirectSolver()
         model.nonlinear_solver.options['compute_jacobian'] = False
@@ -450,7 +450,7 @@ class TestBryoden(unittest.TestCase):
         model = prob.model = SellarStateConnection(nonlinear_solver=BroydenSolver(),
                                                    linear_solver=LinearRunOnce())
 
-        prob.setup(check=False)
+        prob.setup()
 
         model.nonlinear_solver.linear_solver = DirectSolver()
 
@@ -481,7 +481,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver.options['diverge_limit'] = np.inf
         model.nonlinear_solver.linear_solver = DirectSolver()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.set_solver_print(level=2)
         prob.run_model()
@@ -505,7 +505,7 @@ class TestBryoden(unittest.TestCase):
         model.nonlinear_solver.options['diverge_limit'] = 0.5
         model.nonlinear_solver.linear_solver = DirectSolver()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.set_solver_print(level=2)
         prob.run_model()
@@ -525,11 +525,11 @@ class TestBryoden(unittest.TestCase):
 
         top.model.linear_solver = DirectSolver()
 
-        top.setup(check=False)
+        top.setup()
         top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         top.set_solver_print(level=2)
         # Test lower bound: should go to the lower bound and stall

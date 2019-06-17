@@ -43,7 +43,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that output with no specified surrogate gets the default
         sin_mm.options['default_surrogate'] = KrigingSurrogate()
-        prob.setup(check=False)
+        prob.setup()
         surrogate = sin_mm._metadata('f_x').get('surrogate')
         self.assertTrue(isinstance(surrogate, KrigingSurrogate),
                         'sin_mm.f_x should get the default surrogate')
@@ -76,7 +76,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('sin_mm', sin_mm)
 
-        prob.setup(check=False)
+        prob.setup()
 
         sin_mm.options['train:x'] = np.linspace(0,10,20)
         sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
@@ -117,7 +117,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # check that output with no specified surrogate gets the default
         sin_mm.options['default_surrogate'] = KrigingSurrogate()
-        prob.setup(check=False)
+        prob.setup()
 
         surrogate = sin_mm._metadata('f_x').get('surrogate')
         self.assertTrue(isinstance(surrogate, KrigingSurrogate),
@@ -140,7 +140,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add it to a Problem
         prob = Problem()
         prob.model.add_subsystem('sin_mm', sin_mm)
-        prob.setup(check=False)
+        prob.setup()
 
         # train the surrogate and check predicted value
         sin_mm.options['train:x'] = np.linspace(0,10,20)
@@ -168,7 +168,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add metamodel to a problem
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         # check that surrogates were properly assigned
         surrogate = mm._metadata('y1').get('surrogate')
@@ -204,7 +204,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         # change default surrogate, re-setup and check that metamodel re-trains
         mm.options['default_surrogate'] = KrigingSurrogate()
-        prob.setup(check=False)
+        prob.setup()
 
         surrogate = mm._metadata('y1').get('surrogate')
         self.assertTrue(isinstance(surrogate, KrigingSurrogate))
@@ -221,7 +221,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [
             [1.0, 1.0, 1.0, 1.0],
@@ -249,7 +249,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [
             [[1.0, 1.0], [1.0, 1.0]],
@@ -276,7 +276,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [
             [[1.0, 1.0], [1.0, 1.0]],
@@ -308,7 +308,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [
             [[1.0, 1.0], [1.0, 1.0]],
@@ -341,7 +341,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [1.0, 1.0, 1.0, 1.0]
         mm.options['train:y'] = [1.0, 2.0]
@@ -369,7 +369,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [1.0, 1.0, 1.0, 1.0]
         mm.options['train:y'] = [1.0, 2.0, 3.0, 4.0]
@@ -454,7 +454,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add it to a Problem, run and check the predicted values
         prob = Problem()
         prob.model.add_subsystem('trig', trig)
-        prob.setup(check=False)
+        prob.setup()
 
         prob['trig.x'] = 2.1
         prob.run_model()
@@ -476,7 +476,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add it to a Problem
         prob = Problem()
         prob.model.add_subsystem('trig', trig)
-        prob.setup(check=False)
+        prob.setup()
 
         # provide training data
         trig.options['train:x'] = np.linspace(0, 10, 20)
@@ -506,7 +506,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add it to a Problem
         prob = Problem()
         prob.model.add_subsystem('trig', trig)
-        prob.setup(check=False)
+        prob.setup()
 
         # provide training data
         trig.options['train:x'] = np.linspace(0, 10, 20)
@@ -540,7 +540,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add it to a Problem
         prob = Problem()
         prob.model.add_subsystem('trig', trig)
-        prob.setup(check=False)
+        prob.setup()
 
         # provide training data
         trig.options['train:x'] = np.linspace(0, 10, 20)
@@ -566,7 +566,7 @@ class MetaModelTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [
             [[1.0, 2.0, 1.0], [1.0, 2.0, 1.0]],
@@ -649,7 +649,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add it to a Problem
         prob = Problem()
         prob.model.add_subsystem('trig', trig)
-        prob.setup(check=False)
+        prob.setup()
 
         # provide training data
         trig.options['train:x'] = np.linspace(0, 10, 20)
@@ -678,7 +678,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add it to a Problem
         prob = Problem()
         prob.model.add_subsystem('trig', trig)
-        prob.setup(check=False)
+        prob.setup()
 
         # provide training data
         trig.options['train:x'] = np.linspace(0, 10, 20)
@@ -770,7 +770,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add metamodel to a problem
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         # check that surrogates were properly assigned
         surrogate = mm._metadata('y1').get('surrogate')
@@ -815,7 +815,7 @@ class MetaModelTestCase(unittest.TestCase):
         with assert_warning(DeprecationWarning, msg):
             mm.default_surrogate = KrigingSurrogate()
 
-        prob.setup(check=False)
+        prob.setup()
 
         surrogate = mm._metadata('y1').get('surrogate')
         self.assertTrue(isinstance(surrogate, KrigingSurrogate))
@@ -854,7 +854,7 @@ class MetaModelTestCase(unittest.TestCase):
         # add metamodel to a problem
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         # check that surrogates were properly assigned
         surrogate = mm._metadata('y1').get('surrogate')
@@ -899,7 +899,7 @@ class MetaModelTestCase(unittest.TestCase):
         with assert_warning(DeprecationWarning, msg):
             mm.default_surrogate = KrigingSurrogate()
 
-        prob.setup(check=False)
+        prob.setup()
 
         surrogate = mm._metadata('y1').get('surrogate')
         self.assertTrue(isinstance(surrogate, KrigingSurrogate))
@@ -978,7 +978,7 @@ class MetaModelTestCase(unittest.TestCase):
             prob.model.add_subsystem('indep', indep)
             prob.model.add_subsystem('trig', trig)
             prob.model.connect('indep.x', 'trig.x')
-            prob.setup(check=False)
+            prob.setup()
             prob['indep.x'] = 5.0
             trig.train = False
             prob.run_model()
@@ -1039,7 +1039,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('trig', trig)
         prob.model.connect('indep.x', 'trig.x')
         with self.assertRaises(ValueError) as context:
-            prob.setup(check=False)
+            prob.setup()
         expected_msg = 'Complex step has not been tested for MetaModelUnStructuredComp'
         self.assertEqual(expected_msg, str(context.exception))
 
@@ -1055,7 +1055,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('trig', trig)
         prob.model.connect('indep.x1', 'trig.x1')
         prob.model.connect('indep.x2', 'trig.x2')
-        prob.setup(check=False)
+        prob.setup()
         prob['indep.x1'] = 5.0
         prob['indep.x2'] = 5.0
         trig.train = False
@@ -1137,7 +1137,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_design_var('indep.x', lower=4, upper=7)
         prob.model.add_objective('trig.sin_x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob['indep.x'] = 5.0
         prob.run_model()
         J = prob.compute_totals()
@@ -1145,7 +1145,7 @@ class MetaModelTestCase(unittest.TestCase):
         deriv_first_time = J[('trig.sin_x', 'indep.x')]
 
         # Setup and run a second time
-        prob.setup(check=False)
+        prob.setup()
         prob['indep.x'] = 5.0
         prob.run_model()
         J = prob.compute_totals()
@@ -1182,7 +1182,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_objective('trig.sin_x')
 
         # Check to make sure bug reported in story 160200719 is fixed
-        prob.setup(check=False)
+        prob.setup()
         prob['indep.x'] = 5.0
         prob.run_model()
         J = prob.compute_totals()
@@ -1190,7 +1190,7 @@ class MetaModelTestCase(unittest.TestCase):
         deriv_first_time = J[('trig.sin_x', 'indep.x')]
 
         # Setup and run a second time
-        prob.setup(check=False)
+        prob.setup()
         prob['indep.x'] = 5.0
         prob.run_model()
         J = prob.compute_totals()

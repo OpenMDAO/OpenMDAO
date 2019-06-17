@@ -29,7 +29,7 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('con1', lower=0)
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         designvars = prob.driver.get_design_var_values()
@@ -51,7 +51,7 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('con1', lower=0)
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -74,7 +74,7 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('con1', lower=0, ref=2.0, ref0=3.0)
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         cv = prob.driver.get_constraint_values()['con_cmp1.con1'][0]
@@ -91,7 +91,7 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('con1', lower=0)
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         cv = prob.driver.get_objective_values()['obj_cmp.obj'][0]
@@ -108,7 +108,7 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('con1')
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         base = prob.compute_totals(of=['obj', 'con1'], wrt=['z'])
@@ -121,7 +121,7 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('con1', lower=0, ref=2.0, ref0=0.0)
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         derivs = prob.driver._compute_totals(of=['obj_cmp.obj', 'con_cmp1.con1'], wrt=['pz.z'],
@@ -142,7 +142,7 @@ class TestDriver(unittest.TestCase):
         model.add_objective('comp.y1', ref=np.array([[7.0, 11.0]]), ref0=np.array([5.2, 6.3]))
         model.add_constraint('comp.y2', lower=0.0, upper=1.0, ref=np.array([[2.0, 4.0]]), ref0=np.array([1.2, 2.3]))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
@@ -205,7 +205,7 @@ class TestDriver(unittest.TestCase):
         model.add_objective('comp.y1', ref=np.array([[7.0, 11.0, 2.0]]), ref0=np.array([5.2, 6.3, 1.2]))
         model.add_constraint('comp.y2', lower=0.0, upper=1.0, ref=np.array([[2.0]]), ref0=np.array([1.2]))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         derivs = prob.driver._compute_totals(of=['comp.y1'], wrt=['px.x'],
@@ -243,7 +243,7 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('con2', lower=0, linear=True)
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Make sure nothing prints if debug_print is the default of empty list
         stdout = sys.stdout
@@ -280,7 +280,7 @@ class TestDriver(unittest.TestCase):
 
     def test_debug_print_desvar_physical_with_indices(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         size = 3
         model.add_subsystem('p1', IndepVarComp('x', np.array([50.0] * size)))
@@ -309,7 +309,7 @@ class TestDriver(unittest.TestCase):
         model.add_objective('comp.f_xy', index=1)
         model.add_constraint('con.c', indices=[1], upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.driver.options['debug_print'] = ['desvars',]
         stdout = sys.stdout
@@ -332,7 +332,7 @@ class TestDriver(unittest.TestCase):
 
     def test_debug_print_response_physical(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         size = 3
         model.add_subsystem('p1', IndepVarComp('x', np.array([50.0] * size)))
@@ -361,7 +361,7 @@ class TestDriver(unittest.TestCase):
         model.add_objective('comp.f_xy', index=1, ref=1.5)
         model.add_constraint('con.c', indices=[1], upper=-15.0, ref=1.02)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.driver.options['debug_print'] = ['objs', 'nl_cons']
         stdout = sys.stdout
@@ -427,7 +427,7 @@ class TestDriver(unittest.TestCase):
 
         prob.driver = ScipyOptimizeDriver()
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as context:
             prob.final_setup()

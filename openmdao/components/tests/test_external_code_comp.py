@@ -192,7 +192,7 @@ class TestExternalCodeComp(unittest.TestCase):
         # Set command to nonexistant path.
         self.extcode.options['command'] = ['no-such-command']
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         try:
             self.prob.run_model()
         except ValueError as exc:
@@ -206,7 +206,7 @@ class TestExternalCodeComp(unittest.TestCase):
         self.extcode.stdout = 'nullcmd.out'
         self.extcode.stderr = STDOUT
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         try:
             self.prob.run_model()
         except ValueError as exc:
@@ -656,7 +656,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         group.nonlinear_solver.options['maxiter'] = 20
         group.linear_solver = DirectSolver()
 
-        prob.setup(check=False)
+        prob.setup()
 
         area_ratio = 1.3
         super_sonic = False

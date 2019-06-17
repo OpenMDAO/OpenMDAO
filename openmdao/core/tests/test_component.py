@@ -21,7 +21,7 @@ class TestExplicitComponent(unittest.TestCase):
     def test___init___simple(self):
         """Test a simple explicit component."""
         comp = TestExplCompSimple()
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         # check optional metadata (desc)
         self.assertEqual(
@@ -42,7 +42,7 @@ class TestExplicitComponent(unittest.TestCase):
     def test___init___array(self):
         """Test an explicit component with array inputs/outputs."""
         comp = TestExplCompArray(thickness=1.)
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         prob['lengths'] = 3.
         prob['widths'] = 2.
@@ -210,15 +210,15 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=0.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         comp = model.add_subsystem('comp', MyComp())
 
-        prob.setup(check=False)
+        prob.setup()
         self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
         self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 
         prob.run_model()
-        prob.setup(check=False)
+        prob.setup()
         self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
         self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 
@@ -231,7 +231,7 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=3.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('px', IndepVarComp('x', val=3.0))
         model.add_subsystem('comp', Comp())
 
@@ -239,7 +239,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         msg = "Variable name 'x' already exists."
         with assertRaisesRegex(self, ValueError, msg):
-            prob.setup(check=False)
+            prob.setup()
 
         class Comp(ExplicitComponent):
             def setup(self):
@@ -248,7 +248,7 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=3.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('px', IndepVarComp('x', val=3.0))
         model.add_subsystem('comp', Comp())
 
@@ -256,7 +256,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         msg = "Variable name 'y' already exists."
         with assertRaisesRegex(self, ValueError, msg):
-            prob.setup(check=False)
+            prob.setup()
 
         class Comp(ExplicitComponent):
             def setup(self):
@@ -265,7 +265,7 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=3.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('px', IndepVarComp('x', val=3.0))
         model.add_subsystem('comp', Comp())
 
@@ -273,7 +273,7 @@ class TestExplicitComponent(unittest.TestCase):
 
         msg = "Variable name 'x' already exists."
         with assertRaisesRegex(self, ValueError, msg):
-            prob.setup(check=False)
+            prob.setup()
 
         # Make sure we can reconfigure.
 
@@ -283,16 +283,16 @@ class TestExplicitComponent(unittest.TestCase):
                 self.add_output('y', val=3.0)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('px', IndepVarComp('x', val=3.0))
         model.add_subsystem('comp', Comp())
 
         model.connect('px.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
 
         # pretend we reconfigured
-        prob.setup(check=False)
+        prob.setup()
 
 
 class TestImplicitComponent(unittest.TestCase):
@@ -303,7 +303,7 @@ class TestImplicitComponent(unittest.TestCase):
         a = np.abs(np.exp(0.5 * x) / x)
 
         comp = TestImplCompSimple()
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         prob['a'] = a
         prob.run_model()
@@ -312,7 +312,7 @@ class TestImplicitComponent(unittest.TestCase):
     def test___init___array(self):
         """Test an implicit component with array inputs/outputs."""
         comp = TestImplCompArray()
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         prob['rhs'] = np.ones(2)
         prob.run_model()
@@ -361,7 +361,7 @@ class TestRangePartials(unittest.TestCase):
         comp = RangePartialsComp()
 
         prob = Problem(model=comp)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['vSum'], np.array([2., 3., 4., 5.]), 0.00001)

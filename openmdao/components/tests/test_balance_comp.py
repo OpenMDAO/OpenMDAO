@@ -732,7 +732,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # A reasonable initial guess to find the positive root.
         prob['balance.x'] = 1.0
@@ -766,7 +766,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # A reasonable initial guess to find the positive root.
         prob['balance.x'] = 1.0
@@ -800,7 +800,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
         prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['balance.x'] = np.random.rand(n)
 

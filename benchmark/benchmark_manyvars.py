@@ -18,36 +18,36 @@ class BM(unittest.TestCase):
 
     def benchmark_1Kparams(self):
         prob = _build_comp(1000, 1)
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
     def benchmark_2Kparams(self):
         prob = _build_comp(2000, 1)
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
     def benchmark_1Kouts(self):
         prob = _build_comp(1, 1000)
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
     def benchmark_2Kouts(self):
         prob = _build_comp(1, 2000)
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
     def benchmark_1Kvars(self):
         prob = _build_comp(500, 500)
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
     def benchmark_2Kvars(self):
         prob = _build_comp(1000, 1000)
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
 
 if __name__ == '__main__':
     prob = _build_comp(1, 2000)
-    prob.setup(check=False)
+    prob.setup()
     prob.final_setup()

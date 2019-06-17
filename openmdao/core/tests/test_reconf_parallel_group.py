@@ -47,7 +47,7 @@ class Test(unittest.TestCase):
         prob.model.add_subsystem('Cx0', IndepVarComp('x0'), promotes=['x0'])
         prob.model.add_subsystem('Cx1', IndepVarComp('x1'), promotes=['x1'])
         prob.model.add_subsystem('g', ReconfGroup(), promotes=['*'])
-        prob.setup(check=False)
+        prob.setup()
 
         # First, run with full setup, so ReconfGroup should be a parallel group
         prob['x0'] = 6.

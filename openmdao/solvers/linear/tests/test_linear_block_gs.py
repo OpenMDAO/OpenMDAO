@@ -42,7 +42,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
                             promotes=['length', 'width', 'area'])
 
         model.linear_solver = self.linear_solver_class(assemble_jac=True)
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as context:
             prob.run_model()
@@ -55,7 +55,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         # as long as we slot a non-lgs linear solver on that component.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p', IndepVarComp('a', 5.0))
         comp = model.add_subsystem('comp', SimpleImp())
         model.connect('p.a', 'comp.a')
@@ -71,7 +71,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_implicit_cycle(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 1.0))
         model.add_subsystem('d1', SellarImplicitDis1())
@@ -83,7 +83,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.nonlinear_solver.options['maxiter'] = 5
         model.linear_solver = self.linear_solver_class()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob.run_model()
@@ -94,7 +94,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_implicit_cycle_precon(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 1.0))
         model.add_subsystem('d1', SellarImplicitDis1())
@@ -108,7 +108,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
         model.linear_solver = ScipyKrylov()
         model.linear_solver.precon = self.linear_solver_class()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['d1.y1'] = 4.0
         prob.set_solver_print()
@@ -131,7 +131,7 @@ class TestBGSSolver(LinearSolverTests.LinearSolverTestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # We don't call run_driver() here because we don't
         # actually want the optimizer to run
@@ -186,7 +186,7 @@ class TestBGSSolverFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -223,7 +223,7 @@ class TestBGSSolverFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -260,7 +260,7 @@ class TestBGSSolverFeature(unittest.TestCase):
         from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])

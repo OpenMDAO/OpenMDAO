@@ -199,12 +199,12 @@ class TestScaling(unittest.TestCase):
                 self.add_output('zz', val=np.ones((4, 2)), ref=np.ones((3, 5)))
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('comp', EComp())
 
         msg = "'comp': When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref'."
         with self.assertRaises(ValueError) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
 
         class EComp(ImplicitComponent):
@@ -212,12 +212,12 @@ class TestScaling(unittest.TestCase):
                 self.add_output('zz', val=np.ones((4, 2)), ref0=np.ones((3, 5)))
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('comp', EComp())
 
         msg = "'comp': When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'ref0'."
         with self.assertRaises(ValueError) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
 
         class EComp(ImplicitComponent):
@@ -225,12 +225,12 @@ class TestScaling(unittest.TestCase):
                 self.add_output('zz', val=np.ones((4, 2)), res_ref=np.ones((3, 5)))
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('comp', EComp())
 
         msg = "'comp': When adding output 'zz', expected shape (4, 2) but got shape (3, 5) for argument 'res_ref'."
         with self.assertRaises(ValueError) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
 
     def test_pass_through(self):
@@ -242,7 +242,7 @@ class TestScaling(unittest.TestCase):
 
         prob = Problem(group)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob['sys1.old_length'] = 3.e5
@@ -266,7 +266,7 @@ class TestScaling(unittest.TestCase):
         group.connect('c1.time', 'c2.time')
 
         prob = Problem(model=group)
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob.run_model()
@@ -291,7 +291,7 @@ class TestScaling(unittest.TestCase):
 
             prob.set_solver_print(level=0)
 
-            prob.setup(check=False)
+            prob.setup()
             prob.run_model()
 
             return np.linalg.norm(prob.model._residuals._data) < 1e-5
@@ -366,7 +366,7 @@ class TestScaling(unittest.TestCase):
         # Baseline - all should be equal.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', Simple())
         model.add_subsystem('p2', Simple())
         model.connect('p1.y', 'p2.x')
@@ -378,7 +378,7 @@ class TestScaling(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         res1 = -model.p1._residuals._data[0]
@@ -405,7 +405,7 @@ class TestScaling(unittest.TestCase):
         ref0 = 1.5
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', Simple(ref=ref, ref0=ref0))
         model.add_subsystem('p2', Simple(ref=ref, ref0=ref0))
         model.connect('p1.y', 'p2.x')
@@ -417,7 +417,7 @@ class TestScaling(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         res1 = -model.p1._residuals._data[0]
@@ -440,7 +440,7 @@ class TestScaling(unittest.TestCase):
         res_ref = 4.0
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', Simple(res_ref=res_ref))
         model.add_subsystem('p2', Simple(res_ref=res_ref))
         model.connect('p1.y', 'p2.x')
@@ -452,7 +452,7 @@ class TestScaling(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         res1 = -model.p1._residuals._data[0]
@@ -477,7 +477,7 @@ class TestScaling(unittest.TestCase):
         res_ref = 4.0
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', Simple(ref=ref, ref0=ref0, res_ref=res_ref))
         model.add_subsystem('p2', Simple(ref=ref, ref0=ref0, res_ref=res_ref))
         model.connect('p1.y', 'p2.x')
@@ -489,7 +489,7 @@ class TestScaling(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         res1 = -model.p1._residuals._data[0]
@@ -523,13 +523,13 @@ class TestScaling(unittest.TestCase):
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
         model.add_subsystem('comp', ExpCompArrayScale())
         model.connect('p1.x', 'comp.lengths')
 
-        prob.setup(check=False)
+        prob.setup()
         prob['comp.widths'] = np.ones((2, 2))
 
         prob.run_model()
@@ -565,13 +565,13 @@ class TestScaling(unittest.TestCase):
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
         model.add_subsystem('comp', ExpCompArrayScale())
         model.connect('p1.x', 'comp.lengths')
 
-        prob.setup(check=False)
+        prob.setup()
         prob['comp.widths'] = np.ones((2, 2))
         prob.run_model()
 
@@ -610,13 +610,13 @@ class TestScaling(unittest.TestCase):
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
         model.add_subsystem('comp', ExpCompArrayScale())
         model.connect('p1.x', 'comp.lengths')
 
-        prob.setup(check=False)
+        prob.setup()
         prob['comp.widths'] = np.ones((2, 2))
         prob.run_model()
 
@@ -686,13 +686,13 @@ class TestScaling(unittest.TestCase):
 
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
         comp = model.add_subsystem('comp', ImpCompArrayScale())
         model.connect('p1.x', 'comp.rhs')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         base_x = model.comp._outputs['x'].copy()
@@ -745,13 +745,13 @@ class TestScaling(unittest.TestCase):
 
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
         comp = model.add_subsystem('comp', ImpCompArrayScale())
         model.connect('p1.x', 'comp.rhs')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         base_x = model.comp._outputs['x'].copy()
@@ -812,7 +812,7 @@ class TestScaling(unittest.TestCase):
                 outputs['total_volume'] = np.sum(outputs['areas']) + np.sum(outputs['stuff'])
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
         model.add_subsystem('p2', IndepVarComp('x', np.ones((1, 3))))
@@ -823,7 +823,7 @@ class TestScaling(unittest.TestCase):
         model.connect('comp1.areas', 'comp2.lengths')
         model.connect('comp1.stuff', 'comp2.widths')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['comp1.total_volume'], 14.)
@@ -858,7 +858,7 @@ class TestScaling(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = DirectSolver()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['comp.y'], 2.0)
@@ -866,7 +866,7 @@ class TestScaling(unittest.TestCase):
         # Now, let's try with an AssembledJacobian.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 6.0))
         model.add_subsystem('comp', SimpleComp())
@@ -876,7 +876,7 @@ class TestScaling(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['comp.y'], 2.0)
@@ -886,7 +886,7 @@ class TestScaling(unittest.TestCase):
         from openmdao.core.tests.test_scaling import ScalingExample1
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x1', 1.0))
         model.add_subsystem('p2', IndepVarComp('x2', 1.0))
@@ -894,7 +894,7 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         model.run_apply_nonlinear()
@@ -910,7 +910,7 @@ class TestScaling(unittest.TestCase):
         from openmdao.core.tests.test_scaling import ScalingExample2
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x1', 1.0))
         model.add_subsystem('p2', IndepVarComp('x2', 1.0))
@@ -918,7 +918,7 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         model.run_apply_nonlinear()
@@ -934,7 +934,7 @@ class TestScaling(unittest.TestCase):
         from openmdao.core.tests.test_scaling import ScalingExample3
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x1', 1.0))
         model.add_subsystem('p2', IndepVarComp('x2', 1.0))
@@ -942,7 +942,7 @@ class TestScaling(unittest.TestCase):
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         model.run_apply_nonlinear()
@@ -958,13 +958,13 @@ class TestScaling(unittest.TestCase):
         from openmdao.core.tests.test_scaling import ScalingExampleVector
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p', IndepVarComp('x', np.ones((2))))
         comp = model.add_subsystem('comp', ScalingExampleVector())
         model.connect('p.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         model.run_apply_nonlinear()

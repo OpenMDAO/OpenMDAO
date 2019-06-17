@@ -108,7 +108,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         g1 = model.add_subsystem('g1', TestImplicitGroup(lnSolverClass=DirectSolver))
 
-        p.setup(check=False)
+        p.setup()
 
         g1.linear_solver.options['assemble_jac'] = False
 
@@ -218,7 +218,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         teg.nonlinear_solver.options['max_sub_solves'] = 1
         teg.nonlinear_solver.options['atol'] = 1e-4
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         with self.assertRaises(RuntimeError) as cm:
@@ -238,7 +238,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         model.linear_solver = DirectSolver(assemble_jac=True)
 
         with self.assertRaises(Exception) as cm:
-            prob.setup(check=False)
+            prob.setup()
 
         expected_msg = "dupcomp: declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
 
@@ -272,7 +272,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         teg.nonlinear_solver.options['max_sub_solves'] = 1
         teg.nonlinear_solver.options['atol'] = 1e-4
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         with self.assertRaises(RuntimeError) as cm:
@@ -309,7 +309,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         teg.nonlinear_solver.options['max_sub_solves'] = 1
         teg.nonlinear_solver.options['atol'] = 1e-4
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         with self.assertRaises(RuntimeError) as cm:
@@ -346,7 +346,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         teg.nonlinear_solver.options['max_sub_solves'] = 1
         teg.nonlinear_solver.options['atol'] = 1e-4
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         teg.linear_solver.options['err_on_singular'] = False
@@ -596,7 +596,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         prob = Problem()
         prob.model.add_subsystem('sub', Rectifier())
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         with self.assertRaises(RuntimeError) as cm:
@@ -608,7 +608,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     def test_matvec_error_raised(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                             promotes=['length'])
         model.add_subsystem('mycomp', TestExplCompSimpleJacVec(),

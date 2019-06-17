@@ -38,7 +38,7 @@ class TestBsplinesComp(unittest.TestCase):
 
         model.connect('px.x', 'interp.h_cp')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         xx = prob['interp.h'].flatten()
@@ -63,7 +63,7 @@ class TestBsplinesComp(unittest.TestCase):
                               units='inch')
 
         prob = Problem(model=interp)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         # verify that both input and output of the bsplines comp have proper units
@@ -103,7 +103,7 @@ class TestBsplinesCompFeature(unittest.TestCase):
                                                    out_name='h'))
         model.connect('px.x', 'interp.h_cp')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         xx = prob['interp.h'].flatten()
@@ -145,7 +145,7 @@ class TestBsplinesCompFeature(unittest.TestCase):
                                                    out_name='h'))
         model.connect('px.x', 'interp.h_cp')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         xx = prob['interp.h']
@@ -197,7 +197,7 @@ class TestBsplinesCompFeatureWithPlotting(unittest.TestCase):
                                                    distribution='uniform'))
         model.connect('px.x', 'interp.h_cp')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         xx = prob['interp.h'].flatten()
@@ -236,7 +236,7 @@ class TestBsplinesCompFeatureWithPlotting(unittest.TestCase):
                                                    distribution='sine'))
         model.connect('px.x', 'interp.h_cp')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         xx = prob['interp.h'].flatten()

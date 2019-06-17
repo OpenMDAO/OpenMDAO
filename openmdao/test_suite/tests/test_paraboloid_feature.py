@@ -12,7 +12,7 @@ class TestSellarFeature(unittest.TestCase):
     def test_paraboloid_feature(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 3.0))
         model.add_subsystem('p2', IndepVarComp('y', -4.0))
@@ -21,7 +21,7 @@ class TestSellarFeature(unittest.TestCase):
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['comp.f_xy'], -15.0)

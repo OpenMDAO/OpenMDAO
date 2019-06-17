@@ -36,7 +36,7 @@ class TestConnections(unittest.TestCase):
         self.C4 = self.G4.add_subsystem("C4", ExecComp('y=x*2.0'))
 
     def test_no_conns(self):
-        self.p.setup(check=False)
+        self.p.setup()
 
         self.p['G1.G2.C1.x'] = 111.
         self.p['G3.G4.C3.x'] = 222.
@@ -52,7 +52,7 @@ class TestConnections(unittest.TestCase):
         raise unittest.SkipTest("explicit input-input connections not supported yet")
         self.p.model.connect('G3.G4.C3.x', 'G3.G4.C4.x')  # connect inputs
         self.p.model.connect('G1.G2.C2.x', 'G3.G4.C3.x')  # connect src to one of connected inputs
-        self.p.setup(check=False)
+        self.p.setup()
 
         self.p['G1.G2.C2.x'] = 999.
         self.assertEqual(self.C3._inputs['x'], 0.)
@@ -103,7 +103,7 @@ class TestConnections(unittest.TestCase):
         p.model.connect('src.y1', 'tgt.x1')
         p.model.connect('src.y2', 'tgt.x2')
 
-        p.setup(check=False)
+        p.setup()
         p.run_model()
 
         self.assertEqual(p['tgt.y1'], 12.0)
@@ -161,7 +161,7 @@ class TestConnections(unittest.TestCase):
         top.model.connect('src.y2', 'tgt.x2', src_indices=(0, 1))
         top.model.connect('src.y3', 'tgt.x3')
 
-        top.setup(check=False)
+        top.setup()
         top.run_model()
 
         self.assertEqual(top['tgt.y1'], 6.0)
@@ -197,7 +197,7 @@ class TestConnections(unittest.TestCase):
         self.p.model.connect('G1.G2.C1.x', 'G3.G4.C3.x')
 
         try:
-            self.p.setup(check=False)
+            self.p.setup()
         except Exception as err:
             self.assertTrue(
                 "The following sourceless connected inputs have different initial values: "
@@ -216,7 +216,7 @@ class TestConnections(unittest.TestCase):
         self.p.model.connect('G1.G2.C1.x', 'G3.G4.C3.x')
 
         try:
-            self.p.setup(check=False)
+            self.p.setup()
         except Exception as err:
             msg = "The following connected inputs have no source and different units: " \
                   "[('G1.G2.C1.x', 'ft'), ('G3.G4.C3.x', 'inch')]. " \
@@ -235,7 +235,7 @@ class TestConnections(unittest.TestCase):
         self.p.model.connect('G3.G4.C3.x', 'G1.G2.C1.x')
 
         try:
-            self.p.setup(check=False)
+            self.p.setup()
         except Exception as err:
             msg = "The following connected inputs have no source and different units: " \
                   "[('G1.G2.C1.x', 'ft'), ('G3.G4.C3.x', 'inch')]. " \
@@ -268,7 +268,7 @@ class TestConnections(unittest.TestCase):
             root.connect("C%d.x" % (i-1), "C%d.x" % i)
 
         try:
-            p.setup(check=False)
+            p.setup()
         except Exception as err:
             self.assertTrue("The following connected inputs have no source and different units" in
                             str(err))
@@ -281,7 +281,7 @@ class TestConnections(unittest.TestCase):
 
         root.connect('desvars.dvar1', 'C10.x')
 
-        p.setup(check=False)
+        p.setup()
 
 
 class TestConnectionsPromoted(unittest.TestCase):
@@ -325,7 +325,7 @@ class TestConnectionsPromoted(unittest.TestCase):
         C3 = G4.add_subsystem("C3", ExecComp('y=x*2.0'), promotes=['x'])
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
 
-        p.setup(check=False)
+        p.setup()
         p.set_solver_print(level=0)
 
         # setting promoted name will set the value into the outputs, but will
@@ -351,7 +351,7 @@ class TestConnectionsPromoted(unittest.TestCase):
         C4 = G4.add_subsystem("C4", ExecComp('y=x*2.0'), promotes=['x'])
 
         p.model.connect('G1.x', 'G3.x')
-        p.setup(check=False)
+        p.setup()
         p.set_solver_print(level=0)
 
         # setting promoted name will set the value into the outputs, but will
@@ -372,7 +372,7 @@ class TestConnectionsPromoted(unittest.TestCase):
         root.add_subsystem("C3", ExecComp('y=x*2.0', units={'x': 'm'}), promotes=['x'])
 
         try:
-            prob.setup(check=False)
+            prob.setup()
         except Exception as err:
             msg = "The following connected inputs are promoted to 'x', but have different units: " \
                   "[('C1.x', 'ft'), ('C2.x', 'inch'), ('C3.x', 'm')]. " \
@@ -391,12 +391,12 @@ class TestConnectionsPromoted(unittest.TestCase):
         root.add_subsystem("C3", ExecComp('y=x*2.0', units={'x': 'm'}), promotes=['x'])
         root.add_subsystem('p', IndepVarComp('x', 1.0, units='cm'), promotes=['x'])
 
-        prob.setup(check=False)
+        prob.setup()
 
     def test_overlapping_system_names(self):
         # This ensures that _setup_connections does not think g1 and g1a are the same system
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         g1 = model.add_subsystem('g1', Group())
         g1a = model.add_subsystem('g1a', Group())
@@ -441,7 +441,7 @@ class TestConnectionsIndices(unittest.TestCase):
                     r" Expected \(2.*,\) but got \(1.*,\).")
 
         with assertRaisesRegex(self, ValueError, expected):
-            self.prob.setup(check=False)
+            self.prob.setup()
 
     def test_bad_length(self):
         # Should not be allowed because the length of src_indices is greater than
@@ -453,7 +453,7 @@ class TestConnectionsIndices(unittest.TestCase):
                     r"The target shape is \(2.*,\) but indices are \(3.*,\).")
 
         with assertRaisesRegex(self, ValueError, expected):
-            self.prob.setup(check=False)
+            self.prob.setup()
 
     def test_bad_value(self):
         # Should not be allowed because the index value within src_indices is outside
@@ -466,7 +466,7 @@ class TestConnectionsIndices(unittest.TestCase):
                     "size 5.")
 
         try:
-            self.prob.setup(check=False)
+            self.prob.setup()
         except ValueError as err:
             self.assertEqual(str(err), expected)
         else:

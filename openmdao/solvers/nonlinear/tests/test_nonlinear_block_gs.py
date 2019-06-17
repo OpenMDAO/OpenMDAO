@@ -197,7 +197,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         nlgbs = model.nonlinear_solver = NonlinearBlockGS()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -231,7 +231,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         nlgbs = model.nonlinear_solver = NonlinearBlockGS()
         nlgbs.options['use_apply_nonlinear'] = True
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -267,7 +267,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         nlgbs.options['maxiter'] = 2
         nlgbs.options['err_on_maxiter'] = True
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         try:
@@ -305,7 +305,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         root.connect('g1.y2', 'g2.x')
         root.connect('g2.y2', 'g1.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob.run_model()

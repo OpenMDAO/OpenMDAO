@@ -50,7 +50,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
             group = TestImplicitGroup(lnSolverClass=lambda : ScipyIterativeSolver(solver=self.linear_solver_name))
 
         p = Problem(group)
-        p.setup(check=False)
+        p.setup()
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -79,7 +79,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         group.linear_solver.options['maxiter'] = 2
 
         p = Problem(group)
-        p.setup(check=False)
+        p.setup()
         p.set_solver_print(level=0)
 
         # Conclude setup but don't run model.
@@ -105,7 +105,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         """solve an implicit system with GMRES attached to a subsystem"""
 
         p = Problem()
-        model = p.model = Group()
+        model = p.model
         dv = model.add_subsystem('des_vars', IndepVarComp())
         # just need a dummy variable so the sizes don't match between root and g1
         dv.add_output('dummy', val=1.0, shape=10)
@@ -113,7 +113,7 @@ class TestScipyKrylov(LinearSolverTests.LinearSolverTestCase):
         grp = TestImplicitGroup(lnSolverClass=self.linear_solver_class)
         g1 = model.add_subsystem('g1', grp)
 
-        p.setup(check=False)
+        p.setup()
 
         p.set_solver_print(level=0)
 

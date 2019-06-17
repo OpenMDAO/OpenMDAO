@@ -134,7 +134,7 @@ class TestSolverPrint(unittest.TestCase):
 
         prob.set_solver_print(level=2)
 
-        prob.setup(check=False)
+        prob.setup()
 
         output = run_model(prob)
         # TODO: check output
@@ -161,7 +161,7 @@ class TestSolverPrint(unittest.TestCase):
 
         prob.set_solver_print(level=2)
 
-        prob.setup(check=False)
+        prob.setup()
 
         output = run_model(prob)
         # TODO: check output
@@ -190,7 +190,7 @@ class TestSolverPrint(unittest.TestCase):
 
         prob.set_solver_print(level=2)
 
-        prob.setup(check=False)
+        prob.setup()
 
         output = run_model(prob)
         # TODO: check output
@@ -348,7 +348,7 @@ class MPITests(unittest.TestCase):
 
         prob.set_solver_print(level=2)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()

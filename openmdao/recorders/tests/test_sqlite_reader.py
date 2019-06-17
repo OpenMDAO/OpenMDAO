@@ -1634,7 +1634,7 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_simple_paraboloid_scaled_desvars(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1944,7 +1944,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.comp.add_recorder(self.recorder)
         model.add_recorder(self.recorder)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['px.x'] = 2.0
         prob['comp.y'] = 0.0

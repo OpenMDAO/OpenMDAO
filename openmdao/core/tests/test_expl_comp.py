@@ -79,7 +79,7 @@ class ExplCompTestCase(unittest.TestCase):
 
     def test_simple(self):
         prob = Problem(RectangleComp())
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
     def test_feature_simple(self):
@@ -87,12 +87,12 @@ class ExplCompTestCase(unittest.TestCase):
         from openmdao.core.tests.test_expl_comp import RectangleComp
 
         prob = Problem(RectangleComp())
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
     def test_compute_and_list(self):
         prob = Problem(RectangleGroup())
-        prob.setup(check=False)
+        prob.setup()
 
         msg = "Unable to list inputs until model has been run."
         try:
@@ -348,7 +348,7 @@ class ExplCompTestCase(unittest.TestCase):
         g2.linear_solver.precon = LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # logging inputs
@@ -453,13 +453,12 @@ class ExplCompTestCase(unittest.TestCase):
         size = 100  # how many items in the array
 
         prob = Problem()
-        prob.model = Group()
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size), units='inch'),
                                  promotes=['x'])
         prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['x'] = np.ones(size)
 
@@ -635,12 +634,11 @@ class ExplCompTestCase(unittest.TestCase):
         size = 30
 
         prob = Problem()
-        prob.model = Group()
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size), units='inch'),
                                  promotes=['x'])
         prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
 
-        prob.setup(check=False)
+        prob.setup()
         prob['x'] = np.arange(size)
         prob.run_driver()
 

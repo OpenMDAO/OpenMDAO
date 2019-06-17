@@ -33,7 +33,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         # Make sure 'array' return_format works.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
         model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
@@ -112,7 +112,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_design_var('px.x')
         model.add_objective('px.x')
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -128,7 +128,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_scipy_optimizer_simple_paraboloid_unconstrained(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -142,7 +142,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -155,7 +155,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_unconstrained(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -172,7 +172,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -184,7 +184,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
     def test_simple_paraboloid_unconstrained_COBYLA(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -201,7 +201,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -214,7 +214,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_upper(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -233,7 +233,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -247,7 +247,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_lower(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -267,7 +267,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -281,7 +281,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_equality(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -300,7 +300,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', equals=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -315,7 +315,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_unsupported_equality(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -334,7 +334,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', equals=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(Exception) as raises_cm:
             prob.run_driver()
@@ -348,7 +348,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_scipy_missing_objective(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('x', IndepVarComp('x', 2.0), promotes=['*'])
         model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
@@ -359,7 +359,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob.model.add_design_var('x', lower=0)
         # prob.model.add_constraint('x', lower=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(Exception) as raises_msg:
             prob.run_driver()
@@ -373,7 +373,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_double_sided_low(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -392,7 +392,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=-11.0, upper=-10.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -404,7 +404,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_double_sided_high(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -423,7 +423,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=10.0, upper=11.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -435,7 +435,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_array_comp2D(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
@@ -455,7 +455,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('o')
         model.add_constraint('c', equals=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -468,7 +468,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_array_comp2D_eq_con(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
@@ -486,7 +486,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('o')
         model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -499,7 +499,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_array_comp2D_dbl_sided_con(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
@@ -517,7 +517,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('o')
         model.add_constraint('areas', lower=np.array([24.0, 21.0, 3.5, 17.5]), upper=np.array([24.0, 21.0, 3.5, 17.5]))
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -530,7 +530,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_array_comp2D_dbl_sided_con_array(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
@@ -548,7 +548,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('o')
         model.add_constraint('areas', lower=20.0, upper=20.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -561,7 +561,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_array_comp2D_array_lo_hi(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
@@ -581,7 +581,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('o')
         model.add_constraint('c', equals=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -594,7 +594,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_scaled_desvars_fwd(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -625,7 +625,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_scaled_desvars_rev(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -656,7 +656,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_scaled_constraint_fwd(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -687,7 +687,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_scaled_objective_fwd(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         prob.set_solver_print(level=0)
 
@@ -718,7 +718,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_scaled_objective_rev(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         prob.set_solver_print(level=0)
 
@@ -779,7 +779,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         p = Problem(model=SineFitter())
         p.driver = ScipyOptimizeDriver()
 
-        p.setup(check=False)
+        p.setup()
         p.run_driver()
 
         max_defect = np.max(np.abs(p['defect.defect']))
@@ -836,7 +836,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_upper_COBYLA(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -855,7 +855,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -1111,7 +1111,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_lower_linear(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1130,7 +1130,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=15.0, linear=True)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -1146,7 +1146,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_simple_paraboloid_equality_linear(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1165,7 +1165,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', equals=-15.0, linear=True)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -1179,7 +1179,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_debug_print_option_totals(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1210,7 +1210,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue('Solving variable: con.c' in output)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1243,7 +1243,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_debug_print_option(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1264,7 +1264,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed, output = run_driver(prob)
 
@@ -1325,7 +1325,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         # Make sure we call final setup if our model hasn't been setup.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1344,7 +1344,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', equals=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as cm:
             totals = prob.check_totals(method='fd', out_stream=False)
@@ -1361,7 +1361,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1388,7 +1388,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1400,7 +1400,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_driver()
 
@@ -1412,7 +1412,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1425,7 +1425,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_driver()
 
@@ -1437,7 +1437,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1450,7 +1450,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_driver()
 
@@ -1463,7 +1463,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1484,7 +1484,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_driver()
 
@@ -1494,7 +1494,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1515,7 +1515,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_driver()
 
@@ -1546,7 +1546,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_objective('c')  # Second objective
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(RuntimeError):
             prob.run_model()

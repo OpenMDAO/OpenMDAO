@@ -248,7 +248,7 @@ class TestJacobian(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
 
@@ -315,7 +315,7 @@ class TestJacobian(unittest.TestCase):
         prob = Problem()
         comp = ExplicitSetItemComp(dtype, value, shape, constructor)
         prob.model.add_subsystem('C1', comp)
-        prob.setup(check=False)
+        prob.setup()
 
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -400,7 +400,7 @@ class TestJacobian(unittest.TestCase):
 
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', np.array([1.0, 1.0])), promotes=['x'])
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -450,7 +450,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('C1.c', 'C2.b')
         prob.model.connect('C2.d', 'C3.a')
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         assert_rel_error(self, prob['C3.ee'], 8.0, 0000.1)
 
@@ -476,7 +476,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('indeps.y', 'G1.C1.x')
         prob.model.connect('indeps.z', 'G1.C2.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['G1.C1.y'], 50.0)
@@ -507,7 +507,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('indeps.y', 'G1.C1.x')
         prob.model.connect('indeps.z', 'G1.C2.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['G1.C1.y'], 50.0)
@@ -723,7 +723,7 @@ class TestJacobian(unittest.TestCase):
 
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', val=1.0))
         model.add_subsystem('comp', Undeclared())
@@ -754,7 +754,7 @@ class TestJacobian(unittest.TestCase):
         prob.model.connect('indeps.x', 'G1.C1.x', src_indices=[0,1])
         prob.model.connect('indeps.x', 'G1.C1.y', src_indices=[2,3])
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])

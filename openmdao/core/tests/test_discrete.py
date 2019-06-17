@@ -507,7 +507,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
         model.nonlinear_solver = solver_class()
 
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         return prob
 

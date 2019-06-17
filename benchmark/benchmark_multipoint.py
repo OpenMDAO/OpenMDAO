@@ -94,7 +94,7 @@ class BM(unittest.TestCase):
         scalars = np.random.random(size)
 
         prob = om.Problem(MultiPoint(adders, scalars))
-        prob.setup(check=False)
+        prob.setup()
 
         return prob
 

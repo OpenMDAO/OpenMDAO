@@ -117,7 +117,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_upper(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -135,7 +135,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -149,7 +149,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_upper_indices(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         size = 3
         model.add_subsystem('p1', IndepVarComp('x', np.array([50.0]*size)))
@@ -179,7 +179,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('comp.f_xy', index=1)
         model.add_constraint('con.c', indices=[1], upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -193,7 +193,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_lower(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -214,7 +214,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -228,7 +228,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_lower_linear(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -248,7 +248,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=15.0, linear=True)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -264,7 +264,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_equality(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -284,7 +284,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', equals=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -298,7 +298,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_equality_linear(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -318,7 +318,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', equals=-15.0, linear=True)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -332,7 +332,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_double_sided_low(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -350,7 +350,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', lower=-11.0, upper=-10.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -363,7 +363,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_double_sided_high(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -394,7 +394,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_array_comp2D(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
@@ -413,7 +413,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('o')
         model.add_constraint('c', equals=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -426,7 +426,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_array_comp2D_array_lo_hi(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
@@ -445,7 +445,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('o')
         model.add_constraint('c', equals=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -460,7 +460,7 @@ class TestPyoptSparse(unittest.TestCase):
         # This is a slightly modified FanOut
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 1.0))
         model.add_subsystem('p2', IndepVarComp('x', 1.0))
@@ -492,7 +492,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('con1.c', equals=0.0)
         model.add_constraint('con2.c', equals=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -515,7 +515,7 @@ class TestPyoptSparse(unittest.TestCase):
         # reported by rfalck)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -534,7 +534,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -548,7 +548,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_pyopt_fd_solution(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -569,7 +569,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -588,7 +588,7 @@ class TestPyoptSparse(unittest.TestCase):
                                 " pyopt_fd option has failed.")
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -609,7 +609,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -623,7 +623,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_snopt_fd_option_error(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -644,7 +644,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(Exception) as raises_cm:
             prob.run_driver()
@@ -657,7 +657,7 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_unsupported_multiple_obj(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -684,7 +684,7 @@ class TestPyoptSparse(unittest.TestCase):
                    ' but the selected optimizer (SLSQP) does not support' \
                    ' multiple objectives.'
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as cm:
             prob.final_setup()
@@ -694,7 +694,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_scaled_desvars_fwd(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -726,7 +726,7 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_desvars_fd(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -748,7 +748,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.approx_totals(method='fd')
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -760,7 +760,7 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_desvars_cs(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -782,7 +782,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.approx_totals(method='cs')
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -795,7 +795,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_scaled_desvars_rev(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -828,7 +828,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_scaled_constraint_fwd(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -860,7 +860,7 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_constraint_fd(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -882,7 +882,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.approx_totals(method='fd')
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -894,7 +894,7 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_constraint_cs(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -916,7 +916,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         model.approx_totals(method='cs')
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -929,7 +929,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_scaled_constraint_rev(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -962,7 +962,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_scaled_objective_fwd(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         prob.set_solver_print(level=0)
 
@@ -995,7 +995,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_simple_paraboloid_scaled_objective_rev(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         prob.set_solver_print(level=0)
 
@@ -1170,7 +1170,7 @@ class TestPyoptSparse(unittest.TestCase):
         # attempts to recover.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1192,7 +1192,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -1216,7 +1216,7 @@ class TestPyoptSparse(unittest.TestCase):
         # pyoptsparse to raise.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1241,7 +1241,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         comp.fail_hard = True
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(Exception):
             prob.run_driver()
@@ -1254,7 +1254,7 @@ class TestPyoptSparse(unittest.TestCase):
         # pyopt attempts to recover.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1279,7 +1279,7 @@ class TestPyoptSparse(unittest.TestCase):
         comp.grad_fail_at = 2
         comp.eval_fail_at = 100
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -1307,7 +1307,7 @@ class TestPyoptSparse(unittest.TestCase):
         # pyoptsparse to raise.
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1333,7 +1333,7 @@ class TestPyoptSparse(unittest.TestCase):
         comp.grad_fail_at = 2
         comp.eval_fail_at = 100
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(Exception):
             prob.run_driver()
@@ -1343,7 +1343,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_debug_print_option_totals(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1376,7 +1376,7 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertTrue('Solving variable: con.c' in output)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1411,7 +1411,7 @@ class TestPyoptSparse(unittest.TestCase):
     def test_debug_print_option(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1433,7 +1433,7 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed, output = run_driver(prob)
 
@@ -1481,7 +1481,7 @@ class TestPyoptSparse(unittest.TestCase):
 
         # We generally don't hae a working IPOPT install.
         prob.driver.options['optimizer'] = 'IPOPT'
-        prob.setup(check=False)
+        prob.setup()
 
         # Test that we get exception.
         with self.assertRaises(ImportError) as raises_cm:
@@ -1656,7 +1656,7 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_pyoptsparse_missing_objective(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('x', IndepVarComp('x', 2.0), promotes=['*'])
         model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
@@ -1667,7 +1667,7 @@ class TestPyoptSparse(unittest.TestCase):
         prob.model.add_design_var('x', lower=0)
         prob.model.add_constraint('x', lower=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(Exception) as raises_msg:
             prob.run_driver()
@@ -1863,7 +1863,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
     def test_snopt_fd_solution(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1884,7 +1884,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 
@@ -1903,7 +1903,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                                 " snopt_fd option has failed.")
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
@@ -1924,7 +1924,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         failed = prob.run_driver()
 

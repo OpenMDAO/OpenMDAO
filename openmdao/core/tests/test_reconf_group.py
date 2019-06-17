@@ -31,7 +31,7 @@ class Test(unittest.TestCase):
         prob = Problem()
         prob.model.add_subsystem('Cx', IndepVarComp('x', 1.0), promotes=['x'])
         prob.model.add_subsystem('g', ReconfGroup(), promotes=['*'])
-        prob.setup(check=False)
+        prob.setup()
 
         # First run with the initial setup.
         prob['x'] = 2.0

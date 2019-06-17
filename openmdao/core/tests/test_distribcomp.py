@@ -276,7 +276,7 @@ class NOMPITests(unittest.TestCase):
               "available. The default non-distributed vectors will be used."
 
         with assert_warning(UserWarning, msg):
-            p.setup(check=False)
+            p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -302,7 +302,7 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribCompSimple(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -322,7 +322,7 @@ class MPITests(unittest.TestCase):
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -344,7 +344,7 @@ class MPITests(unittest.TestCase):
                                               y=np.zeros(size*commsize)))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.x')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -366,7 +366,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -388,7 +388,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -422,7 +422,7 @@ class MPITests(unittest.TestCase):
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -450,7 +450,7 @@ class MPITests(unittest.TestCase):
         C3 = top.add_subsystem("C3", NonDistribGatherComp(size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -525,9 +525,9 @@ class DeprecatedMPITests(unittest.TestCase):
 
         if PETScVector is None:
             with assert_warning(UserWarning, msg):
-                p.setup(check=False)
+                p.setup()
         else:
-            p.setup(check=False)
+            p.setup()
 
         p.final_setup()
 
@@ -552,7 +552,7 @@ class ProbRemoteTests(unittest.TestCase):
         par = top.add_subsystem('par', ParallelGroup())
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()

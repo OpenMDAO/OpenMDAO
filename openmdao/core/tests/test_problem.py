@@ -512,7 +512,7 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 22.0, 1e-6)
 
         # skip the setup error checking
-        prob.setup(check=False)
+        prob.setup()
         prob['x'] = 4
         prob['y'] = 8.
 
@@ -845,7 +845,7 @@ class TestProblem(unittest.TestCase):
                                                    ayy={'value': 0.0, 'units': 'degC'}),
                                  promotes=['axx', 'ayy'])
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Make sure everything works before final setup with caching system.
 
@@ -1392,7 +1392,7 @@ class TestProblem(unittest.TestCase):
 
         top = Problem(model=Super())
 
-        top.setup(check=False)
+        top.setup()
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
@@ -1434,7 +1434,7 @@ class TestProblem(unittest.TestCase):
 
         top = Problem(model=Super())
 
-        top.setup(check=False)
+        top.setup()
 
         # These solvers override the ones set in the setup method of the 'sub' groups
         top.model.sub.nonlinear_solver = NewtonSolver()
@@ -1481,7 +1481,7 @@ class TestProblem(unittest.TestCase):
 
         top = Problem(model=Super())
 
-        top.setup(check=False)
+        top.setup()
 
         print(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
         print(isinstance(top.model.sub.linear_solver, ScipyKrylov))
@@ -1523,7 +1523,7 @@ class TestProblem(unittest.TestCase):
 
         top = Problem(model=Super())
 
-        top.setup(check=False)
+        top.setup()
 
         # This will solve it.
         top.model.sub.nonlinear_solver = NewtonSolver()

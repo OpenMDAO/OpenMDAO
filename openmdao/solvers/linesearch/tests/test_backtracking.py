@@ -33,7 +33,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = ScipyKrylov()
 
-        top.setup(check=False)
+        top.setup()
 
         self.top = top
 
@@ -60,7 +60,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         ls.options['alpha'] = 1.0
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bound: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -84,7 +84,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         ls.options['alpha'] = 10.0
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bound: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -108,7 +108,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         ls.options['alpha'] = 10.0
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bound: should stop just short of the lower bound
         top['px.x'] = 2.0
@@ -185,7 +185,7 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
     def test_retry(self):
         # Test the behavior with the switch turned on.
         top = self.top
-        top.setup(check=False)
+        top.setup()
         self.ls.options['retry_on_analysis_error'] = True
 
         # Test lower bound: should go as far as it can without going past 1.75 and triggering an
@@ -201,7 +201,7 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
         self.ls.options['retry_on_analysis_error'] = False
 
         top = self.top
-        top.setup(check=False)
+        top.setup()
 
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
@@ -292,7 +292,7 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         ls.options['retry_on_analysis_error'] = True
         ls.options['c'] = 10000.0
 
-        top.setup(check=False)
+        top.setup()
         top.set_solver_print(level=2)
 
         stdout = sys.stdout
@@ -342,7 +342,7 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         ls.options['retry_on_analysis_error'] = True
         ls.options['c'] = 10000.0
 
-        top.setup(check=False)
+        top.setup()
         top.set_solver_print(level=2)
 
         stdout = sys.stdout
@@ -379,7 +379,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top.model.linear_solver = ScipyKrylov()
 
         top.set_solver_print(level=0)
-        top.setup(check=False)
+        top.setup()
 
         self.top = top
         self.ub = np.array([2.6, 2.5, 2.65])
@@ -391,7 +391,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         ls.options['print_bound_enforce'] = True
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -428,7 +428,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -452,7 +452,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should stop just short of the lower bound
         top['px.x'] = 2.0
@@ -515,7 +515,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
         top.set_solver_print(level=0)
 
-        top.setup(check=False)
+        top.setup()
 
         # Make sure we don't raise an error when we reach the final debug print.
         top.run_model()
@@ -564,7 +564,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         top.model.linear_solver = ScipyKrylov()
 
         top.set_solver_print(level=0)
-        top.setup(check=False)
+        top.setup()
 
         self.top = top
         self.ub = np.array([2.6, 2.5, 2.65])
@@ -576,7 +576,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         ls.options['c'] = .1
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -600,7 +600,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -624,7 +624,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should stop just short of the lower bound
         top['px.x'] = 2.0
@@ -765,7 +765,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -795,7 +795,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS()
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -825,7 +825,7 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -856,7 +856,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
         ls.options['bound_enforcement'] = 'vector'
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -887,7 +887,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='wall')
         ls.options['bound_enforcement'] = 'wall'
 
-        top.setup(check=False)
+        top.setup()
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -918,7 +918,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar')
         ls.options['bound_enforcement'] = 'scalar'
 
-        top.setup(check=False)
+        top.setup()
         top.run_model()
 
         # Test lower bounds: should stop just short of the lower bound
@@ -982,7 +982,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['bound_enforcement'] = 'vector'
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -1013,7 +1013,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
         ls.options['bound_enforcement'] = 'wall'
 
-        top.setup(check=False)
+        top.setup()
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -1044,7 +1044,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
         ls.options['bound_enforcement'] = 'scalar'
 
-        top.setup(check=False)
+        top.setup()
         top.run_model()
 
         # Test lower bounds: should stop just short of the lower bound

@@ -14,7 +14,7 @@ class TestIndepVarComp(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp
 
         comp = IndepVarComp('indep_var')
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var'], 1.0)
 
@@ -26,7 +26,7 @@ class TestIndepVarComp(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp
 
         comp = IndepVarComp('indep_var', val=2.0)
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var'], 2.0)
 
@@ -35,7 +35,7 @@ class TestIndepVarComp(unittest.TestCase):
         from openmdao.api import Problem, IndepVarComp
 
         comp = IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var'], 2.0)
 
@@ -51,7 +51,7 @@ class TestIndepVarComp(unittest.TestCase):
         ])
 
         comp = IndepVarComp('indep_var', val=array)
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var'], array)
 
@@ -64,7 +64,7 @@ class TestIndepVarComp(unittest.TestCase):
             ('indep_var_2', 2.0),
         ))
 
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
@@ -78,7 +78,7 @@ class TestIndepVarComp(unittest.TestCase):
             ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
         ))
 
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
@@ -91,14 +91,14 @@ class TestIndepVarComp(unittest.TestCase):
         comp.add_output('indep_var_1', val=1.0, lower=0, upper=10)
         comp.add_output('indep_var_2', val=2.0, lower=1, upper=20)
 
-        prob = Problem(comp).setup(check=False)
+        prob = Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
 
     def test_error_novars(self):
         try:
-            prob = Problem(IndepVarComp()).setup(check=False)
+            prob = Problem(IndepVarComp()).setup()
         except Exception as err:
             self.assertEqual(str(err),
                 "No outputs (independent variables) have been declared for "
@@ -113,7 +113,7 @@ class TestIndepVarComp(unittest.TestCase):
                 ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
                 'indep_var_2',
             ))
-            prob = Problem(comp).setup(check=False)
+            prob = Problem(comp).setup()
         except Exception as err:
             self.assertEqual(str(err),
                 "IndepVarComp init: arg indep_var_2 must be a tuple of the "
@@ -124,7 +124,7 @@ class TestIndepVarComp(unittest.TestCase):
     def test_error_bad_arg(self):
         try:
             comp = IndepVarComp(1.0)
-            prob = Problem(comp).setup(check=False)
+            prob = Problem(comp).setup()
         except Exception as err:
             self.assertEqual(str(err),
                 "first argument to IndepVarComp init must be either of type "

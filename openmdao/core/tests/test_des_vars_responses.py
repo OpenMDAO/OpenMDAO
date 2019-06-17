@@ -38,7 +38,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.driver.add_constraint('con1')
         prob.driver.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_des_vars()
         obj = prob.model.get_objectives()
@@ -61,7 +61,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -84,7 +84,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_response('con1', type_="con")
         prob.model.add_response('con2', type_="con")
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         responses = prob.model.get_responses()
@@ -109,7 +109,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -134,7 +134,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -160,7 +160,7 @@ class TestDesVarsResponses(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -173,7 +173,7 @@ class TestDesVarsResponses(unittest.TestCase):
     def test_api_on_subsystems(self):
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', 1.0))
         model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
@@ -210,7 +210,7 @@ class TestDesVarsResponses(unittest.TestCase):
         con_comp2 = prob.model.con_cmp2
         con_comp2.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
         obj = prob.model.get_objectives()
@@ -233,7 +233,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.add_design_var('junk')
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(context.exception), "Output not found for design variable 'junk' in system ''.")
 
@@ -290,7 +290,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.add_constraint('con1')
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
 
@@ -316,7 +316,7 @@ class TestDesvarOnModel(unittest.TestCase):
         prob.model.add_constraint('con1', scaler=1e6)
         prob.model.add_constraint('con2', scaler=1e6)
 
-        prob.setup(check=False)
+        prob.setup()
 
         des_vars = prob.model.get_design_vars()
 
@@ -376,7 +376,7 @@ class TestConstraintOnModel(unittest.TestCase):
         prob.model.add_constraint('junk')
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(context.exception), "Output not found for response 'junk' in system ''.")
 
@@ -433,7 +433,7 @@ class TestConstraintOnModel(unittest.TestCase):
                                   ref=100)
         prob.model.add_constraint('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         constraints = prob.model.get_constraints()
 
@@ -595,7 +595,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob.model.add_objective('junk')
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(context.exception),
                          "Output not found for response 'junk' in system ''.")
@@ -654,7 +654,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         prob.model.add_objective('obj', ref0=1000, ref=1010)
         prob.model.add_objective('con2')
 
-        prob.setup(check=False)
+        prob.setup()
 
         objectives = prob.model.get_objectives()
 

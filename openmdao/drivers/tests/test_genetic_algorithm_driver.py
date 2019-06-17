@@ -61,7 +61,7 @@ class TestSimpleGA(unittest.TestCase):
 
         prob.driver._randomstate = 11
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # TODO: Satadru listed this solution, but I get a way better one.
@@ -74,7 +74,7 @@ class TestSimpleGA(unittest.TestCase):
         np.random.seed(1)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 7.5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -92,7 +92,7 @@ class TestSimpleGA(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # Optimal solution
@@ -103,7 +103,7 @@ class TestSimpleGA(unittest.TestCase):
         np.random.seed(1)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         indep = IndepVarComp()
         indep.add_output('xC', val=7.5)
@@ -124,7 +124,7 @@ class TestSimpleGA(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # Optimal solution
@@ -158,7 +158,7 @@ class TestSimpleGA(unittest.TestCase):
                 outputs['weighted'] = obj + pen
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('xc_a1', IndepVarComp('area1', 5.0, units='cm**2'), promotes=['*'])
         model.add_subsystem('xc_a2', IndepVarComp('area2', 5.0, units='cm**2'), promotes=['*'])
@@ -183,7 +183,7 @@ class TestSimpleGA(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob['area3'] = 0.0005
         prob.run_driver()
 
@@ -224,7 +224,7 @@ class TestSimpleGA(unittest.TestCase):
                 outputs['weighted'] = obj + pen
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('xc_a1', IndepVarComp('area1', 5.0, units='cm**2'), promotes=['*'])
         model.add_subsystem('xc_a2', IndepVarComp('area2', 5.0, units='cm**2'), promotes=['*'])
@@ -249,7 +249,7 @@ class TestSimpleGA(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob['area3'] = 0.0005
         prob.run_driver()
 
@@ -273,7 +273,7 @@ class TestSimpleGA(unittest.TestCase):
                 raise ValueError
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p', IndepVarComp('x', 0.0))
         model.add_subsystem('comp', ValueErrorComp())
@@ -285,7 +285,7 @@ class TestSimpleGA(unittest.TestCase):
 
         prob.driver = SimpleGADriver(max_gen=75, pop_size=25)
         prob.driver._randomstate = 1
-        prob.setup(check=False)
+        prob.setup()
         # prob.run_driver()
         self.assertRaises(ValueError, prob.run_driver)
 
@@ -342,7 +342,7 @@ class TestSimpleGA(unittest.TestCase):
 
     def test_SimpleGADriver_missing_objective(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('x', IndepVarComp('x', 2.0), promotes=['*'])
         model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
@@ -352,7 +352,7 @@ class TestSimpleGA(unittest.TestCase):
         prob.model.add_design_var('x', lower=0)
         prob.model.add_constraint('x', lower=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(Exception) as raises_msg:
             prob.run_driver()
@@ -380,7 +380,7 @@ class TestDriverOptionsSimpleGA(unittest.TestCase):
         driver.options['bits'] = {'x': 8}
         prob.model.add_design_var('x', lower=-10., upper=10.)
         prob.model.add_objective('y')
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
         self.assertEqual(driver.options['Pm'], 0.1)
         self.assertEqual(driver.options['Pc'], 0.01)
@@ -657,7 +657,7 @@ class MPITestSimpleGA(unittest.TestCase):
         np.random.seed(1)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 7.5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -678,7 +678,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # Optimal solution
@@ -689,7 +689,7 @@ class MPITestSimpleGA(unittest.TestCase):
         np.random.seed(1)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 7.5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -720,7 +720,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # Optimal solution
@@ -755,7 +755,7 @@ class MPITestSimpleGA(unittest.TestCase):
                 outputs['weighted'] = obj + pen
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('xc_a1', IndepVarComp('area1', 5.0, units='cm**2'), promotes=['*'])
         model.add_subsystem('xc_a2', IndepVarComp('area2', 5.0, units='cm**2'), promotes=['*'])
@@ -780,7 +780,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob['area3'] = 0.0005
         prob.run_driver()
 
@@ -802,7 +802,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         np.random.seed(1)
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -833,7 +833,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # Optimal solution
@@ -842,7 +842,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
 
     def test_indivisible_error(self):
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
         model.add_subsystem('par', ParallelGroup())
 
         prob.driver = SimpleGADriver()
@@ -905,7 +905,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         from openmdao.test_suite.components.branin import Branin
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 7.5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -934,7 +934,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         from openmdao.test_suite.components.branin import Branin
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 7.5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -963,7 +963,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         from openmdao.test_suite.components.branin import Branin
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 7.5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -993,7 +993,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         from openmdao.test_suite.components.branin import Branin
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 7.5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -1078,7 +1078,7 @@ class MPIFeatureTests(unittest.TestCase):
         from openmdao.test_suite.components.branin import Branin
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 7.5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -1096,7 +1096,7 @@ class MPIFeatureTests(unittest.TestCase):
         prob.driver.options['max_gen'] = 10
         prob.driver.options['run_parallel'] = True
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # Optimal solution
@@ -1115,7 +1115,7 @@ class MPIFeatureTests4(unittest.TestCase):
         from openmdao.test_suite.components.branin import Branin
 
         prob = Problem()
-        model = prob.model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('xC', 7.5))
         model.add_subsystem('p2', IndepVarComp('xI', 0.0))
@@ -1146,7 +1146,7 @@ class MPIFeatureTests4(unittest.TestCase):
 
         prob.driver._randomstate = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # Optimal solution

@@ -243,7 +243,7 @@ class TestNonlinearSolversIsolated(unittest.TestCase):
         teg.nonlinear_solver.options['atol'] = 1e-4
         teg.nonlinear_solver.options['debug_print'] = True
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         stdout = sys.stdout

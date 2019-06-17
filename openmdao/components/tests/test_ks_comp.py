@@ -29,7 +29,7 @@ class TestKSFunction(unittest.TestCase):
         model.add_objective('comp.y1')
         model.add_constraint('ks.KS', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         assert_rel_error(self, max(prob['comp.y2']), prob['ks.KS'][0])
@@ -50,7 +50,7 @@ class TestKSFunction(unittest.TestCase):
         model.add_design_var('px.x')
         model.add_constraint('ks.KS', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         assert_rel_error(self, prob['ks.KS'][0], 17.0)
@@ -73,7 +73,7 @@ class TestKSFunction(unittest.TestCase):
 
         model.connect('px.x', 'ks.g')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # compute partials with the current model inputs
@@ -185,7 +185,7 @@ class TestKSFunction(unittest.TestCase):
         model.add_objective('comp.y1')
         model.add_constraint('ks.KS', upper=0.0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         assert_rel_error(self, max(prob['comp.y2']), prob['ks.KS'][0])

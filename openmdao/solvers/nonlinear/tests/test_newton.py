@@ -45,7 +45,7 @@ class TestNewton(unittest.TestCase):
 
         prob = Problem(model=SellarDerivatives(nonlinear_solver=NewtonSolver()))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -56,7 +56,7 @@ class TestNewton(unittest.TestCase):
 
         prob = Problem(model=SellarDerivativesGrouped(nonlinear_solver=NewtonSolver()))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -71,7 +71,7 @@ class TestNewton(unittest.TestCase):
 
         prob = Problem(model=SellarNoDerivatives(nonlinear_solver=NewtonSolver()))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -102,7 +102,7 @@ class TestNewton(unittest.TestCase):
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 1.0
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bound: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -126,7 +126,7 @@ class TestNewton(unittest.TestCase):
         prob = Problem()
         prob.model = SellarDerivatives(nonlinear_solver=NewtonSolver(), linear_solver=LinearBlockGS())
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -148,7 +148,7 @@ class TestNewton(unittest.TestCase):
 
         prob = Problem(model=SellarDerivatives(nonlinear_solver=NewtonSolver()))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -164,7 +164,7 @@ class TestNewton(unittest.TestCase):
         prob = Problem(model=SellarStateConnection(nonlinear_solver=NewtonSolver()))
 
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -180,7 +180,7 @@ class TestNewton(unittest.TestCase):
 
         prob.model.approx_totals(method='fd')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -233,7 +233,7 @@ class TestNewton(unittest.TestCase):
         model.nonlinear_solver.linear_solver = ScipyKrylov()
 
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -287,7 +287,7 @@ class TestNewton(unittest.TestCase):
         model.nonlinear_solver.linear_solver = DirectSolver()
 
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['y1'], 25.58830273, .00001)
@@ -744,7 +744,7 @@ class TestNewton(unittest.TestCase):
         nlsolver.options['err_on_maxiter'] = True
         nlsolver.options['maxiter'] = 1
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         with self.assertRaises(AnalysisError) as context:
@@ -789,7 +789,7 @@ class TestNewton(unittest.TestCase):
         model.nonlinear_solver = NewtonSolver()
         model.linear_solver = ScipyKrylov()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
 

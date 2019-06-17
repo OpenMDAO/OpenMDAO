@@ -358,7 +358,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('comp2', om.ExecComp('y=2*foo'), promotes_inputs=['foo'])
 
         with self.assertRaises(Exception) as err:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(err.exception),
                          "comp1: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
@@ -370,7 +370,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('comp2', om.ExecComp('y=2*foo'), promotes_inputs=['foo'])
 
         with self.assertRaises(Exception) as err:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(err.exception),
                          "when adding subsystem 'comp1', entry '('x', 'foo', 'bar')' "
                          "is not a string or tuple of size 2")
@@ -423,7 +423,7 @@ class TestGroup(unittest.TestCase):
         p.model = Sellar()
 
         with self.assertRaises(Exception) as err:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(err.exception),
                          "d1: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
@@ -484,7 +484,7 @@ class TestGroup(unittest.TestCase):
         G1.add_subsystem("C2", om.ExecComp("y=2.0*x"), promotes=['y'])
         msg = r"Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
         with assertRaisesRegex(self, Exception, msg):
-            prob.setup(check=False)
+            prob.setup()
 
     def test_basic_connect_units(self):
         import numpy as np
@@ -548,7 +548,7 @@ class TestGroup(unittest.TestCase):
         p.model.connect('indep.x', 'C1.x', src_indices=[1, 0, 2])
 
         with self.assertRaises(Exception) as context:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(context.exception),
                          ": src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
@@ -609,7 +609,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C2', om.ExecComp('y=x'), promotes_outputs=['x*'])
 
         with self.assertRaises(Exception) as context:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(context.exception),
                          "C2: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['x*'].")
@@ -622,7 +622,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C2', om.ExecComp('y=x'), promotes_inputs=['xx'])
 
         with self.assertRaises(Exception) as context:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(context.exception),
                          "C2: 'promotes_inputs' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
@@ -635,7 +635,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C2', om.ExecComp('y=x'), promotes=['xx'])
 
         with self.assertRaises(Exception) as context:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(context.exception),
                          "C2: 'promotes' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
@@ -650,7 +650,7 @@ class TestGroup(unittest.TestCase):
                               promotes_inputs=['z', 'foo'])
 
         with self.assertRaises(Exception) as context:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(context.exception),
                          "d1: 'promotes_inputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
@@ -665,7 +665,7 @@ class TestGroup(unittest.TestCase):
                               promotes_outputs=['y1', 'blammo', ('bar', 'blah')])
 
         with self.assertRaises(Exception) as context:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(context.exception),
                          "d1: 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['bar', 'blammo'].")
@@ -790,7 +790,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
 
         with self.assertRaises(Exception) as context:
-            p.setup(check=False)
+            p.setup()
         self.assertEqual(str(context.exception),
                          "src_indices for 'x' is not flat, so its input shape "
                          "must be provided. src_indices may contain an extra "
@@ -837,7 +837,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('C1', MyComp(), promotes_inputs=['x'])
 
         p.set_solver_print(level=0)
-        p.setup(check=False)
+        p.setup()
         p.run_model()
         assert_rel_error(self, p['C1.x'],
                          np.array([0., 10., 7., 4.]).reshape(tgt_shape))
@@ -902,7 +902,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(['indeps', 'C1', 'C2', 'C3'],
                          [s.name for s in model._static_subsystems_allprocs])
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         self.assertEqual(['C1', 'C2', 'C3'], order_list)
@@ -912,7 +912,7 @@ class TestGroup(unittest.TestCase):
         # Big boy rules
         model.set_order(['indeps', 'C2', 'C1', 'C3'])
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         self.assertEqual(['C2', 'C1', 'C3'], order_list)
 
@@ -951,7 +951,7 @@ class TestGroup(unittest.TestCase):
         model = prob.model
         model.add_subsystem('indeps', om.IndepVarComp('x', 1.))
         model.add_subsystem('G1', SetOrderGroup())
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         # this test passes if it doesn't raise an exception
@@ -1083,7 +1083,7 @@ def src_indices_model(src_shape, tgt_shape, src_indices=None, flat_src_indices=F
     if promotes is None:
         prob.model.connect('indeps.x', 'C1.x', src_indices=src_indices,
                            flat_src_indices=flat_src_indices)
-    prob.setup(check=False)
+    prob.setup()
     return prob
 
 
@@ -1147,7 +1147,7 @@ class TestConnect(unittest.TestCase):
         # because setup is not called until then
         self.sub.connect('src.z', 'tgt.x', src_indices=[1])
         with assertRaisesRegex(self, NameError, msg):
-            self.prob.setup(check=False)
+            self.prob.setup()
 
     def test_invalid_target(self):
         msg = "Input 'tgt.z' does not exist for connection " + \
@@ -1157,7 +1157,7 @@ class TestConnect(unittest.TestCase):
         # because setup is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
         with assertRaisesRegex(self, NameError, msg):
-            self.prob.setup(check=False)
+            self.prob.setup()
 
     def test_connect_within_system(self):
         msg = "Output and input are in the same System for connection " + \
@@ -1177,7 +1177,7 @@ class TestConnect(unittest.TestCase):
               "in 'sub' from 'y' to 'tgt.x'."
 
         with assertRaisesRegex(self, RuntimeError, msg):
-            prob.setup(check=False)
+            prob.setup()
 
     def test_connect_units_with_unitless(self):
         prob = om.Problem()
@@ -1192,7 +1192,7 @@ class TestConnect(unittest.TestCase):
               "to input 'tgt.x' which has no units."
 
         with assert_warning(UserWarning, msg):
-            prob.setup(check=False)
+            prob.setup()
 
     def test_connect_incompatible_units(self):
         msg = "Output units of 'degC' for 'src.x2' are incompatible " \
@@ -1207,7 +1207,7 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('src.x2', 'tgt.x')
 
         with assertRaisesRegex(self, RuntimeError, msg):
-            prob.setup(check=False)
+            prob.setup()
 
     def test_connect_units_with_nounits(self):
         prob = om.Problem()
@@ -1224,7 +1224,7 @@ class TestConnect(unittest.TestCase):
               "connected to output 'src.x2' which has no units."
 
         with assert_warning(UserWarning, msg):
-            prob.setup(check=False)
+            prob.setup()
 
         prob.run_model()
 
@@ -1242,7 +1242,7 @@ class TestConnect(unittest.TestCase):
               "connected to output 'src.y' which has no units."
 
         with assert_warning(UserWarning, msg):
-            prob.setup(check=False)
+            prob.setup()
 
         prob.run_model()
 
@@ -1254,7 +1254,7 @@ class TestConnect(unittest.TestCase):
                                  promotes=['x', 'y'], promotes_outputs=['y2'])
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(context.exception),
                          "src: 'promotes' cannot be used at the same time as "
@@ -1265,7 +1265,7 @@ class TestConnect(unittest.TestCase):
         prob.model.add_subsystem('src', om.ExecComp(['y = 2 * x', 'y2 = 3 * x2']),
                                  promotes=['x', 'y'], promotes_inputs=['x2'])
         with self.assertRaises(RuntimeError) as context:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(context.exception),
                          "src: 'promotes' cannot be used at the same time as "
@@ -1289,7 +1289,7 @@ class TestConnect(unittest.TestCase):
         root.connect('p.x', 'G1.par1.c2.x')
         root.connect('G1.par1.c2.y', 'G1.par1.c4.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         assert_rel_error(self, prob['G1.par1.c4.y'], 8.0)
@@ -1301,7 +1301,7 @@ class TestConnect(unittest.TestCase):
                "'sub.src.s' to 'sub.arr.x'.")
 
         with assertRaisesRegex(self, ValueError, msg):
-            self.prob.setup(check=False)
+            self.prob.setup()
 
     def test_bad_indices_shape(self):
         p = om.Problem()
@@ -1315,7 +1315,7 @@ class TestConnect(unittest.TestCase):
                r"shape is \(2.*, 2.*\) but indices are \(1.*, 2.*\).")
 
         with assertRaisesRegex(self, ValueError, msg):
-            p.setup(check=False)
+            p.setup()
 
     def test_bad_indices_dimensions(self):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
@@ -1326,7 +1326,7 @@ class TestConnect(unittest.TestCase):
                "The source has 2 dimensions but the indices expect 3.")
 
         try:
-            self.prob.setup(check=False)
+            self.prob.setup()
         except ValueError as err:
             self.assertEqual(str(err), msg)
         else:
@@ -1342,7 +1342,7 @@ class TestConnect(unittest.TestCase):
                "is out of range for source dimension of size 3.")
 
         try:
-            self.prob.setup(check=False)
+            self.prob.setup()
         except ValueError as err:
             self.assertEqual(str(err), msg)
         else:
