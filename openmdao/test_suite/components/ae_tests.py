@@ -2,11 +2,11 @@
 Some classes that are used to test Analysis Errors on multiple processes.
 """
 
-from openmdao.api import ExplicitComponent, AnalysisError
+import openmdao.api as om
 from openmdao.core.driver import Driver
 
 
-class AEComp(ExplicitComponent):
+class AEComp(om.ExplicitComponent):
 
     def setup(self):
         self.add_input('x', val=0.0)
@@ -19,7 +19,7 @@ class AEComp(ExplicitComponent):
         x = inputs['x']
 
         if x > 2.0:
-            raise AnalysisError('Try again.')
+            raise om.AnalysisError('Try again.')
 
         outputs['y'] = x*x + 2.0
 

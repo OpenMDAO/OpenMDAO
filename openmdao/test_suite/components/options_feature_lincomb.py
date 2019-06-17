@@ -4,9 +4,10 @@ are given as an option of type 'numpy.ScalarType'.
 """
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
-class LinearCombinationComp(ExplicitComponent):
+
+class LinearCombinationComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('a', default=1., types=np.ScalarType)

@@ -241,5 +241,6 @@ def _calltree_exec(options):
 
 
 if __name__ == '__main__':
-    from openmdao.api import LinearBlockGS
-    get_nested_calls(LinearBlockGS, 'solve')
+    import openmdao.api as om
+
+    get_nested_calls(om.LinearBlockGS, 'solve')

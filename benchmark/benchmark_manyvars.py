@@ -1,12 +1,12 @@
 
 import unittest
 
-from openmdao.api import Problem, Group
+import openmdao.api as om
 from openmdao.test_suite.build4test import DynComp, create_dyncomps
 
 
 def _build_comp(np, no, ns=0):
-    prob = Problem()
+    prob = om.Problem()
     prob.model.add_subsystem("C1", DynComp(np, no, ns))
     return prob
 

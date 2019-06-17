@@ -1,8 +1,7 @@
-from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
-
+import openmdao.api as om
 from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 
-class Circuit(Group):
+class Circuit(om.Group):
 
     def setup(self):
         self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
@@ -20,16 +19,16 @@ class Circuit(Group):
         self.connect('R2.I', 'n2.I_in:0')
         self.connect('D1.I', 'n2.I_out:0')
 
-        self.nonlinear_solver = NewtonSolver()
+        self.nonlinear_solver = om.NewtonSolver()
         self.nonlinear_solver.options['iprint'] = 2
         self.nonlinear_solver.options['maxiter'] = 20
-        self.linear_solver = DirectSolver()
+        self.linear_solver = om.DirectSolver()
 
-p = Problem()
+p = om.Problem()
 model = p.model
 
-model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
+model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
 model.add_subsystem('circuit', Circuit())
 
 model.connect('source.I', 'circuit.I_in')

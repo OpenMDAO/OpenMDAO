@@ -1,13 +1,14 @@
 from __future__ import print_function
+import time
 import unittest
 from six.moves import range
+
 import numpy as np
 
-import time
-from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, ExecComp
+import openmdao.api as om
 
 
-class Plus(ExplicitComponent):
+class Plus(om.ExplicitComponent):
     def __init__(self, adder):
         super(Plus, self).__init__()
         self.adder = float(adder)
@@ -19,7 +20,8 @@ class Plus(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['f1'] = inputs['x'] + self.adder
 
-class Times(ExplicitComponent):
+
+class Times(om.ExplicitComponent):
     def __init__(self, scalar):
         super(Times, self).__init__()
         self.scalar = float(scalar)
@@ -31,7 +33,8 @@ class Times(ExplicitComponent):
     def compute(self, inputs, outputs):
         outputs['f2'] = inputs['f1'] + self.scalar
 
-class Point(Group):
+
+class Point(om.Group):
 
     def __init__(self, adder, scalar):
         super(Point, self).__init__()
@@ -42,7 +45,8 @@ class Point(Group):
         self.add_subsystem('plus', Plus(self.adder), promotes=['*'])
         self.add_subsystem('times', Times(self.scalar), promotes=['*'])
 
-class Summer(ExplicitComponent):
+
+class Summer(om.ExplicitComponent):
 
     def __init__(self, size):
         super(Summer, self).__init__()
@@ -60,7 +64,8 @@ class Summer(ExplicitComponent):
             tot += inputs['y%d'%i]
         outputs['total'] = tot
 
-class MultiPoint(Group):
+
+class MultiPoint(om.Group):
 
     def __init__(self, adders, scalars):
         super(MultiPoint, self).__init__()
@@ -78,6 +83,7 @@ class MultiPoint(Group):
 
         self.add_subsystem('aggregate', Summer(size))
 
+
 class BM(unittest.TestCase):
     """A few 'brute force' multipoint cases (1K, 2K, 5K)"""
 
@@ -87,7 +93,7 @@ class BM(unittest.TestCase):
         adders =  np.random.random(size)
         scalars = np.random.random(size)
 
-        prob = Problem(MultiPoint(adders, scalars))
+        prob = om.Problem(MultiPoint(adders, scalars))
         prob.setup(check=False)
 
         return prob

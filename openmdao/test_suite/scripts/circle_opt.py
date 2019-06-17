@@ -1,12 +1,13 @@
 
-from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver
 import numpy as np
+
+import openmdao.api as om
 
 # note: size must be an even number
 SIZE = 10
-p = Problem()
+p = om.Problem()
 
-indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
 
 # the following were randomly generated using np.random.random(10)*2-1 to randomly
 # disperse them within a unit circle centered at the origin.
@@ -16,23 +17,24 @@ indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039
                                   -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
 indeps.add_output('r', .7)
 
-p.model.add_subsystem('arctan_yox', ExecComp('g=arctan(y/x)', vectorize=True,
+p.model.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', vectorize=True,
                                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
-p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
+p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
-                                        g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+                                           g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
 thetas = np.linspace(0, np.pi/4, SIZE)
-p.model.add_subsystem('theta_con', ExecComp('g = x - theta', vectorize=True,
-                                            g=np.ones(SIZE), x=np.ones(SIZE),
-                                            theta=thetas))
-p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd', vectorize=True,
-                                                    g=np.ones(SIZE//2), even=np.ones(SIZE//2),
-                                                    odd=np.ones(SIZE//2)))
+p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=True,
+                                               g=np.ones(SIZE), x=np.ones(SIZE),
+                                               theta=thetas))
+p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=True,
+                                                     g=np.ones(SIZE//2), even=np.ones(SIZE//2),
+                                                     odd=np.ones(SIZE//2)))
 
-p.model.add_subsystem('l_conx', ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE),
+                                            x=np.ones(SIZE)))
 
 IND = np.arange(SIZE, dtype=int)
 ODD_IND = IND[1::2]  # all odd indices
@@ -45,7 +47,7 @@ p.model.connect('arctan_yox.g', 'theta_con.x')
 p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
 p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
-p.driver = ScipyOptimizeDriver()
+p.driver = om.ScipyOptimizeDriver()
 p.driver.options['optimizer'] = 'SLSQP'
 p.driver.options['disp'] = False
 
