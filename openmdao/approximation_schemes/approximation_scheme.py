@@ -491,7 +491,6 @@ def _get_wrt_subjacs(system, approxs):
     ofdict = {}
     nondense = {}
     slicedict = system._outputs.get_slice_dict()
-    out_views = system._outputs._views
     abs_out_names = [n for n in system._var_allprocs_abs_names['output'] if n in slicedict]
 
     for key, options in approxs:

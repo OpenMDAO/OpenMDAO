@@ -26,6 +26,7 @@ from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz
 from openmdao.utils.mpi import MPI
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
 
 import openmdao.test_suite
@@ -185,19 +186,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     return p
 
 
+@use_tempdirs
 class SimulColoringPyoptSparseTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto(self):
@@ -354,23 +344,9 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
 
 
+@use_tempdirs
 @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
 class SimulColoringRecordingTestCase(unittest.TestCase):
-
-    def setUp(self):
-        from tempfile import mkdtemp
-        self.dir = mkdtemp()
-        self.original_path = os.getcwd()
-        os.chdir(self.dir)
-
-    def tearDown(self):
-        os.chdir(self.original_path)
-        try:
-            shutil.rmtree(self.dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_recording(self):
         # coloring involves an underlying call to run_model (and final_setup),
@@ -385,20 +361,9 @@ class SimulColoringRecordingTestCase(unittest.TestCase):
         self.assertEqual(cr.list_cases(), ['rank0:pyOptSparse_SNOPT|%d' % i for i in range(p.driver.iter_count)])
 
 
+@use_tempdirs
 class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
     """Reverse coloring tests for pyoptsparse."""
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_rev_simul_coloring_snopt(self):
@@ -456,19 +421,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
                          (p_color.model._solve_count - 1 - 22 * 3) / 11)
 
 
+@use_tempdirs
 class SimulColoringScipyTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_bad_mode(self):
         p_color_fwd = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
@@ -691,20 +645,9 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         self.assertEqual(arctan_yox.num_computes - start_calls, 2)
 
 
+@use_tempdirs
 class SimulColoringRevScipyTestCase(unittest.TestCase):
     """Rev mode coloring tests."""
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     def test_summary(self):
         p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
@@ -782,13 +725,10 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
                          "Derivative support has been turned off but compute_totals was called.")
 
 
+@use_tempdirs
 class SparsityTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='SparsityTestCase-')
-        os.chdir(self.tempdir)
-
         self.sparsity = {
             "circle.area": {
                "indeps.x": [[], [], [1, 10]],
@@ -816,13 +756,6 @@ class SparsityTestCase(unittest.TestCase):
                "indeps.r": [[], [], [1, 1]]
             }
         }
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_sparsity_snopt(self):
@@ -942,27 +875,10 @@ def _get_mat(rows, cols):
         return np.random.random(rows * cols).reshape((rows, cols)) - 0.5
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI is not None and PETScVector is not None and OPTIMIZER is not None, "PETSc and pyOptSparse required.")
 class MatMultMultipointTestCase(unittest.TestCase):
     N_PROCS = 4
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        if MPI.COMM_WORLD.rank == 0:
-            self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-            MPI.COMM_WORLD.bcast(self.tempdir, root=0)
-        else:
-            self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        MPI.COMM_WORLD.bcast(None, root=0)
-        if MPI.COMM_WORLD.rank == 0:
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
 
     def test_multipoint_with_coloring(self):
         size = 10

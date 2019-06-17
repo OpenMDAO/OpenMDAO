@@ -461,34 +461,34 @@ class System(object):
         """
         pass
 
-    def _check_reconf(self):
+    def _check_self_reconf(self):
         """
         Check if this systems wants to reconfigure and if so, perform the reconfiguration.
         """
-        reconf = self.reconfigure()
-
-        if reconf:
+        if self.reconfigure():
             with self._unscaled_context_all():
                 # Backup input values
-                old = {'input': self._inputs, 'output': self._outputs}
+                old_in = self._inputs
+                old_out = self._outputs
 
                 # Perform reconfiguration
                 self.resetup('reconf')
 
-                new = {'input': self._inputs, 'output': self._outputs}
+                new_in = self._inputs
+                new_out = self._outputs
 
                 # Reload input and output values where possible
-                for type_ in ['input', 'output']:
-                    for abs_name, old_view in iteritems(old[type_]._views_flat):
-                        if abs_name in new[type_]._views_flat:
-                            new_view = new[type_]._views_flat[abs_name]
+                for vold, vnew in [(old_in, new_in), (old_out, new_out)]:
+                    for abs_name, old_view in iteritems(vold._views_flat):
+                        if abs_name in vnew._views_flat:
+                            new_view = vnew._views_flat[abs_name]
 
                             if len(old_view) == len(new_view):
                                 new_view[:] = old_view
 
             self._reconfigured = True
 
-    def _check_reconf_update(self, subsys=None):
+    def _check_child_reconf(self, subsys=None):
         """
         Check if any subsystem has reconfigured and if so, perform the necessary update setup.
 
@@ -781,9 +781,81 @@ class System(object):
         self._setup_global_connections(recurse=recurse)
         self._setup_relevance(mode, self._relevant)
         self._setup_var_index_ranges(recurse=recurse)
-        self._setup_var_index_maps(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
+        """
+        Perform final setup for this system and its descendant systems.
+
+        This part of setup is called automatically at the start of run_model or run_driver.
+
+        There are three modes of setup:
+        1. 'full': wipe everything and setup this and all descendant systems from scratch
+        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
+        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The global communicator.
+        setup_mode : str
+            Must be one of 'full', 'reconf', or 'update'.
+        force_alloc_complex : bool
+            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
+            detect when you need to do this, but in some cases (e.g., complex step is used
+            after a reconfiguration) you may need to set this to True.
+        """
+        # 1. Full setup that must be called in the root system.
+        if setup_mode == 'full':
+            initial = True
+            recurse = True
+            resize = False
+        # 2. Partial setup called in the system initiating the reconfiguration.
+        elif setup_mode == 'reconf':
+            initial = False
+            recurse = True
+            resize = True
+        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
+        elif setup_mode == 'update':
+            initial = False
+            recurse = False
+            resize = False
+
+        # For vector-related, setup, recursion is always necessary, even for updating.
+        # For reconfiguration setup, we resize the vectors once, only in the current system.
+        ext_num_vars, ext_sizes = self._get_initial_global(initial)
+        self._setup_global(ext_num_vars, ext_sizes)
+        root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
+        self._setup_vectors(root_vectors, resize=resize)
+
+        # Transfers do not require recursion, but they have to be set up after the vector setup.
+        self._setup_transfers(recurse=recurse)
+
+        # Same situation with solvers, partials, and Jacobians.
+        # If we're updating, we just need to re-run setup on these, but no recursion necessary.
+        self._setup_solvers(recurse=recurse)
+        if self._use_derivatives:
+            self._setup_partials(recurse=recurse)
+            self._setup_jacobians(recurse=recurse)
+
+        self._setup_recording(recurse=recurse)
+
+        # If full or reconf setup, reset this system's variables to initial values.
+        if setup_mode in ('full', 'reconf'):
+            self.set_initial_values()
+
+        rec_model_meta = self.recording_options['record_model_metadata']
+
+        # Tell all subsystems to record their metadata if they have recorders attached
+        for sub in self.system_iter(recurse=True, include_self=True):
+            if sub.recording_options['record_metadata']:
+                sub._rec_mgr.record_metadata(sub)
+
+            # Also, optionally, record to the recorders attached to this System,
+            #   the system metadata for all the subsystems
+            if rec_model_meta:
+                self._rec_mgr.record_metadata(sub)
 
     def use_fixed_coloring(self, coloring=_STD_COLORING_FNAME, recurse=True):
         """
@@ -1283,79 +1355,6 @@ class System(object):
             for subsys in self._subsystems_myproc:
                 subsys._setup_recording(recurse)
 
-    def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
-        """
-        Perform final setup for this system and its descendant systems.
-
-        This part of setup is called automatically at the start of run_model or run_driver.
-
-        There are three modes of setup:
-        1. 'full': wipe everything and setup this and all descendant systems from scratch
-        2. 'reconf': don't wipe everything, but reconfigure this and all descendant systems
-        3. 'update': update after one or more immediate systems has done a 'reconf' or 'update'
-
-        Parameters
-        ----------
-        comm : MPI.Comm or <FakeComm> or None
-            The global communicator.
-        setup_mode : str
-            Must be one of 'full', 'reconf', or 'update'.
-        force_alloc_complex : bool
-            Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
-            detect when you need to do this, but in some cases (e.g., complex step is used
-            after a reconfiguration) you may need to set this to True.
-        """
-        # 1. Full setup that must be called in the root system.
-        if setup_mode == 'full':
-            initial = True
-            recurse = True
-            resize = False
-        # 2. Partial setup called in the system initiating the reconfiguration.
-        elif setup_mode == 'reconf':
-            initial = False
-            recurse = True
-            resize = True
-        # 3. Update-mode setup called in all ancestors of the system initiating the reconf.
-        elif setup_mode == 'update':
-            initial = False
-            recurse = False
-            resize = False
-
-        # For vector-related, setup, recursion is always necessary, even for updating.
-        # For reconfiguration setup, we resize the vectors once, only in the current system.
-        ext_num_vars, ext_sizes = self._get_initial_global(initial)
-        self._setup_global(ext_num_vars, ext_sizes)
-        root_vectors = self._get_root_vectors(initial, force_alloc_complex=force_alloc_complex)
-        self._setup_vectors(root_vectors, resize=resize)
-
-        # Transfers do not require recursion, but they have to be set up after the vector setup.
-        self._setup_transfers(recurse=recurse)
-
-        # Same situation with solvers, partials, and Jacobians.
-        # If we're updating, we just need to re-run setup on these, but no recursion necessary.
-        self._setup_solvers(recurse=recurse)
-        if self._use_derivatives:
-            self._setup_partials(recurse=recurse)
-            self._setup_jacobians(recurse=recurse)
-
-        self._setup_recording(recurse=recurse)
-
-        # If full or reconf setup, reset this system's variables to initial values.
-        if setup_mode in ('full', 'reconf'):
-            self.set_initial_values()
-
-        rec_model_meta = self.recording_options['record_model_metadata']
-
-        # Tell all subsystems to record their metadata if they have recorders attached
-        for sub in self.system_iter(recurse=True, include_self=True):
-            if sub.recording_options['record_metadata']:
-                sub._rec_mgr.record_metadata(sub)
-
-            # Also, optionally, record to the recorders attached to this System,
-            #   the system metadata for all the subsystems
-            if rec_model_meta:
-                self._rec_mgr.record_metadata(sub)
-
     def _setup_var_index_ranges(self, recurse=True):
         """
         Compute the division of variables by subsystem.
@@ -1363,9 +1362,9 @@ class System(object):
         Parameters
         ----------
         recurse : bool
-            Whether to call this method in subsystems.
+            Whether to call this method in subsystems (ignored).
         """
-        pass
+        self._setup_var_index_maps(recurse=recurse)
 
     def _setup_var_data(self, recurse=True):
         """
@@ -1492,23 +1491,17 @@ class System(object):
             of mode.
 
         """
-        def _filter_names(voi_dict):
-            return set(voi for voi, data in iteritems(voi_dict)
-                       if data['parallel_deriv_color'] is not None
-                       or data['vectorize_derivs'])
-
         self._vois = vois
         if vec_names is None:  # should only occur at top level on full setup
             if self._use_derivatives:
                 vec_names = ['nonlinear', 'linear']
                 if mode == 'fwd':
-                    desvars = self.get_design_vars(recurse=True, get_sizes=False)
-                    vec_names.extend(sorted(_filter_names(desvars)))
-                    self._vois = vois = desvars
+                    self._vois = vois = self.get_design_vars(recurse=True, get_sizes=False)
                 else:  # rev
-                    responses = self.get_responses(recurse=True, get_sizes=False)
-                    vec_names.extend(sorted(_filter_names(responses)))
-                    self._vois = vois = responses
+                    self._vois = vois = self.get_responses(recurse=True, get_sizes=False)
+                vec_names.extend(sorted(set(voi for voi, data in iteritems(vois)
+                                            if data['parallel_deriv_color'] is not None
+                                            or data['vectorize_derivs'])))
             else:
                 vec_names = ['nonlinear']
                 self._vois = {}
@@ -3260,7 +3253,7 @@ class System(object):
 
         """
         # Reconfigure if needed.
-        self._check_reconf()
+        self._check_self_reconf()
 
     def check_config(self, logger):
         """

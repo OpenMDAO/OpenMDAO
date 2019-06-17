@@ -202,7 +202,7 @@ class NonlinearBlockGS(NonlinearSolver):
             for isub, subsys in enumerate(system._subsystems_myproc):
                 system._transfer('nonlinear', 'fwd', isub)
                 subsys._solve_nonlinear()
-                system._check_reconf_update()
+                system._check_child_reconf()
 
             self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals]):
