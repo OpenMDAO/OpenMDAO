@@ -47,10 +47,9 @@ openmdao check
 
 The :code:`openmdao check` command will perform a number of checks on a model and display
 errors, warnings, or informational messages describing what it finds. Some of the available
-checks are *hanging_inputs*, which lists any input variables that are not connected, and
-*cycles*, which will display any component dependency cycles or out-of-order executing components.
-By default, all checks will be done, unless you supply individual checks on the command line
-using *-c* args.  For example:
+checks are *unconnected_inputs*, which lists any input variables that are not connected, and
+*out_of_order*, which displays any systems that are being executed out-of-order.
+You can supply individual checks on the command line using *-c* args.  For example:
 
 
 .. embed-shell-cmd::
@@ -58,7 +57,8 @@ using *-c* args.  For example:
     :dir: ../test_suite/scripts
 
 
-To see the available checks, run the following command:
+Otherwise, a set of default checks will be done.
+To see lists of the available and default checks, run the following command:
 
 .. embed-shell-cmd::
     :cmd: openmdao check -h
