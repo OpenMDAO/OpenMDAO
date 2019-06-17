@@ -45,7 +45,7 @@ def _check_cycles(group, infos=None):
 
 def _check_ubcs(group, warnings):
     """
-    Report any out of order Systems to the logger.
+    Report any 'used before calculated' Systems to the logger.
 
     Parameters
     ----------
@@ -64,7 +64,7 @@ def _check_ubcs(group, warnings):
         for s in cycle:
             cycle_idxs[s] = i
 
-    ubcs = _get_out_of_order_subs(group, group._conn_global_abs_in2out)
+    ubcs = _get_used_before_calc_subs(group, group._conn_global_abs_in2out)
 
     for tgt_system, src_systems in sorted(ubcs.items()):
         keep_srcs = []
@@ -124,7 +124,7 @@ def _check_ubcs_prob(prob, logger):
         logger.warning(''.join(warnings[:1] + sorted(warnings[1:])))
 
 
-def _get_out_of_order_subs(group, input_srcs):
+def _get_used_before_calc_subs(group, input_srcs):
     """
     Return Systems that are executed out of dataflow order.
 
