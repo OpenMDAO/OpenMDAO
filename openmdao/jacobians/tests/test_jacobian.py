@@ -223,7 +223,7 @@ class TestJacobian(unittest.TestCase):
         self._check_rev(self.prob, rev_check)
 
     def _setup_model(self, assembled_jac, comp_jac_class, nested, lincalls):
-        self.prob = prob = Problem(model=Group())
+        self.prob = prob = Problem()
         if nested:
             top = prob.model.add_subsystem('G1', Group())
         else:
@@ -312,7 +312,7 @@ class TestJacobian(unittest.TestCase):
         shape, constructor, expected_shape = shapes
         dtype, value = dtypes
 
-        prob = Problem(model=Group())
+        prob = Problem()
         comp = ExplicitSetItemComp(dtype, value, shape, constructor)
         prob.model.add_subsystem('C1', comp)
         prob.setup(check=False)

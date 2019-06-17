@@ -43,7 +43,7 @@ class Test(unittest.TestCase):
     N_PROCS = 2
 
     def test(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('Cx0', IndepVarComp('x0'), promotes=['x0'])
         prob.model.add_subsystem('Cx1', IndepVarComp('x1'), promotes=['x1'])
         prob.model.add_subsystem('g', ReconfGroup(), promotes=['*'])

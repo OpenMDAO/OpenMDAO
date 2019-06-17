@@ -134,7 +134,7 @@ class TestHohmannTransfer(unittest.TestCase):
         from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver
         from openmdao.test_suite.test_examples.test_hohmann_transfer import  VCircComp, TransferOrbitComp, DeltaVComp
 
-        prob = Problem(model=Group())
+        prob = Problem()
 
         model = prob.model
 

@@ -15,7 +15,7 @@ class TestDemuxCompOptions(unittest.TestCase):
     def test_invalid_axis(self):
         nn = 10
 
-        p = Problem(model=Group())
+        p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(nn,))
@@ -32,11 +32,11 @@ class TestDemuxCompOptions(unittest.TestCase):
             p.setup()
         self.assertEqual(str(ctx.exception),
                          "Invalid axis (1) for variable 'a' of shape (10,)")
-            
+
     def test_axis_with_wrong_size(self):
         nn = 10
 
-        p = Problem(model=Group())
+        p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(nn, 7))
@@ -64,7 +64,7 @@ class TestDemuxComp1D(unittest.TestCase):
     def setUp(self):
         self.nn = 10
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn,))
@@ -111,7 +111,7 @@ class TestDemuxComp2D(unittest.TestCase):
     def setUp(self):
         self.nn = 10
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 7))
@@ -154,7 +154,7 @@ class TestDemuxComp2D(unittest.TestCase):
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         """
@@ -170,7 +170,7 @@ class TestForDocs(unittest.TestCase):
         # The size of each element to be demuxed
         m = 100
 
-        p = Problem(model=Group())
+        p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='pos_ecef', shape=(m, 3), units='km')

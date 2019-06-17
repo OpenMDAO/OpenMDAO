@@ -12,7 +12,7 @@ class TestDotProductCompNx3(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3))
@@ -60,7 +60,7 @@ class TestDotProductCompNx4(unittest.TestCase):
     def setUp(self):
         self.nn = 100
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 4))
@@ -108,7 +108,7 @@ class TestUnits(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3), units='lbf')
@@ -154,7 +154,7 @@ class TestUnits(unittest.TestCase):
                                                decimal=6)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         """
@@ -167,7 +167,7 @@ class TestForDocs(unittest.TestCase):
 
         n = 100
 
-        p = Problem(model=Group())
+        p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='force', shape=(n, 3))

@@ -699,7 +699,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
 
     def test_approx_totals_multi_input_constrained_desvar(self):
-        p = Problem(model=Group())
+        p = Problem()
 
         indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
 

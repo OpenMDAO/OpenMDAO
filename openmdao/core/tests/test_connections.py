@@ -16,7 +16,7 @@ class TestConnections(unittest.TestCase):
         self.setup_model(None, None)
 
     def setup_model(self, c1meta=None, c3meta=None):
-        self.p = Problem(model=Group())
+        self.p = Problem()
         root = self.p.model
 
         if c1meta is None:
@@ -247,7 +247,7 @@ class TestConnections(unittest.TestCase):
     def test_diff_conn_input_units_w_src(self):
         raise unittest.SkipTest("no compatability checking of connected inputs yet")
 
-        p = Problem(model=Group())
+        p = Problem()
         root = p.model
 
         num_comps = 50
@@ -288,7 +288,7 @@ class TestConnectionsPromoted(unittest.TestCase):
 
     def test_inp_inp_promoted_no_src(self):
 
-        p = Problem(model=Group())
+        p = Problem()
         root = p.model
 
         G1 = root.add_subsystem("G1", Group())
@@ -312,7 +312,7 @@ class TestConnectionsPromoted(unittest.TestCase):
                          "[G3.G4.C3.x, G3.G4.C4.x] that are not connected to an output variable.")
 
     def test_inp_inp_promoted_w_prom_src(self):
-        p = Problem(model=Group())
+        p = Problem()
         root = p.model
 
         G1 = root.add_subsystem("G1", Group(), promotes=['x'])
@@ -337,7 +337,7 @@ class TestConnectionsPromoted(unittest.TestCase):
         self.assertEqual(C4._inputs['x'], 999.)
 
     def test_inp_inp_promoted_w_explicit_src(self):
-        p = Problem(model=Group())
+        p = Problem()
         root = p.model
 
         G1 = root.add_subsystem("G1", Group())
@@ -364,7 +364,7 @@ class TestConnectionsPromoted(unittest.TestCase):
 
     def test_unit_conv_message(self):
         raise unittest.SkipTest("no units yet")
-        prob = Problem(model=Group())
+        prob = Problem()
         root = prob.model
 
         root.add_subsystem("C1", ExecComp('y=x*2.0', units={'x': 'ft'}), promotes=['x'])
@@ -383,7 +383,7 @@ class TestConnectionsPromoted(unittest.TestCase):
 
         # Remedy the problem with an Indepvarcomp
 
-        prob = Problem(model=Group())
+        prob = Problem()
         root = prob.model
 
         root.add_subsystem("C1", ExecComp('y=x*2.0', units={'x': 'ft'}), promotes=['x'])

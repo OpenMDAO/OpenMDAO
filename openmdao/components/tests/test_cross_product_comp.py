@@ -13,7 +13,7 @@ class TestCrossProductCompNx3(unittest.TestCase):
     def setUp(self):
         self.n = 5
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(self.n, 3))
@@ -68,7 +68,7 @@ class TestCrossProductCompNx3x1(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3, 1))
@@ -121,7 +121,7 @@ class TestCrossProductCompNx3x1(unittest.TestCase):
 class TestCrossProductCompNonVectorized(unittest.TestCase):
 
     def setUp(self):
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(3, 1))
@@ -177,7 +177,7 @@ class TestUnits(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3), units='ft')
@@ -223,7 +223,7 @@ class TestUnits(unittest.TestCase):
                                                decimal=6)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         import numpy as np
@@ -232,7 +232,7 @@ class TestForDocs(unittest.TestCase):
 
         n = 100
 
-        p = Problem(model=Group())
+        p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='r', shape=(n, 3))

@@ -451,7 +451,7 @@ class Summer(ExplicitComponent):
 def simple_model(order, dvgroup='pardv', congroup='parc', vectorize=False):
     n = order + 1
 
-    p = Problem(model=Group())
+    p = Problem()
 
     # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
     p.model.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n),

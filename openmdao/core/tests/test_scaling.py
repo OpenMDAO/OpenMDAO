@@ -279,7 +279,7 @@ class TestScaling(unittest.TestCase):
     def test_scaling(self):
         """Test convergence in essentially one Newton iteration to atol=1e-5."""
         def runs_successfully(use_scal, coeffs):
-            prob = Problem(model=Group())
+            prob = Problem()
             prob.model.add_subsystem('row1', ScalingTestComp(row=1, coeffs=coeffs,
                                                              use_scal=use_scal))
             prob.model.add_subsystem('row2', ScalingTestComp(row=2, coeffs=coeffs,

@@ -260,7 +260,7 @@ _ufunc_test_data = {
 class TestExecComp(unittest.TestCase):
 
     def test_no_expr(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('C1', ExecComp())
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
@@ -268,7 +268,7 @@ class TestExecComp(unittest.TestCase):
                          "C1: No valid expressions provided to ExecComp(): [].")
 
     def test_colon_vars(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('y=foo:bar+1.'))
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
@@ -276,7 +276,7 @@ class TestExecComp(unittest.TestCase):
                          "C1: failed to compile expression 'y=foo:bar+1.'.")
 
     def test_bad_kwargs(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('y=x+1.', xx=2.0))
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
@@ -285,7 +285,7 @@ class TestExecComp(unittest.TestCase):
                          "in the expressions ['y=x+1.']")
 
     def test_bad_kwargs_meta(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('y=x+1.',
                                                 x={'val': 2, 'low': 0, 'high': 10, 'units': 'ft'}))
         with self.assertRaises(Exception) as context:
@@ -295,7 +295,7 @@ class TestExecComp(unittest.TestCase):
                          "variable 'x': ['high', 'low', 'val']")
 
     def test_name_collision_const(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('e=x+1.'))
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
@@ -304,7 +304,7 @@ class TestExecComp(unittest.TestCase):
                          "as an internal function or constant.")
 
     def test_name_collision_func(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('sin=x+1.'))
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
@@ -313,7 +313,7 @@ class TestExecComp(unittest.TestCase):
                          "as an internal function or constant.")
 
     def test_func_as_rhs_var(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('y=sin+1.'))
         with self.assertRaises(Exception) as context:
             prob.setup(check=False)
@@ -322,7 +322,7 @@ class TestExecComp(unittest.TestCase):
                          "as an internal function.")
 
     def test_mixed_type(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=sum(x)',
                                                      x=np.arange(10, dtype=float)))
         prob.setup(check=False)
@@ -339,7 +339,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 45.0, 0.00001)
 
     def test_simple(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=x+1.', x=2.0))
 
         prob.setup(check=False)
@@ -356,7 +356,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 3.0, 0.00001)
 
     def test_for_spaces(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y = pi * x', x=2.0))
 
         prob.setup(check=False)
@@ -374,7 +374,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 2 * math.pi, 0.00001)
 
     def test_units(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
         C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.',
                                                      x={'value': 2.0, 'units': 'm'},
@@ -390,7 +390,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
 
     def test_units_varname(self):
-        prob = Problem(model=Group())
+        prob = Problem()
 
         with self.assertRaises(TypeError) as cm:
             prob.model.add_subsystem('C1', ExecComp('y=x+units+1.',
@@ -403,7 +403,7 @@ class TestExecComp(unittest.TestCase):
                          "but type 'str' was expected.")
 
     def test_units_varname_str(self):
-        prob = Problem(model=Group())
+        prob = Problem()
 
         with self.assertRaises(ValueError) as cm:
             prob.model.add_subsystem('C1', ExecComp('y=x+units+1.',
@@ -414,7 +414,7 @@ class TestExecComp(unittest.TestCase):
         self.assertEqual(str(cm.exception), "The units 'two' are invalid.")
 
     def test_units_varname_novalue(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
         C1 = prob.model.add_subsystem('C1', ExecComp('y=x+units+1.',
                                                      x={'value': 2.0, 'units': 'm'},
@@ -429,7 +429,7 @@ class TestExecComp(unittest.TestCase):
 
     def test_common_units(self):
         # all variables in the ExecComp have the same units
-        prob = Problem(model=Group())
+        prob = Problem()
 
         prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
         prob.model.add_subsystem('comp', ExecComp('y=x+z+1.', units='m',
@@ -457,7 +457,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 2001., 0.00001)
 
     def test_conflicting_units(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
         C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.', units='m',
                                                      x={'value': 2.0, 'units': 'km'},
@@ -576,7 +576,7 @@ class TestExecComp(unittest.TestCase):
                          "but shape of (5,) has been specified for the entire component.")
 
     def test_math(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=sin(x)', x=2.0))
 
         prob.setup(check=False)
@@ -593,7 +593,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], math.sin(2.0), 0.00001)
 
     def test_array(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=x[1]',
                                                      x=np.array([1., 2., 3.]),
                                                      y=0.0))
@@ -612,7 +612,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 2.0, 0.00001)
 
     def test_array_lhs(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp(['y[0]=x[1]', 'y[1]=x[0]'],
                                                      x=np.array([1., 2., 3.]),
                                                      y=np.array([0., 0.])))
@@ -677,7 +677,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, data['comp'][('y', 'x')]['rel error'][2], 0.0, 1e-5)
 
     def test_complex_step(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0))
 
         prob.setup(check=False)
@@ -717,7 +717,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
 
     def test_abs_complex_step(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=2.0*abs(x)', x=-2.0))
 
         prob.setup(check=False)
@@ -740,7 +740,7 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._jacobian['y', 'x'], [[2.0]], 0.00001)
 
     def test_abs_array_complex_step(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         C1 = prob.model.add_subsystem('C1', ExecComp('y=2.0*abs(x)',
                                                      x=np.ones(3)*-2.0, y=np.zeros(3)))
 

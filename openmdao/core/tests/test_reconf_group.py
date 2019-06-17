@@ -28,7 +28,7 @@ class ReconfGroup(Group):
 class Test(unittest.TestCase):
 
     def test(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('Cx', IndepVarComp('x', 1.0), promotes=['x'])
         prob.model.add_subsystem('g', ReconfGroup(), promotes=['*'])
         prob.setup(check=False)

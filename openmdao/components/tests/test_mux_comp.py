@@ -15,7 +15,7 @@ class TestMuxCompOptions(unittest.TestCase):
     def test_invalid_axis_scalar(self):
         nn = 10
 
-        p = Problem(model=Group())
+        p = Problem()
 
         ivc = IndepVarComp()
         for i in range(nn):
@@ -41,7 +41,7 @@ class TestMuxCompOptions(unittest.TestCase):
         a_size = 7
         b_size = 3
 
-        p = Problem(model=Group())
+        p = Problem()
 
         ivc = IndepVarComp()
         for i in range(nn):
@@ -72,7 +72,7 @@ class TestMuxCompScalar(unittest.TestCase):
     def setUp(self):
         self.nn = 10
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         for i in range(self.nn):
@@ -125,7 +125,7 @@ class TestMuxComp1D(unittest.TestCase):
         a_size = 7
         b_size = 3
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         for i in range(self.nn):
@@ -178,7 +178,7 @@ class TestMuxComp2D(unittest.TestCase):
         a_shape = (3, 3)
         b_shape = (2, 4)
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         for i in range(self.nn):
@@ -230,7 +230,7 @@ class TestMuxComp2D(unittest.TestCase):
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         """
@@ -246,7 +246,7 @@ class TestForDocs(unittest.TestCase):
         # The size of each element to be muxed
         m = 100
 
-        p = Problem(model=Group())
+        p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='x', shape=(m,), units='m')

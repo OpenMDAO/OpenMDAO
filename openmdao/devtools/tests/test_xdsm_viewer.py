@@ -432,7 +432,7 @@ class TestPyXDSMViewer(unittest.TestCase):
     def test_execcomp(self):
         filename = 'pyxdsm_execcomp'
         out_format = PYXDSM_OUT
-        prob = Problem(model=Group())
+        prob = Problem()
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x')
         prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0), promotes=['*'])
@@ -452,7 +452,7 @@ class TestPyXDSMViewer(unittest.TestCase):
     def test_doe(self):
         filename = 'pyxdsm_doe'
         out_format = PYXDSM_OUT
-        prob = Problem(model=Group())
+        prob = Problem()
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x')
         prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0), promotes=['*'])
@@ -831,7 +831,7 @@ class TestXDSMjsViewer(unittest.TestCase):
     def test_execcomp(self):
         filename = 'xdsmjs_execcomp'
         out_format = 'html'
-        prob = Problem(model=Group())
+        prob = Problem()
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x')
         prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0), promotes=['*'])
@@ -851,7 +851,7 @@ class TestXDSMjsViewer(unittest.TestCase):
     def test_doe(self):
         filename = 'xdsmjs_doe'
         out_format = 'html'
-        prob = Problem(model=Group())
+        prob = Problem()
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x')
         prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0), promotes=['*'])

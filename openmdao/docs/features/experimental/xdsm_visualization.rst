@@ -74,8 +74,8 @@ You can do the same thing programmatically by calling the `write_xdsm` function.
 .. autofunction:: openmdao.devtools.xdsm_viewer.xdsm_writer.write_xdsm
    :noindex:
 
-Notice that the data source can be either a :code:`Problem` containing the model or 
-or a case recorder database containing the model data. The latter is indicated by a string 
+Notice that the data source can be either a :code:`Problem` containing the model or
+or a case recorder database containing the model data. The latter is indicated by a string
 giving the file path to the case recorder file.
 
 Here are some code snippets showing the two cases.
@@ -88,8 +88,8 @@ Problem as Data Source
     p.setup()
     p.run_model()
 
-    from openmdao.api import write_xdsm
-    write_xdsm(p, 'xdsmjs_circuit', out_format='html', show_browser=False)
+    import openmdao.api as om
+    om.write_xdsm(p, 'xdsmjs_circuit', out_format='html', show_browser=False)
 
 
 Case Recorder as Data Source
@@ -104,8 +104,8 @@ Case Recorder as Data Source
     p.final_setup()
     r.shutdown()
 
-    from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm
-    write_xdsm('circuit.sqlite', 'xdsmjs_circuit', out_format='html', show_browser=False)
+    import openmdao.api as om
+    om.write_xdsm('circuit.sqlite', 'xdsmjs_circuit', out_format='html', show_browser=False)
 
 
 In the latter case, you could view the XDSM diagram at a later time using the command:

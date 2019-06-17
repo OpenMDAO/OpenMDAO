@@ -23,6 +23,7 @@ class AEComp(om.ExplicitComponent):
 
         outputs['y'] = x*x + 2.0
 
+
 class AEDriver(Driver):
     """
     Handle an Analysis Error from below.
@@ -34,7 +35,7 @@ class AEDriver(Driver):
         """
         try:
             self._problem.model.run_solve_nonlinear()
-        except AnalysisError:
+        except om.AnalysisError:
             return True
 
         return False

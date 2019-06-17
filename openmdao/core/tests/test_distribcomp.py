@@ -265,7 +265,7 @@ class NOMPITests(unittest.TestCase):
     def test_distrib_idx_in_full_out(self):
         size = 11
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
@@ -296,7 +296,7 @@ class MPITests(unittest.TestCase):
     def test_distrib_full_in_out(self):
         size = 11
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribCompSimple(arr_size=size))
@@ -316,7 +316,7 @@ class MPITests(unittest.TestCase):
     def test_distrib_idx_in_full_out(self):
         size = 11
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
@@ -336,7 +336,7 @@ class MPITests(unittest.TestCase):
     def test_distrib_1D_dist_output(self):
         size = 11
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
@@ -359,7 +359,7 @@ class MPITests(unittest.TestCase):
         # normal comp to distrib comp to distrb gather comp
         size = 3
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
@@ -381,7 +381,7 @@ class MPITests(unittest.TestCase):
         # take even input indices in 0 rank and odd ones in 1 rank
         size = 11
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribNoncontiguousComp(arr_size=size))
@@ -417,7 +417,7 @@ class MPITests(unittest.TestCase):
         # entries are distributed to multiple processes
         size = 11
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size))
@@ -443,7 +443,7 @@ class MPITests(unittest.TestCase):
         # automagically gather the full vector without declaring src_indices
         size = 11
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
@@ -547,7 +547,7 @@ class ProbRemoteTests(unittest.TestCase):
     def test_prob_getitem_err(self):
         size = 3
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         par = top.add_subsystem('par', ParallelGroup())
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
@@ -668,7 +668,7 @@ class MPIFeatureTests(unittest.TestCase):
 
                 outputs['out'] = total[0]
 
-        p = Problem(model=Group())
+        p = Problem()
         top = p.model
         top.add_subsystem("indep", IndepVarComp('x', np.zeros(size)))
         top.add_subsystem("C2", DistribComp(size=size))

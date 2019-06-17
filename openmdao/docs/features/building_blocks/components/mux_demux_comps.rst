@@ -60,7 +60,7 @@ Earth-centered, Earth-fixed (ECEF) frame (n x 3), extract the three (n x 1) colu
 and use the first two to compute the longitude at the given position vector.
 
 .. embed-code::
-    openmdao.components.tests.test_demux_comp.TestForDocs.test
+    openmdao.components.tests.test_demux_comp.TestFeature.test
     :layout: interleave
 
 Example: Muxing 3 (n x 1) columns into a single (n x 3) matrix
@@ -72,7 +72,7 @@ along `axis = 1`.  Like the previous example, this is somewhat contrived but is 
 the capabilities of the MuxComp.
 
 .. embed-code::
-    openmdao.components.tests.test_mux_comp.TestForDocs.test
+    openmdao.components.tests.test_mux_comp.TestFeature.test
     :layout: interleave
 
 .. tags:: DemuxComp, MuxComp, Component

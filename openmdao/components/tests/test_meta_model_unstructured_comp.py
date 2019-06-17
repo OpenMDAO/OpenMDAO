@@ -166,7 +166,7 @@ class MetaModelTestCase(unittest.TestCase):
         mm.options['default_surrogate'] = ResponseSurface()
 
         # add metamodel to a problem
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
@@ -768,7 +768,7 @@ class MetaModelTestCase(unittest.TestCase):
             mm.default_surrogate = ResponseSurface()
 
         # add metamodel to a problem
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 
@@ -852,7 +852,7 @@ class MetaModelTestCase(unittest.TestCase):
             mm.default_surrogate = ResponseSurface()
 
         # add metamodel to a problem
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup(check=False)
 

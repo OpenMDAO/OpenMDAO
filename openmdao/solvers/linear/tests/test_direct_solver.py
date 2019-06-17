@@ -481,7 +481,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         self.assertEqual(expected_msg, str(cm.exception))
 
     def test_error_on_singular_with_sparsejac_bug(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         model = prob.model
 
         model.add_subsystem('p', IndepVarComp('x', 2.0*np.ones((2, 2))))
@@ -510,7 +510,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         self.assertEqual(expected_msg, str(cm.exception))
 
     def test_error_on_singular_with_densejac_bug(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         model = prob.model
 
         model.add_subsystem('p', IndepVarComp('x', 2.0*np.ones((2, 2))))

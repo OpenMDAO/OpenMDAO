@@ -2,15 +2,15 @@
 
 import unittest
 
-from openmdao.api import Problem
+import openmdao.api as om
+from openmdao.test_suite.components.sellar_feature import SellarMDA, SellarMDALinearSolver
 from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.test_suite.components.sellar_feature import SellarMDA, SellarMDALinearSolver, IndepVarComp
 
 
 class TestSellarFeature(unittest.TestCase):
 
     def test_sellar(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarMDA()
 
         prob.setup(check=False)
@@ -25,7 +25,7 @@ class TestSellarFeature(unittest.TestCase):
 
     def test_sellar_linear_solver(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarMDALinearSolver()
 
         prob.setup(check=False)
@@ -46,6 +46,7 @@ class TestSellarFeature(unittest.TestCase):
         assert_rel_error(self, jac['con1', 'z'][0], [-9.61002284, -0.78449158], 1e-4)
         assert_rel_error(self, jac['con2', 'x'][0], 0.09692762, 1e-4)
         assert_rel_error(self, jac['con2', 'z'][0], [1.94989079, 1.0775421], 1e-4)
+
 
 if __name__ == "__main__":
     unittest.main()

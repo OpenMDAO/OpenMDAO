@@ -13,7 +13,7 @@ class TestMatrixVectorProductComp3x3(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='A', shape=(self.nn, 3, 3))
@@ -62,7 +62,7 @@ class TestMatrixVectorProductComp6x4(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='A', shape=(self.nn, 6, 4))
@@ -109,7 +109,7 @@ class TestMatrixVectorProductComp6x4(unittest.TestCase):
 class TestMatrixVectorProductCompNonVectorized(unittest.TestCase):
 
     def setUp(self):
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='A', shape=(3, 3))
@@ -157,7 +157,7 @@ class TestUnits(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='A', shape=(self.nn, 3, 3), units='ft')
@@ -203,7 +203,7 @@ class TestUnits(unittest.TestCase):
                                                decimal=6)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         import numpy as np
@@ -212,7 +212,7 @@ class TestForDocs(unittest.TestCase):
 
         nn = 100
 
-        p = Problem(model=Group())
+        p = Problem()
 
         ivc = IndepVarComp()
         ivc.add_output(name='A', shape=(nn, 3, 3))

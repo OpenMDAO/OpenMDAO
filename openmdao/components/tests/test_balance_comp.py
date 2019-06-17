@@ -16,10 +16,9 @@ class TestBalanceComp(unittest.TestCase):
 
     def test_scalar_example(self):
 
-        prob = Problem(model=Group())
+        prob = Problem()
 
         bal = BalanceComp()
-
         bal.add_balance('x', val=1.0)
 
         tgt = IndepVarComp(name='y_tgt', val=2)
@@ -66,7 +65,7 @@ class TestBalanceComp(unittest.TestCase):
 
     def test_create_on_init(self):
 
-        prob = Problem(model=Group())
+        prob = Problem()
 
         bal = BalanceComp('x', val=1.0)
 
@@ -103,7 +102,7 @@ class TestBalanceComp(unittest.TestCase):
 
     def test_create_on_init_no_normalization(self):
 
-        prob = Problem(model=Group())
+        prob = Problem()
 
         bal = BalanceComp('x', val=1.0, normalize=False)
 

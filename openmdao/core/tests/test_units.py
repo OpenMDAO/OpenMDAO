@@ -60,7 +60,7 @@ class TestUnitConversion(unittest.TestCase):
         assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
     def test_dangling_input_w_units(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('y=x', x={'units': 'ft'}, y={'units': 'm'}))
         prob.setup()
         prob.run_model()
@@ -74,7 +74,7 @@ class TestUnitConversion(unittest.TestCase):
         comp.add_output('distance', val=1., units='m')
         comp.add_output('time', val=1., units='s')
 
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('c1', comp)
         prob.model.add_subsystem('c2', SpeedComp())
         prob.model.add_subsystem('c3', ExecComp('f=speed',speed={'units': 'm/s'}))
@@ -291,7 +291,7 @@ class TestUnitConversion(unittest.TestCase):
         self.assertTrue(expected_msg in str(cm.exception))
 
     def test_add_unitless_output(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('indep', IndepVarComp('x', 0.0, units='unitless'))
 
         msg = "Output 'x' has units='unitless' but 'unitless' has been deprecated. " \
@@ -302,7 +302,7 @@ class TestUnitConversion(unittest.TestCase):
             prob.setup(check=False)
 
     def test_add_unitless_input(self):
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('C1', ExecComp('y=x', x={'units': 'unitless'}))
 
         msg = "Input 'x' has units='unitless' but 'unitless' has been deprecated. " \
@@ -314,7 +314,7 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_incompatible_units(self):
         """Test error handling when only one of src and tgt have units."""
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'])
         prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx={'value': 0.0, 'units': 'unitless'}))
@@ -327,7 +327,7 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic_implicit_conn(self):
         """Test units with all implicit connections."""
-        prob = Problem(model=Group())
+        prob = Problem()
         prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'], promotes_outputs=['x2'])
         prob.model.add_subsystem('tgtF', TgtCompF(), promotes_inputs=['x2'])
