@@ -3,7 +3,7 @@ import numpy as np
 
 import unittest
 
-from openmdao.api import ExplicitComponent, ImplicitComponent, Group, NewtonSolver, DirectSolver
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -11,11 +11,10 @@ class TestCircuit(unittest.TestCase):
 
     def test_circuit_plain_newton_assembled(self):
 
-        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
-
+        import openmdao.api as om
         from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 
-        class Circuit(Group):
+        class Circuit(om.Group):
 
             def setup(self):
                 self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
@@ -33,20 +32,20 @@ class TestCircuit(unittest.TestCase):
                 self.connect('R2.I', 'n2.I_in:0')
                 self.connect('D1.I', 'n2.I_out:0')
 
-                self.nonlinear_solver = NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver()
                 self.nonlinear_solver.options['iprint'] = 2
                 self.nonlinear_solver.options['maxiter'] = 20
                 ##################################################################
                 # Assemble at the group level. Default assembled jac type is 'csc'
                 ##################################################################
                 self.options['assembled_jac_type'] = 'csc'
-                self.linear_solver = DirectSolver(assemble_jac=True)
+                self.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
 
         model.connect('source.I', 'circuit.I_in')
@@ -71,11 +70,10 @@ class TestCircuit(unittest.TestCase):
 
     def test_circuit_plain_newton(self):
 
-        from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
-
+        import openmdao.api as om
         from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 
-        class Circuit(Group):
+        class Circuit(om.Group):
 
             def setup(self):
                 self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
@@ -93,16 +91,16 @@ class TestCircuit(unittest.TestCase):
                 self.connect('R2.I', 'n2.I_in:0')
                 self.connect('D1.I', 'n2.I_out:0')
 
-                self.nonlinear_solver = NewtonSolver()
+                self.nonlinear_solver = om.NewtonSolver()
                 self.nonlinear_solver.options['iprint'] = 2
                 self.nonlinear_solver.options['maxiter'] = 20
-                self.linear_solver = DirectSolver()
+                self.linear_solver = om.DirectSolver()
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
 
         model.connect('source.I', 'circuit.I_in')
@@ -127,15 +125,14 @@ class TestCircuit(unittest.TestCase):
 
     def test_circuit_plain_newton_many_iter(self):
 
-        from openmdao.api import Problem, IndepVarComp
-
+        import openmdao.api as om
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
 
         model.connect('source.I', 'circuit.I_in')
@@ -160,15 +157,14 @@ class TestCircuit(unittest.TestCase):
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], 0.09987447, 1e-6)
 
     def test_circuit_advanced_newton(self):
-        from openmdao.api import ArmijoGoldsteinLS, Problem, IndepVarComp
-
+        import openmdao.api as om
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
 
         model.connect('source.I', 'circuit.I_in')
@@ -181,7 +177,7 @@ class TestCircuit(unittest.TestCase):
         newton.options['iprint'] = 2
         newton.options['maxiter'] = 10
         newton.options['solve_subsystems'] = True
-        newton.linesearch = ArmijoGoldsteinLS()
+        newton.linesearch = om.ArmijoGoldsteinLS()
         newton.linesearch.options['maxiter'] = 10
         newton.linesearch.options['iprint'] = 2
 
@@ -201,24 +197,23 @@ class TestCircuit(unittest.TestCase):
         assert_rel_error(self, p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
 
     def test_circuit_voltage_source(self):
-        from openmdao.api import ArmijoGoldsteinLS, Problem, IndepVarComp, BalanceComp, ExecComp
-        from openmdao.api import NewtonSolver, DirectSolver, NonlinearRunOnce, LinearRunOnce
-
+        import openmdao.api as om
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
 
         # replacing the fixed current source with a BalanceComp to represent a fixed Voltage source
-        # model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-        model.add_subsystem('batt', IndepVarComp('V', 1.5, units='V'))
-        bal = model.add_subsystem('batt_balance', BalanceComp())
+        # model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('batt', om.IndepVarComp('V', 1.5, units='V'))
+        bal = model.add_subsystem('batt_balance', om.BalanceComp())
         bal.add_balance('I', units='A', eq_units='V')
 
         model.add_subsystem('circuit', Circuit())
-        model.add_subsystem('batt_deltaV', ExecComp('dV = V1 - V2', V1={'units':'V'}, V2={'units':'V'}, dV={'units':'V'}))
+        model.add_subsystem('batt_deltaV', om.ExecComp('dV = V1 - V2', V1={'units':'V'},
+                                                       V2={'units':'V'}, dV={'units':'V'}))
 
         # current into the circuit is now the output state from the batt_balance comp
         model.connect('batt_balance.I', 'circuit.I_in')
@@ -237,16 +232,16 @@ class TestCircuit(unittest.TestCase):
 
         # change the circuit solver to RunOnce because we're
         # going to converge at the top level of the model with newton instead
-        p.model.circuit.nonlinear_solver = NonlinearRunOnce()
-        p.model.circuit.linear_solver = LinearRunOnce()
+        p.model.circuit.nonlinear_solver = om.NonlinearRunOnce()
+        p.model.circuit.linear_solver = om.LinearRunOnce()
 
         # Put Newton at the top so it can also converge the new BalanceComp residual
-        newton = p.model.nonlinear_solver = NewtonSolver()
-        p.model.linear_solver = DirectSolver()
+        newton = p.model.nonlinear_solver = om.NewtonSolver()
+        p.model.linear_solver = om.DirectSolver()
         newton.options['iprint'] = 2
         newton.options['maxiter'] = 20
         newton.options['solve_subsystems'] = True
-        newton.linesearch = ArmijoGoldsteinLS()
+        newton.linesearch = om.ArmijoGoldsteinLS()
         newton.linesearch.options['maxiter'] = 10
         newton.linesearch.options['iprint'] = 2
 

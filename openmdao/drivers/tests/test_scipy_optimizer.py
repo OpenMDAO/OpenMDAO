@@ -70,7 +70,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     def test_compute_totals_return_array_non_square(self):
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', NonSquareArrayComp())

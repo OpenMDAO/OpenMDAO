@@ -823,7 +823,7 @@ class TestExecComp(unittest.TestCase):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p', IndepVarComp('x', 2.0))
         model.add_subsystem('comp', ExecComp('y=x+1.'))
@@ -841,7 +841,7 @@ class TestExecComp(unittest.TestCase):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p', IndepVarComp('x', 2.0))
         model.add_subsystem('comp', ExecComp(['y1=x+1.', 'y2=x-1.']))
@@ -862,7 +862,7 @@ class TestExecComp(unittest.TestCase):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p', IndepVarComp('x', np.array([1., 2., 3.])))
         model.add_subsystem('comp', ExecComp('y=x[1]',
@@ -883,7 +883,7 @@ class TestExecComp(unittest.TestCase):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', np.pi/2.0))
         model.add_subsystem('p2', IndepVarComp('y', np.pi/2.0))
@@ -905,7 +905,7 @@ class TestExecComp(unittest.TestCase):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p', IndepVarComp('x', np.array([1., 2., 3.])))
         model.add_subsystem('comp', ExecComp('y=sum(x)', x=np.zeros((3, ))))
@@ -922,7 +922,7 @@ class TestExecComp(unittest.TestCase):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 12.0, units='inch'))
         model.add_subsystem('p2', IndepVarComp('y', 1.0, units='ft'))
@@ -971,7 +971,7 @@ class TestExecCompParameterized(unittest.TestCase):
         test_data = _ufunc_test_data[f]
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         if len(test_data['args']) > 1:
             ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
@@ -1016,7 +1016,7 @@ class TestExecCompParameterized(unittest.TestCase):
         test_data = _ufunc_test_data[f]
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         if len(test_data['args']) > 1:
             ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())

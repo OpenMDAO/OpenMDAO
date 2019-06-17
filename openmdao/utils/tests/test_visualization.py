@@ -51,7 +51,7 @@ class TestVisualization(unittest.TestCase):
                 partials[('y1', 'x1')] = self.JJ + error
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
         model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))), promotes=['x1'])
         model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
         prob.setup(check=False, mode='fwd')
@@ -175,7 +175,7 @@ class TestFeatureVisualization(unittest.TestCase):
                 partials[('y1', 'x1')] = self.JJ + error
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
         model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))), promotes=['x1'])
         model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
         prob.setup(check=False, mode='fwd')
@@ -220,7 +220,7 @@ class TestFeatureVisualization(unittest.TestCase):
                 partials[('y1', 'x1')] = self.JJ + error
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
         model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))), promotes=['x1'])
         model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
         prob.setup(check=False, mode='fwd')

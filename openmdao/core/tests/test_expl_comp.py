@@ -159,7 +159,7 @@ class ExplCompTestCase(unittest.TestCase):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 12.0,
                                                lower=1.0, upper=100.0,
@@ -264,7 +264,7 @@ class ExplCompTestCase(unittest.TestCase):
         from openmdao.api import IndepVarComp, Group, Problem, ExecComp
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 12.0,
                                                lower=1.0, upper=100.0,

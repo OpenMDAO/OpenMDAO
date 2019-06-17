@@ -1,11 +1,9 @@
 import unittest
 
-from openmdao.utils.assert_utils import assert_rel_error
-
 import numpy as np
 
-from openmdao.api import ExplicitComponent, ImplicitComponent, NewtonSolver, DirectSolver, ArmijoGoldsteinLS
-from openmdao.api import IndepVarComp, Problem, Group
+import openmdao.api as om
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestNonlinearCircuit(unittest.TestCase):
@@ -13,10 +11,9 @@ class TestNonlinearCircuit(unittest.TestCase):
     def test_nonlinear_circuit_analysis(self):
         import numpy as np
 
-        from openmdao.api import ExplicitComponent, ImplicitComponent,  NewtonSolver, DirectSolver, ArmijoGoldsteinLS
-        from openmdao.api import IndepVarComp, Problem, Group
+        import openmdao.api as om
 
-        class Resistor(ExplicitComponent):
+        class Resistor(om.ExplicitComponent):
             """Computes current across a resistor using Ohm's law."""
 
             def initialize(self):
@@ -36,7 +33,7 @@ class TestNonlinearCircuit(unittest.TestCase):
                 deltaV = inputs['V_in'] - inputs['V_out']
                 outputs['I'] = deltaV / self.options['R']
 
-        class Diode(ExplicitComponent):
+        class Diode(om.ExplicitComponent):
             """Computes current across a diode using the Shockley diode equation."""
 
             def initialize(self):
@@ -67,7 +64,7 @@ class TestNonlinearCircuit(unittest.TestCase):
                 J['I', 'V_in'] = I/Vt
                 J['I', 'V_out'] = -I/Vt
 
-        class Node(ImplicitComponent):
+        class Node(om.ImplicitComponent):
             """Computes voltage residual across a node based on incoming and outgoing current."""
 
             def initialize(self):
@@ -97,7 +94,7 @@ class TestNonlinearCircuit(unittest.TestCase):
                 for i_conn in range(self.options['n_out']):
                     residuals['V'] -= inputs['I_out:{}'.format(i_conn)]
 
-        class Circuit(Group):
+        class Circuit(om.Group):
 
             def setup(self):
                 self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
@@ -115,22 +112,22 @@ class TestNonlinearCircuit(unittest.TestCase):
                 self.connect('R2.I', 'n2.I_in:0')
                 self.connect('D1.I', 'n2.I_out:0')
 
-                self.nonlinear_solver = NewtonSolver()
-                self.linear_solver = DirectSolver()
+                self.nonlinear_solver = om.NewtonSolver()
+                self.linear_solver = om.DirectSolver()
 
                 self.nonlinear_solver.options['iprint'] = 2
                 self.nonlinear_solver.options['maxiter'] = 10
                 self.nonlinear_solver.options['solve_subsystems'] = True
-                self.nonlinear_solver.linesearch = ArmijoGoldsteinLS()
+                self.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS()
                 self.nonlinear_solver.linesearch.options['maxiter'] = 10
                 self.nonlinear_solver.linesearch.options['iprint'] = 2
 
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
 
         model.connect('source.I', 'circuit.I_in')

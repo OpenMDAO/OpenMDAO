@@ -163,7 +163,7 @@ class TestNonlinearBlockJacobiMPI(unittest.TestCase):
     @unittest.skipUnless(MPI, "MPI is not active.")
     def test_reraise_analylsis_error(self):
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('p1', IndepVarComp('x', 0.5))
         model.add_subsystem('p2', IndepVarComp('x', 3.0))

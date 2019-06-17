@@ -2056,27 +2056,27 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         class CompOne(om.ExplicitComponent):
 
-                def setup(self):
-                    self.add_input('x', val=0.0)
-                    self.add_output('y', val=np.zeros(25))
-                    self._exec_count = 0
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('y', val=np.zeros(25))
+                self._exec_count = 0
 
-                def compute(self, inputs, outputs):
-                    x = inputs['x']
-                    outputs['y'] = np.arange(25) * x
-                    self._exec_count += 1
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['y'] = np.arange(25) * x
+                self._exec_count += 1
 
         class CompTwo(om.ExplicitComponent):
 
-                def setup(self):
-                    self.add_input('y', val=np.zeros(25))
-                    self.add_output('z', val=0.0)
-                    self._exec_count = 0
+            def setup(self):
+                self.add_input('y', val=np.zeros(25))
+                self.add_output('z', val=0.0)
+                self._exec_count = 0
 
-                def compute(self, inputs, outputs):
-                    y = inputs['y']
-                    outputs['z'] = np.sum(y)
-                    self._exec_count += 1
+            def compute(self, inputs, outputs):
+                y = inputs['y']
+                outputs['z'] = np.sum(y)
+                self._exec_count += 1
 
         prob = om.Problem()
         model = prob.model
@@ -2104,27 +2104,27 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         class CompOne(om.ExplicitComponent):
 
-                def setup(self):
-                    self.add_input('x', val=0.0)
-                    self.add_output('y', val=np.zeros(25))
-                    self._exec_count = 0
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('y', val=np.zeros(25))
+                self._exec_count = 0
 
-                def compute(self, inputs, outputs):
-                    x = inputs['x']
-                    outputs['y'] = np.arange(25) * x
-                    self._exec_count += 1
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['y'] = np.arange(25) * x
+                self._exec_count += 1
 
         class CompTwo(om.ExplicitComponent):
 
-                def setup(self):
-                    self.add_input('y', val=np.zeros(25))
-                    self.add_output('z', val=0.0)
-                    self._exec_count = 0
+            def setup(self):
+                self.add_input('y', val=np.zeros(25))
+                self.add_output('z', val=0.0)
+                self._exec_count = 0
 
-                def compute(self, inputs, outputs):
-                    y = inputs['y']
-                    outputs['z'] = np.sum(y)
-                    self._exec_count += 1
+            def compute(self, inputs, outputs):
+                y = inputs['y']
+                outputs['z'] = np.sum(y)
+                self._exec_count += 1
 
         prob = om.Problem()
         model = prob.model
@@ -2151,27 +2151,27 @@ class ApproxTotalsFeature(unittest.TestCase):
 
         class CompOne(om.ExplicitComponent):
 
-                def setup(self):
-                    self.add_input('x', val=0.0)
-                    self.add_output('y', val=np.zeros(25))
-                    self._exec_count = 0
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_output('y', val=np.zeros(25))
+                self._exec_count = 0
 
-                def compute(self, inputs, outputs):
-                    x = inputs['x']
-                    outputs['y'] = np.arange(25) * x
-                    self._exec_count += 1
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['y'] = np.arange(25) * x
+                self._exec_count += 1
 
         class CompTwo(om.ExplicitComponent):
 
-                def setup(self):
-                    self.add_input('y', val=np.zeros(25))
-                    self.add_output('z', val=0.0)
-                    self._exec_count = 0
+            def setup(self):
+                self.add_input('y', val=np.zeros(25))
+                self.add_output('z', val=0.0)
+                self._exec_count = 0
 
-                def compute(self, inputs, outputs):
-                    y = inputs['y']
-                    outputs['z'] = np.sum(y)
-                    self._exec_count += 1
+            def compute(self, inputs, outputs):
+                y = inputs['y']
+                outputs['z'] = np.sum(y)
+                self._exec_count += 1
 
         prob = om.Problem()
         model = prob.model

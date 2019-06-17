@@ -153,7 +153,6 @@ class TestConnections(unittest.TestCase):
                 outputs['y3'] = np.sum(x3)
 
         top = Problem()
-        top.model = Group()
         top.model.add_subsystem('src', Src())
         top.model.add_subsystem('tgt', Tgt())
 

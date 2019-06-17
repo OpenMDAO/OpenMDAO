@@ -17,7 +17,7 @@ class TestKSFunction(unittest.TestCase):
 
     def test_basic_ks(self):
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
         model.add_subsystem('comp', DoubleArrayComp())
@@ -36,7 +36,7 @@ class TestKSFunction(unittest.TestCase):
 
     def test_vectorized(self):
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         x = np.zeros((3, 5))
         x[0, :] = np.array([3.0, 5.0, 11.0, 13.0, 17.0])
@@ -168,7 +168,7 @@ class TestKSFunction(unittest.TestCase):
         from openmdao.components.ks_comp import KSComponent  # deprecated
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2,))))
         model.add_subsystem('comp', DoubleArrayComp())

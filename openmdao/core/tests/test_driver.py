@@ -132,7 +132,7 @@ class TestDriver(unittest.TestCase):
     def test_vector_scaled_derivs(self):
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', DoubleArrayComp())
@@ -171,7 +171,7 @@ class TestDriver(unittest.TestCase):
 
         # make sure no overflow when there is no specified upper/lower bound and significatn scaling
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', DoubleArrayComp())
@@ -195,7 +195,7 @@ class TestDriver(unittest.TestCase):
     def test_vector_scaled_derivs_diff_sizes(self):
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', NonSquareArrayComp())

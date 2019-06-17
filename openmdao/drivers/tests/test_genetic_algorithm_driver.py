@@ -39,7 +39,7 @@ class TestSimpleGA(unittest.TestCase):
                 outputs['d'] = 19.0 - 14.0*x[0] + 3.0*x[0]**2 - 14.0*x[1] + 6.0*x[0]*x[1] + 3.0*x[1]**2
 
         prob = Problem()
-        prob.model = model = Group()
+        model = prob.model
 
         model.add_subsystem('px', IndepVarComp('x', np.array([0.2, -0.2])))
         model.add_subsystem('comp', MyComp())
