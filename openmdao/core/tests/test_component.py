@@ -222,6 +222,37 @@ class TestExplicitComponent(unittest.TestCase):
         self.assertEqual(comp._var_abs_names['input'], ['comp.x'])
         self.assertEqual(comp._var_abs_names['output'], ['comp.y'])
 
+    def test_invalid_name(self):
+        comp = ExplicitComponent()
+
+        add_input_methods = [comp.add_input, comp.add_discrete_input]
+        add_output_methods = [comp.add_output, comp.add_discrete_output]
+
+        invalid_names = ['a.b', 'a*b', 'a?b', 'a!', '[a', 'b]']
+        invalid_error = "'%s' is not a valid %s name."
+
+        empty_error = "The name argument should be a non-empty string."
+
+        for func in add_input_methods:
+            with self.assertRaises(NameError) as cm:
+                func('', 0.)
+            self.assertEqual(str(cm.exception), empty_error)
+
+            for name in invalid_names:
+                with self.assertRaises(NameError) as cm:
+                    func(name, 0.)
+                self.assertEqual(str(cm.exception), invalid_error % (name, 'input'))
+
+        for func in add_output_methods:
+            with self.assertRaises(NameError) as cm:
+                func('', 0.)
+            self.assertEqual(str(cm.exception), empty_error)
+
+            for name in invalid_names:
+                with self.assertRaises(NameError) as cm:
+                    func(name, 0.)
+                self.assertEqual(str(cm.exception), invalid_error % (name, 'output'))
+
     def test_add_input_output_dupes(self):
 
         class Comp(ExplicitComponent):
