@@ -1234,7 +1234,7 @@ def _write_sparsity(sparsity, stream):
         else:
             stream.write(',\n')
 
-    stream.write("}")
+    stream.write("}\n")
 
 
 def _get_desvar_sizes(driver, names):

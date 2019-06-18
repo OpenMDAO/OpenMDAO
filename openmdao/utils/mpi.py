@@ -57,31 +57,37 @@ def use_proc_files():
             ofile = open(os.path.join(working_dir, "%d.out" % MPI.COMM_WORLD.rank), 'wb')
         _redirect_streams(ofile.fileno())
 
+# Determine whether OPENMDAO_REQUIRE_MPI is set. Use 'try' as the default value. 
+use_mpi = 'try'
 
-def under_mpirun():
-    """
-    Return True if we're being executed under mpirun.
+if 'OPENMDAO_REQUIRE_MPI' in os.environ:
+    use_mpi = os.environ['OPENMDAO_REQUIRE_MPI']
+    if use_mpi not in { 'never', 'try', 'always' }:
+        raise RuntimeError("If set, OPENMDAO_REQUIRE_MPI must be 'never', 'try', or 'always'.")
 
-    Returns
-    -------
-    bool
-        True if the current process is executing under mpirun.
-    """
-    # this is a bit of a hack, but there appears to be
-    # no consistent set of environment vars between MPI
-    # implementations.
-    for name in os.environ.keys():
-        if name == 'OMPI_COMM_WORLD_RANK' or \
-           name == 'MPIEXEC_HOSTNAME' or \
-           name.startswith('MPIR_') or \
-           name.startswith('MPICH_'):
-            return True
-    return False
+# Decide whether to ignore MPI, attempt to import mpi4py but continue on failure, or
+# bail out on import failure.
+if use_mpi != 'never':
+    try:
+        from mpi4py import MPI
+    except ImportError as mpi_import_err:
+        if use_mpi == 'try':
+            MPI = None
+            sys.stdout.write("Unable to import mpi4py. Parallel processing unavailable.\n")
+            sys.stdout.flush()
+        else:
+            raise
+    else:
+        # If the import succeeded, but it doesn't look like a parallel
+        # run was intended, don't use MPI
+        if use_mpi == 'try' and MPI.COMM_WORLD.size == 1:
+            MPI = None
+else:
+    MPI = None
 
+del use_mpi
 
-if under_mpirun():
-    from mpi4py import MPI
-
+if MPI:
     def debug(*msg):  # pragma: no cover
         """
         Print debug message to stdout.
@@ -97,8 +103,6 @@ if under_mpirun():
         sys.stdout.write('\n')
         sys.stdout.flush()
 else:
-    MPI = None
-
     def debug(*msg):  # pragma: no cover
         """
         Print debug message to stdout.
