@@ -3,6 +3,7 @@ import numpy as np
 
 import openmdao.api as om
 
+
 class LocalStiffnessMatrixComp(om.ExplicitComponent):
 
     def initialize(self):

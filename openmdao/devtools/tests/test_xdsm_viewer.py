@@ -90,7 +90,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         Writes a recorder file, and the XDSM writer makes the diagram based on the SQL file
         and not the Problem instance.
         """
-        from openmdao.recorders.sqlite_recorder import SqliteRecorder
+        import openmdao.api as om
 
         filename = 'xdsm_from_sql'
         case_recording_filename = filename + '.sql'
@@ -104,7 +104,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
 
-        recorder = SqliteRecorder(case_recording_filename)
+        recorder = om.SqliteRecorder(case_recording_filename)
         prob.driver.add_recorder(recorder)
 
         prob.setup()

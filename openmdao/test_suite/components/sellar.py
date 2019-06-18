@@ -7,23 +7,14 @@ From Sellar's analytic problem.
     Optimization for Multidisciplinary System Design," Proceedings References 79 of the 34th AIAA
     Aerospace Sciences Meeting and Exhibit, Reno, NV, January 1996.
 """
+import inspect
 
 import numpy as np
 
-import inspect
-
-from openmdao.components.exec_comp import ExecComp
-from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.core.group import Group
-from openmdao.core.problem import Problem
-from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
-from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
-from openmdao.solvers.nonlinear.newton import NewtonSolver
+import openmdao.api as om
 
 
-class SellarDis1(ExplicitComponent):
+class SellarDis1(om.ExplicitComponent):
     """
     Component containing Discipline 1 -- no derivatives version.
     """
@@ -108,7 +99,7 @@ class SellarDis1CS(SellarDis1):
         self.declare_partials(of='*', wrt='*', method='cs')
 
 
-class SellarDis2(ExplicitComponent):
+class SellarDis2(om.ExplicitComponent):
     """
     Component containing Discipline 2 -- no derivatives version.
     """
@@ -199,19 +190,19 @@ class SellarDis2CS(SellarDis2):
         self.declare_partials(of='*', wrt='*', method='cs')
 
 
-class SellarNoDerivatives(Group):
+class SellarNoDerivatives(om.Group):
     """
     Group containing the Sellar MDA. This version uses the disciplines without derivatives.
     """
 
     def initialize(self):
-        self.options.declare('nonlinear_solver', default=NonlinearBlockGS,
+        self.options.declare('nonlinear_solver', default=om.NonlinearBlockGS,
                              desc='Nonlinear solver for Sellar MDA')
         self.options.declare('nl_atol', default=None,
                              desc='User-specified atol for nonlinear solver.')
         self.options.declare('nl_maxiter', default=None,
                              desc='Iteration limit for nonlinear solver.')
-        self.options.declare('linear_solver', default=ScipyKrylov,
+        self.options.declare('linear_solver', default=om.ScipyKrylov,
                              desc='Linear solver')
         self.options.declare('ln_atol', default=None,
                              desc='User-specified atol for linear solver.')
@@ -219,19 +210,19 @@ class SellarNoDerivatives(Group):
                              desc='Iteration limit for linear solver.')
 
     def setup(self):
-        self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-        cycle = self.add_subsystem('cycle', Group(), promotes=['x', 'z', 'y1', 'y2'])
+        cycle = self.add_subsystem('cycle', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
         cycle.add_subsystem('d1', SellarDis1(), promotes=['x', 'z', 'y1', 'y2'])
         cycle.add_subsystem('d2', SellarDis2(), promotes=['z', 'y1', 'y2'])
 
-        self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0),
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z=np.array([0.0, 0.0]), x=0.0),
                            promotes=['x', 'z', 'y1', 'y2', 'obj'])
 
-        self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         nl = self.options['nonlinear_solver']
         self.nonlinear_solver = nl() if inspect.isclass(nl) else nl
@@ -249,19 +240,19 @@ class SellarNoDerivatives(Group):
             self.cycle.linear_solver.options['maxiter'] = self.options['ln_maxiter']
 
 
-class SellarDerivatives(Group):
+class SellarDerivatives(om.Group):
     """
     Group containing the Sellar MDA. This version uses the disciplines with derivatives.
     """
 
     def initialize(self):
-        self.options.declare('nonlinear_solver', default=NonlinearBlockGS,
+        self.options.declare('nonlinear_solver', default=om.NonlinearBlockGS,
                              desc='Nonlinear solver (class or instance) for Sellar MDA')
         self.options.declare('nl_atol', default=None,
                              desc='User-specified atol for nonlinear solver.')
         self.options.declare('nl_maxiter', default=None,
                              desc='Iteration limit for nonlinear solver.')
-        self.options.declare('linear_solver', default=ScipyKrylov,
+        self.options.declare('linear_solver', default=om.ScipyKrylov,
                              desc='Linear solver (class or instance)')
         self.options.declare('ln_atol', default=None,
                              desc='User-specified atol for linear solver.')
@@ -269,19 +260,19 @@ class SellarDerivatives(Group):
                              desc='Iteration limit for linear solver.')
 
     def setup(self):
-        self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         self.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         self.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
-                                               x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
+                                                  x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
                            promotes=['con1', 'y1'])
-        self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                            promotes=['con2', 'y2'])
 
         nl = self.options['nonlinear_solver']
@@ -299,46 +290,46 @@ class SellarDerivatives(Group):
             self.linear_solver.options['maxiter'] = self.options['ln_maxiter']
 
 
-class SellarDerivativesConnected(Group):
+class SellarDerivativesConnected(om.Group):
     """
     Group containing the Sellar MDA. This version uses the disciplines with derivatives.
     """
 
     def setup(self):
-        self.add_subsystem('px', IndepVarComp('x', 1.0))
-        self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+        self.add_subsystem('px', om.IndepVarComp('x', 1.0))
+        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
 
         self.add_subsystem('d1', SellarDis1withDerivatives())
         self.add_subsystem('d2', SellarDis2withDerivatives())
 
-        self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0))
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z=np.array([0.0, 0.0]), x=0.0))
 
-        self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'))
-        self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'))
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'))
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'))
 
         self.connect('px.x', ['d1.x', 'obj_cmp.x'])
         self.connect('pz.z', ['d1.z', 'd2.z', 'obj_cmp.z'])
         self.connect('d1.y1', ['d2.y1', 'obj_cmp.y1', 'con_cmp1.y1'])
         self.connect('d2.y2', ['d1.y2', 'obj_cmp.y2', 'con_cmp2.y2'])
 
-        self.nonlinear_solver = NonlinearBlockGS()
-        self.linear_solver = ScipyKrylov()
+        self.nonlinear_solver = om.NonlinearBlockGS()
+        self.linear_solver = om.ScipyKrylov()
 
 
-class SellarDerivativesGrouped(Group):
+class SellarDerivativesGrouped(om.Group):
     """
     Group containing the Sellar MDA. This version uses the disciplines with derivatives.
     """
 
     def initialize(self):
-        self.options.declare('nonlinear_solver', default=NonlinearBlockGS,
+        self.options.declare('nonlinear_solver', default=om.NonlinearBlockGS,
                              desc='Nonlinear solver (class or instance) for Sellar MDA')
         self.options.declare('nl_atol', default=None,
                              desc='User-specified atol for nonlinear solver.')
         self.options.declare('nl_maxiter', default=None,
                              desc='Iteration limit for nonlinear solver.')
-        self.options.declare('linear_solver', default=ScipyKrylov,
+        self.options.declare('linear_solver', default=om.ScipyKrylov,
                              desc='Linear solver (class or instance)')
         self.options.declare('ln_atol', default=None,
                              desc='User-specified atol for linear solver.')
@@ -346,19 +337,19 @@ class SellarDerivativesGrouped(Group):
                              desc='Iteration limit for linear solver.')
 
     def setup(self):
-        self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-        self.mda = mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
+        self.mda = mda = self.add_subsystem('mda', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
         nl = self.options['nonlinear_solver']
         self.nonlinear_solver = nl() if inspect.isclass(nl) else nl
@@ -375,11 +366,11 @@ class SellarDerivativesGrouped(Group):
             self.linear_solver.options['maxiter'] = self.options['ln_maxiter']
 
     def configure(self):
-        self.mda.linear_solver = ScipyKrylov()
-        self.mda.nonlinear_solver = NonlinearBlockGS()
+        self.mda.linear_solver = om.ScipyKrylov()
+        self.mda.nonlinear_solver = om.NonlinearBlockGS()
 
 
-class StateConnection(ImplicitComponent):
+class StateConnection(om.ImplicitComponent):
     """
     Define connection with an explicit equation.
     """
@@ -419,19 +410,19 @@ class StateConnection(ImplicitComponent):
         J[('y2_command', 'y2_actual')] = 1.0
 
 
-class SellarStateConnection(Group):
+class SellarStateConnection(om.Group):
     """
     Group containing the Sellar MDA. This version uses the disciplines with derivatives.
     """
 
     def initialize(self):
-        self.options.declare('nonlinear_solver', default=NewtonSolver,
+        self.options.declare('nonlinear_solver', default=om.NewtonSolver,
                              desc='Nonlinear solver (class or instance) for Sellar MDA')
         self.options.declare('nl_atol', default=None,
                              desc='User-specified atol for nonlinear solver.')
         self.options.declare('nl_maxiter', default=None,
                              desc='Iteration limit for nonlinear solver.')
-        self.options.declare('linear_solver', default=ScipyKrylov,
+        self.options.declare('linear_solver', default=om.ScipyKrylov,
                              desc='Linear solver (class or instance)')
         self.options.declare('ln_atol', default=None,
                              desc='User-specified atol for linear solver.')
@@ -439,15 +430,15 @@ class SellarStateConnection(Group):
                              desc='Iteration limit for linear solver.')
 
     def setup(self):
-        self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-        sub = self.add_subsystem('sub', Group(),
+        sub = self.add_subsystem('sub', om.Group(),
                                  promotes=['x', 'z', 'y1',
                                            'state_eq.y2_actual', 'state_eq.y2_command',
                                            'd1.y2', 'd2.y2'])
 
-        subgrp = sub.add_subsystem('state_eq_group', Group(),
+        subgrp = sub.add_subsystem('state_eq_group', om.Group(),
                                    promotes=['state_eq.y2_actual', 'state_eq.y2_command'])
         subgrp.add_subsystem('state_eq', StateConnection())
 
@@ -457,13 +448,13 @@ class SellarStateConnection(Group):
         self.connect('state_eq.y2_command', 'd1.y2')
         self.connect('d2.y2', 'state_eq.y2_actual')
 
-        self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                               z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
                            promotes=['x', 'z', 'y1', 'obj'])
         self.connect('d2.y2', 'obj_cmp.y2')
 
-        self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2'])
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2'])
         self.connect('d2.y2', 'con_cmp2.y2')
 
         nl = self.options['nonlinear_solver']
@@ -481,11 +472,11 @@ class SellarStateConnection(Group):
             self.linear_solver.options['maxiter'] = self.options['ln_maxiter']
 
     def configure(self):
-        self.sub.linear_solver = ScipyKrylov()
-        self.sub.state_eq_group.linear_solver = ScipyKrylov()
+        self.sub.linear_solver = om.ScipyKrylov()
+        self.sub.state_eq_group.linear_solver = om.ScipyKrylov()
 
 
-class SellarImplicitDis1(ImplicitComponent):
+class SellarImplicitDis1(om.ImplicitComponent):
     """
     Component containing Discipline 1 -- no derivatives version.
     """
@@ -547,7 +538,7 @@ class SellarImplicitDis1(ImplicitComponent):
         J['y1', 'y1'] = 1.0
 
 
-class SellarImplicitDis2(ImplicitComponent):
+class SellarImplicitDis2(om.ImplicitComponent):
     """
     Component containing Discipline 2 -- implicit version.
     """
@@ -616,7 +607,7 @@ class SellarImplicitDis2(ImplicitComponent):
         J['y2', 'y2'] = 1.0
 
 
-class SellarProblem(Problem):
+class SellarProblem(om.Problem):
     """
     The Sellar problem with configurable model class.
     """
@@ -635,7 +626,7 @@ class SellarProblem(Problem):
         self.set_solver_print(0)
 
 
-class SellarProblemWithArrays(Problem):
+class SellarProblemWithArrays(om.Problem):
     """
     The Sellar problem with ndarray variable options
     """

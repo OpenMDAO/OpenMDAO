@@ -5,9 +5,7 @@ from __future__ import division, print_function
 import unittest
 import numpy as np
 
-from openmdao.api import Problem, Group, ParallelGroup, ExecComp, IndepVarComp, \
-                         ExplicitComponent, ImplicitComponent, DefaultVector
-
+import openmdao.api as om
 from openmdao.utils.mpi import under_mpirun
 from openmdao.utils.mpi import MPI
 
@@ -30,7 +28,7 @@ class TestParallelGroups(unittest.TestCase):
     N_PROCS = 2
 
     def test_fan_out_grouped(self):
-        prob = Problem(FanOutGrouped())
+        prob = om.Problem(FanOutGrouped())
 
         of=['c2.y', "c3.y"]
         wrt=['iv.x']
@@ -60,7 +58,7 @@ class TestParallelGroups(unittest.TestCase):
 
     def test_fan_in_grouped(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanInGrouped2()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -91,19 +89,19 @@ class TestParallelGroups(unittest.TestCase):
 
     def test_fan_in_grouped_feature(self):
 
-        from openmdao.api import Problem, IndepVarComp, ParallelGroup, ExecComp, PETScVector
+        import openmdao.api as om
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 1.0))
-        model.add_subsystem('p2', IndepVarComp('x', 1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
 
-        parallel = model.add_subsystem('parallel', ParallelGroup())
-        parallel.add_subsystem('c1', ExecComp(['y=-2.0*x']))
-        parallel.add_subsystem('c2', ExecComp(['y=5.0*x']))
+        parallel = model.add_subsystem('parallel', om.ParallelGroup())
+        parallel.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+        parallel.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
 
-        model.add_subsystem('c3', ExecComp(['y=3.0*x1+7.0*x2']))
+        model.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
 
         model.connect("parallel.c1.y", "c3.x1")
         model.connect("parallel.c2.y", "c3.x2")
@@ -118,7 +116,7 @@ class TestParallelGroups(unittest.TestCase):
 
     def test_diamond(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = Diamond()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -146,7 +144,7 @@ class TestParallelGroups(unittest.TestCase):
 
     def test_converge_diverge(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = ConvergeDiverge()
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -191,13 +189,13 @@ class TestParallelGroups(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = np.array([self.mult])
 
-        prob = Problem()
+        prob = om.Problem()
 
         model = prob.model
-        model.add_subsystem('iv', IndepVarComp('x', 1.0))
+        model.add_subsystem('iv', om.IndepVarComp('x', 1.0))
         model.add_subsystem('c1', MultComp(3.0))
 
-        model.sub = model.add_subsystem('sub', ParallelGroup())
+        model.sub = model.add_subsystem('sub', om.ParallelGroup())
         model.sub.add_subsystem('c2', MultComp(-2.0))
         model.sub.add_subsystem('c3', MultComp(5.0))
 
@@ -246,14 +244,14 @@ class TestParallelGroups(unittest.TestCase):
                 logger.warning(msg)
                 logger.info(msg)
 
-        prob = Problem(Noisy())
+        prob = om.Problem(Noisy())
 
         # check that error is thrown if not using PETScVector
         if under_mpirun():
             msg = ("The `distributed_vector_class` argument must be `PETScVector` when "
                    "running in parallel under MPI but 'DefaultVector' was specified.")
             with self.assertRaises(ValueError) as cm:
-                prob.setup(check=False, mode='fwd', distributed_vector_class=DefaultVector)
+                prob.setup(check=False, mode='fwd', distributed_vector_class=om.DefaultVector)
 
             self.assertEqual(str(cm.exception), msg)
         else:
@@ -285,7 +283,7 @@ class TestParallelListStates(unittest.TestCase):
     N_PROCS = 4
 
     def test_list_states_allprocs(self):
-        class StateComp(ImplicitComponent):
+        class StateComp(om.ImplicitComponent):
 
             def initialize(self):
                 self.mtx = np.array([
@@ -305,10 +303,10 @@ class TestParallelListStates(unittest.TestCase):
             def solve_nonlinear(self, inputs, outputs):
                 outputs['x'] = np.linalg.solve(self.mtx, inputs['rhs'])
 
-        p = Problem(model=ParallelGroup())
+        p = om.Problem(model=om.ParallelGroup())
         p.model.add_subsystem('C1', StateComp())
         p.model.add_subsystem('C2', StateComp())
-        p.model.add_subsystem('C3', ExecComp('y=2.0*x'))
+        p.model.add_subsystem('C3', om.ExecComp('y=2.0*x'))
         p.model.add_subsystem('C4', StateComp())
         p.setup()
         p.final_setup()
@@ -320,12 +318,12 @@ class MatMatParDevTestCase(unittest.TestCase):
     N_PROCS = 2
 
     def test_size_1_matmat(self):
-        p = Problem()
-        indeps = p.model.add_subsystem('indeps', IndepVarComp('x', np.ones(2)))
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(2)))
         indeps.add_output('y', 1.0)
-        par = p.model.add_subsystem('par', ParallelGroup())
-        par.add_subsystem('C1', ExecComp('y=2*x', x=np.zeros(2), y=np.zeros(2)))
-        par.add_subsystem('C2', ExecComp('y=3*x'))
+        par = p.model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', om.ExecComp('y=2*x', x=np.zeros(2), y=np.zeros(2)))
+        par.add_subsystem('C2', om.ExecComp('y=3*x'))
         p.model.connect("indeps.x", "par.C1.x")
         p.model.connect("indeps.y", "par.C2.x")
         p.model.add_design_var('indeps.x', vectorize_derivs=True, parallel_deriv_color='foo')

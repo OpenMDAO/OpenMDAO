@@ -78,17 +78,17 @@ class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
 
     @unittest.skipUnless(MPI, "MPI is not active.")
     def test_reraise_analylsis_error(self):
-        prob = om.om.Problem()
+        prob = om.Problem()
         model = prob.model
 
         model.add_subsystem('p1', om.IndepVarComp('x', 0.5))
         model.add_subsystem('p2', om.IndepVarComp('x', 3.0))
-        sub = model.add_subsystem('sub', ParallelGroup())
+        sub = model.add_subsystem('sub', om.ParallelGroup())
 
         sub.add_subsystem('c1', AEComp())
         sub.add_subsystem('c2', AEComp())
 
-        model.add_subsystem('obj', ExecComp(['val = x1 + x2']))
+        model.add_subsystem('obj', om.ExecComp(['val = x1 + x2']))
 
         model.connect('p1.x', 'sub.c1.x')
         model.connect('p2.x', 'sub.c2.x')

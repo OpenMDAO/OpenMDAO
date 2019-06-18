@@ -6,6 +6,7 @@ from six import assertRaisesRegex
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 

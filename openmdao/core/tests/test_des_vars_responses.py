@@ -7,13 +7,12 @@ import unittest
 
 import numpy as np
 
-import openmdao
-from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp
+from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp, ExecComp, ScipyKrylov
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
-     SellarDis2withDerivatives, ExecComp, ScipyKrylov
+     SellarDis2withDerivatives
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
