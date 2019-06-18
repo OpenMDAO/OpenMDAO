@@ -109,7 +109,7 @@ class DenseMatrix(COOMatrix):
         """
         if len(d_inputs._views) > len(d_inputs._names):
             sub = d_inputs._names
-            mask = np.ones(d_inputs._data.size, dtype=np.bool)
+            mask = np.ones(len(d_inputs), dtype=np.bool)
             for key, val in iteritems(self._metadata):
                 if key[1] in sub:
                     mask[val[1]] = False

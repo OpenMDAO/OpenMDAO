@@ -1173,8 +1173,6 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
                 fullJ += np.abs(J)
         elapsed = time.time() - start_time
 
-    # fullJ /= num_full_jacs
-
     info = _tol_sweep(fullJ, tol, orders)
     info['num_full_jacs'] = num_full_jacs
     info['sparsity_time'] = elapsed
