@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, MatrixVectorProductComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -13,9 +13,9 @@ class TestMatrixVectorProductComp3x3(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem()
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='A', shape=(self.nn, 3, 3))
         ivc.add_output(name='x', shape=(self.nn, 3))
 
@@ -24,7 +24,7 @@ class TestMatrixVectorProductComp3x3(unittest.TestCase):
                                    promotes_outputs=['A', 'x'])
 
         self.p.model.add_subsystem(name='mat_vec_product_comp',
-                                   subsys=MatrixVectorProductComp(vec_size=self.nn))
+                                   subsys=om.MatrixVectorProductComp(vec_size=self.nn))
 
         self.p.model.connect('A', 'mat_vec_product_comp.A')
         self.p.model.connect('x', 'mat_vec_product_comp.x')
@@ -62,9 +62,9 @@ class TestMatrixVectorProductComp6x4(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem()
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='A', shape=(self.nn, 6, 4))
         ivc.add_output(name='x', shape=(self.nn, 4))
 
@@ -73,8 +73,8 @@ class TestMatrixVectorProductComp6x4(unittest.TestCase):
                                    promotes_outputs=['A', 'x'])
 
         self.p.model.add_subsystem(name='mat_vec_product_comp',
-                                   subsys=MatrixVectorProductComp(vec_size=self.nn,
-                                                                  A_shape=(6, 4)))
+                                   subsys=om.MatrixVectorProductComp(vec_size=self.nn,
+                                                                     A_shape=(6, 4)))
 
         self.p.model.connect('A', 'mat_vec_product_comp.A')
         self.p.model.connect('x', 'mat_vec_product_comp.x')
@@ -109,9 +109,9 @@ class TestMatrixVectorProductComp6x4(unittest.TestCase):
 class TestMatrixVectorProductCompNonVectorized(unittest.TestCase):
 
     def setUp(self):
-        self.p = Problem()
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='A', shape=(3, 3))
         ivc.add_output(name='x', shape=(3, 1))
 
@@ -120,7 +120,7 @@ class TestMatrixVectorProductCompNonVectorized(unittest.TestCase):
                                    promotes_outputs=['A', 'x'])
 
         self.p.model.add_subsystem(name='mat_vec_product_comp',
-                                   subsys=MatrixVectorProductComp())
+                                   subsys=om.MatrixVectorProductComp())
 
         self.p.model.connect('A', 'mat_vec_product_comp.A')
         self.p.model.connect('x', 'mat_vec_product_comp.x')
@@ -157,9 +157,9 @@ class TestUnits(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem()
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='A', shape=(self.nn, 3, 3), units='ft')
         ivc.add_output(name='x', shape=(self.nn, 3), units='lbf')
 
@@ -168,9 +168,9 @@ class TestUnits(unittest.TestCase):
                                    promotes_outputs=['A', 'x'])
 
         self.p.model.add_subsystem(name='mat_vec_product_comp',
-                                   subsys=MatrixVectorProductComp(vec_size=self.nn,
-                                                                  A_units='m', x_units='N',
-                                                                  b_units='N*m'))
+                                   subsys=om.MatrixVectorProductComp(vec_size=self.nn,
+                                                                     A_units='m', x_units='N',
+                                                                     b_units='N*m'))
 
         self.p.model.connect('A', 'mat_vec_product_comp.A')
         self.p.model.connect('x', 'mat_vec_product_comp.x')
@@ -207,14 +207,14 @@ class TestFeature(unittest.TestCase):
 
     def test(self):
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp, MatrixVectorProductComp
+        import openmdao.api as om
         from openmdao.utils.assert_utils import assert_rel_error
 
         nn = 100
 
-        p = Problem()
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='A', shape=(nn, 3, 3))
         ivc.add_output(name='x', shape=(nn, 3))
 
@@ -223,8 +223,8 @@ class TestFeature(unittest.TestCase):
                               promotes_outputs=['A', 'x'])
 
         p.model.add_subsystem(name='mat_vec_product_comp',
-                              subsys=MatrixVectorProductComp(A_name='M', vec_size=nn,
-                                                             b_name='y', b_units='m'))
+                              subsys=om.MatrixVectorProductComp(A_name='M', vec_size=nn,
+                                                                b_name='y', b_units='m'))
 
         p.model.connect('A', 'mat_vec_product_comp.M')
         p.model.connect('x', 'mat_vec_product_comp.x')

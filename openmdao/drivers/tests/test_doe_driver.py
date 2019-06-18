@@ -13,13 +13,7 @@ import json
 
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, IndepVarComp, ExecComp, \
-    SqliteRecorder, CaseReader, PETScVector
-
-from openmdao.drivers.doe_driver import DOEDriver
-from openmdao.drivers.doe_generators import ListGenerator, CSVGenerator, \
-    UniformGenerator, FullFactorialGenerator, PlackettBurmanGenerator, \
-    BoxBehnkenGenerator, LatinHypercubeGenerator
+import openmdao.api as om
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
@@ -30,7 +24,7 @@ from openmdao.utils.general_utils import run_driver, printoptions
 from openmdao.utils.mpi import MPI
 
 
-class ParaboloidArray(ExplicitComponent):
+class ParaboloidArray(om.ExplicitComponent):
     """
     Evaluates the equation f(x,y) = (x-3)^2 + x*y + (y+4)^2 - 3.
 
@@ -55,17 +49,17 @@ class ParaboloidArray(ExplicitComponent):
 class TestErrors(unittest.TestCase):
 
     def test_generator_check(self):
-        prob = Problem()
+        prob = om.Problem()
 
         with self.assertRaises(TypeError) as err:
-            prob.driver = DOEDriver(FullFactorialGenerator)
+            prob.driver = om.DOEDriver(om.FullFactorialGenerator)
 
         self.assertEqual(str(err.exception),
                          "DOEDriver requires an instance of DOEGenerator, "
                          "but a class object was found: FullFactorialGenerator")
 
         with self.assertRaises(TypeError) as err:
-            prob.driver = DOEDriver(Problem())
+            prob.driver = om.DOEDriver(om.Problem())
 
         self.assertEqual(str(err.exception),
                          "DOEDriver requires an instance of DOEGenerator, "
@@ -73,7 +67,7 @@ class TestErrors(unittest.TestCase):
 
     def test_lhc_criterion(self):
         with self.assertRaises(ValueError) as err:
-            LatinHypercubeGenerator(criterion='foo')
+            om.LatinHypercubeGenerator(criterion='foo')
 
         self.assertEqual(str(err.exception),
                          "Invalid criterion 'foo' specified for LatinHypercubeGenerator. "
@@ -96,35 +90,35 @@ class TestDOEDriver(unittest.TestCase):
             pass
 
     def test_no_generator(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         model.add_design_var('x', lower=-10, upper=10)
         model.add_design_var('y', lower=-10, upper=10)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver()
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver()
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 0)
 
     def test_list(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
@@ -134,12 +128,12 @@ class TestDOEDriver(unittest.TestCase):
         prob.setup()
 
         # create a list of DOE cases
-        case_gen = FullFactorialGenerator(levels=3)
+        case_gen = om.FullFactorialGenerator(levels=3)
         cases = list(case_gen(model.get_design_vars(recurse=True)))
 
         # create DOEDriver using provided list of cases
-        prob.driver = DOEDriver(cases)
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(cases)
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.run_driver()
         prob.cleanup()
@@ -158,7 +152,7 @@ class TestDOEDriver(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 9)
@@ -170,11 +164,11 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
 
     def test_list_errors(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
@@ -187,13 +181,13 @@ class TestDOEDriver(unittest.TestCase):
         cases = {'desvar': 1.0}
 
         with self.assertRaises(RuntimeError) as err:
-            prob.driver = DOEDriver(generator=ListGenerator(cases))
+            prob.driver = om.DOEDriver(generator=om.ListGenerator(cases))
         self.assertEqual(str(err.exception), "Invalid DOE case data, "
                          "expected a list but got a dict.")
 
         # data contains a list of non-list
         cases = [{'desvar': 1.0}]
-        prob.driver = DOEDriver(generator=ListGenerator(cases))
+        prob.driver = om.DOEDriver(generator=om.ListGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
@@ -206,7 +200,7 @@ class TestDOEDriver(unittest.TestCase):
             [['p1.x', 1.], ['p2.y', 1., 'foo']]
         ]
 
-        prob.driver = DOEDriver(generator=ListGenerator(cases))
+        prob.driver = om.DOEDriver(generator=om.ListGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
@@ -220,7 +214,7 @@ class TestDOEDriver(unittest.TestCase):
             [['p1.x', 1.], ['p2.z', 1.]]
         ]
 
-        prob.driver = DOEDriver(generator=ListGenerator(cases))
+        prob.driver = om.DOEDriver(generator=om.ListGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
@@ -234,7 +228,7 @@ class TestDOEDriver(unittest.TestCase):
             [['p1.y', 1.], ['p2.z', 1.]]
         ]
 
-        prob.driver = DOEDriver(generator=ListGenerator(cases))
+        prob.driver = om.DOEDriver(generator=om.ListGenerator(cases))
 
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
@@ -243,11 +237,11 @@ class TestDOEDriver(unittest.TestCase):
                          "[['p1.y', 1.0], ['p2.z', 1.0]]")
 
     def test_csv(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
@@ -258,7 +252,7 @@ class TestDOEDriver(unittest.TestCase):
 
         # create a list of DOE cases
         cases = []
-        case_gen = FullFactorialGenerator(levels=3)
+        case_gen = om.FullFactorialGenerator(levels=3)
         for case in case_gen(model.get_design_vars(recurse=True)):
             cases.append([(var, val) for (var, val) in case])
 
@@ -271,8 +265,8 @@ class TestDOEDriver(unittest.TestCase):
                 writer.writerow([val for (var, val) in case])
 
         # create DOEDriver using generated CSV file
-        prob.driver = DOEDriver(CSVGenerator('cases.csv'))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.CSVGenerator('cases.csv'))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.run_driver()
         prob.cleanup()
@@ -291,7 +285,7 @@ class TestDOEDriver(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 9)
@@ -303,11 +297,11 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
 
     def test_csv_array(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', [0., 1.]))
-        model.add_subsystem('p2', IndepVarComp('y', [0., 1.]))
+        model.add_subsystem('p1', om.IndepVarComp('x', [0., 1.]))
+        model.add_subsystem('p2', om.IndepVarComp('y', [0., 1.]))
         model.add_subsystem('comp1', Paraboloid())
         model.add_subsystem('comp2', Paraboloid())
 
@@ -324,7 +318,7 @@ class TestDOEDriver(unittest.TestCase):
 
         # create a list of DOE cases
         cases = []
-        case_gen = FullFactorialGenerator(levels=2)
+        case_gen = om.FullFactorialGenerator(levels=2)
         for case in case_gen(model.get_design_vars(recurse=True)):
             cases.append([(var, val) for (var, val) in case])
 
@@ -337,8 +331,8 @@ class TestDOEDriver(unittest.TestCase):
                 writer.writerow([val for (var, val) in case])
 
         # create DOEDriver using generated CSV file
-        prob.driver = DOEDriver(CSVGenerator('cases.csv'))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.CSVGenerator('cases.csv'))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.run_driver()
         prob.cleanup()
@@ -362,7 +356,7 @@ class TestDOEDriver(unittest.TestCase):
             15: {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
         }
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 16)
@@ -377,22 +371,22 @@ class TestDOEDriver(unittest.TestCase):
     def test_csv_errors(self):
         # test invalid file name
         with self.assertRaises(RuntimeError) as err:
-            CSVGenerator(1.23)
+            om.CSVGenerator(1.23)
         self.assertEqual(str(err.exception),
                          "'1.23' is not a valid file name.")
 
         # test file not found
         with self.assertRaises(RuntimeError) as err:
-            CSVGenerator('nocases.csv')
+            om.CSVGenerator('nocases.csv')
         self.assertEqual(str(err.exception),
                          "File not found: nocases.csv")
 
         # create problem and a list of DOE cases
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
@@ -402,7 +396,7 @@ class TestDOEDriver(unittest.TestCase):
         prob.setup()
 
         cases = []
-        case_gen = FullFactorialGenerator(levels=2)
+        case_gen = om.FullFactorialGenerator(levels=2)
         for case in case_gen(model.get_design_vars(recurse=True)):
             cases.append([(var, val) for (var, val) in case])
 
@@ -415,7 +409,7 @@ class TestDOEDriver(unittest.TestCase):
             for case in cases:
                 writer.writerow([val for (var, val) in case])
 
-        prob.driver = DOEDriver(CSVGenerator('cases.csv'))
+        prob.driver = om.DOEDriver(om.CSVGenerator('cases.csv'))
         with self.assertRaises(RuntimeError) as err:
             prob.run_driver()
         self.assertEqual(str(err.exception), "Invalid DOE case file, "
@@ -457,19 +451,19 @@ class TestDOEDriver(unittest.TestCase):
                              "could not broadcast input array from shape (4) into shape (1)")
 
     def test_uniform(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         model.add_design_var('x', lower=-10, upper=10)
         model.add_design_var('y', lower=-10, upper=10)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(UniformGenerator(num_samples=5, seed=0))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.UniformGenerator(num_samples=5, seed=0))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
@@ -484,7 +478,7 @@ class TestDOEDriver(unittest.TestCase):
             4: {'x': np.array([ 9.27325521]), 'y': np.array([-2.33116962])},
         }
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 5)
@@ -495,19 +489,19 @@ class TestDOEDriver(unittest.TestCase):
             assert_rel_error(self, outputs['y'], expected[n]['y'], 1e-4)
 
     def test_full_factorial(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(generator=FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
@@ -527,7 +521,7 @@ class TestDOEDriver(unittest.TestCase):
             8: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 9)
@@ -539,17 +533,17 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
 
     def test_full_factorial_array(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('xy', np.array([0., 0.])), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('xy', np.array([0., 0.])), promotes=['*'])
         model.add_subsystem('comp', ParaboloidArray(), promotes=['*'])
 
         model.add_design_var('xy', lower=np.array([-50., -50.]), upper=np.array([50., 50.]))
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
@@ -567,7 +561,7 @@ class TestDOEDriver(unittest.TestCase):
             8: {'xy': np.array([ 50.,  50.])},
         }
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 9)
@@ -578,19 +572,19 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['xy'][1], expected[n]['xy'][1])
 
     def test_plackett_burman(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(PlackettBurmanGenerator())
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.PlackettBurmanGenerator())
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
@@ -603,7 +597,7 @@ class TestDOEDriver(unittest.TestCase):
             3: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         }
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 4)
@@ -618,15 +612,15 @@ class TestDOEDriver(unittest.TestCase):
         upper = 10.
         center = 1
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
         indep.add_output('x', 0.0)
         indep.add_output('y', 0.0)
         indep.add_output('z', 0.0)
 
-        model.add_subsystem('comp', ExecComp('a = x**2 + y - z'), promotes=['*'])
+        model.add_subsystem('comp', om.ExecComp('a = x**2 + y - z'), promotes=['*'])
 
         model.add_design_var('x', lower=0., upper=upper)
         model.add_design_var('y', lower=0., upper=upper)
@@ -634,14 +628,14 @@ class TestDOEDriver(unittest.TestCase):
 
         model.add_objective('a')
 
-        prob.driver = DOEDriver(BoxBehnkenGenerator(center=center))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.BoxBehnkenGenerator(center=center))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         # The Box-Behnken design for 3 factors involves three blocks, in each of
@@ -685,21 +679,21 @@ class TestDOEDriver(unittest.TestCase):
         xlb, xub = bounds[0][0], bounds[1][0]
         ylb, yub = bounds[0][1], bounds[1][1]
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=xlb, upper=xub)
         model.add_design_var('y', lower=ylb, upper=yub)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver()
-        prob.driver.options['generator'] = LatinHypercubeGenerator(samples=4, seed=0)
+        prob.driver = om.DOEDriver()
+        prob.driver.options['generator'] = om.LatinHypercubeGenerator(samples=4, seed=0)
 
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
@@ -727,7 +721,7 @@ class TestDOEDriver(unittest.TestCase):
             3: {'x': np.array([-0.72559325]), 'y': np.array([-2.27558409])},
         }
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 4)
@@ -757,17 +751,17 @@ class TestDOEDriver(unittest.TestCase):
             [ 10,  50]   # upper bounds for x and y
         ])
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('xy', np.array([50., 50.])), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('xy', np.array([50., 50.])), promotes=['*'])
         model.add_subsystem('comp', ParaboloidArray(), promotes=['*'])
 
         model.add_design_var('xy', lower=bounds[0], upper=bounds[1])
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(LatinHypercubeGenerator(samples=4, seed=0))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.LatinHypercubeGenerator(samples=4, seed=0))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
@@ -795,7 +789,7 @@ class TestDOEDriver(unittest.TestCase):
             3: {'xy': np.array([-7.25593248, -11.37792043])},
         }
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 4)
@@ -821,10 +815,10 @@ class TestDOEDriver(unittest.TestCase):
         samples = 4
         upper = 10.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        indep = model.add_subsystem('indep', IndepVarComp())
+        indep = model.add_subsystem('indep', om.IndepVarComp())
         indep.add_output('x', 0.0)
         indep.add_output('y', 0.0)
 
@@ -838,14 +832,14 @@ class TestDOEDriver(unittest.TestCase):
 
         model.add_objective('comp.f_xy')
 
-        prob.driver = DOEDriver(LatinHypercubeGenerator(samples=samples, criterion='c'))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.LatinHypercubeGenerator(samples=samples, criterion='c'))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), samples)
@@ -876,7 +870,7 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(y_buckets_filled, all_buckets)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(om.PETScVector, "PETSc is required.")
 class TestParallelDOE(unittest.TestCase):
 
     N_PROCS = 4
@@ -894,9 +888,9 @@ class TestParallelDOE(unittest.TestCase):
             pass
 
     def test_indivisible_error(self):
-        prob = Problem()
+        prob = om.Problem()
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
         prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  3
 
@@ -910,13 +904,13 @@ class TestParallelDOE(unittest.TestCase):
                          "of processors per model that divides into 4.")
 
     def test_minprocs_error(self):
-        prob = Problem(FanInGrouped())
+        prob = om.Problem(FanInGrouped())
 
         # require 2 procs for the ParallelGroup
         prob.model._proc_info['sub'] = (2, None, 1.0)
 
         # run cases on all procs
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
         prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  1
 
@@ -928,20 +922,20 @@ class TestParallelDOE(unittest.TestCase):
                          "required for the following subsystems: ['sub']")
 
     def test_full_factorial(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3), procs_per_model=1,
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3), procs_per_model=1,
                                 run_parallel=True)
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
 
@@ -973,7 +967,7 @@ class TestParallelDOE(unittest.TestCase):
         expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
         self.assertTrue(expect_msg in output)
 
-        cr = CaseReader(filename)
+        cr = om.CaseReader(filename)
         cases = cr.list_cases('driver')
 
         # cases recorded on this proc
@@ -996,7 +990,7 @@ class TestParallelDOE(unittest.TestCase):
         # run 2 cases at a time, each using 2 of our 4 procs
         doe_parallel = 2
 
-        prob = Problem(FanInGrouped())
+        prob = om.Problem(FanInGrouped())
         model = prob.model
 
         model.add_design_var('iv.x1', lower=0.0, upper=1.0)
@@ -1004,8 +998,8 @@ class TestParallelDOE(unittest.TestCase):
 
         model.add_objective('c3.y')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  doe_parallel
 
@@ -1042,7 +1036,7 @@ class TestParallelDOE(unittest.TestCase):
             expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
             self.assertTrue(expect_msg in output)
 
-            cr = CaseReader(filename)
+            cr = om.CaseReader(filename)
             cases = cr.list_cases('driver')
 
             # cases recorded on this proc
@@ -1068,7 +1062,7 @@ class TestParallelDOE(unittest.TestCase):
         # run cases on all procs (parallel model will run on single proc)
         doe_parallel = 1
 
-        prob = Problem(FanInGrouped())
+        prob = om.Problem(FanInGrouped())
         model = prob.model
 
         model.add_design_var('iv.x1', lower=0.0, upper=1.0)
@@ -1076,8 +1070,8 @@ class TestParallelDOE(unittest.TestCase):
 
         model.add_objective('c3.y')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  doe_parallel
 
@@ -1113,7 +1107,7 @@ class TestParallelDOE(unittest.TestCase):
         expect_msg = "Cases from rank %d are being written to %s." % (rank, filename)
         self.assertTrue(expect_msg in output)
 
-        cr = CaseReader(filename)
+        cr = om.CaseReader(filename)
         cases = cr.list_cases('driver')
 
         # cases recorded on this proc
@@ -1204,30 +1198,27 @@ class TestDOEDriverFeature(unittest.TestCase):
             pass
 
     def test_uniform(self):
-        from openmdao.api import Problem, IndepVarComp
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        from openmdao.api import DOEDriver, UniformGenerator, SqliteRecorder, CaseReader
-
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         model.add_design_var('x', lower=-10, upper=10)
         model.add_design_var('y', lower=-10, upper=10)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(UniformGenerator(num_samples=5))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.UniformGenerator(num_samples=5))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
         prob.cleanup()
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         self.assertEqual(len(cases), 5)
@@ -1240,16 +1231,14 @@ class TestDOEDriverFeature(unittest.TestCase):
         print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % (x, y, f_xy) for x, y, f_xy in values]))
 
     def test_csv(self):
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        from openmdao.api import DOEDriver, CSVGenerator, SqliteRecorder, CaseReader
-
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
@@ -1263,13 +1252,13 @@ class TestDOEDriverFeature(unittest.TestCase):
             self.assertEqual(f.read(), self.expected_csv)
 
         # run problem with DOEDriver using the CSV file
-        prob.driver = DOEDriver(CSVGenerator('cases.csv'))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.CSVGenerator('cases.csv'))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.run_driver()
         prob.cleanup()
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         values = []
@@ -1281,18 +1270,16 @@ class TestDOEDriverFeature(unittest.TestCase):
             self.expected_text)
 
     def test_list(self):
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        from openmdao.api import DOEDriver, ListGenerator, SqliteRecorder, CaseReader
 
         import json
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
@@ -1312,17 +1299,17 @@ class TestDOEDriverFeature(unittest.TestCase):
         self.assertEqual(case_list, json.loads(json_data))
 
         # create DOEDriver using provided list of cases
-        prob.driver = DOEDriver(case_list)
+        prob.driver = om.DOEDriver(case_list)
 
         # a ListGenerator was created
-        self.assertEqual(type(prob.driver.options['generator']), ListGenerator)
+        self.assertEqual(type(prob.driver.options['generator']), om.ListGenerator)
 
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.run_driver()
         prob.cleanup()
 
-        cr = CaseReader("cases.sql")
+        cr = om.CaseReader("cases.sql")
         cases = cr.list_cases('driver')
 
         values = []
@@ -1334,7 +1321,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             self.expected_text)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(om.PETScVector, "PETSc is required.")
 class TestParallelDOEFeature(unittest.TestCase):
 
     N_PROCS = 2
@@ -1385,30 +1372,27 @@ class TestParallelDOEFeature(unittest.TestCase):
             pass
 
     def test_full_factorial(self):
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
-
-        from openmdao.api import DOEDriver, FullFactorialGenerator
-        from openmdao.api import SqliteRecorder, CaseReader
 
         from mpi4py import MPI
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
         model.add_design_var('y', lower=0.0, upper=1.0)
         model.add_objective('f_xy')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
         prob.driver.options['run_parallel'] =  True
         prob.driver.options['procs_per_model'] =  1
 
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
 
         prob.setup()
         prob.run_driver()
@@ -1421,7 +1405,7 @@ class TestParallelDOEFeature(unittest.TestCase):
         filename = "cases.sql_%d" % rank
         self.assertEqual(filename, "cases.sql_%d" % rank)
 
-        cr = CaseReader(filename)
+        cr = om.CaseReader(filename)
         cases = cr.list_cases('driver')
         self.assertEqual(len(cases), 5 if rank == 0 else 4)
 
@@ -1434,7 +1418,7 @@ class TestParallelDOEFeature(unittest.TestCase):
                          self.expect_text)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(om.PETScVector, "PETSc is required.")
 class TestParallelDOEFeature2(unittest.TestCase):
 
     N_PROCS = 4
@@ -1485,15 +1469,12 @@ class TestParallelDOEFeature2(unittest.TestCase):
             pass
 
     def test_fan_in_grouped(self):
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.test_suite.groups.parallel_groups import FanInGrouped
-
-        from openmdao.api import DOEDriver, FullFactorialGenerator
-        from openmdao.api import SqliteRecorder, CaseReader
 
         from mpi4py import MPI
 
-        prob = Problem(FanInGrouped())
+        prob = om.Problem(FanInGrouped())
         model = prob.model
 
         model.add_design_var('iv.x1', lower=0.0, upper=1.0)
@@ -1501,8 +1482,8 @@ class TestParallelDOEFeature2(unittest.TestCase):
 
         model.add_objective('c3.y')
 
-        prob.driver = DOEDriver(FullFactorialGenerator(levels=3))
-        prob.driver.add_recorder(SqliteRecorder("cases.sql"))
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
         prob.driver.options['run_parallel'] =  True
 
         # run 2 cases at a time, each using 2 of our 4 procs
@@ -1518,7 +1499,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
         if rank < doe_parallel:
             filename = "cases.sql_%d" % rank
 
-            cr = CaseReader(filename)
+            cr = om.CaseReader(filename)
             cases = cr.list_cases('driver')
 
             values = []

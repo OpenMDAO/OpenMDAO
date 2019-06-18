@@ -8,12 +8,11 @@ from distutils.version import LooseVersion
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, ExecComp, AnalysisError, ExplicitComponent, \
-    ScipyKrylov, NonlinearBlockGS, LinearBlockGS, DirectSolver
-from openmdao.utils.assert_utils import assert_rel_error
+import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 
 # check that pyoptsparse is installed
@@ -24,7 +23,7 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
-class ParaboloidAE(ExplicitComponent):
+class ParaboloidAE(om.ExplicitComponent):
     """ Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
     This version raises an analysis error 50% of the time.
     The AE in ParaboloidAE stands for AnalysisError."""
@@ -57,7 +56,7 @@ class ParaboloidAE(ExplicitComponent):
             if self.fail_hard:
                 raise RuntimeError('This should error.')
             else:
-                raise AnalysisError('Try again.')
+                raise om.AnalysisError('Try again.')
 
         x = inputs['x']
         y = inputs['y']
@@ -74,7 +73,7 @@ class ParaboloidAE(ExplicitComponent):
             if self.fail_hard:
                 raise RuntimeError('This should error.')
             else:
-                raise AnalysisError('Try again.')
+                raise om.AnalysisError('Try again.')
 
         x = inputs['x']
         y = inputs['y']
@@ -84,7 +83,7 @@ class ParaboloidAE(ExplicitComponent):
         self.grad_iter_count += 1
 
 
-class DataSave(ExplicitComponent):
+class DataSave(om.ExplicitComponent):
     """ Saves run points so that we can verify that initial point is run."""
 
     def setup(self):
@@ -116,13 +115,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_upper(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -148,18 +147,18 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_upper_indices(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         size = 3
-        model.add_subsystem('p1', IndepVarComp('x', np.array([50.0]*size)))
-        model.add_subsystem('p2', IndepVarComp('y', np.array([50.0]*size)))
-        model.add_subsystem('comp', ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
-                                             x=np.zeros(size), y=np.zeros(size),
-                                             f_xy=np.zeros(size)))
-        model.add_subsystem('con', ExecComp('c = - x + y',
-                                            c=np.zeros(size), x=np.zeros(size),
-                                            y=np.zeros(size)))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.array([50.0]*size)))
+        model.add_subsystem('p2', om.IndepVarComp('y', np.array([50.0]*size)))
+        model.add_subsystem('comp', om.ExecComp('f_xy = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0',
+                                                x=np.zeros(size), y=np.zeros(size),
+                                                f_xy=np.zeros(size)))
+        model.add_subsystem('con', om.ExecComp('c = - x + y',
+                                               c=np.zeros(size), x=np.zeros(size),
+                                               y=np.zeros(size)))
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
@@ -192,13 +191,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_lower(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -227,13 +226,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_lower_linear(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -263,13 +262,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_equality(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -297,13 +296,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_equality_linear(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -331,13 +330,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_double_sided_low(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -362,13 +361,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_double_sided_high(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -393,14 +392,14 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_array_comp2D(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = areas - 20.0', c=np.zeros((2, 2)), areas=np.zeros((2, 2))),
+        model.add_subsystem('con', om.ExecComp('c = areas - 20.0', c=np.zeros((2, 2)), areas=np.zeros((2, 2))),
                             promotes=['*'])
-        model.add_subsystem('obj', ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
                             promotes=['*'])
 
         prob.set_solver_print(level=0)
@@ -425,14 +424,14 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_array_comp2D_array_lo_hi(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('widths', np.zeros((2, 2))), promotes=['*'])
         model.add_subsystem('comp', TestExplCompArrayDense(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = areas - 20.0', c=np.zeros((2, 2)), areas=np.zeros((2, 2))),
+        model.add_subsystem('con', om.ExecComp('c = areas - 20.0', c=np.zeros((2, 2)), areas=np.zeros((2, 2))),
                             promotes=['*'])
-        model.add_subsystem('obj', ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
+        model.add_subsystem('obj', om.ExecComp('o = areas[0, 0]', areas=np.zeros((2, 2))),
                             promotes=['*'])
 
         prob.set_solver_print(level=0)
@@ -459,18 +458,18 @@ class TestPyoptSparse(unittest.TestCase):
         # This tests sparse-response specification.
         # This is a slightly modified FanOut
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 1.0))
-        model.add_subsystem('p2', IndepVarComp('x', 1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x', 1.0))
 
-        model.add_subsystem('comp1', ExecComp('y = 3.0*x'))
-        model.add_subsystem('comp2', ExecComp('y = 5.0*x'))
+        model.add_subsystem('comp1', om.ExecComp('y = 3.0*x'))
+        model.add_subsystem('comp2', om.ExecComp('y = 5.0*x'))
 
-        model.add_subsystem('obj', ExecComp('o = i1 + i2'))
-        model.add_subsystem('con1', ExecComp('c = 15.0 - x'))
-        model.add_subsystem('con2', ExecComp('c = 15.0 - x'))
+        model.add_subsystem('obj', om.ExecComp('o = i1 + i2'))
+        model.add_subsystem('con1', om.ExecComp('c = 15.0 - x'))
+        model.add_subsystem('con2', om.ExecComp('c = 15.0 - x'))
 
         # hook up explicitly
         model.connect('p1.x', 'comp1.x')
@@ -514,13 +513,13 @@ class TestPyoptSparse(unittest.TestCase):
         # may do it anyway, so make sure SLSQP doesn't blow up with it (bug
         # reported by rfalck)
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -547,15 +546,15 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_pyopt_fd_solution(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -587,15 +586,15 @@ class TestPyoptSparse(unittest.TestCase):
                 raise Exception("OpenMDAO's finite difference has been called."
                                 " pyopt_fd option has failed.")
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         model.add_subsystem('comp', ParaboloidApplyLinear(), promotes=['*'])
 
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -622,15 +621,15 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_snopt_fd_option_error(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -656,16 +655,16 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertEqual(exception.args[0], msg)
 
     def test_unsupported_multiple_obj(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('comp2', Paraboloid())
 
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -693,13 +692,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_desvars_fwd(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -725,13 +724,13 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_fd(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -759,13 +758,13 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_desvars_cs(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -794,13 +793,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_desvars_rev(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -827,13 +826,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_constraint_fwd(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -859,13 +858,13 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_fd(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -893,13 +892,13 @@ class TestPyoptSparse(unittest.TestCase):
         assert_rel_error(self, prob['x'] - prob['y'], 11.0, 1e-6)
 
     def test_simple_paraboloid_scaled_constraint_cs(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -928,13 +927,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_constraint_rev(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -961,15 +960,15 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_objective_fwd(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         prob.set_solver_print(level=0)
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -994,15 +993,15 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_simple_paraboloid_scaled_objective_rev(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         prob.set_solver_print(level=0)
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -1027,7 +1026,7 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_sellar_mdf(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
         prob.driver = pyOptSparseDriver()
@@ -1059,7 +1058,7 @@ class TestPyoptSparse(unittest.TestCase):
         # This test makes sure that we call solve_nonlinear first if we have any linear constraints
         # to cache.
 
-        class SellarDis1withDerivatives(ExplicitComponent):
+        class SellarDis1withDerivatives(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('z', val=np.zeros(2))
@@ -1083,7 +1082,7 @@ class TestPyoptSparse(unittest.TestCase):
                 partials['y1', 'x'] = 1.0
 
 
-        class SellarDis2withDerivatives(ExplicitComponent):
+        class SellarDis2withDerivatives(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('z', val=np.zeros(2))
@@ -1111,28 +1110,28 @@ class TestPyoptSparse(unittest.TestCase):
                 J['y2', 'z'] = np.array([[1.0, 1.0]])
 
 
-        class MySellarGroup(Group):
+        class MySellarGroup(om.Group):
 
             def setup(self):
-                self.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-                self.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+                self.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+                self.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
-                self.mda = mda = self.add_subsystem('mda', Group(), promotes=['x', 'z', 'y1', 'y2'])
+                self.mda = mda = self.add_subsystem('mda', om.Group(), promotes=['x', 'z', 'y1', 'y2'])
                 mda.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
                 mda.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-                self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                       z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
+                self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                          z=np.array([0.0, 0.0]), x=0.0, y1=0.0, y2=0.0),
                                    promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-                self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-                self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+                self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+                self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-                self.linear_solver = DirectSolver()
-                self.nonlinear_solver = NonlinearBlockGS()
+                self.linear_solver = om.DirectSolver()
+                self.nonlinear_solver = om.NonlinearBlockGS()
 
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = MySellarGroup()
 
         prob.driver = pyOptSparseDriver()
@@ -1169,15 +1168,15 @@ class TestPyoptSparse(unittest.TestCase):
         # Component raises an analysis error during some runs, and pyopt
         # attempts to recover.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
 
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -1215,15 +1214,15 @@ class TestPyoptSparse(unittest.TestCase):
         # Component fails hard this time during execution, so we expect
         # pyoptsparse to raise.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         comp = model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
 
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.driver = pyOptSparseDriver()
 
@@ -1253,15 +1252,15 @@ class TestPyoptSparse(unittest.TestCase):
         # Component raises an analysis error during some linearize calls, and
         # pyopt attempts to recover.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         comp = model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
 
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.driver = pyOptSparseDriver()
         prob.driver.options['optimizer'] = OPTIMIZER
@@ -1306,14 +1305,14 @@ class TestPyoptSparse(unittest.TestCase):
         # Component fails hard this time during gradient eval, so we expect
         # pyoptsparse to raise.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         comp = model.add_subsystem('comp', ParaboloidAE(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.driver = pyOptSparseDriver()
 
@@ -1342,13 +1341,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_debug_print_option_totals(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -1375,13 +1374,13 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertTrue('Solving variable: comp.f_xy' in output)
         self.assertTrue('Solving variable: con.c' in output)
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -1410,13 +1409,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_debug_print_option(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -1462,13 +1461,13 @@ class TestPyoptSparse(unittest.TestCase):
 
     def test_show_exception_bad_opt(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -1498,9 +1497,9 @@ class TestPyoptSparse(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not providing NSGA2")
 
         # Make sure all our opts have run the initial point just once.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', val=1.0))
         comp = model.add_subsystem('comp1', DataSave())
         model.connect('p1.x', 'comp1.x')
 
@@ -1525,9 +1524,9 @@ class TestPyoptSparse(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not providing SLSQP")
 
         # Make sure all our opts have run the initial point just once.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', val=1.0))
         comp = model.add_subsystem('comp1', DataSave())
         model.connect('p1.x', 'comp1.x')
 
@@ -1551,9 +1550,9 @@ class TestPyoptSparse(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not providing SNOPT")
 
         # Make sure all our opts have run the initial point just once.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', val=1.0))
         comp = model.add_subsystem('comp1', DataSave())
         model.connect('p1.x', 'comp1.x')
 
@@ -1580,9 +1579,9 @@ class TestPyoptSparse(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not providing ALPSO")
 
         # Make sure all our opts have run the initial point just once.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', val=1.0))
         comp = model.add_subsystem('comp1', DataSave())
         model.connect('p1.x', 'comp1.x')
 
@@ -1606,9 +1605,9 @@ class TestPyoptSparse(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not providing PSQP")
 
         # Make sure all our opts have run the initial point just once.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', val=1.0))
         comp = model.add_subsystem('comp1', DataSave())
         model.connect('p1.x', 'comp1.x')
 
@@ -1633,9 +1632,9 @@ class TestPyoptSparse(unittest.TestCase):
             raise unittest.SkipTest("pyoptsparse is not providing CONMIN")
 
         # Make sure all our opts have run the initial point just once.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', val=1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', val=1.0))
         comp = model.add_subsystem('comp1', DataSave())
         model.connect('p1.x', 'comp1.x')
 
@@ -1655,10 +1654,10 @@ class TestPyoptSparse(unittest.TestCase):
         self.assertNotEqual(comp.visited_points[1], 1.0)
 
     def test_pyoptsparse_missing_objective(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('x', IndepVarComp('x', 2.0), promotes=['*'])
+        model.add_subsystem('x', om.IndepVarComp('x', 2.0), promotes=['*'])
         model.add_subsystem('f_x', Paraboloid(), promotes=['*'])
 
         prob.driver = pyOptSparseDriver()
@@ -1693,10 +1692,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
     def test_basic(self):
         import numpy as np
 
-        from openmdao.api import Problem, pyOptSparseDriver
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
         prob.driver = pyOptSparseDriver()
@@ -1718,10 +1717,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
     def test_settings_print(self):
         import numpy as np
 
-        from openmdao.api import Problem, pyOptSparseDriver
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
@@ -1744,10 +1743,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
     def test_slsqp_atol(self):
         import numpy as np
 
-        from openmdao.api import Problem, pyOptSparseDriver
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
         prob.driver = pyOptSparseDriver()
@@ -1771,10 +1770,10 @@ class TestPyoptSparseFeature(unittest.TestCase):
     def test_slsqp_maxit(self):
         import numpy as np
 
-        from openmdao.api import Problem, pyOptSparseDriver
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
         prob.driver = pyOptSparseDriver()
@@ -1807,10 +1806,10 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
     def test_snopt_atol(self):
         import numpy as np
 
-        from openmdao.api import Problem, pyOptSparseDriver
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
         prob.driver = pyOptSparseDriver()
@@ -1834,10 +1833,10 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
     def test_snopt_maxit(self):
         import numpy as np
 
-        from openmdao.api import Problem, pyOptSparseDriver
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
         prob.driver = pyOptSparseDriver()
@@ -1862,15 +1861,15 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
 
     def test_snopt_fd_solution(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -1902,15 +1901,15 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                 raise Exception("OpenMDAO's finite difference has been called."
                                 " snopt_fd option has failed.")
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
 
         model.add_subsystem('comp', ParaboloidApplyLinear(), promotes=['*'])
 
-        model.add_subsystem('con', ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -1939,7 +1938,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         # One discipline of Sellar will something raise analysis error. This is to test that
         # the iprinting doesn't get out-of-whack.
 
-        class SellarDis1AE(ExplicitComponent):
+        class SellarDis1AE(om.ExplicitComponent):
             def setup(self):
                 self.add_input('z', val=np.zeros(2))
                 self.add_input('x', val=0.)
@@ -1966,13 +1965,13 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                 self.count_iter += 1
                 if self.count_iter in self.fail_deriv:
                     self.failed += 1
-                    raise AnalysisError('Try again.')
+                    raise om.AnalysisError('Try again.')
 
                 partials['y1', 'y2'] = -0.2
                 partials['y1', 'z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
                 partials['y1', 'x'] = 1.0
 
-        class SellarDis2AE(ExplicitComponent):
+        class SellarDis2AE(om.ExplicitComponent):
             def setup(self):
                 self.add_input('z', val=np.zeros(2))
                 self.add_input('y1', val=1.0)
@@ -2001,13 +2000,13 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                 J['y2', 'y1'] = .5*y1**-.5
                 J['y2', 'z'] = np.array([[1.0, 1.0]])
 
-        class SellarMDAAE(Group):
+        class SellarMDAAE(om.Group):
             def setup(self):
-                indeps = self.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+                indeps = self.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
                 indeps.add_output('x', 1.0)
                 indeps.add_output('z', np.array([5.0, 2.0]))
 
-                cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
+                cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
 
                 cycle.add_subsystem('d1', SellarDis1AE(),
                                     promotes_inputs=['x', 'z', 'y2'],
@@ -2016,18 +2015,18 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
                                     promotes_inputs=['z', 'y1'],
                                     promotes_outputs=['y2'])
 
-                self.linear_solver = LinearBlockGS()
-                cycle.linear_solver = ScipyKrylov()
-                cycle.nonlinear_solver = NonlinearBlockGS()
+                self.linear_solver = om.LinearBlockGS()
+                cycle.linear_solver = om.ScipyKrylov()
+                cycle.nonlinear_solver = om.NonlinearBlockGS()
 
-                self.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                   z=np.array([0.0, 0.0]), x=0.0),
+                self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                          z=np.array([0.0, 0.0]), x=0.0),
                                    promotes=['x', 'z', 'y1', 'y2', 'obj'])
 
-                self.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-                self.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+                self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+                self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = SellarMDAAE()
 
         prob.driver = pyOptSparseDriver()
