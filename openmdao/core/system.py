@@ -3597,7 +3597,6 @@ def get_relevant_vars(connections, desvars, responses, mode):
         keyed by design vars and responses.
     """
     relevant = defaultdict(dict)
-    cache = {}
 
     # Create a hybrid graph with components and all connected vars.  If a var is connected,
     # also connect it to its corresponding component.
@@ -3638,18 +3637,18 @@ def get_relevant_vars(connections, desvars, responses, mode):
 
     nodes = graph.nodes
     grev = graph.reverse(copy=False)
+    dvcache = {}
+    rescache = {}
 
     for desvar in desvars:
-        dv = (desvar, 'dv')
-        if dv not in cache:
-            cache[dv] = set(all_connected_nodes(graph, desvar))
+        if desvar not in dvcache:
+            dvcache[desvar] = set(all_connected_nodes(graph, desvar))
 
         for response in responses:
-            res = (response, 'r')
-            if res not in cache:
-                cache[res] = set(all_connected_nodes(grev, response))
+            if response not in rescache:
+                rescache[response] = set(all_connected_nodes(grev, response))
 
-            common = cache[dv].intersection(cache[res])
+            common = dvcache[desvar].intersection(rescache[response])
 
             if common:
                 input_deps = set()

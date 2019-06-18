@@ -306,15 +306,18 @@ class SqliteRecorder(CaseRecorder):
                             (objectives, 'objective'), (constraints, 'constraint')]
 
             # merge current abs2prom and prom2abs with this system's version
-            for io in ['input', 'output']:
-                self._abs2prom[io].update(system._var_abs2prom[io])
-                for v in system._var_allprocs_prom2abs_list[io]:
-                    if v not in self._prom2abs[io]:
-                        self._prom2abs[io][v] = system._var_allprocs_prom2abs_list[io][v]
-                    else:
-                        self._prom2abs[io][v] = list(
-                            set(chain(self._prom2abs[io][v],
-                                system._var_allprocs_prom2abs_list[io][v])))
+            self._abs2prom['input'].update(system._var_abs2prom['input'])
+            self._abs2prom['output'].update(system._var_abs2prom['output'])
+            for v, abs_names in iteritems(system._var_allprocs_prom2abs_list['input']):
+                if v not in self._prom2abs['input']:
+                    self._prom2abs['input'][v] = abs_names
+                else:
+                    self._prom2abs['input'][v] = list(set(chain(self._prom2abs['input'][v],
+                                                                abs_names)))
+
+            # for outputs, there can be only one abs name per promoted name
+            for v, abs_names in iteritems(system._var_allprocs_prom2abs_list['output']):
+                self._prom2abs['output'][v] = abs_names
 
             for var_set, var_type in full_var_set:
                 for name in var_set:
@@ -332,8 +335,6 @@ class SqliteRecorder(CaseRecorder):
                 self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
                 self._abs2meta[name]['type'] = ['input']
                 self._abs2meta[name]['explicit'] = True
-                if name in states:
-                    self._abs2meta[name]['explicit'] = False
 
             self._cleanup_abs2meta()
 
