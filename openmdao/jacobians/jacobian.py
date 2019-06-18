@@ -232,6 +232,7 @@ class Jacobian(object):
         if isinstance(subjac, sparse_types):  # sparse
             sparse = subjac.copy()
             sparse.data = rand(sparse.data.size)
+            sparse.data /= 100.
             sparse.data += 1.0
             return sparse
 
@@ -246,9 +247,13 @@ class Jacobian(object):
             assert subjac_info['rows'] is None
             rows, cols, shape = subjac_info['sparsity']
             r = np.zeros(shape)
-            r[rows, cols] = rand(len(rows)) + 1.0
+            val = rand(len(rows))
+            val /= 100.
+            val += 1.0
+            r[rows, cols] = val
         else:
             r = rand(*subjac.shape)
+            r /= 100.
             r += 1.0
         return r
 
