@@ -40,6 +40,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         import re
         import os
         from tempfile import mkdtemp
+
         # perform test in temporary directory
         self.startdir = os.getcwd()
         self.tempdir = mkdtemp(prefix='test_solver')
@@ -141,6 +142,11 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         with open(self.filename, 'r') as f:
             self.assertEqual(f.read(), self.expected_data)
+
+        # setup & run again to make sure there is no error due to existing file
+        p.setup()
+        with printoptions(**opts):
+            run_model(p, ignore_exception=False)
 
     def test_solver_debug_print_feature(self):
         from distutils.version import LooseVersion

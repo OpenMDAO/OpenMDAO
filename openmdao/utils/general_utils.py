@@ -9,7 +9,7 @@ import math
 import warnings
 import unittest
 from fnmatch import fnmatchcase
-from six import string_types, PY2
+from six import string_types, PY2, reraise
 from six.moves import range, cStringIO as StringIO
 from collections import Iterable
 import numbers
