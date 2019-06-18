@@ -26,3 +26,7 @@ class TestCircuitWithUnconnectedInputScript(unittest.TestCase):
 
         self.assertTrue('The following inputs are not connected' in output,
                         msg="Should have gotten error about unconnected input")
+
+
+if __name__ == '__main__':
+    unittest.main()
