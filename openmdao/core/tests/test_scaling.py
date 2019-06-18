@@ -7,16 +7,15 @@ from six import assertRaisesRegex
 
 import numpy as np
 
-from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, IndepVarComp
-from openmdao.api import NewtonSolver, ScipyKrylov, NonlinearBlockGS, DirectSolver
+import openmdao.api as om
 from openmdao.core.driver import Driver
 
-from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayDense
+from openmdao.utils.assert_utils import assert_rel_error
 
 
-class PassThroughLength(ExplicitComponent):
+class PassThroughLength(om.ExplicitComponent):
     """Units/scaling test component taking length in cm and passing it through in km."""
 
     def setup(self):
@@ -30,7 +29,7 @@ class PassThroughLength(ExplicitComponent):
         outputs['new_length'] = length_km
 
 
-class ScalingExample1(ImplicitComponent):
+class ScalingExample1(om.ImplicitComponent):
 
     def setup(self):
         self.add_input('x1', val=100.0)
@@ -48,7 +47,7 @@ class ScalingExample1(ImplicitComponent):
         residuals['y2'] = 1e-5 * (x2 - y2)/y2
 
 
-class ScalingExample2(ImplicitComponent):
+class ScalingExample2(om.ImplicitComponent):
 
     def setup(self):
         self.add_input('x1', val=100.0)
@@ -66,7 +65,7 @@ class ScalingExample2(ImplicitComponent):
         residuals['y2'] = 1e-5 * (x2 - y2)/y2
 
 
-class ScalingExample3(ImplicitComponent):
+class ScalingExample3(om.ImplicitComponent):
 
     def setup(self):
         self.add_input('x1', val=100.0)
@@ -84,7 +83,7 @@ class ScalingExample3(ImplicitComponent):
         residuals['y2'] = 1e-5 * (x2 - y2)/y2
 
 
-class ScalingExampleVector(ImplicitComponent):
+class ScalingExampleVector(om.ImplicitComponent):
 
     def setup(self):
         self.add_input('x', val=np.array([100., 5000.]))
@@ -100,7 +99,7 @@ class ScalingExampleVector(ImplicitComponent):
         residuals['y'][1] = 1e-5 * (x[1] - y[1])/y[1]
 
 
-class SpeedComputationWithUnits(ExplicitComponent):
+class SpeedComputationWithUnits(om.ExplicitComponent):
     """Simple speed computation from distance and time with unit conversations."""
 
     def setup(self):
@@ -119,7 +118,7 @@ class SpeedComputationWithUnits(ExplicitComponent):
         outputs['speed'] = speed_kph
 
 
-class ScalingTestComp(ImplicitComponent):
+class ScalingTestComp(om.ImplicitComponent):
     """Explicit component used to test output and residual scaling.
 
     This component helps assemble a system of the following form with
@@ -194,11 +193,11 @@ class TestScaling(unittest.TestCase):
 
     def test_error_messages(self):
 
-        class EComp(ImplicitComponent):
+        class EComp(om.ImplicitComponent):
             def setup(self):
                 self.add_output('zz', val=np.ones((4, 2)), ref=np.ones((3, 5)))
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         model.add_subsystem('comp', EComp())
 
@@ -207,11 +206,11 @@ class TestScaling(unittest.TestCase):
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
 
-        class EComp(ImplicitComponent):
+        class EComp(om.ImplicitComponent):
             def setup(self):
                 self.add_output('zz', val=np.ones((4, 2)), ref0=np.ones((3, 5)))
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         model.add_subsystem('comp', EComp())
 
@@ -220,11 +219,11 @@ class TestScaling(unittest.TestCase):
             prob.setup()
         self.assertEqual(_winfix(str(context.exception)), msg)
 
-        class EComp(ImplicitComponent):
+        class EComp(om.ImplicitComponent):
             def setup(self):
                 self.add_output('zz', val=np.ones((4, 2)), res_ref=np.ones((3, 5)))
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         model.add_subsystem('comp', EComp())
 
@@ -234,13 +233,13 @@ class TestScaling(unittest.TestCase):
         self.assertEqual(_winfix(str(context.exception)), msg)
 
     def test_pass_through(self):
-        group = Group()
-        group.add_subsystem('sys1', IndepVarComp('old_length', 1.0,
-                                                 units='mm', ref=1e5))
+        group = om.Group()
+        group.add_subsystem('sys1', om.IndepVarComp('old_length', 1.0,
+                                                    units='mm', ref=1e5))
         group.add_subsystem('sys2', PassThroughLength())
         group.connect('sys1.old_length', 'sys2.old_length')
 
-        prob = Problem(group)
+        prob = om.Problem(group)
 
         prob.setup()
         prob.set_solver_print(level=0)
@@ -255,17 +254,17 @@ class TestScaling(unittest.TestCase):
         assert_rel_error(self, prob.model._outputs['sys2.new_length'], 3.e-1)
 
     def test_speed(self):
-        comp = IndepVarComp()
+        comp = om.IndepVarComp()
         comp.add_output('distance', 1., units='km')
         comp.add_output('time', 1., units='h')
 
-        group = Group()
+        group = om.Group()
         group.add_subsystem('c1', comp)
         group.add_subsystem('c2', SpeedComputationWithUnits())
         group.connect('c1.distance', 'c2.distance')
         group.connect('c1.time', 'c2.time')
 
-        prob = Problem(model=group)
+        prob = om.Problem(model=group)
         prob.setup()
         prob.set_solver_print(level=0)
 
@@ -279,15 +278,15 @@ class TestScaling(unittest.TestCase):
     def test_scaling(self):
         """Test convergence in essentially one Newton iteration to atol=1e-5."""
         def runs_successfully(use_scal, coeffs):
-            prob = Problem()
+            prob = om.Problem()
             prob.model.add_subsystem('row1', ScalingTestComp(row=1, coeffs=coeffs,
                                                              use_scal=use_scal))
             prob.model.add_subsystem('row2', ScalingTestComp(row=2, coeffs=coeffs,
                                                              use_scal=use_scal))
             prob.model.connect('row1.y', 'row2.x')
             prob.model.connect('row2.y', 'row1.x')
-            prob.model.nonlinear_solver = NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
-            prob.model.nonlinear_solver.linear_solver = ScipyKrylov(maxiter=1)
+            prob.model.nonlinear_solver = om.NewtonSolver(maxiter=2, atol=1e-5, rtol=0)
+            prob.model.nonlinear_solver.linear_solver = om.ScipyKrylov(maxiter=1)
 
             prob.set_solver_print(level=0)
 
@@ -334,7 +333,7 @@ class TestScaling(unittest.TestCase):
         # The model is a cycle that iterates once, so the first component in the cycle carries
         # a residual.
 
-        class Simple(ExplicitComponent):
+        class Simple(om.ExplicitComponent):
 
             def initialize(self):
                 self.options.declare('ref', default=1.0)
@@ -365,14 +364,14 @@ class TestScaling(unittest.TestCase):
 
         # Baseline - all should be equal.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         model.add_subsystem('p1', Simple())
         model.add_subsystem('p2', Simple())
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver = om.NonlinearBlockGS()
         model.nonlinear_solver.options['maxiter'] = 1
         model.nonlinear_solver.options['use_apply_nonlinear'] = True
 
@@ -404,14 +403,14 @@ class TestScaling(unittest.TestCase):
         ref = 1.0
         ref0 = 1.5
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         model.add_subsystem('p1', Simple(ref=ref, ref0=ref0))
         model.add_subsystem('p2', Simple(ref=ref, ref0=ref0))
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver = om.NonlinearBlockGS()
         model.nonlinear_solver.options['maxiter'] = 1
         model.nonlinear_solver.options['use_apply_nonlinear'] = True
 
@@ -439,14 +438,14 @@ class TestScaling(unittest.TestCase):
 
         res_ref = 4.0
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         model.add_subsystem('p1', Simple(res_ref=res_ref))
         model.add_subsystem('p2', Simple(res_ref=res_ref))
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver = om.NonlinearBlockGS()
         model.nonlinear_solver.options['maxiter'] = 1
         model.nonlinear_solver.options['use_apply_nonlinear'] = True
 
@@ -476,14 +475,14 @@ class TestScaling(unittest.TestCase):
         ref0 = 2.75
         res_ref = 4.0
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         model.add_subsystem('p1', Simple(ref=ref, ref0=ref0, res_ref=res_ref))
         model.add_subsystem('p2', Simple(ref=ref, ref0=ref0, res_ref=res_ref))
         model.connect('p1.y', 'p2.x')
         model.connect('p2.y', 'p1.x')
 
-        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver = om.NonlinearBlockGS()
         model.nonlinear_solver.options['maxiter'] = 1
         model.nonlinear_solver.options['use_apply_nonlinear'] = True
 
@@ -522,10 +521,10 @@ class TestScaling(unittest.TestCase):
                 super(ExpCompArrayScale, self).compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.ones((2, 2))))
         model.add_subsystem('comp', ExpCompArrayScale())
         model.connect('p1.x', 'comp.lengths')
 
@@ -564,10 +563,10 @@ class TestScaling(unittest.TestCase):
                 super(ExpCompArrayScale, self).compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.ones((2, 2))))
         model.add_subsystem('comp', ExpCompArrayScale())
         model.connect('p1.x', 'comp.lengths')
 
@@ -609,10 +608,10 @@ class TestScaling(unittest.TestCase):
                 super(ExpCompArrayScale, self).compute(inputs, outputs)
                 outputs['stuff'] = inputs['widths'] + inputs['lengths']
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.ones((2, 2))))
         model.add_subsystem('comp', ExpCompArrayScale())
         model.connect('p1.x', 'comp.lengths')
 
@@ -685,10 +684,10 @@ class TestScaling(unittest.TestCase):
                 jacobian['x', 'rhs'] = -np.eye(2)
 
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.ones(2)))
         comp = model.add_subsystem('comp', ImpCompArrayScale())
         model.connect('p1.x', 'comp.rhs')
 
@@ -744,10 +743,10 @@ class TestScaling(unittest.TestCase):
                 jacobian['x', 'rhs'] = -np.eye(2)
 
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', np.ones(2)))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.ones(2)))
         comp = model.add_subsystem('comp', ImpCompArrayScale())
         model.connect('p1.x', 'comp.rhs')
 
@@ -811,11 +810,11 @@ class TestScaling(unittest.TestCase):
 
                 outputs['total_volume'] = np.sum(outputs['areas']) + np.sum(outputs['stuff'])
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', np.ones((2, 2))))
-        model.add_subsystem('p2', IndepVarComp('x', np.ones((1, 3))))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.ones((2, 2))))
+        model.add_subsystem('p2', om.IndepVarComp('x', np.ones((1, 3))))
         model.add_subsystem('comp1', ExpCompArrayScale())
         model.add_subsystem('comp2', ExpCompArrayScale())
         model.connect('p1.x', 'comp1.lengths')
@@ -831,7 +830,7 @@ class TestScaling(unittest.TestCase):
 
     def test_newton_resid_scaling(self):
 
-        class SimpleComp(ImplicitComponent):
+        class SimpleComp(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('x', val=6.0)
@@ -847,16 +846,16 @@ class TestScaling(unittest.TestCase):
                 jacobian['y', 'x'] = -1.0
                 jacobian['y', 'y'] = 3.0
 
-        prob = Problem()
-        model = prob.model = Group(assembled_jac_type='dense')
+        prob = om.Problem()
+        model = prob.model = om.Group(assembled_jac_type='dense')
 
-        model.add_subsystem('p1', IndepVarComp('x', 6.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 6.0))
         model.add_subsystem('comp', SimpleComp())
 
         model.connect('p1.x', 'comp.x')
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = DirectSolver()
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.DirectSolver()
 
         prob.setup()
         prob.run_model()
@@ -865,16 +864,16 @@ class TestScaling(unittest.TestCase):
 
         # Now, let's try with an AssembledJacobian.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 6.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 6.0))
         model.add_subsystem('comp', SimpleComp())
 
         model.connect('p1.x', 'comp.x')
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = DirectSolver(assemble_jac=True)
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         prob.setup()
         prob.run_model()
@@ -882,14 +881,14 @@ class TestScaling(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 2.0)
 
     def test_feature1(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_scaling import ScalingExample1
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x1', 1.0))
-        model.add_subsystem('p2', IndepVarComp('x2', 1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x1', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x2', 1.0))
         comp = model.add_subsystem('comp', ScalingExample1())
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
@@ -906,14 +905,14 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val, 6.0)
 
     def test_feature2(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_scaling import ScalingExample2
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x1', 1.0))
-        model.add_subsystem('p2', IndepVarComp('x2', 1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x1', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x2', 1.0))
         comp = model.add_subsystem('comp', ScalingExample2())
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
@@ -930,14 +929,14 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val, 0.5)
 
     def test_feature3(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_scaling import ScalingExample3
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x1', 1.0))
-        model.add_subsystem('p2', IndepVarComp('x2', 1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x1', 1.0))
+        model.add_subsystem('p2', om.IndepVarComp('x2', 1.0))
         comp = model.add_subsystem('comp', ScalingExample3())
         model.connect('p1.x1', 'comp.x1')
         model.connect('p2.x2', 'comp.x2')
@@ -954,13 +953,13 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val, (1-6000.)/6000.)
 
     def test_feature_vector(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_scaling import ScalingExampleVector
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p', IndepVarComp('x', np.ones((2))))
+        model.add_subsystem('p', om.IndepVarComp('x', np.ones((2))))
         comp = model.add_subsystem('comp', ScalingExampleVector())
         model.connect('p.x', 'comp.x')
 
@@ -978,7 +977,7 @@ class TestScaling(unittest.TestCase):
             assert_rel_error(self, val[1], 6.0)
 
 
-class MyComp(ExplicitComponent):
+class MyComp(om.ExplicitComponent):
 
     def setup(self):
 
@@ -1029,7 +1028,7 @@ class MyComp(ExplicitComponent):
         outputs['x3_s_s'] = self.J[3, 0] * inputs['x2_u_u'] + self.J[3, 1] * inputs['x2_u_s'] + self.J[3, 2] * inputs['x2_s_u'] + self.J[3, 3] * inputs['x2_s_s']
 
 
-class MyImplicitComp(ImplicitComponent):
+class MyImplicitComp(om.ImplicitComponent):
 
     def setup(self):
 
@@ -1082,10 +1081,10 @@ class TestScalingOverhaul(unittest.TestCase):
     def test_in_driver(self):
         # This test assures that the driver is correctly seeing unscaled (physical) data.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        inputs_comp = IndepVarComp()
+        inputs_comp = om.IndepVarComp()
         inputs_comp.add_output('x1_u_u', val=1.0)
         inputs_comp.add_output('x1_u_s', val=1.0)
         inputs_comp.add_output('x1_s_u', val=1.0, ref=3.0)
@@ -1187,10 +1186,10 @@ class TestScalingOverhaul(unittest.TestCase):
     def test_iimplicit(self):
         # Testing that our scale/unscale contexts leave the output vector in the correct state when
         # linearize is called on implicit components.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        inputs_comp = IndepVarComp()
+        inputs_comp = om.IndepVarComp()
         inputs_comp.add_output('x1_u', val=1.0)
 
         model.add_subsystem('p', inputs_comp)
@@ -1198,8 +1197,8 @@ class TestScalingOverhaul(unittest.TestCase):
 
         model.connect('p.x1_u', 'comp.x2_u')
 
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver()
+        model.linear_solver = om.DirectSolver()
+        model.nonlinear_solver = om.NewtonSolver()
         model.nonlinear_solver.options['atol'] = 1e-12
         model.nonlinear_solver.options['rtol'] = 1e-12
 

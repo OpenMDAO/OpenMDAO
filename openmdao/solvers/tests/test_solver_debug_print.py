@@ -15,14 +15,7 @@ from distutils.version import LooseVersion
 
 import numpy as np
 
-from openmdao.api import Problem, IndepVarComp, ExecComp, Group, BalanceComp, AnalysisError
-
-from openmdao.solvers.linear.direct import DirectSolver
-from openmdao.solvers.nonlinear.broyden import BroydenSolver
-from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
-from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
-
+import openmdao.api as om
 from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
 from openmdao.utils.assert_utils import assert_rel_error
@@ -35,10 +28,10 @@ except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 nonlinear_solvers = [
-    NonlinearBlockGS,
-    NonlinearBlockJac,
-    NewtonSolver,
-    BroydenSolver
+    om.NonlinearBlockGS,
+    om.NonlinearBlockJac,
+    om.NewtonSolver,
+    om.BroydenSolver
 ]
 
 
@@ -97,11 +90,11 @@ class TestNonlinearSolvers(unittest.TestCase):
         [solver.__name__, solver] for solver in nonlinear_solvers
     ])
     def test_solver_debug_print(self, name, solver):
-        p = Problem()
+        p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
 
         model.connect('source.I', 'circuit.I_in')
@@ -152,15 +145,16 @@ class TestNonlinearSolvers(unittest.TestCase):
     def test_solver_debug_print_feature(self):
         from distutils.version import LooseVersion
         import numpy as np
-        from openmdao.api import Problem, IndepVarComp, NewtonSolver, AnalysisError
+
+        import openmdao.api as om
         from openmdao.test_suite.scripts.circuit_analysis import Circuit
         from openmdao.utils.general_utils import printoptions
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
 
-        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
-        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', om.IndepVarComp('I', 0.1, units='A'))
         model.add_subsystem('circuit', Circuit())
 
         model.connect('source.I', 'circuit.I_in')
@@ -168,7 +162,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         p.setup()
 
-        nl = model.circuit.nonlinear_solver = NewtonSolver()
+        nl = model.circuit.nonlinear_solver = om.NewtonSolver()
 
         nl.options['iprint'] = 2
         nl.options['debug_print'] = True
@@ -187,7 +181,7 @@ class TestNonlinearSolvers(unittest.TestCase):
             # run the model
             try:
                 p.run_model()
-            except AnalysisError:
+            except om.AnalysisError:
                 pass
 
         with open(self.filename, 'r') as f:
@@ -216,18 +210,18 @@ class TestNonlinearSolversIsolated(unittest.TestCase):
             pass
 
     def test_debug_after_raised_error(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        comp = IndepVarComp()
+        comp = om.IndepVarComp()
         comp.add_output('dXdt:TAS', val=1.0)
         comp.add_output('accel_target', val=2.0)
         model.add_subsystem('des_vars', comp, promotes=['*'])
 
-        teg = model.add_subsystem('thrust_equilibrium_group', subsys=Group())
-        teg.add_subsystem('dynamics', ExecComp('z = 2.0*thrust'), promotes=['*'])
+        teg = model.add_subsystem('thrust_equilibrium_group', subsys=om.Group())
+        teg.add_subsystem('dynamics', om.ExecComp('z = 2.0*thrust'), promotes=['*'])
 
-        thrust_bal = BalanceComp()
+        thrust_bal = om.BalanceComp()
         thrust_bal.add_balance(name='thrust', val=1207.1, lhs_name='dXdt:TAS',
                                rhs_name='accel_target', eq_units='m/s**2', lower=-10.0, upper=10000.0)
 
@@ -235,9 +229,9 @@ class TestNonlinearSolversIsolated(unittest.TestCase):
                           promotes_inputs=['dXdt:TAS', 'accel_target'],
                           promotes_outputs=['thrust'])
 
-        teg.linear_solver = DirectSolver()
+        teg.linear_solver = om.DirectSolver()
 
-        teg.nonlinear_solver = NewtonSolver()
+        teg.nonlinear_solver = om.NewtonSolver()
         teg.nonlinear_solver.options['solve_subsystems'] = True
         teg.nonlinear_solver.options['max_sub_solves'] = 1
         teg.nonlinear_solver.options['atol'] = 1e-4
