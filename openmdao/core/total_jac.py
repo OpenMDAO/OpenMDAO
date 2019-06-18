@@ -1300,6 +1300,10 @@ class _TotalJacInfo(object):
 
         # Re-initialize so that it is clean.
         if initialize:
+
+            # Need this cache cleared because we re-initialize after computing linear constraints.
+            model._approx_subjac_keys = None
+
             if model._approx_schemes:
                 method = list(model._approx_schemes)[0]
                 kwargs = model._owns_approx_jac_meta
@@ -1320,11 +1324,18 @@ class _TotalJacInfo(object):
 
         of_idx = model._owns_approx_of_idx
         wrt_idx = model._owns_approx_wrt_idx
+        wrt_meta = self.wrt_meta
 
         totals = self.J_dict
         if return_format == 'flat_dict':
             for prom_out, output_name in zip(self.prom_of, of):
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
+
+                    if output_name in wrt_meta and output_name != input_name:
+                        # Special case where we constrain an input, and need derivatives of that
+                        # constraint wrt all other inputs.
+                        continue
+
                     totals[prom_out, prom_in][:] = _get_subjac(approx_jac[output_name, input_name],
                                                                prom_out, prom_in, of_idx, wrt_idx)
 
@@ -1332,6 +1343,12 @@ class _TotalJacInfo(object):
             for prom_out, output_name in zip(self.prom_of, of):
                 tot = totals[prom_out]
                 for prom_in, input_name in zip(self.prom_wrt, wrt):
+
+                    if output_name in wrt_meta and output_name != input_name:
+                        # Special case where we constrain an input, and need derivatives of that
+                        # constraint wrt all other inputs.
+                        continue
+
                     if prom_out == prom_in and isinstance(tot[prom_in], dict):
                         rows, cols, data = tot[prom_in]['coo']
                         data[:] = _get_subjac(approx_jac[output_name, input_name],
