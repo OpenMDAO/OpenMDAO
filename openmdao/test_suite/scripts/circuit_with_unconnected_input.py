@@ -1,5 +1,5 @@
 from openmdao.api import Group, NewtonSolver, DirectSolver, Problem, IndepVarComp
-
+from openmdao.error_checking.check_config import check_config
 from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node
 
 class Circuit(Group):
@@ -40,7 +40,8 @@ model.add_design_var('ground.V')
 model.add_design_var('source.I')
 model.add_objective('circuit.D1.I')
 
-p.setup(check=True)
+p.setup()
+check_config(p, checks=['unconnected_inputs'])
 
 # set some initial guesses
 p['circuit.n1.V'] = 10.

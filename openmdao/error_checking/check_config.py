@@ -16,9 +16,9 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 
 
-def _check_dataflow(group, infos, warnings):
+def _check_cycles(group, infos=None):
     """
-    Report any cycles and out of order Systems to the logger.
+    Report any cycles to the logger.
 
     Parameters
     ----------
@@ -26,45 +26,87 @@ def _check_dataflow(group, infos, warnings):
         The Group being checked for dataflow issues
     infos : list
         List to collect informational messages.
-    warnings : list
-        List to collect warning messages.
+
+    Returns
+    -------
+    list
+        List of cycles, with subsystem names sorted in execution order.
     """
     graph = group.compute_sys_graph(comps_only=False)
     sccs = get_sccs_topo(graph)
     sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
     cycles = [sorted(s, key=lambda n: sub2i[n]) for s in sccs if len(s) > 1]
+
+    if cycles and infos is not None:
+        infos.append("   Group '%s' has the following cycles: %s\n" % (group.pathname, cycles))
+
+    return cycles
+
+
+def _check_ubcs(group, warnings):
+    """
+    Report any 'used before calculated' Systems to the logger.
+
+    Parameters
+    ----------
+    group : <Group>
+        The Group being checked for dataflow issues
+    warnings : list
+        List to collect warning messages.
+    """
+    cycles = _check_cycles(group)
+
     cycle_idxs = {}
 
-    if cycles:
-        infos.append("   Group '%s' has the following cycles: %s\n" % (group.pathname, cycles))
-        for i, cycle in enumerate(cycles):
-            # keep track of cycles so we can detect when a system in
-            # one cycle is out of order with a system in a different cycle.
-            for s in cycle:
-                if group.pathname:
-                    s = '.'.join((group.pathname, s))
-                cycle_idxs[s] = i
+    for i, cycle in enumerate(cycles):
+        # keep track of cycles so we can detect when a system in
+        # one cycle is out of order with a system in a different cycle.
+        for s in cycle:
+            cycle_idxs[s] = i
 
-    ubcs = _get_out_of_order_subs(group, group._conn_global_abs_in2out)
+    ubcs = _get_used_before_calc_subs(group, group._conn_global_abs_in2out)
 
     for tgt_system, src_systems in sorted(ubcs.items()):
         keep_srcs = []
 
         for src_system in src_systems:
-            if not (src_system in cycle_idxs and
-                    tgt_system in cycle_idxs and
-                    cycle_idxs[tgt_system] == cycle_idxs[src_system]):
+            if (src_system not in cycle_idxs or
+                    tgt_system not in cycle_idxs or
+                    cycle_idxs[tgt_system] != cycle_idxs[src_system]):
                 keep_srcs.append(src_system)
 
         if keep_srcs:
+            if group.pathname:
+                tgt_system = '.'.join((group.pathname, tgt_system))
+                keep_srcs = ['.'.join((group.pathname, n)) for n in keep_srcs]
             warnings.append("   System '%s' executes out-of-order with "
                             "respect to its source systems %s\n" %
                             (tgt_system, sorted(keep_srcs)))
 
 
-def _check_dataflow_prob(prob, logger):
+def _check_cycles_prob(prob, logger):
     """
-    Report any cycles and out of order Systems.
+    Report any cycles.
+
+    Parameters
+    ----------
+    prob : <Problem>
+        The Problem being checked for cycles.
+    logger : object
+        The object that manages logging output.
+
+    """
+    infos = ["The following groups contain cycles:\n"]
+    for group in prob.model.system_iter(include_self=True, recurse=True, typ=Group):
+        _check_cycles(group, infos)
+
+    if len(infos) > 1:
+        logger.info(''.join(infos[:1] + sorted(infos[1:])))
+
+
+def _check_ubcs_prob(prob, logger):
+    """
+    Report any out of order Systems.
 
     Parameters
     ----------
@@ -74,19 +116,15 @@ def _check_dataflow_prob(prob, logger):
         The object that manages logging output.
 
     """
-    infos = ["The following groups contain cycles:\n"]
     warnings = ["The following systems are executed out-of-order:\n"]
     for group in prob.model.system_iter(include_self=True, recurse=True, typ=Group):
-        _check_dataflow(group, infos, warnings)
-
-    if len(infos) > 1:
-        logger.info(''.join(infos[:1] + sorted(infos[1:])))
+        _check_ubcs(group, warnings)
 
     if len(warnings) > 1:
         logger.warning(''.join(warnings[:1] + sorted(warnings[1:])))
 
 
-def _get_out_of_order_subs(group, input_srcs):
+def _get_used_before_calc_subs(group, input_srcs):
     """
     Return Systems that are executed out of dataflow order.
 
@@ -105,20 +143,19 @@ def _get_out_of_order_subs(group, input_srcs):
         A dict mapping names of target Systems to a set of names of their
         source Systems that execute after them.
     """
-    subsystems = group._subsystems_allprocs
-    sub2i = {sub.name: i for i, sub in enumerate(subsystems)}
+    sub2i = {sub.name: i for i, sub in enumerate(group._subsystems_allprocs)}
     glen = len(group.pathname.split('.')) if group.pathname else 0
 
     ubcs = defaultdict(set)
-    for in_abs, src_abs in iteritems(input_srcs):
+    for tgt_abs, src_abs in iteritems(input_srcs):
         if src_abs is not None:
-            iparts = in_abs.split('.')
+            iparts = tgt_abs.split('.')
             oparts = src_abs.split('.')
             src_sys = oparts[glen]
             tgt_sys = iparts[glen]
             if (src_sys in sub2i and tgt_sys in sub2i and
                     (sub2i[src_sys] > sub2i[tgt_sys])):
-                ubcs['.'.join(iparts[:glen + 1])].add('.'.join(oparts[:glen + 1]))
+                ubcs[tgt_sys].add(src_sys)
 
     return ubcs
 
@@ -416,19 +453,24 @@ def _check_explicitly_connected_promoted_inputs(problem, logger):
 
 # Dict of all checks by name, mapped to the corresponding function that performs the check
 # Each function must be of the form  f(problem, logger).
-_checks = {
-    'hanging_inputs': _check_hanging_inputs,
-    'cycles': _check_dataflow_prob,
+_default_checks = {
+    'out_of_order': _check_ubcs_prob,
     'system': _check_system_configs,
     'solvers': _check_solvers,
     'dup_inputs': _check_dup_comp_inputs,
     'missing_recorders': _check_missing_recorders,
     'comp_has_no_outputs': _check_comp_has_no_outputs,
-    'promoted_connected': _check_explicitly_connected_promoted_inputs,
 }
 
+_all_checks = _default_checks.copy()
+_all_checks.update({
+    'cycles': _check_cycles_prob,
+    'unconnected_inputs': _check_hanging_inputs,
+    'promotions': _check_explicitly_connected_promoted_inputs,
+})
 
-def check_config(problem, logger=None):
+
+def check_config(problem, logger=None, checks=None):
     """
     Perform optional error checks on a Problem.
 
@@ -438,11 +480,19 @@ def check_config(problem, logger=None):
         The Problem being checked.
     logger : object
         Logging object.
+    checks : list of str or None
+        List of specific checks to be performed.
     """
     logger = logger if logger else get_logger('check_config', use_format=True)
 
-    for c in sorted(_checks.keys()):
-        _checks[c](problem, logger)
+    if checks is None:
+        checks = sorted(_default_checks)
+
+    for c in checks:
+        if c not in _all_checks:
+            print("WARNING: '%s' is not a recognized check." % c)
+            continue
+        _all_checks[c](problem, logger)
 
 
 #
@@ -461,8 +511,9 @@ def _check_config_setup_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file.')
     parser.add_argument('-c', action='append', dest='checks', default=[],
-                        help='Only perform specific check(s). Available checks are: %s. '
-                        'By default, will perform all checks.' % sorted(_checks.keys()))
+                        help='Only perform specific check(s). Default checks are: %s. '
+                        'Other available checks are: %s.' %
+                        (sorted(_default_checks), sorted(set(_all_checks) - set(_default_checks))))
 
 
 def _check_config_cmd(options):
@@ -488,10 +539,9 @@ def _check_config_cmd(options):
                 logger = get_logger('check_config', out_stream=outfile, use_format=True)
 
             if not options.checks:
-                options.checks = sorted(_checks.keys())
+                options.checks = sorted(_default_checks)
 
-            for c in options.checks:
-                _checks[c](prob, logger)
+            check_config(prob, logger, options.checks)
 
         exit()
 
