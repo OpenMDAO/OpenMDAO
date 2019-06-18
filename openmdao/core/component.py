@@ -454,7 +454,9 @@ class Component(System):
 
         # First, type check all arguments
         if not isinstance(name, str):
-            raise TypeError('The name argument should be a string')
+            raise TypeError('The name argument should be a string.')
+        if not name:
+            raise NameError('The name argument should be a non-empty string.')
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid input name." % name)
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
@@ -529,7 +531,9 @@ class Component(System):
         """
         # First, type check all arguments
         if not isinstance(name, str):
-            raise TypeError('The name argument should be a string')
+            raise TypeError('The name argument should be a string.')
+        if not name:
+            raise NameError('The name argument should be a non-empty string.')
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid input name." % name)
 
@@ -610,7 +614,9 @@ class Component(System):
             units = None
 
         if not isinstance(name, str):
-            raise TypeError('The name argument should be a string')
+            raise TypeError('The name argument should be a string.')
+        if not name:
+            raise NameError('The name argument should be a non-empty string.')
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid output name." % name)
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
@@ -730,7 +736,9 @@ class Component(System):
             metadata for added variable
         """
         if not isinstance(name, str):
-            raise TypeError('The name argument should be a string')
+            raise TypeError('The name argument should be a string.')
+        if not name:
+            raise NameError('The name argument should be a non-empty string.')
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid output name." % name)
 

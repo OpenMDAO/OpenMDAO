@@ -87,15 +87,6 @@ class TestExplicitComponent(unittest.TestCase):
         comp.add_output('aro', shape=shapes[0])
         comp.add_input('ari', shape=shapes[0])
 
-        msg = "The name argument should be a string"
-        name = 3
-
-        with assertRaisesRegex(self, TypeError, msg):
-            comp.add_input(name, val=np.ones((2, 2)))
-
-        with assertRaisesRegex(self, TypeError, msg):
-            comp.add_output(name, val=np.ones((2, 2)))
-
         msg = 'The val argument should be a float, list, tuple, ndarray or Iterable'
         val = Component
 
@@ -144,47 +135,51 @@ class TestExplicitComponent(unittest.TestCase):
         with assertRaisesRegex(self, TypeError, msg):
             comp.add_output('x', val=5.0, res_units=val)
 
+    def test_invalid_name(self):
+        comp = ExplicitComponent()
+
+        add_input_methods = [comp.add_input, comp.add_discrete_input]
+        add_output_methods = [comp.add_output, comp.add_discrete_output]
+
         # Test some forbidden names.
+        invalid_names = ['a.b', 'a*b', 'a?b', 'a!', '[a', 'b]']
+        invalid_error = "'%s' is not a valid %s name."
 
-        msg = "'x.y' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('x.y', val=5.0)
+        nostr_names = [3, None, object, object()]
+        nostr_error = "The name argument should be a string."
 
-        msg = "'*' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('*', val=5.0)
+        empty_error = "The name argument should be a non-empty string."
 
-        msg = "'?' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('?', val=5.0)
+        for func in add_input_methods:
+            for name in invalid_names:
+                with self.assertRaises(NameError) as cm:
+                    func(name, val=5.0)
+                self.assertEqual(str(cm.exception), invalid_error % (name, 'input'))
 
-        msg = r"'\[' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input('[', val=5.0)
+            for name in nostr_names:
+                with self.assertRaises(TypeError) as cm:
+                    func(name, val=5.0)
+                self.assertEqual(str(cm.exception), nostr_error)
 
-        msg = r"'\]' is not a valid input name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_input(']', val=5.0)
+            with self.assertRaises(NameError) as cm:
+                func('', val=5.0)
+            self.assertEqual(str(cm.exception), empty_error)
 
-        msg = "'x.y' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('x.y', val=5.0)
+        for func in add_output_methods:
+            for name in invalid_names:
+                with self.assertRaises(NameError) as cm:
+                    func(name, val=5.0)
+                self.assertEqual(str(cm.exception), invalid_error % (name, 'output'))
 
-        msg = "'*' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('*', val=5.0)
+            for name in nostr_names:
+                with self.assertRaises(TypeError) as cm:
+                    func(name, val=5.0)
+                self.assertEqual(str(cm.exception), nostr_error)
 
-        msg = "'?' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('?', val=5.0)
+            with self.assertRaises(NameError) as cm:
+                func('', val=5.0)
+            self.assertEqual(str(cm.exception), empty_error)
 
-        msg = r"'\[' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output('[', val=5.0)
-
-        msg = r"'\]' is not a valid output name."
-        with assertRaisesRegex(self, NameError, msg):
-            comp.add_output(']', val=5.0)
 
         # Stuff we allow.
         comp.add_input('a:b', val=5.0)
