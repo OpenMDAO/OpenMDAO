@@ -241,7 +241,8 @@ class TestPyXDSMViewer(unittest.TestCase):
         p.model.add_subsystem('extra_phase', systems_phase)
         p.model.add_design_var('orbit_phase.t_initial')
         p.model.add_design_var('orbit_phase.t_duration')
-        p.setup(check=True)
+        p.model.add_objective('systems_phase.time.time')
+        p.setup(check=False)
 
         p.run_model()
 
@@ -321,6 +322,7 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob.model = model = SellarNoDerivatives()
         model.nonlinear_solver = NonlinearBlockGS()
         prob.driver = ScipyOptimizeDriver()
+        prob.model.add_objective('obj')
 
         prob.setup(check=False)
         prob.run_model()
@@ -358,8 +360,6 @@ class TestPyXDSMViewer(unittest.TestCase):
         prob = Problem(model=SellarMDA())
         model = prob.model
         prob.driver = ScipyOptimizeDriver()
-        prob.setup(check=False)
-        prob.final_setup()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
                              upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
@@ -367,6 +367,9 @@ class TestPyXDSMViewer(unittest.TestCase):
         model.add_objective('obj')
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
 
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format, quiet=QUIET,
@@ -710,7 +713,8 @@ class TestXDSMjsViewer(unittest.TestCase):
         p.model.add_subsystem('extra_phase', systems_phase)
         p.model.add_design_var('orbit_phase.t_initial')
         p.model.add_design_var('orbit_phase.t_duration')
-        p.setup(check=True)
+        p.model.add_objective('systems_phase.time.time')
+        p.setup(check=False)
 
         p.run_model()
 
@@ -736,8 +740,6 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob = Problem(model=SellarMDA())
         model = prob.model
         prob.driver = ScipyOptimizeDriver()
-        prob.setup(check=False)
-        prob.final_setup()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]),
                              upper=np.array([10.0, 10.0]), indices=np.arange(2, dtype=int))
@@ -745,6 +747,9 @@ class TestXDSMjsViewer(unittest.TestCase):
         model.add_objective('obj')
         model.add_constraint('con1', equals=np.zeros(1))
         model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False)
+        prob.final_setup()
 
         # Write output
         write_xdsm(prob, filename=filename, out_format=out_format,
@@ -760,6 +765,7 @@ class TestXDSMjsViewer(unittest.TestCase):
         prob = Problem(model=SellarNoDerivatives())
         prob.model.nonlinear_solver = NonlinearBlockGS()
         prob.driver = ScipyOptimizeDriver()
+        prob.model.add_objective('obj')
 
         prob.setup(check=False)
         prob.run_model()
@@ -931,6 +937,35 @@ class TestXDSMjsViewer(unittest.TestCase):
         write_xdsm(p, 'xdsmjs_circuit', out_format='html', quiet=QUIET, show_browser=SHOW,
                    recurse=True)
         self.assertTrue(os.path.isfile('.'.join(['xdsmjs_circuit', 'html'])))
+
+    def test_legend(self):
+        from openmdao.api import Problem, IndepVarComp
+
+        p = Problem()
+        model = p.model
+
+        model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+        model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
+        model.add_subsystem('circuit', Circuit())
+
+        model.connect('source.I', 'circuit.I_in')
+        model.connect('ground.V', 'circuit.Vg')
+
+        model.add_design_var('ground.V')
+        model.add_design_var('source.I')
+        model.add_objective('circuit.D1.I')
+
+        p.setup(check=False)
+
+        # set some initial guesses
+        p['circuit.n1.V'] = 10.
+        p['circuit.n2.V'] = 1.
+
+        p.run_model()
+
+        write_xdsm(p, 'xdsmjs_circuit_legend', out_format='html', quiet=QUIET, show_browser=SHOW,
+                   recurse=True, legend=True)
+        self.assertTrue(os.path.isfile('.'.join(['xdsmjs_circuit_legend', 'html'])))
 
     def test_xdsmjs_right_outputs(self):
         """Makes XDSM for the Sellar problem"""

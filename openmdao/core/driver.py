@@ -291,6 +291,14 @@ class Driver(object):
                     coloring._check_config_total(self)
                 self._setup_simul_coloring()
 
+    def _check_for_missing_objective(self):
+        """
+        Check for missing objective and raise error if no objectives found.
+        """
+        if len(self._objs) == 0:
+            msg = "Driver requires objective to be declared"
+            raise RuntimeError(msg)
+
     def _get_vars_to_record(self, recording_options):
         """
         Get variables to record based on recording options.
@@ -786,7 +794,11 @@ class Driver(object):
                 if total_jac is None:
                     total_jac = _TotalJacInfo(problem, of, wrt, global_names,
                                               return_format, approx=True, debug_print=debug_print)
-                    self._total_jac = total_jac
+
+                    # Don't cache linear constraint jacobian
+                    if not total_jac.has_lin_cons:
+                        self._total_jac = total_jac
+
                     totals = total_jac.compute_totals_approx(initialize=True)
                 else:
                     totals = total_jac.compute_totals_approx()
@@ -798,9 +810,9 @@ class Driver(object):
                 total_jac = _TotalJacInfo(problem, of, wrt, global_names, return_format,
                                           debug_print=debug_print)
 
-            # don't cache linear constraint jacobian
-            if not total_jac.has_lin_cons:
-                self._total_jac = total_jac
+                # don't cache linear constraint jacobian
+                if not total_jac.has_lin_cons:
+                    self._total_jac = total_jac
 
             self._recording_iter.stack.append(('_compute_totals', 0))
 

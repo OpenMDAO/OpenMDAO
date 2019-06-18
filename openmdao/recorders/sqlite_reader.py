@@ -31,7 +31,7 @@ elif PY3:
 _coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear)$')
 
 # Regular expression used for splitting iteration coordinates, removes separator and iter counts
-_coord_split_re = re.compile('\|\\d+\|*')
+_coord_split_re = re.compile('\\|\\d+\\|*')
 
 
 def _get_source_system(iteration_coordinate):

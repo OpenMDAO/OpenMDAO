@@ -1,5 +1,5 @@
 """
-Utility functions and constants related to writing outputs.
+Utility functions and constants related to writing a table of variable metadata.
 """
 import numpy as np
 from six import iteritems
@@ -20,21 +20,20 @@ column_spacing = 2
 indent_inc = 2
 
 
-def write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arrays,
-                  out_stream, pathname, var_allprocs_abs_names):
+def write_var_table(pathname, var_list, var_type, var_dict,
+                    hierarchical, print_arrays, out_stream):
     """
     Write table of variable names, values, residuals, and metadata to out_stream.
 
-    The output values could actually represent input variables.
-    In this context, outputs refers to the data that is being logged to an output stream.
-
     Parameters
     ----------
-    in_or_out : str, 'input' or 'output'
-        indicates whether the values passed in are from inputs or output variables.
-    comp_type : str, 'Explicit' or 'Implicit'
-        the type of component with the output values.
-    dict_of_outputs : dict
+    pathname : str
+        pathname to be printed. If None, defaults to 'model'
+    var_list : list of str
+        List of variable names in the order they are to be written.
+    var_type : 'input', 'explicit' or 'implicit'
+        Indicates type of variables, input or explicit/implicit output.
+    var_dict : dict
         dict storing vals and metadata for each var name
     hierarchical : bool
         When True, human readable output shows variables in hierarchical format.
@@ -47,21 +46,17 @@ def write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arr
     out_stream : file-like object
         Where to send human readable output.
         Set to None to suppress.
-    pathname : str
-        pathname to be printed. If None, defaults to 'model'
-    var_allprocs_abs_names : {'input': [], 'output': []}
-        set of variable names across all processes
     """
-    count = len(dict_of_outputs)
+    count = len(var_dict)
 
     # Write header
     pathname = pathname if pathname else 'model'
-    header_name = 'Input' if in_or_out == 'input' else 'Output'
-    if in_or_out == 'input':
-        header = "%d %s(s) in '%s'" % (count, header_name, pathname)
+
+    if var_type is 'input':
+        header = "%d Input(s) in '%s'" % (count, pathname)
     else:
-        header = "%d %s %s(s) in '%s'" % (
-            count, comp_type, header_name, pathname)
+        header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
+
     out_stream.write(header + '\n')
     out_stream.write('-' * len(header) + '\n' + '\n')
 
@@ -70,14 +65,15 @@ def write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arr
 
     # Need an ordered list of possible output values for the two cases: inputs and outputs
     #  so that we do the column output in the correct order
-    if in_or_out == 'input':
+    if var_type is 'input':
         out_types = ('value', 'units', 'shape', 'prom_name')
     else:
         out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref',
                      'ref0', 'res_ref', 'prom_name')
     # Figure out which columns will be displayed
     # Look at any one of the outputs, they should all be the same
-    outputs = dict_of_outputs[list(dict_of_outputs)[0]]
+    outputs = var_dict[list(var_dict)[0]]
+
     column_names = []
     for out_type in out_types:
         if out_type in outputs:
@@ -89,29 +85,27 @@ def write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arr
     #    Need to look through all the possible varnames to find the max width
     max_varname_len = max(len(top_level_system_name), len('varname'))
     if hierarchical:
-        for name, outs in iteritems(dict_of_outputs):
+        for name, outs in iteritems(var_dict):
             for i, name_part in enumerate(name.split('.')):
                 total_len = (i + 1) * indent_inc + len(name_part)
                 max_varname_len = max(max_varname_len, total_len)
     else:
-        for name, outs in iteritems(dict_of_outputs):
+        for name, outs in iteritems(var_dict):
             max_varname_len = max(max_varname_len, len(name))
 
     # Determine the column widths of the data fields by finding the max width for all rows
     for column_name in column_names:
-        column_widths[column_name] = len(
-            column_name)  # has to be able to display name!
-    for name in var_allprocs_abs_names[in_or_out]:
-        if name in dict_of_outputs:
-            for column_name in column_names:
-                if isinstance(dict_of_outputs[name][column_name], np.ndarray) and \
-                        dict_of_outputs[name][column_name].size > 1:
-                    out = '|{}|'.format(
-                        str(np.linalg.norm(dict_of_outputs[name][column_name])))
-                else:
-                    out = str(dict_of_outputs[name][column_name])
-                column_widths[column_name] = max(column_widths[column_name],
-                                                 len(str(out)))
+        column_widths[column_name] = len(column_name)  # has to be able to display name!
+    for name in var_list:
+        for column_name in column_names:
+            if isinstance(var_dict[name][column_name], np.ndarray) and \
+                    var_dict[name][column_name].size > 1:
+                out = '|{}|'.format(
+                    str(np.linalg.norm(var_dict[name][column_name])))
+            else:
+                out = str(var_dict[name][column_name])
+            column_widths[column_name] = max(column_widths[column_name],
+                                             len(str(out)))
 
     # Write out the column headers
     column_header = '{:{align}{width}}'.format('varname', align=align,
@@ -131,12 +125,8 @@ def write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arr
         out_stream.write(top_level_system_name + '\n')
 
         cur_sys_names = []
-        # _var_allprocs_abs_names has all the vars across all procs in execution order
-        #   But not all the values need to be written since, at least for output vars,
-        #      the output var lists are divided into explicit and implicit
-        for varname in var_allprocs_abs_names[in_or_out]:
-            if varname not in dict_of_outputs:
-                continue
+
+        for varname in var_list:
 
             # For hierarchical, need to display system levels in the rows above the
             #   actual row containing the var name and values. Want to make use
@@ -164,19 +154,17 @@ def write_outputs(in_or_out, comp_type, dict_of_outputs, hierarchical, print_arr
             indent += indent_inc
             row = '{:{align}{width}}'.format(indent * ' ' + varname.split('.')[-1],
                                              align=align, width=max_varname_len)
-            _write_outputs_rows(out_stream, row, column_names, dict_of_outputs[varname],
-                                print_arrays)
+            _write_variable(out_stream, row, column_names, var_dict[varname],
+                            print_arrays)
     else:
-        for name in var_allprocs_abs_names[in_or_out]:
-            if name in dict_of_outputs:
-                row = '{:{align}{width}}'.format(
-                    name, align=align, width=max_varname_len)
-                _write_outputs_rows(out_stream, row, column_names, dict_of_outputs[name],
-                                    print_arrays)
+        for name in var_list:
+            row = '{:{align}{width}}'.format(name, align=align, width=max_varname_len)
+            _write_variable(out_stream, row, column_names, var_dict[name],
+                            print_arrays)
     out_stream.write(2 * '\n')
 
 
-def _write_outputs_rows(out_stream, row, column_names, dict_of_outputs, print_arrays):
+def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
     """
     For one variable, write name, values, residuals, and metadata to out_stream.
 
@@ -192,7 +180,7 @@ def _write_outputs_rows(out_stream, row, column_names, dict_of_outputs, print_ar
     column_names : list of str
         Indicates which columns will be written in this row.
 
-    dict_of_outputs : dict
+    var_dict : dict
         Contains the values to be written in this row. Keys are columns names.
 
     print_arrays : bool
@@ -209,13 +197,13 @@ def _write_outputs_rows(out_stream, row, column_names, dict_of_outputs, print_ar
     have_array_values = []  # keep track of which values are arrays
     for column_name in column_names:
         row += column_spacing * ' '
-        if isinstance(dict_of_outputs[column_name], np.ndarray) and \
-                dict_of_outputs[column_name].size > 1:
+        if isinstance(var_dict[column_name], np.ndarray) and \
+                var_dict[column_name].size > 1:
             have_array_values.append(column_name)
             out = '|{}|'.format(
-                str(np.linalg.norm(dict_of_outputs[column_name])))
+                str(np.linalg.norm(var_dict[column_name])))
         else:
-            out = str(dict_of_outputs[column_name])
+            out = str(var_dict[column_name])
         row += '{:{align}{width}}'.format(out, align=align,
                                           width=column_widths[column_name])
     out_stream.write(row + '\n')
@@ -223,7 +211,7 @@ def _write_outputs_rows(out_stream, row, column_names, dict_of_outputs, print_ar
         for column_name in have_array_values:
             out_stream.write("{}  {}:\n".format(
                 left_column_width * ' ', column_name))
-            out_str = str(dict_of_outputs[column_name])
+            out_str = str(var_dict[column_name])
             indented_lines = [(left_column_width + indent_inc) * ' ' +
                               s for s in out_str.splitlines()]
             out_stream.write('\n'.join(indented_lines) + '\n')

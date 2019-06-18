@@ -14,7 +14,6 @@ The pyXDSM package is available at https://github.com/mdolab/pyXDSM.
 XDSMjs is available at https://github.com/OneraHub/XDSMjs.
 """
 
-# FIXME numbering in pyXDSM, when multiple solvers are used
 from __future__ import print_function
 
 import json
@@ -63,7 +62,7 @@ _DEFAULT_WRITER = 'pyxdsm'
 _COMPONENT_TYPE_MAP = {
     'pyxdsm': {
         'indep': 'Function',
-        'explicit': 'Analysis',
+        'explicit': 'Function',
         'implicit': 'ImplicitAnalysis',
         'exec': 'Function',
         'metamodel': 'Metamodel',
@@ -73,7 +72,7 @@ _COMPONENT_TYPE_MAP = {
     },
     'xdsmjs': {
         'indep': 'function',
-        'explicit': 'analysis',
+        'explicit': 'function',
         'implicit': 'analysis',
         'exec': 'function',
         'metamodel': 'metamodel',
@@ -466,13 +465,15 @@ else:
         """
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
-                     number_alignment=_DEFAULT_NUMBER_ALIGNMENT, add_component_indices=True):
+                     number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False,
+                     add_component_indices=True):
             super(XDSMWriter, self).__init__()
             self.name = name
             # Formatting options
             self.box_stacking = box_stacking
             self.number_alignment = number_alignment
             self.add_component_indices = add_component_indices
+            self.has_legend = legend  # If true, a legend will be added to the diagram
             # Output file saved with this extension
             self.extension = 'pdf'
             if self.name in _COMPONENT_TYPE_MAP:
@@ -489,6 +490,8 @@ else:
             self._comps = []
             # Index of last components in a process
             self._loop_ends = []
+            # Styles in use (needed for legend)
+            self._styles_used = set()
 
         def write(self, filename=None, **kwargs):
             """
@@ -530,7 +533,7 @@ else:
 
             super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
 
-        def add_system(self, node_name, style, label, stack=False, faded=False):
+        def add_system(self, node_name, style, label, stack=False, faded=False, **kwargs):
             """
             Add a system.
 
@@ -546,6 +549,8 @@ else:
                 Defaults to False.
             faded : bool
                 Defaults to False.
+            kwargs : dict
+                Keyword arguments.
             """
             super(XDSMWriter, self).add_system(node_name=node_name, style=style, label=label,
                                                stack=stack, faded=faded)
@@ -553,6 +558,8 @@ else:
         def _add_system(self, node_name, style, label, stack=False, faded=False):
             # Adds a system dictionary to the components.
             # This dictionary can be modified by other methods.
+            self._styles_used.add(style)
+
             if label is None:
                 label = node_name
             self._comp_indices[node_name] = self._nr_comps
@@ -763,11 +770,43 @@ else:
             else:
                 return txt
 
+        def _make_legend(self, title="Legend"):
+            """
+            Adds a legend row to the matrix. The labels of this row show the used component types.
+
+            Parameters
+            ----------
+            title : str, optional
+                Defaults to "Legend".
+
+            Returns
+            -------
+                str
+            """
+            node_str = r'\node [{style}] ({name}) {{{label}}};'
+            styles = sorted(self._styles_used)  # Alphabetical sort
+            for i, style in enumerate(styles):
+                super(XDSMWriter, self).add_system(node_name="style{}".format(i), style=style,
+                                                   label=style)
+            style_strs = [node_str.format(name="style{}".format(i), style=style, label=style)
+                          for i, style in enumerate(styles)]
+            # return '};\n\\matrix[MatrixSetup, below left]{' + '  &\n'.join(style_strs) + r'\\'
+            title_str = r'\node (legend_title) {{\LARGE \textbf{{{title}}}}};\\'
+            return title_str.format(title=title) + '  &\n'.join(style_strs) + r'\\'
+
+        def _build_node_grid(self):
+            """Optionally appends the legend to the node grid."""
+            node_grid = super(XDSMWriter, self)._build_node_grid()
+            if self.has_legend:
+                node_grid += self._make_legend()
+            return node_grid
+
 
 def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
-               add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE, **kwargs):
+               add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE,
+               legend=False, **kwargs):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -848,6 +887,9 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
         Left or right, or a dictionary with component types as keys. Component type key can
         be 'optimization', 'doe' or 'default'.
         Defaults to "left".
+    legend : bool, optional
+        If true, it adds a legend to the diagram.
+        Defaults to False.
     kwargs : dict
         Keyword arguments
     Returns
@@ -932,14 +974,15 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, build_pdf=build_pdf,
                        show_parallel=show_parallel, driver_type=driver_type,
-                       output_side=output_side, **kwargs)
+                       output_side=output_side, legend=legend, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanup=True,
                 design_vars=None, responses=None, residuals=None, model_path=None, recurse=True,
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
-                output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', **kwargs):
+                output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', legend=False,
+                **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -983,15 +1026,19 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         Defaults to True.
     quiet : bool
         Set to True to suppress output from pdflatex
-    build_pdf : bool
+    build_pdf : bool, optional
         If True and a .tex file is generated, create a .pdf file from the .tex.
-    output_side : str or dict(str, str)
+        Defaults to False.
+    output_side : str or dict(str, str), optional
         Left or right, or a dictionary with component types as keys. Component type key can
         be 'optimization', 'doe' or 'default'.
         Defaults to "left".
-    driver_type : str
+    driver_type : str, optional
         Optimization or DOE.
         Defaults to "optimization".
+    legend : bool, optional
+        If true, it adds a legend to the diagram.
+        Defaults to False.
     kwargs : dict
         Keyword arguments
 
@@ -1015,7 +1062,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         if writer.lower() == 'pyxdsm':  # pyXDSM
             x = XDSMWriter(box_stacking=box_stacking,
                            number_alignment=number_alignment,
-                           add_component_indices=add_component_indices)
+                           add_component_indices=add_component_indices,
+                           legend=legend)
         elif writer.lower() == 'xdsmjs':  # XDSMjs
             x = XDSMjsWriter()
         else:
@@ -1048,9 +1096,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     # Get the top level system to be transcripted to XDSM
     comps = _get_comps(tree, model_path=model_path, recurse=recurse, include_solver=include_solver)
     if include_solver:
-        msg = "Solvers in the XDSM diagram are not fully supported yet, and needs manual editing."
-        simple_warning(msg)
-
         # Add the top level solver
         top_level_solver = dict(tree)
         top_level_solver.update({'comps': list(comps), 'abs_name': 'root@solver', 'index': 0,

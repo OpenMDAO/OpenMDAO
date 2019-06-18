@@ -39,8 +39,9 @@ New Features:
     - N2 diagram html files have been reduced in size significantly
     - `openmdao view_model` command line utility now supports case record database files
 
-- (Experimental) Automatic XDSM generator (using either Latex with pyXDSM or html with XDSMjs) 
+- (Experimental) Automatic XDSM generator (using either Latex with pyXDSM or html with XDSMjs)
   *** contributed by Peter Onodi ***
+  *** uses XDSMjs v0.6.0 by Rémi Lafage (https://github.com/OneraHub/XDSMjs) ***
 
 Backwards Incompatible API Changes: 
 -----------------------------------

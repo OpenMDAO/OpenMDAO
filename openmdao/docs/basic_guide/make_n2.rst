@@ -29,7 +29,7 @@ On the diagonal is each input and output of each of the components. Off-diagonal
 Feed-forward connections are shown in the upper triangle, and feed-back connections (the kind that cause cycles) are shown in the lower triangle.
 If you hover over any of the blocks on the diagonal, the incoming and outgoing connections are highlighted with arrows.
 
-The unconnected input mentioned above, `cycle.d1.y1`, is highlighted in red to immediately draw attention to a possible problem.
+The unconnected input mentioned above, `cycle.d1.y2`, is highlighted in red to immediately draw attention to a possible problem.
 You can also see that it's a member of the cycle group (in this case, that was obvious by its name, but with variable promotion that will not always be the case).
 Furthermore, you can see that the variable you would want to connect `cycle.d1.y1` to, `cycle.d2.y2`, is in the same group.
 The lack of cycles in the model is made visually evident by the lack of any connections in the lower triangle of the diagram.

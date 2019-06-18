@@ -201,7 +201,7 @@ class CSVGenerator(DOEGenerator):
             reader = csv.DictReader(f)
             for row in reader:
                 case = [(name_map[name.strip()],
-                         np.fromstring(re.sub('[\[\]]', '', row[name]), sep=' '))
+                         np.fromstring(re.sub(r'[\[\]]', '', row[name]), sep=' '))
                         for name in reader.fieldnames]
                 yield case
 

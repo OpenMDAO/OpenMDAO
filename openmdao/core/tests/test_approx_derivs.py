@@ -13,8 +13,11 @@ except ImportError:
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ScipyKrylov, ExecComp, NewtonSolver, \
-    ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DirectSolver, LinearBlockGS
+    ExplicitComponent, DefaultVector, NonlinearBlockGS, LinearRunOnce, DirectSolver, LinearBlockGS, \
+    ScipyOptimizeDriver
+from openmdao.core.tests.test_coloring import CounterGroup
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArray, TestImplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -31,6 +34,13 @@ try:
 except ImportError:
     vector_class = DefaultVector
     PETScVector = None
+
+# check that pyoptsparse is installed
+# if it is, try to use SNOPT but fall back to SLSQP
+OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
+
+if OPTIMIZER:
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
 class TestGroupFiniteDifference(unittest.TestCase):
@@ -687,6 +697,124 @@ class TestGroupFiniteDifference(unittest.TestCase):
         J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
         assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, .00001)
         assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, .00001)
+
+    def test_approx_totals_multi_input_constrained_desvar(self):
+        p = Problem(model=Group())
+
+        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+
+        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                                          0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
+        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                                         -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+        indeps.add_output('r', .7)
+
+        arctan_yox = ExecComp('g=arctan(y/x)', vectorize=True,
+                              g=np.ones(10), x=np.ones(10), y=np.ones(10))
+
+        p.model.add_subsystem('arctan_yox', arctan_yox)
+
+        p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
+
+        p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
+                                                g=np.ones(10), x=np.ones(10), y=np.ones(10)))
+
+        p.model.connect('r', ('circle.r', 'r_con.r'))
+        p.model.connect('x', ['r_con.x', 'arctan_yox.x'])
+        p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
+
+        p.model.approx_totals(method='cs')
+
+        p.model.add_design_var('x')
+        p.model.add_design_var('y')
+        p.model.add_design_var('r', lower=.5, upper=10)
+        p.model.add_constraint('y', equals=0, indices=[0,])
+        p.model.add_objective('circle.area', ref=-1)
+
+        p.setup(derivatives=True)
+
+        p.run_model()
+        # Formerly a KeyError
+        derivs = p.check_totals(compact_print=True, out_stream=None)
+        assert_rel_error(self, 0.0, derivs['indeps.y', 'indeps.x']['abs error'][0])
+
+        # Coverage
+        derivs = p.driver._compute_totals(return_format='dict')
+        assert_rel_error(self, np.zeros((1, 10)), derivs['indeps.y']['indeps.x'])
+
+    def test_opt_with_linear_constraint(self):
+        # Test for a bug where we weren't re-initializing things in-between computing totals on
+        # linear constraints, and the nonlinear ones.
+        if OPT is None:
+            raise unittest.SkipTest("pyoptsparse is not installed")
+
+        if OPTIMIZER is None:
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
+
+        p = Problem()
+
+        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+
+        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                                          0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
+        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                                         -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+        indeps.add_output('r', .7)
+
+        arctan_yox = ExecComp('g=arctan(y/x)', vectorize=True,
+                              g=np.ones(10), x=np.ones(10), y=np.ones(10))
+
+        p.model.add_subsystem('arctan_yox', arctan_yox)
+
+        p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
+
+        p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
+                                                g=np.ones(10), x=np.ones(10), y=np.ones(10)))
+
+        thetas = np.linspace(0, np.pi/4, 10)
+        p.model.add_subsystem('theta_con', ExecComp('g = x - theta', vectorize=True,
+                                                    g=np.ones(10), x=np.ones(10),
+                                                    theta=thetas))
+        p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd', vectorize=True,
+                                                          g=np.ones(10//2), even=np.ones(10//2),
+                                                          odd=np.ones(10//2)))
+
+        p.model.add_subsystem('l_conx', ExecComp('g=x-1', vectorize=True, g=np.ones(10), x=np.ones(10)))
+
+        IND = np.arange(10, dtype=int)
+        ODD_IND = IND[1::2]  # all odd indices
+        EVEN_IND = IND[0::2]  # all even indices
+
+        p.model.connect('r', ('circle.r', 'r_con.r'))
+        p.model.connect('x', ['r_con.x', 'arctan_yox.x', 'l_conx.x'])
+        p.model.connect('y', ['r_con.y', 'arctan_yox.y'])
+        p.model.connect('arctan_yox.g', 'theta_con.x')
+        p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
+        p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
+
+        p.driver = pyOptSparseDriver()
+        p.driver.options['print_results'] = False
+        p.model.approx_totals(method='fd')
+
+        p.model.add_design_var('x')
+        p.model.add_design_var('y')
+        p.model.add_design_var('r', lower=.5, upper=10)
+
+        # nonlinear constraints
+        p.model.add_constraint('r_con.g', equals=0)
+
+        p.model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
+        p.model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+        p.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+        p.model.add_constraint('y', equals=0, indices=[0,], linear=True)
+
+        p.model.add_objective('circle.area', ref=-1)
+
+        p.setup(mode='fwd', derivatives=True)
+
+        p.run_driver()
+
+        assert_rel_error(self, p['circle.area'], np.pi, 1e-6)
 
 
 @unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")

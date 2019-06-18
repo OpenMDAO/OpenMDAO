@@ -13,7 +13,7 @@ import numpy as np
 from openmdao.utils.record_util import json_to_np_array
 from openmdao.recorders.sqlite_recorder import blob_to_array
 
-from openmdao.utils.write_outputs import write_outputs
+from openmdao.utils.variable_table import write_var_table
 
 _DEFAULT_OUT_STREAM = object()
 
@@ -338,7 +338,7 @@ class Case(object):
                 out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
                                  'settings have record_inputs set to True\n')
 
-            self._write_outputs('input', None, inputs, hierarchical, print_arrays, out_stream)
+            self._write_table('input', inputs, hierarchical, print_arrays, out_stream)
 
         return inputs
 
@@ -452,12 +452,10 @@ class Case(object):
                                  'settings have record_outputs set to True\n')
 
             if explicit:
-                self._write_outputs('output', 'Explicit', expl_outputs, hierarchical, print_arrays,
-                                    out_stream)
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays, out_stream)
 
             if implicit:
-                self._write_outputs('output', 'Implicit', impl_outputs, hierarchical, print_arrays,
-                                    out_stream)
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays, out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -468,7 +466,7 @@ class Case(object):
         else:
             raise RuntimeError('You have excluded both Explicit and Implicit components.')
 
-    def _write_outputs(self, in_out, comp_type, outputs, hierarchical, print_arrays, out_stream):
+    def _write_table(self, var_type, var_data, hierarchical, print_arrays, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -477,12 +475,10 @@ class Case(object):
 
         Parameters
         ----------
-        in_out : str, 'input' or 'output'
-            indicates whether the values passed in are from inputs or output variables.
-        comp_type : str, 'Explicit' or 'Implicit'
-            the type of component with the output values.
-        outputs : list
-            list of (name, dict of vals and metadata) tuples.
+        var_type : 'input', 'explicit' or 'implicit'
+            Indicates type of variables, input or explicit/implicit output.
+        var_data : list
+            List of (name, dict of vals and metadata) tuples.
         hierarchical : bool
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool
@@ -499,17 +495,12 @@ class Case(object):
             return
 
         # Make a dict of outputs. Makes it easier to work with in this method
-        dict_of_outputs = OrderedDict()
-        for name, vals in outputs:
-            dict_of_outputs[name] = vals
+        var_dict = OrderedDict()
+        for name, vals in var_data:
+            var_dict[name] = vals
 
-        allprocs_abs_names = {
-            'input': dict_of_outputs.keys(),
-            'output': dict_of_outputs.keys()
-        }
-
-        write_outputs(in_out, comp_type, dict_of_outputs, hierarchical, print_arrays, out_stream,
-                      'model', allprocs_abs_names)
+        write_var_table('model', var_dict.keys(), var_type, var_dict,
+                        hierarchical, print_arrays, out_stream)
 
     def _get_variables_of_type(self, var_type):
         """
