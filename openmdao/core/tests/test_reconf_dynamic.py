@@ -58,7 +58,6 @@ class Test(unittest.TestCase):
     def ttest_reconf_comp(self):
         p = Problem()
 
-        p.model = Group()
         p.model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         p.model.add_subsystem('c2', ReconfComp(), promotes_inputs=['x'], promotes_outputs=['y'])
         p.model.add_subsystem('c3', Comp(), promotes_inputs=['x'], promotes_outputs=['z'])
@@ -86,7 +85,6 @@ class Test(unittest.TestCase):
     def test_reconf_group(self):
         p = Problem()
 
-        p.model = Group()
         p.model.add_subsystem('s1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         s2 = p.model.add_subsystem('s2', ReconfGroup(), promotes=['*'])
         p.model.add_subsystem('s3', ExecComp('z=3*x'), promotes=['*'])

@@ -96,7 +96,6 @@ class TestConnections(unittest.TestCase):
                 outputs['y2'] = np.sum(x2)
 
         p = Problem()
-        p.model = Group()
         p.model.add_subsystem('src', Src())
         p.model.add_subsystem('tgt', Tgt())
 

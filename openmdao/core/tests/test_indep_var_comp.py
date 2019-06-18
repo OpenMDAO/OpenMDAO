@@ -3,7 +3,7 @@ from __future__ import division
 
 import unittest
 
-from openmdao.api import Problem, IndepVarComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -11,10 +11,10 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple(self):
         """Define one independent variable and set its value."""
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
 
-        comp = IndepVarComp('indep_var')
-        prob = Problem(comp).setup()
+        comp = om.IndepVarComp('indep_var')
+        prob = om.Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var'], 1.0)
 
@@ -23,19 +23,19 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_simple_default(self):
         """Define one independent variable with a default value."""
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
 
-        comp = IndepVarComp('indep_var', val=2.0)
-        prob = Problem(comp).setup()
+        comp = om.IndepVarComp('indep_var', val=2.0)
+        prob = om.Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var'], 2.0)
 
     def test_simple_kwargs(self):
         """Define one independent variable with a default value and additional options."""
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
 
-        comp = IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
-        prob = Problem(comp).setup()
+        comp = om.IndepVarComp('indep_var', val=2.0, units='m', lower=0, upper=10)
+        prob = om.Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var'], 2.0)
 
@@ -43,62 +43,62 @@ class TestIndepVarComp(unittest.TestCase):
         """Define one independent array variable."""
         import numpy as np
 
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
 
         array = np.array([
             [1., 2.],
             [3., 4.],
         ])
 
-        comp = IndepVarComp('indep_var', val=array)
-        prob = Problem(comp).setup()
+        comp = om.IndepVarComp('indep_var', val=array)
+        prob = om.Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var'], array)
 
     def test_multiple_default(self):
         """Define two independent variables at once."""
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
 
-        comp = IndepVarComp((
+        comp = om.IndepVarComp((
             ('indep_var_1', 1.0),
             ('indep_var_2', 2.0),
         ))
 
-        prob = Problem(comp).setup()
+        prob = om.Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
 
     def test_multiple_kwargs(self):
         """Define two independent variables at once and additional options."""
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
 
-        comp = IndepVarComp((
+        comp = om.IndepVarComp((
             ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
             ('indep_var_2', 2.0, {'lower': 1., 'upper': 20}),
         ))
 
-        prob = Problem(comp).setup()
+        prob = om.Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
 
     def test_add_output(self):
         """Define two independent variables using the add_output method."""
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
 
-        comp = IndepVarComp()
+        comp = om.IndepVarComp()
         comp.add_output('indep_var_1', val=1.0, lower=0, upper=10)
         comp.add_output('indep_var_2', val=2.0, lower=1, upper=20)
 
-        prob = Problem(comp).setup()
+        prob = om.Problem(comp).setup()
 
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
 
     def test_error_novars(self):
         try:
-            prob = Problem(IndepVarComp()).setup()
+            prob = om.Problem(om.IndepVarComp()).setup()
         except Exception as err:
             self.assertEqual(str(err),
                 "No outputs (independent variables) have been declared for "
@@ -109,11 +109,11 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_error_badtup(self):
         try:
-            comp = IndepVarComp((
+            comp = om.IndepVarComp((
                 ('indep_var_1', 1.0, {'lower': 0, 'upper': 10}),
                 'indep_var_2',
             ))
-            prob = Problem(comp).setup()
+            prob = om.Problem(comp).setup()
         except Exception as err:
             self.assertEqual(str(err),
                 "IndepVarComp init: arg indep_var_2 must be a tuple of the "
@@ -123,8 +123,8 @@ class TestIndepVarComp(unittest.TestCase):
 
     def test_error_bad_arg(self):
         try:
-            comp = IndepVarComp(1.0)
-            prob = Problem(comp).setup()
+            comp = om.IndepVarComp(1.0)
+            prob = om.Problem(comp).setup()
         except Exception as err:
             self.assertEqual(str(err),
                 "first argument to IndepVarComp init must be either of type "
@@ -134,10 +134,10 @@ class TestIndepVarComp(unittest.TestCase):
             self.fail('Exception expected.')
 
     def test_add_output_type_bug(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output('x1', val=[1, 2, 3], lower=0, upper=10)
 
         model.add_subsystem('p', ivc)
