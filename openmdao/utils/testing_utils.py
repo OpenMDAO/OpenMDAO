@@ -28,14 +28,18 @@ def _new_teardown(self):
 
     os.chdir(self.startdir)
 
-    if MPI is not None:
+    if MPI is None:
+        rank = 0
+    else:
         # make sure everyone's out of that directory before rank 0 deletes it
         MPI.COMM_WORLD.barrier()
-        if MPI.COMM_WORLD.rank == 0:
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
+        rank = MPI.COMM_WORLD.rank
+
+    if rank == 0:
+        try:
+            shutil.rmtree(self.tempdir)
+        except OSError:
+            pass
 
 
 def use_tempdirs(cls):
