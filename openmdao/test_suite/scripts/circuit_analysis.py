@@ -46,7 +46,7 @@ class Diode(ExplicitComponent):
         deltaV = inputs['V_in'] - inputs['V_out']
         Is = self.options['Is']
         Vt = self.options['Vt']
-        outputs['I'] = Is * np.exp(deltaV / Vt - 1)
+        outputs['I'] = Is * (np.exp(deltaV / Vt) - 1)
 
 
 class Node(ImplicitComponent):
