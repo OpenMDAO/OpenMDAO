@@ -1129,7 +1129,7 @@ class Problem(object):
                                 dinputs.set_const(0.0)
                                 dstate.set_const(0.0)
 
-                                # Dictionary access returns a scaler for 1d input, and we
+                                # Dictionary access returns a scalar for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
                                 flat_view[idx] = 1.0
 

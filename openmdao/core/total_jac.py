@@ -1255,8 +1255,9 @@ class _TotalJacInfo(object):
 
                     jac_setter(inds, mode)
 
+        # Driver scaling.
         if self.has_scaling:
-            self._do_scaling(self.J_dict)
+            self._do_driver_scaling(self.J_dict)
 
         if debug_print:
             # Debug outputs scaled derivatives.
@@ -1360,8 +1361,9 @@ class _TotalJacInfo(object):
             msg = "Unsupported return format '%s." % return_format
             raise NotImplementedError(msg)
 
+        # Driver scaling.
         if self.has_scaling:
-            self._do_scaling(totals)
+            self._do_driver_scaling(totals)
 
         if return_format == 'array':
             totals = self.J  # change back to array version
@@ -1412,7 +1414,7 @@ class _TotalJacInfo(object):
             doutputs = self.output_vec[mode][vec_name]
             save_vec[:] = doutputs._data
 
-    def _do_scaling(self, J):
+    def _do_driver_scaling(self, J):
         """
         Apply scalers to the jacobian if the driver defined any.
 
