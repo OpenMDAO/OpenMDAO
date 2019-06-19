@@ -106,7 +106,7 @@ class TestViewModelData(unittest.TestCase):
         self.assertListEqual(sorted(pathnames), self.expected_pathnames)
 
         # check expected connections, after mapping cycle_arrows indices back to pathnames
-        connections = model_viewer_data['connections_list']
+        connections = sorted(model_viewer_data['connections_list'], key=lambda x: (x['tgt'], x['src']))
         for conn in connections:
             if 'cycle_arrows' in conn:
                 cycle_arrows = []
@@ -143,7 +143,7 @@ class TestViewModelData(unittest.TestCase):
         self.assertListEqual(sorted(pathnames), self.expected_pathnames)
 
         # check expected connections, after mapping cycle_arrows indices back to pathnames
-        connections = model_viewer_data['connections_list']
+        connections = sorted(model_viewer_data['connections_list'], key=lambda x: (x['tgt'], x['src']))
         for conn in connections:
             if 'cycle_arrows' in conn:
                 cycle_arrows = []

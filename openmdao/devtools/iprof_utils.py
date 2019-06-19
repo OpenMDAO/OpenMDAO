@@ -146,7 +146,7 @@ def _setup_func_group():
             ('_get_initial_*', (System,)),
             ('_initialize_*', (DefaultVector,)),
             ('_create_*', (DefaultVector,)),
-            ('_extract_data', (DefaultVector,)),
+            ('_extract_root_data', (DefaultVector,)),
         ],
         'dataflow': [
             ('*compute*', (System,)),
