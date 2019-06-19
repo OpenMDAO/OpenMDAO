@@ -583,8 +583,8 @@ class Driver(object):
             desvar = problem.model._outputs._views_flat[name]
             desvar[indices] = value
 
+            # Undo driver scaling when setting design var values into model.
             if self._has_scaling:
-                # Scale design variable values
                 scaler = meta['scaler']
                 if scaler is not None:
                     desvar[indices] *= 1.0 / scaler
