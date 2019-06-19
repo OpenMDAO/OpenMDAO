@@ -57,35 +57,28 @@ def use_proc_files():
             ofile = open(os.path.join(working_dir, "%d.out" % MPI.COMM_WORLD.rank), 'wb')
         _redirect_streams(ofile.fileno())
 
-# Determine whether OPENMDAO_REQUIRE_MPI is set. Use 'try' as the default value. 
-use_mpi = 'try'
 
+# Attempt to import mpi4py.
+# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
+# and raise exception on failure. If set to anything else, no import is attempted.
 if 'OPENMDAO_REQUIRE_MPI' in os.environ:
-    use_mpi = os.environ['OPENMDAO_REQUIRE_MPI']
-    if use_mpi not in { 'never', 'try', 'always' }:
-        raise RuntimeError("If set, OPENMDAO_REQUIRE_MPI must be 'never', 'try', or 'always'.")
-
-# Decide whether to ignore MPI, attempt to import mpi4py but continue on failure, or
-# bail out on import failure.
-if use_mpi != 'never':
+    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+        from mpi4py import MPI
+# If OPENMDAO_REQUIRE_MPI is unset, attempt to import mpi4py, but continue on failure
+# with a notification.
+else:
     try:
         from mpi4py import MPI
-    except ImportError as mpi_import_err:
-        if use_mpi == 'try':
-            MPI = None
-            sys.stdout.write("Unable to import mpi4py. Parallel processing unavailable.\n")
-            sys.stdout.flush()
-        else:
-            raise
+    except ImportError:
+        MPI = None
+        sys.stdout.write("Unable to import mpi4py. Parallel processing unavailable.\n")
+        sys.stdout.flush()
     else:
         # If the import succeeded, but it doesn't look like a parallel
         # run was intended, don't use MPI
-        if use_mpi == 'try' and MPI.COMM_WORLD.size == 1:
+        if MPI.COMM_WORLD.size == 1:
             MPI = None
-else:
-    MPI = None
 
-del use_mpi
 
 if MPI:
     def debug(*msg):  # pragma: no cover
