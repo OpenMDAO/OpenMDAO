@@ -138,6 +138,9 @@ install:
 - conda list
 
 script:
+# prevent OpenMPI warning messages
+- export OMPI_MCA_btl=^openib
+
 # make docs first
 - cd openmdao/docs;
 - if [ "$PETSc" ]; then
