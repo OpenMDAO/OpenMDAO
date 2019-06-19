@@ -302,41 +302,49 @@ def config_summary(problem, stream=sys.stdout):
 
     if setup_done:
         desvars = model.get_design_vars()
-        printer("Design variables: %5d   Total size: %8d" %
-              (len(desvars), sum(d['size'] for d in desvars.values())))
+        printer("Design variables:        %5d   Total size: %8d" %
+                (len(desvars), sum(d['size'] for d in desvars.values())))
 
-        # TODO: give separate info for linear, nonlinear constraints, equality, inequality
-        constraints = model.get_constraints()
-        printer("Constraints:      %5d   Total size: %8d" %
-              (len(constraints), sum(d['size'] for d in constraints.values())))
+        # TODO: give separate info for equality, inequality constraints
+        con_nonlin = {}
+        con_linear = {}
+        for con, vals in iteritems(model.get_constraints()):
+            if not vals['linear']:
+                con_nonlin[con]= vals
+            else:
+                con_linear[con] = vals
+        printer("Constraints (nonlinear): %5d   Total size: %8d" %
+                (len(con_nonlin), sum(d['size'] for d in con_nonlin.values())))
+        printer("Constraints (linear):    %5d   Total size: %8d" %
+                (len(con_linear), sum(d['size'] for d in con_linear.values())))
 
         objs = model.get_objectives()
-        printer("Objectives:       %5d   Total size: %8d" %
-              (len(objs), sum(d['size'] for d in objs.values())))
+        printer("Objectives:              %5d   Total size: %8d" %
+                (len(objs), sum(d['size'] for d in objs.values())))
 
     printer()
 
     input_names = model._var_allprocs_abs_names['input']
     ninputs = len(input_names)
     if setup_done:
-        printer("Input variables:  %5d   Total size: %8d" %
-              (ninputs, sum(meta[n]['size'] for n in input_names)))
+        printer("Input variables:         %5d   Total size: %8d" %
+                (ninputs, sum(meta[n]['size'] for n in input_names)))
     else:
-        printer("Input variables: %5d" % ninputs)
+        printer("Input variables:         %5d" % ninputs)
 
     output_names = model._var_allprocs_abs_names['output']
     noutputs = len(output_names)
     if setup_done:
-        printer("Output variables: %5d   Total size: %8d" %
-              (noutputs, sum(meta[n]['global_size'] for n in output_names)))
+        printer("Output variables:        %5d   Total size: %8d" %
+                (noutputs, sum(meta[n]['global_size'] for n in output_names)))
     else:
-        printer("Output variables: %5d" % noutputs)
+        printer("Output variables:        %5d" % noutputs)
 
     if setup_done and isinstance(model, Group):
         printer()
         conns = model._conn_global_abs_in2out
         printer("Total connections: %d   Total transfer data size: %d" %
-              (len(conns), sum(meta[n]['size'] for n in conns)))
+                (len(conns), sum(meta[n]['size'] for n in conns)))
 
     printer()
     printer("Driver type: %s" % problem.driver.__class__.__name__)
