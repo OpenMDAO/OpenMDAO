@@ -1198,6 +1198,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             pass
 
     def test_uniform(self):
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()

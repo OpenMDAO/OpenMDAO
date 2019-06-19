@@ -549,7 +549,7 @@ class ProbRemoteTests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-        par = top.add_subsystem('par', ParallelGroup())
+        par = top.add_subsystem('par', om.ParallelGroup())
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
         p.setup()

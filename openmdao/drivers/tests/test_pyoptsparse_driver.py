@@ -1698,7 +1698,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = pyOptSparseDriver()
+        prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SLSQP"
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -1723,7 +1723,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
 
         prob.driver.options['print_results'] = False
 
@@ -1749,7 +1749,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = pyOptSparseDriver()
+        prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SLSQP"
 
         prob.driver.opt_settings['ACC'] = 1e-9
@@ -1776,7 +1776,7 @@ class TestPyoptSparseFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = pyOptSparseDriver()
+        prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SLSQP"
 
         prob.driver.opt_settings['MAXIT'] = 3
@@ -1812,7 +1812,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = pyOptSparseDriver()
+        prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
 
         prob.driver.opt_settings['Major feasibility tolerance'] = 1e-9
@@ -1839,7 +1839,7 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         prob = om.Problem()
         model = prob.model = SellarDerivativesGrouped()
 
-        prob.driver = pyOptSparseDriver()
+        prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "SNOPT"
 
         # after upgrading to SNOPT 7.5-1.1, this test failed unless iter limit raised from 4 to 5
