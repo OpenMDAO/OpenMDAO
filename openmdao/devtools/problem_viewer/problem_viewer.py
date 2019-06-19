@@ -2,6 +2,7 @@ import base64
 import json
 import os
 from collections import OrderedDict
+from itertools import chain
 
 import networkx as nx
 from six import iteritems, itervalues
@@ -115,18 +116,17 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['linear_solver'] = "solve_linear"
         else:
             tree_dict['linear_solver'] = ""
+
+        if overrides_method('solve_nonlinear', system, ImplicitComponent):
+            tree_dict['nonlinear_solver'] = "solve_nonlinear"
+        else:
+            tree_dict['nonlinear_solver'] = ""
     else:
         if system.linear_solver:
             tree_dict['linear_solver'] = system.linear_solver.SOLVER
         else:
             tree_dict['linear_solver'] = ""
 
-    if isinstance(system, ImplicitComponent):
-        if overrides_method('solve_nonlinear', system, ImplicitComponent):
-            tree_dict['nonlinear_solver'] = "solve_nonlinear"
-        else:
-            tree_dict['nonlinear_solver'] = ""
-    else:
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
         else:
@@ -221,68 +221,65 @@ def _get_viewer_data(data_source):
 
     data_dict = {}
     comp_exec_idx = [0]  # list so pass by ref
-    comp_exec_orders = {}
-    data_dict['tree'] = _get_tree_dict(root_group, comp_exec_orders, comp_exec_idx)
+    orders = {}
+    data_dict['tree'] = _get_tree_dict(root_group, orders, comp_exec_idx)
 
     connections_list = []
 
     sys_pathnames_list = []  # list of pathnames of systems found in cycles
     sys_pathnames_dict = {}  # map of pathnames to index of pathname in list
 
-    # sort to make deterministic for testing
-    sorted_abs_input2src = OrderedDict(sorted(root_group._conn_global_abs_in2out.items()))
-    root_group._conn_global_abs_in2out = sorted_abs_input2src
-
     G = root_group.compute_sys_graph(comps_only=True)
+
     scc = nx.strongly_connected_components(G)
-    scc_list = [s for s in scc if len(s) > 1]
 
-    for in_abs, out_abs in iteritems(sorted_abs_input2src):
-        if out_abs is None:
-            continue
+    seen = set()
+    for strong_comp in scc:
+        if len(strong_comp) > 1:
+            strongset = set(strong_comp)
+            sys_pathnames_list.extend(strong_comp)
+            for name in strong_comp:
+                sys_pathnames_dict[name] = len(sys_pathnames_dict)
 
-        src_subsystem = out_abs.rsplit('.', 1)[0]
-        tgt_subsystem = in_abs.rsplit('.', 1)[0]
-        src_to_tgt_str = src_subsystem + ' ' + tgt_subsystem
+            edge_orders = [(u, orders[u], v, orders[v]) for u, v in G.edges(strong_comp)
+                           if u in strongset and v in strongset]
 
-        count = 0
-        edges_list = []
+            for src, exe_src, tgt, exe_tgt in edge_orders:
+                if exe_tgt < exe_src:
+                    exe_low = exe_tgt
+                    exe_high = exe_src
+                else:
+                    exe_low = exe_src
+                    exe_high = exe_tgt
 
-        for li in scc_list:
-            if src_subsystem in li and tgt_subsystem in li:
-                count += 1
-                if count > 1:
-                    raise ValueError('Count greater than 1')
+                edges_list = [(sys_pathnames_dict[s], sys_pathnames_dict[t])
+                              for s, order_s, t, order_t in edge_orders
+                              if exe_low <= order_s <= exe_high
+                              and exe_low <= order_t <= exe_high and not (s == src and t == tgt)]
 
-                exe_tgt = comp_exec_orders[tgt_subsystem]
-                exe_src = comp_exec_orders[src_subsystem]
-                exe_low = min(exe_tgt, exe_src)
-                exe_high = max(exe_tgt, exe_src)
-
-                subg = G.subgraph(n for n in li if exe_low <= comp_exec_orders[n] <= exe_high)
-                for edge in subg.edges():
-                    edge_str = ' '.join(edge)
-                    if edge_str != src_to_tgt_str:
-                        src, tgt = edge
-
-                        # add src & tgt to pathnames list & dict if not already there
-                        for pathname in edge:
-                            if pathname not in sys_pathnames_dict:
-                                sys_pathnames_list.append(pathname)
-                                sys_pathnames_dict[pathname] = len(sys_pathnames_list) - 1
-
-                        # replace src & tgt pathnames with indices into pathname list
-                        src = sys_pathnames_dict[src]
-                        tgt = sys_pathnames_dict[tgt]
-
-                        edges_list.append([src, tgt])
-
-        if edges_list:
-            edges_list.sort()  # make deterministic so same .html file will be produced each run
-            connections_list.append(dict([('src', out_abs), ('tgt', in_abs),
-                                          ('cycle_arrows', edges_list)]))
+                if edges_list:
+                    for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                        for vtgt in vtgtlist:
+                            conn = (vsrc, vtgt)
+                            if conn not in seen:
+                                connections_list.append({'src': vsrc, 'tgt': vtgt,
+                                                         'cycle_arrows': edges_list})
+                                seen.add(conn)
+                else:
+                    for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                        for vtgt in vtgtlist:
+                            conn = (vsrc, vtgt)
+                            if conn not in seen:
+                                connections_list.append({'src': vsrc, 'tgt': vtgt})
+                                seen.add(conn)
         else:
-            connections_list.append(dict([('src', out_abs), ('tgt', in_abs)]))
+            for edge in chain(G.edges(strong_comp), G.in_edges(strong_comp)):
+                for vsrc, vtgtlist in iteritems(G.get_edge_data(edge[0], edge[1])['conns']):
+                    for vtgt in vtgtlist:
+                        conn = (vsrc, vtgt)
+                        if conn not in seen:
+                            connections_list.append({'src': vsrc, 'tgt': vtgt})
+                            seen.add(conn)
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list

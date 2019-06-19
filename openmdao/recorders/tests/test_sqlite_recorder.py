@@ -1819,7 +1819,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = CaseReader("cases.sql")
 
         # access list of connections stored in metadata
-        connections = cr.problem_metadata['connections_list']
+        connections = sorted(cr.problem_metadata['connections_list'], key=lambda x: (x['tgt'], x['src']))
+        
         self.assertEqual('\n'.join([conn['src']+'\t'+conn['tgt'] for conn in connections]),
                          '\n'.join(["d1.y1\tcon_cmp1.y1",
                                     "d2.y2\tcon_cmp2.y2",

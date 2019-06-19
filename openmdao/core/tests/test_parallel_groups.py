@@ -311,7 +311,7 @@ class TestParallelListStates(unittest.TestCase):
         p.model.add_subsystem('C4', StateComp())
         p.setup()
         p.final_setup()
-        self.assertEqual(p.model._list_states_allprocs(), ['C1.x', 'C2.x', 'C4.x'])
+        self.assertEqual(sorted(p.model._list_states_allprocs()), ['C1.x', 'C2.x', 'C4.x'])
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

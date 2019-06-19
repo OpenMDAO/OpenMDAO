@@ -15,6 +15,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
+from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed
 # if it is, try to use SNOPT but fall back to SLSQP
@@ -105,14 +106,9 @@ class DataSave(ExplicitComponent):
         partials['y', 'x'] = 2.0*x - 6.0
 
 
+@unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
 class TestPyoptSparse(unittest.TestCase):
-
-    def setUp(self):
-        if OPT is None:
-            raise unittest.SkipTest("pyoptsparse is not installed")
-
-        if OPTIMIZER is None:
-            raise unittest.SkipTest("pyoptsparse is not providing SNOPT or SLSQP")
 
     def test_simple_paraboloid_upper(self):
 
