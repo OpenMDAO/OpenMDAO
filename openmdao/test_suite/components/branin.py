@@ -16,10 +16,10 @@ The global minimum can be found at f(x) = 0.397887
 """
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
 
-class Branin(ExplicitComponent):
+class Branin(om.ExplicitComponent):
     """
     The Branin test problem. This version is the standard version and
     contains two continuous parameters.
@@ -74,7 +74,7 @@ class Branin(ExplicitComponent):
         partials['f', 'x0'] = 2.0*a*(x1 - b*x0**2 + c*x0 - d)*(-2.*b*x0 + c) - e*(1.-f)*np.sin(x0)
 
 
-class BraninDiscrete(ExplicitComponent):
+class BraninDiscrete(om.ExplicitComponent):
     """
     The Branin test problem. This version defines a Discrete Variable in OpenMDAO.
 

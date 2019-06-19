@@ -2,13 +2,9 @@
 
 from __future__ import division, print_function
 
-from openmdao.core.group import Group
-from openmdao.core.parallel_group import ParallelGroup
-from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.components.exec_comp import ExecComp
+import openmdao.api as om
 
-
-class FanOut(Group):
+class FanOut(om.Group):
     """
     Topology where one comp broadcasts an output to two target
     components.
@@ -17,17 +13,17 @@ class FanOut(Group):
     def __init__(self):
         super(FanOut, self).__init__()
 
-        self.add_subsystem('p', IndepVarComp('x', 1.0))
-        self.add_subsystem('comp1', ExecComp(['y=3.0*x']))
-        self.add_subsystem('comp2', ExecComp(['y=-2.0*x']))
-        self.add_subsystem('comp3', ExecComp(['y=5.0*x']))
+        self.add_subsystem('p', om.IndepVarComp('x', 1.0))
+        self.add_subsystem('comp1', om.ExecComp(['y=3.0*x']))
+        self.add_subsystem('comp2', om.ExecComp(['y=-2.0*x']))
+        self.add_subsystem('comp3', om.ExecComp(['y=5.0*x']))
 
         self.connect("p.x", "comp1.x")
         self.connect("comp1.y", "comp2.x")
         self.connect("comp1.y", "comp3.x")
 
 
-class FanOutGrouped(Group):
+class FanOutGrouped(om.Group):
     """
     Topology where one component broadcasts an output to two target
     components.
@@ -36,15 +32,15 @@ class FanOutGrouped(Group):
     def __init__(self):
         super(FanOutGrouped, self).__init__()
 
-        self.add_subsystem('iv', IndepVarComp('x', 1.0))
-        self.add_subsystem('c1', ExecComp(['y=3.0*x']))
+        self.add_subsystem('iv', om.IndepVarComp('x', 1.0))
+        self.add_subsystem('c1', om.ExecComp(['y=3.0*x']))
 
-        self.sub = self.add_subsystem('sub', ParallelGroup())
-        self.sub.add_subsystem('c2', ExecComp(['y=-2.0*x']))
-        self.sub.add_subsystem('c3', ExecComp(['y=5.0*x']))
+        self.sub = self.add_subsystem('sub', om.ParallelGroup())
+        self.sub.add_subsystem('c2', om.ExecComp(['y=-2.0*x']))
+        self.sub.add_subsystem('c3', om.ExecComp(['y=5.0*x']))
 
-        self.add_subsystem('c2', ExecComp(['y=x']))
-        self.add_subsystem('c3', ExecComp(['y=x']))
+        self.add_subsystem('c2', om.ExecComp(['y=x']))
+        self.add_subsystem('c3', om.ExecComp(['y=x']))
 
         self.connect('iv.x', 'c1.x')
 
@@ -55,7 +51,7 @@ class FanOutGrouped(Group):
         self.connect('sub.c3.y', 'c3.x')
 
 
-class FanIn(Group):
+class FanIn(om.Group):
     """
     Topology where two comps feed a single comp.
     """
@@ -63,11 +59,11 @@ class FanIn(Group):
     def __init__(self):
         super(FanIn, self).__init__()
 
-        self.add_subsystem('p1', IndepVarComp('x1', 1.0))
-        self.add_subsystem('p2', IndepVarComp('x2', 1.0))
-        self.add_subsystem('comp1', ExecComp(['y=-2.0*x']))
-        self.add_subsystem('comp2', ExecComp(['y=5.0*x']))
-        self.add_subsystem('comp3', ExecComp(['y=3.0*x1+7.0*x2']))
+        self.add_subsystem('p1', om.IndepVarComp('x1', 1.0))
+        self.add_subsystem('p2', om.IndepVarComp('x2', 1.0))
+        self.add_subsystem('comp1', om.ExecComp(['y=-2.0*x']))
+        self.add_subsystem('comp2', om.ExecComp(['y=5.0*x']))
+        self.add_subsystem('comp3', om.ExecComp(['y=3.0*x1+7.0*x2']))
 
         self.connect("comp1.y", "comp3.x1")
         self.connect("comp2.y", "comp3.x2")
@@ -75,7 +71,7 @@ class FanIn(Group):
         self.connect("p2.x2", "comp2.x")
 
 
-class FanInGrouped(Group):
+class FanInGrouped(om.Group):
     """
     Topology where two components in a Group feed a single component
     outside of that Group.
@@ -84,16 +80,16 @@ class FanInGrouped(Group):
     def __init__(self):
         super(FanInGrouped, self).__init__()
 
-        iv = self.add_subsystem('iv', IndepVarComp())
+        iv = self.add_subsystem('iv', om.IndepVarComp())
         iv.add_output('x1', 1.0)
         iv.add_output('x2', 1.0)
         iv.add_output('x3', 1.0)
 
-        self.sub = self.add_subsystem('sub', ParallelGroup())
-        self.sub.add_subsystem('c1', ExecComp(['y=-2.0*x']))
-        self.sub.add_subsystem('c2', ExecComp(['y=5.0*x']))
+        self.sub = self.add_subsystem('sub', om.ParallelGroup())
+        self.sub.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+        self.sub.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
 
-        self.add_subsystem('c3', ExecComp(['y=3.0*x1+7.0*x2']))
+        self.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
 
         self.connect("sub.c1.y", "c3.x1")
         self.connect("sub.c2.y", "c3.x2")
@@ -101,7 +97,8 @@ class FanInGrouped(Group):
         self.connect("iv.x1", "sub.c1.x")
         self.connect("iv.x2", "sub.c2.x")
 
-class FanInGrouped2(Group):
+
+class FanInGrouped2(om.Group):
     """
     Topology where two components in a Group feed a single component
     outside of that Group. This is slightly different than FanInGrouped
@@ -113,14 +110,14 @@ class FanInGrouped2(Group):
     def __init__(self):
         super(FanInGrouped2, self).__init__()
 
-        p1 = self.add_subsystem('p1', IndepVarComp('x', 1.0))
-        p2 = self.add_subsystem('p2', IndepVarComp('x', 1.0))
+        p1 = self.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        p2 = self.add_subsystem('p2', om.IndepVarComp('x', 1.0))
 
-        self.sub = self.add_subsystem('sub', ParallelGroup())
-        self.sub.add_subsystem('c1', ExecComp(['y=-2.0*x']))
-        self.sub.add_subsystem('c2', ExecComp(['y=5.0*x']))
+        self.sub = self.add_subsystem('sub', om.ParallelGroup())
+        self.sub.add_subsystem('c1', om.ExecComp(['y=-2.0*x']))
+        self.sub.add_subsystem('c2', om.ExecComp(['y=5.0*x']))
 
-        self.add_subsystem('c3', ExecComp(['y=3.0*x1+7.0*x2']))
+        self.add_subsystem('c3', om.ExecComp(['y=3.0*x1+7.0*x2']))
 
         self.connect("sub.c1.y", "c3.x1")
         self.connect("sub.c2.y", "c3.x2")
@@ -129,7 +126,7 @@ class FanInGrouped2(Group):
         self.connect("p2.x", "sub.c2.x")
 
 
-class DiamondFlat(Group):
+class DiamondFlat(om.Group):
     """
     Topology: one - two - one.
 
@@ -138,20 +135,18 @@ class DiamondFlat(Group):
     def __init__(self):
         super(DiamondFlat, self).__init__()
 
-        self.add_subsystem('iv', IndepVarComp('x', 2.0))
+        self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
-        self.add_subsystem('c1', ExecComp([
-            'y1 = 2.0*x1**2',
-            'y2 = 3.0*x1'
-        ]))
+        self.add_subsystem('c1', om.ExecComp(['y1 = 2.0*x1**2',
+                                              'y2 = 3.0*x1'
+                                              ]))
 
-        self.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
-        self.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
+        self.add_subsystem('c2', om.ExecComp('y1 = 0.5*x1'))
+        self.add_subsystem('c3', om.ExecComp('y1 = 3.5*x1'))
 
-        self.add_subsystem('c4', ExecComp([
-            'y1 = x1 + 2.0*x2',
-            'y2 = 3.0*x1 - 5.0*x2'
-        ]))
+        self.add_subsystem('c4', om.ExecComp(['y1 = x1 + 2.0*x2',
+                                              'y2 = 3.0*x1 - 5.0*x2'
+                                              ]))
 
         # make connections
         self.connect('iv.x', 'c1.x1')
@@ -161,7 +156,7 @@ class DiamondFlat(Group):
         self.connect('c3.y1', 'c4.x2')
 
 
-class Diamond(Group):
+class Diamond(om.Group):
     """
     Topology: one - two - one.
     """
@@ -169,21 +164,19 @@ class Diamond(Group):
     def __init__(self):
         super(Diamond, self).__init__()
 
-        self.add_subsystem('iv', IndepVarComp('x', 2.0))
+        self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
-        self.add_subsystem('c1', ExecComp([
-            'y1 = 2.0*x1**2',
-            'y2 = 3.0*x1'
-        ]))
+        self.add_subsystem('c1', om.ExecComp(['y1 = 2.0*x1**2',
+                                              'y2 = 3.0*x1'
+                                              ]))
 
-        sub = self.add_subsystem('sub', ParallelGroup())
-        sub.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
-        sub.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
+        sub = self.add_subsystem('sub', om.ParallelGroup())
+        sub.add_subsystem('c2', om.ExecComp('y1 = 0.5*x1'))
+        sub.add_subsystem('c3', om.ExecComp('y1 = 3.5*x1'))
 
-        self.add_subsystem('c4', ExecComp([
-            'y1 = x1 + 2.0*x2',
-            'y2 = 3.0*x1 - 5.0*x2'
-        ]))
+        self.add_subsystem('c4', om.ExecComp(['y1 = x1 + 2.0*x2',
+                                              'y2 = 3.0*x1 - 5.0*x2'
+                                              ]))
 
         # make connections
         self.connect('iv.x', 'c1.x1')
@@ -195,7 +188,7 @@ class Diamond(Group):
         self.connect('sub.c3.y1', 'c4.x2')
 
 
-class ConvergeDivergeFlat(Group):
+class ConvergeDivergeFlat(om.Group):
     """
     Topology one - two - one - two - one. This model was critical in
     testing parallel reverse scatters. This version is perfectly flat.
@@ -204,24 +197,22 @@ class ConvergeDivergeFlat(Group):
     def __init__(self):
         super(ConvergeDivergeFlat, self).__init__()
 
-        self.add_subsystem('iv', IndepVarComp('x', 2.0))
+        self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
-        self.add_subsystem('c1', ExecComp([
-            'y1 = 2.0*x1**2',
-            'y2 = 3.0*x1'
-        ]))
+        self.add_subsystem('c1', om.ExecComp(['y1 = 2.0*x1**2',
+                                              'y2 = 3.0*x1'
+                                              ]))
 
-        self.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
-        self.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
+        self.add_subsystem('c2', om.ExecComp('y1 = 0.5*x1'))
+        self.add_subsystem('c3', om.ExecComp('y1 = 3.5*x1'))
 
-        self.add_subsystem('c4', ExecComp([
-            'y1 = x1 + 2.0*x2',
-            'y2 = 3.0*x1 - 5.0*x2'
-        ]))
+        self.add_subsystem('c4', om.ExecComp(['y1 = x1 + 2.0*x2',
+                                              'y2 = 3.0*x1 - 5.0*x2'
+                                              ]))
 
-        self.add_subsystem('c5', ExecComp('y1 = 0.8*x1'))
-        self.add_subsystem('c6', ExecComp('y1 = 0.5*x1'))
-        self.add_subsystem('c7', ExecComp('y1 = x1 + 3.0*x2'))
+        self.add_subsystem('c5', om.ExecComp('y1 = 0.8*x1'))
+        self.add_subsystem('c6', om.ExecComp('y1 = 0.5*x1'))
+        self.add_subsystem('c7', om.ExecComp('y1 = x1 + 3.0*x2'))
 
         # make connections
         self.connect('iv.x', 'c1.x1')
@@ -239,7 +230,7 @@ class ConvergeDivergeFlat(Group):
         self.connect('c6.y1', 'c7.x2')
 
 
-class ConvergeDiverge(Group):
+class ConvergeDiverge(om.Group):
     """
     Topology: one - two - one - two - one.
 
@@ -249,27 +240,25 @@ class ConvergeDiverge(Group):
     def __init__(self):
         super(ConvergeDiverge, self).__init__()
 
-        self.add_subsystem('iv', IndepVarComp('x', 2.0))
+        self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
-        self.add_subsystem('c1', ExecComp([
-            'y1 = 2.0*x1**2',
-            'y2 = 3.0*x1'
-        ]))
+        self.add_subsystem('c1', om.ExecComp(['y1 = 2.0*x1**2',
+                                              'y2 = 3.0*x1'
+                                              ]))
 
-        g1 = self.add_subsystem('g1', ParallelGroup())
-        g1.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
-        g1.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
+        g1 = self.add_subsystem('g1', om.ParallelGroup())
+        g1.add_subsystem('c2', om.ExecComp('y1 = 0.5*x1'))
+        g1.add_subsystem('c3', om.ExecComp('y1 = 3.5*x1'))
 
-        self.add_subsystem('c4', ExecComp([
-            'y1 = x1 + 2.0*x2',
-            'y2 = 3.0*x1 - 5.0*x2'
-        ]))
+        self.add_subsystem('c4', om.ExecComp(['y1 = x1 + 2.0*x2',
+                                              'y2 = 3.0*x1 - 5.0*x2'
+                                              ]))
 
-        g2 = self.add_subsystem('g2', ParallelGroup())
-        g2.add_subsystem('c5', ExecComp('y1 = 0.8*x1'))
-        g2.add_subsystem('c6', ExecComp('y1 = 0.5*x1'))
+        g2 = self.add_subsystem('g2', om.ParallelGroup())
+        g2.add_subsystem('c5', om.ExecComp('y1 = 0.8*x1'))
+        g2.add_subsystem('c6', om.ExecComp('y1 = 0.5*x1'))
 
-        self.add_subsystem('c7', ExecComp('y1 = x1 + 3.0*x2'))
+        self.add_subsystem('c7', om.ExecComp('y1 = x1 + 3.0*x2'))
 
         # make connections
         self.connect('iv.x', 'c1.x1')
@@ -287,7 +276,7 @@ class ConvergeDiverge(Group):
         self.connect('g2.c6.y1', 'c7.x2')
 
 
-class ConvergeDivergeGroups(Group):
+class ConvergeDivergeGroups(om.Group):
     """
     Topology: one - two - one - two - one.
 
@@ -298,28 +287,26 @@ class ConvergeDivergeGroups(Group):
     def __init__(self):
         super(ConvergeDivergeGroups, self).__init__()
 
-        self.add_subsystem('iv', IndepVarComp('x', 2.0))
+        self.add_subsystem('iv', om.IndepVarComp('x', 2.0))
 
-        g1 = self.add_subsystem('g1', ParallelGroup())
-        g1.add_subsystem('c1', ExecComp([
-            'y1 = 2.0*x1**2',
-            'y2 = 3.0*x1'
-        ]))
+        g1 = self.add_subsystem('g1', om.ParallelGroup())
+        g1.add_subsystem('c1', om.ExecComp(['y1 = 2.0*x1**2',
+                                            'y2 = 3.0*x1'
+                                            ]))
 
-        g2 = g1.add_subsystem('g2', ParallelGroup())
-        g2.add_subsystem('c2', ExecComp('y1 = 0.5*x1'))
-        g2.add_subsystem('c3', ExecComp('y1 = 3.5*x1'))
+        g2 = g1.add_subsystem('g2', om.ParallelGroup())
+        g2.add_subsystem('c2', om.ExecComp('y1 = 0.5*x1'))
+        g2.add_subsystem('c3', om.ExecComp('y1 = 3.5*x1'))
 
-        g1.add_subsystem('c4', ExecComp([
-            'y1 = x1 + 2.0*x2',
-            'y2 = 3.0*x1 - 5.0*x2'
-        ]))
+        g1.add_subsystem('c4', om.ExecComp(['y1 = x1 + 2.0*x2',
+                                            'y2 = 3.0*x1 - 5.0*x2'
+                                            ]))
 
-        g3 = self.add_subsystem('g3', ParallelGroup())
-        g3.add_subsystem('c5', ExecComp('y1 = 0.8*x1'))
-        g3.add_subsystem('c6', ExecComp('y1 = 0.5*x1'))
+        g3 = self.add_subsystem('g3', om.ParallelGroup())
+        g3.add_subsystem('c5', om.ExecComp('y1 = 0.8*x1'))
+        g3.add_subsystem('c6', om.ExecComp('y1 = 0.5*x1'))
 
-        self.add_subsystem('c7', ExecComp('y1 = x1 + 3.0*x2'))
+        self.add_subsystem('c7', om.ExecComp('y1 = x1 + 3.0*x2'))
 
         # make connections
         self.connect('iv.x', 'g1.c1.x1')
@@ -337,25 +324,25 @@ class ConvergeDivergeGroups(Group):
         self.connect('g3.c6.y1', 'c7.x2')
 
 
-class FanInSubbedIDVC(Group):
+class FanInSubbedIDVC(om.Group):
     """
     Classic Fan In with indepvarcomps buried below the parallel group, and a summation
     component.
     """
 
     def setup(self):
-        sub = self.add_subsystem('sub', ParallelGroup())
-        sub1 = sub.add_subsystem('sub1', Group())
-        sub2 = sub.add_subsystem('sub2', Group())
+        sub = self.add_subsystem('sub', om.ParallelGroup())
+        sub1 = sub.add_subsystem('sub1', om.Group())
+        sub2 = sub.add_subsystem('sub2', om.Group())
 
-        sub1.add_subsystem('p1', IndepVarComp('x', 3.0))
-        sub2.add_subsystem('p2', IndepVarComp('x', 5.0))
-        sub1.add_subsystem('c1', ExecComp(['y = 2.0*x']))
-        sub2.add_subsystem('c2', ExecComp(['y = 4.0*x']))
+        sub1.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        sub2.add_subsystem('p2', om.IndepVarComp('x', 5.0))
+        sub1.add_subsystem('c1', om.ExecComp(['y = 2.0*x']))
+        sub2.add_subsystem('c2', om.ExecComp(['y = 4.0*x']))
         sub1.connect('p1.x', 'c1.x')
         sub2.connect('p2.x', 'c2.x')
 
-        self.add_subsystem('sum', ExecComp(['y = z1 + z2']))
+        self.add_subsystem('sum',om. ExecComp(['y = z1 + z2']))
         self.connect('sub.sub1.c1.y', 'sum.z1')
         self.connect('sub.sub2.c2.y', 'sum.z2')
 

@@ -34,7 +34,7 @@ The following code demonstrates the use of the MatrixVectorProductComp, finding 
 of a random 3x3 matrix `M` and a 3-vector `x` at 100 points simultaneously.
 
 .. embed-code::
-    openmdao.components.tests.test_matrix_vector_product_comp.TestForDocs.test
+    openmdao.components.tests.test_matrix_vector_product_comp.TestFeature.test
 
 
 .. tags:: MatrixVectorProductComp, Component

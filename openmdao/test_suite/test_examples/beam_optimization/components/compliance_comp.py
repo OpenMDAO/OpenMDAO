@@ -3,10 +3,10 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
 
-class ComplianceComp(ExplicitComponent):
+class ComplianceComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)
@@ -29,7 +29,7 @@ class ComplianceComp(ExplicitComponent):
         outputs['compliance'] = np.dot(force_vector, inputs['displacements'])
 
 
-class MultiComplianceComp(ExplicitComponent):
+class MultiComplianceComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)

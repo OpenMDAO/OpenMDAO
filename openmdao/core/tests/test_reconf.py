@@ -52,7 +52,6 @@ class Test(unittest.TestCase):
     def test(self):
         p = Problem()
 
-        p.model = Group()
         p.model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         p.model.add_subsystem('c2', ReconfComp(), promotes_inputs=['x'], promotes_outputs=['y'])
         p.model.add_subsystem('c3', Comp(), promotes_inputs=['x'], promotes_outputs=['z'])

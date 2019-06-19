@@ -1,9 +1,11 @@
-"""Definition of the Add/Subtract Component."""
-
+"""
+Definition of the Add/Subtract Component.
+"""
 import collections
+from six import string_types
+
 import numpy as np
 from scipy import sparse as sp
-from six import string_types
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 

@@ -32,7 +32,7 @@ class LinearSolverTests(object):
             group.linear_solver.options['maxiter'] = 2
 
             p = Problem(group)
-            p.setup(check=False)
+            p.setup()
             p.set_solver_print(level=0)
 
             # Conclude setup but don't run model.
@@ -58,7 +58,7 @@ class LinearSolverTests(object):
             # Tests derivatives on a simple comp that defines compute_jacvec.
             # Note, For DirectSolver, assemble_jac must be False for mat-vec.
             prob = Problem()
-            model = prob.model = Group()
+            model = prob.model
             model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                                 promotes=['length'])
             model.add_subsystem('mycomp', TestExplCompSimpleJacVec(),
@@ -93,7 +93,7 @@ class LinearSolverTests(object):
             # Tests derivatives on a group that contains a simple comp that
             # defines compute_jacvec.
             prob = Problem()
-            model = prob.model = Group()
+            model = prob.model
             model.add_subsystem('x_param', IndepVarComp('length', 3.0),
                                 promotes=['length'])
             sub = model.add_subsystem('sub', Group(),
@@ -131,7 +131,7 @@ class LinearSolverTests(object):
             # defines compute_jacvec. For this one, the indepvarcomp is also
             # in the subsystem.
             prob = Problem()
-            model = prob.model = Group()
+            model = prob.model
             sub = model.add_subsystem('sub', Group(),
                                       promotes=['length', 'width', 'area'])
             sub.add_subsystem('x_param', IndepVarComp('length', 3.0),

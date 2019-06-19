@@ -17,7 +17,6 @@ class TestFindCite(unittest.TestCase):
 
         p = Problem()
 
-        p.model = Group()
         p.model.cite = "foobar model"
         p.model.nonlinear_solver.cite = "foobar nonlinear_solver"
         p.model.linear_solver.cite = "foobar linear_solver"
@@ -139,8 +138,6 @@ class TestFindCitePar(unittest.TestCase):
 
         p = Problem()
 
-        p.model = Group()
-        
         p.model.cite = "foobar model"
         p.model.nonlinear_solver.cite = "foobar nonlinear_solver"
         p.model.linear_solver.cite = "foobar linear_solver"

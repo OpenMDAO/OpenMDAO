@@ -4,8 +4,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Group, Problem, IndepVarComp
-from openmdao.api import LinearSystemComp, ScipyKrylov, DirectSolver
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -15,25 +14,25 @@ class TestLinearSystemComp(unittest.TestCase):
     def test_basic(self):
         """Check against the scipy solver."""
 
-        model = Group()
+        model = om.Group()
 
         x = np.array([1, 2, -3])
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
         b = A.dot(x)
 
-        model.add_subsystem('p1', IndepVarComp('A', A))
-        model.add_subsystem('p2', IndepVarComp('b', b))
+        model.add_subsystem('p1', om.IndepVarComp('A', A))
+        model.add_subsystem('p2', om.IndepVarComp('b', b))
 
-        lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
-        lingrp.add_subsystem('lin', LinearSystemComp(size=3))
+        lingrp = model.add_subsystem('lingrp', om.Group(), promotes=['*'])
+        lingrp.add_subsystem('lin', om.LinearSystemComp(size=3))
 
         model.connect('p1.A', 'lin.A')
         model.connect('p2.b', 'lin.b')
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
-        lingrp.linear_solver = ScipyKrylov()
+        lingrp.linear_solver = om.ScipyKrylov()
 
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -50,25 +49,25 @@ class TestLinearSystemComp(unittest.TestCase):
     def test_vectorized(self):
         """Check against the scipy solver."""
 
-        model = Group()
+        model = om.Group()
 
         x = np.array([[1, 2, -3], [2, -1, 4]])
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
         b = np.einsum('jk,ik->ij', A, x)
 
-        model.add_subsystem('p1', IndepVarComp('A', A))
-        model.add_subsystem('p2', IndepVarComp('b', b))
+        model.add_subsystem('p1', om.IndepVarComp('A', A))
+        model.add_subsystem('p2', om.IndepVarComp('b', b))
 
-        lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
-        lingrp.add_subsystem('lin', LinearSystemComp(size=3, vec_size=2))
+        lingrp = model.add_subsystem('lingrp', om.Group(), promotes=['*'])
+        lingrp.add_subsystem('lin', om.LinearSystemComp(size=3, vec_size=2))
 
         model.connect('p1.A', 'lin.A')
         model.connect('p2.b', 'lin.b')
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
-        lingrp.linear_solver = ScipyKrylov()
+        lingrp.linear_solver = om.ScipyKrylov()
 
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -85,26 +84,26 @@ class TestLinearSystemComp(unittest.TestCase):
     def test_vectorized_A(self):
         """Check against the scipy solver."""
 
-        model = Group()
+        model = om.Group()
 
         x = np.array([[1, 2, -3], [2, -1, 4]])
         A = np.array([[[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]],
                       [[2.0, 3.0, 4.0], [1.0, -1.0, -2.0], [3.0, 2.0, -2.0]]])
         b = np.einsum('ijk,ik->ij', A, x)
 
-        model.add_subsystem('p1', IndepVarComp('A', A))
-        model.add_subsystem('p2', IndepVarComp('b', b))
+        model.add_subsystem('p1', om.IndepVarComp('A', A))
+        model.add_subsystem('p2', om.IndepVarComp('b', b))
 
-        lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
-        lingrp.add_subsystem('lin', LinearSystemComp(size=3, vec_size=2, vectorize_A=True))
+        lingrp = model.add_subsystem('lingrp', om.Group(), promotes=['*'])
+        lingrp.add_subsystem('lin', om.LinearSystemComp(size=3, vec_size=2, vectorize_A=True))
 
         model.connect('p1.A', 'lin.A')
         model.connect('p2.b', 'lin.b')
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
-        lingrp.linear_solver = ScipyKrylov()
+        lingrp.linear_solver = om.ScipyKrylov()
 
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -126,20 +125,20 @@ class TestLinearSystemComp(unittest.TestCase):
         b = A.dot(x)
         b_T = A.T.dot(x)
 
-        lin_sys_comp = LinearSystemComp(size=3)
+        lin_sys_comp = om.LinearSystemComp(size=3)
 
-        prob = Problem()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('A', A))
-        prob.model.add_subsystem('p2', IndepVarComp('b', b))
+        prob.model.add_subsystem('p1', om.IndepVarComp('A', A))
+        prob.model.add_subsystem('p2', om.IndepVarComp('b', b))
 
-        lingrp = prob.model.add_subsystem('lingrp', Group(), promotes=['*'])
+        lingrp = prob.model.add_subsystem('lingrp', om.Group(), promotes=['*'])
         lingrp.add_subsystem('lin', lin_sys_comp)
 
         prob.model.connect('p1.A', 'lin.A')
         prob.model.connect('p2.b', 'lin.b')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob.run_model()
@@ -187,20 +186,20 @@ class TestLinearSystemComp(unittest.TestCase):
         b = np.einsum('jk,ik->ij', A, x)
         b_T = np.einsum('jk,ik->ij', A.T, x)
 
-        lin_sys_comp = LinearSystemComp(size=3, vec_size=2)
+        lin_sys_comp = om.LinearSystemComp(size=3, vec_size=2)
 
-        prob = Problem()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('A', A))
-        prob.model.add_subsystem('p2', IndepVarComp('b', b))
+        prob.model.add_subsystem('p1', om.IndepVarComp('A', A))
+        prob.model.add_subsystem('p2', om.IndepVarComp('b', b))
 
-        lingrp = prob.model.add_subsystem('lingrp', Group(), promotes=['*'])
+        lingrp = prob.model.add_subsystem('lingrp', om.Group(), promotes=['*'])
         lingrp.add_subsystem('lin', lin_sys_comp)
 
         prob.model.connect('p1.A', 'lin.A')
         prob.model.connect('p2.b', 'lin.b')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob.run_model()
@@ -249,20 +248,20 @@ class TestLinearSystemComp(unittest.TestCase):
         b = np.einsum('ijk,ik->ij', A, x)
         b_T = np.einsum('ijk,ik->ij', A.transpose(0, 2, 1), x)
 
-        lin_sys_comp = LinearSystemComp(size=3, vec_size=2, vectorize_A=True)
+        lin_sys_comp = om.LinearSystemComp(size=3, vec_size=2, vectorize_A=True)
 
-        prob = Problem()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('A', A))
-        prob.model.add_subsystem('p2', IndepVarComp('b', b))
+        prob.model.add_subsystem('p1', om.IndepVarComp('A', A))
+        prob.model.add_subsystem('p2', om.IndepVarComp('b', b))
 
-        lingrp = prob.model.add_subsystem('lingrp', Group(), promotes=['*'])
+        lingrp = prob.model.add_subsystem('lingrp', om.Group(), promotes=['*'])
         lingrp.add_subsystem('lin', lin_sys_comp)
 
         prob.model.connect('p1.A', 'lin.A')
         prob.model.connect('p2.b', 'lin.b')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
 
         prob.run_model()
@@ -315,27 +314,26 @@ class TestLinearSystemComp(unittest.TestCase):
     def test_feature_basic(self):
         import numpy as np
 
-        from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.api import LinearSystemComp, ScipyKrylov
+        import openmdao.api as om
 
-        model = Group()
+        model = om.Group()
 
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
         b = np.array([1.0, 2.0, -3.0])
 
-        model.add_subsystem('p1', IndepVarComp('A', A))
-        model.add_subsystem('p2', IndepVarComp('b', b))
+        model.add_subsystem('p1', om.IndepVarComp('A', A))
+        model.add_subsystem('p2', om.IndepVarComp('b', b))
 
-        lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
-        lingrp.add_subsystem('lin', LinearSystemComp(size=3))
+        lingrp = model.add_subsystem('lingrp', om.Group(), promotes=['*'])
+        lingrp.add_subsystem('lin', om.LinearSystemComp(size=3))
 
         model.connect('p1.A', 'lin.A')
         model.connect('p2.b', 'lin.b')
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
-        lingrp.linear_solver = ScipyKrylov()
+        lingrp.linear_solver = om.ScipyKrylov()
 
         prob.run_model()
 
@@ -344,27 +342,26 @@ class TestLinearSystemComp(unittest.TestCase):
     def test_feature_vectorized(self):
         import numpy as np
 
-        from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.api import LinearSystemComp, ScipyKrylov
+        import openmdao.api as om
 
-        model = Group()
+        model = om.Group()
 
         A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
         b = np.array([[2.0, -3.0, 4.0], [1.0, 0.0, -1.0]])
 
-        model.add_subsystem('p1', IndepVarComp('A', A))
-        model.add_subsystem('p2', IndepVarComp('b', b))
+        model.add_subsystem('p1', om.IndepVarComp('A', A))
+        model.add_subsystem('p2', om.IndepVarComp('b', b))
 
-        lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
-        lingrp.add_subsystem('lin', LinearSystemComp(size=3, vec_size=2))
+        lingrp = model.add_subsystem('lingrp', om.Group(), promotes=['*'])
+        lingrp.add_subsystem('lin', om.LinearSystemComp(size=3, vec_size=2))
 
         model.connect('p1.A', 'lin.A')
         model.connect('p2.b', 'lin.b')
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
-        lingrp.linear_solver = ScipyKrylov()
+        lingrp.linear_solver = om.ScipyKrylov()
 
         prob.run_model()
 
@@ -375,28 +372,27 @@ class TestLinearSystemComp(unittest.TestCase):
     def test_feature_vectorized_A(self):
         import numpy as np
 
-        from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.api import LinearSystemComp, ScipyKrylov
+        import openmdao.api as om
 
-        model = Group()
+        model = om.Group()
 
         A = np.array([[[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]],
                       [[2.0, 3.0, 4.0], [1.0, -1.0, -2.0], [3.0, 2.0, -2.0]]])
         b = np.array([[-5.0, 2.0, 3.0], [-1.0, 1.0, -3.0]])
 
-        model.add_subsystem('p1', IndepVarComp('A', A))
-        model.add_subsystem('p2', IndepVarComp('b', b))
+        model.add_subsystem('p1', om.IndepVarComp('A', A))
+        model.add_subsystem('p2', om.IndepVarComp('b', b))
 
-        lingrp = model.add_subsystem('lingrp', Group(), promotes=['*'])
-        lingrp.add_subsystem('lin', LinearSystemComp(size=3, vec_size=2, vectorize_A=True))
+        lingrp = model.add_subsystem('lingrp', om.Group(), promotes=['*'])
+        lingrp.add_subsystem('lin', om.LinearSystemComp(size=3, vec_size=2, vectorize_A=True))
 
         model.connect('p1.A', 'lin.A')
         model.connect('p2.b', 'lin.b')
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
-        lingrp.linear_solver = ScipyKrylov()
+        lingrp.linear_solver = om.ScipyKrylov()
 
         prob.run_model()
 

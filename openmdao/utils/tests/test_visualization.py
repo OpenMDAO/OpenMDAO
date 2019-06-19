@@ -9,7 +9,7 @@ try:
 except ImportError:
     matplotlib = None
 
-from openmdao.api import Problem, IndepVarComp, ExplicitComponent, Group, partial_deriv_plot
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 @unittest.skipUnless(matplotlib, "Matplotlib is required.")
@@ -20,7 +20,7 @@ class TestVisualization(unittest.TestCase):
 
     def test_partial_deriv_plot(self):
 
-        class ArrayComp2D(ExplicitComponent):
+        class ArrayComp2D(om.ExplicitComponent):
             """
             A fairly simple array component with an intentional error in compute_partials.
             """
@@ -50,15 +50,15 @@ class TestVisualization(unittest.TestCase):
                 error[1][2] = - 2.0 * err
                 partials[('y1', 'x1')] = self.JJ + error
 
-        prob = Problem()
-        prob.model = model = Group()
-        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))), promotes=['x1'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))), promotes=['x1'])
         model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
         prob.setup(check=False, mode='fwd')
         check_partials_data = prob.check_partials(out_stream=None)
 
         # plot with defaults
-        fig, ax = partial_deriv_plot('y1', 'x1', check_partials_data, title="Defaults")
+        fig, ax = om.partial_deriv_plot('y1', 'x1', check_partials_data, title="Defaults")
         # Instead of seeing if the images created by matplotlib match what we expect, which
         # is a fragile thing to do in testing, check a data structure inside matplotlib's
         # objects. We will assume matplotlib draws the correct thing.
@@ -82,8 +82,8 @@ class TestVisualization(unittest.TestCase):
         assert_rel_error(self, expected_array, actual_array, 1e-8)
 
         # plot with specified jac_method
-        fig, ax = partial_deriv_plot('y1', 'x1', check_partials_data, jac_method = "J_rev",
-                           title="specified jac_method")
+        fig, ax = om.partial_deriv_plot('y1', 'x1', check_partials_data, jac_method = "J_rev",
+                                        title="specified jac_method")
         expected_array = np.array([[1., 0., 0., 1.],
                                    [0., 1., 0., 0.],
                                    [1., 0., 1., 0.],
@@ -104,8 +104,8 @@ class TestVisualization(unittest.TestCase):
         assert_rel_error(self, expected_array, actual_array, 1e-8)
 
         # plot in non-binary mode
-        fig, ax = partial_deriv_plot('y1', 'x1', check_partials_data, binary = False,
-                                     title="non-binary")
+        fig, ax = om.partial_deriv_plot('y1', 'x1', check_partials_data, binary = False,
+                                        title="non-binary")
         expected_array = np.array([[ 1. ,  0. ,  0. ,  7. ],
                                    [ 0. ,  2.5,  0. ,  0. ],
                                    [-1. ,  0. ,  8. ,  0. ],
@@ -127,10 +127,10 @@ class TestVisualization(unittest.TestCase):
 
         # plot with different tol values
         # Not obvious how to test this other than image matching
-        partial_deriv_plot('y1', 'x1', check_partials_data, tol=1e-5,
-                                     title="tol greater than err")
-        partial_deriv_plot('y1', 'x1', check_partials_data, tol=1e-10,
-                                     title="tol less than err")
+        om.partial_deriv_plot('y1', 'x1', check_partials_data, tol=1e-5,
+                              title="tol greater than err")
+        om.partial_deriv_plot('y1', 'x1', check_partials_data, tol=1e-10,
+                              title="tol less than err")
 
 
 @unittest.skipUnless(matplotlib, "Matplotlib is required.")
@@ -141,8 +141,9 @@ class TestFeatureVisualization(unittest.TestCase):
 
     def test_partial_deriv_plot(self):
         import numpy as np
-        from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
-        class ArrayComp2D(ExplicitComponent):
+        import openmdao.api as om
+
+        class ArrayComp2D(om.ExplicitComponent):
             """
             A fairly simple array component with an intentional error in compute_partials.
             """
@@ -174,20 +175,21 @@ class TestFeatureVisualization(unittest.TestCase):
                 error[1][2] = - 2.0 * err
                 partials[('y1', 'x1')] = self.JJ + error
 
-        prob = Problem()
-        prob.model = model = Group()
-        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))), promotes=['x1'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))), promotes=['x1'])
         model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
         prob.setup(check=False, mode='fwd')
         check_partials_data = prob.check_partials(out_stream=None)
 
         # plot with defaults
-        partial_deriv_plot('y1', 'x1', check_partials_data)
+        om.partial_deriv_plot('y1', 'x1', check_partials_data)
 
     def test_partial_deriv_non_binary_plot(self):
         import numpy as np
-        from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
-        class ArrayComp2D(ExplicitComponent):
+        import openmdao.api as om
+
+        class ArrayComp2D(om.ExplicitComponent):
             """
             A fairly simple array component with an intentional error in compute_partials.
             """
@@ -219,15 +221,15 @@ class TestFeatureVisualization(unittest.TestCase):
                 error[1][2] = - 2.0 * err
                 partials[('y1', 'x1')] = self.JJ + error
 
-        prob = Problem()
-        prob.model = model = Group()
-        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))), promotes=['x1'])
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))), promotes=['x1'])
         model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
         prob.setup(check=False, mode='fwd')
         check_partials_data = prob.check_partials(out_stream=None)
 
         # plot in non-binary mode
-        partial_deriv_plot('y1', 'x1', check_partials_data, binary = False)
+        om.partial_deriv_plot('y1', 'x1', check_partials_data, binary = False)
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ class CircleOpt(om.Group):
         indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
                                           0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
         indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                                         -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
         indeps.add_output('r', .7)
 
         self.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', vectorize=True,
@@ -68,8 +68,8 @@ class CircleOpt(om.Group):
 
 
 if __name__ == '__main__':
-	p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
-	p.setup(mode='fwd')
-	p.run_driver()
+    p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
+    p.setup(mode='fwd')
+    p.run_driver()
 
-	print(p['circle.area'], np.pi)
+    print(p['circle.area'], np.pi)

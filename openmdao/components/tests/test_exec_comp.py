@@ -14,7 +14,7 @@ try:
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
-from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+import openmdao.api as om
 from openmdao.components.exec_comp import _expr_dict
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -260,72 +260,72 @@ _ufunc_test_data = {
 class TestExecComp(unittest.TestCase):
 
     def test_no_expr(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp())
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp())
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: No valid expressions provided to ExecComp(): [].")
 
     def test_colon_vars(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('y=foo:bar+1.'))
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=foo:bar+1.'))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: failed to compile expression 'y=foo:bar+1.'.")
 
     def test_bad_kwargs(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('y=x+1.', xx=2.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=x+1.', xx=2.0))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: arg 'xx' in call to ExecComp() does not refer to any variable "
                          "in the expressions ['y=x+1.']")
 
     def test_bad_kwargs_meta(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('y=x+1.',
-                                                x={'val': 2, 'low': 0, 'high': 10, 'units': 'ft'}))
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=x+1.',
+                                                   x={'val': 2, 'low': 0, 'high': 10, 'units': 'ft'}))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: the following metadata names were not recognized for "
                          "variable 'x': ['high', 'low', 'val']")
 
     def test_name_collision_const(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('e=x+1.'))
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('e=x+1.'))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: cannot assign to variable 'e' because it's already defined "
                          "as an internal function or constant.")
 
     def test_name_collision_func(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('sin=x+1.'))
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('sin=x+1.'))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: cannot assign to variable 'sin' because it's already defined "
                          "as an internal function or constant.")
 
     def test_func_as_rhs_var(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('y=sin+1.'))
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=sin+1.'))
         with self.assertRaises(Exception) as context:
-            prob.setup(check=False)
+            prob.setup()
         self.assertEqual(str(context.exception),
                          "C1: cannot use 'sin' as a variable because it's already defined "
                          "as an internal function.")
 
     def test_mixed_type(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=sum(x)',
-                                                     x=np.arange(10, dtype=float)))
-        prob.setup(check=False)
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=sum(x)',
+                                                        x=np.arange(10, dtype=float)))
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -339,10 +339,10 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 45.0, 0.00001)
 
     def test_simple(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+1.', x=2.0))
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+1.', x=2.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -356,10 +356,10 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 3.0, 0.00001)
 
     def test_for_spaces(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('y = pi * x', x=2.0))
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y = pi * x', x=2.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -374,15 +374,15 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 2 * math.pi, 0.00001)
 
     def test_units(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.',
-                                                     x={'value': 2.0, 'units': 'm'},
-                                                     y={'units': 'm'},
-                                                     z=2.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
+                                                        x={'value': 2.0, 'units': 'm'},
+                                                        y={'units': 'm'},
+                                                        z=2.0))
         prob.model.connect('indep.x', 'C1.x')
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -390,51 +390,51 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 4.0, 0.00001)
 
     def test_units_varname(self):
-        prob = Problem(model=Group())
+        prob = om.Problem()
 
         with self.assertRaises(TypeError) as cm:
-            prob.model.add_subsystem('C1', ExecComp('y=x+units+1.',
-                                                    x={'value': 2.0, 'units': 'm'},
-                                                    y={'units': 'm'},
-                                                    units=2.0))
+            prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
+                                                       x={'value': 2.0, 'units': 'm'},
+                                                       y={'units': 'm'},
+                                                       units=2.0))
 
         self.assertEqual(str(cm.exception),
                          "Value (2.0) of option 'units' has type 'float', "
                          "but type 'str' was expected.")
 
     def test_units_varname_str(self):
-        prob = Problem(model=Group())
+        prob = om.Problem()
 
         with self.assertRaises(ValueError) as cm:
-            prob.model.add_subsystem('C1', ExecComp('y=x+units+1.',
-                                                    x={'value': 2.0, 'units': 'm'},
-                                                    y={'units': 'm'},
-                                                    units='two'))
+            prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
+                                                       x={'value': 2.0, 'units': 'm'},
+                                                       y={'units': 'm'},
+                                                       units='two'))
 
         self.assertEqual(str(cm.exception), "The units 'two' are invalid.")
 
     def test_units_varname_novalue(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+units+1.',
-                                                     x={'value': 2.0, 'units': 'm'},
-                                                     y={'units': 'm'}))
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+units+1.',
+                                                        x={'value': 2.0, 'units': 'm'},
+                                                        y={'units': 'm'}))
         prob.model.connect('indep.x', 'C1.x')
 
         with self.assertRaises(NameError) as cm:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(cm.exception),
                          "C1: cannot use variable name 'units' because it's a reserved keyword.")
 
     def test_common_units(self):
         # all variables in the ExecComp have the same units
-        prob = Problem(model=Group())
+        prob = om.Problem()
 
-        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
-        prob.model.add_subsystem('comp', ExecComp('y=x+z+1.', units='m',
-                                                  x={'value': 2.0},
-                                                  z=2.0))
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        prob.model.add_subsystem('comp', om.ExecComp('y=x+z+1.', units='m',
+                                                     x={'value': 2.0},
+                                                     z=2.0))
         prob.model.connect('indep.x', 'comp.x')
 
         prob.setup()
@@ -444,10 +444,10 @@ class TestExecComp(unittest.TestCase):
 
     def test_common_units_no_meta(self):
         # make sure common units are assigned when no metadata is provided
-        prob = Problem()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('indep', IndepVarComp('x', 2.0, units='km'))
-        prob.model.add_subsystem('comp', ExecComp('y = x+1', units='m'))
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0, units='km'))
+        prob.model.add_subsystem('comp', om.ExecComp('y = x+1', units='m'))
 
         prob.model.connect('indep.x', 'comp.x')
 
@@ -457,28 +457,28 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 2001., 0.00001)
 
     def test_conflicting_units(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.', units='m',
-                                                     x={'value': 2.0, 'units': 'km'},
-                                                     z=2.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.', units='m',
+                                                        x={'value': 2.0, 'units': 'km'},
+                                                        z=2.0))
         prob.model.connect('indep.x', 'C1.x')
 
         with self.assertRaises(RuntimeError) as cm:
-            prob.setup(check=False)
+            prob.setup()
 
         self.assertEqual(str(cm.exception),
                          "C1: units of 'km' have been specified for variable 'x', but "
                          "units of 'm' have been specified for the entire component.")
 
     def test_shape_and_value(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5',
-                                             x={'shape': (5,), 'value': np.zeros(5)},
-                                             y={'shape': (5,), 'value': np.zeros(5)}))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
+                                                x={'shape': (5,), 'value': np.zeros(5)},
+                                                y={'shape': (5,), 'value': np.zeros(5)}))
 
         model.connect('indep.x', 'comp.x')
 
@@ -490,13 +490,13 @@ class TestExecComp(unittest.TestCase):
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_conflicting_shape(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5',
-                                             x={'shape': (5,), 'value': 5},
-                                             y={'shape': (5,)}))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5',
+                                                x={'shape': (5,), 'value': 5},
+                                                y={'shape': (5,)}))
 
         model.connect('indep.x', 'comp.x')
 
@@ -508,11 +508,11 @@ class TestExecComp(unittest.TestCase):
                          "but a value of shape (1,) has been provided.")
 
     def test_common_shape(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', shape=(5,)))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,)))
 
         model.connect('indep.x', 'comp.x')
 
@@ -524,13 +524,13 @@ class TestExecComp(unittest.TestCase):
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_common_shape_with_values(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', shape=(5,),
-                                             x={'value': np.zeros(5)},
-                                             y={'value': np.zeros(5)}))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
+                                                x={'value': np.zeros(5)},
+                                                y={'value': np.zeros(5)}))
 
         model.connect('indep.x', 'comp.x')
 
@@ -542,12 +542,12 @@ class TestExecComp(unittest.TestCase):
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_common_shape_conflicting_shape(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', shape=(5,),
-                                             y={'shape': (10,)}))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
+                                                y={'shape': (10,)}))
 
         model.connect('indep.x', 'comp.x')
 
@@ -559,12 +559,12 @@ class TestExecComp(unittest.TestCase):
                          "but shape of (5,) has been specified for the entire component.")
 
     def test_common_shape_conflicting_value(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', shape=(5,),
-                                             x={'value': 5}))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', shape=(5,),
+                                                x={'value': 5}))
 
         model.connect('indep.x', 'comp.x')
 
@@ -576,10 +576,10 @@ class TestExecComp(unittest.TestCase):
                          "but shape of (5,) has been specified for the entire component.")
 
     def test_math(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=sin(x)', x=2.0))
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=sin(x)', x=2.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -593,12 +593,12 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], math.sin(2.0), 0.00001)
 
     def test_array(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=x[1]',
-                                                     x=np.array([1., 2., 3.]),
-                                                     y=0.0))
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x[1]',
+                                                        x=np.array([1., 2., 3.]),
+                                                        y=0.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -612,12 +612,12 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], 2.0, 0.00001)
 
     def test_array_lhs(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp(['y[0]=x[1]', 'y[1]=x[0]'],
-                                                     x=np.array([1., 2., 3.]),
-                                                     y=np.array([0., 0.])))
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp(['y[0]=x[1]', 'y[1]=x[0]'],
+                                                        x=np.array([1., 2., 3.]),
+                                                        y=np.array([0., 0.])))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -631,16 +631,15 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._outputs['y'], np.array([2., 1.]), 0.00001)
 
     def test_simple_array_model(self):
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
-        prob.model.add_subsystem('comp', ExecComp(['y[0]=2.0*x[0]+7.0*x[1]',
-                                                   'y[1]=5.0*x[0]-3.0*x[1]'],
-                                                  x=np.zeros([2]), y=np.zeros([2])))
+        prob = om.Problem()
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', np.ones([2])))
+        prob.model.add_subsystem('comp', om.ExecComp(['y[0]=2.0*x[0]+7.0*x[1]',
+                                                      'y[1]=5.0*x[0]-3.0*x[1]'],
+                                                     x=np.zeros([2]), y=np.zeros([2])))
 
         prob.model.connect('p1.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -654,16 +653,15 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, data['comp'][('y', 'x')]['rel error'][2], 0.0, 1e-5)
 
     def test_simple_array_model2(self):
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones([2])))
-        prob.model.add_subsystem('comp', ExecComp('y = mat.dot(x)',
-                                                  x=np.zeros((2,)), y=np.zeros((2,)),
-                                                  mat=np.array([[2., 7.], [5., -3.]])))
+        prob = om.Problem()
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', np.ones([2])))
+        prob.model.add_subsystem('comp', om.ExecComp('y = mat.dot(x)',
+                                                     x=np.zeros((2,)), y=np.zeros((2,)),
+                                                     mat=np.array([[2., 7.], [5., -3.]])))
 
         prob.model.connect('p1.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -677,10 +675,10 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, data['comp'][('y', 'x')]['rel error'][2], 0.0, 1e-5)
 
     def test_complex_step(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp(['y=2.0*x+1.'], x=2.0))
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp(['y=2.0*x+1.'], x=2.0))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Conclude setup but don't run model.
         prob.final_setup()
@@ -698,9 +696,9 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._jacobian[('y', 'x')], [[2.0]], 0.00001)
 
     def test_complex_step2(self):
-        prob = Problem(Group())
-        prob.model.add_subsystem('p1', IndepVarComp('x', 2.0))
-        prob.model.add_subsystem('comp', ExecComp('y=x*x + x*2.0'))
+        prob = om.Problem(om.Group())
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 2.0))
+        prob.model.add_subsystem('comp', om.ExecComp('y=x*x + x*2.0'))
         prob.model.connect('p1.x', 'comp.x')
         prob.set_solver_print(level=0)
 
@@ -717,10 +715,10 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, J['comp.y', 'p1.x'], np.array([[6.0]]), 0.00001)
 
     def test_abs_complex_step(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=2.0*abs(x)', x=-2.0))
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=2.0*abs(x)', x=-2.0))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -740,11 +738,11 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._jacobian['y', 'x'], [[2.0]], 0.00001)
 
     def test_abs_array_complex_step(self):
-        prob = Problem(model=Group())
-        C1 = prob.model.add_subsystem('C1', ExecComp('y=2.0*abs(x)',
-                                                     x=np.ones(3)*-2.0, y=np.zeros(3)))
+        prob = om.Problem()
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=2.0*abs(x)',
+                                                        x=np.ones(3)*-2.0, y=np.zeros(3)))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=0)
         prob.run_model()
 
@@ -773,13 +771,13 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, C1._jacobian['y', 'x'], expect, 0.00001)
 
     def test_vectorize_error(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(3)))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(3)))
         model.add_design_var('indep.x')
 
         mat = np.arange(15).reshape((3,5))
-        model.add_subsystem('comp', ExecComp('y=A.dot(x)', vectorize=True, A=mat, x=np.ones(5), y=np.ones(3)))
+        model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', vectorize=True, A=mat, x=np.ones(5), y=np.ones(3)))
         model.connect('indep.x', 'comp.x')
 
         with self.assertRaises(Exception) as context:
@@ -788,12 +786,12 @@ class TestExecComp(unittest.TestCase):
                          "comp: vectorize is True but partial(y, A) is not square (shape=(3, 15)).")
 
     def test_vectorize_shape_only(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', vectorize=True,
-                                             x={'shape': (5,)}, y={'shape': (5,)}))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', vectorize=True,
+                                                x={'shape': (5,)}, y={'shape': (5,)}))
         model.connect('indep.x', 'comp.x')
 
         p.setup()
@@ -805,13 +803,13 @@ class TestExecComp(unittest.TestCase):
 
     def test_feature_vectorize(self):
         import numpy as np
-        from openmdao.api import IndepVarComp, Problem, ExecComp
+        import openmdao.api as om
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(5)))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', ExecComp('y=3.0*x + 2.5', vectorize=True, x=np.ones(5), y=np.ones(5)))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', vectorize=True, x=np.ones(5), y=np.ones(5)))
         model.connect('indep.x', 'comp.x')
 
         p.setup()
@@ -822,13 +820,13 @@ class TestExecComp(unittest.TestCase):
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
     def test_feature_simple(self):
-        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p', IndepVarComp('x', 2.0))
-        model.add_subsystem('comp', ExecComp('y=x+1.'))
+        model.add_subsystem('p', om.IndepVarComp('x', 2.0))
+        model.add_subsystem('comp', om.ExecComp('y=x+1.'))
 
         model.connect('p.x', 'comp.x')
 
@@ -840,13 +838,13 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 3.0, 0.00001)
 
     def test_feature_multi_output(self):
-        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p', IndepVarComp('x', 2.0))
-        model.add_subsystem('comp', ExecComp(['y1=x+1.', 'y2=x-1.']))
+        model.add_subsystem('p', om.IndepVarComp('x', 2.0))
+        model.add_subsystem('comp', om.ExecComp(['y1=x+1.', 'y2=x-1.']))
 
         model.connect('p.x', 'comp.x')
 
@@ -861,15 +859,15 @@ class TestExecComp(unittest.TestCase):
     def test_feature_array(self):
         import numpy as np
 
-        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p', IndepVarComp('x', np.array([1., 2., 3.])))
-        model.add_subsystem('comp', ExecComp('y=x[1]',
-                                             x=np.array([1., 2., 3.]),
-                                             y=0.0))
+        model.add_subsystem('p', om.IndepVarComp('x', np.array([1., 2., 3.])))
+        model.add_subsystem('comp', om.ExecComp('y=x[1]',
+                                                x=np.array([1., 2., 3.]),
+                                                y=0.0))
         model.connect('p.x', 'comp.x')
 
         prob.setup()
@@ -882,14 +880,14 @@ class TestExecComp(unittest.TestCase):
     def test_feature_math(self):
         import numpy as np
 
-        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', np.pi/2.0))
-        model.add_subsystem('p2', IndepVarComp('y', np.pi/2.0))
-        model.add_subsystem('comp', ExecComp('z = sin(x)**2 + cos(y)**2'))
+        model.add_subsystem('p1', om.IndepVarComp('x', np.pi/2.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', np.pi/2.0))
+        model.add_subsystem('comp', om.ExecComp('z = sin(x)**2 + cos(y)**2'))
 
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
@@ -904,13 +902,13 @@ class TestExecComp(unittest.TestCase):
     def test_feature_numpy(self):
         import numpy as np
 
-        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p', IndepVarComp('x', np.array([1., 2., 3.])))
-        model.add_subsystem('comp', ExecComp('y=sum(x)', x=np.zeros((3, ))))
+        model.add_subsystem('p', om.IndepVarComp('x', np.array([1., 2., 3.])))
+        model.add_subsystem('comp', om.ExecComp('y=sum(x)', x=np.zeros((3, ))))
         model.connect('p.x', 'comp.x')
 
         prob.setup()
@@ -921,17 +919,17 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.y'], 6.0, 0.00001)
 
     def test_feature_metadata(self):
-        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 12.0, units='inch'))
-        model.add_subsystem('p2', IndepVarComp('y', 1.0, units='ft'))
-        model.add_subsystem('comp', ExecComp('z=x+y',
-                                             x={'value': 0.0, 'units': 'inch'},
-                                             y={'value': 0.0, 'units': 'inch'},
-                                             z={'value': 0.0, 'units': 'inch'}))
+        model.add_subsystem('p1', om.IndepVarComp('x', 12.0, units='inch'))
+        model.add_subsystem('p2', om.IndepVarComp('y', 1.0, units='ft'))
+        model.add_subsystem('comp', om.ExecComp('z=x+y',
+                                                x={'value': 0.0, 'units': 'inch'},
+                                                y={'value': 0.0, 'units': 'inch'},
+                                                z={'value': 0.0, 'units': 'inch'}))
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
@@ -943,18 +941,18 @@ class TestExecComp(unittest.TestCase):
         assert_rel_error(self, prob['comp.z'], 24.0, 0.00001)
 
     def test_feature_options(self):
-        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+        import openmdao.api as om
 
-        model = Group()
+        model = om.Group()
 
-        indep = model.add_subsystem('indep', IndepVarComp('x', shape=(2,), units='cm'))
-        xcomp = model.add_subsystem('comp', ExecComp('y=2*x', shape=(2,)))
+        indep = model.add_subsystem('indep', om.IndepVarComp('x', shape=(2,), units='cm'))
+        xcomp = model.add_subsystem('comp', om.ExecComp('y=2*x', shape=(2,)))
 
         xcomp.options['units'] = 'm'
 
         model.connect('indep.x', 'comp.x')
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
         prob['indep.x'] = [100., 200.]
@@ -972,18 +970,18 @@ class TestExecCompParameterized(unittest.TestCase):
     def test_exec_comp_value(self, f):
         test_data = _ufunc_test_data[f]
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
         if len(test_data['args']) > 1:
-            ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
+            ivc = model.add_subsystem(name='ivc', subsys=om.IndepVarComp())
             for arg_name, arg_value in iteritems(test_data['args']):
                 if arg_name == 'f':
                     continue
                 ivc.add_output(name=arg_name, val=arg_value['value'])
                 model.connect('ivc.{0}'.format(arg_name), 'comp.{0}'.format(arg_name))
 
-        model.add_subsystem('comp', ExecComp(test_data['str'], **test_data['args']),
+        model.add_subsystem('comp', om.ExecComp(test_data['str'], **test_data['args']),
                             promotes_outputs=['f'])
         prob.setup()
         prob.run_model()
@@ -1017,11 +1015,11 @@ class TestExecCompParameterized(unittest.TestCase):
     def test_exec_comp_jac(self, f):
         test_data = _ufunc_test_data[f]
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
         if len(test_data['args']) > 1:
-            ivc = model.add_subsystem(name='ivc', subsys=IndepVarComp())
+            ivc = model.add_subsystem(name='ivc', subsys=om.IndepVarComp())
             for arg_name, arg_value in iteritems(test_data['args']):
                 if arg_name == 'f':
                     continue
@@ -1030,7 +1028,7 @@ class TestExecCompParameterized(unittest.TestCase):
                               '{0}_comp.{1}'.format(f, arg_name))
 
         model.add_subsystem('{0}_comp'.format(f),
-                            ExecComp(test_data['str'], **test_data['args']),
+                            om.ExecComp(test_data['str'], **test_data['args']),
                             promotes_outputs=['f'])
         prob.setup()
         prob.run_model()

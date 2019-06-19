@@ -2,10 +2,10 @@
 
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
 
-class DoubleArrayComp(ExplicitComponent):
+class DoubleArrayComp(om.ExplicitComponent):
     """
     A fairly simple array component.
     """
@@ -51,7 +51,7 @@ class DoubleArrayComp(ExplicitComponent):
         partials[('y2', 'x2')] = self.JJ[2:4, 2:4]
 
 
-class NonSquareArrayComp(ExplicitComponent):
+class NonSquareArrayComp(om.ExplicitComponent):
     """
     A fairly simple array component.
     """
@@ -97,7 +97,7 @@ class NonSquareArrayComp(ExplicitComponent):
         partials[('y2', 'x2')] = self.JJ[3:4, 2:4]
 
 
-class TestExplCompDeprecated(ExplicitComponent):
+class TestExplCompDeprecated(om.ExplicitComponent):
     """
     A component that adds variables in the __init__ function.
     """

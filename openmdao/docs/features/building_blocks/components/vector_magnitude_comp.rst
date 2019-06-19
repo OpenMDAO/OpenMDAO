@@ -37,6 +37,6 @@ Units are assigned using `units`.  The units of the output magnitude are the sam
 the input.
 
 .. embed-code::
-    openmdao.components.tests.test_vector_magnitude_comp.TestForDocs.test
+    openmdao.components.tests.test_vector_magnitude_comp.TestFeature.test
 
 .. tags:: VectorMagnitudeComp, Component

@@ -7,9 +7,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, ExplicitComponent, ImplicitComponent, \
-    IndepVarComp, ExecComp, NonlinearRunOnce, NonlinearBlockGS, ScipyKrylov, NewtonSolver, \
-    DirectSolver, LinearBlockGS, BroydenSolver
+import openmdao.api as om
 from openmdao.core.tests.test_impl_comp import QuadraticLinearize, QuadraticJacVec
 from openmdao.core.tests.test_matmat import MultiJacVec
 from openmdao.test_suite.components.impl_comp_array import TestImplCompArrayMatVec
@@ -29,7 +27,7 @@ except ImportError:
     PETScVector = None
 
 
-class ParaboloidTricky(ExplicitComponent):
+class ParaboloidTricky(om.ExplicitComponent):
     """
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
@@ -68,7 +66,7 @@ class ParaboloidTricky(ExplicitComponent):
         partials['f_xy', 'y'] = 2.0*y*sc*sc + 8.0*sc + x*sc*sc
 
 
-class MyCompGoodPartials(ExplicitComponent):
+class MyCompGoodPartials(om.ExplicitComponent):
     def setup(self):
         self.add_input('x1', 3.0)
         self.add_input('x2', 5.0)
@@ -85,7 +83,7 @@ class MyCompGoodPartials(ExplicitComponent):
         J['y', 'x2'] = np.array([4.0])
 
 
-class MyCompBadPartials(ExplicitComponent):
+class MyCompBadPartials(om.ExplicitComponent):
     def setup(self):
         self.add_input('y1', 3.0)
         self.add_input('y2', 5.0)
@@ -102,7 +100,7 @@ class MyCompBadPartials(ExplicitComponent):
         J['z', 'y2'] = np.array([40.0])
 
 
-class MyComp(ExplicitComponent):
+class MyComp(om.ExplicitComponent):
     def setup(self):
         self.add_input('x1', 3.0)
         self.add_input('x2', 5.0)
@@ -125,11 +123,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_incorrect_jacobian(self):
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
 
         prob.model.connect('p1.x1', 'comp.x1')
@@ -137,7 +134,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         stream = cStringIO()
@@ -158,12 +155,12 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_component_only(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = MyComp()
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         stream = cStringIO()
@@ -178,12 +175,12 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_component_only_suppress(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = MyComp()
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         stream = cStringIO()
@@ -199,13 +196,13 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(len(lines), 0)
 
     def test_component_has_no_outputs(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem("indep", IndepVarComp('x', 5.))
-        model.add_subsystem("comp1", ExecComp("y=2*x"))
+        model.add_subsystem("indep", om.IndepVarComp('x', 5.))
+        model.add_subsystem("comp1", om.ExecComp("y=2*x"))
 
-        comp2 = model.add_subsystem("comp2", ExplicitComponent())
+        comp2 = model.add_subsystem("comp2", om.ExplicitComponent())
         comp2.add_input('x', val=0.)
 
         model.connect('indep.x', ['comp1.x', 'comp2.x'])
@@ -230,7 +227,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_rel_error(self, data['comp1'][('y', 'x')]['J_rev'][0][0], 2., 1e-15)
 
     def test_missing_entry(self):
-        class MyComp(ExplicitComponent):
+        class MyComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -250,10 +247,9 @@ class TestProblemCheckPartials(unittest.TestCase):
                 J['y', 'x1'] = np.array([3.0])
                 self.lin_count += 1
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
 
         prob.model.connect('p1.x1', 'comp.x1')
@@ -261,7 +257,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
@@ -287,7 +283,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                                delta=1e-6)
 
     def test_nested_fd_units(self):
-        class UnitCompBase(ExplicitComponent):
+        class UnitCompBase(om.ExplicitComponent):
             def setup(self):
                 self.add_input('T', val=284., units="degR", desc="Temperature")
                 self.add_input('P', val=1., units='lbf/inch**2', desc="Pressure")
@@ -302,9 +298,9 @@ class TestProblemCheckPartials(unittest.TestCase):
                 outputs['flow:T'] = inputs['T']
                 outputs['flow:P'] = inputs['P']
 
-        p = Problem()
-        model = p.model = Group()
-        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+        p = om.Problem()
+        model = p.model
+        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
 
         indep.add_output('T', val=100., units='degK')
         indep.add_output('P', val=1., units='bar')
@@ -323,7 +319,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 self.assertAlmostEqual(np.linalg.norm(forward - fd), 0., delta=1e-6)
 
     def test_units(self):
-        class UnitCompBase(ExplicitComponent):
+        class UnitCompBase(om.ExplicitComponent):
             def setup(self):
                 self.add_input('T', val=284., units="degR", desc="Temperature")
                 self.add_input('P', val=1., units='lbf/inch**2', desc="Pressure")
@@ -345,16 +341,16 @@ class TestProblemCheckPartials(unittest.TestCase):
 
                 self.run_count += 1
 
-        p = Problem()
-        model = p.model = Group()
-        indep = model.add_subsystem('indep', IndepVarComp(), promotes=['*'])
+        p = om.Problem()
+        model = p.model
+        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
 
         indep.add_output('T', val=100., units='degK')
         indep.add_output('P', val=1., units='bar')
 
         units = model.add_subsystem('units', UnitCompBase(), promotes=['*'])
 
-        model.nonlinear_solver = NonlinearRunOnce()
+        model.nonlinear_solver = om.NonlinearRunOnce()
 
         p.setup()
         data = p.check_partials(out_stream=None)
@@ -373,7 +369,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(units.run_count, 5)
 
     def test_scalar_val(self):
-        class PassThrough(ExplicitComponent):
+        class PassThrough(om.ExplicitComponent):
             """
             Helper component that is needed when variables must be passed
             directly from input to output
@@ -411,9 +407,9 @@ class TestProblemCheckPartials(unittest.TestCase):
             def linearize(self, inputs, outputs, J):
                 pass
 
-        p = Problem()
+        p = om.Problem()
 
-        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
         indeps.add_output('foo', val=np.ones(4))
         indeps.add_output('foo2', val=np.ones(4))
 
@@ -436,11 +432,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_rel_error(self, data['pt2'][('bar2', 'foo2')]['J_fd'], identity, 1e-9)
 
     def test_matrix_free_explicit(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidMatVec())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -448,7 +443,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
@@ -470,17 +465,16 @@ class TestProblemCheckPartials(unittest.TestCase):
         assert_rel_error(self, data['comp'][('f_xy', 'y')]['J_rev'][0][0], 21.0, 1e-6)
 
     def test_matrix_free_implicit(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('rhs', np.ones((2, ))))
+        prob.model.add_subsystem('p1', om.IndepVarComp('rhs', np.ones((2, ))))
         prob.model.add_subsystem('comp', TestImplCompArrayMatVec())
 
         prob.model.connect('p1.rhs', 'comp.rhs')
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
@@ -500,7 +494,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         # Test to see that check_partials works when state_wrt_input and state_wrt_state
         # partials are missing.
 
-        class ImplComp4Test(ImplicitComponent):
+        class ImplComp4Test(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('x', np.ones(2))
@@ -521,11 +515,10 @@ class TestProblemCheckPartials(unittest.TestCase):
                 partials['y', 'x'] = -np.eye(2)
                 partials['y', 'y'] = self.mtx
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', np.ones((2, ))))
-        prob.model.add_subsystem('p2', IndepVarComp('dummy', np.ones((2, ))))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', np.ones((2, ))))
+        prob.model.add_subsystem('p2', om.IndepVarComp('dummy', np.ones((2, ))))
         prob.model.add_subsystem('comp', ImplComp4Test())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -533,7 +526,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
@@ -546,7 +539,7 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_dependent_false_hide(self):
         # Test that we omit derivs declared with dependent=False
 
-        class SimpleComp1(ExplicitComponent):
+        class SimpleComp1(om.ExplicitComponent):
             def setup(self):
                 self.add_input('z', shape=(2, 2))
                 self.add_input('x', shape=(2, 2))
@@ -561,16 +554,15 @@ class TestProblemCheckPartials(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['g', 'x'] = 3.
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('z', np.ones((2, 2))))
-        prob.model.add_subsystem('p2', IndepVarComp('x', np.ones((2, 2))))
+        prob.model.add_subsystem('p1', om.IndepVarComp('z', np.ones((2, 2))))
+        prob.model.add_subsystem('p2', om.IndepVarComp('x', np.ones((2, 2))))
         prob.model.add_subsystem('comp', SimpleComp1())
         prob.model.connect('p1.z', 'comp.z')
         prob.model.connect('p2.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
 
         stream = cStringIO()
         data = prob.check_partials(out_stream=stream)
@@ -585,7 +577,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         # API Change: we no longer omit derivatives for compact_print, even when declared as not
         # dependent.
 
-        class SimpleComp1(ExplicitComponent):
+        class SimpleComp1(om.ExplicitComponent):
             def setup(self):
                 self.add_input('z', shape=(2, 2))
                 self.add_input('x', shape=(2, 2))
@@ -600,16 +592,15 @@ class TestProblemCheckPartials(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['g', 'x'] = 3.
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('z', np.ones((2, 2))))
-        prob.model.add_subsystem('p2', IndepVarComp('x', np.ones((2, 2))))
+        prob.model.add_subsystem('p1', om.IndepVarComp('z', np.ones((2, 2))))
+        prob.model.add_subsystem('p2', om.IndepVarComp('x', np.ones((2, 2))))
         prob.model.add_subsystem('comp', SimpleComp1())
         prob.model.connect('p1.z', 'comp.z')
         prob.model.connect('p2.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
 
         stream = cStringIO()
         data = prob.check_partials(out_stream=stream, compact_print=True)
@@ -624,7 +615,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         # Test that we show derivs declared with dependent=False if the fd is not
         # ~zero.
 
-        class SimpleComp2(ExplicitComponent):
+        class SimpleComp2(om.ExplicitComponent):
             def setup(self):
                 self.add_input('z', shape=(2, 2))
                 self.add_input('x', shape=(2, 2))
@@ -639,16 +630,15 @@ class TestProblemCheckPartials(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['g', 'x'] = 3.
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('z', np.ones((2, 2))))
-        prob.model.add_subsystem('p2', IndepVarComp('x', np.ones((2, 2))))
+        prob.model.add_subsystem('p1', om.IndepVarComp('z', np.ones((2, 2))))
+        prob.model.add_subsystem('p2', om.IndepVarComp('x', np.ones((2, 2))))
         prob.model.add_subsystem('comp', SimpleComp2())
         prob.model.connect('p1.z', 'comp.z')
         prob.model.connect('p2.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
 
         stream = cStringIO()
         data = prob.check_partials(out_stream=stream)
@@ -660,11 +650,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertTrue(('g', 'x') in data['comp'])
 
     def test_set_step_on_comp(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -674,7 +663,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         comp.set_check_partial_options(wrt='*', step=1e-2)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None, compact_print=True)
@@ -685,11 +674,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertLess(x_error.reverse, 1e-5)
 
     def test_set_step_global(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -697,7 +685,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None, step=1e-2)
@@ -708,11 +696,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertLess(x_error.reverse, 1e-5)
 
     def test_complex_step_not_allocated(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidMatVec())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -722,7 +709,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         comp.set_check_partial_options(wrt='*', method='cs')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         msg = "The following components requested complex step, but force_alloc_complex " + \
@@ -739,11 +726,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertLess(x_error.reverse, 1e-5)
 
     def test_set_method_on_comp(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -763,11 +749,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertLess(x_error.reverse, 1e-5)
 
     def test_set_method_global(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -785,11 +770,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertLess(x_error.reverse, 1e-5)
 
     def test_set_form_on_comp(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -799,7 +783,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         comp.set_check_partial_options(wrt='*', form='central')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None, compact_print=True)
@@ -810,11 +794,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertLess(x_error.reverse, 1e-3)
 
     def test_set_form_global(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -822,7 +805,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None, form='central')
@@ -833,11 +816,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertLess(x_error.reverse, 1e-3)
 
     def test_set_step_calc_on_comp(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -847,7 +829,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         comp.set_check_partial_options(wrt='*', step_calc='rel')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None, compact_print=True)
@@ -858,11 +840,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertLess(x_error.reverse, 3e-3)
 
     def test_set_step_calc_global(self):
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -870,7 +851,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None, step_calc='rel')
@@ -883,7 +864,7 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_set_check_option_precedence(self):
         # Test that we omit derivs declared with dependent=False
 
-        class SimpleComp1(ExplicitComponent):
+        class SimpleComp1(om.ExplicitComponent):
             def setup(self):
                 self.add_input('ab', 13.0)
                 self.add_input('aba', 13.0)
@@ -908,19 +889,18 @@ class TestProblemCheckPartials(unittest.TestCase):
                 partials['y', 'aba'] = 3.0*aba**2
                 partials['y', 'ba'] = 3.0*ba**2
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('ab', 13.0))
-        prob.model.add_subsystem('p2', IndepVarComp('aba', 13.0))
-        prob.model.add_subsystem('p3', IndepVarComp('ba', 13.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('ab', 13.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('aba', 13.0))
+        prob.model.add_subsystem('p3', om.IndepVarComp('ba', 13.0))
         comp = prob.model.add_subsystem('comp', SimpleComp1())
 
         prob.model.connect('p1.ab', 'comp.ab')
         prob.model.connect('p2.aba', 'comp.aba')
         prob.model.connect('p3.ba', 'comp.ba')
 
-        prob.setup(check=False)
+        prob.setup()
 
         comp.set_check_partial_options(wrt='a*', step=1e-2)
         comp.set_check_partial_options(wrt='*a', step=1e-4)
@@ -936,11 +916,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_option_printing(self):
         # Make sure we print the approximation type for each variable.
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -964,15 +943,14 @@ class TestProblemCheckPartials(unittest.TestCase):
                         msg='Did you change the format for printing check derivs?')
 
     def test_set_check_partial_options_invalid(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
         from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
@@ -1051,7 +1029,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                          "for check_partial options on Component 'comp': ['a', 'b', 'c'].")
 
     def test_compact_print_formatting(self):
-        class MyCompShortVarNames(ExplicitComponent):
+        class MyCompShortVarNames(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -1067,7 +1045,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 J['y', 'x1'] = np.array([4.0])
                 J['y', 'x2'] = np.array([40])
 
-        class MyCompLongVarNames(ExplicitComponent):
+        class MyCompLongVarNames(om.ExplicitComponent):
             def setup(self):
                 self.add_input('really_long_variable_name_x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -1085,15 +1063,14 @@ class TestProblemCheckPartials(unittest.TestCase):
                 J['really_long_variable_name_y', 'x2'] = np.array([40])
 
         # First short var names
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyCompShortVarNames())
         prob.model.connect('p1.x1', 'comp.x1')
         prob.model.connect('p2.x2', 'comp.x2')
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
@@ -1111,15 +1088,14 @@ class TestProblemCheckPartials(unittest.TestCase):
                     header_locations_of_bars = [i for i, ltr in enumerate(line) if ltr == sep]
 
         # Then long var names
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p1', IndepVarComp('really_long_variable_name_x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('p1', om.IndepVarComp('really_long_variable_name_x1', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyCompLongVarNames())
         prob.model.connect('p1.really_long_variable_name_x1', 'comp.really_long_variable_name_x1')
         prob.model.connect('p2.x2', 'comp.x2')
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
@@ -1138,20 +1114,20 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_compact_print_exceed_tol(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = MyCompGoodPartials()
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('>ABS_TOL'), 0)
         self.assertEqual(stream.getvalue().count('>REL_TOL'), 0)
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = MyCompBadPartials()
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
@@ -1161,8 +1137,8 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_check_partials_display_rev(self):
 
         # 1: Check display of revs for implicit comp for compact and non-compact display
-        group = Group()
-        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        group = om.Group()
+        comp1 = group.add_subsystem('comp1', om.IndepVarComp())
         comp1.add_output('a', 1.0)
         comp1.add_output('b', -4.0)
         comp1.add_output('c', 3.0)
@@ -1174,8 +1150,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         group.connect('comp1.a', 'comp3.a')
         group.connect('comp1.b', 'comp3.b')
         group.connect('comp1.c', 'comp3.c')
-        prob = Problem(model=group)
-        prob.setup(check=False)
+        prob = om.Problem(model=group)
+        prob.setup()
 
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
@@ -1191,7 +1167,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('Jrev'), 20)
 
         # 2: Explicit comp, all comps define Jacobians for compact and non-compact display
-        class MyComp(ExplicitComponent):
+        class MyComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -1207,10 +1183,10 @@ class TestProblemCheckPartials(unittest.TestCase):
                 J['z', 'x1'] = np.array([3.0])
                 J['z', 'x2'] = np.array([-4444.0])
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = MyComp()
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
@@ -1229,15 +1205,14 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # 3: Explicit comp that does not define Jacobian. It defines compute_jacvec_product
         #      For both compact and non-compact display
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidMatVec())
         prob.model.connect('p1.x', 'comp.x')
         prob.model.connect('p2.y', 'comp.y')
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
@@ -1249,19 +1224,18 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('Jrev'), 10)
 
         # 4: Mixed comps. Some with jacobians. Some not
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p1', IndepVarComp('x2', 5.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('p0', om.IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('c0', MyComp())  # in x1,x2, out is z
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidMatVec())
         prob.model.connect('p0.x1', 'c0.x1')
         prob.model.connect('p1.x2', 'c0.x2')
         prob.model.connect('c0.z', 'comp.x')
         prob.model.connect('p2.y', 'comp.y')
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         stream = cStringIO()
@@ -1283,10 +1257,10 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         # 5: One comp defines compute_multi_jacvec_product
         size = 6
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('px', IndepVarComp('x', val=(np.arange(size, dtype=float) + 1.) * 3.0))
-        model.add_subsystem('py', IndepVarComp('y', val=(np.arange(size, dtype=float) + 1.) * 2.0))
+        model.add_subsystem('px', om.IndepVarComp('x', val=(np.arange(size, dtype=float) + 1.) * 3.0))
+        model.add_subsystem('py', om.IndepVarComp('y', val=(np.arange(size, dtype=float) + 1.) * 2.0))
         model.add_subsystem('comp', MultiJacVec(size))
 
         model.connect('px.x', 'comp.x')
@@ -1296,7 +1270,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         model.add_design_var('py.y', vectorize_derivs=False)
         model.add_constraint('comp.f_xy', vectorize_derivs=False)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
         stream = cStringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
@@ -1309,11 +1283,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         # repeat the full row for the worst-case subjac (i.e., output-input pair).
         # This should only occur in the compact_print=True case.
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p1', IndepVarComp('x2', 5.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y2', 6.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('p0', om.IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y2', 6.0))
         prob.model.add_subsystem('good', MyCompGoodPartials())
         prob.model.add_subsystem('bad', MyCompBadPartials())
         prob.model.connect('p0.x1', 'good.x1')
@@ -1321,7 +1294,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.model.connect('good.y', 'bad.y1')
         prob.model.connect('p2.y2', 'bad.y2')
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         stream = cStringIO()
@@ -1335,11 +1308,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         # it should print only the subjacs found to be incorrect. This applies
         # to both compact_print=True and False.
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p1', IndepVarComp('x2', 5.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y2', 6.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('p0', om.IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y2', 6.0))
         prob.model.add_subsystem('good', MyCompGoodPartials())
         prob.model.add_subsystem('bad', MyCompBadPartials())
         prob.model.connect('p0.x1', 'good.x1')
@@ -1347,7 +1319,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.model.connect('good.y', 'bad.y1')
         prob.model.connect('p2.y2', 'bad.y2')
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         stream = cStringIO()
@@ -1365,19 +1337,19 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_includes_excludes(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        sub = model.add_subsystem('c1c', Group())
-        sub.add_subsystem('d1', ExecComp('y=2*x'))
-        sub.add_subsystem('e1', ExecComp('y=2*x'))
+        sub = model.add_subsystem('c1c', om.Group())
+        sub.add_subsystem('d1', om.ExecComp('y=2*x'))
+        sub.add_subsystem('e1', om.ExecComp('y=2*x'))
 
-        sub2 = model.add_subsystem('sss', Group())
-        sub3 = sub2.add_subsystem('sss2', Group())
-        sub2.add_subsystem('d1', ExecComp('y=2*x'))
-        sub3.add_subsystem('e1', ExecComp('y=2*x'))
+        sub2 = model.add_subsystem('sss', om.Group())
+        sub3 = sub2.add_subsystem('sss2', om.Group())
+        sub2.add_subsystem('d1', om.ExecComp('y=2*x'))
+        sub3.add_subsystem('e1', om.ExecComp('y=2*x'))
 
-        model.add_subsystem('abc1cab', ExecComp('y=2*x'))
+        model.add_subsystem('abc1cab', om.ExecComp('y=2*x'))
 
         prob.setup()
         prob.run_model()
@@ -1406,11 +1378,11 @@ class TestProblemCheckPartials(unittest.TestCase):
 
     def test_directional_derivative_option(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         mycomp = model.add_subsystem('mycomp', ArrayComp(), promotes=['*'])
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
@@ -1439,7 +1411,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 super(ArrayCompCS, self).setup()
                 self.set_check_partial_options('x*', directional=True, method='cs')
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         mycomp = model.add_subsystem('mycomp', ArrayCompCS(), promotes=['*'])
 
@@ -1462,7 +1434,7 @@ class TestProblemCheckPartials(unittest.TestCase):
     def test_bug_local_method(self):
         # This fixes a bug setting the check method on a component overrode the requested method for
         # subsequent components.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         model.add_subsystem('comp1', Paraboloid())
@@ -1489,7 +1461,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         # When the fd turns out to be zero, test that we switch the definition of relative
         # to divide by the forward derivative instead of reporting NaN.
 
-        class SimpleComp2(ExplicitComponent):
+        class SimpleComp2(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', val=3.0)
                 self.add_output('y', val=4.0)
@@ -1503,14 +1475,13 @@ class TestProblemCheckPartials(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.0
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.5))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.5))
         prob.model.add_subsystem('comp', SimpleComp2())
         prob.model.connect('p1.x', 'comp.x')
 
-        prob.setup(check=False)
+        prob.setup()
 
         stream = cStringIO()
         data = prob.check_partials(out_stream=stream)
@@ -1524,9 +1495,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
     def test_feature_incorrect_jacobian(self):
         import numpy as np
 
-        from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem
+        import openmdao.api as om
 
-        class MyComp(ExplicitComponent):
+        class MyComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -1544,11 +1515,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 J['y', 'x1'] = np.array([4.0])
                 J['y', 'x2'] = np.array([40])
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
 
         prob.model.connect('p1.x1', 'comp.x1')
@@ -1556,7 +1526,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials()
@@ -1574,9 +1544,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
     def test_feature_check_partials_suppress(self):
         import numpy as np
 
-        from openmdao.api import Group, ExplicitComponent, IndepVarComp, Problem
+        import openmdao.api as om
 
-        class MyComp(ExplicitComponent):
+        class MyComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -1594,11 +1564,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 J['y', 'x1'] = np.array([4.0])
                 J['y', 'x2'] = np.array([40])
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('x2', 5.0))
         prob.model.add_subsystem('comp', MyComp())
 
         prob.model.connect('p1.x1', 'comp.x1')
@@ -1606,22 +1575,21 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None, compact_print=True)
         print(data)
 
     def test_set_step_on_comp(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
         from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
@@ -1639,15 +1607,14 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True)
 
     def test_set_step_global(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
         from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
@@ -1663,15 +1630,14 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(step=1e-2, compact_print=True)
 
     def test_set_method_on_comp(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
         from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         comp = prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
@@ -1689,15 +1655,14 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True)
 
     def test_set_method_global(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
         from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
@@ -1713,15 +1678,14 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(method='cs', compact_print=True)
 
     def test_set_form_global(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
         from openmdao.test_suite.components.paraboloid_mat_vec import ParaboloidMatVec
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
         prob.model.add_subsystem('comp2', ParaboloidMatVec())
 
@@ -1737,14 +1701,13 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(form='central', compact_print=True)
 
     def test_set_step_calc_global(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_check_derivs import ParaboloidTricky
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y', 5.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
         prob.model.add_subsystem('comp', ParaboloidTricky())
 
         prob.model.connect('p1.x', 'comp.x')
@@ -1759,9 +1722,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_feature_check_partials_show_only_incorrect(self):
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+        import openmdao.api as om
 
-        class MyCompGoodPartials(ExplicitComponent):
+        class MyCompGoodPartials(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -1777,7 +1740,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 J['y', 'x1'] = np.array([3.0])
                 J['y', 'x2'] = np.array([4.0])
 
-        class MyCompBadPartials(ExplicitComponent):
+        class MyCompBadPartials(om.ExplicitComponent):
             def setup(self):
                 self.add_input('y1', 3.0)
                 self.add_input('y2', 5.0)
@@ -1793,11 +1756,10 @@ class TestCheckPartialsFeature(unittest.TestCase):
                 J['z', 'y1'] = np.array([33.0])
                 J['z', 'y2'] = np.array([40.0])
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('p0', IndepVarComp('x1', 3.0))
-        prob.model.add_subsystem('p1', IndepVarComp('x2', 5.0))
-        prob.model.add_subsystem('p2', IndepVarComp('y2', 6.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('p0', om.IndepVarComp('x1', 3.0))
+        prob.model.add_subsystem('p1', om.IndepVarComp('x2', 5.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y2', 6.0))
         prob.model.add_subsystem('good', MyCompGoodPartials())
         prob.model.add_subsystem('bad', MyCompBadPartials())
         prob.model.connect('p0.x1', 'good.x1')
@@ -1805,28 +1767,28 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.model.connect('good.y', 'bad.y1')
         prob.model.connect('p2.y2', 'bad.y2')
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         prob.check_partials(compact_print=True, show_only_incorrect=True)
         prob.check_partials(compact_print=False, show_only_incorrect=True)
 
     def test_includes_excludes(self):
-        from openmdao.api import Problem, Group, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        sub = model.add_subsystem('c1c', Group())
-        sub.add_subsystem('d1', ExecComp('y=2*x'))
-        sub.add_subsystem('e1', ExecComp('y=2*x'))
+        sub = model.add_subsystem('c1c', om.Group())
+        sub.add_subsystem('d1', om.ExecComp('y=2*x'))
+        sub.add_subsystem('e1', om.ExecComp('y=2*x'))
 
-        sub2 = model.add_subsystem('sss', Group())
-        sub3 = sub2.add_subsystem('sss2', Group())
-        sub2.add_subsystem('d1', ExecComp('y=2*x'))
-        sub3.add_subsystem('e1', ExecComp('y=2*x'))
+        sub2 = model.add_subsystem('sss', om.Group())
+        sub3 = sub2.add_subsystem('sss2', om.Group())
+        sub2.add_subsystem('d1', om.ExecComp('y=2*x'))
+        sub3.add_subsystem('e1', om.ExecComp('y=2*x'))
 
-        model.add_subsystem('abc1cab', ExecComp('y=2*x'))
+        model.add_subsystem('abc1cab', om.ExecComp('y=2*x'))
 
         prob.setup()
         prob.run_model()
@@ -1840,14 +1802,14 @@ class TestCheckPartialsFeature(unittest.TestCase):
         prob.check_partials(compact_print=True, includes='*c*c*', excludes=['*e*'])
 
     def test_directional(self):
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.test_suite.components.array_comp import ArrayComp
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         mycomp = model.add_subsystem('mycomp', ArrayComp(), promotes=['*'])
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials()
@@ -1856,9 +1818,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 class TestProblemCheckTotals(unittest.TestCase):
 
     def test_cs(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -1890,9 +1852,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['con_cmp2.con2', 'px.x']['J_fd'], [[0.09692762]], 1e-5)
 
     def test_desvar_as_obj(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_objective('x')
@@ -1921,7 +1883,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
     def test_desvar_and_response_with_indices(self):
 
-        class ArrayComp2D(ExplicitComponent):
+        class ArrayComp2D(om.ExplicitComponent):
             """
             A fairly simple array component.
             """
@@ -1953,9 +1915,9 @@ class TestProblemCheckTotals(unittest.TestCase):
                 """
                 partials[('y1', 'x1')] = self.JJ
 
-        prob = Problem()
-        prob.model = model = Group()
-        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
         mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
@@ -1986,9 +1948,9 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # Objective instead
 
-        prob = Problem()
-        prob.model = model = Group()
-        model.add_subsystem('x_param1', IndepVarComp('x1', np.ones((4))),
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('x_param1', om.IndepVarComp('x1', np.ones((4))),
                             promotes=['x1'])
         mycomp = model.add_subsystem('mycomp', ArrayComp2D(), promotes=['x1', 'y1'])
 
@@ -2014,9 +1976,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, jac[0][1], Jbase[1, 3], 1e-8)
 
     def test_cs_suppress(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -2042,9 +2004,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertTrue('magnitude' in data)
 
     def test_two_desvar_as_con(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.model.add_design_var('x', lower=-100, upper=100)
@@ -2053,7 +2015,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # We don't call run_driver() here because we don't
         # actually want the optimizer to run
@@ -2071,16 +2033,16 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['pz.z', 'px.x']['J_fd'], [[0.0], [0.0]], 1e-5)
 
     def test_full_con_with_index_desvar(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('z', lower=-100, upper=100, indices=[1])
         prob.model.add_constraint('z', upper=0.0)
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # We don't call run_driver() here because we don't
         # actually want the optimizer to run
@@ -2092,16 +2054,16 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0], [1.0]], 1e-5)
 
     def test_full_desvar_with_index_con(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.model.add_constraint('z', upper=0.0, indices=[1])
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # We don't call run_driver() here because we don't
         # actually want the optimizer to run
@@ -2113,16 +2075,16 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, totals['pz.z', 'pz.z']['J_fd'], [[0.0, 1.0]], 1e-5)
 
     def test_full_desvar_with_index_obj(self):
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.model.add_objective('z', index=1)
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
 
         # We don't call run_driver() here because we don't
         # actually want the optimizer to run
@@ -2136,7 +2098,7 @@ class TestProblemCheckTotals(unittest.TestCase):
     def test_bug_fd_with_sparse(self):
         # This bug was found via the x57 model in pointer.
 
-        class TimeComp(ExplicitComponent):
+        class TimeComp(om.ExplicitComponent):
 
             def setup(self):
                 self.node_ptau = node_ptau = np.array([-1., 0., 1.])
@@ -2162,7 +2124,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
                 jacobian['time', 't_duration'] = 0.5 * (node_ptau + 33)
 
-        class CellComp(ExplicitComponent):
+        class CellComp(om.ExplicitComponent):
 
             def initialize(self):
                 self.options.declare('num_nodes', types=int)
@@ -2184,12 +2146,12 @@ class TestProblemCheckTotals(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['zSOC', 'I_Li'] = -1./(3600.0)
 
-        class GaussLobattoPhase(Group):
+        class GaussLobattoPhase(om.Group):
 
             def setup(self):
                 self.connect('t_duration', 'time.t_duration')
 
-                indep = IndepVarComp()
+                indep = om.IndepVarComp()
                 indep.add_output('t_duration', val=1.0)
                 self.add_subsystem('time_extents', indep, promotes_outputs=['*'])
                 self.add_design_var('t_duration', 5.0, 25.0)
@@ -2199,18 +2161,18 @@ class TestProblemCheckTotals(unittest.TestCase):
 
                 self.add_subsystem(name='cell', subsys=CellComp(num_nodes=3))
 
-                self.linear_solver = ScipyKrylov()
-                self.nonlinear_solver = NewtonSolver()
+                self.linear_solver = om.ScipyKrylov()
+                self.nonlinear_solver = om.NewtonSolver()
                 self.nonlinear_solver.options['maxiter'] = 1
 
             def initialize(self):
                 self.options.declare('ode_class', desc='System defining the ODE.')
 
-        p = Problem(model=GaussLobattoPhase())
+        p = om.Problem(model=GaussLobattoPhase())
 
         p.model.add_objective('time', index=-1)
 
-        p.model.linear_solver = ScipyKrylov(assemble_jac=True)
+        p.model.linear_solver = om.ScipyKrylov(assemble_jac=True)
 
         p.setup(mode='fwd')
         p.set_solver_print(level=0)
@@ -2224,12 +2186,12 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         # Try again with a direct solver and sparse assembled hierarchy.
 
-        p = Problem()
+        p = om.Problem()
         p.model.add_subsystem('sub', GaussLobattoPhase())
 
         p.model.sub.add_objective('time', index=-1)
 
-        p.model.linear_solver = DirectSolver(assemble_jac=True)
+        p.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         p.setup(mode='fwd')
         p.set_solver_print(level=0)
@@ -2243,10 +2205,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
     def test_vector_scaled_derivs(self):
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('px', IndepVarComp(name="x", val=np.ones((2, ))))
+        model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2, ))))
         comp = model.add_subsystem('comp', DoubleArrayComp())
         model.connect('px.x', 'comp.x1')
 
@@ -2255,7 +2217,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         model.add_constraint('comp.y2', lower=0.0, upper=1.0,
                              ref=np.array([[2.0, 4.0]]), ref0=np.array([1.2, 2.3]))
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # First, test that we get scaled results in compute and check totals.
@@ -2295,28 +2257,28 @@ class TestProblemCheckTotals(unittest.TestCase):
     def test_cs_around_newton(self):
         # Basic sellar test.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = NewtonSolver()
-        sub.linear_solver = DirectSolver(assemble_jac=False)
+        sub.nonlinear_solver = om.NewtonSolver()
+        sub.linear_solver = om.DirectSolver(assemble_jac=False)
 
         # Need this.
-        model.linear_solver = LinearBlockGS()
+        model.linear_solver = om.LinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -2337,28 +2299,28 @@ class TestProblemCheckTotals(unittest.TestCase):
     def test_cs_around_broyden(self):
         # Basic sellar test.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        sub = model.add_subsystem('sub', Group(), promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
-        model.add_subsystem('px', IndepVarComp('x', 1.0), promotes=['x'])
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
-        model.add_subsystem('obj_cmp', ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
-        model.add_subsystem('con_cmp1', ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
-        model.add_subsystem('con_cmp2', ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
-        sub.nonlinear_solver = BroydenSolver()
-        sub.linear_solver = DirectSolver()
+        sub.nonlinear_solver = om.BroydenSolver()
+        sub.linear_solver = om.DirectSolver()
 
         # Need this.
-        model.linear_solver = LinearBlockGS()
+        model.linear_solver = om.LinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -2377,11 +2339,11 @@ class TestProblemCheckTotals(unittest.TestCase):
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
 
     def test_cs_error_allocate(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p', IndepVarComp('x', 3.0), promotes=['*'])
+        model.add_subsystem('p', om.IndepVarComp('x', 3.0), promotes=['*'])
         model.add_subsystem('comp', ParaboloidTricky(), promotes=['*'])
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         with self.assertRaises(RuntimeError) as cm:
@@ -2399,7 +2361,7 @@ class TestProblemCheckTotalsMPI(unittest.TestCase):
 
     def test_indepvarcomp_under_par_sys(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanInSubbedIDVC()
 
         prob.setup(check=False, mode='rev')
