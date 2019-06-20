@@ -2347,11 +2347,13 @@ class System(object):
             interest for this particular design variable.  These may be
             positive or negative integers.
         adder : float or ndarray, optional
-            Value to add to the model value to get the scaled value. Adder
-            is first in precedence.
+            Value to add to the model value to get the scaled value for the driver. adder
+            is first in precedence.  adder and scaler are an alterantive to using ref
+            and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value. Scaler
-            is second in precedence.
+            value to multiply the model value to get the scaled value for the driver. scaler
+            is second in precedence. adder and scaler are an alterantive to using ref
+            and ref0.
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
@@ -2482,11 +2484,13 @@ class System(object):
             If variable is an array, this indicates which entry is of
             interest for this particular response.
         adder : float or ndarray, optional
-            Value to add to the model value to get the scaled value. Adder
-            is first in precedence.
+            Value to add to the model value to get the scaled value for the driver. adder
+            is first in precedence.  adder and scaler are an alterantive to using ref
+            and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value. Scaler
-            is second in precedence.
+            value to multiply the model value to get the scaled value for the driver. scaler
+            is second in precedence. adder and scaler are an alterantive to using ref
+            and ref0.
         linear : bool
             Set to True if constraint is linear. Default is False.
         parallel_deriv_color : string
@@ -2643,11 +2647,13 @@ class System(object):
         ref0 : float or ndarray, optional
             Value of response variable that scales to 0.0 in the driver.
         adder : float or ndarray, optional
-            Value to add to the model value to get the scaled value. Adder
-            is first in precedence.
+            Value to add to the model value to get the scaled value for the driver. adder
+            is first in precedence.  adder and scaler are an alterantive to using ref
+            and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value. Scaler
-            is second in precedence.
+            value to multiply the model value to get the scaled value for the driver. scaler
+            is second in precedence. adder and scaler are an alterantive to using ref
+            and ref0.
         indices : sequence of int, optional
             If variable is an array, these indicate which entries are of
             interest for this particular response.  These may be positive or
@@ -2696,11 +2702,13 @@ class System(object):
             interest for this particular response. This may be a positive
             or negative integer.
         adder : float or ndarray, optional
-            Value to add to the model value to get the scaled value. Adder
-            is first in precedence.
+            Value to add to the model value to get the scaled value for the driver. adder
+            is first in precedence.  adder and scaler are an alterantive to using ref
+            and ref0.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value. Scaler
-            is second in precedence.
+            value to multiply the model value to get the scaled value for the driver. scaler
+            is second in precedence. adder and scaler are an alterantive to using ref
+            and ref0.
         parallel_deriv_color : string
             If specified, this design var will be grouped for parallel derivative
             calculations with other variables sharing the same parallel_deriv_color.
