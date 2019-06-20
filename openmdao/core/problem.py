@@ -1346,8 +1346,9 @@ class Problem(object):
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
         driver_scaling : bool
-            Set to True to scale derivative values by the quantities specified when the desvars and
-            responses were added. Default if False, which is unscaled.
+            When True, return derivatives that are scaled according to either the adder and scaler
+            or the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is False, which is unscaled.
         abs_err_tol : float
             Threshold value for absolute error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Default is 1.0E-6.
@@ -1458,8 +1459,9 @@ class Problem(object):
         debug_print : bool
             Set to True to print out some debug information during linear solve.
         driver_scaling : bool
-            Set to True to scale derivative values by the quantities specified when the desvars and
-            responses were added. Default if False, which is unscaled.
+            When True, return derivatives that are scaled according to either the adder and scaler
+            or the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is False, which is unscaled.
 
         Returns
         -------

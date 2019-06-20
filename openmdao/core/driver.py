@@ -459,8 +459,9 @@ class Driver(object):
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
         driver_scaling : bool
-            When True, return values that are scaled by driver scaling that was specified in calls
-            to add_design_var, add_objective, and add_constraint.
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
 
@@ -534,8 +535,9 @@ class Driver(object):
         filter : list
             List of desvar names used by recorders.
         driver_scaling : bool
-            When True, return values that are scaled by driver scaling that was specified in calls
-            to add_design_var, add_objective, and add_constraint.
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
 
@@ -621,8 +623,9 @@ class Driver(object):
         Parameters
         ----------
         driver_scaling : bool
-            When True, return values that are scaled by driver scaling that was specified in calls
-            to add_design_var, add_objective, and add_constraint.
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         filter : list
             List of objective names used by recorders.
         ignore_indices : bool
@@ -657,8 +660,9 @@ class Driver(object):
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
         driver_scaling : bool
-            When True, return values that are scaled by driver scaling that was specified in calls
-            to add_design_var, add_objective, and add_constraint.
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         filter : list
             List of constraint names used by recorders.
         ignore_indices : bool
