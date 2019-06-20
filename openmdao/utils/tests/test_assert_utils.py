@@ -39,7 +39,7 @@ class TestAssertUtils(unittest.TestCase):
         prob.model = MyComp()
 
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
@@ -71,7 +71,7 @@ class TestAssertUtils(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
@@ -124,7 +124,7 @@ class TestAssertUtils(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
@@ -141,7 +141,7 @@ class TestAssertUtils(unittest.TestCase):
         prob = Problem()
         prob.model = SellarNoDerivativesCS()
 
-        prob.setup(check=False)
+        prob.setup()
 
         try:
             assert_no_approx_partials(prob.model, include_self=True, recurse=True)
@@ -163,7 +163,7 @@ class TestAssertUtils(unittest.TestCase):
         prob = Problem()
         prob.model = DoubleSellar()
 
-        prob.setup(check=False)
+        prob.setup()
 
         assert_no_approx_partials(prob.model, include_self=True, recurse=True)
 
@@ -172,7 +172,7 @@ class TestAssertUtils(unittest.TestCase):
         prob = Problem()
         prob.model = SellarNoDerivativesCS()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.model.cycle._jacobian = DictionaryJacobian(prob.model.cycle)
 
         try:
@@ -199,6 +199,6 @@ class TestAssertUtils(unittest.TestCase):
         prob = Problem(model)
         prob.model.linear_solver = DirectSolver(assemble_jac=True)
 
-        prob.setup(check=False)
+        prob.setup()
 
         assert_no_dict_jacobians(prob.model, include_self=True, recurse=True)

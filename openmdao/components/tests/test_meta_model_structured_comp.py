@@ -2,18 +2,14 @@
 Unit tests for the structured metamodel component.
 """
 from __future__ import division, print_function, absolute_import
-
-from six import assertRaisesRegex
 from copy import deepcopy
-
-from openmdao.core.problem import Problem
-from openmdao.core.group import Group
-from openmdao.core.indepvarcomp import IndepVarComp
-from openmdao.core.analysis_error import AnalysisError
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+import unittest
+from six import assertRaisesRegex
 
 import numpy as np
-import unittest
+
+import openmdao.api as om
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 from numpy.testing import (assert_array_almost_equal, assert_almost_equal,
                            assert_allclose, assert_array_equal, assert_equal)
@@ -25,8 +21,7 @@ except ImportError:
     scipy_gte_019 = False
 
 if scipy_gte_019:
-    from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp, \
-        _RegularGridInterp, OutOfBoundsError
+    from openmdao.components.meta_model_structured_comp import _RegularGridInterp, OutOfBoundsError
 
 x = np.array([-0.97727788, -0.15135721, -0.10321885,  0.40015721,  0.4105985,
                0.95008842,  0.97873798,  1.76405235,  1.86755799,  2.2408932 ])
@@ -779,6 +774,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
 
         self.assertEqual(set(interp.methods()), set(["quintic", "cubic", "slinear"]))
 
+
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestRegularGridMap(unittest.TestCase):
     """
@@ -788,8 +784,8 @@ class TestRegularGridMap(unittest.TestCase):
 
     def setUp(self):
 
-        model = Group()
-        ivc = IndepVarComp()
+        model = om.Group()
+        ivc = om.IndepVarComp()
 
         mapdata = SampleMap()
 
@@ -803,7 +799,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = MetaModelStructuredComp(method='slinear', extrapolate=True)
+        comp = om.MetaModelStructuredComp(method='slinear', extrapolate=True)
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -812,7 +808,7 @@ class TestRegularGridMap(unittest.TestCase):
             comp.add_output(out['name'], out['default'], out['values'])
 
         model.add_subsystem('comp', comp, promotes=["*"])
-        self.prob = Problem(model)
+        self.prob = om.Problem(model)
         self.prob.setup()
         self.prob['x'] = 1.0
         self.prob['y'] = 0.75
@@ -832,8 +828,8 @@ class TestRegularGridMap(unittest.TestCase):
     def test_deriv1_swap(self):
         # Bugfix test that we can add outputs before inputs.
 
-        model = Group()
-        ivc = IndepVarComp()
+        model = om.Group()
+        ivc = om.IndepVarComp()
 
         mapdata = SampleMap()
 
@@ -847,7 +843,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = MetaModelStructuredComp(method='slinear', extrapolate=True)
+        comp = om.MetaModelStructuredComp(method='slinear', extrapolate=True)
 
         for out in outs:
             comp.add_output(out['name'], out['default'], out['values'])
@@ -856,7 +852,7 @@ class TestRegularGridMap(unittest.TestCase):
             comp.add_input(param['name'], param['default'], param['values'])
 
         model.add_subsystem('comp', comp, promotes=["*"])
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
         prob['x'] = 1.0
         prob['y'] = 0.75
@@ -897,8 +893,8 @@ class TestRegularGridMap(unittest.TestCase):
                          "but this RegularGridInterp has dimension 0")
 
     def test_raise_out_of_bounds_error(self):
-        model = Group()
-        ivc = IndepVarComp()
+        model = om.Group()
+        ivc = om.IndepVarComp()
 
         mapdata = SampleMap()
 
@@ -913,7 +909,7 @@ class TestRegularGridMap(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         # Need to make sure extrapolate is False for bounds to be checked
-        comp = MetaModelStructuredComp(method='slinear', extrapolate=False)
+        comp = om.MetaModelStructuredComp(method='slinear', extrapolate=False)
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -922,7 +918,7 @@ class TestRegularGridMap(unittest.TestCase):
             comp.add_output(out['name'], out['default'], out['values'])
 
         model.add_subsystem('comp', comp, promotes=["*"])
-        self.prob = Problem(model)
+        self.prob = om.Problem(model)
         self.prob.setup()
 
         self.prob['x'] = 1.0
@@ -934,12 +930,12 @@ class TestRegularGridMap(unittest.TestCase):
         #   dict so no guarantee on the order except for Python 3.6 !
         msg = "Error interpolating output '[f|g]' in 'comp' because input 'comp.z' was " \
               "out of bounds \('.*', '.*'\) with value '9.0'"
-        with assertRaisesRegex(self, AnalysisError, msg):
+        with assertRaisesRegex(self, om.AnalysisError, msg):
             self.run_and_check_derivs(self.prob)
 
     def test_training_gradient(self):
-        model = Group()
-        ivc = IndepVarComp()
+        model = om.Group()
+        ivc = om.IndepVarComp()
 
         mapdata = SampleMap()
 
@@ -953,9 +949,9 @@ class TestRegularGridMap(unittest.TestCase):
         ivc.add_output('f_train', outs[0]['values'])
         ivc.add_output('g_train', outs[1]['values'])
 
-        comp = MetaModelStructuredComp(training_data_gradients=True,
-                                       method='cubic',
-                                       vec_size=3)
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          method='cubic',
+                                          vec_size=3)
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
 
@@ -968,7 +964,7 @@ class TestRegularGridMap(unittest.TestCase):
                             promotes=["*"])
 
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
         prob.run_model()
 
@@ -981,8 +977,8 @@ class TestRegularGridMap(unittest.TestCase):
         self.run_and_check_derivs(prob)
 
     def test_training_gradient_setup_called_twice(self):
-        model = Group()
-        ivc = IndepVarComp()
+        model = om.Group()
+        ivc = om.IndepVarComp()
 
         mapdata = SampleMap()
 
@@ -996,9 +992,9 @@ class TestRegularGridMap(unittest.TestCase):
         ivc.add_output('f_train', outs[0]['values'])
         ivc.add_output('g_train', outs[1]['values'])
 
-        comp = MetaModelStructuredComp(training_data_gradients=True,
-                                       method='cubic',
-                                       vec_size=3)
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          method='cubic',
+                                          vec_size=3)
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
 
@@ -1011,7 +1007,7 @@ class TestRegularGridMap(unittest.TestCase):
                             promotes=["*"])
 
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
         prob.run_model()
 
@@ -1055,7 +1051,7 @@ class TestRegularGridMap(unittest.TestCase):
         y_data = np.array([0., 4.])
         nn = 5
 
-        class MMComp(MetaModelStructuredComp):
+        class MMComp(om.MetaModelStructuredComp):
 
             def setup(self):
                 nn = self.options['vec_size']
@@ -1063,9 +1059,9 @@ class TestRegularGridMap(unittest.TestCase):
 
                 self.add_output(name='y', val=np.zeros(nn), units=None, training_data=y_data)
 
-        p = Problem()
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output('x', val=np.linspace(.5, 1.1, nn))
 
         p.model.add_subsystem('ivc', ivc, promotes=['x'])
@@ -1073,7 +1069,7 @@ class TestRegularGridMap(unittest.TestCase):
 
         p.setup()
 
-        with self.assertRaises(AnalysisError) as cm:
+        with self.assertRaises(om.AnalysisError) as cm:
             p.run_model()
 
         msg = ("Error interpolating output 'y' in 'MM' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
@@ -1086,11 +1082,10 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_xor(self):
         import numpy as np
-        from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+        import openmdao.api as om
 
         # Create regular grid interpolator instance
-        xor_interp = MetaModelStructuredComp(method='slinear')
+        xor_interp = om.MetaModelStructuredComp(method='slinear')
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
@@ -1099,13 +1094,13 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         xor_interp.add_output('xor', 1.0, training_data=np.array([[0.0, 1.0], [1.0, 0.0]]), units=None)
 
         # Set up the OpenMDAO model
-        model = Group()
-        ivc = IndepVarComp()
+        model = om.Group()
+        ivc = om.IndepVarComp()
         ivc.add_output('x', 0.0)
         ivc.add_output('y', 1.0)
         model.add_subsystem('ivc', ivc, promotes=["*"])
         model.add_subsystem('comp', xor_interp, promotes=["*"])
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
         # Now test out a 'fuzzy' XOR
@@ -1125,8 +1120,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_shape(self):
         import numpy as np
-        from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+        import openmdao.api as om
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -1141,7 +1135,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         print(f.shape)
 
         # Create regular grid interpolator instance
-        interp = MetaModelStructuredComp(method='cubic')
+        interp = om.MetaModelStructuredComp(method='cubic')
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
         interp.add_input('p3', 3.14, training_data=p3)
@@ -1149,9 +1143,9 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         interp.add_output('f', 0.0, training_data=f)
 
         # Set up the OpenMDAO model
-        model = Group()
+        model = om.Group()
         model.add_subsystem('comp', interp, promotes=["*"])
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
         # set inputs
@@ -1172,8 +1166,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_vectorized(self):
         import numpy as np
-        from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+        import openmdao.api as om
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -1185,7 +1178,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         f = np.sqrt(P1) + P2 * P3
 
         # Create regular grid interpolator instance
-        interp = MetaModelStructuredComp(method='cubic', vec_size=2)
+        interp = om.MetaModelStructuredComp(method='cubic', vec_size=2)
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
         interp.add_input('p3', 3.14, training_data=p3)
@@ -1193,9 +1186,9 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         interp.add_output('f', 0.0, training_data=f)
 
         # Set up the OpenMDAO model
-        model = Group()
+        model = om.Group()
         model.add_subsystem('comp', interp, promotes=["*"])
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
         # set inputs
@@ -1213,8 +1206,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_training_derivatives(self):
         import numpy as np
-        from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+        import openmdao.api as om
 
         # create input param training data, of sizes 25, 5, and 10 points resp.
         p1 = np.linspace(0, 100, 25)
@@ -1229,7 +1221,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         print(f.shape)
 
         # Create regular grid interpolator instance
-        interp = MetaModelStructuredComp(method='cubic', training_data_gradients=True)
+        interp = om.MetaModelStructuredComp(method='cubic', training_data_gradients=True)
         interp.add_input('p1', 0.5, p1)
         interp.add_input('p2', 0.0, p2)
         interp.add_input('p3', 3.14, p3)
@@ -1237,9 +1229,9 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         interp.add_output('f', 0.0, f)
 
         # Set up the OpenMDAO model
-        model = Group()
+        model = om.Group()
         model.add_subsystem('comp', interp, promotes=["*"])
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
         # set inputs
@@ -1262,14 +1254,11 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         # run same test as above, only with the deprecated component,
         # to ensure we get the warning and the correct answer.
         # self-contained, to be removed when class name goes away.
-        import numpy as np
-        from openmdao.api import Group, Problem, IndepVarComp
-        from openmdao.components.meta_model_structured_comp import MetaModelStructured  # deprecated
 
         msg = "'MetaModelStructured' has been deprecated. Use 'MetaModelStructuredComp' instead."
 
         with assert_warning(DeprecationWarning, msg):
-            xor_interp = MetaModelStructured(method='slinear')
+            xor_interp = om.MetaModelStructured(method='slinear')
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
@@ -1278,13 +1267,13 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         xor_interp.add_output('xor', 1.0, training_data=np.array([[0.0, 1.0], [1.0, 0.0]]), units=None)
 
         # Set up the OpenMDAO model
-        model = Group()
-        ivc = IndepVarComp()
+        model = om.Group()
+        ivc = om.IndepVarComp()
         ivc.add_output('x', 0.0)
         ivc.add_output('y', 1.0)
         model.add_subsystem('ivc', ivc, promotes=["*"])
         model.add_subsystem('comp', xor_interp, promotes=["*"])
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
         # Now test out a 'fuzzy' XOR

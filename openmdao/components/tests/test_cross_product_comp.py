@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, CrossProductComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -13,9 +13,9 @@ class TestCrossProductCompNx3(unittest.TestCase):
     def setUp(self):
         self.n = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.n, 3))
         ivc.add_output(name='b', shape=(self.n, 3))
 
@@ -24,7 +24,7 @@ class TestCrossProductCompNx3(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         self.p.model.add_subsystem(name='cross_prod_comp',
-                                   subsys=CrossProductComp(vec_size=self.n))
+                                   subsys=om.CrossProductComp(vec_size=self.n))
 
         self.p.model.connect('a', 'cross_prod_comp.a')
         self.p.model.connect('b', 'cross_prod_comp.b')
@@ -68,9 +68,9 @@ class TestCrossProductCompNx3x1(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3, 1))
         ivc.add_output(name='b', shape=(self.nn, 3, 1))
 
@@ -79,7 +79,7 @@ class TestCrossProductCompNx3x1(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         self.p.model.add_subsystem(name='cross_prod_comp',
-                                   subsys=CrossProductComp(vec_size=self.nn))
+                                   subsys=om.CrossProductComp(vec_size=self.nn))
 
         self.p.model.connect('a', 'cross_prod_comp.a')
         self.p.model.connect('b', 'cross_prod_comp.b')
@@ -121,9 +121,9 @@ class TestCrossProductCompNx3x1(unittest.TestCase):
 class TestCrossProductCompNonVectorized(unittest.TestCase):
 
     def setUp(self):
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(3, 1))
         ivc.add_output(name='b', shape=(3, 1))
 
@@ -132,7 +132,7 @@ class TestCrossProductCompNonVectorized(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         self.p.model.add_subsystem(name='cross_prod_comp',
-                                   subsys=CrossProductComp())
+                                   subsys=om.CrossProductComp())
 
         self.p.model.connect('a', 'cross_prod_comp.a')
         self.p.model.connect('b', 'cross_prod_comp.b')
@@ -177,9 +177,9 @@ class TestUnits(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3), units='ft')
         ivc.add_output(name='b', shape=(self.nn, 3), units='lbf')
 
@@ -188,9 +188,9 @@ class TestUnits(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         self.p.model.add_subsystem(name='cross_prod_comp',
-                                   subsys=CrossProductComp(vec_size=self.nn,
-                                                           a_units='m', b_units='N',
-                                                           c_units='N*m'))
+                                   subsys=om.CrossProductComp(vec_size=self.nn,
+                                                              a_units='m', b_units='N',
+                                                              c_units='N*m'))
 
         self.p.model.connect('a', 'cross_prod_comp.a')
         self.p.model.connect('b', 'cross_prod_comp.b')
@@ -223,18 +223,19 @@ class TestUnits(unittest.TestCase):
                                                decimal=6)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp, CrossProductComp
+
+        import openmdao.api as om
         from openmdao.utils.assert_utils import assert_rel_error
 
         n = 100
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='r', shape=(n, 3))
         ivc.add_output(name='F', shape=(n, 3))
 
@@ -243,9 +244,9 @@ class TestForDocs(unittest.TestCase):
                               promotes_outputs=['r', 'F'])
 
         p.model.add_subsystem(name='cross_prod_comp',
-                              subsys=CrossProductComp(vec_size=n,
-                                                      a_name='r', b_name='F', c_name='torque',
-                                                      a_units='m', b_units='N', c_units='N*m'))
+                              subsys=om.CrossProductComp(vec_size=n,
+                                                         a_name='r', b_name='F', c_name='torque',
+                                                         a_units='m', b_units='N', c_units='N*m'))
 
         p.model.connect('r', 'cross_prod_comp.r')
         p.model.connect('F', 'cross_prod_comp.F')

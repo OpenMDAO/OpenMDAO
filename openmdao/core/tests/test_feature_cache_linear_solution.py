@@ -5,15 +5,16 @@ from distutils.version import LooseVersion
 import unittest
 from copy import deepcopy
 from six.moves import cStringIO
+
 import numpy as np
 import scipy
 from scipy.sparse.linalg import gmres
 
-from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class CacheLinearTestCase(unittest.TestCase): 
+class CacheLinearTestCase(unittest.TestCase):
 
     def test_feature_cache_linear(self):
 
@@ -22,10 +23,10 @@ class CacheLinearTestCase(unittest.TestCase):
         import scipy
         from scipy.sparse.linalg import gmres
 
-        from openmdao.api import ImplicitComponent, Group, IndepVarComp, Problem
+        import openmdao.api as om
 
 
-        class QuadraticComp(ImplicitComponent):
+        class QuadraticComp(om.ImplicitComponent):
             """
             A Simple Implicit Component representing a Quadratic Equation.
 
@@ -88,9 +89,8 @@ class CacheLinearTestCase(unittest.TestCase):
                     else:
                         d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'], atol='legacy')[0]
 
-        p = Problem()
-        p.model = Group()
-        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['a', 'b', 'c'])
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['a', 'b', 'c'])
         indeps.add_output('a', 1.)
         indeps.add_output('b', 4.)
         indeps.add_output('c', 1.)
@@ -113,6 +113,6 @@ class CacheLinearTestCase(unittest.TestCase):
         assert_rel_error(self, derivs['states', 'a'], [[-0.02072594],[4.]], 1e-6)
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     unittest.main()
 

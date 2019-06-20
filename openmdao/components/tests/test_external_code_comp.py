@@ -9,7 +9,7 @@ import unittest
 
 from scipy.optimize import fsolve
 
-from openmdao.api import Problem, ExternalCodeComp, AnalysisError
+import openmdao.api as om
 from openmdao.components.external_code_comp import STDOUT
 
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
@@ -52,9 +52,9 @@ class TestExternalCodeComp(unittest.TestCase):
         shutil.copy(os.path.join(DIRECTORY, 'extcode_example.py'),
                     os.path.join(self.tempdir, 'extcode_example.py'))
 
-        self.prob = Problem()
+        self.prob = om.Problem()
 
-        self.extcode = self.prob.model.add_subsystem('extcode', ExternalCodeComp())
+        self.extcode = self.prob.model.add_subsystem('extcode', om.ExternalCodeComp())
 
     def tearDown(self):
         os.chdir(self.startdir)
@@ -117,7 +117,7 @@ class TestExternalCodeComp(unittest.TestCase):
         self.prob.setup(check=True)
         try:
             self.prob.run_model()
-        except AnalysisError as exc:
+        except om.AnalysisError as exc:
             self.assertEqual(str(exc), 'Timed out after 1.0 sec.')
         else:
             self.fail('Expected AnalysisError')
@@ -152,7 +152,7 @@ class TestExternalCodeComp(unittest.TestCase):
         self.prob.setup(check=True)
         try:
             self.prob.run_model()
-        except AnalysisError as err:
+        except om.AnalysisError as err:
             self.assertTrue("delay must be >= 0" in str(err),
                             "expected 'delay must be >= 0' to be in '%s'" % str(err))
             self.assertTrue('Traceback' in str(err),
@@ -192,7 +192,7 @@ class TestExternalCodeComp(unittest.TestCase):
         # Set command to nonexistant path.
         self.extcode.options['command'] = ['no-such-command']
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         try:
             self.prob.run_model()
         except ValueError as exc:
@@ -206,7 +206,7 @@ class TestExternalCodeComp(unittest.TestCase):
         self.extcode.stdout = 'nullcmd.out'
         self.extcode.stderr = STDOUT
 
-        self.prob.setup(check=False)
+        self.prob.setup()
         try:
             self.prob.run_model()
         except ValueError as exc:
@@ -237,12 +237,12 @@ class TestExternalCodeCompArgs(unittest.TestCase):
 
     def test_kwargs(self):
         # check kwargs are passed to options
-        extcode = ExternalCodeComp(poll_delay=999)
+        extcode = om.ExternalCodeComp(poll_delay=999)
 
         self.assertTrue(extcode.options['poll_delay'] == 999)
 
         # check subclass kwargs are also passed to options
-        class MyComp(ExternalCodeComp):
+        class MyComp(om.ExternalCodeComp):
             def initialize(self):
                 self.options.declare('my_arg', 'foo', desc='subclass option')
 
@@ -258,7 +258,7 @@ class TestExternalCodeCompArgs(unittest.TestCase):
         self.assertEqual(my_comp_opts.difference(extcode_opts), set(('my_arg',)))
 
 
-class ParaboloidExternalCodeComp(ExternalCodeComp):
+class ParaboloidExternalCodeComp(om.ExternalCodeComp):
     def setup(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
@@ -295,7 +295,7 @@ class ParaboloidExternalCodeComp(ExternalCodeComp):
         outputs['f_xy'] = f_xy
 
 
-class ParaboloidExternalCodeCompFD(ExternalCodeComp):
+class ParaboloidExternalCodeCompFD(om.ExternalCodeComp):
     def setup(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
@@ -335,7 +335,7 @@ class ParaboloidExternalCodeCompFD(ExternalCodeComp):
         outputs['f_xy'] = f_xy
 
 
-class ParaboloidExternalCodeCompDerivs(ExternalCodeComp):
+class ParaboloidExternalCodeCompDerivs(om.ExternalCodeComp):
     def setup(self):
         self.add_input('x', val=0.0)
         self.add_input('y', val=0.0)
@@ -419,15 +419,15 @@ class TestExternalCodeCompFeature(unittest.TestCase):
             pass
 
     def test_main(self):
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeComp
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         # create and connect inputs
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('p', ParaboloidExternalCodeComp())
 
         model.connect('p1.x', 'p.x')
@@ -441,16 +441,15 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         self.assertEqual(prob['p.f_xy'], -15.0)
 
     def test_optimize_fd(self):
-        from openmdao.api import Problem, IndepVarComp
-        from openmdao.api import ScipyOptimizeDriver
+        import openmdao.api as om
         from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeCompFD
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         # create and connect inputs
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('p', ParaboloidExternalCodeCompFD())
 
         model.connect('p1.x', 'p.x')
@@ -458,7 +457,7 @@ class TestExternalCodeCompFeature(unittest.TestCase):
 
         # find optimal solution with SciPy optimize
         # solution (minimum): x = 6.6667; y = -7.3333
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         prob.model.add_design_var('p1.x', lower=-50, upper=50)
@@ -476,16 +475,15 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
 
     def test_optimize_derivs(self):
-        from openmdao.api import Problem, IndepVarComp
-        from openmdao.api import ScipyOptimizeDriver
+        import openmdao.api as om
         from openmdao.components.tests.test_external_code_comp import ParaboloidExternalCodeCompDerivs
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
         # create and connect inputs
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('p', ParaboloidExternalCodeCompDerivs())
 
         model.connect('p1.x', 'p.x')
@@ -493,7 +491,7 @@ class TestExternalCodeCompFeature(unittest.TestCase):
 
         # find optimal solution with SciPy optimize
         # solution (minimum): x = 6.6667; y = -7.3333
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         prob.model.add_design_var('p1.x', lower=-50, upper=50)
@@ -537,7 +535,7 @@ class TestDeprecatedExternalCode(unittest.TestCase):
         with assert_warning(DeprecationWarning, msg):
             self.extcode = DeprecatedExternalCodeForTesting()
 
-        self.prob = Problem()
+        self.prob = om.Problem()
 
         self.prob.model.add_subsystem('extcode', self.extcode)
 
@@ -591,10 +589,9 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
             pass
 
     def test_simple_external_code_implicit_comp(self):
-        from openmdao.api import Group, NewtonSolver, Problem, IndepVarComp, DirectSolver, \
-            ExternalCodeImplicitComp
+        import openmdao.api as om
 
-        class MachExternalCodeComp(ExternalCodeImplicitComp):
+        class MachExternalCodeComp(om.ExternalCodeImplicitComp):
 
             def initialize(self):
                 self.options.declare('super_sonic', types=bool)
@@ -646,17 +643,17 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                     mach = float(output_file.read())
                 outputs['mach'] = mach
 
-        group = Group()
-        group.add_subsystem('ar', IndepVarComp('area_ratio', 0.5))
+        group = om.Group()
+        group.add_subsystem('ar', om.IndepVarComp('area_ratio', 0.5))
         mach_comp = group.add_subsystem('comp', MachExternalCodeComp(), promotes=['*'])
-        prob = Problem(model=group)
-        group.nonlinear_solver = NewtonSolver()
+        prob = om.Problem(model=group)
+        group.nonlinear_solver = om.NewtonSolver()
         group.nonlinear_solver.options['solve_subsystems'] = True
         group.nonlinear_solver.options['iprint'] = 0
         group.nonlinear_solver.options['maxiter'] = 20
-        group.linear_solver = DirectSolver()
+        group.linear_solver = om.DirectSolver()
 
-        prob.setup(check=False)
+        prob.setup()
 
         area_ratio = 1.3
         super_sonic = False

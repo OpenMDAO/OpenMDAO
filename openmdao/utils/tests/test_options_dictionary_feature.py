@@ -1,18 +1,20 @@
-from openmdao.api import ExplicitComponent
 import unittest
 from six import PY3, assertRegex
+
 import numpy as np
+
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestOptionsDictionaryFeature(unittest.TestCase):
 
     def test_simple(self):
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
 
-        prob = Problem()
-        prob.model.add_subsystem('inputs', IndepVarComp('x', shape=3))
+        prob = om.Problem()
+        prob.model.add_subsystem('inputs', om.IndepVarComp('x', shape=3))
         prob.model.add_subsystem('double', VectorDoublingComp(size=3))  # 'size' is an option
         prob.model.connect('inputs.x', 'double.x')
 
@@ -24,11 +26,11 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         assert_rel_error(self, prob['double.y'], [2., 4., 6.])
 
     def test_simple_fail(self):
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
 
-        prob = Problem()
-        prob.model.add_subsystem('inputs', IndepVarComp('x', shape=3))
+        prob = om.Problem()
+        prob.model.add_subsystem('inputs', om.IndepVarComp('x', shape=3))
         prob.model.add_subsystem('double', VectorDoublingComp())  # 'size' not specified
         prob.model.connect('inputs.x', 'double.x')
 
@@ -38,11 +40,11 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
             self.assertEqual(str(err), "Option 'size' is required but has not been set.")
 
     def test_with_default(self):
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
 
-        prob = Problem()
-        prob.model.add_subsystem('inputs', IndepVarComp('x'))
+        prob = om.Problem()
+        prob.model.add_subsystem('inputs', om.IndepVarComp('x'))
         prob.model.add_subsystem('linear', LinearCombinationComp(a=2.))  # 'b' not specified
         prob.model.connect('inputs.x', 'linear.x')
 
@@ -56,11 +58,11 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
     def test_simple_array(self):
         import numpy as np
 
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.options_feature_array import ArrayMultiplyComp
 
-        prob = Problem()
-        prob.model.add_subsystem('inputs', IndepVarComp('x', 1.))
+        prob = om.Problem()
+        prob.model.add_subsystem('inputs', om.IndepVarComp('x', 1.))
         prob.model.add_subsystem('a_comp', ArrayMultiplyComp(array=np.array([1, 2, 3])))
         prob.model.connect('inputs.x', 'a_comp.x')
 
@@ -73,14 +75,14 @@ class TestOptionsDictionaryFeature(unittest.TestCase):
         assert_rel_error(self, prob['a_comp.y'], [5., 10., 15.])
 
     def test_simple_function(self):
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.options_feature_function import UnitaryFunctionComp
 
         def my_func(x):
             return x*2
 
-        prob = Problem()
-        prob.model.add_subsystem('inputs', IndepVarComp('x', 1.))
+        prob = om.Problem()
+        prob.model.add_subsystem('inputs', om.IndepVarComp('x', 1.))
         prob.model.add_subsystem('f_comp', UnitaryFunctionComp(func=my_func))
         prob.model.connect('inputs.x', 'f_comp.x')
 

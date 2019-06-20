@@ -5,8 +5,8 @@ import unittest
 import numpy as np
 from numpy.testing import assert_almost_equal
 
-from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, \
-    ExecComp, DirectSolver, NewtonSolver
+import openmdao.api as om
+
 
 class TestKeplersEquation(unittest.TestCase):
 
@@ -14,12 +14,11 @@ class TestKeplersEquation(unittest.TestCase):
         import numpy as np
         from numpy.testing import assert_almost_equal
 
-        from openmdao.api import Problem, Group, IndepVarComp, BalanceComp, \
-            ExecComp, DirectSolver, NewtonSolver
+        import openmdao.api as om
 
-        prob = Problem()
+        prob = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
 
         ivc.add_output(name='M',
                        val=0.0,
@@ -31,7 +30,7 @@ class TestKeplersEquation(unittest.TestCase):
                        units=None,
                        desc='orbit eccentricity')
 
-        bal = BalanceComp()
+        bal = om.BalanceComp()
 
         bal.add_balance(name='E', val=0.0, units='rad', eq_units='rad', rhs_name='M')
 
@@ -42,10 +41,10 @@ class TestKeplersEquation(unittest.TestCase):
         bal.options['guess_func'] = guess_function
 
         # ExecComp used to compute the LHS of Kepler's equation.
-        lhs_comp = ExecComp('lhs=E - ecc * sin(E)',
-                            lhs={'value': 0.0, 'units': 'rad'},
-                            E={'value': 0.0, 'units': 'rad'},
-                            ecc={'value': 0.0})
+        lhs_comp = om.ExecComp('lhs=E - ecc * sin(E)',
+                               lhs={'value': 0.0, 'units': 'rad'},
+                               E={'value': 0.0, 'units': 'rad'},
+                               ecc={'value': 0.0})
 
         prob.model.add_subsystem(name='ivc', subsys=ivc,
                                  promotes_outputs=['M', 'ecc'])
@@ -61,8 +60,8 @@ class TestKeplersEquation(unittest.TestCase):
         prob.model.connect('lhs_comp.lhs', 'balance.lhs:E')
 
         # Set up solvers
-        prob.model.linear_solver = DirectSolver()
-        prob.model.nonlinear_solver = NewtonSolver(maxiter=100, iprint=0)
+        prob.model.linear_solver = om.DirectSolver()
+        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
 
         prob.setup()
 

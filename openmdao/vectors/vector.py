@@ -163,8 +163,6 @@ class Vector(object):
         self._initialize_data(root_vector)
         self._initialize_views()
 
-        self._length = np.sum(system._var_sizes[name][self._typ][self._iproc, :])
-
         self.read_only = False
 
     def __str__(self):
@@ -190,7 +188,7 @@ class Vector(object):
         int
             Total flattened length of this vector.
         """
-        return self._length
+        return self._data.size
 
     def _clone(self, initialize_views=False):
         """
@@ -280,7 +278,7 @@ class Vector(object):
 
     def __getitem__(self, name):
         """
-        Get the unscaled variable value in true units.
+        Get the variable value.
 
         Parameters
         ----------
@@ -290,7 +288,7 @@ class Vector(object):
         Returns
         -------
         float or ndarray
-            variable value (not scaled, not dimensionless).
+            variable value.
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
@@ -299,19 +297,18 @@ class Vector(object):
             else:
                 return self._views[abs_name][:, self._icol]
         else:
-            msg = 'Variable name "{}" not found.'
-            raise KeyError(msg.format(name))
+            raise KeyError('Variable name "{}" not found.'.format(name))
 
     def __setitem__(self, name, value):
         """
-        Set the unscaled variable value in true units.
+        Set the variable value.
 
         Parameters
         ----------
         name : str
             Promoted or relative variable name in the owning system's namespace.
         value : float or list or tuple or ndarray
-            variable value to set (not scaled, not dimensionless)
+            variable value to set
         """
         abs_name = name2abs_name(self._system, name, self._names, self._typ)
         if abs_name is not None:
@@ -439,15 +436,15 @@ class Vector(object):
         scale_to : str
             Values are "phys" or "norm" to scale to physical or normalized.
         """
-        scaling = self._scaling[scale_to]
+        adder, scaler = self._scaling[scale_to]
         if self._ncol == 1:
-            self._data *= scaling[1]
-            if scaling[0] is not None:  # nonlinear only
-                self._data += scaling[0]
+            self._data *= scaler
+            if adder is not None:  # nonlinear only
+                self._data += adder
         else:
-            self._data *= scaling[1][:, np.newaxis]
-            if scaling[0] is not None:  # nonlinear only
-                self._data += scaling[0]
+            self._data *= scaler[:, np.newaxis]
+            if adder is not None:  # nonlinear only
+                self._data += adder
 
     def set_vec(self, vec):
         """

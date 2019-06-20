@@ -30,7 +30,7 @@ class NonlinearBlockJac(NonlinearSolver):
                 for subsys in system._subsystems_myproc:
                     subsys._solve_nonlinear()
 
-            system._check_reconf_update()
+            system._check_child_reconf()
             rec.abs = 0.0
             rec.rel = 0.0
 

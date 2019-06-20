@@ -55,7 +55,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
             prob.model.linear_solver = DirectSolver(assemble_jac=jac in ('csc','dense'))
             prob.set_solver_print(level=0)
 
-            prob.setup(check=False)
+            prob.setup()
 
             prob.run_model()
             assert_rel_error(self, prob['y'], [-1., 1.])
@@ -80,7 +80,7 @@ class TestLinearSolverParametricSuite(unittest.TestCase):
         """
         prob = Problem(model=TestImplicitGroup(lnSolverClass=DirectSolver))
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Set this to False because we have matrix-free component(s).
         prob.model.linear_solver.options['assemble_jac'] = False

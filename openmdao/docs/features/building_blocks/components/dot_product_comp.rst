@@ -41,6 +41,6 @@ Note that no internal checks are performed to ensure that `c_units` are consiste
 with `a_units` and `b_units`.
 
 .. embed-code::
-    openmdao.components.tests.test_dot_product_comp.TestForDocs.test
+    openmdao.components.tests.test_dot_product_comp.TestFeature.test
 
 .. tags:: DotProductComp, Component

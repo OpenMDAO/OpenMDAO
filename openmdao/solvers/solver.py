@@ -665,7 +665,7 @@ class NonlinearSolver(Solver):
             if subsys.name in loc:
                 subsys._solve_nonlinear()
 
-            system._check_reconf_update(subsys)
+            system._check_child_reconf(subsys)
 
 
 class LinearSolver(Solver):

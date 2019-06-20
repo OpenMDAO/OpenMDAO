@@ -4,9 +4,10 @@ size of the vector is given as an option of type 'int'.
 """
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
-class VectorDoublingComp(ExplicitComponent):
+
+class VectorDoublingComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('size', types=int)

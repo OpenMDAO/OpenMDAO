@@ -1,14 +1,15 @@
 """
 A simple component used for derivative testing.
 """
-
 from __future__ import division, print_function
 import time
+
 import numpy as np
-from openmdao.core.explicitcomponent import ExplicitComponent
+
+import openmdao.api as om
 
 
-class MatMultComp(ExplicitComponent):
+class MatMultComp(om.ExplicitComponent):
     def __init__(self, mat, approx_method='exact', sleep_time=0.1, **kwargs):
         super(MatMultComp, self).__init__(**kwargs)
         self.mat = mat
@@ -30,7 +31,8 @@ class MatMultComp(ExplicitComponent):
 
 if __name__ == '__main__':
     import sys
-    from openmdao.api import Problem, IndepVarComp
+
+    import openmdao.api as om
     from openmdao.utils.mpi import MPI
 
     if len(sys.argv) > 1:
@@ -52,9 +54,9 @@ if __name__ == '__main__':
 
     print("mat shape:", mat.shape)
 
-    p = Problem()
+    p = om.Problem()
     model = p.model
-    model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
+    model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
     comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd', num_par_fd=5))
 
     model.connect('indep.x', 'comp.x')

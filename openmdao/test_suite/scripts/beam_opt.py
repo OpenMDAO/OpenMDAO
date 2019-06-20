@@ -1,7 +1,6 @@
 import numpy as np
 
-from openmdao.api import Problem, ScipyOptimizeDriver
-
+import openmdao.api as om
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 
 if __name__ == '__main__':
@@ -13,8 +12,8 @@ if __name__ == '__main__':
 
     num_elements = 50
 
-    prob = Problem(model=BeamGroup(E=E, L=L, b=b, volume=volume, num_elements=num_elements),
-                   driver=ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True))
+    prob = om.Problem(model=BeamGroup(E=E, L=L, b=b, volume=volume, num_elements=num_elements),
+                      driver=om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True))
     prob.setup()
     prob.run_driver()
 

@@ -69,7 +69,7 @@ You can do the same thing programmatically by calling the :code:`view_model` fun
    :noindex:
 
 Notice that the data source can be either a :code:`Problem` or case recorder database containing
-the model or model data. The latter is indicated by a string giving the file path to the case 
+the model or model data. The latter is indicated by a string giving the file path to the case
 recorder file.
 
 Here are some code snippets showing the two cases.
@@ -81,8 +81,8 @@ Problem as Data Source
 
     p.setup()
 
-    from openmdao.api import view_model
-    view_model(p)
+    import openmdao.api as om
+    om.view_model(p)
 
 Case Recorder as Data Source
 ****************************
@@ -96,9 +96,9 @@ Case Recorder as Data Source
     p.final_setup()
     r.shutdown()
 
-    from openmdao.api import view_model
+    import openmdao.api as om
 
-    view_model('circuit.sqlite', outfile='circuit.html')
+    om.view_model('circuit.sqlite', outfile='circuit.html')
 
 
 In the latter case, you could view the N2 diagram at a later time using the command:

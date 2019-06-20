@@ -32,6 +32,7 @@ from openmdao.utils.general_utils import warn_deprecation, ContainsAll, all_ance
 from openmdao.utils.units import is_compatible, get_conversion
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import Coloring, _STD_COLORING_FNAME, _DYN_COLORING
+import openmdao.utils.coloring as coloring_mod
 
 # regex to check for valid names.
 import re
@@ -281,6 +282,8 @@ class Group(System):
 
             if subsys._has_guess:
                 self._has_guess = True
+            if subsys._has_bounds:
+                self._has_bounds = True
             if subsys.matrix_free:
                 self.matrix_free = True
 
@@ -413,7 +416,7 @@ class Group(System):
 
         self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
 
-    def _check_reconf_update(self, subsys=None):
+    def _check_child_reconf(self, subsys=None):
         """
         Check if any subsystem has reconfigured and if so, perform the necessary update setup.
 
@@ -477,10 +480,9 @@ class Group(System):
             byproc = self.comm.allgather(self._list_states())
             for proc_states in byproc:
                 all_states.update(proc_states)
+            return sorted(all_states)
         else:
-            all_states = self._list_states()
-
-        return sorted(all_states)
+            return self._list_states()
 
     def _setup_var_index_ranges(self, recurse=True):
         """
@@ -491,8 +493,6 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(Group, self)._setup_var_index_ranges()
-
         nsub_allprocs = len(self._subsystems_allprocs)
 
         subsystems_var_range = self._subsystems_var_range = {}
@@ -504,10 +504,9 @@ class Group(System):
 
             # Here, we count the number of variables in each subsystem.
             # We do this so that we can compute the offset when we recurse into each subsystem.
-            allprocs_counters = {
-                type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']}
-
+            allprocs_counters = {}
             for type_ in ['input', 'output']:
+                allprocs_counters[type_] = np.zeros(nsub_allprocs, INT_DTYPE)
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
                     comm = subsys.comm if subsys._full_comm is None else subsys._full_comm
                     if comm.rank == 0 and vec_name in subsys._rel_vec_names:
@@ -517,7 +516,6 @@ class Group(System):
             # If running in parallel, allgather
             if self.comm.size > 1:
                 gathered = self.comm.allgather(allprocs_counters)
-
                 allprocs_counters = {
                     type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']}
                 for myproc_counters in gathered:
@@ -533,12 +531,15 @@ class Group(System):
                 for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
                     if vec_name not in subsys._rel_vec_names:
                         continue
+                    start = np.sum(allprocs_counters[type_][:isub])
                     subsystems_var_range[vec_name][type_][subsys.name] = (
-                        np.sum(allprocs_counters[type_][:isub]),
-                        np.sum(allprocs_counters[type_][:isub + 1]))
+                        start, start + allprocs_counters[type_][isub]
+                    )
 
         if self._use_derivatives:
             subsystems_var_range['nonlinear'] = subsystems_var_range['linear']
+
+        self._setup_var_index_maps(recurse=recurse)
 
         # Recursion
         if recurse:
@@ -565,14 +566,12 @@ class Group(System):
         allprocs_abs2prom = self._var_allprocs_abs2prom
         abs2meta = self._var_abs2meta
 
-        # Recursion
-        if recurse:
-            for subsys in self._subsystems_myproc:
+        for subsys in self._subsystems_myproc:
+            if recurse:
                 subsys._setup_var_data(recurse)
                 self._has_output_scaling |= subsys._has_output_scaling
                 self._has_resid_scaling |= subsys._has_resid_scaling
 
-        for subsys in self._subsystems_myproc:
             var_maps = subsys._get_maps(subsys._var_allprocs_prom2abs_list)
 
             # Assemble allprocs_abs2meta and abs2meta
@@ -696,8 +695,8 @@ class Group(System):
             subsystems_var_range = self._subsystems_var_range[vec_name]
 
             for type_ in ['input', 'output']:
-                sizes[vec_name][type_] = np.zeros((nproc, len(relnames[vec_name][type_])),
-                                                  INT_DTYPE)
+                sizes[vec_name][type_] = sz = np.zeros((nproc, len(relnames[vec_name][type_])),
+                                                       INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
                     if vec_name not in subsys._rel_vec_names:
@@ -715,19 +714,18 @@ class Group(System):
                                 self.pathname, self.comm.size, subsys.pathname, subsys.comm.size)
                         proc_i = proc_slice.start
                         while proc_i < proc_slice.stop:
-                            sizes[vec_name][type_][proc_i:proc_i + subsys.comm.size, var_slice] = \
+                            sz[proc_i:proc_i + subsys.comm.size, var_slice] = \
                                 subsys._var_sizes[vec_name][type_]
                             proc_i += subsys.comm.size
                     else:
-                        sizes[vec_name][type_][proc_slice, var_slice] = \
-                            subsys._var_sizes[vec_name][type_]
+                        sz[proc_slice, var_slice] = subsys._var_sizes[vec_name][type_]
 
         # If parallel, all gather
         if self.comm.size > 1:
             for vec_name in self._lin_rel_vec_name_list:
                 sizes = self._var_sizes[vec_name]
                 for type_ in ['input', 'output']:
-                    sizes_in = copy.deepcopy(sizes[type_][iproc, :])
+                    sizes_in = sizes[type_][iproc, :].copy()
                     self.comm.Allgather(sizes_in, sizes[type_])
 
             # compute owning ranks
@@ -1245,7 +1243,7 @@ class Group(System):
         ext_num_vars : {'input': (int, int), 'output': (int, int)}
             Total number of allprocs variables in system before/after this one.
         ext_sizes : {'input': (int, int), 'output': (int, int)}
-            Total size of allprocs variables in system before/after this one.
+            Total size of local variables in system before/after this one.
         """
         super(Group, self)._setup_global(ext_num_vars, ext_sizes)
 
@@ -1269,18 +1267,15 @@ class Group(System):
                 sub_ext_sizes[vec_name] = {}
 
                 for type_ in ['input', 'output']:
-                    num = len(relnames[vec_name][type_])
                     idx1, idx2 = subsystems_var_range[type_][subsys.name]
-                    size1 = np.sum(sizes[type_][iproc, :idx1])
-                    size2 = np.sum(sizes[type_][iproc, idx2:])
 
                     sub_ext_num_vars[vec_name][type_] = (
                         ext_num_vars[vec_name][type_][0] + idx1,
-                        ext_num_vars[vec_name][type_][1] + num - idx2,
+                        ext_num_vars[vec_name][type_][1] + len(relnames[vec_name][type_]) - idx2,
                     )
                     sub_ext_sizes[vec_name][type_] = (
-                        ext_sizes[vec_name][type_][0] + size1,
-                        ext_sizes[vec_name][type_][1] + size2,
+                        ext_sizes[vec_name][type_][0] + np.sum(sizes[type_][iproc, :idx1]),
+                        ext_sizes[vec_name][type_][1] + np.sum(sizes[type_][iproc, idx2:]),
                     )
 
             if subsys._use_derivatives:
@@ -1769,8 +1764,11 @@ class Group(System):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
-            is_dynamic = self._coloring_info['coloring'] is _DYN_COLORING
-            coloring = self._get_coloring()
+            if coloring_mod._use_partial_sparsity:
+                is_dynamic = self._coloring_info['coloring'] is _DYN_COLORING
+                coloring = self._get_coloring()
+            else:
+                coloring = None
             if coloring is not None:
                 if not is_dynamic:
                     coloring._check_config_partial(self)

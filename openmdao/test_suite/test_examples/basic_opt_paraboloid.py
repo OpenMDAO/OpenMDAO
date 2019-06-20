@@ -3,22 +3,20 @@ from __future__ import print_function, division, absolute_import
 import unittest
 
 from openmdao.utils.assert_utils import assert_rel_error
-
-from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp
-
 from openmdao.test_suite.components.paraboloid import Paraboloid
+
 
 class BasicOptParaboloid(unittest.TestCase):
 
     def test_unconstrainted(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, IndepVarComp
+        import openmdao.api as om
 
         # We'll use the component that was defined in the last tutorial
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         # build the model
-        prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp())
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', 3.0)
         indeps.add_output('y', -4.0)
 
@@ -28,7 +26,7 @@ class BasicOptParaboloid(unittest.TestCase):
         prob.model.connect('indeps.y', 'paraboloid.y')
 
         # setup the optimization
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
@@ -47,27 +45,27 @@ class BasicOptParaboloid(unittest.TestCase):
 
 
     def test_constrained(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp
+        import openmdao.api as om
 
         # We'll use the component that was defined in the last tutorial
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         # build the model
-        prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp())
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', 3.0)
         indeps.add_output('y', -4.0)
 
         prob.model.add_subsystem('parab', Paraboloid())
 
         # define the component whose output will be constrained
-        prob.model.add_subsystem('const', ExecComp('g = x + y'))
+        prob.model.add_subsystem('const', om.ExecComp('g = x + y'))
 
         prob.model.connect('indeps.x', ['parab.x', 'const.x'])
         prob.model.connect('indeps.y', ['parab.y', 'const.y'])
 
         # setup the optimization
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'COBYLA'
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)

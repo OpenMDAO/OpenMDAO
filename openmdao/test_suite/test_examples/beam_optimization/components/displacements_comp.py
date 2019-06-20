@@ -3,10 +3,10 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
 
-class DisplacementsComp(ExplicitComponent):
+class DisplacementsComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)
@@ -29,7 +29,7 @@ class DisplacementsComp(ExplicitComponent):
         outputs['displacements'] = inputs['d'][:2 * num_nodes]
 
 
-class MultiDisplacementsComp(ExplicitComponent):
+class MultiDisplacementsComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)

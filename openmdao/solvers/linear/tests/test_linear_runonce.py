@@ -2,24 +2,23 @@
 
 import unittest
 
-from openmdao.api import Problem, Group, IndepVarComp
-from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.solvers.linear.linear_runonce import LinearRunOnce
+import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import ConvergeDivergeGroups
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestLinearRunOnceSolver(unittest.TestCase):
 
     def test_converge_diverge_groups(self):
         # Test derivatives for converge-diverge-groups topology.
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = ConvergeDivergeGroups()
 
-        model.linear_solver = LinearRunOnce()
-        model.g1.linear_solver = LinearRunOnce()
-        model.g1.g2.linear_solver = LinearRunOnce()
-        model.g3.linear_solver = LinearRunOnce()
+        model.linear_solver = om.LinearRunOnce()
+        model.g1.linear_solver = om.LinearRunOnce()
+        model.g1.g2.linear_solver = om.LinearRunOnce()
+        model.g3.linear_solver = om.LinearRunOnce()
 
         prob.set_solver_print(level=0)
         prob.setup(check=False, mode='fwd')
@@ -42,7 +41,7 @@ class TestLinearRunOnceSolver(unittest.TestCase):
 
     def test_undeclared_options(self):
         # Test that using options that should not exist in class cause an error
-        solver = LinearRunOnce()
+        solver = om.LinearRunOnce()
 
         msg = "\"Option '%s' cannot be set because it has not been declared.\""
 
@@ -54,17 +53,17 @@ class TestLinearRunOnceSolver(unittest.TestCase):
 
 
     def test_feature_solver(self):
-        from openmdao.api import Problem, Group, IndepVarComp, LinearRunOnce
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
-        model.linear_solver = LinearRunOnce()
+        model.linear_solver = om.LinearRunOnce()
 
         prob.setup(check=False, mode='fwd')
 

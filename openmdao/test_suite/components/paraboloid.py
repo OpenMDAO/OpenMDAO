@@ -2,10 +2,11 @@
 (x-3)^2 + xy + (y+4)^2 = 3
 """
 from __future__ import division, print_function
-from openmdao.core.explicitcomponent import ExplicitComponent
+
+import openmdao.api as om
 
 
-class Paraboloid(ExplicitComponent):
+class Paraboloid(om.ExplicitComponent):
     """
     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
     """
@@ -41,10 +42,9 @@ class Paraboloid(ExplicitComponent):
 
 
 if __name__ == "__main__":
-    from openmdao.api import Problem, Group, ScipyOptimizeDriver, ExecComp, IndepVarComp
 
-    model = Group()
-    ivc = IndepVarComp()
+    model = om.Group()
+    ivc = om.IndepVarComp()
     ivc.add_output('x', 3.0)
     ivc.add_output('y', -4.0)
     model.add_subsystem('des_vars', ivc)
@@ -53,8 +53,8 @@ if __name__ == "__main__":
     model.connect('des_vars.x', 'parab_comp.x')
     model.connect('des_vars.y', 'parab_comp.y')
 
-    prob = Problem(model)
-    prob.driver = ScipyOptimizeDriver()  # so 'openmdao cite' will report it for cite docs
+    prob = om.Problem(model)
+    prob.driver = om.ScipyOptimizeDriver()  # so 'openmdao cite' will report it for cite docs
     prob.setup()
     prob.run_model()
     print(prob['parab_comp.f_xy'])

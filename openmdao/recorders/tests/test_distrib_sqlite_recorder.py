@@ -117,7 +117,6 @@ class DistributedRecorderTest(unittest.TestCase):
 
     def test_distrib_record_system(self):
         prob = Problem()
-        prob.model = Group()
 
         try:
             prob.model.add_recorder(self.recorder)
@@ -129,7 +128,6 @@ class DistributedRecorderTest(unittest.TestCase):
 
     def test_distrib_record_solver(self):
         prob = Problem()
-        prob.model = Group()
         try:
             prob.model.nonlinear_solver.add_recorder(self.recorder)
         except RuntimeError as err:
@@ -141,7 +139,6 @@ class DistributedRecorderTest(unittest.TestCase):
     def test_distrib_record_driver(self):
         size = 100  # how many items in the array
         prob = Problem()
-        prob.model = Group()
 
         prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size)), promotes=['x'])
         prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
@@ -156,7 +153,7 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.model.add_design_var('x')
         prob.model.add_objective('sum')
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['x'] = np.ones(size)
 

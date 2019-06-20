@@ -4,10 +4,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
-
-from openmdao.api import MuxComp
 
 
 class TestMuxCompOptions(unittest.TestCase):
@@ -15,15 +13,15 @@ class TestMuxCompOptions(unittest.TestCase):
     def test_invalid_axis_scalar(self):
         nn = 10
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         for i in range(nn):
             ivc.add_output(name='a_{0}'.format(i), val=1.0)
 
         p.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['*'])
 
-        mux_comp = p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=nn))
+        mux_comp = p.model.add_subsystem(name='mux_comp', subsys=om.MuxComp(vec_size=nn))
 
         mux_comp.add_var('a', shape=(1,), axis=2)
 
@@ -41,9 +39,9 @@ class TestMuxCompOptions(unittest.TestCase):
         a_size = 7
         b_size = 3
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         for i in range(nn):
             ivc.add_output(name='a_{0}'.format(i), shape=(a_size,))
             ivc.add_output(name='b_{0}'.format(i), shape=(b_size,))
@@ -52,7 +50,7 @@ class TestMuxCompOptions(unittest.TestCase):
                                    subsys=ivc,
                                    promotes_outputs=['*'])
 
-        mux_comp = p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=nn))
+        mux_comp = p.model.add_subsystem(name='mux_comp', subsys=om.MuxComp(vec_size=nn))
 
         mux_comp.add_var('a', shape=(a_size,), axis=0)
         mux_comp.add_var('b', shape=(b_size,), axis=2)
@@ -72,9 +70,9 @@ class TestMuxCompScalar(unittest.TestCase):
     def setUp(self):
         self.nn = 10
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         for i in range(self.nn):
             ivc.add_output(name='a_{0}'.format(i), val=1.0)
             ivc.add_output(name='b_{0}'.format(i), val=1.0)
@@ -83,7 +81,7 @@ class TestMuxCompScalar(unittest.TestCase):
                                    subsys=ivc,
                                    promotes_outputs=['*'])
 
-        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=self.nn))
+        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=om.MuxComp(vec_size=self.nn))
 
         mux_comp.add_var('a', shape=(1,), axis=0)
         mux_comp.add_var('b', shape=(1,), axis=1)
@@ -125,9 +123,9 @@ class TestMuxComp1D(unittest.TestCase):
         a_size = 7
         b_size = 3
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         for i in range(self.nn):
             ivc.add_output(name='a_{0}'.format(i), shape=(a_size,))
             ivc.add_output(name='b_{0}'.format(i), shape=(b_size,))
@@ -136,7 +134,7 @@ class TestMuxComp1D(unittest.TestCase):
                                    subsys=ivc,
                                    promotes_outputs=['*'])
 
-        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=self.nn))
+        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=om.MuxComp(vec_size=self.nn))
 
         mux_comp.add_var('a', shape=(a_size,), axis=0)
         mux_comp.add_var('b', shape=(b_size,), axis=1)
@@ -178,9 +176,9 @@ class TestMuxComp2D(unittest.TestCase):
         a_shape = (3, 3)
         b_shape = (2, 4)
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         for i in range(self.nn):
             ivc.add_output(name='a_{0}'.format(i), shape=a_shape)
             ivc.add_output(name='b_{0}'.format(i), shape=b_shape)
@@ -190,7 +188,7 @@ class TestMuxComp2D(unittest.TestCase):
                                    subsys=ivc,
                                    promotes_outputs=['*'])
 
-        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=MuxComp(vec_size=self.nn))
+        mux_comp = self.p.model.add_subsystem(name='mux_comp', subsys=om.MuxComp(vec_size=self.nn))
 
         mux_comp.add_var('a', shape=a_shape, axis=0)
         mux_comp.add_var('b', shape=b_shape, axis=1)
@@ -230,14 +228,15 @@ class TestMuxComp2D(unittest.TestCase):
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         """
         An example demonstrating a trivial use case of MuxComp
         """
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp, MuxComp, VectorMagnitudeComp
+
+        import openmdao.api as om
         from openmdao.utils.assert_utils import assert_rel_error
 
         # The number of elements to be muxed
@@ -246,9 +245,9 @@ class TestForDocs(unittest.TestCase):
         # The size of each element to be muxed
         m = 100
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='x', shape=(m,), units='m')
         ivc.add_output(name='y', shape=(m,), units='m')
         ivc.add_output(name='z', shape=(m,), units='m')
@@ -257,13 +256,13 @@ class TestForDocs(unittest.TestCase):
                               subsys=ivc,
                               promotes_outputs=['x', 'y', 'z'])
 
-        mux_comp = p.model.add_subsystem(name='mux', subsys=MuxComp(vec_size=n))
+        mux_comp = p.model.add_subsystem(name='mux', subsys=om.MuxComp(vec_size=n))
 
         mux_comp.add_var('r', shape=(m,), axis=1, units='m')
 
         p.model.add_subsystem(name='vec_mag_comp',
-                              subsys=VectorMagnitudeComp(vec_size=m, length=n, in_name='r',
-                                                         mag_name='r_mag', units='m'))
+                              subsys=om.VectorMagnitudeComp(vec_size=m, length=n, in_name='r',
+                                                            mag_name='r_mag', units='m'))
 
         p.model.connect('x', 'mux.r_0')
         p.model.connect('y', 'mux.r_1')

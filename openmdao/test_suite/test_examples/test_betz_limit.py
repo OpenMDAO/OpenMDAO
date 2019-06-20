@@ -5,12 +5,12 @@ import unittest
 
 import scipy
 
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
-from openmdao.api import Problem, ScipyOptimizeDriver, IndepVarComp, ExplicitComponent
 
 # duplicate definition here so it can be included in docs by itself
-class ActuatorDisc(ExplicitComponent):
+class ActuatorDisc(om.ExplicitComponent):
     """Simple wind turbine model based on actuator disc theory"""
 
     def setup(self):
@@ -90,14 +90,15 @@ class ActuatorDisc(ExplicitComponent):
         J['power', 'rho'] = 2.0 * a_times_area * Vu ** 3 * (one_minus_a)**2
         J['power', 'Vu'] = 6.0 * Area * Vu**2 * a * rho * one_minus_a**2
 
+
 class TestBetzLimit(unittest.TestCase):
 
     def test_betz(self):
         from distutils.version import LooseVersion
         import scipy
-        from openmdao.api import Problem, ScipyOptimizeDriver, IndepVarComp, ExplicitComponent
+        import openmdao.api as om
 
-        class ActuatorDisc(ExplicitComponent):
+        class ActuatorDisc(om.ExplicitComponent):
             """Simple wind turbine model based on actuator disc theory"""
 
             def setup(self):
@@ -180,8 +181,8 @@ class TestBetzLimit(unittest.TestCase):
 
 
         # build the model
-        prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
         indeps.add_output('a', .5)
         indeps.add_output('Area', 10.0, units='m**2')
         indeps.add_output('rho', 1.225, units='kg/m**3')
@@ -191,7 +192,7 @@ class TestBetzLimit(unittest.TestCase):
                                 promotes_inputs=['a', 'Area', 'rho', 'Vu'])
 
         # setup the optimization
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         prob.model.add_design_var('a', lower=0., upper=1.)
@@ -213,16 +214,15 @@ class TestBetzLimit(unittest.TestCase):
             raise unittest.SkipTest(msg)
 
     def test_betz_derivatives(self):
-        from openmdao.api import Problem, IndepVarComp
+        import openmdao.api as om
 
         from openmdao.test_suite.test_examples.test_betz_limit import ActuatorDisc
 
-        prob = Problem()
+        prob = om.Problem()
 
         prob.model.add_subsystem('a_disk', ActuatorDisc())
 
         prob.setup()
-
         prob.check_partials(compact_print=True)
 
 

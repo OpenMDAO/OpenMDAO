@@ -29,7 +29,7 @@ class TestMap(unittest.TestCase):
         # add compressor map to problem
         p = Problem()
         p.model.add_subsystem('compmap', c)
-        p.setup(check=False)
+        p.setup()
 
         # train metamodel
         Nc = np.array([0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1])
