@@ -566,17 +566,45 @@ class Coloring(object):
                                "colorings overlap!")
 
     def display(self):
+        """
+        Display a plot of the sparsity pattern, showing grouping by color.
+        """
         self.display_txt()
 
         from matplotlib import pyplot, patches, axes, cm
-        from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+
+        nrows, ncols = self._shape
+        aspect_ratio = ncols / nrows
+        J = np.ones((nrows, ncols, 3), dtype=float)
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
 
-        nrows, ncols = self._shape
-        J = np.ones((nrows, ncols, 3), dtype=float)
+        xtics = []
+        ytics = []
 
-        fig = pyplot.figure(figsize=(10, 10)) # in inches
+        # display grid that breaks up the Jacobian into subjacs by variable pairs.
+        if self._row_vars is not None and self._col_vars is not None:
+            sjcolors = [cm.get_cmap('Greys')(0.3), cm.get_cmap('Greys')(0.4)]
+
+            colstart = colend = 0
+            for cvsize in self._col_var_sizes:
+                colend += cvsize
+                xtics.append(colstart + colend/2)
+                colstart = colend
+
+            # we have var name/size info, so mark rows/cols with their respective variable names
+            rowstart = rowend = 0
+            for ridx, rvsize in enumerate(self._row_var_sizes):
+                rowend += rvsize
+                ytics.append(rowstart + rowend/2)
+
+                colstart = colend = 0
+                for cidx, cvsize in enumerate(self._col_var_sizes):
+                    colend += cvsize
+                    J[rowstart:rowend, colstart:colend] = sjcolors[(ridx+cidx)%2][:3]
+                    colstart = colend
+
+                rowstart = rowend
 
         color_arrays = []
         if self._fwd:
@@ -598,7 +626,7 @@ class Coloring(object):
                 icol += 1
 
         if self._rev:
-            cmap = cm.get_cmap('autumn', rev_solves)
+            cmap = cm.get_cmap('autumn_r', rev_solves)
 
             icol = 1
             full_cols = np.arange(ncols, dtype=int)
@@ -615,35 +643,23 @@ class Coloring(object):
                         icol += 1
                 icol += 1
 
+        fig = pyplot.figure()#figsize=(10, 10)) # in inches
+        ax = pyplot.gca()
+        ax.set_title("%s jacobian coloring (%d x %d)" % (self._meta['type'],
+                                                         self._shape[0], self._shape[1]))
+        if xtics:
+            # ax.xaxis.set_major_locator(FixedLocator(xtics))
+            # ax.yaxis.set_major_locator(FixedLocator(ytics))
+            pyplot.xticks(xtics, self._col_vars, rotation=70, horizontal_alignment='right')
+            pyplot.margins(0.2)
+            # ax.set_xticks(xtics)
+            # ax.set_xticklabels(self._col_vars)
+            ax.set_yticks(ytics)
+            ax.set_yticklabels(self._row_vars)
+
         pyplot.imshow(J, interpolation="none")
 
-        # axes.Axes.set_xticks()
-        # axes.Axes.set_xticklabels()
-        # axes.Axes.set_yticks()
-        # axes.Axes.set_yticklabels()
-
         pyplot.show()
-
-        # def draw_partitions(partitions=[]):
-        #     """
-        #     - partitions is a list of column lists, where each column appears
-        #         in exactly one list
-        #     If partitions is specified, the same number of colors needs to be
-        #     specified.
-        #     """
-        #     # The rest is just if you have sorted nodes by a partition and want to
-        #     # highlight the module boundaries
-        #     ax = pyplot.gca()
-        #     for partition, color in zip(partitions, colors):
-        #         current_idx = 0
-        #         for module in partition:
-        #             ax.add_patch(patches.Rectangle((current_idx, current_idx),
-        #                                         len(module), # Width
-        #                                         len(module), # Height
-        #                                         facecolor="none",
-        #                                         edgecolor=color,
-        #                                         linewidth="1"))
-        #             current_idx += len(module)
 
     def get_dense_sparsity(self):
         """
@@ -1638,7 +1654,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
                                       setup=False, run_model=run_model, fname=fname)
 
     if driver._coloring_info['show_sparsity']:
-        coloring.display()
+        coloring.display_txt()
     if driver._coloring_info['show_summary']:
         coloring.summary()
 
@@ -1722,7 +1738,7 @@ def _total_coloring_cmd(options):
                                                   setup=False, run_model=True, fname=outfile)
 
             if options.show_sparsity:
-                coloring.display()
+                coloring.display_txt()
             coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
@@ -1813,7 +1829,7 @@ def _partial_coloring_cmd(options):
 
     def _show(system, options, coloring):
         if options.show_sparsity and not coloring._meta.get('show_sparsity'):
-            coloring.display()
+            coloring.display_txt()
             print('\n')
 
         if not coloring._meta.get('show_summary'):
