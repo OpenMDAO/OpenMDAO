@@ -468,12 +468,14 @@ class Coloring(object):
         if self._coloring_time is not None:
             print("Time to compute coloring: %f sec." % self._coloring_time)
 
-    def display(self):
+    def display_txt(self):
         """
-        Display the structure of a boolean array with coloring info for each nonzero value.
+        Print the structure of a boolean array with coloring info for each nonzero value.
 
         Forward mode colored nonzeros are denoted by 'f', reverse mode nonzeros by 'r',
         overlapping nonzeros by 'O' and uncolored nonzeros by 'x'.  Zeros are denoted by '.'.
+        Note that x's and O's should never appear unless there is a bug in the colorning
+        algorithm.
 
         If names and sizes of row and column vars are known, print the name of the row var
         alongside each row and print the names of the column vars, aligned with each column,
@@ -550,6 +552,86 @@ class Coloring(object):
         if has_overlap:
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
                                "colorings overlap!")
+
+    def display(self):
+        self.display_txt()
+
+        from matplotlib import pyplot, patches, axes, cm
+        from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
+
+        nrows, ncols = self._shape
+        J = np.ones((nrows, ncols, 3), dtype=float)
+
+        fig = pyplot.figure(figsize=(10, 10)) # in inches
+
+        color_arrays = []
+        if self._fwd:
+            cmap = cm.get_cmap('winter', fwd_solves)
+
+            icol = 1
+            full_rows = np.arange(nrows, dtype=int)
+            col2row = self._fwd[1]
+            for i, grp in enumerate(self._fwd[0]):
+                for c in grp:
+                    rows = col2row[c]
+                    if rows is None:
+                        rows = full_rows
+                    idx = icol / fwd_solves
+                    for r in rows:
+                        J[r, c][:] = cmap(idx)[:3]
+                    if i == 0:  # group 0 are uncolored (each col has different color)
+                        icol += 1
+                icol += 1
+
+        if self._rev:
+            cmap = cm.get_cmap('autumn', rev_solves)
+
+            icol = 1
+            full_cols = np.arange(ncols, dtype=int)
+            row2col = self._rev[1]
+            for i, grp in enumerate(self._rev[0]):
+                for r in grp:
+                    cols = row2col[r]
+                    if cols is None:
+                        cols = full_cols
+                    idx = icol / rev_solves
+                    for c in cols:
+                        J[r, c][:] = cmap(idx)[:3]
+                    if i == 0:  # group 0 are uncolored (each col has different color)
+                        icol += 1
+                icol += 1
+
+        pyplot.imshow(J, interpolation="none")
+
+        # axes.Axes.set_xticks()
+        # axes.Axes.set_xticklabels()
+        # axes.Axes.set_yticks()
+        # axes.Axes.set_yticklabels()
+
+        pyplot.show()
+
+        # def draw_partitions(partitions=[]):
+        #     """
+        #     - partitions is a list of column lists, where each column appears
+        #         in exactly one list
+        #     If partitions is specified, the same number of colors needs to be
+        #     specified.
+        #     """
+        #     # The rest is just if you have sorted nodes by a partition and want to
+        #     # highlight the module boundaries
+        #     ax = pyplot.gca()
+        #     for partition, color in zip(partitions, colors):
+        #         current_idx = 0
+        #         for module in partition:
+        #             ax.add_patch(patches.Rectangle((current_idx, current_idx),
+        #                                         len(module), # Width
+        #                                         len(module), # Height
+        #                                         facecolor="none",
+        #                                         edgecolor=color,
+        #                                         linewidth="1"))
+        #             current_idx += len(module)
 
     def get_dense_sparsity(self):
         """
@@ -1433,7 +1515,11 @@ def compute_total_coloring(problem, mode=None,
             coloring._sparsity_time = sparsity_time
 
             # save metadata we used to create the coloring
-            coloring._meta = {'num_full_jacs': num_full_jacs, 'tol': tol, 'orders': orders}
+            coloring._meta = {
+                'num_full_jacs': num_full_jacs,
+                'tol': tol,
+                'orders': orders,
+            }
 
             driver._total_jac = None
 
