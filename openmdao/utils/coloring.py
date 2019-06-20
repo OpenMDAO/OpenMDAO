@@ -1130,24 +1130,17 @@ def _tol_sweep(arr, tol=1e-15, orders=20):
         good_tol = tol
         nz_matches = n_tested = 1
     else:
-        last_rows = last_cols = None
         nzeros = []
         itol = tol * 10.**orders
         smallest = tol / 10.**orders
         n_tested = 0
         while itol >= smallest:
             if itol < 1.:
-                if last_rows is None:
-                    last_rows, last_cols = np.nonzero(arr > itol)
-                    nzeros.append(([itol], len(last_rows)))
+                rows, cols = np.nonzero(arr > itol)
+                if nzeros and nzeros[-1][1] == len(rows):
+                    nzeros[-1][0].append(itol)
                 else:
-                    rows, cols = np.nonzero(arr > itol)
-                    if (len(rows) == len(last_rows) and np.all(rows == last_rows) and
-                            np.all(cols == last_cols)):
-                        nzeros[-1][0].append(itol)
-                    else:
-                        nzeros.append(([itol], len(rows)))
-                        last_rows, last_cols = rows, cols
+                    nzeros.append(([itol], len(rows)))
                 n_tested += 1
             itol /= 10.
 
@@ -1270,6 +1263,8 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
             else:
                 fullJ += np.abs(J)
         elapsed = time.time() - start_time
+
+    fullJ /= num_full_jacs
 
     info = _tol_sweep(fullJ, tol, orders)
     info['num_full_jacs'] = num_full_jacs

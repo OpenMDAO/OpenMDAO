@@ -443,7 +443,7 @@ class Driver(object):
             for sub in self._problem.model.system_iter(recurse=True, include_self=True):
                 self._rec_mgr.record_metadata(sub)
 
-    def _get_voi_val(self, name, meta, remote_vois, unscaled=False, ignore_indices=False):
+    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, ignore_indices=False):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -458,8 +458,10 @@ class Driver(object):
         remote_vois : dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
-        unscaled : bool
-            Set to True if unscaled (physical) design variables are desired.
+        driver_scaling : bool
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
 
@@ -510,7 +512,7 @@ class Driver(object):
             else:
                 val = vec[name][indices]
 
-        if self._has_scaling and not unscaled:
+        if self._has_scaling and driver_scaling:
             # Scale design variable values
             adder = meta['adder']
             if adder is not None:
@@ -522,7 +524,7 @@ class Driver(object):
 
         return val
 
-    def get_design_var_values(self, filter=None, unscaled=False, ignore_indices=False):
+    def get_design_var_values(self, filter=None, driver_scaling=True, ignore_indices=False):
         """
         Return the design variable values.
 
@@ -532,8 +534,10 @@ class Driver(object):
         ----------
         filter : list
             List of desvar names used by recorders.
-        unscaled : bool
-            Set to True if unscaled (physical) design variables are desired.
+        driver_scaling : bool
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
 
@@ -548,7 +552,8 @@ class Driver(object):
             # use all the designvars
             dvs = self._designvars
 
-        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs, unscaled=unscaled,
+        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs,
+                                     driver_scaling=driver_scaling,
                                      ignore_indices=ignore_indices) for n in dvs}
 
     def set_design_var(self, name, value):
@@ -580,8 +585,8 @@ class Driver(object):
             desvar = problem.model._outputs._views_flat[name]
             desvar[indices] = value
 
+            # Undo driver scaling when setting design var values into model.
             if self._has_scaling:
-                # Scale design variable values
                 scaler = meta['scaler']
                 if scaler is not None:
                     desvar[indices] *= 1.0 / scaler
@@ -611,14 +616,16 @@ class Driver(object):
 
         return {n: self._get_voi_val(n, self._responses[n], self._remote_objs) for n in resps}
 
-    def get_objective_values(self, unscaled=False, filter=None, ignore_indices=False):
+    def get_objective_values(self, driver_scaling=True, filter=None, ignore_indices=False):
         """
         Return objective values.
 
         Parameters
         ----------
-        unscaled : bool
-            Set to True if unscaled (physical) design variables are desired.
+        driver_scaling : bool
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         filter : list
             List of objective names used by recorders.
         ignore_indices : bool
@@ -634,11 +641,12 @@ class Driver(object):
         else:
             objs = self._objs
 
-        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs, unscaled=unscaled,
+        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs,
+                                     driver_scaling=driver_scaling,
                                      ignore_indices=ignore_indices)
                 for n in objs}
 
-    def get_constraint_values(self, ctype='all', lintype='all', unscaled=False, filter=None,
+    def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True, filter=None,
                               ignore_indices=False):
         """
         Return constraint values.
@@ -651,8 +659,10 @@ class Driver(object):
         lintype : string
             Default is 'all'. Optionally return just the linear constraints
             with 'linear' or the nonlinear constraints with 'nonlinear'.
-        unscaled : bool
-            Set to True if unscaled (physical) design variables are desired.
+        driver_scaling : bool
+            When True, return values that are scaled according to either the adder and scaler or
+            the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is True.
         filter : list
             List of constraint names used by recorders.
         ignore_indices : bool
@@ -684,7 +694,8 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
-            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons, unscaled=unscaled,
+            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
+                                               driver_scaling=driver_scaling,
                                                ignore_indices=ignore_indices)
 
         return con_dict
@@ -846,17 +857,17 @@ class Driver(object):
         filt = self._filtered_vars_to_record
 
         if opts['record_desvars']:
-            des_vars = self.get_design_var_values(unscaled=True, ignore_indices=True)
+            des_vars = self.get_design_var_values(driver_scaling=False, ignore_indices=True)
         else:
             des_vars = {}
 
         if opts['record_objectives']:
-            obj_vars = self.get_objective_values(unscaled=True, ignore_indices=True)
+            obj_vars = self.get_objective_values(driver_scaling=False, ignore_indices=True)
         else:
             obj_vars = {}
 
         if opts['record_constraints']:
-            con_vars = self.get_constraint_values(unscaled=True, ignore_indices=True)
+            con_vars = self.get_constraint_values(driver_scaling=False, ignore_indices=True)
         else:
             con_vars = {}
 
@@ -1130,7 +1141,7 @@ class Driver(object):
             print(len(header) * '-')
 
         if 'desvars' in debug_opt:
-            desvar_vals = self.get_design_var_values(unscaled=True, ignore_indices=True)
+            desvar_vals = self.get_design_var_values(driver_scaling=False, ignore_indices=True)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Design Vars")
                 if desvar_vals:
@@ -1152,7 +1163,7 @@ class Driver(object):
         Optionally print some debugging information after the model runs.
         """
         if 'nl_cons' in self.options['debug_print']:
-            cons = self.get_constraint_values(lintype='nonlinear', unscaled=True)
+            cons = self.get_constraint_values(lintype='nonlinear', driver_scaling=False)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Nonlinear constraints")
                 if cons:
@@ -1162,7 +1173,7 @@ class Driver(object):
                 print()
 
         if 'ln_cons' in self.options['debug_print']:
-            cons = self.get_constraint_values(lintype='linear', unscaled=True)
+            cons = self.get_constraint_values(lintype='linear', driver_scaling=False)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Linear constraints")
                 if cons:
@@ -1172,7 +1183,7 @@ class Driver(object):
                 print()
 
         if 'objs' in self.options['debug_print']:
-            objs = self.get_objective_values(unscaled=True)
+            objs = self.get_objective_values(driver_scaling=False)
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Objectives")
                 if objs:
