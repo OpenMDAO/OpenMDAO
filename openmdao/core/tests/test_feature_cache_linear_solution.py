@@ -105,11 +105,11 @@ class CacheLinearTestCase(unittest.TestCase):
 
         assert_rel_error(self, p['states'], [-0.26794919, -4.], 1e-6)
 
-        derivs = p.compute_totals(of=['states'], wrt=['a'])
+        derivs = p.driver._compute_totals(of=['states'], wrt=['a'], global_names=False)
         assert_rel_error(self, derivs['states', 'a'], [[-0.02072594],[4.]], 1e-6)
 
         p['a'] = 4
-        derivs = p.compute_totals(of=['states'], wrt=['a'])
+        derivs = p.driver._compute_totals(of=['states'], wrt=['a'], global_names=False)
         assert_rel_error(self, derivs['states', 'a'], [[-0.02072594],[4.]], 1e-6)
 
 
