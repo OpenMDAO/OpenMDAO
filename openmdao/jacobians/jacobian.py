@@ -232,8 +232,7 @@ class Jacobian(object):
         if isinstance(subjac, sparse_types):  # sparse
             sparse = subjac.copy()
             sparse.data = rand(sparse.data.size)
-            sparse.data *= .01
-            sparse.data += 1.0
+            sparse.data += 10.0
             return sparse
 
         # if a subsystem has computed a dynamic partial or semi-total coloring,
@@ -248,13 +247,11 @@ class Jacobian(object):
             rows, cols, shape = subjac_info['sparsity']
             r = np.zeros(shape)
             val = rand(len(rows))
-            val *= .01
-            val += 1.0
+            val += 10.0
             r[rows, cols] = val
         else:
             r = rand(*subjac.shape)
-            r *= .01
-            r += 1.0
+            r += 10.0
         return r
 
     def _get_ranges(self, system, vtype):
@@ -351,6 +348,8 @@ class Jacobian(object):
                         raise NotImplementedError("don't support scipy sparse arrays yet")
                     else:
                         J[roffset:rend, coffset:cend] = summ[key]
+
+        J /= num_full_jacs
 
         tol_info = _tol_sweep(J, tol, orders)
 
