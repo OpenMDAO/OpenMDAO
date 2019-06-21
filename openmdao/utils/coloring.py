@@ -569,10 +569,16 @@ class Coloring(object):
         """
         Display a plot of the sparsity pattern, showing grouping by color.
         """
-        self.display_txt()
-
-        from matplotlib import pyplot, patches, axes, cm
-        from matplotlib.artist import getp
+        try:
+            from matplotlib import pyplot, patches, axes, cm
+            from matplotlib.artist import getp
+            from matplotlib.offsetbox import AnchoredText
+        except ImportError:
+            print("matplotlib is not installed so the coloring viewer is not available. The ascii "
+                  "based coloring viewer can be accessed by calling display_txt() on the Coloring "
+                  "object or by using 'openmdao view_coloring --jtext <your_coloring_file>' from "
+                  "the command line.")
+            return
 
         nrows, ncols = self._shape
         aspect_ratio = ncols / nrows
@@ -580,24 +586,37 @@ class Coloring(object):
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
 
-        # xtics = []
-        # ytics = []
+        size = 15
+        if nrows > ncols:
+            mult = nrows / size
+            ysize = nrows / mult
+            xsize = ysize * aspect_ratio
+        else:
+            mult = ncols / size
+            xsize = ncols / mult
+            ysize = xsize / aspect_ratio
 
-        fig = pyplot.figure()#(figsize=(20,10)) # in inches
+        xsize = max(1, int(xsize))
+        ysize = max(1, int(ysize))
+
+        fig = pyplot.figure(figsize=(xsize, ysize)) # in inches
         ax = pyplot.gca()
 
-        # display grid that breaks up the Jacobian into subjacs by variable pairs.
+        # hide tic marks/labels
+        ax.axes.get_xaxis().set_ticks([])
+        ax.axes.get_yaxis().set_ticks([])
+
         if self._row_vars is not None and self._col_vars is not None:
             # map row/col to corresponding var names
             entry_xnames = np.zeros(ncols, dtype=int)
             entry_ynames = np.zeros(nrows, dtype=int)
 
+            # pick two colors for our checkerboard pattern
             sjcolors = [cm.get_cmap('Greys')(0.3), cm.get_cmap('Greys')(0.4)]
 
             colstart = colend = 0
             for i, cvsize in enumerate(self._col_var_sizes):
                 colend += cvsize
-                # xtics.append(colstart + cvsize/2 - 0.5)
                 entry_xnames[colstart:colend] = i
                 colstart = colend
 
@@ -605,21 +624,17 @@ class Coloring(object):
             rowstart = rowend = 0
             for ridx, rvsize in enumerate(self._row_var_sizes):
                 rowend += rvsize
-                # ytics.append(rowstart + rvsize/2 - 0.5)
                 entry_ynames[rowstart:rowend] = ridx
 
                 colstart = colend = 0
                 for cidx, cvsize in enumerate(self._col_var_sizes):
                     colend += cvsize
+                    # display grid that breaks up the Jacobian into subjacs by variable pairs.
+                    # using (ridx+cidx)%2 will give us a nice checkerboard pattern
                     J[rowstart:rowend, colstart:colend] = sjcolors[(ridx+cidx)%2][:3]
                     colstart = colend
 
                 rowstart = rowend
-
-            annot = ax.annotate("", xy=(0,0), xytext=(2,2),textcoords="offset points",
-                                bbox=dict(boxstyle="round", fc="w"),
-                                arrowprops=dict(arrowstyle="->"))
-            annot.set_visible(False)
 
             def on_press(event):
                 if event.inaxes == ax:
@@ -628,29 +643,18 @@ class Coloring(object):
 
                     if event.xdata - ix >= .5:
                         ix += 1
-                    if ix < 0:
-                        ix = 0
-                    if ix > ncols:
-                        ix = ncols
+                    ix = max(0, ix)
+                    ix = min(ncols, ix)
+
                     if event.ydata - iy >= .5:
                         iy += 1
-                    if iy < 0:
-                        iy = 0
-                    if iy > nrows:
-                        iy = nrows
+                    iy = max(0, iy)
+                    iy = min(nrows, iy)
 
-                    annot.set_text("of: %s\nwrt: %s" % (self._row_vars[entry_ynames[iy]],
-                                                        self._col_vars[entry_xnames[ix]]))
-                    annot.xy = (event.xdata, event.ydata)
-                    annot.set_visible(True)
-                    fig.canvas.draw_idle()
-
-            def on_release(event):
-                annot.set_visible(False)
-                fig.canvas.draw_idle()
+                    print('(%d, %d)' % (ix, iy), '\nOF:', self._row_vars[entry_ynames[iy]],
+                          '\nWRT:', self._col_vars[entry_xnames[ix]])
 
             cid = fig.canvas.mpl_connect('button_press_event', on_press)
-            cid2 = fig.canvas.mpl_connect('button_release_event', on_release)
 
         color_arrays = []
         if self._fwd:
@@ -689,19 +693,12 @@ class Coloring(object):
                         icol += 1
                 icol += 1
 
-        ax.set_title("%s jacobian coloring (%d x %d)" % (self._meta['type'],
-                                                         self._shape[0], self._shape[1]))
-        # if xtics:
-        #     ax.set_xticks(xtics)
-        #     ax.set_xticklabels(self._col_vars, rotation=40, ha='right')
-        #     #pyplot.margins(0.4)
-        #     ax.set_yticks(ytics)
-        #     ax.set_yticklabels(self._row_vars)
+        ax.set_title("%s jacobian coloring (%d x %d)\n%d fwd colors, %d rev colors (%.1f%% improvement)" %
+                     (self._meta['type'], self._shape[0], self._shape[1],
+                     fwd_solves, rev_solves, pct))
 
         pyplot.imshow(J, interpolation="none")
-        #fig.tight_layout()
-
-        print(getp(ax.patch))
+        fig.tight_layout()
 
         pyplot.show()
 
@@ -2016,6 +2013,9 @@ def _view_coloring_setup_parser(parser):
     parser.add_argument('-j', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final sparsity matrix used to "
                         "compute the coloring.")
+    parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
+                        help="Display an ascii visualization of the final sparsity matrix used to "
+                        "compute the coloring.")
     parser.add_argument('-s', action='store_true', dest='subjac_sparsity',
                         help="Display sparsity patterns for subjacs.")
     parser.add_argument('-m', action='store_true', dest='show_meta',
@@ -2035,6 +2035,9 @@ def _view_coloring_exec(options):
         Command line options.
     """
     coloring = Coloring.load(options.file[0])
+    if options.show_sparsity_text:
+        coloring.display_txt()
+
     if options.show_sparsity:
         coloring.display()
 
