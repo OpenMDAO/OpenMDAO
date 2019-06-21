@@ -7,16 +7,15 @@ from six import assertRaisesRegex, StringIO, assertRegex, iteritems
 
 import numpy as np
 
+import openmdao.api as om
 from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
-from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, DirectSolver, \
-    ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent, NonlinearRunOnce
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
 
-class SellarOneComp(ImplicitComponent):
+class SellarOneComp(om.ImplicitComponent):
 
     def initialize(self):
         self.options.declare('solve_y1', types=bool, default=True)
@@ -115,14 +114,14 @@ class SellarOneComp(ImplicitComponent):
 class TestProblem(unittest.TestCase):
 
     def test_feature_simple_run_once_no_promote(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
         model.connect('p1.x', 'comp.x')
@@ -134,13 +133,13 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['comp.f_xy'], -15.0)
 
     def test_feature_simple_run_once_input_input(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
 
         # promote the two inputs to the same name
         model.add_subsystem('comp1', Paraboloid(), promotes_inputs=['x'])
@@ -156,14 +155,14 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['comp2.f_xy'], 13.0)
 
     def test_feature_simple_run_once_compute_totals(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
         model.connect('p1.x', 'comp.x')
@@ -181,14 +180,14 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, totals['comp.f_xy']['p2.y'][0][0], 3.0)
 
     def test_feature_simple_run_once_compute_totals_scaled(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
         model.connect('p1.x', 'comp.x')
@@ -206,14 +205,14 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, totals[('comp.f_xy', 'p2.y')][0][0], 3.0)
 
     def test_feature_simple_run_once_set_deriv_mode(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 3.0))
-        model.add_subsystem('p2', IndepVarComp('y', -4.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
         model.add_subsystem('comp', Paraboloid())
 
         model.connect('p1.x', 'comp.x')
@@ -228,13 +227,13 @@ class TestProblem(unittest.TestCase):
         prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
 
     def test_compute_totals_cleanup(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indeps1', IndepVarComp('x', np.ones(5)))
-        model.add_subsystem('indeps2', IndepVarComp('x', np.ones(3)))
+        model.add_subsystem('indeps1', om.IndepVarComp('x', np.ones(5)))
+        model.add_subsystem('indeps2', om.IndepVarComp('x', np.ones(3)))
 
-        model.add_subsystem('MP1', ExecComp('y=7*x', x=np.zeros(5), y=np.zeros(5)))
-        model.add_subsystem('MP2', ExecComp('y=-3*x', x=np.zeros(3), y=np.zeros(3)))
+        model.add_subsystem('MP1', om.ExecComp('y=7*x', x=np.zeros(5), y=np.zeros(5)))
+        model.add_subsystem('MP2', om.ExecComp('y=-3*x', x=np.zeros(3), y=np.zeros(3)))
 
         model.add_design_var('indeps1.x')
         model.add_design_var('indeps2.x')
@@ -259,12 +258,12 @@ class TestProblem(unittest.TestCase):
     def test_set_2d_array(self):
         import numpy as np
 
-        from openmdao.api import Problem, IndepVarComp, Group
+        import openmdao.api as om
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
         model.add_subsystem(name='indeps',
-                            subsys=IndepVarComp(name='X_c', shape=(3, 1)))
+                            subsys=om.IndepVarComp(name='X_c', shape=(3, 1)))
         prob.setup()
 
         new_val = -5*np.ones((3, 1))
@@ -282,13 +281,13 @@ class TestProblem(unittest.TestCase):
 
     def test_set_checks_shape(self):
 
-        model = Group()
+        model = om.Group()
 
-        indep = model.add_subsystem('indep', IndepVarComp())
+        indep = model.add_subsystem('indep', om.IndepVarComp())
         indep.add_output('num')
         indep.add_output('arr', shape=(10, 1))
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
 
         msg = "Incompatible shape for '.*': Expected (.*) but got (.*)"
@@ -334,10 +333,10 @@ class TestProblem(unittest.TestCase):
     def test_compute_totals_basic(self):
         # Basic test for the method using default solvers on simple model.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup(check=False, mode='fwd')
@@ -364,10 +363,10 @@ class TestProblem(unittest.TestCase):
     def test_compute_totals_basic_return_dict(self):
         # Make sure 'dict' return_format works.
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup(check=False, mode='fwd')
@@ -392,12 +391,12 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['f_xy']['y'], [[8.0]], 1e-6)
 
     def test_compute_totals_no_args_no_desvar(self):
-        p = Problem()
+        p = om.Problem()
 
-        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv = p.model.add_subsystem('des_vars', om.IndepVarComp())
         dv.add_output('x', val=2.)
 
-        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+        p.model.add_subsystem('calc', om.ExecComp('y=2*x'))
 
         p.model.connect('des_vars.x', 'calc.x')
 
@@ -413,12 +412,12 @@ class TestProblem(unittest.TestCase):
                          "Driver is not providing any design variables for compute_totals.")
 
     def test_compute_totals_no_args_no_response(self):
-        p = Problem()
+        p = om.Problem()
 
-        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv = p.model.add_subsystem('des_vars', om.IndepVarComp())
         dv.add_output('x', val=2.)
 
-        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+        p.model.add_subsystem('calc', om.ExecComp('y=2*x'))
 
         p.model.connect('des_vars.x', 'calc.x')
 
@@ -434,12 +433,12 @@ class TestProblem(unittest.TestCase):
                          "Driver is not providing any response variables for compute_totals.")
 
     def test_compute_totals_no_args(self):
-        p = Problem()
+        p = om.Problem()
 
-        dv = p.model.add_subsystem('des_vars', IndepVarComp())
+        dv = p.model.add_subsystem('des_vars', om.IndepVarComp())
         dv.add_output('x', val=2.)
 
-        p.model.add_subsystem('calc', ExecComp('y=2*x'))
+        p.model.add_subsystem('calc', om.ExecComp('y=2*x'))
 
         p.model.connect('des_vars.x', 'calc.x')
 
@@ -454,12 +453,12 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
 
     def test_compute_totals_no_args_promoted(self):
-        p = Problem()
+        p = om.Problem()
 
-        dv = p.model.add_subsystem('des_vars', IndepVarComp(), promotes=['*'])
+        dv = p.model.add_subsystem('des_vars', om.IndepVarComp(), promotes=['*'])
         dv.add_output('x', val=2.)
 
-        p.model.add_subsystem('calc', ExecComp('y=2*x'), promotes=['*'])
+        p.model.add_subsystem('calc', om.ExecComp('y=2*x'), promotes=['*'])
 
         p.model.add_design_var('x')
         p.model.add_objective('y')
@@ -472,14 +471,14 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
 
     def test_feature_set_indeps(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
 
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup()
@@ -490,13 +489,13 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_basic_setup(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         prob.setup()
@@ -512,7 +511,7 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 22.0, 1e-6)
 
         # skip the setup error checking
-        prob.setup(check=False)
+        prob.setup()
         prob['x'] = 4
         prob['y'] = 8.
 
@@ -520,13 +519,13 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 174.0, 1e-6)
 
     def test_feature_petsc_setup(self):
-        from openmdao.api import Problem, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        model.add_subsystem('p1', IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
         model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
 
         # PETScVectors will be used automatically where needed. No need to set manually.
@@ -538,12 +537,12 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 214.0, 1e-6)
 
     def test_feature_check_totals_manual(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
         prob.run_model()
@@ -552,12 +551,12 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(of=['obj', 'con1'], wrt=['x', 'z'])
 
     def test_feature_check_totals_from_driver_compact(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -575,12 +574,12 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(compact_print=True)
 
     def test_feature_check_totals_from_driver(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -598,12 +597,12 @@ class TestProblem(unittest.TestCase):
         prob.check_totals()
 
     def test_feature_check_totals_from_driver_scaled(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100, ref=100.0, ref0=-100.0)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -621,12 +620,12 @@ class TestProblem(unittest.TestCase):
         prob.check_totals(driver_scaling=True)
 
     def test_feature_check_totals_suppress(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -645,12 +644,12 @@ class TestProblem(unittest.TestCase):
         print(totals)
 
     def test_feature_check_totals_cs(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -672,7 +671,7 @@ class TestProblem(unittest.TestCase):
 
     def test_check_totals_user_detect(self):
 
-        class SimpleComp(ExplicitComponent):
+        class SimpleComp(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('x', val=1.0)
@@ -692,8 +691,8 @@ class TestProblem(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
 
-        prob = Problem()
-        prob.model.add_subsystem('px', IndepVarComp('x', 2.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('px', om.IndepVarComp('x', 2.0))
         prob.model.add_subsystem('comp', SimpleComp())
         prob.model.connect('px.x', 'comp.x')
 
@@ -710,9 +709,9 @@ class TestProblem(unittest.TestCase):
                          msg="The under_complex_step flag should be reset.")
 
     def test_feature_check_totals_user_detect_forced(self):
-        from openmdao.api import Problem, ExplicitComponent, IndepVarComp
+        import openmdao.api as om
 
-        class SimpleComp(ExplicitComponent):
+        class SimpleComp(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('x', val=1.0)
@@ -729,8 +728,8 @@ class TestProblem(unittest.TestCase):
             def compute_partials(self, inputs, partials):
                 partials['y', 'x'] = 3.
 
-        prob = Problem()
-        prob.model.add_subsystem('px', IndepVarComp('x', val=1.0))
+        prob = om.Problem()
+        prob.model.add_subsystem('px', om.IndepVarComp('x', val=1.0))
         prob.model.add_subsystem('comp', SimpleComp())
         prob.model.connect('px.x', 'comp.x')
 
@@ -746,14 +745,14 @@ class TestProblem(unittest.TestCase):
     def test_feature_run_driver(self):
         import numpy as np
 
-        from openmdao.api import Problem, NonlinearBlockGS, ScipyOptimizeDriver
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem(model=SellarDerivatives())
+        prob = om.Problem(model=SellarDerivatives())
         model = prob.model
-        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver = om.NonlinearBlockGS()
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
 
@@ -773,11 +772,11 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['obj'], 3.18339395, 1e-2)
 
     def test_feature_promoted_sellar_set_get_outputs(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem(model=SellarDerivatives())
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob = om.Problem(model=SellarDerivatives())
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
 
@@ -790,11 +789,11 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y1'], 27.3049178437, 1e-6)
 
     def test_feature_not_promoted_sellar_set_get_outputs(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivativesConnected
 
-        prob = Problem(model= SellarDerivativesConnected())
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob = om.Problem(model= SellarDerivativesConnected())
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
 
@@ -807,11 +806,11 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['d1.y1'], 27.3049178437, 1e-6)
 
     def test_feature_promoted_sellar_set_get_inputs(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem(model=SellarDerivatives())
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob = om.Problem(model=SellarDerivatives())
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
 
@@ -827,25 +826,25 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['d2.y1'], 27.3049178437, 1e-6)
 
     def test_get_set_with_units_exhaustive(self):
-        from openmdao.api import Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model.add_subsystem('comp', ExecComp('y=x-25.',
-                                                  x={'value': 77.0, 'units': 'degF'},
-                                                  y={'value': 0.0, 'units': 'degC'}))
-        prob.model.add_subsystem('prom', ExecComp('yy=xx-25.',
-                                                  xx={'value': 77.0, 'units': 'degF'},
-                                                  yy={'value': 0.0, 'units': 'degC'}),
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('y=x-25.',
+                                                     x={'value': 77.0, 'units': 'degF'},
+                                                     y={'value': 0.0, 'units': 'degC'}))
+        prob.model.add_subsystem('prom', om.ExecComp('yy=xx-25.',
+                                                     xx={'value': 77.0, 'units': 'degF'},
+                                                     yy={'value': 0.0, 'units': 'degC'}),
                                  promotes=['xx', 'yy'])
-        prob.model.add_subsystem('acomp', ExecComp('y=x-25.',
-                                                   x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                   y={'value': 0.0, 'units': 'degC'}))
-        prob.model.add_subsystem('aprom', ExecComp('ayy=axx-25.',
-                                                   axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                   ayy={'value': 0.0, 'units': 'degC'}),
+        prob.model.add_subsystem('acomp', om.ExecComp('y=x-25.',
+                                                      x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                      y={'value': 0.0, 'units': 'degC'}))
+        prob.model.add_subsystem('aprom', om.ExecComp('ayy=axx-25.',
+                                                      axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                      ayy={'value': 0.0, 'units': 'degC'}),
                                  promotes=['axx', 'ayy'])
 
-        prob.setup(check=False)
+        prob.setup()
 
         # Make sure everything works before final setup with caching system.
 
@@ -942,13 +941,13 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([0])), 35.0, 1e-6)
 
     def test_get_set_with_units_error_messages(self):
-        from openmdao.api import Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model.add_subsystem('comp', ExecComp('y=x+1.',
-                                                  x={'value': 100.0, 'units': 'cm'},
-                                                  y={'units': 'm'}))
-        prob.model.add_subsystem('no_unit', ExecComp('y=x+1.', x={'value': 100.0}))
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
+                                                     x={'value': 100.0, 'units': 'cm'},
+                                                     y={'units': 'm'}))
+        prob.model.add_subsystem('no_unit', om.ExecComp('y=x+1.', x={'value': 100.0}))
 
         prob.setup()
         prob.run_model()
@@ -970,12 +969,12 @@ class TestProblem(unittest.TestCase):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
     def test_feature_get_set_with_units(self):
-        from openmdao.api import Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model.add_subsystem('comp', ExecComp('y=x+1.',
-                                                  x={'value': 100.0, 'units': 'cm'},
-                                                  y={'units': 'm'}))
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
+                                                     x={'value': 100.0, 'units': 'cm'},
+                                                     y={'units': 'm'}))
 
         prob.setup()
         prob.run_model()
@@ -988,12 +987,12 @@ class TestProblem(unittest.TestCase):
 
     def test_feature_get_set_array_with_units(self):
         import numpy as np
-        from openmdao.api import Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model.add_subsystem('comp', ExecComp('y=x+1.',
-                                                  x={'value': np.array([100.0, 33.3]), 'units': 'cm'},
-                                                  y={'shape': (2, ), 'units': 'm'}))
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
+                                                     x={'value': np.array([100.0, 33.3]), 'units': 'cm'},
+                                                     y={'shape': (2, ), 'units': 'm'}))
 
         prob.setup()
         prob.run_model()
@@ -1013,11 +1012,11 @@ class TestProblem(unittest.TestCase):
     def test_feature_set_get_array(self):
         import numpy as np
 
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem(model=SellarDerivatives())
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob = om.Problem(model=SellarDerivatives())
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
 
@@ -1045,11 +1044,11 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 8.14191301549, 1e-6)
 
     def test_feature_residuals(self):
-        from openmdao.api import Problem, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem(model=SellarDerivatives())
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob = om.Problem(model=SellarDerivatives())
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
 
@@ -1064,7 +1063,7 @@ class TestProblem(unittest.TestCase):
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
 
-        prob = Problem()
+        prob = om.Problem()
 
         try:
             prob.setup(mode='junk')
@@ -1076,9 +1075,9 @@ class TestProblem(unittest.TestCase):
 
     def test_setup_bad_mode_direction_fwd(self):
 
-        prob = Problem()
-        prob.model.add_subsystem("indep", IndepVarComp("x", np.ones(99)))
-        prob.model.add_subsystem("C1", ExecComp("y=2.0*x", x=np.zeros(10), y=np.zeros(10)))
+        prob = om.Problem()
+        prob.model.add_subsystem("indep", om.IndepVarComp("x", np.ones(99)))
+        prob.model.add_subsystem("C1", om.ExecComp("y=2.0*x", x=np.zeros(10), y=np.zeros(10)))
 
         prob.model.connect("indep.x", "C1.x", src_indices=list(range(10)))
 
@@ -1096,10 +1095,10 @@ class TestProblem(unittest.TestCase):
 
     def test_setup_bad_mode_direction_rev(self):
 
-        prob = Problem()
-        prob.model.add_subsystem("indep", IndepVarComp("x", np.ones(10)))
-        prob.model.add_subsystem("C1", ExecComp("y=2.0*x", x=np.zeros(10), y=np.zeros(10)))
-        prob.model.add_subsystem("C2", ExecComp("y=2.0*x", x=np.zeros(10), y=np.zeros(10)))
+        prob = om.Problem()
+        prob.model.add_subsystem("indep", om.IndepVarComp("x", np.ones(10)))
+        prob.model.add_subsystem("C1", om.ExecComp("y=2.0*x", x=np.zeros(10), y=np.zeros(10)))
+        prob.model.add_subsystem("C2", om.ExecComp("y=2.0*x", x=np.zeros(10), y=np.zeros(10)))
 
         prob.model.connect("indep.x", ["C1.x", "C2.x"])
 
@@ -1119,7 +1118,7 @@ class TestProblem(unittest.TestCase):
     def test_run_before_setup(self):
         # Test error message when running before setup.
 
-        prob = Problem()
+        prob = om.Problem()
 
         try:
             prob.run_model()
@@ -1142,7 +1141,7 @@ class TestProblem(unittest.TestCase):
 
         msg = "The 'case_prefix' argument should be a string."
 
-        prob = Problem()
+        prob = om.Problem()
 
         try:
             prob.setup()
@@ -1165,18 +1164,18 @@ class TestProblem(unittest.TestCase):
         msg = "The 'root' property provides backwards compatibility " \
               "with OpenMDAO <= 1.x ; use 'model' instead."
 
-        prob = Problem()
+        prob = om.Problem()
 
         # check deprecation on setter & getter
         with assert_warning(DeprecationWarning, msg):
-            prob.root = Group()
+            prob.root = om.Group()
 
         with assert_warning(DeprecationWarning, msg):
             prob.root
 
         # testing the root kwarg
         with self.assertRaises(ValueError) as cm:
-            prob = Problem(root=Group(), model=Group())
+            prob = om.Problem(root=om.Group(), model=om.Group())
 
         self.assertEqual(str(cm.exception),
                          "Cannot specify both 'root' and 'model'. "
@@ -1186,60 +1185,60 @@ class TestProblem(unittest.TestCase):
               "compatibility with OpenMDAO <= 1.x ; use 'model' instead."
 
         with assert_warning(DeprecationWarning, msg):
-            prob = Problem(root=Group())
+            prob = om.Problem(root=om.Group())
 
     def test_args(self):
         # defaults
-        prob = Problem()
-        self.assertTrue(isinstance(prob.model, Group))
+        prob = om.Problem()
+        self.assertTrue(isinstance(prob.model, om.Group))
         self.assertTrue(isinstance(prob.driver, Driver))
 
         # model
-        prob = Problem(SellarDerivatives())
+        prob = om.Problem(SellarDerivatives())
         self.assertTrue(isinstance(prob.model, SellarDerivatives))
         self.assertTrue(isinstance(prob.driver, Driver))
 
         # driver
-        prob = Problem(driver=ScipyOptimizeDriver())
-        self.assertTrue(isinstance(prob.model, Group))
-        self.assertTrue(isinstance(prob.driver, ScipyOptimizeDriver))
+        prob = om.Problem(driver=om.ScipyOptimizeDriver())
+        self.assertTrue(isinstance(prob.model, om.Group))
+        self.assertTrue(isinstance(prob.driver, om.ScipyOptimizeDriver))
 
         # model and driver
-        prob = Problem(model=SellarDerivatives(), driver=ScipyOptimizeDriver())
+        prob = om.Problem(model=SellarDerivatives(), driver=om.ScipyOptimizeDriver())
         self.assertTrue(isinstance(prob.model, SellarDerivatives))
-        self.assertTrue(isinstance(prob.driver, ScipyOptimizeDriver))
+        self.assertTrue(isinstance(prob.driver, om.ScipyOptimizeDriver))
 
         # invalid model
         with self.assertRaises(TypeError) as cm:
-            prob = Problem(ScipyOptimizeDriver())
+            prob = om.Problem(om.ScipyOptimizeDriver())
 
         self.assertEqual(str(cm.exception),
                          "The value provided for 'model' is not a valid System.")
 
         # invalid driver
         with self.assertRaises(TypeError) as cm:
-            prob = Problem(driver=SellarDerivatives())
+            prob = om.Problem(driver=SellarDerivatives())
 
         self.assertEqual(str(cm.exception),
                          "The value provided for 'driver' is not a valid Driver.")
 
     def test_relevance(self):
-        p = Problem()
+        p = om.Problem()
         model = p.model
 
-        model.add_subsystem("indep1", IndepVarComp('x', 1.0))
-        G1 = model.add_subsystem('G1', Group())
-        G1.add_subsystem('C1', ExecComp(['x=2.0*a', 'y=2.0*b', 'z=2.0*a']))
-        G1.add_subsystem('C2', ExecComp(['x=2.0*a', 'y=2.0*b', 'z=2.0*b']))
-        model.add_subsystem("C3", ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
-        model.add_subsystem("C4", ExecComp(['x=2.0*a', 'y=2.0*b']))
-        model.add_subsystem("indep2", IndepVarComp('x', 1.0))
-        G2 = model.add_subsystem('G2', Group())
-        G2.add_subsystem('C5', ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
-        G2.add_subsystem('C6', ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
-        G2.add_subsystem('C7', ExecComp(['x=2.0*a', 'y=2.0*b']))
-        model.add_subsystem("C8", ExecComp(['y=1.5*a+2.0*b']))
-        model.add_subsystem("Unconnected", ExecComp('y=99.*x'))
+        model.add_subsystem("indep1", om.IndepVarComp('x', 1.0))
+        G1 = model.add_subsystem('G1', om.Group())
+        G1.add_subsystem('C1', om.ExecComp(['x=2.0*a', 'y=2.0*b', 'z=2.0*a']))
+        G1.add_subsystem('C2', om.ExecComp(['x=2.0*a', 'y=2.0*b', 'z=2.0*b']))
+        model.add_subsystem("C3", om.ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
+        model.add_subsystem("C4", om.ExecComp(['x=2.0*a', 'y=2.0*b']))
+        model.add_subsystem("indep2", om.IndepVarComp('x', 1.0))
+        G2 = model.add_subsystem('G2', om.Group())
+        G2.add_subsystem('C5', om.ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
+        G2.add_subsystem('C6', om.ExecComp(['x=2.0*a', 'y=2.0*b+3.0*c']))
+        G2.add_subsystem('C7', om.ExecComp(['x=2.0*a', 'y=2.0*b']))
+        model.add_subsystem("C8", om.ExecComp(['y=1.5*a+2.0*b']))
+        model.add_subsystem("Unconnected", om.ExecComp('y=99.*x'))
 
         model.connect('indep1.x', 'G1.C1.a')
         model.connect('indep2.x', 'G2.C6.a')
@@ -1311,18 +1310,18 @@ class TestProblem(unittest.TestCase):
         SOLVE_Y1 = False
         SOLVE_Y2 = True
 
-        p_opt = Problem()
+        p_opt = om.Problem()
 
         p_opt.model = SellarOneComp(solve_y1=SOLVE_Y1, solve_y2=SOLVE_Y2)
 
         if SOLVE_Y1 or SOLVE_Y2:
-            newton = p_opt.model.nonlinear_solver = NewtonSolver()
+            newton = p_opt.model.nonlinear_solver = om.NewtonSolver()
             newton.options['iprint'] = 0
 
         # NOTE: need to have this direct solver attached to the sellar comp until I define a solve_linear for it
-        p_opt.model.linear_solver = DirectSolver(assemble_jac=True)
+        p_opt.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
-        p_opt.driver = ScipyOptimizeDriver()
+        p_opt.driver = om.ScipyOptimizeDriver()
         p_opt.driver.options['disp'] = False
 
         if not SOLVE_Y1:
@@ -1353,7 +1352,7 @@ class TestProblem(unittest.TestCase):
         # Test that we can change solver settings on a subsystem in a system's setup method.
         # Also assures that highest system's settings take precedence.
 
-        class ImplSimple(ImplicitComponent):
+        class ImplSimple(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('a', val=1.)
@@ -1368,39 +1367,39 @@ class TestProblem(unittest.TestCase):
                     2 * inputs['a']**2 * outputs['x']
                 jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
 
-        class Sub(Group):
+        class Sub(om.Group):
 
             def setup(self):
                 self.add_subsystem('comp', ImplSimple())
 
                 # This will not solve it
-                self.nonlinear_solver = NonlinearBlockGS()
+                self.nonlinear_solver = om.NonlinearBlockGS()
 
             def configure(self):
                 # This will not solve it either.
-                self.nonlinear_solver = NonlinearBlockGS()
+                self.nonlinear_solver = om.NonlinearBlockGS()
 
-        class Super(Group):
+        class Super(om.Group):
 
             def setup(self):
                 self.add_subsystem('sub', Sub())
 
             def configure(self):
                 # This will solve it.
-                self.sub.nonlinear_solver = NewtonSolver()
-                self.sub.linear_solver = ScipyKrylov()
+                self.sub.nonlinear_solver = om.NewtonSolver()
+                self.sub.linear_solver = om.ScipyKrylov()
 
-        top = Problem(model=Super())
+        top = om.Problem(model=Super())
 
-        top.setup(check=False)
+        top.setup()
 
-        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
-        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
+        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
     def test_post_setup_solver_configure(self):
         # Test that we can change solver settings after we have instantiated our model.
 
-        class ImplSimple(ImplicitComponent):
+        class ImplSimple(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('a', val=1.)
@@ -1415,38 +1414,38 @@ class TestProblem(unittest.TestCase):
                     2 * inputs['a']**2 * outputs['x']
                 jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
 
-        class Sub(Group):
+        class Sub(om.Group):
 
             def setup(self):
                 self.add_subsystem('comp', ImplSimple())
 
                 # This solver will get over-ridden below
-                self.nonlinear_solver = NonlinearBlockGS()
+                self.nonlinear_solver = om.NonlinearBlockGS()
 
             def configure(self):
                 # This solver will get over-ridden below
-                self.nonlinear_solver = NonlinearBlockGS()
+                self.nonlinear_solver = om.NonlinearBlockGS()
 
-        class Super(Group):
+        class Super(om.Group):
 
             def setup(self):
                 self.add_subsystem('sub', Sub())
 
-        top = Problem(model=Super())
+        top = om.Problem(model=Super())
 
-        top.setup(check=False)
+        top.setup()
 
         # These solvers override the ones set in the setup method of the 'sub' groups
-        top.model.sub.nonlinear_solver = NewtonSolver()
-        top.model.sub.linear_solver = ScipyKrylov()
+        top.model.sub.nonlinear_solver = om.NewtonSolver()
+        top.model.sub.linear_solver = om.ScipyKrylov()
 
-        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
-        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
+        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
     def test_feature_system_configure(self):
-        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyKrylov, NonlinearBlockGS
+        import openmdao.api as om
 
-        class ImplSimple(ImplicitComponent):
+        class ImplSimple(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('a', val=1.)
@@ -1461,35 +1460,35 @@ class TestProblem(unittest.TestCase):
                     2 * inputs['a']**2 * outputs['x']
                 jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
 
-        class Sub(Group):
+        class Sub(om.Group):
             def setup(self):
                 self.add_subsystem('comp', ImplSimple())
 
             def configure(self):
                 # This solver won't solve the system. We want
                 # to override it in the parent.
-                self.nonlinear_solver = NonlinearBlockGS()
+                self.nonlinear_solver = om.NonlinearBlockGS()
 
-        class Super(Group):
+        class Super(om.Group):
             def setup(self):
                 self.add_subsystem('sub', Sub())
 
             def configure(self):
                 # This will solve it.
-                self.sub.nonlinear_solver = NewtonSolver()
-                self.sub.linear_solver = ScipyKrylov()
+                self.sub.nonlinear_solver = om.NewtonSolver()
+                self.sub.linear_solver = om.ScipyKrylov()
 
-        top = Problem(model=Super())
+        top = om.Problem(model=Super())
 
-        top.setup(check=False)
+        top.setup()
 
-        print(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
-        print(isinstance(top.model.sub.linear_solver, ScipyKrylov))
+        print(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
+        print(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
     def test_feature_post_setup_solver_configure(self):
-        from openmdao.api import Problem, Group, ImplicitComponent, NewtonSolver, ScipyKrylov, NonlinearBlockGS
+        import openmdao.api as om
 
-        class ImplSimple(ImplicitComponent):
+        class ImplSimple(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('a', val=1.)
@@ -1504,46 +1503,46 @@ class TestProblem(unittest.TestCase):
                     2 * inputs['a']**2 * outputs['x']
                 jacobian['x', 'a'] = -2 * inputs['a'] * outputs['x']**2
 
-        class Sub(Group):
+        class Sub(om.Group):
 
             def setup(self):
                 self.add_subsystem('comp', ImplSimple())
 
                 # This will not solve it
-                self.nonlinear_solver = NonlinearBlockGS()
+                self.nonlinear_solver = om.NonlinearBlockGS()
 
             def configure(self):
                 # This will not solve it either.
-                self.nonlinear_solver = NonlinearBlockGS()
+                self.nonlinear_solver = om.NonlinearBlockGS()
 
-        class Super(Group):
+        class Super(om.Group):
 
             def setup(self):
                 self.add_subsystem('sub', Sub())
 
-        top = Problem(model=Super())
+        top = om.Problem(model=Super())
 
-        top.setup(check=False)
+        top.setup()
 
         # This will solve it.
-        top.model.sub.nonlinear_solver = NewtonSolver()
-        top.model.sub.linear_solver = ScipyKrylov()
+        top.model.sub.nonlinear_solver = om.NewtonSolver()
+        top.model.sub.linear_solver = om.ScipyKrylov()
 
-        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, NewtonSolver))
-        self.assertTrue(isinstance(top.model.sub.linear_solver, ScipyKrylov))
+        self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
+        self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
     def test_post_setup_hook(self):
         def hook_func(prob):
             prob['p2.y'] = 5.0
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
-        Problem._post_setup_func = hook_func
+        om.Problem._post_setup_func = hook_func
 
         try:
-            model.add_subsystem('p1', IndepVarComp('x', 3.0))
-            model.add_subsystem('p2', IndepVarComp('y', -4.0))
-            model.add_subsystem('comp', ExecComp("f_xy=2.0*x+3.0*y"))
+            model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+            model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
+            model.add_subsystem('comp', om.ExecComp("f_xy=2.0*x+3.0*y"))
 
             model.connect('p1.x', 'comp.x')
             model.connect('p2.y', 'comp.y')
@@ -1554,14 +1553,14 @@ class TestProblem(unittest.TestCase):
             assert_rel_error(self, prob['p2.y'], 5.0)
             assert_rel_error(self, prob['comp.f_xy'], 21.0)
         finally:
-            Problem._post_setup_func = None
+            om.Problem._post_setup_func = None
 
     def test_list_problem_vars(self):
         model = SellarDerivatives()
-        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver = om.NonlinearBlockGS()
 
-        prob = Problem(model)
-        prob.driver = ScipyOptimizeDriver()
+        prob = om.Problem(model)
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
 
@@ -1670,14 +1669,14 @@ class TestProblem(unittest.TestCase):
 
     def test_feature_list_problem_vars(self):
         import numpy as np
-        from openmdao.api import Problem, ScipyOptimizeDriver, NonlinearBlockGS
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarDerivatives
 
-        prob = Problem(model=SellarDerivatives())
+        prob = om.Problem(model=SellarDerivatives())
         model = prob.model
-        model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver = om.NonlinearBlockGS()
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
         prob.driver.options['tol'] = 1e-9
 
@@ -1708,22 +1707,22 @@ class NestedProblemTestCase(unittest.TestCase):
 
     def test_nested_prob(self):
 
-        class _ProblemSolver(NonlinearRunOnce):
+        class _ProblemSolver(om.NonlinearRunOnce):
             def solve(self):
                 # create a simple subproblem and run it to test for global solver_info bug
-                p = Problem()
-                p.model.add_subsystem('indep', IndepVarComp('x', 1.0))
-                p.model.add_subsystem('comp', ExecComp('y=2*x'))
+                p = om.Problem()
+                p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
+                p.model.add_subsystem('comp', om.ExecComp('y=2*x'))
                 p.model.connect('indep.x', 'comp.x')
                 p.setup()
                 p.run_model()
 
                 return super(_ProblemSolver, self).solve()
 
-        p = Problem()
-        p.model.add_subsystem('indep', IndepVarComp('x', 1.0))
-        G = p.model.add_subsystem('G', Group())
-        G.add_subsystem('comp', ExecComp('y=2*x'))
+        p = om.Problem()
+        p.model.add_subsystem('indep', om.IndepVarComp('x', 1.0))
+        G = p.model.add_subsystem('G', om.Group())
+        G.add_subsystem('comp', om.ExecComp('y=2*x'))
         G.nonlinear_solver = _ProblemSolver()
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()

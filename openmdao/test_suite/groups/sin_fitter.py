@@ -3,11 +3,11 @@
 """
 
 from __future__ import print_function, division, absolute_import
-
-import numpy as np
 from six.moves import range
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+import numpy as np
+
+import openmdao.api as om
 
 
 def lgl(n, tol=np.finfo(float).eps):
@@ -155,7 +155,7 @@ def lagrange_matrices(x_disc, x_interp):
 
     return Li, Di
 
-class LGLFit(ExplicitComponent):
+class LGLFit(om.ExplicitComponent):
     """
     Given values at discretization nodes, provide interpolated values at midpoint nodes and
     an approximation of arclength.
@@ -187,7 +187,7 @@ class LGLFit(ExplicitComponent):
         outputs['yp_lgl'] = np.dot(self.D_lgl, inputs['y_lgl'])/np.pi
 
 
-class DefectComp(ExplicitComponent):
+class DefectComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare(name='num_nodes', types=int)
@@ -207,7 +207,7 @@ class DefectComp(ExplicitComponent):
         outputs['defect'] = inputs['y_truth'] - inputs['y_approx']
 
 
-class ArcLengthFunction(ExplicitComponent):
+class ArcLengthFunction(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare(name='num_nodes', types=int)
@@ -229,7 +229,7 @@ class ArcLengthFunction(ExplicitComponent):
         partials['f_arclength', 'yp_lgl'] = inputs['yp_lgl'] / np.sqrt(1 + inputs['yp_lgl']**2)
 
 
-class ArcLengthQuadrature(ExplicitComponent):
+class ArcLengthQuadrature(om.ExplicitComponent):
     """
     Computes the arclength of a polynomial segment whose values are given at the LGL nodes.
     """
@@ -262,7 +262,7 @@ class ArcLengthQuadrature(ExplicitComponent):
         outputs['arclength'] = outputs['arclength']*np.pi
 
 
-class SineFitter(Group):
+class SineFitter(om.Group):
 
     def setup(self):
 
@@ -272,16 +272,15 @@ class SineFitter(Group):
 
 
         # Step 1:  Make an indep var comp that provides the approximated values at the LGL nodes.
-        self.add_subsystem('y_lgl_ivc', IndepVarComp('y_lgl', val=np.zeros(n), desc='values at LGL nodes'),
-                           promotes_outputs=['y_lgl'])
+        ivc = om.IndepVarComp('y_lgl', val=np.zeros(n), desc='values at LGL nodes')
+        self.add_subsystem('y_lgl_ivc', ivc, promotes_outputs=['y_lgl'])
 
         # Step 2:  Make an indep var comp that provides the 'truth' values at the midpoint nodes.
         x_lgl, _ = lgl(n)
         x_lgl = x_lgl * np.pi # put x_lgl on [-pi, pi]
         x_mid = (x_lgl[1:] + x_lgl[:-1])/2.0 # midpoints on [-pi, pi]
-        self.add_subsystem('truth', IndepVarComp('y_mid',
-                                                 val=np.sin(x_mid),
-                                                 desc='truth values at midpoint nodes'))
+        self.add_subsystem('truth', om.IndepVarComp('y_mid', val=np.sin(x_mid),
+                                                    desc='truth values at midpoint nodes'))
 
         # Step 3: Make a polynomial fitting component
         self.add_subsystem('lgl_fit', LGLFit(num_nodes=n))

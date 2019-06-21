@@ -5,10 +5,10 @@ import numpy as np
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import splu
 
-from openmdao.api import ImplicitComponent
+import openmdao.api as om
 
 
-class StatesComp(ImplicitComponent):
+class StatesComp(om.ImplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)
@@ -120,7 +120,7 @@ class StatesComp(ImplicitComponent):
         return coo_matrix((data, (rows, cols)), shape=(n_K, n_K)).tocsc()
 
 
-class MultiStatesComp(ImplicitComponent):
+class MultiStatesComp(om.ImplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)

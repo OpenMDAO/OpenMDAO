@@ -1,14 +1,13 @@
 from __future__ import print_function, division, absolute_import
-import numpy as np
-
 import unittest
 
-from openmdao.api import ExplicitComponent, ImplicitComponent, Group, NewtonSolver, DirectSolver
+import numpy as np
 
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class Resistor(ExplicitComponent):
+class Resistor(om.ExplicitComponent):
     """Computes current across a resistor using Ohm's law."""
 
     def initialize(self):
@@ -27,7 +26,7 @@ class Resistor(ExplicitComponent):
         outputs['I'] = deltaV / self.options['R']
 
 
-class Diode(ExplicitComponent):
+class Diode(om.ExplicitComponent):
     """Computes current across a diode using the Shockley diode equation."""
 
     def initialize(self):
@@ -49,7 +48,7 @@ class Diode(ExplicitComponent):
         outputs['I'] = Is * (np.exp(deltaV / Vt) - 1)
 
 
-class Node(ImplicitComponent):
+class Node(om.ImplicitComponent):
     """Computes voltage residual across a node based on incoming and outgoing current."""
 
     def initialize(self):
@@ -80,7 +79,7 @@ class Node(ImplicitComponent):
 
 
 # note: This is defined twice in the file. Once so you can import it, and once inside a test that gets included in the docs.
-class Circuit(Group):
+class Circuit(om.Group):
 
     def setup(self):
         self.add_subsystem('n1', Node(n_in=1, n_out=2), promotes_inputs=[('I_in:0', 'I_in')])
@@ -98,29 +97,29 @@ class Circuit(Group):
         self.connect('R2.I', 'n2.I_in:0')
         self.connect('D1.I', 'n2.I_out:0')
 
-        self.nonlinear_solver = NewtonSolver()
+        self.nonlinear_solver = om.NewtonSolver()
         self.nonlinear_solver.options['iprint'] = 2
         self.nonlinear_solver.options['maxiter'] = 20
-        self.linear_solver = DirectSolver()
+        self.linear_solver = om.DirectSolver()
 
 
 if __name__ == "__main__":
-    from openmdao.api import ArmijoGoldsteinLS, Problem, IndepVarComp, BalanceComp, ExecComp
-    from openmdao.api import NewtonSolver, DirectSolver, NonlinearRunOnce, LinearRunOnce
+    import openmdao.api as om
 
-    p = Problem()
+    p = om.Problem()
     model = p.model
 
-    model.add_subsystem('ground', IndepVarComp('V', 0., units='V'))
+    model.add_subsystem('ground', om.IndepVarComp('V', 0., units='V'))
 
     # replacing the fixed current source with a BalanceComp to represent a fixed Voltage source
     # model.add_subsystem('source', IndepVarComp('I', 0.1, units='A'))
-    model.add_subsystem('batt', IndepVarComp('V', 1.5, units='V'))
-    bal = model.add_subsystem('batt_balance', BalanceComp())
+    model.add_subsystem('batt', om.IndepVarComp('V', 1.5, units='V'))
+    bal = model.add_subsystem('batt_balance', om.BalanceComp())
     bal.add_balance('I', units='A', eq_units='V')
 
     model.add_subsystem('circuit', Circuit())
-    model.add_subsystem('batt_deltaV', ExecComp('dV = V1 - V2', V1={'units':'V'}, V2={'units':'V'}, dV={'units':'V'}))
+    model.add_subsystem('batt_deltaV', om.ExecComp('dV = V1 - V2', V1={'units':'V'},
+                                                   V2={'units':'V'}, dV={'units':'V'}))
 
     # current into the circuit is now the output state from the batt_balance comp
     model.connect('batt_balance.I', 'circuit.I_in')
@@ -139,16 +138,16 @@ if __name__ == "__main__":
 
     # change the circuit solver to RunOnce because we're
     # going to converge at the top level of the model with newton instead
-    p.model.circuit.nonlinear_solver = NonlinearRunOnce()
-    p.model.circuit.linear_solver = LinearRunOnce()
+    p.model.circuit.nonlinear_solver = om.NonlinearRunOnce()
+    p.model.circuit.linear_solver = om.LinearRunOnce()
 
     # Put Newton at the top so it can also converge the new BalanceComp residual
-    newton = p.model.nonlinear_solver = NewtonSolver()
-    p.model.linear_solver = DirectSolver()
+    newton = p.model.nonlinear_solver = om.NewtonSolver()
+    p.model.linear_solver = om.DirectSolver()
     newton.options['iprint'] = 2
     newton.options['maxiter'] = 20
     newton.options['solve_subsystems'] = True
-    newton.linesearch = ArmijoGoldsteinLS()
+    newton.linesearch = om.ArmijoGoldsteinLS()
     newton.linesearch.options['maxiter'] = 10
     newton.linesearch.options['iprint'] = 2
 

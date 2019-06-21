@@ -11,6 +11,7 @@ import numpy as np
 
 from openmdao.vectors.vector import Vector, INT_DTYPE
 from openmdao.vectors.default_transfer import DefaultTransfer
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 
 
 class DefaultVector(Vector):
@@ -43,30 +44,16 @@ class DefaultVector(Vector):
         system = self._system
         type_ = self._typ
         vec_name = self._name
-        iproc = self._iproc
         root_vec = self._root_vector
 
-        self._create_data()
-
-        ext_sizes_t = system._ext_sizes[vec_name][type_]
-        int_sizes_t = np.sum(system._var_sizes[vec_name][type_][iproc, :])
-        old_sizes_total = len(root_vec._data)
-
-        old_sizes = (
-            ext_sizes_t[0],
-            old_sizes_total - ext_sizes_t[0] - ext_sizes_t[1],
-            ext_sizes_t[1],
-        )
-        new_sizes = (
-            ext_sizes_t[0],
-            int_sizes_t,
-            ext_sizes_t[1],
-        )
+        sys_offset, size_after_sys = system._ext_sizes[vec_name][type_]
+        sys_size = np.sum(system._var_sizes[vec_name][type_][self._iproc, :])
+        old_sizes_total = root_vec._data.size
 
         root_vec._data = np.concatenate([
-            root_vec._data[:old_sizes[0]],
-            np.zeros(new_sizes[1]),
-            root_vec._data[old_sizes[0] + old_sizes[1]:],
+            root_vec._data[:sys_offset],
+            np.zeros(sys_size),
+            root_vec._data[old_sizes_total - size_after_sys:],
         ])
 
         if self._alloc_complex and root_vec._cplx_data.size != root_vec._data.size:
@@ -74,7 +61,7 @@ class DefaultVector(Vector):
 
         root_vec._initialize_views()
 
-    def _extract_data(self):
+    def _extract_root_data(self):
         """
         Extract views of arrays from root_vector.
 
@@ -147,7 +134,7 @@ class DefaultVector(Vector):
                 self._cplx_data = np.zeros(self._data.shape, dtype=np.complex)
 
         else:
-            self._data, self._cplx_data, self._scaling = self._extract_data()
+            self._data, self._cplx_data, self._scaling = self._extract_root_data()
 
     def _initialize_views(self):
         """
@@ -177,11 +164,21 @@ class DefaultVector(Vector):
 
         allprocs_abs2idx_t = system._var_allprocs_abs2idx[self._name]
         sizes_t = system._var_sizes[self._name][type_]
+        offs = system._get_var_offsets()[self._name][type_]
+        if offs.size > 0:
+            offs = offs[iproc].copy()
+            # turn global offset into local offset
+            start = offs[0]
+            offs -= start
+        else:
+            offs = offs[0].copy()
+        offsets_t = offs
+
         abs2meta = system._var_abs2meta
         for abs_name in system._var_relevant_names[self._name][type_]:
             idx = allprocs_abs2idx_t[abs_name]
 
-            ind1 = np.sum(sizes_t[iproc, :idx])
+            ind1 = offsets_t[idx]
             ind2 = ind1 + sizes_t[iproc, idx]
             shape = abs2meta[abs_name]['shape']
             if ncol > 1:
@@ -346,8 +343,7 @@ class DefaultVector(Vector):
         slices = {}
         start = end = 0
         for name in self._system._var_abs_names[self._typ]:
-            arr = self._views_flat[name]
-            end += arr.size
+            end += self._views_flat[name].size
             slices[name] = slice(start, end)
             start = end
 

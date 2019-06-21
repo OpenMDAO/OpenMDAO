@@ -5,9 +5,10 @@ is a function given as an option.
 
 from types import FunctionType
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
-class UnitaryFunctionComp(ExplicitComponent):
+
+class UnitaryFunctionComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('func', types=FunctionType)

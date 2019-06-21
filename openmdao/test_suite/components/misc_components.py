@@ -9,10 +9,10 @@ from __future__ import division, print_function
 
 import numpy as np
 
-from openmdao.api import ImplicitComponent
+import openmdao.api as om
 
 
-class Comp4LinearCacheTest(ImplicitComponent):
+class Comp4LinearCacheTest(om.ImplicitComponent):
     """
     Component needed for testing cached linear solutions.
 

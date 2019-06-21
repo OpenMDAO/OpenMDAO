@@ -58,30 +58,29 @@ def use_proc_files():
         _redirect_streams(ofile.fileno())
 
 
-def under_mpirun():
-    """
-    Return True if we're being executed under mpirun.
+# Attempt to import mpi4py.
+# If OPENMDAO_REQUIRE_MPI is set to a recognized positive value, attempt import
+# and raise exception on failure. If set to anything else, no import is attempted.
+if 'OPENMDAO_REQUIRE_MPI' in os.environ:
+    if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
+        from mpi4py import MPI
+# If OPENMDAO_REQUIRE_MPI is unset, attempt to import mpi4py, but continue on failure
+# with a notification.
+else:
+    try:
+        from mpi4py import MPI
+    except ImportError:
+        MPI = None
+        sys.stdout.write("Unable to import mpi4py. Parallel processing unavailable.\n")
+        sys.stdout.flush()
+    else:
+        # If the import succeeded, but it doesn't look like a parallel
+        # run was intended, don't use MPI
+        if MPI.COMM_WORLD.size == 1:
+            MPI = None
 
-    Returns
-    -------
-    bool
-        True if the current process is executing under mpirun.
-    """
-    # this is a bit of a hack, but there appears to be
-    # no consistent set of environment vars between MPI
-    # implementations.
-    for name in os.environ.keys():
-        if name == 'OMPI_COMM_WORLD_RANK' or \
-           name == 'MPIEXEC_HOSTNAME' or \
-           name.startswith('MPIR_') or \
-           name.startswith('MPICH_'):
-            return True
-    return False
 
-
-if under_mpirun():
-    from mpi4py import MPI
-
+if MPI:
     def debug(*msg):  # pragma: no cover
         """
         Print debug message to stdout.
@@ -97,8 +96,6 @@ if under_mpirun():
         sys.stdout.write('\n')
         sys.stdout.flush()
 else:
-    MPI = None
-
     def debug(*msg):  # pragma: no cover
         """
         Print debug message to stdout.

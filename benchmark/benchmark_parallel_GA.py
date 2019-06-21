@@ -4,7 +4,7 @@ Benchmarks the parallel scaling for the GA driver.
 from time import time
 import unittest
 
-from openmdao.api import Problem, SimpleGADriver, IndepVarComp, Group
+import openmdao.api as om
 from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 
 
@@ -15,13 +15,13 @@ MAXGEN = 5
 POPSIZE = 40
 
 
-class GAGroup(Group):
+class GAGroup(om.Group):
 
     def setup(self):
 
-        self.add_subsystem('p1', IndepVarComp('x', 1.0))
-        self.add_subsystem('p2', IndepVarComp('y', 1.0))
-        self.add_subsystem('p3', IndepVarComp('z', 1.0))
+        self.add_subsystem('p1', om.IndepVarComp('x', 1.0))
+        self.add_subsystem('p2', om.IndepVarComp('y', 1.0))
+        self.add_subsystem('p3', om.IndepVarComp('z', 1.0))
 
         self.add_subsystem('comp', ExecComp4Test(['f = x + y + z'], nl_delay=DELAY))
 
@@ -37,10 +37,10 @@ class BenchParGA1(unittest.TestCase):
 
     def benchmark_genetic_1(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = GAGroup()
 
-        driver = prob.driver = SimpleGADriver()
+        driver = prob.driver = om.SimpleGADriver()
         driver.options['max_gen'] = MAXGEN
         driver.options['pop_size'] = POPSIZE
         driver.options['run_parallel'] = True
@@ -58,10 +58,10 @@ class BenchParGA2(unittest.TestCase):
 
     def benchmark_genetic_2(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = GAGroup()
 
-        driver = prob.driver = SimpleGADriver()
+        driver = prob.driver = om.SimpleGADriver()
         driver.options['max_gen'] = MAXGEN
         driver.options['pop_size'] = POPSIZE
         driver.options['run_parallel'] = True
@@ -79,10 +79,10 @@ class BenchParGA4(unittest.TestCase):
 
     def benchmark_genetic_4(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = GAGroup()
 
-        driver = prob.driver = SimpleGADriver()
+        driver = prob.driver = om.SimpleGADriver()
         driver.options['max_gen'] = MAXGEN
         driver.options['pop_size'] = POPSIZE
         driver.options['run_parallel'] = True

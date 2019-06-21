@@ -443,7 +443,7 @@ class TestColoringSemitotals(unittest.TestCase):
     )
     def test_simple_semitotals(self, method, isplit, osplit):
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         sparsity = setup_sparsity(_BIGMASK)
         indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'sub.comp')
@@ -481,7 +481,7 @@ class TestColoringSemitotals(unittest.TestCase):
     )
     def test_simple_semitotals_static(self, method, isplit, osplit):
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         sparsity = setup_sparsity(_BIGMASK)
         indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'sub.comp')
@@ -507,7 +507,7 @@ class TestColoringSemitotals(unittest.TestCase):
 
         # now create a second problem and use the static coloring
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'sub.comp')
 
@@ -818,7 +818,7 @@ class TestStaticColoring(unittest.TestCase):
     )
     def test_simple_totals_static(self, method, isplit, osplit):
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         sparsity = setup_sparsity(_BIGMASK)
         indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
@@ -845,7 +845,7 @@ class TestStaticColoring(unittest.TestCase):
 
         # new Problem, loading the coloring we just computed
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
 
@@ -885,7 +885,7 @@ class TestStaticColoring(unittest.TestCase):
     )
     def test_totals_over_implicit_comp(self, method, isplit, osplit):
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         sparsity = setup_sparsity(_BIGMASK)
         indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
@@ -911,7 +911,7 @@ class TestStaticColoring(unittest.TestCase):
         model._save_coloring(compute_total_coloring(prob))
 
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
 
@@ -951,7 +951,7 @@ class TestStaticColoring(unittest.TestCase):
     )
     def test_totals_of_indices(self, method):
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         mask = np.array(
             [[1, 0, 0, 1, 1],
@@ -983,7 +983,7 @@ class TestStaticColoring(unittest.TestCase):
 
 
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
@@ -1019,7 +1019,7 @@ class TestStaticColoring(unittest.TestCase):
     )
     def test_totals_wrt_indices(self, method):
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         mask = np.array(
             [[1, 0, 0, 1, 1],
@@ -1052,7 +1052,7 @@ class TestStaticColoring(unittest.TestCase):
 
 
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
@@ -1090,7 +1090,7 @@ class TestStaticColoring(unittest.TestCase):
     )
     def test_totals_of_wrt_indices(self, method):
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         mask = np.array(
             [[1, 0, 0, 1, 1],
@@ -1125,7 +1125,7 @@ class TestStaticColoring(unittest.TestCase):
 
 
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
@@ -1186,7 +1186,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
     )
     def test_simple_semitotals_all_local_vars(self, method):
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         mask = np.array(
             [[1, 0, 0, 1, 1],
@@ -1227,7 +1227,7 @@ class TestStaticColoringParallelCS(unittest.TestCase):
 
         # now create a second problem and use the static coloring
         prob = Problem(coloring_dir=self.tempdir)
-        model = prob.model = Group()
+        model = prob.model
 
         indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 

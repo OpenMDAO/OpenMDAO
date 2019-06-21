@@ -9,31 +9,26 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp, DirectSolver, AnalysisError, \
-    ExplicitComponent, ImplicitComponent
-from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS, BoundsEnforceLS
-from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
+import openmdao.api as om
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 class TestArmejoGoldsteinBounds(unittest.TestCase):
 
     def setUp(self):
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', 1.0))
         top.model.add_subsystem('comp', ImplCompTwoStates())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        top.setup(check=False)
+        top.setup()
 
         self.top = top
 
@@ -55,12 +50,12 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
     def test_linesearch_bounds_vector(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 1.0
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bound: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -79,12 +74,12 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
     def test_linesearch_bounds_wall(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bound: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -103,12 +98,12 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
     def test_linesearch_bounds_scalar(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 10.0
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bound: should stop just short of the lower bound
         top['px.x'] = 2.0
@@ -125,7 +120,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         self.assertTrue(2.4 <= top['comp.z'] <= 2.5)
 
 
-class ParaboloidAE(ExplicitComponent):
+class ParaboloidAE(om.ExplicitComponent):
     """ Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
     This version raises an analysis error if x < 2.0
     The AE in ParaboloidAE stands for AnalysisError."""
@@ -146,7 +141,7 @@ class ParaboloidAE(ExplicitComponent):
         y = inputs['y']
 
         if x < 1.75:
-            raise AnalysisError('Try Again.')
+            raise om.AnalysisError('Try Again.')
 
         outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
 
@@ -162,19 +157,18 @@ class ParaboloidAE(ExplicitComponent):
 class TestAnalysisErrorExplicit(unittest.TestCase):
 
     def setUp(self):
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', 1.0))
         top.model.add_subsystem('comp', ImplCompTwoStates())
         top.model.add_subsystem('par', ParaboloidAE())
         top.model.connect('px.x', 'comp.x')
         top.model.connect('comp.z', 'par.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 1
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['maxiter'] = 10
         ls.options['alpha'] = 1.0
         top.set_solver_print(level=0)
@@ -185,7 +179,7 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
     def test_retry(self):
         # Test the behavior with the switch turned on.
         top = self.top
-        top.setup(check=False)
+        top.setup()
         self.ls.options['retry_on_analysis_error'] = True
 
         # Test lower bound: should go as far as it can without going past 1.75 and triggering an
@@ -201,19 +195,19 @@ class TestAnalysisErrorExplicit(unittest.TestCase):
         self.ls.options['retry_on_analysis_error'] = False
 
         top = self.top
-        top.setup(check=False)
+        top.setup()
 
         top['px.x'] = 2.0
         top['comp.y'] = 0.0
         top['comp.z'] = 2.1
 
-        with self.assertRaises(AnalysisError) as context:
+        with self.assertRaises(om.AnalysisError) as context:
             top.run_model()
 
         self.assertEqual(str(context.exception), 'Try Again.')
 
 
-class ImplCompTwoStatesAE(ImplicitComponent):
+class ImplCompTwoStatesAE(om.ImplicitComponent):
 
     def setup(self):
         self.add_input('x', 0.5)
@@ -241,7 +235,7 @@ class ImplCompTwoStatesAE(ImplicitComponent):
 
         self.counter += 1
         if self.counter > 5 and self.counter < 11:
-            raise AnalysisError('catch me')
+            raise om.AnalysisError('catch me')
 
     def linearize(self, inputs, outputs, jac):
         """
@@ -268,31 +262,30 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
 
     def test_deep_analysis_error_iprint(self):
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', 7.0))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', 7.0))
 
-        sub = top.model.add_subsystem('sub', Group())
+        sub = top.model.add_subsystem('sub', om.Group())
         sub.add_subsystem('comp', ImplCompTwoStatesAE())
 
         top.model.connect('px.x', 'sub.comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.nonlinear_solver.options['solve_subsystems'] = True
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        sub.nonlinear_solver = NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver()
         sub.nonlinear_solver.options['maxiter'] = 2
-        sub.linear_solver = ScipyKrylov()
+        sub.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
         ls.options['maxiter'] = 5
         ls.options['alpha'] = 10.0
         ls.options['retry_on_analysis_error'] = True
         ls.options['c'] = 10000.0
 
-        top.setup(check=False)
+        top.setup()
         top.set_solver_print(level=2)
 
         stdout = sys.stdout
@@ -318,31 +311,30 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         # this tests for a bug in which guess_nonlinear failed due to the output
         # vector being left in a read only state after the AnalysisError
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', 7.0))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', 7.0))
 
-        sub = top.model.add_subsystem('sub', Group())
+        sub = top.model.add_subsystem('sub', om.Group())
         sub.add_subsystem('comp', ImplCompTwoStatesGuess())
 
         top.model.connect('px.x', 'sub.comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
         top.model.nonlinear_solver.options['solve_subsystems'] = True
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        sub.nonlinear_solver = NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver()
         sub.nonlinear_solver.options['maxiter'] = 2
-        sub.linear_solver = ScipyKrylov()
+        sub.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
         ls.options['maxiter'] = 5
         ls.options['alpha'] = 10.0
         ls.options['retry_on_analysis_error'] = True
         ls.options['c'] = 10000.0
 
-        top.setup(check=False)
+        top.setup()
         top.set_solver_print(level=2)
 
         stdout = sys.stdout
@@ -368,18 +360,17 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
     def setUp(self):
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
         top.set_solver_print(level=0)
-        top.setup(check=False)
+        top.setup()
 
         self.top = top
         self.ub = np.array([2.6, 2.5, 2.65])
@@ -387,11 +378,11 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
         ls.options['print_bound_enforce'] = True
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -425,10 +416,10 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='wall')
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -449,10 +440,10 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar')
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should stop just short of the lower bound
         top['px.x'] = 2.0
@@ -473,7 +464,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_error_handling(self):
         # Make sure the debug_print doesn't bomb out.
 
-        class Bad(ExplicitComponent):
+        class Bad(om.ExplicitComponent):
 
             def setup(self):
                 self.add_input('x', val=0.0)
@@ -501,21 +492,20 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
                 partials['f_xy', 'x'] = 2.0*x - 6.0 + y
                 partials['f_xy', 'y'] = 2.0*y + 8.0 + x
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', 1.0))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', 1.0))
         top.model.add_subsystem('comp', ImplCompTwoStates())
         top.model.add_subsystem('par', Bad())
         top.model.connect('px.x', 'comp.x')
         top.model.connect('comp.z', 'par.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 3
 
-        top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
         top.set_solver_print(level=0)
 
-        top.setup(check=False)
+        top.setup()
 
         # Make sure we don't raise an error when we reach the final debug print.
         top.run_model()
@@ -526,25 +516,25 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         # atol, rtol, maxiter, and err_on_maxiter are not used in BoundsEnforceLS
 
         with self.assertRaises(KeyError) as context:
-            BoundsEnforceLS(bound_enforcement='scalar', atol=1.0)
+            om.BoundsEnforceLS(bound_enforcement='scalar', atol=1.0)
 
         self.assertEqual(str(context.exception), "\"Option 'atol' cannot be set because it "
                                                  "has not been declared.\"")
 
         with self.assertRaises(KeyError) as context:
-            BoundsEnforceLS(bound_enforcement='scalar', rtol=2.0)
+            om.BoundsEnforceLS(bound_enforcement='scalar', rtol=2.0)
 
         self.assertEqual(str(context.exception), "\"Option 'rtol' cannot be set because it "
                                                  "has not been declared.\"")
 
         with self.assertRaises(KeyError) as context:
-            BoundsEnforceLS(bound_enforcement='scalar', maxiter=1)
+            om.BoundsEnforceLS(bound_enforcement='scalar', maxiter=1)
 
         self.assertEqual(str(context.exception), "\"Option 'maxiter' cannot be set because it "
                                                  "has not been declared.\"")
 
         with self.assertRaises(KeyError) as context:
-            BoundsEnforceLS(bound_enforcement='scalar', err_on_maxiter=True)
+            om.BoundsEnforceLS(bound_enforcement='scalar', err_on_maxiter=True)
 
         self.assertEqual(str(context.exception), "\"Option 'err_on_maxiter' cannot be set because it "
                                                  "has not been declared.\"")
@@ -553,18 +543,17 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 
     def setUp(self):
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
         top.set_solver_print(level=0)
-        top.setup(check=False)
+        top.setup()
 
         self.top = top
         self.ub = np.array([2.6, 2.5, 2.65])
@@ -572,11 +561,11 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
     def test_linesearch_vector_bound_enforcement(self):
         top = self.top
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['c'] = .1
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -597,10 +586,10 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_wall(self):
         top = self.top
 
-        top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -621,10 +610,10 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
     def test_linesearch_wall_bound_enforcement_scalar(self):
         top = self.top
 
-        top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
 
         # Setup again because we assigned a new linesearch
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should stop just short of the lower bound
         top['px.x'] = 2.0
@@ -643,25 +632,25 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
     def test_with_subsolves(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model = DoubleSellar()
 
         g1 = model.g1
-        g1.nonlinear_solver = NewtonSolver()
+        g1.nonlinear_solver = om.NewtonSolver()
         g1.nonlinear_solver.options['rtol'] = 1.0e-5
-        g1.linear_solver = DirectSolver()
+        g1.linear_solver = om.DirectSolver()
 
         g2 = model.g2
-        g2.nonlinear_solver = NewtonSolver()
+        g2.nonlinear_solver = om.NewtonSolver()
         g2.nonlinear_solver.options['rtol'] = 1.0e-5
-        g2.linear_solver = DirectSolver()
+        g2.linear_solver = om.DirectSolver()
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.ScipyKrylov()
 
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 4
-        ls = model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls = model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
         # This is pretty bogus, but it ensures that we get a few LS iterations.
         ls.options['c'] = 100.0
@@ -677,7 +666,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         assert_rel_error(self, prob['g2.y2'], 0.80, .00001)
 
 
-class CompAtan(ImplicitComponent):
+class CompAtan(om.ImplicitComponent):
     """
     A simple implicit component with the following equation:
 
@@ -716,14 +705,13 @@ class CompAtan(ImplicitComponent):
 class TestFeatureLineSearch(unittest.TestCase):
 
     def test_feature_specification(self):
-        from openmdao.api import Problem, IndepVarComp, NewtonSolver, BoundsEnforceLS
-        from openmdao.api import DirectSolver
+        import openmdao.api as om
         from openmdao.solvers.linesearch.tests.test_backtracking import CompAtan
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('px', IndepVarComp('x', -100.0))
+        model.add_subsystem('px', om.IndepVarComp('x', -100.0))
         model.add_subsystem('comp', CompAtan())
 
         model.connect('px.x', 'comp.x')
@@ -733,14 +721,14 @@ class TestFeatureLineSearch(unittest.TestCase):
         # Initial value for the state:
         prob['comp.y'] = 12.0
 
-        # You can change the NewtonSolver settings after setup is called
-        newton = prob.model.nonlinear_solver = NewtonSolver()
-        prob.model.linear_solver = DirectSolver()
+        # You can change the om.NewtonSolver settings after setup is called
+        newton = prob.model.nonlinear_solver = om.NewtonSolver()
+        prob.model.linear_solver = om.DirectSolver()
         newton.options['iprint'] = 2
         newton.options['rtol'] = 1e-8
         newton.options['solve_subsystems'] = True
 
-        newton.linesearch = BoundsEnforceLS()
+        newton.linesearch = om.BoundsEnforceLS()
         newton.linesearch.options['iprint'] = 2
 
         prob.run_model()
@@ -750,22 +738,21 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundsenforcels_basic(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -780,22 +767,21 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_armijogoldsteinls_basic(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, ArmijoGoldsteinLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS()
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS()
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -810,22 +796,21 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_basic(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        top.model.nonlinear_solver.linesearch = BoundsEnforceLS()
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS()
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -840,23 +825,22 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_vector(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
         ls.options['bound_enforcement'] = 'vector'
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -871,23 +855,22 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_wall(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='wall')
+        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='wall')
         ls.options['bound_enforcement'] = 'wall'
 
-        top.setup(check=False)
+        top.setup()
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -902,23 +885,22 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_boundscheck_scalar(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = BoundsEnforceLS(bound_enforcement='scalar')
+        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar')
         ls.options['bound_enforcement'] = 'scalar'
 
-        top.setup(check=False)
+        top.setup()
         top.run_model()
 
         # Test lower bounds: should stop just short of the lower bound
@@ -934,20 +916,19 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_print_bound_enforce(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, BoundsEnforceLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        newt = top.model.nonlinear_solver = NewtonSolver()
+        newt = top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        ls = newt.linesearch = BoundsEnforceLS(bound_enforcement='vector')
+        ls = newt.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
         ls.options['print_bound_enforce'] = True
 
         top.set_solver_print(level=2)
@@ -966,23 +947,22 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_armijo_boundscheck_vector(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, ArmijoGoldsteinLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
         ls.options['bound_enforcement'] = 'vector'
 
-        top.setup(check=False)
+        top.setup()
 
         # Test lower bounds: should go to the lower bound and stall
         top['px.x'] = 2.0
@@ -997,23 +977,22 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_armijo_boundscheck_wall(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, ArmijoGoldsteinLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='wall')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
         ls.options['bound_enforcement'] = 'wall'
 
-        top.setup(check=False)
+        top.setup()
 
         # Test upper bounds: should go to the upper bound and stall
         top['px.x'] = 0.5
@@ -1028,23 +1007,22 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_armijo_boundscheck_scalar(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, ArmijoGoldsteinLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        top.model.nonlinear_solver = NewtonSolver()
+        top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = ArmijoGoldsteinLS(bound_enforcement='scalar')
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
         ls.options['bound_enforcement'] = 'scalar'
 
-        top.setup(check=False)
+        top.setup()
         top.run_model()
 
         # Test lower bounds: should stop just short of the lower bound
@@ -1060,20 +1038,19 @@ class TestFeatureLineSearch(unittest.TestCase):
     def test_feature_armijo_print_bound_enforce(self):
         import numpy as np
 
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, ArmijoGoldsteinLS
+        import openmdao.api as om
         from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
 
-        top = Problem()
-        top.model = Group()
-        top.model.add_subsystem('px', IndepVarComp('x', np.ones((3, 1))))
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
         top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
         top.model.connect('px.x', 'comp.x')
 
-        newt = top.model.nonlinear_solver = NewtonSolver()
+        newt = top.model.nonlinear_solver = om.NewtonSolver()
         top.model.nonlinear_solver.options['maxiter'] = 2
-        top.model.linear_solver = ScipyKrylov()
+        top.model.linear_solver = om.ScipyKrylov()
 
-        ls = newt.linesearch = ArmijoGoldsteinLS()
+        ls = newt.linesearch = om.ArmijoGoldsteinLS()
         ls.options['print_bound_enforce'] = True
 
         top.set_solver_print(level=2)

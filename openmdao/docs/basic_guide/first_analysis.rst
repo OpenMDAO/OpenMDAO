@@ -38,15 +38,16 @@ Preamble
 ::
 
     from __future__ import division, print_function
-    from openmdao.api import ExplicitComponent
+    import openmdao.api as om
 
 At the top of any script you'll see these lines (or lines very similar to these) which import needed classes and functions.
 On the first import line, the `print_function` is used so that the code in the script will work in either Python 2 or 3.
 If you want to know whats going on with the division operator, check out this `detailed explanation <https://www.python.org/dev/peps/pep-0238/>`_.
 
-The second import line brings in OpenMDAO classes that are needed to build and run a model.
-As you progress to more complex models, you can expect to import more classes from `openmdao.api`,
-but for now we only need this one to define our paraboloid component.
+The second import line make availabe the most common OpenMDAO classes that are needed to build and run a model.
+The `openmdao.api` module contains the class `ExplicitComponent` that we need to define the Paraboloid model. This
+can be accessed via "om.ExplicitComponent" when we need it. As you progress to more complex models, you will learn about
+more classes available in `openmdao.api`,but for now we only need this one to define our paraboloid component.
 
 Defining a Component
 ---------------------
@@ -111,12 +112,10 @@ In this case, there are no units on the source (i.e. `des_vars.x`).
 .. code::
 
     if __name__ == "__main__":
-        from openmdao.api import Problem
-        from openmdao.api import Group
-        from openmdao.api import IndepVarComp
+        import openmdao.api as om
 
-        model = Group()
-        ivc = IndepVarComp()
+        model = om.Group()
+        ivc = om.IndepVarComp()
         ivc.add_output('x', 3.0)
         ivc.add_output('y', -4.0)
         model.add_subsystem('des_vars', ivc)
@@ -125,7 +124,7 @@ In this case, there are no units on the source (i.e. `des_vars.x`).
         model.connect('des_vars.x', 'parab_comp.x')
         model.connect('des_vars.y', 'parab_comp.y')
 
-        prob = Problem(model)
+        prob = om.Problem(model)
         prob.setup()
         prob.run_model()
         print(prob['parab_comp.f_xy'])

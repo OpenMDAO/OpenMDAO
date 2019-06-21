@@ -10,10 +10,10 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
 
-class MultiStressComp(ExplicitComponent):
+class MultiStressComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)

@@ -12,7 +12,7 @@ class TestSellarFeature(unittest.TestCase):
         prob = Problem()
         prob.model = SellarNoDerivatives()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.final_setup()
 
         # no output checking, just make sure no exceptions raised

@@ -4,14 +4,13 @@ import unittest
 
 from six import iteritems
 
-from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, DirectSolver
-from openmdao.api import ExecComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 
 
-class SpeedComp(ExplicitComponent):
+class SpeedComp(om.ExplicitComponent):
     """Simple speed computation from distance and time with unit conversations."""
 
     def setup(self):
@@ -28,9 +27,9 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic_dense_jac(self):
         """Test that output values and total derivatives are correct."""
-        prob = Problem(model=UnitConvGroup(assembled_jac_type='dense'))
+        prob = om.Problem(model=UnitConvGroup(assembled_jac_type='dense'))
 
-        prob.model.linear_solver = DirectSolver(assemble_jac=True)
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         # Check the outputs after running to test the unit conversions
         prob.setup(check=False, mode='fwd')
@@ -60,24 +59,24 @@ class TestUnitConversion(unittest.TestCase):
         assert_rel_error(self, J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
     def test_dangling_input_w_units(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('y=x', x={'units': 'ft'}, y={'units': 'm'}))
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=x', x={'units': 'ft'}, y={'units': 'm'}))
         prob.setup()
         prob.run_model()
         # this test passes as long as it doesn't raise an exception
 
     def test_speed(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+        import openmdao.api as om
         from openmdao.core.tests.test_units import SpeedComp
 
-        comp = IndepVarComp()
+        comp = om.IndepVarComp()
         comp.add_output('distance', val=1., units='m')
         comp.add_output('time', val=1., units='s')
 
-        prob = Problem(model=Group())
+        prob = om.Problem()
         prob.model.add_subsystem('c1', comp)
         prob.model.add_subsystem('c2', SpeedComp())
-        prob.model.add_subsystem('c3', ExecComp('f=speed',speed={'units': 'm/s'}))
+        prob.model.add_subsystem('c3', om.ExecComp('f=speed',speed={'units': 'm/s'}))
         prob.model.connect('c1.distance', 'c2.distance')
         prob.model.connect('c1.time', 'c2.time')
         prob.model.connect('c2.speed', 'c3.speed')
@@ -96,7 +95,7 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic(self):
         """Test that output values and total derivatives are correct."""
-        prob = Problem(model=UnitConvGroup())
+        prob = om.Problem(model=UnitConvGroup())
 
         # Check the outputs after running to test the unit conversions
         prob.setup(check=False, mode='fwd')
@@ -140,7 +139,7 @@ class TestUnitConversion(unittest.TestCase):
     def test_basic_apply(self):
         """Test that output values and total derivatives are correct."""
 
-        class SrcCompa(ExplicitComponent):
+        class SrcCompa(om.ExplicitComponent):
             """Source provides degrees Celsius."""
 
             def setup(self):
@@ -159,7 +158,7 @@ class TestUnitConversion(unittest.TestCase):
                 else:
                     d_inputs['x1'] += d_outputs['x2']
 
-        class TgtCompFa(ExplicitComponent):
+        class TgtCompFa(om.ExplicitComponent):
             """Target expressed in degrees F."""
 
             def setup(self):
@@ -178,10 +177,10 @@ class TestUnitConversion(unittest.TestCase):
                 else:
                     d_inputs['x2'] += d_outputs['x3']
 
-        prob = Problem()
-        model = prob.model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('px1', IndepVarComp('x1', 100.0))
+        model.add_subsystem('px1', om.IndepVarComp('x1', 100.0))
         model.add_subsystem('src', SrcCompa())
         model.add_subsystem('tgtF', TgtCompFa())
 
@@ -211,9 +210,8 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic_fd_comps(self):
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        prob = om.Problem()
+        prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
         prob.model.add_subsystem('src', SrcCompFD())
         prob.model.add_subsystem('tgtF', TgtCompFFD())
         prob.model.add_subsystem('tgtC', TgtCompCFD())
@@ -223,7 +221,7 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.connect('src.x2', 'tgtC.x2')
         prob.model.connect('src.x2', 'tgtK.x2')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
@@ -270,54 +268,54 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_bad_units(self):
         """Test error handling when invalid units are declared."""
-        class Comp1(ExplicitComponent):
+        class Comp1(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', 0.0, units='junk')
 
-        class Comp2(ExplicitComponent):
+        class Comp2(om.ExplicitComponent):
             def setup(self):
                 self.add_output('x', 0.0, units='junk')
 
         with self.assertRaises(Exception) as cm:
-            prob = Problem(model=Comp1())
+            prob = om.Problem(model=Comp1())
             prob.setup()
         expected_msg = "The units 'junk' are invalid"
         self.assertTrue(expected_msg in str(cm.exception))
 
         with self.assertRaises(Exception) as cm:
-            prob = Problem(model=Comp2())
+            prob = om.Problem(model=Comp2())
             prob.setup()
         expected_msg = "The units 'junk' are invalid"
         self.assertTrue(expected_msg in str(cm.exception))
 
     def test_add_unitless_output(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('indep', IndepVarComp('x', 0.0, units='unitless'))
+        prob = om.Problem()
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 0.0, units='unitless'))
 
         msg = "Output 'x' has units='unitless' but 'unitless' has been deprecated. " \
               "Use units=None instead.  Note that connecting a unitless variable to " \
               "one with units is no longer an error, but will issue a warning instead."
 
         with assert_warning(DeprecationWarning, msg):
-            prob.setup(check=False)
+            prob.setup()
 
     def test_add_unitless_input(self):
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('C1', ExecComp('y=x', x={'units': 'unitless'}))
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=x', x={'units': 'unitless'}))
 
         msg = "Input 'x' has units='unitless' but 'unitless' has been deprecated. " \
               "Use units=None instead.  Note that connecting a unitless variable to " \
               "one with units is no longer an error, but will issue a warning instead."
 
         with assert_warning(DeprecationWarning, msg):
-            prob.setup(check=False)
+            prob.setup()
 
     def test_incompatible_units(self):
         """Test error handling when only one of src and tgt have units."""
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
+        prob = om.Problem()
+        prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'])
-        prob.model.add_subsystem('tgt', ExecComp('yy=xx', xx={'value': 0.0, 'units': 'unitless'}))
+        prob.model.add_subsystem('tgt', om.ExecComp('yy=xx', xx={'value': 0.0, 'units': 'unitless'}))
         prob.model.connect('src.x2', 'tgt.xx')
 
         msg = "Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
@@ -327,15 +325,15 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic_implicit_conn(self):
         """Test units with all implicit connections."""
-        prob = Problem(model=Group())
-        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
+        prob = om.Problem()
+        prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'], promotes_outputs=['x2'])
         prob.model.add_subsystem('tgtF', TgtCompF(), promotes_inputs=['x2'])
         prob.model.add_subsystem('tgtC', TgtCompC(), promotes_inputs=['x2'])
         prob.model.add_subsystem('tgtK', TgtCompK(), promotes_inputs=['x2'])
 
         # Check the outputs after running to test the unit conversions
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['x2'], 100.0, 1e-6)
@@ -363,11 +361,10 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic_grouped(self):
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        sub1 = prob.model.add_subsystem('sub1', Group())
-        sub2 = prob.model.add_subsystem('sub2', Group())
+        prob = om.Problem()
+        prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
+        sub1 = prob.model.add_subsystem('sub1', om.Group())
+        sub2 = prob.model.add_subsystem('sub2', om.Group())
 
         sub1.add_subsystem('src', SrcComp())
         sub2.add_subsystem('tgtF', TgtCompF())
@@ -379,7 +376,7 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.connect('sub1.src.x2', 'sub2.tgtC.x2')
         prob.model.connect('sub1.src.x2', 'sub2.tgtK.x2')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['sub1.src.x2'], 100.0, 1e-6)
@@ -406,11 +403,11 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_basic_grouped_bug_from_pycycle(self):
 
-        prob = Problem()
-        root = prob.model = Group()
+        prob = om.Problem()
+        root = prob.model
 
-        prob.model.add_subsystem('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
-        sub1 = prob.model.add_subsystem('sub1', Group(), promotes=['x2'])
+        prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
+        sub1 = prob.model.add_subsystem('sub1', om.Group(), promotes=['x2'])
         sub1.add_subsystem('src', SrcComp(), promotes=['x2'])
         root.add_subsystem('tgtF', TgtCompFMulti())
         root.add_subsystem('tgtC', TgtCompC())
@@ -421,7 +418,7 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.connect('x2', 'tgtC.x2')
         prob.model.connect('x2', 'tgtK.x2')
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         assert_rel_error(self, prob['x2'], 100.0, 1e-6)
@@ -448,18 +445,18 @@ class TestUnitConversion(unittest.TestCase):
 
     #def test_basic_grouped_grouped_implicit(self):
 
-        #prob = Problem()
-        #root = prob.model = Group()
-        #sub1 = prob.model.add('sub1', Group(), promotes=['x2'])
-        #sub2 = prob.model.add('sub2', Group(), promotes=['x2'])
+        #prob = om.Problem()
+        #root = prob.model
+        #sub1 = prob.model.add('sub1', om.Group(), promotes=['x2'])
+        #sub2 = prob.model.add('sub2', om.Group(), promotes=['x2'])
         #sub1.add('src', SrcComp(), promotes = ['x2'])
         #sub2.add('tgtF', TgtCompFMulti(), promotes=['x2'])
         #sub2.add('tgtC', TgtCompC(), promotes=['x2'])
         #sub2.add('tgtK', TgtCompK(), promotes=['x2'])
-        #prob.model.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        #prob.model.add('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
         #prob.model.connect('x1', 'sub1.src.x1')
 
-        #prob.setup(check=False)
+        #prob.setup()
         #prob.run()
 
         #assert_rel_error(self, prob['x2'], 100.0, 1e-6)
@@ -576,13 +573,13 @@ class TestUnitConversion(unittest.TestCase):
                                     #dinputs['Odot_BI'][i, j, :] -= -self.dw_dOdot[:, k, i, j] * \
                                         #dw_B[k, :]
 
-        #prob = Problem()
-        #root = prob.model = Group()
+        #prob = om.Problem()
+        #root = prob.model
         #prob.model.add('comp', Attitude_Angular(n=5), promotes=['*'])
-        #prob.model.add('p1', IndepVarComp('O_BI', np.ones((3, 3, 5))), promotes=['*'])
-        #prob.model.add('p2', IndepVarComp('Odot_BI', np.ones((3, 3, 5))), promotes=['*'])
+        #prob.model.add('p1', om.IndepVarComp('O_BI', np.ones((3, 3, 5))), promotes=['*'])
+        #prob.model.add('p2', om.IndepVarComp('Odot_BI', np.ones((3, 3, 5))), promotes=['*'])
 
-        #prob.setup(check=False)
+        #prob.setup()
         #prob.run()
 
         #indep_list = ['O_BI', 'Odot_BI']
@@ -602,31 +599,29 @@ class TestUnitConversion(unittest.TestCase):
 
     def test_incompatible_connections(self):
 
-        class BadComp(ExplicitComponent):
+        class BadComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x2', 100.0, units='m')
                 self.add_output('x3', 100.0)
 
         # Explicit Connection
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
         prob.model.add_subsystem('src', SrcComp())
         prob.model.add_subsystem('dest', BadComp())
         prob.model.connect('src.x2', 'dest.x2')
         with self.assertRaises(Exception) as cm:
-            prob.setup(check=False)
+            prob.setup()
 
         expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
         # Implicit Connection
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
         prob.model.add_subsystem('src', SrcComp(), promotes=['x2'])
         prob.model.add_subsystem('dest', BadComp(),promotes=['x2'])
         with self.assertRaises(Exception) as cm:
-            prob.setup(check=False)
+            prob.setup()
 
         expected_msg = "Output units of 'degC' for 'src.x2' are incompatible with input units of 'm' for 'dest.x2'."
 
@@ -638,14 +633,14 @@ class TestUnitConversion(unittest.TestCase):
         ## "rest" of the problem that the others are testing, namely that
         ## outscope vars could sometimes cause a problem even absent any units.
 
-        #prob = Problem()
-        #root = prob.model = Group()
-        #root.add('p1', IndepVarComp('xx', 3.0))
-        #root.add('c1', ExecComp(['y1=0.5*x + 0.1*xx', 'y2=0.3*x - 1.0*xx']))
-        #root.add('c2', ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', Group())
-        #sub.add('cc1', ExecComp(['y=0.1*x1 + 0.01*x2']))
-        #sub.add('cc2', ExecComp(['y=0.1*x']))
+        #prob = om.Problem()
+        #root = prob.model
+        #root.add('p1', om.IndepVarComp('xx', 3.0))
+        #root.add('c1', om.ExecComp(['y1=0.5*x + 0.1*xx', 'y2=0.3*x - 1.0*xx']))
+        #root.add('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add('sub', om.Group())
+        #sub.add('cc1', om.ExecComp(['y=0.1*x1 + 0.01*x2']))
+        #sub.add('cc2', om.ExecComp(['y=0.1*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -658,12 +653,12 @@ class TestUnitConversion(unittest.TestCase):
         #root.linear_solver = ScipyKrylov()
 
         #sub.nonlinear_solver = Newton()
-        #sub.linear_solver = DirectSolver()
+        #sub.linear_solver = om.DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('c1.y2')
 
-        #prob.setup(check=False)
+        #prob.setup()
 
         #prob.run()
 
@@ -684,14 +679,14 @@ class TestUnitConversion(unittest.TestCase):
         ## higher scopes aren't sitting there converting themselves during sub
         ## iterations.
 
-        #prob = Problem()
-        #root = prob.model = Group()
-        #root.add('p1', IndepVarComp('xx', 3.0))
-        #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', Group())
-        #sub.add('cc1', ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
-        #sub.add('cc2', ExecComp(['y=1.01*x']))
+        #prob = om.Problem()
+        #root = prob.model
+        #root.add('p1', om.IndepVarComp('xx', 3.0))
+        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add('sub', om.Group())
+        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
+        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -706,12 +701,12 @@ class TestUnitConversion(unittest.TestCase):
         #root.linear_solver.options['maxiter'] = 1
 
         #sub.nonlinear_solver = Newton()
-        #sub.linear_solver = DirectSolver()
+        #sub.linear_solver = om.DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
 
-        #prob.setup(check=False)
+        #prob.setup()
 
         #prob.run()
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
@@ -722,14 +717,14 @@ class TestUnitConversion(unittest.TestCase):
         ## higher scopes aren't sitting there converting themselves during sub
         ## iterations.
 
-        #prob = Problem()
-        #root = prob.model = Group()
-        #root.add('p1', IndepVarComp('xx', 3.0))
-        #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', Group())
-        #sub.add('cc1', ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
-        #sub.add('cc2', ExecComp(['y=1.01*x']))
+        #prob = om.Problem()
+        #root = prob.model
+        #root.add('p1', om.IndepVarComp('xx', 3.0))
+        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add('sub', om.Group())
+        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'nm'}))
+        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -745,12 +740,12 @@ class TestUnitConversion(unittest.TestCase):
         #root.linear_solver.options['mode'] = 'rev'
 
         #sub.nonlinear_solver = Newton()
-        #sub.linear_solver = DirectSolver()
+        #sub.linear_solver = om.DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
 
-        #prob.setup(check=False)
+        #prob.setup()
 
         #prob.run()
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
@@ -801,14 +796,14 @@ class TestUnitConversion(unittest.TestCase):
                         #dinputs['x2'] = 1.01*dresids['y']
                         #self.dx2count += 1
 
-        #prob = Problem()
-        #root = prob.model = Group()
-        #root.add('p1', IndepVarComp('xx', 3.0))
-        #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', Group())
+        #prob = om.Problem()
+        #root = prob.model
+        #root.add('p1', om.IndepVarComp('xx', 3.0))
+        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add('sub', om.Group())
         #sub.add('cc1', TestComp())
-        #sub.add('cc2', ExecComp(['y=1.01*x']))
+        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -824,12 +819,12 @@ class TestUnitConversion(unittest.TestCase):
         #root.linear_solver.options['mode'] = 'rev'
 
         #sub.nonlinear_solver = Newton()
-        #sub.linear_solver = DirectSolver()
+        #sub.linear_solver = om.DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
 
-        #prob.setup(check=False)
+        #prob.setup()
         #prob.run()
 
         ## x1 deriv code should be called less if the dinputs vec only
@@ -842,14 +837,14 @@ class TestUnitConversion(unittest.TestCase):
         ## higher scopes aren't sitting there converting themselves during sub
         ## iterations.
 
-        #prob = Problem()
-        #root = prob.model = Group()
-        #root.add('p1', IndepVarComp('xx', 3.0))
-        #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', Group())
-        #sub.add('cc1', ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
-        #sub.add('cc2', ExecComp(['y=1.01*x']))
+        #prob = om.Problem()
+        #root = prob.model
+        #root.add('p1', om.IndepVarComp('xx', 3.0))
+        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add('sub', om.Group())
+        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
+        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -869,7 +864,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
 
-        #prob.setup(check=False)
+        #prob.setup()
 
         #prob.run()
 
@@ -884,14 +879,14 @@ class TestUnitConversion(unittest.TestCase):
 
         ## Make sure preconditioners also work
 
-        #prob = Problem()
-        #root = prob.model = Group()
-        #root.add('p1', IndepVarComp('xx', 3.0))
-        #root.add('c1', ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
-        #root.add('c2', ExecComp(['y=0.5*x']))
-        #sub = root.add('sub', Group())
-        #sub.add('cc1', ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
-        #sub.add('cc2', ExecComp(['y=1.01*x']))
+        #prob = om.Problem()
+        #root = prob.model
+        #root.add('p1', om.IndepVarComp('xx', 3.0))
+        #root.add('c1', om.ExecComp(['y1=0.5*x + 1.0*xx', 'y2=0.3*x - 1.0*xx'], units={'y2' : 'km'}))
+        #root.add('c2', om.ExecComp(['y=0.5*x']))
+        #sub = root.add('sub', om.Group())
+        #sub.add('cc1', om.ExecComp(['y=1.01*x1 + 1.01*x2'], units={'x1' : 'fm'}))
+        #sub.add('cc2', om.ExecComp(['y=1.01*x']))
 
         #root.connect('p1.xx', 'c1.xx')
         #root.connect('c1.y1', 'c2.x')
@@ -907,12 +902,12 @@ class TestUnitConversion(unittest.TestCase):
 
         #sub.nonlinear_solver = Newton()
         #sub.linear_solver = ScipyKrylov()
-        #sub.linear_solver.precon = DirectSolver()
+        #sub.linear_solver.precon = om.DirectSolver()
 
         #prob.driver.add_desvar('p1.xx')
         #prob.driver.add_objective('sub.cc2.y')
 
-        #prob.setup(check=False)
+        #prob.setup()
 
         #prob.run()
 
@@ -956,17 +951,16 @@ class TestUnitConversion(unittest.TestCase):
 
     #def test_basic(self):
 
-        #prob = Problem()
-        #prob.model = Group()
+        #prob = om.Problem()
         #prob.model.add('src', PBOSrcComp())
         #prob.model.add('tgtF', PBOTgtCompF())
-        #prob.model.add('px1', IndepVarComp('x1', 100.0), promotes=['x1'])
+        #prob.model.add('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
         #prob.model.connect('x1', 'src.x1')
         #prob.model.connect('src.x2', 'tgtF.x2')
 
         #prob.model.deriv_options['type'] = 'fd'
 
-        #prob.setup(check=False)
+        #prob.setup()
         #prob.run()
 
         #assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
@@ -1015,8 +1009,8 @@ class TestUnitConversion(unittest.TestCase):
                 #""" No action."""
                 #pass
 
-        #top = Problem()
-        #root = top.root = Group()
+        #top = om.Problem()
+        #root = top.root = om.Group()
         #root.add('src', Src())
         #root.add('tgt', Tgt())
 
@@ -1024,7 +1018,7 @@ class TestUnitConversion(unittest.TestCase):
         #root.connect('src.x2', 'tgt.x2')
         #root.connect('src.x3', 'tgt.x3')
 
-        #top.setup(check=False)
+        #top.setup()
         #top.run()
 
         #assert_rel_error(self, top['tgt.x1'], np.pi, 1e-6)

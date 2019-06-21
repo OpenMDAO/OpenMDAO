@@ -32,7 +32,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [0.0, 0.4, 1.0]
         mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
@@ -57,7 +57,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [0.0, 0.4, 1.0]
         mm.options['train:x2'] = [0.0, 0.4, 1.0, 999.0]
@@ -85,7 +85,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [0.0, 0.4, 1.0]
         mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
@@ -111,7 +111,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         self.assertEqual(mm.options['train:x'], None)
         self.assertEqual(mm.options['train:x_fi2'], None)
@@ -129,7 +129,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [0.0, 0.4, 1.0]
         mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
@@ -156,7 +156,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = [0.0, 0.4, 1.0]
         mm.options['train:y'] = [3.02720998, 0.11477697, 15.82973195]
@@ -175,7 +175,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
 
         # Setup and run second time
-        prob.setup(check=False)
+        prob.setup()
         expected_xpredict=0.5
         prob['mm.x'] = expected_xpredict
         prob.run_model()
@@ -191,7 +191,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x']= [0.0, 0.4, 1.0]
         mm.options['train:x_fi2'] = [0.1, 0.2, 0.3, 0.5, 0.6,
@@ -226,7 +226,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x1']     = [1.0, 2.0, 3.0]
         mm.options['train:x1_fi2'] = [1.1, 2.1, 3.1, 1.0, 2.0, 3.0]
@@ -273,7 +273,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         x = [[[ 0.13073587,  0.24909577],  # expensive (hifi) doe
               [ 0.91915571,  0.4735261 ],
@@ -334,7 +334,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem()
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         mm.options['train:x'] = x[0]
         mm.options['train:y'] = y[0]
@@ -362,7 +362,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         self.assertEqual(mm.options['train:x'], None)
         self.assertEqual(mm.options['train:x_fi2'], None)
@@ -387,7 +387,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         prob = Problem(Group())
         prob.model.add_subsystem('mm', mm)
-        prob.setup(check=False)
+        prob.setup()
 
         self.assertEqual(mm.options['train:x'], None)
         self.assertEqual(mm.options['train:x_fi2'], None)

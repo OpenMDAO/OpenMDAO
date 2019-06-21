@@ -3,15 +3,14 @@ Find the minimum delta-V for an impulsive Hohmann Transer from
 Low Earth Orbit (LEO) to Geostationary Orbit (GEO)
 """
 from __future__ import print_function, division, absolute_import
-
 import unittest
 
 import numpy as np
-from openmdao.api import Problem, Group, ExplicitComponent, IndepVarComp, \
-    ExecComp, ScipyOptimizeDriver
+
+import openmdao.api as om
 
 
-class VCircComp(ExplicitComponent):
+class VCircComp(om.ExplicitComponent):
     """
     Computes the circular orbit velocity given a radius and gravitational
     parameter.
@@ -54,7 +53,7 @@ class VCircComp(ExplicitComponent):
         partials['vcirc', 'r'] = -0.5 * mu / (vcirc * r ** 2)
 
 
-class DeltaVComp(ExplicitComponent):
+class DeltaVComp(om.ExplicitComponent):
     """
     Compute the delta-V performed given the magnitude of two velocities
     and the angle between them.
@@ -95,7 +94,7 @@ class DeltaVComp(ExplicitComponent):
         partials['delta_v', 'dinc'] = 0.5 / delta_v * (2 * v1 * v2 * np.sin(dinc))
 
 
-class TransferOrbitComp(ExplicitComponent):
+class TransferOrbitComp(om.ExplicitComponent):
     def initialize(self):
         pass
 
@@ -131,14 +130,14 @@ class TransferOrbitComp(ExplicitComponent):
 class TestHohmannTransfer(unittest.TestCase):
 
     def test_dv_at_apogee(self):
-        from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ScipyOptimizeDriver
+        import openmdao.api as om
         from openmdao.test_suite.test_examples.test_hohmann_transfer import  VCircComp, TransferOrbitComp, DeltaVComp
 
-        prob = Problem(model=Group())
+        prob = om.Problem()
 
         model = prob.model
 
-        ivc = model.add_subsystem('ivc', IndepVarComp(), promotes_outputs=['*'])
+        ivc = model.add_subsystem('ivc', om.IndepVarComp(), promotes_outputs=['*'])
         ivc.add_output('mu', val=0.0, units='km**3/s**2')
         ivc.add_output('r1', val=0.0, units='km')
         ivc.add_output('r2', val=0.0, units='km')
@@ -168,26 +167,26 @@ class TestHohmannTransfer(unittest.TestCase):
         model.connect('dinc2', 'dv2.dinc')
 
         model.add_subsystem('dv_total',
-                            subsys=ExecComp('delta_v=dv1+dv2',
-                                            delta_v={'units': 'km/s'},
-                                            dv1={'units': 'km/s'},
-                                            dv2={'units': 'km/s'}),
+                            subsys=om.ExecComp('delta_v=dv1+dv2',
+                                               delta_v={'units': 'km/s'},
+                                               dv1={'units': 'km/s'},
+                                               dv2={'units': 'km/s'}),
                             promotes=['delta_v'])
 
         model.connect('dv1.delta_v', 'dv_total.dv1')
         model.connect('dv2.delta_v', 'dv_total.dv2')
 
         model.add_subsystem('dinc_total',
-                            subsys=ExecComp('dinc=dinc1+dinc2',
-                                            dinc={'units': 'deg'},
-                                            dinc1={'units': 'deg'},
-                                            dinc2={'units': 'deg'}),
+                            subsys=om.ExecComp('dinc=dinc1+dinc2',
+                                               dinc={'units': 'deg'},
+                                               dinc1={'units': 'deg'},
+                                               dinc2={'units': 'deg'}),
                             promotes=['dinc'])
 
         model.connect('dinc1', 'dinc_total.dinc1')
         model.connect('dinc2', 'dinc_total.dinc2')
 
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
 
         model.add_design_var('dinc1', lower=0, upper=28.5)
         model.add_design_var('dinc2', lower=0, upper=28.5)

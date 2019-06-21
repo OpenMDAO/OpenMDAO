@@ -4,9 +4,10 @@ the array is given as an option of type 'numpy.ndarray'.
 """
 import numpy as np
 
-from openmdao.api import ExplicitComponent
+import openmdao.api as om
 
-class ArrayMultiplyComp(ExplicitComponent):
+
+class ArrayMultiplyComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('array', types=np.ndarray)

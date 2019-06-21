@@ -24,7 +24,7 @@ AddSubtractComp Example
 In the following example AddSubtractComp is used to add thrust, drag, lift, and weight forces. Note the scaling factor of -1 for the drag force and weight force.
 
 .. embed-code::
-    openmdao.components.tests.test_add_subtract_comp.TestForDocs.test
+    openmdao.components.tests.test_add_subtract_comp.TestFeature.test
     :layout: code, output
 
 .. tags:: AddSubtractComp, Component
