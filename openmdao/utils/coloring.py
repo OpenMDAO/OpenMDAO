@@ -572,6 +572,7 @@ class Coloring(object):
         self.display_txt()
 
         from matplotlib import pyplot, patches, axes, cm
+        from matplotlib.artist import getp
 
         nrows, ncols = self._shape
         aspect_ratio = ncols / nrows
@@ -579,24 +580,33 @@ class Coloring(object):
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
 
-        xtics = []
-        ytics = []
+        # xtics = []
+        # ytics = []
+
+        fig = pyplot.figure()#(figsize=(20,10)) # in inches
+        ax = pyplot.gca()
 
         # display grid that breaks up the Jacobian into subjacs by variable pairs.
         if self._row_vars is not None and self._col_vars is not None:
+            # map row/col to corresponding var names
+            entry_xnames = np.zeros(ncols, dtype=int)
+            entry_ynames = np.zeros(nrows, dtype=int)
+
             sjcolors = [cm.get_cmap('Greys')(0.3), cm.get_cmap('Greys')(0.4)]
 
             colstart = colend = 0
-            for cvsize in self._col_var_sizes:
+            for i, cvsize in enumerate(self._col_var_sizes):
                 colend += cvsize
-                xtics.append(colstart + colend/2)
+                # xtics.append(colstart + cvsize/2 - 0.5)
+                entry_xnames[colstart:colend] = i
                 colstart = colend
 
             # we have var name/size info, so mark rows/cols with their respective variable names
             rowstart = rowend = 0
             for ridx, rvsize in enumerate(self._row_var_sizes):
                 rowend += rvsize
-                ytics.append(rowstart + rowend/2)
+                # ytics.append(rowstart + rvsize/2 - 0.5)
+                entry_ynames[rowstart:rowend] = ridx
 
                 colstart = colend = 0
                 for cidx, cvsize in enumerate(self._col_var_sizes):
@@ -606,9 +616,45 @@ class Coloring(object):
 
                 rowstart = rowend
 
+            annot = ax.annotate("", xy=(0,0), xytext=(2,2),textcoords="offset points",
+                                bbox=dict(boxstyle="round", fc="w"),
+                                arrowprops=dict(arrowstyle="->"))
+            annot.set_visible(False)
+
+            def on_press(event):
+                if event.inaxes == ax:
+                    ix = int(event.xdata)
+                    iy = int(event.ydata)
+
+                    if event.xdata - ix >= .5:
+                        ix += 1
+                    if ix < 0:
+                        ix = 0
+                    if ix > ncols:
+                        ix = ncols
+                    if event.ydata - iy >= .5:
+                        iy += 1
+                    if iy < 0:
+                        iy = 0
+                    if iy > nrows:
+                        iy = nrows
+
+                    annot.set_text("of: %s\nwrt: %s" % (self._row_vars[entry_ynames[iy]],
+                                                        self._col_vars[entry_xnames[ix]]))
+                    annot.xy = (event.xdata, event.ydata)
+                    annot.set_visible(True)
+                    fig.canvas.draw_idle()
+
+            def on_release(event):
+                annot.set_visible(False)
+                fig.canvas.draw_idle()
+
+            cid = fig.canvas.mpl_connect('button_press_event', on_press)
+            cid2 = fig.canvas.mpl_connect('button_release_event', on_release)
+
         color_arrays = []
         if self._fwd:
-            cmap = cm.get_cmap('winter', fwd_solves)
+            cmap = cm.get_cmap('winter')
 
             icol = 1
             full_rows = np.arange(nrows, dtype=int)
@@ -626,7 +672,7 @@ class Coloring(object):
                 icol += 1
 
         if self._rev:
-            cmap = cm.get_cmap('autumn_r', rev_solves)
+            cmap = cm.get_cmap('autumn_r')
 
             icol = 1
             full_cols = np.arange(ncols, dtype=int)
@@ -643,21 +689,19 @@ class Coloring(object):
                         icol += 1
                 icol += 1
 
-        fig = pyplot.figure()#figsize=(10, 10)) # in inches
-        ax = pyplot.gca()
         ax.set_title("%s jacobian coloring (%d x %d)" % (self._meta['type'],
                                                          self._shape[0], self._shape[1]))
-        if xtics:
-            # ax.xaxis.set_major_locator(FixedLocator(xtics))
-            # ax.yaxis.set_major_locator(FixedLocator(ytics))
-            pyplot.xticks(xtics, self._col_vars, rotation=70, horizontal_alignment='right')
-            pyplot.margins(0.2)
-            # ax.set_xticks(xtics)
-            # ax.set_xticklabels(self._col_vars)
-            ax.set_yticks(ytics)
-            ax.set_yticklabels(self._row_vars)
+        # if xtics:
+        #     ax.set_xticks(xtics)
+        #     ax.set_xticklabels(self._col_vars, rotation=40, ha='right')
+        #     #pyplot.margins(0.4)
+        #     ax.set_yticks(ytics)
+        #     ax.set_yticklabels(self._row_vars)
 
         pyplot.imshow(J, interpolation="none")
+        #fig.tight_layout()
+
+        print(getp(ax.patch))
 
         pyplot.show()
 
