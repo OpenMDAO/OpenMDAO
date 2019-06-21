@@ -187,6 +187,8 @@ class MultiFiCoKriging(object):
     ----------
     corr : Object
         Correlation function to use, default is squared_exponential_correlation.
+    normalize : bool, optional
+        When true, normalize X and Y so that the mean is at zero.
     regr : string or callable
         A regression function returning an array of outputs of the linear
         regression functional basis for Universal Kriging purpose.
@@ -287,7 +289,7 @@ class MultiFiCoKriging(object):
         'linear': linear_regression
     }
 
-    def __init__(self, regr='constant', rho_regr='constant',
+    def __init__(self, regr='constant', rho_regr='constant', normalize=True,
                  theta=None, theta0=None, thetaL=None, thetaU=None):
         """
         Initialize all attributes.
@@ -340,6 +342,8 @@ class MultiFiCoKriging(object):
             if array_like: An array with shape matching theta0's. It is replicated
             for all levels of code.
             if list: a list of nlevel arrays specifying value for each level
+        normalize : bool, optional
+            When true, normalize X and Y so that the mean is at zero.
         """
         self.corr = squared_exponential_correlation
         self.regr = regr
@@ -348,6 +352,11 @@ class MultiFiCoKriging(object):
         self.theta0 = theta0
         self.thetaL = thetaL
         self.thetaU = thetaU
+        self.normalize = normalize
+        self.X_mean = 0
+        self.X_std = 1
+        self.y_mean = 0
+        self.y_std = 1
 
         self._nfev = 0
 
@@ -423,12 +432,21 @@ class MultiFiCoKriging(object):
         self.sigma2 = nlevel * [0]
         self._R_adj = nlevel * [None]
 
-        self.y_mean = np.zeros(1)
-        self.y_std = np.ones(1)
-        self.X_mean = np.zeros(1)
-        self.X_std = np.ones(1)
+        # Training data will be normalized using statistical quantities from the low fidelity set.
+        if self.normalize:
+            self.X_mean = X_mean = np.mean(X[0], axis=0)
+            self.X_std = X_std = np.std(X[0], axis=0)
+            self.y_mean = y_mean = np.mean(y[0], axis=0)
+            self.y_std = y_std = np.std(y[0], axis=0)
+
+            X_std[X_std == 0.] = 1.
+            y_std[y_std == 0.] = 1.
 
         for lvl in range(nlevel):
+
+            if self.normalize:
+                X[lvl] = (X[lvl] - X_mean) / X_std
+                y[lvl] = (y[lvl] - y_mean) / y_std
 
             # Calculate matrix of distances D between samples
             self.D[lvl] = l1_cross_distances(X[lvl])
@@ -657,6 +675,10 @@ class MultiFiCoKriging(object):
         nlevel = self.nlevel
         n_eval, n_features_X = X.shape
 
+        # Normalize
+        if self.normalize:
+            X = (X - self.X_mean) / self.X_std
+
         # Calculate kriging mean and variance at level 0
         mu = np.zeros((n_eval, nlevel))
 
@@ -877,7 +899,7 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
         Optimizer terminates when the tolerance tol is reached.
     """
 
-    def __init__(self, regr='constant', rho_regr='constant',
+    def __init__(self, regr='constant', rho_regr='constant', normalize=True,
                  theta=None, theta0=None, thetaL=None, thetaU=None,
                  tolerance=TOLERANCE_DEFAULT, initial_range=INITIAL_RANGE_DEFAULT):
         """
@@ -885,6 +907,8 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
         Parameters
         ----------
+        normalize : bool, optional
+            When true, normalize X and Y so that the mean is at zero.
         regr : string or callable, optional
             A regression function returning an array of outputs of the linear
             regression functional basis for Universal Kriging purpose.
@@ -941,7 +965,8 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
         self.tolerance = tolerance
         self.initial_range = initial_range
         self.model = MultiFiCoKriging(regr=regr, rho_regr=rho_regr, theta=theta,
-                                      theta0=theta0, thetaL=thetaL, thetaU=thetaU)
+                                      theta0=theta0, thetaL=thetaL, thetaU=thetaU,
+                                      normalize=normalize)
 
     def predict(self, new_x):
         """

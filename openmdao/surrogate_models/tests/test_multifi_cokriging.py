@@ -24,7 +24,7 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         assert_rel_error(self, sigma, [[1.3408]], 1e-3)
 
         # Test with theta setting instead of estimation
-        krig2 = MultiFiCoKrigingSurrogate(theta=0.1)
+        krig2 = MultiFiCoKrigingSurrogate(theta=0.1, normalize=False)
         krig2.train(x, y)
 
         mu, sigma = krig2.predict(x[0])
@@ -137,7 +137,7 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         y = array([[branin(case) for case in x[0]],
                    [branin_low_fidelity(case) for case in x[1]]])
         nfi=2
-        cokrig = MultiFiCoKrigingSurrogate()
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False)
         cokrig.train_multifi(x, y)
 
         mu, sigma = cokrig.predict([2./3., 1/3.])
@@ -145,7 +145,7 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         assert_rel_error(self, sigma, [[0.3]], 0.2)
 
         # Test with theta setting instead of theta estimation
-        cokrig2 = MultiFiCoKrigingSurrogate(theta=0.1)
+        cokrig2 = MultiFiCoKrigingSurrogate(theta=0.1, normalize=False)
         cokrig2.train_multifi(x, y)
 
         mu, sigma = cokrig2.predict([2./3., 1/3.])
@@ -153,7 +153,7 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         assert_rel_error(self, sigma, [[2.29]], 0.1)
 
         # Test with theta setting instead of theta estimation
-        cokrig2 = MultiFiCoKrigingSurrogate(theta=[0.1, 10])
+        cokrig2 = MultiFiCoKrigingSurrogate(theta=[0.1, 10], normalize=False)
         cokrig2.train_multifi(x, y)
 
         mu, sigma = cokrig2.predict([2./3., 1/3.])
