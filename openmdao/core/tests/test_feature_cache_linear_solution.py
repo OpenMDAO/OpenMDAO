@@ -110,7 +110,7 @@ class CacheLinearTestCase(unittest.TestCase):
 
         print(p['a'], p['b'], p['c'])
         print(p['states'])
-        assert_rel_error(self, p['obj.y'], 0.25029766, 1e-4)
+        assert_rel_error(self, p['obj.y'], 0.25029766, 1e-3)
 
 
 if __name__ == "__main__":
