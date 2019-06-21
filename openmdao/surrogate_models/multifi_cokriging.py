@@ -235,6 +235,14 @@ class MultiFiCoKriging(object):
         if array_like: An array with shape matching theta0's. It is replicated
         for all levels of code.
         if list: a list of nlevel arrays specifying value for each level
+    X_mean : float
+        Mean of the low fidelity training data for X.
+    X_std : float
+        Standard deviation of the low fidelity training data for X.
+    y_mean : float
+        Mean of the low fidelity training data for y.
+    y_std : float
+        Standard deviation of the low fidelity training data for y.
     _nfev : int
         Number of function evaluations.
 
