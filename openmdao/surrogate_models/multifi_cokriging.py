@@ -423,11 +423,6 @@ class MultiFiCoKriging(object):
         self.sigma2 = nlevel * [0]
         self._R_adj = nlevel * [None]
 
-        y_best = y[nlevel - 1]
-        for i in range(nlevel - 2, -1, -1):
-            y_best = np.concatenate((y[i][:-n_samples[i + 1]], y_best))
-        self.y_best = y_best
-
         self.y_mean = np.zeros(1)
         self.y_std = np.ones(1)
         self.X_mean = np.zeros(1)
