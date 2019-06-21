@@ -120,5 +120,4 @@ install:
 
 test_script:
 - sh: testflo openmdao -n 1;
-- cmd: echo %PATH%
 - cmd: testflo openmdao -n 1
