@@ -165,7 +165,6 @@ class PETScVector(DefaultVector):
             self._petsc.array = self._data
             return self._petsc.norm()
 
-
     def dot(self, vec):
         """
         Compute the dot product of the real parts of the current vec and the incoming vec.
