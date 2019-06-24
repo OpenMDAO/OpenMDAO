@@ -176,6 +176,19 @@ option as follows:
 
 which will display a visualization of the sparsity
 structure with rows and columns labelled with the response and design variable names, respectively.
+See the figure :ref:`here <fig-coloring-view>`.
+
+
+A text-based view is also available using the `--jtext` arg.  For example:
+
+
+.. code-block:: none
+
+    openmdao total_coloring <your_script_name> --jtext
+
+
+will display something like the following:
+
 
 .. code-block:: none
 
@@ -252,6 +265,25 @@ For example:
 
     Time to compute sparsity: 0.024192 sec.
     Time to compute coloring: 0.001076 sec.
+
+
+Adding a `-j` arg will pop up an interactive plot showing the coloring of the jacobian. Forward
+colors will be colored blue/green and reverse colors will be colored red/yellow.  Clicking on
+a particular cell of the jacobian will display the location, the color number, the coloring direction,
+and the particular 'of' and 'wrt' variables for that particular sub-jacobian.  Note that this
+viewer requires the installation of matplotlib. See the figure below.
+
+.. _fig-coloring-view:
+
+
+.. figure:: coloring_viewer.png
+   :align: center
+   :width: 500 px
+   :alt: Coloring viewer example
+
+
+If matplotlib is not available, a text-based version of the jacobian can be printed using the
+`--jtext` arg.
 
 
 .. note::
