@@ -533,25 +533,6 @@ class MatMatTestCase(unittest.TestCase):
         expected = np.eye(asize)*8.0
         assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
 
-    def test_parallel_multi_fwd_krylov(self):
-        asize = self.asize
-        prob = self.setup_model()
-
-        prob.model.add_design_var('p1.x', parallel_deriv_color='par', vectorize_derivs=True)
-        prob.model.add_design_var('p2.x', parallel_deriv_color='par', vectorize_derivs=True)
-        prob.model.add_constraint('c3.y', upper=0.0)
-        prob.model.add_constraint('c4.y', upper=0.0)
-
-        prob.setup(check=False, mode='fwd')
-        prob.run_driver()
-
-        J = prob.compute_totals(['c3.y', 'c4.y'], ['p1.x', 'p2.x'],
-                                return_format='flat_dict')
-
-        assert_rel_error(self, J['c3.y', 'p1.x'], np.array([[15., 20., 25.],[15., 20., 25.], [15., 20., 25.]]), 1e-6)
-        expected = np.eye(asize)*8.0
-        assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
-
     def test_parallel_rev(self):
         asize = self.asize
         prob = self.setup_model()
