@@ -232,7 +232,7 @@ class Jacobian(object):
         if isinstance(subjac, sparse_types):  # sparse
             sparse = subjac.copy()
             sparse.data = rand(sparse.data.size)
-            sparse.data += 10.0
+            sparse.data += 1.0
             return sparse
 
         # if a subsystem has computed a dynamic partial or semi-total coloring,
@@ -247,11 +247,11 @@ class Jacobian(object):
             rows, cols, shape = subjac_info['sparsity']
             r = np.zeros(shape)
             val = rand(len(rows))
-            val += 10.0
+            val += 1.0
             r[rows, cols] = val
         else:
             r = rand(*subjac.shape)
-            r += 10.0
+            r += 1.0
         return r
 
     def _get_ranges(self, system, vtype):

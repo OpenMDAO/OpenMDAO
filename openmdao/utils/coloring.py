@@ -486,7 +486,7 @@ class Coloring(object):
 
         Forward mode colored nonzeros are denoted by 'f', reverse mode nonzeros by 'r',
         overlapping nonzeros by 'O' and uncolored nonzeros by 'x'.  Zeros are denoted by '.'.
-        Note that x's and O's should never appear unless there is a bug in the colorning
+        Note that x's and O's should never appear unless there is a bug in the coloring
         algorithm.
 
         If names and sizes of row and column vars are known, print the name of the row var
