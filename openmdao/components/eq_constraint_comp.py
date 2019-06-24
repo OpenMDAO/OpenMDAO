@@ -90,10 +90,10 @@ class EQConstraintComp(ExplicitComponent):
             Value of response variable that scales to 0.0 in the driver. This option is only
             meaningful when add_constraint=True.
         adder : float or ndarray, optional
-            Value to add to the model value to get the scaled value. Adder
+            Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence. This option is only meaningful when add_constraint=True.
         scaler : float or ndarray, optional
-            value to multiply the model value to get the scaled value. Scaler
+            value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. This option is only meaningful when add_constraint=True.
         **kwargs : dict
             Additional arguments to be passed for the creation of the output variable.
@@ -290,10 +290,10 @@ class EQConstraintComp(ExplicitComponent):
             Value of response variable that scales to 0.0 in the driver. This option is only
             meaningful when add_constraint=True.
         adder : float or ndarray, optional
-            Value to add to the model value to get the scaled value. Adder
+            Value to add to the model value to get the scaled value for the driver. adder
             is first in precedence. This option is only meaningful when add_constraint=True.
         scaler : float or ndarray, optional
-            Value to multiply the model value to get the scaled value. Scaler
+            Value to multiply the model value to get the scaled value for the driver. scaler
             is second in precedence. This option is only meaningful when add_constraint=True.
         **kwargs : dict
             Additional arguments to be passed for the creation of the output variable.

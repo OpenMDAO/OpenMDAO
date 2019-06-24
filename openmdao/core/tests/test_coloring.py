@@ -19,13 +19,12 @@ try:
 except ImportError:
     load_npz = None
 
-from openmdao.api import Problem, IndepVarComp, ExecComp, DirectSolver,\
-    ExplicitComponent, LinearRunOnce, ScipyOptimizeDriver, ParallelGroup, Group, \
-    SqliteRecorder, CaseReader
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz
 from openmdao.utils.mpi import MPI
+from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
 
 import openmdao.test_suite
@@ -42,7 +41,7 @@ if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 
-class CounterGroup(Group):
+class CounterGroup(om.Group):
     def __init__(self, *args, **kwargs):
         self._solve_count = 0
         self._solve_nl_count = 0
@@ -66,7 +65,7 @@ class CounterGroup(Group):
 SIZE = 10
 
 
-class DynPartialsComp(ExplicitComponent):
+class DynPartialsComp(om.ExplicitComponent):
     def __init__(self, size):
         super(DynPartialsComp, self).__init__()
         self.size = size
@@ -91,13 +90,13 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
             recorder=None, has_lin_constraint=True, vectorize=True, partial_coloring=False,
             **options):
 
-    p = Problem(model=CounterGroup())
+    p = om.Problem(model=CounterGroup())
 
     if assemble_type is not None:
-        p.model.linear_solver = DirectSolver(assemble_jac=True)
+        p.model.linear_solver = om.DirectSolver(assemble_jac=True)
         p.model.options['assembled_jac_type'] = assemble_type
 
-    indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+    indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
 
     # the following were randomly generated using np.random.random(10)*2-1 to randomly
     # disperse them within a unit circle centered at the origin.
@@ -110,25 +109,25 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     if partial_coloring:
         arctan_yox = DynPartialsComp(SIZE)
     else:
-        arctan_yox = ExecComp('g=arctan(y/x)', vectorize=vectorize,
-                              g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE))
+        arctan_yox = om.ExecComp('g=arctan(y/x)', vectorize=vectorize,
+                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE))
 
     p.model.add_subsystem('arctan_yox', arctan_yox)
 
-    p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
+    p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-    p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=vectorize,
-                                            g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+    p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=vectorize,
+                                               g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
     thetas = np.linspace(0, np.pi/4, SIZE)
-    p.model.add_subsystem('theta_con', ExecComp('g = x - theta', vectorize=vectorize,
-                                                g=np.ones(SIZE), x=np.ones(SIZE),
-                                                theta=thetas))
-    p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd', vectorize=vectorize,
-                                                      g=np.ones(SIZE//2), even=np.ones(SIZE//2),
-                                                      odd=np.ones(SIZE//2)))
+    p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=vectorize,
+                                                   g=np.ones(SIZE), x=np.ones(SIZE),
+                                                   theta=thetas))
+    p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=vectorize,
+                                                         g=np.ones(SIZE//2), even=np.ones(SIZE//2),
+                                                         odd=np.ones(SIZE//2)))
 
-    p.model.add_subsystem('l_conx', ExecComp('g=x-1', vectorize=vectorize, g=np.ones(SIZE), x=np.ones(SIZE)))
+    p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=vectorize, g=np.ones(SIZE), x=np.ones(SIZE)))
 
     IND = np.arange(SIZE, dtype=int)
     ODD_IND = IND[1::2]  # all odd indices
@@ -185,19 +184,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     return p
 
 
+@use_tempdirs
 class SimulColoringPyoptSparseTestCase(unittest.TestCase):
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_total_coloring_snopt_auto(self):
@@ -354,51 +342,26 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
 
 
+@use_tempdirs
 @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
 class SimulColoringRecordingTestCase(unittest.TestCase):
-
-    def setUp(self):
-        from tempfile import mkdtemp
-        self.dir = mkdtemp()
-        self.original_path = os.getcwd()
-        os.chdir(self.dir)
-
-    def tearDown(self):
-        os.chdir(self.original_path)
-        try:
-            shutil.rmtree(self.dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_recording(self):
         # coloring involves an underlying call to run_model (and final_setup),
         # this verifies that it is handled properly by the recording setup logic
-        recorder = SqliteRecorder('cases.sql')
+        recorder = om.SqliteRecorder('cases.sql')
 
         p = run_opt(pyOptSparseDriver, 'auto', assemble_type='csc', optimizer='SNOPT',
                     dynamic_total_coloring=True, print_results=False, recorder=recorder)
 
-        cr = CaseReader('cases.sql')
+        cr = om.CaseReader('cases.sql')
 
         self.assertEqual(cr.list_cases(), ['rank0:pyOptSparse_SNOPT|%d' % i for i in range(p.driver.iter_count)])
 
 
+@use_tempdirs
 class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
     """Reverse coloring tests for pyoptsparse."""
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_dynamic_rev_simul_coloring_snopt(self):
@@ -456,34 +419,23 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
                          (p_color.model._solve_count - 1 - 22 * 3) / 11)
 
 
+@use_tempdirs
 class SimulColoringScipyTestCase(unittest.TestCase):
 
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
-
     def test_bad_mode(self):
-        p_color_fwd = run_opt(ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
+        p_color_fwd = run_opt(om.ScipyOptimizeDriver, 'fwd', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color_fwd.driver._coloring_info['coloring']
 
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(ScipyOptimizeDriver, 'rev', color_info=coloring, optimizer='SLSQP', disp=False)
+            p_color = run_opt(om.ScipyOptimizeDriver, 'rev', color_info=coloring, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does forward solves but mode has been set to 'rev'")
 
     def test_dynamic_total_coloring_auto(self):
 
         # first, run w/o coloring
-        p = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
-        p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
+        p = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False)
+        p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -498,14 +450,14 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
     def test_simul_coloring_example(self):
 
-        from openmdao.api import Problem, IndepVarComp, ExecComp, ScipyOptimizeDriver
         import numpy as np
+        import openmdao.api as om
 
         SIZE = 10
 
-        p = Problem()
+        p = om.Problem()
 
-        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
 
         # the following were randomly generated using np.random.random(10)*2-1 to randomly
         # disperse them within a unit circle centered at the origin.
@@ -515,23 +467,23 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                                           -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
         indeps.add_output('r', .7)
 
-        p.model.add_subsystem('arctan_yox', ExecComp('g=arctan(y/x)', vectorize=True,
-                                                    g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+        p.model.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', vectorize=True,
+                                                        g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
-        p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
+        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-        p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
-                                                g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
         thetas = np.linspace(0, np.pi/4, SIZE)
-        p.model.add_subsystem('theta_con', ExecComp('g = x - theta', vectorize=True,
-                                                    g=np.ones(SIZE), x=np.ones(SIZE),
-                                                    theta=thetas))
-        p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd', vectorize=True,
-                                                        g=np.ones(SIZE//2), even=np.ones(SIZE//2),
-                                                        odd=np.ones(SIZE//2)))
+        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=True,
+                                                       g=np.ones(SIZE), x=np.ones(SIZE),
+                                                       theta=thetas))
+        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=True,
+                                                             g=np.ones(SIZE//2), even=np.ones(SIZE//2),
+                                                             odd=np.ones(SIZE//2)))
 
-        p.model.add_subsystem('l_conx', ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
@@ -544,7 +496,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
         p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
-        p.driver = ScipyOptimizeDriver()
+        p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
         p.driver.options['disp'] = False
 
@@ -577,10 +529,9 @@ class SimulColoringScipyTestCase(unittest.TestCase):
     def test_total_and_partial_coloring_example(self):
 
         import numpy as np
-        from openmdao.api import Problem, IndepVarComp, ExecComp, ExplicitComponent, ScipyOptimizeDriver
+        import openmdao.api as om
 
-
-        class DynamicPartialsComp(ExplicitComponent):
+        class DynamicPartialsComp(om.ExplicitComponent):
             def __init__(self, size):
                 super(DynamicPartialsComp, self).__init__()
                 self.size = size
@@ -604,9 +555,9 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         SIZE = 10
 
-        p = Problem()
+        p = om.Problem()
 
-        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['*'])
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['*'])
 
         # the following were randomly generated using np.random.random(10)*2-1 to randomly
         # disperse them within a unit circle centered at the origin.
@@ -621,20 +572,20 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         arctan_yox = p.model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE))
         ########################################################################
 
-        p.model.add_subsystem('circle', ExecComp('area=pi*r**2'))
+        p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-        p.model.add_subsystem('r_con', ExecComp('g=x**2 + y**2 - r', vectorize=True,
-                                                g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+                                                   g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
         thetas = np.linspace(0, np.pi/4, SIZE)
-        p.model.add_subsystem('theta_con', ExecComp('g = x - theta', vectorize=True,
-                                                    g=np.ones(SIZE), x=np.ones(SIZE),
-                                                    theta=thetas))
-        p.model.add_subsystem('delta_theta_con', ExecComp('g = even - odd', vectorize=True,
-                                                        g=np.ones(SIZE//2), even=np.ones(SIZE//2),
-                                                        odd=np.ones(SIZE//2)))
+        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=True,
+                                                       g=np.ones(SIZE), x=np.ones(SIZE),
+                                                       theta=thetas))
+        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=True,
+                                                             g=np.ones(SIZE//2), even=np.ones(SIZE//2),
+                                                             odd=np.ones(SIZE//2)))
 
-        p.model.add_subsystem('l_conx', ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
@@ -647,7 +598,7 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         p.model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
         p.model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
-        p.driver = ScipyOptimizeDriver()
+        p.driver = om.ScipyOptimizeDriver()
         p.driver.options['optimizer'] = 'SLSQP'
         p.driver.options['disp'] = False
 
@@ -691,23 +642,12 @@ class SimulColoringScipyTestCase(unittest.TestCase):
         self.assertEqual(arctan_yox.num_computes - start_calls, 2)
 
 
+@use_tempdirs
 class SimulColoringRevScipyTestCase(unittest.TestCase):
     """Rev mode coloring tests."""
 
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
-
     def test_summary(self):
-        p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
+        p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color.driver._coloring_info['coloring']
         save_out = sys.stdout
         sys.stdout = StringIO()
@@ -739,7 +679,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         self.assertTrue('Time to compute coloring:' in summary)
 
     def test_repr(self):
-        p_color = run_opt(ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
+        p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color.driver._coloring_info['coloring']
         rep = repr(coloring)
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
@@ -750,18 +690,18 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: rev, ncolors: 50, shape: (50, 50)')
 
     def test_bad_mode(self):
-        p_color_rev = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
+        p_color_rev = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
         coloring = p_color_rev.driver._coloring_info['coloring']
 
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(ScipyOptimizeDriver, 'fwd', color_info=coloring, optimizer='SLSQP', disp=False)
+            p_color = run_opt(om.ScipyOptimizeDriver, 'fwd', color_info=coloring, optimizer='SLSQP', disp=False)
         self.assertEqual(str(context.exception),
                          "Simultaneous coloring does reverse solves but mode has been set to 'fwd'")
 
     def test_dynamic_total_coloring(self):
 
-        p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
-        p = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
+        p_color = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
+        p = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False)
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
@@ -776,19 +716,16 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
 
     def test_dynamic_total_coloring_no_derivs(self):
         with self.assertRaises(Exception) as context:
-            p_color = run_opt(ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False,
+            p_color = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False,
                               dynamic_total_coloring=True, derivs=False)
         self.assertEqual(str(context.exception),
                          "Derivative support has been turned off but compute_totals was called.")
 
 
+@use_tempdirs
 class SparsityTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='SparsityTestCase-')
-        os.chdir(self.tempdir)
-
         self.sparsity = {
             "circle.area": {
                "indeps.x": [[], [], [1, 10]],
@@ -816,13 +753,6 @@ class SparsityTestCase(unittest.TestCase):
                "indeps.r": [[], [], [1, 1]]
             }
         }
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_sparsity_snopt(self):
@@ -942,27 +872,10 @@ def _get_mat(rows, cols):
         return np.random.random(rows * cols).reshape((rows, cols)) - 0.5
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI is not None and PETScVector is not None and OPTIMIZER is not None, "PETSc and pyOptSparse required.")
 class MatMultMultipointTestCase(unittest.TestCase):
     N_PROCS = 4
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        if MPI.COMM_WORLD.rank == 0:
-            self.tempdir = tempfile.mkdtemp(prefix=self.__class__.__name__ + '_')
-            MPI.COMM_WORLD.bcast(self.tempdir, root=0)
-        else:
-            self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
-        os.chdir(self.tempdir)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        MPI.COMM_WORLD.bcast(None, root=0)
-        if MPI.COMM_WORLD.rank == 0:
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
 
     def test_multipoint_with_coloring(self):
         size = 10
@@ -970,7 +883,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         np.random.seed(11)
 
-        p = Problem()
+        p = om.Problem()
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
         p.driver.declare_coloring()
@@ -982,26 +895,26 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         model = p.model
         for i in range(num_pts):
-            model.add_subsystem('indep%d' % i, IndepVarComp('x', val=np.ones(size)))
+            model.add_subsystem('indep%d' % i, om.IndepVarComp('x', val=np.ones(size)))
             model.add_design_var('indep%d.x' % i)
 
-        par1 = model.add_subsystem('par1', ParallelGroup())
+        par1 = model.add_subsystem('par1', om.ParallelGroup())
         for i in range(num_pts):
             mat = _get_mat(5, size)
-            par1.add_subsystem('comp%d' % i, ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
+            par1.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
             model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
 
-        par2 = model.add_subsystem('par2', ParallelGroup())
+        par2 = model.add_subsystem('par2', om.ParallelGroup())
         for i in range(num_pts):
             mat = _get_mat(size, 5)
-            par2.add_subsystem('comp%d' % i, ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
+            par2.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
             model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
             par2.add_constraint('comp%d.y' % i, lower=-1.)
 
-            model.add_subsystem('normcomp%d' % i, ExecComp("y=sum(x*x)", x=np.ones(size)))
+            model.add_subsystem('normcomp%d' % i, om.ExecComp("y=sum(x*x)", x=np.ones(size)))
             model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
 
-        model.add_subsystem('obj', ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
+        model.add_subsystem('obj', om.ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
 
         for i in range(num_pts):
             model.connect('normcomp%d.y' % i, 'obj.x%d' % i)

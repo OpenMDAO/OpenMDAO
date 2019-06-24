@@ -2,7 +2,8 @@
 from __future__ import print_function, division, absolute_import
 
 import numpy as np
-from openmdao.api import Problem, ScipyOptimizeDriver
+
+import openmdao.api as om
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
@@ -23,11 +24,11 @@ if __name__ == '__main__' and PETScVector is not None:
     num_elements = 50
     num_load_cases = 2
 
-    prob = Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
-                                             num_elements=num_elements, num_cp=num_cp,
-                                             num_load_cases=num_load_cases))
+    prob = om.Problem(model=MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
+                                                num_elements=num_elements, num_cp=num_cp,
+                                                num_load_cases=num_load_cases))
 
-    prob.driver = ScipyOptimizeDriver()
+    prob.driver = om.ScipyOptimizeDriver()
     prob.driver.options['optimizer'] = 'SLSQP'
     prob.driver.options['tol'] = 1e-9
     prob.driver.options['disp'] = True

@@ -8,14 +8,13 @@ from six.moves import cStringIO
 
 import numpy as np
 
-from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, \
-    NewtonSolver, ScipyKrylov, AnalysisError, ExecComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
 # Note: The following class definitions are used in feature docs
 
-class QuadraticComp(ImplicitComponent):
+class QuadraticComp(om.ImplicitComponent):
     """
     A Simple Implicit Component representing a Quadratic Equation.
 
@@ -114,9 +113,9 @@ class QuadraticJacVec(QuadraticComp):
 class ImplicitCompTestCase(unittest.TestCase):
 
     def setUp(self):
-        group = Group()
+        group = om.Group()
 
-        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1 = group.add_subsystem('comp1', om.IndepVarComp())
         comp1.add_output('a', 1.0)
         comp1.add_output('b', -4.0)
         comp1.add_output('c', 3.0)
@@ -132,8 +131,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         group.connect('comp1.b', 'comp3.b')
         group.connect('comp1.c', 'comp3.c')
 
-        prob = Problem(model=group)
-        prob.setup(check=False)
+        prob = om.Problem(model=group)
+        prob.setup()
 
         self.prob = prob
 
@@ -331,23 +330,23 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # we set it to a value that will take us to the x=3 solution.
                 outputs['x'] = 5.0
 
-        group = Group()
+        group = om.Group()
 
-        group.add_subsystem('pa', IndepVarComp('a', 1.0))
-        group.add_subsystem('pb', IndepVarComp('b', 1.0))
-        group.add_subsystem('pc', IndepVarComp('c', 1.0))
+        group.add_subsystem('pa', om.IndepVarComp('a', 1.0))
+        group.add_subsystem('pb', om.IndepVarComp('b', 1.0))
+        group.add_subsystem('pc', om.IndepVarComp('c', 1.0))
         group.add_subsystem('comp2', ImpWithInitial())
         group.connect('pa.a', 'comp2.a')
         group.connect('pb.b', 'comp2.b')
         group.connect('pc.c', 'comp2.c')
 
-        prob = Problem(model=group)
-        group.nonlinear_solver = NewtonSolver()
+        prob = om.Problem(model=group)
+        group.nonlinear_solver = om.NewtonSolver()
         group.nonlinear_solver.options['solve_subsystems'] = True
         group.nonlinear_solver.options['max_sub_solves'] = 1
-        group.linear_solver = ScipyKrylov()
+        group.linear_solver = om.ScipyKrylov()
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['pa.a'] = 1.
         prob['pb.b'] = -4.
@@ -361,7 +360,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
     def test_guess_nonlinear_complex_step(self):
 
-        class ImpWithInitial(ImplicitComponent):
+        class ImpWithInitial(om.ImplicitComponent):
             """
             An implicit component to solve the quadratic equation: x^2 - 4x + 3
             (solutions at x=1 and x=3)
@@ -402,16 +401,16 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # Here we set it to a value that will take us to the x=3 solution.
                 outputs['x'] = 5.0
 
-        prob = Problem()
-        model = prob.model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        indep = IndepVarComp()
+        indep = om.IndepVarComp()
         indep.add_output('a', 1.0)
         indep.add_output('b', -4.0)
         indep.add_output('c', 3.0)
         model.add_subsystem('p', indep)
         model.add_subsystem('comp', ImpWithInitial())
-        model.add_subsystem('fn', ExecComp(['y = .03*a*x*x - .04*a*a*b*x - c']))
+        model.add_subsystem('fn', om.ExecComp(['y = .03*a*x*x - .04*a*a*b*x - c']))
 
         model.connect('p.a', 'comp.a')
         model.connect('p.a', 'fn.a')
@@ -419,11 +418,11 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         model.connect('p.c', 'fn.c')
         model.connect('comp.x', 'fn.x')
 
-        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver()
         model.nonlinear_solver.options['rtol'] = 1e-12
         model.nonlinear_solver.options['atol'] = 1e-12
         model.nonlinear_solver.options['maxiter'] = 15
-        model.linear_solver = ScipyKrylov()
+        model.linear_solver = om.ScipyKrylov()
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
@@ -438,7 +437,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
     def test_guess_nonlinear_transfer(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
 
-        class ImpWithInitial(ImplicitComponent):
+        class ImpWithInitial(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('x', 3.0)
@@ -456,20 +455,20 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # Passthrough
                 outputs['y'] = inputs['x']
 
-        group = Group()
+        group = om.Group()
 
-        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('px', om.IndepVarComp('x', 77.0))
         group.add_subsystem('comp1', ImpWithInitial())
         group.add_subsystem('comp2', ImpWithInitial())
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
 
-        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver()
         group.nonlinear_solver.options['maxiter'] = 1
 
-        prob = Problem(model=group)
+        prob = om.Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
         assert_rel_error(self, prob['comp2.y'], 77., 1e-5)
@@ -477,7 +476,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
     def test_guess_nonlinear_transfer_subbed(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
 
-        class ImpWithInitial(ImplicitComponent):
+        class ImpWithInitial(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('x', 3.0)
@@ -496,10 +495,10 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # Passthrough
                 outputs['y'] = inputs['x']
 
-        group = Group()
-        sub = Group()
+        group = om.Group()
+        sub = om.Group()
 
-        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('px', om.IndepVarComp('x', 77.0))
         sub.add_subsystem('comp1', ImpWithInitial())
         sub.add_subsystem('comp2', ImpWithInitial())
         group.connect('px.x', 'sub.comp1.x')
@@ -507,12 +506,12 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         group.add_subsystem('sub', sub)
 
-        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver()
         group.nonlinear_solver.options['maxiter'] = 1
 
-        prob = Problem(model=group)
+        prob = om.Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
         assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
@@ -520,7 +519,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
     def test_guess_nonlinear_transfer_subbed2(self):
         # Test that data is transfered to a component before calling guess_nonlinear.
 
-        class ImpWithInitial(ImplicitComponent):
+        class ImpWithInitial(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('x', 3.0)
@@ -539,10 +538,10 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # Passthrough
                 outputs['y'] = inputs['x']
 
-        group = Group()
-        sub = Group()
+        group = om.Group()
+        sub = om.Group()
 
-        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('px', om.IndepVarComp('x', 77.0))
         sub.add_subsystem('comp1', ImpWithInitial())
         sub.add_subsystem('comp2', ImpWithInitial())
         group.connect('px.x', 'sub.comp1.x')
@@ -550,20 +549,20 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         group.add_subsystem('sub', sub)
 
-        sub.nonlinear_solver = NewtonSolver()
+        sub.nonlinear_solver = om.NewtonSolver()
         sub.nonlinear_solver.options['maxiter'] = 1
 
-        prob = Problem(model=group)
+        prob = om.Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         prob.run_model()
         assert_rel_error(self, prob['sub.comp2.y'], 77., 1e-5)
 
     def test_guess_nonlinear_feature(self):
-        from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp, NewtonSolver, ScipyKrylov
+        import openmdao.api as om
 
-        class ImpWithInitial(ImplicitComponent):
+        class ImpWithInitial(om.ImplicitComponent):
             """
             An implicit component to solve the quadratic equation: x^2 - 4x + 3
             (solutions at x=1 and x=3)
@@ -600,13 +599,13 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # Here we set it to a value that will take us to the x=3 solution.
                 outputs['x'] = 5.0
 
-        prob = Problem()
-        model = prob.model = Group()
+        prob = om.Problem()
+        model = prob.model
 
         model.add_subsystem('comp', ImpWithInitial())
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.ScipyKrylov()
 
         prob.setup()
         prob.run_model()
@@ -614,7 +613,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         assert_rel_error(self, prob['comp.x'], 3.)
 
     def test_guess_nonlinear_inputs_read_only(self):
-        class ImpWithInitial(ImplicitComponent):
+        class ImpWithInitial(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('x', 3.0)
@@ -624,20 +623,20 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # inputs is read_only, should not be allowed
                 inputs['x'] = 0.
 
-        group = Group()
+        group = om.Group()
 
-        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('px', om.IndepVarComp('x', 77.0))
         group.add_subsystem('comp1', ImpWithInitial())
         group.add_subsystem('comp2', ImpWithInitial())
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
 
-        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver()
         group.nonlinear_solver.options['maxiter'] = 1
 
-        prob = Problem(model=group)
+        prob = om.Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
@@ -647,38 +646,38 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                          "when it is read only.")
 
     def test_guess_nonlinear_inputs_read_only_reset(self):
-        class ImpWithInitial(ImplicitComponent):
+        class ImpWithInitial(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('x', 3.0)
                 self.add_output('y', 4.0)
 
             def guess_nonlinear(self, inputs, outputs, resids):
-                raise AnalysisError("It's just a scratch.")
+                raise om.AnalysisError("It's just a scratch.")
 
-        group = Group()
+        group = om.Group()
 
-        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('px', om.IndepVarComp('x', 77.0))
         group.add_subsystem('comp1', ImpWithInitial())
         group.add_subsystem('comp2', ImpWithInitial())
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
 
-        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver()
         group.nonlinear_solver.options['maxiter'] = 1
 
-        prob = Problem(model=group)
+        prob = om.Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
-        with self.assertRaises(AnalysisError):
+        with self.assertRaises(om.AnalysisError):
             prob.run_model()
 
         # verify read_only status is reset after AnalysisError
         prob['comp1.x'] = 111.
 
     def test_guess_nonlinear_resids_read_only(self):
-        class ImpWithInitial(ImplicitComponent):
+        class ImpWithInitial(om.ImplicitComponent):
 
             def setup(self):
                 self.add_input('x', 3.0)
@@ -688,20 +687,20 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
                 # inputs is read_only, should not be allowed
                 resids['y'] = 0.
 
-        group = Group()
+        group = om.Group()
 
-        group.add_subsystem('px', IndepVarComp('x', 77.0))
+        group.add_subsystem('px', om.IndepVarComp('x', 77.0))
         group.add_subsystem('comp1', ImpWithInitial())
         group.add_subsystem('comp2', ImpWithInitial())
         group.connect('px.x', 'comp1.x')
         group.connect('comp1.y', 'comp2.x')
 
-        group.nonlinear_solver = NewtonSolver()
+        group.nonlinear_solver = om.NewtonSolver()
         group.nonlinear_solver.options['maxiter'] = 1
 
-        prob = Problem(model=group)
+        prob = om.Problem(model=group)
         prob.set_solver_print(level=0)
-        prob.setup(check=False)
+        prob.setup()
 
         with self.assertRaises(ValueError) as cm:
             prob.run_model()
@@ -719,7 +718,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                 super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
                 inputs['a'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -738,7 +737,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                 super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
                 outputs['x'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -755,14 +754,14 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         class BadComp(QuadraticComp):
             def apply_nonlinear(self, inputs, outputs, residuals):
                 super(BadComp, self).apply_nonlinear(inputs, outputs, residuals)
-                raise AnalysisError("It's just a scratch.")
+                raise om.AnalysisError("It's just a scratch.")
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
 
-        with self.assertRaises(AnalysisError):
+        with self.assertRaises(om.AnalysisError):
             prob.model.run_apply_nonlinear()
 
         # verify read_only status is reset after AnalysisError
@@ -775,7 +774,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                 super(BadComp, self).solve_nonlinear(inputs, outputs)
                 inputs['a'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
 
@@ -791,13 +790,13 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         class BadComp(QuadraticComp):
             def solve_nonlinear(self, inputs, outputs):
                 super(BadComp, self).solve_nonlinear(inputs, outputs)
-                raise AnalysisError("It's just a scratch.")
+                raise om.AnalysisError("It's just a scratch.")
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
 
-        with self.assertRaises(AnalysisError):
+        with self.assertRaises(om.AnalysisError):
             prob.run_model()
 
         # verify read_only status is reset after AnalysisError
@@ -809,7 +808,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                 super(BadComp, self).linearize(inputs, outputs, partials)
                 inputs['a'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -828,7 +827,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                 super(BadComp, self).linearize(inputs, outputs, partials)
                 outputs['x'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -845,14 +844,14 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         class BadComp(QuadraticLinearize):
             def linearize(self, inputs, outputs, partials):
                 super(BadComp, self).linearize(inputs, outputs, partials)
-                raise AnalysisError("It's just a scratch.")
+                raise om.AnalysisError("It's just a scratch.")
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
 
-        with self.assertRaises(AnalysisError):
+        with self.assertRaises(om.AnalysisError):
             prob.model.run_linearize()
 
         # verify read_only status is reset after AnalysisError
@@ -866,7 +865,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                                                   d_inputs, d_outputs, d_residuals, mode)
                 inputs['a'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -886,7 +885,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                                                   d_inputs, d_outputs, d_residuals, mode)
                 outputs['x'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -906,7 +905,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                                                   d_inputs, d_outputs, d_residuals, mode)
                 d_inputs['a'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -926,7 +925,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                                                   d_inputs, d_outputs, d_residuals, mode)
                 d_outputs['x'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -946,7 +945,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                                                   d_inputs, d_outputs, d_residuals, mode)
                 d_residuals['x'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -964,14 +963,14 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
             def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
                 super(BadComp, self).apply_linear(inputs, outputs,
                                                   d_inputs, d_outputs, d_residuals, mode)
-                raise AnalysisError("It's just a scratch.")
+                raise om.AnalysisError("It's just a scratch.")
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
 
-        with self.assertRaises(AnalysisError):
+        with self.assertRaises(om.AnalysisError):
             prob.model.run_apply_linear(['linear'], 'rev')
 
         # verify read_only status is reset after AnalysisError
@@ -985,7 +984,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                 super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
                 d_outputs['x'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -1005,7 +1004,7 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
                 super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
                 d_residuals['x'] = 0.  # should not be allowed
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
@@ -1023,15 +1022,15 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
         class BadComp(QuadraticJacVec):
             def solve_linear(self, d_outputs, d_residuals, mode):
                 super(BadComp, self).solve_linear(d_outputs, d_residuals, mode)
-                raise AnalysisError("It's just a scratch.")
+                raise om.AnalysisError("It's just a scratch.")
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('bad', BadComp())
         prob.setup()
         prob.run_model()
         prob.model.run_linearize()
 
-        with self.assertRaises(AnalysisError):
+        with self.assertRaises(om.AnalysisError):
             prob.model.run_solve_linear(['linear'], 'fwd')
 
         # verify read_only status is reset after AnalysisError
@@ -1041,17 +1040,17 @@ class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 class ListFeatureTestCase(unittest.TestCase):
 
     def setUp(self):
-        from openmdao.api import Group, Problem, IndepVarComp
+        import openmdao.api as om
         from openmdao.core.tests.test_impl_comp import QuadraticComp
 
-        group = Group()
+        group = om.Group()
 
-        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1 = group.add_subsystem('comp1', om.IndepVarComp())
         comp1.add_output('a', 1.0)
         comp1.add_output('b', 1.0)
         comp1.add_output('c', 1.0)
 
-        sub = group.add_subsystem('sub', Group())
+        sub = group.add_subsystem('sub', om.Group())
         sub.add_subsystem('comp2', QuadraticComp())
         sub.add_subsystem('comp3', QuadraticComp())
 
@@ -1064,7 +1063,7 @@ class ListFeatureTestCase(unittest.TestCase):
         group.connect('comp1.c', 'sub.comp3.c')
 
         global prob
-        prob = Problem(model=group)
+        prob = om.Problem(model=group)
         prob.setup()
 
         prob['comp1.a'] = 1.
@@ -1137,9 +1136,9 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
 
     def test_simple_list_vars_options(self):
-        from openmdao.api import Group, Problem, IndepVarComp
+        import openmdao.api as om
 
-        class QuadraticComp(ImplicitComponent):
+        class QuadraticComp(om.ImplicitComponent):
             """
             A Simple Implicit Component representing a Quadratic Equation.
 
@@ -1173,14 +1172,14 @@ class ListFeatureTestCase(unittest.TestCase):
                 c = inputs['c']
                 outputs['x'] = (-b + (b ** 2 - 4 * a * c) ** 0.5) / (2 * a)
 
-        group = Group()
+        group = om.Group()
 
-        comp1 = group.add_subsystem('comp1', IndepVarComp())
+        comp1 = group.add_subsystem('comp1', om.IndepVarComp())
         comp1.add_output('a', 1.0, units='ft')
         comp1.add_output('b', 1.0, units='inch')
         comp1.add_output('c', 1.0, units='ft')
 
-        sub = group.add_subsystem('sub', Group())
+        sub = group.add_subsystem('sub', om.Group())
         sub.add_subsystem('comp2', QuadraticComp())
         sub.add_subsystem('comp3', QuadraticComp())
 
@@ -1193,7 +1192,7 @@ class ListFeatureTestCase(unittest.TestCase):
         group.connect('comp1.c', 'sub.comp3.c')
 
         global prob
-        prob = Problem(model=group)
+        prob = om.Problem(model=group)
         prob.setup()
 
         prob['comp1.a'] = 1.
@@ -1239,23 +1238,23 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
 
     def test_list_residuals_with_tol(self):
+        import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarImplicitDis1, SellarImplicitDis2
-        from openmdao.api import Problem, Group, IndepVarComp, NewtonSolver, ScipyKrylov, LinearBlockGS
-        prob = Problem()
-        model = prob.model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 1.0))
+        model.add_subsystem('p1', om.IndepVarComp('x', 1.0))
         model.add_subsystem('d1', SellarImplicitDis1())
         model.add_subsystem('d2', SellarImplicitDis2())
         model.connect('d1.y1', 'd2.y1')
         model.connect('d2.y2', 'd1.y2')
 
-        model.nonlinear_solver = NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver()
         model.nonlinear_solver.options['maxiter'] = 5
-        model.linear_solver = ScipyKrylov()
-        model.linear_solver.precon = LinearBlockGS()
+        model.linear_solver = om.ScipyKrylov()
+        model.linear_solver.precon = om.LinearBlockGS()
 
-        prob.setup(check=False)
+        prob.setup()
         prob.set_solver_print(level=-1)
 
         prob.run_model()
@@ -1264,7 +1263,7 @@ class ListFeatureTestCase(unittest.TestCase):
         print(outputs)
 
 
-class CacheUsingComp(ImplicitComponent):
+class CacheUsingComp(om.ImplicitComponent):
     def setup(self):
         self.cache = {}
         self.lin_sol_count = 0
@@ -1315,8 +1314,8 @@ class CacheUsingComp(ImplicitComponent):
 
 class CacheLinSolutionTestCase(unittest.TestCase):
     def test_caching_fwd(self):
-        p = Problem()
-        p.model.add_subsystem('indeps', IndepVarComp('x', val=np.arange(10, dtype=float)))
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.arange(10, dtype=float)))
         p.model.add_subsystem('C1', CacheUsingComp())
         p.model.connect('indeps.x', 'C1.x')
         p.model.add_design_var('indeps.x', cache_linear_solution=True)
@@ -1335,8 +1334,8 @@ class CacheLinSolutionTestCase(unittest.TestCase):
             p.driver._compute_totals(of=['C1.y'], wrt=['indeps.x'])
 
     def test_caching_rev(self):
-        p = Problem()
-        p.model.add_subsystem('indeps', IndepVarComp('x', val=np.arange(10, dtype=float)))
+        p = om.Problem()
+        p.model.add_subsystem('indeps', om.IndepVarComp('x', val=np.arange(10, dtype=float)))
         p.model.add_subsystem('C1', CacheUsingComp())
         p.model.connect('indeps.x', 'C1.x')
         p.model.add_design_var('indeps.x')

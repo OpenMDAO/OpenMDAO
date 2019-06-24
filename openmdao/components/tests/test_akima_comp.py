@@ -6,8 +6,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 
-from openmdao.api import Problem, IndepVarComp
-from openmdao.components.akima_spline_comp import AkimaSplineComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 
 
@@ -20,10 +19,10 @@ class AkimaTestCase(unittest.TestCase):
         n = 50
         x = np.linspace(1.0, 12.0, n)
 
-        prob = Problem()
+        prob = om.Problem()
 
-        comp = AkimaSplineComp(num_control_points=ncp, num_points=n,
-                               name='chord', input_x=True, input_xcp=True)
+        comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n,
+                                  name='chord', input_x=True, input_xcp=True)
 
         prob.model.add_subsystem('akima', comp)
 
@@ -58,10 +57,10 @@ class AkimaTestCase(unittest.TestCase):
         ncp = len(ycp)
         n = 11
 
-        prob = Problem()
+        prob = om.Problem()
 
-        comp = AkimaSplineComp(num_control_points=ncp, num_points=n,
-                               name='chord', eval_at='end')
+        comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n,
+                                 name='chord', eval_at='end')
 
         prob.model.add_subsystem('akima', comp)
 
@@ -92,10 +91,10 @@ class AkimaTestCase(unittest.TestCase):
         n = 12
         x = np.linspace(1.0, 12.0, n)
 
-        prob = Problem()
+        prob = om.Problem()
 
-        comp = AkimaSplineComp(num_control_points=ncp, num_points=n, vec_size=2,
-                               name='chord', input_x=True, input_xcp=True)
+        comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n, vec_size=2,
+                                 name='chord', input_x=True, input_xcp=True)
 
         prob.model.add_subsystem('akima', comp)
 
@@ -126,8 +125,7 @@ class TestAkimaFeature(unittest.TestCase):
     def test_input_grid(self):
         import numpy as np
 
-        from openmdao.api import Problem
-        from openmdao.components.akima_spline_comp import AkimaSplineComp
+        import openmdao.api as om
 
         xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
@@ -135,10 +133,10 @@ class TestAkimaFeature(unittest.TestCase):
         n = 50
         x = np.linspace(1.0, 12.0, n)
 
-        prob = Problem()
+        prob = om.Problem()
 
-        comp = AkimaSplineComp(num_control_points=ncp, num_points=n,
-                               name='chord', input_x=True, input_xcp=True)
+        comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n,
+                                  name='chord', input_x=True, input_xcp=True)
 
         prob.model.add_subsystem('akima', comp)
 
@@ -167,18 +165,16 @@ class TestAkimaFeature(unittest.TestCase):
     def test_fixed_grid(self):
         import numpy as np
 
-        from openmdao.api import Problem
-        from openmdao.components.akima_spline_comp import AkimaSplineComp
-
+        import openmdao.api as om
 
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         ncp = len(ycp)
         n = 11
 
-        prob = Problem()
+        prob = om.Problem()
 
-        comp = AkimaSplineComp(num_control_points=ncp, num_points=n,
-                               name='chord', eval_at='end')
+        comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n,
+                                  name='chord', eval_at='end')
 
         prob.model.add_subsystem('akima', comp)
 

@@ -8,18 +8,17 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, NewtonSolver, ScipyKrylov, Group, \
-    IndepVarComp, LinearBlockGS, AnalysisError
-from openmdao.utils.assert_utils import assert_rel_error
+import openmdao.api as om
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
     TestExplCompSimpleDense
+from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import printoptions
 
 
 # Note: The following class definitions are used in feature docs
 
-class RectangleComp(ExplicitComponent):
+class RectangleComp(om.ExplicitComponent):
     """
     A simple Explicit Component that computes the area of a rectangle.
     """
@@ -75,10 +74,10 @@ class RectangleJacVec(RectangleComp):
                     d_inputs['width'] += inputs['length'] * d_outputs['area']
 
 
-class RectangleGroup(Group):
+class RectangleGroup(om.Group):
 
     def setup(self):
-        comp1 = self.add_subsystem('comp1', IndepVarComp())
+        comp1 = self.add_subsystem('comp1', om.IndepVarComp())
         comp1.add_output('length', 1.0)
         comp1.add_output('width', 1.0)
 
@@ -94,21 +93,21 @@ class RectangleGroup(Group):
 class ExplCompTestCase(unittest.TestCase):
 
     def test_simple(self):
-        prob = Problem(RectangleComp())
-        prob.setup(check=False)
+        prob = om.Problem(RectangleComp())
+        prob.setup()
         prob.run_model()
 
     def test_feature_simple(self):
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.core.tests.test_expl_comp import RectangleComp
 
-        prob = Problem(RectangleComp())
-        prob.setup(check=False)
+        prob = om.Problem(RectangleComp())
+        prob.setup()
         prob.run_model()
 
     def test_compute_and_list(self):
-        prob = Problem(RectangleGroup())
-        prob.setup(check=False)
+        prob = om.Problem(RectangleGroup())
+        prob.setup()
 
         msg = "Unable to list inputs until model has been run."
         try:
@@ -172,23 +171,23 @@ class ExplCompTestCase(unittest.TestCase):
 
     def test_simple_list_vars_options(self):
 
-        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 12.0,
-                                               lower=1.0, upper=100.0,
-                                               ref=1.1, ref0=2.1,
-                                               units='inch'))
-        model.add_subsystem('p2', IndepVarComp('y', 1.0,
-                                               lower=2.0, upper=200.0,
-                                               ref=1.2, res_ref=2.2,
-                                               units='ft'))
-        model.add_subsystem('comp', ExecComp('z=x+y',
-                                             x={'value': 0.0, 'units': 'inch'},
-                                             y={'value': 0.0, 'units': 'inch'},
-                                             z={'value': 0.0, 'units': 'inch'}))
+        model.add_subsystem('p1', om.IndepVarComp('x', 12.0,
+                                                  lower=1.0, upper=100.0,
+                                                  ref=1.1, ref0=2.1,
+                                                  units='inch'))
+        model.add_subsystem('p2', om.IndepVarComp('y', 1.0,
+                                                  lower=2.0, upper=200.0,
+                                                  ref=1.2, res_ref=2.2,
+                                                  units='ft'))
+        model.add_subsystem('comp', om.ExecComp('z=x+y',
+                                                x={'value': 0.0, 'units': 'inch'},
+                                                y={'value': 0.0, 'units': 'inch'},
+                                                z={'value': 0.0, 'units': 'inch'}))
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
@@ -277,25 +276,25 @@ class ExplCompTestCase(unittest.TestCase):
 
     def test_for_feature_docs_list_vars_options(self):
 
-        from openmdao.api import IndepVarComp, Group, Problem, ExecComp
+        import openmdao.api as om
 
-        prob = Problem()
-        prob.model = model = Group()
+        prob = om.Problem()
+        model = prob.model
 
-        model.add_subsystem('p1', IndepVarComp('x', 12.0,
-                                               lower=1.0, upper=100.0,
-                                               ref=1.1, ref0=2.1,
-                                               units='inch',
-                                               ))
-        model.add_subsystem('p2', IndepVarComp('y', 1.0,
-                                               lower=2.0, upper=200.0,
-                                               ref=1.2, res_ref=2.2,
-                                               units='ft',
-                                               ))
-        model.add_subsystem('comp', ExecComp('z=x+y',
-                                             x={'value': 0.0, 'units': 'inch'},
-                                             y={'value': 0.0, 'units': 'inch'},
-                                             z={'value': 0.0, 'units': 'inch'}))
+        model.add_subsystem('p1', om.IndepVarComp('x', 12.0,
+                                                  lower=1.0, upper=100.0,
+                                                  ref=1.1, ref0=2.1,
+                                                  units='inch',
+                                                  ))
+        model.add_subsystem('p2', om.IndepVarComp('y', 1.0,
+                                                  lower=2.0, upper=200.0,
+                                                  ref=1.2, res_ref=2.2,
+                                                  units='ft',
+                                                  ))
+        model.add_subsystem('comp', om.ExecComp('z=x+y',
+                                                x={'value': 0.0, 'units': 'inch'},
+                                                y={'value': 0.0, 'units': 'inch'},
+                                                z={'value': 0.0, 'units': 'inch'}))
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
@@ -337,13 +336,13 @@ class ExplCompTestCase(unittest.TestCase):
 
     def test_hierarchy_list_vars_options(self):
 
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('pz', IndepVarComp('z', np.array([5.0, 2.0])))
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
 
-        sub1 = model.add_subsystem('sub1', Group())
-        sub2 = sub1.add_subsystem('sub2', Group())
+        sub1 = model.add_subsystem('sub1', om.Group())
+        sub2 = sub1.add_subsystem('sub2', om.Group())
         g1 = sub2.add_subsystem('g1', SubSellar())
         g2 = model.add_subsystem('g2', SubSellar())
 
@@ -351,20 +350,20 @@ class ExplCompTestCase(unittest.TestCase):
         model.connect('sub1.sub2.g1.y2', 'g2.x')
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
-        model.nonlinear_solver = NewtonSolver()
-        model.linear_solver = ScipyKrylov()
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.ScipyKrylov()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
-        g1.nonlinear_solver = NewtonSolver()
-        g1.linear_solver = LinearBlockGS()
+        g1.nonlinear_solver = om.NewtonSolver()
+        g1.linear_solver = om.LinearBlockGS()
 
-        g2.nonlinear_solver = NewtonSolver()
-        g2.linear_solver = ScipyKrylov()
-        g2.linear_solver.precon = LinearBlockGS()
+        g2.nonlinear_solver = om.NewtonSolver()
+        g2.linear_solver = om.ScipyKrylov()
+        g2.linear_solver.precon = om.LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_driver()
 
         # logging inputs
@@ -450,7 +449,7 @@ class ExplCompTestCase(unittest.TestCase):
 
     def test_array_list_vars_options(self):
 
-        class ArrayAdder(ExplicitComponent):
+        class ArrayAdder(om.ExplicitComponent):
             """
             Just a simple component that has array inputs and outputs
             """
@@ -468,14 +467,13 @@ class ExplCompTestCase(unittest.TestCase):
 
         size = 100  # how many items in the array
 
-        prob = Problem()
-        prob.model = Group()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size), units='inch'),
+        prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size), units='inch'),
                                  promotes=['x'])
         prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
 
-        prob.setup(check=False)
+        prob.setup()
 
         prob['x'] = np.ones(size)
 
@@ -629,10 +627,11 @@ class ExplCompTestCase(unittest.TestCase):
     def test_for_docs_array_list_vars_options(self):
 
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
+
+        import openmdao.api as om
         from openmdao.utils.general_utils import printoptions
 
-        class ArrayAdder(ExplicitComponent):
+        class ArrayAdder(om.ExplicitComponent):
             """
             Just a simple component that has array inputs and outputs
             """
@@ -650,13 +649,12 @@ class ExplCompTestCase(unittest.TestCase):
 
         size = 30
 
-        prob = Problem()
-        prob.model = Group()
-        prob.model.add_subsystem('des_vars', IndepVarComp('x', np.ones(size), units='inch'),
+        prob = om.Problem()
+        prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size), units='inch'),
                                  promotes=['x'])
         prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
 
-        prob.setup(check=False)
+        prob.setup()
         prob['x'] = np.arange(size)
         prob.run_driver()
 
@@ -819,7 +817,7 @@ class ExplCompTestCase(unittest.TestCase):
                 super(BadComp, self).compute(inputs, outputs)
                 inputs['length'] = 0.  # should not be allowed
 
-        prob = Problem(BadComp())
+        prob = om.Problem(BadComp())
         prob.setup()
 
         with self.assertRaises(ValueError) as cm:
@@ -833,11 +831,11 @@ class ExplCompTestCase(unittest.TestCase):
         class BadComp(TestExplCompSimple):
             def compute(self, inputs, outputs):
                 super(BadComp, self).compute(inputs, outputs)
-                raise AnalysisError("It's just a scratch.")
+                raise om.AnalysisError("It's just a scratch.")
 
-        prob = Problem(BadComp())
+        prob = om.Problem(BadComp())
         prob.setup()
-        with self.assertRaises(AnalysisError):
+        with self.assertRaises(om.AnalysisError):
             prob.run_model()
 
         # verify read_only status is reset after AnalysisError
@@ -849,7 +847,7 @@ class ExplCompTestCase(unittest.TestCase):
                 super(BadComp, self).compute_partials(inputs, partials)
                 inputs['length'] = 0.  # should not be allowed
 
-        prob = Problem(BadComp())
+        prob = om.Problem(BadComp())
         prob.setup()
         prob.run_model()
 
@@ -864,13 +862,13 @@ class ExplCompTestCase(unittest.TestCase):
         class BadComp(TestExplCompSimpleDense):
             def compute_partials(self, inputs, partials):
                 super(BadComp, self).compute_partials(inputs, partials)
-                raise AnalysisError("It's just a scratch.")
+                raise om.AnalysisError("It's just a scratch.")
 
-        prob = Problem(BadComp())
+        prob = om.Problem(BadComp())
         prob.setup()
         prob.run_model()
 
-        with self.assertRaises(AnalysisError):
+        with self.assertRaises(om.AnalysisError):
             prob.check_partials()
 
         # verify read_only status is reset after AnalysisError
@@ -882,7 +880,7 @@ class ExplCompTestCase(unittest.TestCase):
                 super(BadComp, self).compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
                 inputs['length'] = 0.  # should not be allowed
 
-        prob = Problem(BadComp())
+        prob = om.Problem(BadComp())
         prob.setup()
         prob.run_model()
 
@@ -897,13 +895,13 @@ class ExplCompTestCase(unittest.TestCase):
         class BadComp(RectangleJacVec):
             def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
                 super(BadComp, self).compute_jacvec_product(inputs, d_inputs, d_outputs, mode)
-                raise AnalysisError("It's just a scratch.")
+                raise om.AnalysisError("It's just a scratch.")
 
-        prob = Problem(BadComp())
+        prob = om.Problem(BadComp())
         prob.setup()
         prob.run_model()
 
-        with self.assertRaises(AnalysisError):
+        with self.assertRaises(om.AnalysisError):
             prob.check_partials()
 
         # verify read_only status is reset after AnalysisError

@@ -5,7 +5,6 @@ from __future__ import division
 from collections import OrderedDict, Iterable, Counter, defaultdict
 from itertools import product
 from six import string_types, iteritems, itervalues
-import copy
 
 import numpy as np
 from numpy import ndarray, isscalar, atleast_1d, atleast_2d, promote_types
@@ -21,7 +20,7 @@ from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, find_matches, simple_warning
-from openmdao.utils.coloring import _DYN_COLORING
+import openmdao.utils.coloring as coloring_mod
 
 
 # the following metadata will be accessible for vars on all procs
@@ -335,7 +334,7 @@ class Component(System):
                 sizes = self._var_sizes[vec_name]
                 if self.options['distributed']:
                     for type_ in ['input', 'output']:
-                        sizes_in = copy.deepcopy(sizes[type_][iproc, :])
+                        sizes_in = sizes[type_][iproc, :].copy()
                         self.comm.Allgather(sizes_in, sizes[type_])
                 else:
                     # if component isn't distributed, we don't need to allgather sizes since
@@ -457,7 +456,9 @@ class Component(System):
 
         # First, type check all arguments
         if not isinstance(name, str):
-            raise TypeError('The name argument should be a string')
+            raise TypeError('The name argument should be a string.')
+        if not name:
+            raise NameError('The name argument should be a non-empty string.')
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid input name." % name)
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
@@ -543,7 +544,9 @@ class Component(System):
         """
         # First, type check all arguments
         if not isinstance(name, str):
-            raise TypeError('The name argument should be a string')
+            raise TypeError('The name argument should be a string.')
+        if not name:
+            raise NameError('The name argument should be a non-empty string.')
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid input name." % name)
 
@@ -633,7 +636,9 @@ class Component(System):
             units = None
 
         if not isinstance(name, str):
-            raise TypeError('The name argument should be a string')
+            raise TypeError('The name argument should be a string.')
+        if not name:
+            raise NameError('The name argument should be a non-empty string.')
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid output name." % name)
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
@@ -678,8 +683,10 @@ class Component(System):
 
         if lower is not None:
             lower = ensure_compatible(name, lower, metadata['shape'])[0]
+            self._has_bounds = True
         if upper is not None:
             upper = ensure_compatible(name, upper, metadata['shape'])[0]
+            self._has_bounds = True
 
         metadata['lower'] = lower
         metadata['upper'] = upper
@@ -764,7 +771,9 @@ class Component(System):
             metadata for added variable
         """
         if not isinstance(name, str):
-            raise TypeError('The name argument should be a string')
+            raise TypeError('The name argument should be a string.')
+        if not name:
+            raise NameError('The name argument should be a non-empty string.')
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid output name." % name)
 
@@ -1186,6 +1195,7 @@ class Component(System):
 
         is_array = isinstance(val, ndarray)
         patmeta = dict(dct)
+        patmeta_not_none = {k: v for k, v in dct.items() if v is not None}
 
         for of_bundle, wrt_bundle in product(*pattern_matches):
             of_pattern, of_matches = of_bundle
@@ -1204,6 +1214,7 @@ class Component(System):
 
                 if abs_key in self._subjacs_info:
                     meta = self._subjacs_info[abs_key]
+                    meta.update(patmeta_not_none)
                 else:
                     meta = patmeta.copy()
 
@@ -1323,12 +1334,13 @@ class Component(System):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
-            is_dynamic = self._coloring_info['coloring'] is _DYN_COLORING
-            coloring = self._get_coloring()
-            if coloring is not None:
-                if not is_dynamic:
-                    coloring._check_config_partial(self)
-                self._update_subjac_sparsity(coloring.get_subjac_sparsity())
+            if coloring_mod._use_partial_sparsity:
+                is_dynamic = self._coloring_info['coloring'] is coloring_mod._DYN_COLORING
+                coloring = self._get_coloring()
+                if coloring is not None:
+                    if not is_dynamic:
+                        coloring._check_config_partial(self)
+                    self._update_subjac_sparsity(coloring.get_subjac_sparsity())
 
 
 class _DictValues(object):

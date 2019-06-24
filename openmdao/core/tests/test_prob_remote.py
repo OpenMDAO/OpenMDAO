@@ -133,7 +133,7 @@ class ProbRemote4TestCase(unittest.TestCase):
         self.assertEqual(comm.size, 2)
 
         prob = Problem(comm=comm)
-        model = prob.model = Group()
+        model = prob.model
 
         p1 = model.add_subsystem('p1', IndepVarComp('x', 99.0))
         p1.add_design_var('x', lower=-50.0, upper=50.0)
@@ -156,7 +156,7 @@ class ProbRemote4TestCase(unittest.TestCase):
         prob.driver.options['optimizer'] = OPTIMIZER
         prob.driver.options['print_results'] = False
 
-        prob.setup(check=False)
+        prob.setup()
         prob.run_model()
 
         failed = prob.run_driver()

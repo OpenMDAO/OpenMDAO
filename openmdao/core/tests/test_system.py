@@ -6,6 +6,7 @@ from six import assertRaisesRegex
 import numpy as np
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp
+from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
@@ -236,9 +237,6 @@ class TestSystem(unittest.TestCase):
         self.assertTrue(isinstance(solver, DummySolver))
 
     def test_deprecated_metadata(self):
-        from openmdao.api import Problem, IndepVarComp
-        from openmdao.test_suite.components.options_feature_vector import VectorDoublingComp
-
         prob = Problem()
         prob.model.add_subsystem('inputs', IndepVarComp('x', shape=3))
         prob.model.add_subsystem('double', VectorDoublingComp())

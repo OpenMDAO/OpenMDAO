@@ -1,9 +1,10 @@
 from __future__ import division
 import numpy as np
-from openmdao.api import ExplicitComponent
+
+import openmdao.api as om
 
 
-class LocalStiffnessMatrixComp(ExplicitComponent):
+class LocalStiffnessMatrixComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)

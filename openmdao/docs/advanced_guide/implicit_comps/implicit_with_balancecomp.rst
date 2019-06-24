@@ -76,8 +76,8 @@ You can do the same thing programmatically by adding the following to your pytho
 
     p.setup()
 
-    from openmdao.api import view_model
-    view_model(p)
+    import openmdao.api as om
+    om.view_model(p)
 
 Here is what the resulting visualization would look like for the above model:
 

@@ -921,7 +921,8 @@ class Problem(object):
         coloring = driver._coloring_info['coloring']
         if coloring is coloring_mod._STD_COLORING_FNAME:
             coloring = driver._get_static_coloring()
-        if coloring and coloring is not coloring_mod._DYN_COLORING and coloring_mod._use_sparsity:
+        if (coloring and coloring is not coloring_mod._DYN_COLORING and
+                coloring_mod._use_total_sparsity):
             # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
             if coloring._fwd and coloring._rev:
@@ -1128,7 +1129,7 @@ class Problem(object):
                                 dinputs.set_const(0.0)
                                 dstate.set_const(0.0)
 
-                                # Dictionary access returns a scaler for 1d input, and we
+                                # Dictionary access returns a scalar for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
                                 flat_view[idx] = 1.0
 
@@ -1345,8 +1346,9 @@ class Problem(object):
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
         driver_scaling : bool
-            Set to True to scale derivative values by the quantities specified when the desvars and
-            responses were added. Default if False, which is unscaled.
+            When True, return derivatives that are scaled according to either the adder and scaler
+            or the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is False, which is unscaled.
         abs_err_tol : float
             Threshold value for absolute error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Default is 1.0E-6.
@@ -1457,8 +1459,9 @@ class Problem(object):
         debug_print : bool
             Set to True to print out some debug information during linear solve.
         driver_scaling : bool
-            Set to True to scale derivative values by the quantities specified when the desvars and
-            responses were added. Default if False, which is unscaled.
+            When True, return derivatives that are scaled according to either the adder and scaler
+            or the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is False, which is unscaled.
 
         Returns
         -------

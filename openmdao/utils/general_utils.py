@@ -9,7 +9,7 @@ import math
 import warnings
 import unittest
 from fnmatch import fnmatchcase
-from six import string_types, PY2
+from six import string_types, PY2, reraise
 from six.moves import range, cStringIO as StringIO
 from collections import Iterable
 import numbers
@@ -737,6 +737,9 @@ def str2valid_python_name(s):
     return s.translate(_transtab)
 
 
+_container_classes = (list, tuple, set)
+
+
 def make_serializable(o):
     """
     Recursively convert numpy types to native types for JSON serialization.
@@ -751,13 +754,13 @@ def make_serializable(o):
     object
         The converted object.
     """
-    if (isinstance(o, np.number)):
+    if isinstance(o, _container_classes):
+        return [make_serializable(item) for item in o]
+    elif isinstance(o, np.number):
         return o.item()
     elif isinstance(o, np.ndarray):
         return make_serializable(o.tolist())
-    elif isinstance(o, (list, tuple, set)):
-        return [make_serializable(item) for item in o]
-    elif '__dict__' in dir(o):
+    elif hasattr(o, '__dict__'):
         return make_serializable(o.__class__.__name__)
     else:
         return o

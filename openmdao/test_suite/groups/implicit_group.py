@@ -2,11 +2,10 @@
 
 from __future__ import division, print_function
 
-from openmdao.api import Group, ImplicitComponent
-from openmdao.api import LinearBlockGS, NonlinearBlockGS
+import openmdao.api as om
 
 
-class Comp(ImplicitComponent):
+class Comp(om.ImplicitComponent):
 
     def setup(self):
         self.add_input('a')
@@ -74,13 +73,13 @@ class Comp(ImplicitComponent):
             out_vec[var] = in_vec[var]
 
 
-class TestImplicitGroup(Group):
+class TestImplicitGroup(om.Group):
     """
     A `Group` with two interconnected <ImplicitComponent>s.
     """
 
-    def __init__(self, lnSolverClass=LinearBlockGS,
-                       nlSolverClass=NonlinearBlockGS):
+    def __init__(self, lnSolverClass=om.LinearBlockGS,
+                       nlSolverClass=om.NonlinearBlockGS):
 
         super(TestImplicitGroup, self).__init__()
 
