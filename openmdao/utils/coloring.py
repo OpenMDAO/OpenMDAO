@@ -669,7 +669,11 @@ class Coloring(object):
                           '\nOF:', self._row_vars[entry_ynames[iy]],
                           '\nWRT:', self._col_vars[entry_xnames[ix]])
 
-            cid = fig.canvas.mpl_connect('button_press_event', on_press)
+            def on_resize(event):
+                fig.tight_layout()
+
+            fig.canvas.mpl_connect('button_press_event', on_press)
+            fig.canvas.mpl_connect('resize_event', on_resize)
 
         color_arrays = []
         if self._fwd:
