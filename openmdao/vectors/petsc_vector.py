@@ -157,8 +157,7 @@ class PETScVector(DefaultVector):
                 data_cache = self._data.flatten()
                 data_cache[dup_slice] = 0.0
                 self._petsc.array = data_cache.reshape(self._data.shape)[:, icol]
-                distributed_norm = self._petsc.norm()
-                return distributed_norm
+                return self._petsc.norm()
 
         else:
             # If we are below a parallel group, all variables only appear on the rank that
