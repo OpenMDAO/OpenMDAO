@@ -610,6 +610,8 @@ class Coloring(object):
             # map row/col to corresponding var names
             entry_xnames = np.zeros(ncols, dtype=int)
             entry_ynames = np.zeros(nrows, dtype=int)
+            entry_xcolors = np.zeros(ncols, dtype=int)
+            entry_ycolors = np.zeros(nrows, dtype=int)
 
             # pick two colors for our checkerboard pattern
             sjcolors = [cm.get_cmap('Greys')(0.3), cm.get_cmap('Greys')(0.4)]
@@ -651,7 +653,20 @@ class Coloring(object):
                     iy = max(0, iy)
                     iy = min(nrows, iy)
 
-                    print('(%d, %d)' % (ix, iy), '\nOF:', self._row_vars[entry_ynames[iy]],
+                    # if J[iy, ix] is not one of the background 'checkerboard' colors, then it
+                    # must be either forward or reverse colored.
+                    if np.all(J[iy, ix] == sjcolors[0][:3]) or np.all(J[iy, ix] == sjcolors[1][:3]):
+                        color_str = ''
+                    else:
+                        # display the color number because sometimes certain colormap colors look
+                        # too similar to the eye.
+                        if entry_xcolors[ix] != 0:
+                            color_str = 'Color: %d (fwd)' % entry_xcolors[ix]
+                        else:
+                            color_str = 'Color: %d (rev)' % entry_ycolors[iy]
+
+                    print('\nJ[%d, %d]  %s' % (iy, ix, color_str),
+                          '\nOF:', self._row_vars[entry_ynames[iy]],
                           '\nWRT:', self._col_vars[entry_xnames[ix]])
 
             cid = fig.canvas.mpl_connect('button_press_event', on_press)
@@ -673,6 +688,7 @@ class Coloring(object):
                         J[r, c][:] = cmap(idx)[:3]
                     if i == 0:  # group 0 are uncolored (each col has different color)
                         icol += 1
+                    entry_xcolors[c] = icol
                 icol += 1
 
         if self._rev:
@@ -691,6 +707,7 @@ class Coloring(object):
                         J[r, c][:] = cmap(idx)[:3]
                     if i == 0:  # group 0 are uncolored (each col has different color)
                         icol += 1
+                    entry_ycolors[r] = icol
                 icol += 1
 
         ax.set_title("%s jacobian coloring (%d x %d)\n%d fwd colors, %d rev colors (%.1f%% improvement)" %
