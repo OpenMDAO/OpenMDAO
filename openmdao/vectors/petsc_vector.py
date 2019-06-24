@@ -139,8 +139,7 @@ class PETScVector(DefaultVector):
 
                 self._dup_slice = dup_slice
 
-            data_cache = self._data.copy()
-            self._petsc.array = data_cache
+            data_cache = self._petsc.array.copy()
             self._petsc.array[dup_slice] = 0.0
             distributed_norm = self._petsc.norm()
 
@@ -152,7 +151,6 @@ class PETScVector(DefaultVector):
         else:
             # If we are below a parallel group, all variables only appear on the rank that
             # owns them.
-            self._petsc.array = self._data
             return self._petsc.norm()
 
 
