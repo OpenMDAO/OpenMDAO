@@ -599,7 +599,7 @@ class Coloring(object):
         xsize = max(1, int(xsize))
         ysize = max(1, int(ysize))
 
-        fig = pyplot.figure(figsize=(xsize, ysize)) # in inches
+        fig = pyplot.figure(figsize=(xsize, ysize))  # in inches
         ax = pyplot.gca()
 
         # hide tic marks/labels
@@ -633,7 +633,7 @@ class Coloring(object):
                     colend += cvsize
                     # display grid that breaks up the Jacobian into subjacs by variable pairs.
                     # using (ridx+cidx)%2 will give us a nice checkerboard pattern
-                    J[rowstart:rowend, colstart:colend] = sjcolors[(ridx+cidx)%2][:3]
+                    J[rowstart:rowend, colstart:colend] = sjcolors[(ridx + cidx) % 2][:3]
                     colstart = colend
 
                 rowstart = rowend
@@ -722,7 +722,8 @@ class Coloring(object):
 
         typ = self._meta['type'].upper()[0] + self._meta['type'][1:]
 
-        ax.set_title("%s Jacobian Coloring (%d x %d)\n%d fwd colors, %d rev colors (%.1f%% improvement)" %
+        ax.set_title("%s Jacobian Coloring (%d x %d)\n%d fwd colors, %d rev colors "
+                     "(%.1f%% improvement)" %
                      (typ, self._shape[0], self._shape[1], fwd_solves, rev_solves, pct))
 
         pyplot.imshow(J, interpolation="none")
