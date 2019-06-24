@@ -139,7 +139,8 @@ class PETScVector(DefaultVector):
                 self._dup_slice = dup_slice
 
             if self._ncol == 1:
-                data_cache = self._petsc.array.copy()
+                data_cache = self._data.copy()
+                self._petsc.array = self._data
                 self._petsc.array[dup_slice] = 0.0
                 distributed_norm = self._petsc.norm()
 
