@@ -586,7 +586,7 @@ class Coloring(object):
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
 
-        size = 15
+        size = 10
         if nrows > ncols:
             mult = nrows / size
             ysize = nrows / mult
@@ -665,6 +665,9 @@ class Coloring(object):
                         else:
                             color_str = 'Color: %d (rev)' % entry_ycolors[iy]
 
+                    # because we have potentially really long pathnames, we just print
+                    # the 'of' and 'wrt' variables to the console instead of trying to display
+                    # them on the plot.
                     print('\nJ[%d, %d]  %s' % (iy, ix, color_str),
                           '\nOF:', self._row_vars[entry_ynames[iy]],
                           '\nWRT:', self._col_vars[entry_xnames[ix]])
@@ -672,11 +675,13 @@ class Coloring(object):
             def on_resize(event):
                 fig.tight_layout()
 
+            # set up event handling
             fig.canvas.mpl_connect('button_press_event', on_press)
             fig.canvas.mpl_connect('resize_event', on_resize)
 
         color_arrays = []
         if self._fwd:
+            # winter is a blue/green color map
             cmap = cm.get_cmap('winter')
 
             icol = 1
@@ -696,6 +701,7 @@ class Coloring(object):
                 icol += 1
 
         if self._rev:
+            # autumn_r is a red/yellow color map
             cmap = cm.get_cmap('autumn_r')
 
             icol = 1
@@ -714,9 +720,10 @@ class Coloring(object):
                     entry_ycolors[r] = icol
                 icol += 1
 
-        ax.set_title("%s jacobian coloring (%d x %d)\n%d fwd colors, %d rev colors (%.1f%% improvement)" %
-                     (self._meta['type'], self._shape[0], self._shape[1],
-                     fwd_solves, rev_solves, pct))
+        typ = self._meta['type'].upper()[0] + self._meta['type'][1:]
+
+        ax.set_title("%s Jacobian Coloring (%d x %d)\n%d fwd colors, %d rev colors (%.1f%% improvement)" %
+                     (typ, self._shape[0], self._shape[1], fwd_solves, rev_solves, pct))
 
         pyplot.imshow(J, interpolation="none")
         fig.tight_layout()
@@ -1743,6 +1750,8 @@ def _total_coloring_setup_parser(parser):
     parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final jacobian used to "
                         "compute the coloring.")
+    parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
+                        help="Display a text-based visualization of the colored jacobian.")
     parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
                         help="Exclude the sparsity structure from the coloring data structure.")
     parser.add_argument('--profile', action='store_true', dest='profile',
@@ -1794,8 +1803,10 @@ def _total_coloring_cmd(options):
                                                   orders=options.orders,
                                                   setup=False, run_model=True, fname=outfile)
 
-            if options.show_sparsity:
+            if options.show_sparsity_text:
                 coloring.display_txt()
+            if options.show_sparsity:
+                coloring.display()
             coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
@@ -1839,8 +1850,9 @@ def _partial_coloring_setup_parser(parser):
     parser.add_argument('--tol', action='store', dest='tol', default=1.e-15, type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
-                        help="Display a visualization of the final jacobian used to "
-                        "compute the coloring.")
+                        help="Display a visualization of the colored jacobian.")
+    parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
+                        help="Display a text-based visualization of the colored jacobian.")
     parser.add_argument('--profile', action='store_true', dest='profile',
                         help="Do profiling on the coloring process.")
 
@@ -1885,8 +1897,12 @@ def _partial_coloring_cmd(options):
     _force_dyn_coloring = True
 
     def _show(system, options, coloring):
-        if options.show_sparsity and not coloring._meta.get('show_sparsity'):
+        if options.show_sparsity_text and not coloring._meta.get('show_sparsity'):
             coloring.display_txt()
+            print('\n')
+
+        if options.show_sparsity and not coloring._meta.get('show_sparsity'):
+            coloring.display()
             print('\n')
 
         if not coloring._meta.get('show_summary'):
@@ -2032,11 +2048,9 @@ def _view_coloring_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='coloring file.')
     parser.add_argument('-j', action='store_true', dest='show_sparsity',
-                        help="Display a visualization of the final sparsity matrix used to "
-                        "compute the coloring.")
+                        help="Display a visualization of the colored jacobian.")
     parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
-                        help="Display an ascii visualization of the final sparsity matrix used to "
-                        "compute the coloring.")
+                        help="Display a text-based visualization of the colored jacobian.")
     parser.add_argument('-s', action='store_true', dest='subjac_sparsity',
                         help="Display sparsity patterns for subjacs.")
     parser.add_argument('-m', action='store_true', dest='show_meta',
