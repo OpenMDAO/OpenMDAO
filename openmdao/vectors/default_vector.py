@@ -342,7 +342,6 @@ class DefaultVector(Vector):
         """
         slices = {}
         start = end = 0
-        print(self._system.pathname)
         for name in self._system._var_relevant_names[self._name][self._typ]:
             end += self._views_flat[name].size
             slices[name] = slice(start, end)

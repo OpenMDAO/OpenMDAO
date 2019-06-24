@@ -139,18 +139,31 @@ class PETScVector(DefaultVector):
 
                 self._dup_slice = dup_slice
 
-            data_cache = self._petsc.array.copy()
-            self._petsc.array[dup_slice] = 0.0
-            distributed_norm = self._petsc.norm()
+            if self._ncol == 1:
+                data_cache = self._petsc.array.copy()
+                self._petsc.array[dup_slice] = 0.0
+                distributed_norm = self._petsc.norm()
 
-            # Reset petsc array
-            self._petsc.array = data_cache
+                # Reset petsc array
+                self._petsc.array = data_cache
 
-            return distributed_norm
+                return distributed_norm
+
+            else:
+                # With Vectorized derivative solves, data contains multiple columns.
+                icol = self._icol
+                if icol is None:
+                    icol = 0
+                data_cache = self._data.flatten()
+                data_cache[dup_slice] = 0.0
+                self._petsc.array = data_cache.reshape(self._data.shape)[:, icol]
+                distributed_norm = self._petsc.norm()
+                return distributed_norm
 
         else:
             # If we are below a parallel group, all variables only appear on the rank that
             # owns them.
+            self._petsc.array = self._data
             return self._petsc.norm()
 
 
