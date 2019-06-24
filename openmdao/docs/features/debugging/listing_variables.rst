@@ -116,6 +116,20 @@ you can enable the display of promoted names by setting the optional argument,
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_prom_names
     :layout: interleave
 
+*List Variables Filtered by Tags*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you add inputs and outputs to components, you can optionally set tags on the variables. These tags can then be
+used to filter what variables are printed and returned by the :code:`System.list_inputs` and :code:`System.list_outputs`
+methods. Each of those methods has an optional argument :code:`tags` for that purpose. Here is a simple example to show
+you how this works. Notice that if you only have one tag, you can set the :code:`tags` to a string. If you have more
+than one tag, you use a list of strings.
+
+.. embed-code::
+    openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple_var_tags
+    :layout: interleave
+
+
 *List Residuals Above a Tolerance*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

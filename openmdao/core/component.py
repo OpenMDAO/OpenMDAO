@@ -409,7 +409,7 @@ class Component(System):
                     self._subjacs_info[abs_key]['sparsity'] = tup
 
     def add_input(self, name, val=1.0, shape=None, src_indices=None, flat_src_indices=None,
-                  units=None, desc=''):
+                  units=None, desc='', tags=None):
         """
         Add an input variable to the component.
 
@@ -437,6 +437,9 @@ class Component(System):
             during execution. Default is None, which means it is unitless.
         desc : str
             description of the variable
+        tags : str or list of strs or tuple of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_inputs and list_outputs and also when listing results from case recorders.
 
         Returns
         -------
@@ -473,6 +476,9 @@ class Component(System):
         if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
 
+        if tags is not None and not isinstance(tags, (str, list, tuple)):
+            raise TypeError('The tags argument should be a str, list, or tuple')
+
         metadata = {}
 
         # value, shape: based on args, making sure they are compatible
@@ -490,6 +496,11 @@ class Component(System):
         metadata['units'] = units
         metadata['desc'] = desc
         metadata['distributed'] = self.options['distributed']
+
+        if isinstance(tags, str):
+            metadata['tags'] = [tags, ]
+        else:
+            metadata['tags'] = tags
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -509,7 +520,7 @@ class Component(System):
 
         return metadata
 
-    def add_discrete_input(self, name, val, desc=''):
+    def add_discrete_input(self, name, val, desc='', tags=None):
         """
         Add a discrete input variable to the component.
 
@@ -521,6 +532,9 @@ class Component(System):
             The initial value of the variable being added.
         desc : str
             description of the variable
+        tags : str or list of strs or tuple of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_inputs and list_outputs and also when listing results from case recorders.
 
         Returns
         -------
@@ -533,10 +547,16 @@ class Component(System):
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid input name." % name)
 
+        if isinstance(tags, str):
+            tag_list = [tags, ]
+        else:
+            tag_list = tags
+
         metadata = {
             'value': val,
             'type': type(val),
             'desc': desc,
+            'tags': tag_list,
         }
 
         if self._static_mode:
@@ -554,7 +574,7 @@ class Component(System):
         return metadata
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None):
         """
         Add an output variable to the component.
 
@@ -594,6 +614,9 @@ class Component(System):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
+        tags : str or list of strs or tuple of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_inputs and list_outputs and also when listing results from case recorders.
 
         Returns
         -------
@@ -636,6 +659,9 @@ class Component(System):
         # Check that units are valid
         if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
+
+        if tags is not None and not isinstance(tags, (str, list, tuple)):
+            raise TypeError('The tags argument should be a str, list, or tuple')
 
         metadata = {}
 
@@ -693,6 +719,11 @@ class Component(System):
 
         metadata['distributed'] = self.options['distributed']
 
+        if isinstance(tags, str):
+            metadata['tags'] = [tags, ]
+        else:
+            metadata['tags'] = tags
+
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
@@ -711,7 +742,7 @@ class Component(System):
 
         return metadata
 
-    def add_discrete_output(self, name, val, desc=''):
+    def add_discrete_output(self, name, val, desc='', tags=None):
         """
         Add an output variable to the component.
 
@@ -723,6 +754,9 @@ class Component(System):
             The initial value of the variable being added.
         desc : str
             description of the variable.
+        tags : str or list of strs or tuple of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_inputs and list_outputs and also when listing results from case recorders.
 
         Returns
         -------
@@ -734,10 +768,16 @@ class Component(System):
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid output name." % name)
 
+        if isinstance(tags, str):
+            tag_list = [tags, ]
+        else:
+            tag_list = tags
+
         metadata = {
             'value': val,
             'type': type(val),
-            'desc': desc
+            'desc': desc,
+            'tags': tag_list
         }
 
         if self._static_mode:

@@ -101,7 +101,7 @@ class IndepVarComp(ExplicitComponent):
                                "afterwards.".format(self.pathname))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
         """
         Add an independent variable to this component.
 
@@ -142,16 +142,26 @@ class IndepVarComp(ExplicitComponent):
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
+        tags : str or list of strs or tuple of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_outputs and also when listing results from case recorders.
         """
         if res_ref is None:
             res_ref = ref
 
+        if not tags:
+            tags = []
+        elif isinstance(tags, str):
+            tags = [tags, ]
+        tags.append('indep_var_comp')  # automatically add that for all IndepVarComp vars
+
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref}
+                  'res_ref': res_ref, 'tags': tags
+                  }
         self._indep_external.append((name, val, kwargs))
 
-    def add_discrete_output(self, name, val, desc=''):
+    def add_discrete_output(self, name, val, desc='', tags=None):
         """
         Add an output variable to the component.
 
@@ -163,8 +173,11 @@ class IndepVarComp(ExplicitComponent):
             The initial value of the variable being added in user-defined units. Default is 1.0.
         desc : str
             description of the variable.
+        tags : str or list of strs or tuple of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_outputs and also when listing results from case recorders.
         """
-        kwargs = {'desc': desc}
+        kwargs = {'desc': desc, 'tags': tags}
         self._indep_external_discrete.append((name, val, kwargs))
 
     def _linearize(self, jac=None, sub_do_ln=False):

@@ -803,6 +803,68 @@ class TestExecComp(unittest.TestCase):
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
+    def test_tags(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('indep', IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', ExecComp('y=x+z+1.',
+                                                     x={'value': 1.0, 'units': 'm', 'tags': 'tagx'},
+                                                     y={'units': 'm', 'tags': ['tagy','tagq']},
+                                                     z={'value': 2.0, 'tags': 'tagz'},
+                                                     ))
+        prob.model.connect('indep.x', 'C1.x')
+
+        prob.setup(check=False)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        # Inputs no tags
+        inputs = prob.model.list_inputs(out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('C1.x', {'value': [1.]}),
+            ('C1.z', {'value': [2.]}),
+        ])
+
+        # Inputs with tags
+        inputs = prob.model.list_inputs(out_stream=None, tags="tagx")
+        self.assertEqual(sorted(inputs), [
+            ('C1.x', {'value': [1.]}),
+        ])
+
+        # Inputs with multiple tags
+        inputs = prob.model.list_inputs(out_stream=None, tags=["tagx", "tagz"])
+        self.assertEqual(sorted(inputs), [
+            ('C1.x', {'value': [1.]}),
+            ('C1.z', {'value': [2.]}),
+        ])
+
+        # Inputs with tag that does not match
+        inputs = prob.model.list_inputs(out_stream=None, tags="tag_wrong")
+        self.assertEqual(sorted(inputs), [])
+
+        # Outputs no tags
+        outputs = prob.model.list_outputs(out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('C1.y', {'value': [4.]}),
+            ('indep.x', {'value': [100.]}),
+        ])
+
+        # Outputs with tags
+        outputs = prob.model.list_outputs(out_stream=None, tags="tagy")
+        self.assertEqual(sorted(outputs), [
+            ('C1.y', {'value': [4.]}),
+        ])
+
+        # Outputs with multiple tags
+        outputs = prob.model.list_outputs(out_stream=None, tags=["tagy", "tagx"])
+        self.assertEqual(sorted(outputs), [
+            ('C1.y', {'value': [4.]}),
+        ])
+
+        # Outputs with tag that does not match
+        outputs = prob.model.list_outputs(out_stream=None, tags="tag_wrong")
+        self.assertEqual(sorted(outputs), [])
+
     def test_feature_vectorize(self):
         import numpy as np
         from openmdao.api import IndepVarComp, Problem, ExecComp

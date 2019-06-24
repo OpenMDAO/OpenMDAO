@@ -96,6 +96,73 @@ class TestIndepVarComp(unittest.TestCase):
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
 
+    def test_simple_with_tags(self):
+        """Define one independent variable and set its value. Try filtering with tag"""
+        from openmdao.api import Problem, IndepVarComp
+
+        comp = IndepVarComp('indep_var', tags='tag1')
+        prob = Problem(comp).setup(check=False)
+        prob.run_model()
+
+        # Outputs no tags
+        outputs = prob.model.list_outputs(out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('indep_var', {'value': [1.]}),
+        ])
+
+        # Outputs with tag
+        outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
+        self.assertEqual(sorted(outputs), [
+            ('indep_var', {'value': [1.]}),
+        ])
+
+        # Outputs with wrong tag
+        outputs = prob.model.list_outputs(out_stream=None, tags="tag_wrong")
+        self.assertEqual(sorted(outputs), [])
+
+    def test_add_output_with_tags(self):
+        """Define two independent variables using the add_output method.
+        Add tags to them and see if we can filter them with list_outputs"""
+        from openmdao.api import Problem, IndepVarComp
+
+        comp = IndepVarComp()
+        comp.add_output('indep_var_1', val=1.0, lower=0, upper=10, tags="tag1")
+        comp.add_output('indep_var_2', val=2.0, lower=1, upper=20, tags="tag2")
+
+        prob = Problem(comp).setup(check=False)
+        prob.run_model()
+
+        # Outputs no tags
+        outputs = prob.model.list_outputs(out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('indep_var_1', {'value': [1.]}),
+            ('indep_var_2', {'value': [2.]}),
+        ])
+
+        # Outputs with tags
+        outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
+        self.assertEqual(sorted(outputs), [
+            ('indep_var_1', {'value': [1.]}),
+        ])
+
+        # Outputs with the indep_var_comp tags
+        outputs = prob.model.list_outputs(out_stream=None, tags="indep_var_comp")
+        self.assertEqual(sorted(outputs), [
+            ('indep_var_1', {'value': [1.]}),
+            ('indep_var_2', {'value': [2.]}),
+        ])
+
+        # Outputs with multiple tags
+        outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag2"])
+        self.assertEqual(sorted(outputs), [
+            ('indep_var_1', {'value': [1.]}),
+            ('indep_var_2', {'value': [2.]}),
+        ])
+
+        # Outputs with tag that does not match
+        outputs = prob.model.list_outputs(out_stream=None, tags="tag3")
+        self.assertEqual(sorted(outputs), [])
+
     def test_error_novars(self):
         try:
             prob = Problem(IndepVarComp()).setup(check=False)
