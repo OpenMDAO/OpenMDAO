@@ -384,7 +384,7 @@ def is_output_node(node):
     return False
 
 
-def split_source_into_input_blocks(src):
+def split_source_into_input_blocks(src, debug=False):
     """
     Split source into blocks; the splits occur at inserted prints.
 
@@ -398,19 +398,28 @@ def split_source_into_input_blocks(src):
     list
         List of input code sections.
     """
+    if debug:
+        print('---------')
+        print(src)
+        print('---------')
+
     input_blocks = []
 
     current_block = []
 
-    for line in src.split('\n'):
+    for line in src.splitlines():
         if 'print(">>>>>' in line:
-            input_blocks.append('\n'.join(current_block))
+            tag = line[7:-2]
+            input_blocks.append(('\n'.join(current_block), tag))
             current_block = []
         else:
             current_block.append(line)
 
     if current_block and current_block[0]:
-        input_blocks.append('\n'.join(current_block))
+        print('Extra Input Block:')
+        from pprint import pprint
+        pprint(current_block)
+        input_blocks.append(('\n'.join(current_block), 'EXTRA?'))
 
     return input_blocks
 
@@ -490,7 +499,8 @@ def insert_output_start_stop_indicators(src):
 
 
 def clean_up_empty_output_blocks(input_blocks, output_blocks):
-    """Some of the blocks do not generate output. We only want to have
+    """
+    Some of the blocks do not generate output. We only want to have
     input blocks that have outputs.
     """
 
@@ -528,31 +538,29 @@ def extract_output_blocks(run_output):
 
     Returns
     -------
-    list of str
-        List containing output text blocks.
+    dict
+        output blocks keyed on tags like ">>>>>4"
     """
-
-    # Look for start and end lines that look like this:
-    #  <<<<<4
-    #  >>>>>4
-
     if isinstance(run_output, list):
         return sync_multi_output_blocks(run_output)
 
-    output_blocks = []
+    output_blocks = {}
     output_block = None
 
     for line in run_output.splitlines():
         if output_block is None:
             output_block = []
         if line[:5] == '>>>>>':
-            output_blocks.append('\n'.join(output_block))
+            output_blocks[line] = '\n'.join(output_block)
             output_block = None
         else:
             output_block.append(line)
 
     if output_block is not None:
-        output_blocks.append('\n'.join(output_block))
+        print('Extra Output Block:')
+        from pprint import pprint
+        pprint(output_block)
+        output_blocks['EXTRA?'] = '\n'.join(output_block)
 
     return output_blocks
 
@@ -604,30 +612,35 @@ def dedent(src):
     return ''
 
 
-def sync_multi_output_blocks(blocks):
+def sync_multi_output_blocks(run_output):
     """
     Combine output from different procs into the same output blocks.
 
     Parameters
     ----------
-    blocks : list of str
+    run_output : list of str
         List of outputs from individual procs.
 
     Returns
     -------
-    list of list of str
+    dict
         List of synced output blocks from all procs.
     """
-    if blocks:
-        split_blocks = [extract_output_blocks(b) for b in blocks]
-        n_out_blocks = len(split_blocks[0])
-        synced_blocks = []
-        for i in range(n_out_blocks):
-            synced_blocks.append('\n'.join(["(rank %d) %s" % (j, m[i])
-                for j, m in enumerate(split_blocks) if m[i]]))
+    if run_output:
+        split_blocks = [extract_output_blocks(outp) for outp in run_output]
+
+        synced_blocks = {}
+
+        for i, outp in enumerate(split_blocks):
+            for tag in outp:
+                if tag in synced_blocks:
+                    synced_blocks[tag] += "(rank %d) %s" % (i, outp[tag])
+                else:
+                    synced_blocks[tag] = "(rank %d) %s" % (i, outp[tag])
+
         return synced_blocks
     else:
-        return []
+        return {}
 
 
 def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports_not_required=False):
@@ -779,17 +792,38 @@ def get_skip_output_node(output):
 
 
 def get_interleaved_io_nodes(input_blocks, output_blocks):
+    """
+    Parameters
+    ----------
+    input_blocks : list of tuple
+        Each tuple is a block of code and the tag marking it's output.
+
+    output_blocks : dict
+        Output blocks keyed on tag.
+    """
     nodelist = []
     n = 1
-    output_blocks = [cgiesc.escape(ob) for ob in output_blocks]
-    for input_block, output_block in zip(input_blocks, output_blocks):
-        input_node = nodes.literal_block(input_block, input_block)
+
+    for (inp, tag) in input_blocks:
+        input_node = nodes.literal_block(inp, inp)
         input_node['language'] = 'python'
         nodelist.append(input_node)
-        if len(output_block) > 0:
-            output_node = in_or_out_node(kind="Out", number=n, text=output_block)
+        if tag in output_blocks:
+            outp = cgiesc.escape(output_blocks[tag])
+            output_node = in_or_out_node(kind="Out", number=n, text=outp)
             nodelist.append(output_node)
         n += 1
+
+    # output_blocks = [cgiesc.escape(ob) for ob in output_blocks]
+    # for input_block, output_block in zip(input_blocks, output_blocks):
+    #     input_node = nodes.literal_block(input_block, input_block)
+    #     input_node['language'] = 'python'
+    #     nodelist.append(input_node)
+    #     if len(output_block) > 0:
+    #         output_node = in_or_out_node(kind="Out", number=n, text=output_block)
+    #         nodelist.append(output_node)
+    #     n += 1
+
     return nodelist
 
 

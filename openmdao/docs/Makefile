@@ -31,7 +31,7 @@ ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(SPHINXOPTS) .
 html-update: mock redbaron matplotlib build
 
 # to force the rebuild a file when its dependecy (e.g. code-embed) changes, not its rst file
-single: mock redbaron matplotlib touch build
+single: touch buildone
 
 # build it all over again (note: make all == make html)
 all html: make_srcdocs mock redbaron matplotlib tagg buildall post_remove
@@ -61,6 +61,11 @@ help:
 
 build:
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
+
+buildone:
+	@echo building $$file
+	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html $$file
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
 buildall:

@@ -169,22 +169,37 @@ class EmbedCodeDirective(Directive):
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
             elif 'interleave' in layout:
+                debug = is_test and 'list_inputs' in method_name
+
                 if is_test:
-                    start = len(self_code) + len(setup_code) + 1
+                    start = len(self_code) + len(setup_code)
                     end = len(code_to_run) - len(teardown_code)
-                    input_blocks = split_source_into_input_blocks(code_to_run[start:end])
+                    input_blocks = split_source_into_input_blocks(code_to_run[start:end], debug=debug)
                 else:
                     input_blocks = split_source_into_input_blocks(code_to_run)
+
                 output_blocks = extract_output_blocks(run_outputs)
 
-                # the last input block may not produce any output
-                if len(output_blocks) == len(input_blocks) - 1:
-                    output_blocks.append('')
+                if debug:
+                    from pprint import pprint
+                    print('---------')
+                    print(code_to_run)
+                    print('---------')
+                    pprint(input_blocks)
+                    print('---------')
+                    print(run_outputs)
+                    print('---------')
+                    pprint(output_blocks)
+                    print('---------')
 
-                # Need to deal with the cases when there is no output for a given input block
-                # Merge an input block with the previous block and throw away the output block
-                input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks,
-                                                                           output_blocks)
+                # # the last input block may not produce any output
+                # if len(output_blocks) == len(input_blocks) - 1:
+                #     output_blocks.append('')
+
+                # # Need to deal with the cases when there is no output for a given input block
+                # # Merge an input block with the previous block and throw away the output block
+                # input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks,
+                #                                                            output_blocks)
 
             if 'plot' in layout:
                 if not os.path.isfile(plot_file_abs):
