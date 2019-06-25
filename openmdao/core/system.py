@@ -1097,6 +1097,7 @@ class System(object):
         sp_info['sparsity_time'] = sparsity_time
         sp_info['pathname'] = self.pathname
         sp_info['class'] = type(self).__name__
+        sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
 
         info = self._coloring_info
 
@@ -1126,7 +1127,7 @@ class System(object):
             print("\nApprox coloring for '%s' (class %s)\n" % (self.pathname, type(self).__name__))
 
         if info['show_sparsity']:
-            coloring.display()
+            coloring.display_txt()
         if info['show_summary']:
             coloring.summary()
 
