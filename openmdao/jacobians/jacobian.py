@@ -232,7 +232,6 @@ class Jacobian(object):
         if isinstance(subjac, sparse_types):  # sparse
             sparse = subjac.copy()
             sparse.data = rand(sparse.data.size)
-            sparse.data *= .01
             sparse.data += 1.0
             return sparse
 
@@ -248,12 +247,10 @@ class Jacobian(object):
             rows, cols, shape = subjac_info['sparsity']
             r = np.zeros(shape)
             val = rand(len(rows))
-            val *= .01
             val += 1.0
             r[rows, cols] = val
         else:
             r = rand(*subjac.shape)
-            r *= .01
             r += 1.0
         return r
 
@@ -351,6 +348,8 @@ class Jacobian(object):
                         raise NotImplementedError("don't support scipy sparse arrays yet")
                     else:
                         J[roffset:rend, coffset:cend] = summ[key]
+
+        J *= (1.0 / num_full_jacs)
 
         tol_info = _tol_sweep(J, tol, orders)
 

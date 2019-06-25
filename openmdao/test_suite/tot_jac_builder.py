@@ -67,7 +67,7 @@ class TotJacBuilder(object):
         return self.coloring
 
     def show(self):
-        self.coloring.display()
+        self.coloring.display_txt()
 
         maxdeg_fwd = np.max(np.count_nonzero(self.J, axis=1))
         maxdeg_rev = np.max(np.count_nonzero(self.J, axis=0))
