@@ -27,6 +27,7 @@ from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
 from openmdao.utils.coloring import _total_coloring_setup_parser, _total_coloring_cmd, \
     _sparsity_setup_parser, _sparsity_cmd, _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
+from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 
 
 def _view_model_setup_parser(parser):
@@ -499,6 +500,7 @@ _non_post_setup_map = {
     'mempost': (_mempost_setup_parser, _mempost_exec),
     'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec),
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd),
+    'scaffold': (_scaffold_setup_parser, _scaffold_exec)
 }
 
 
