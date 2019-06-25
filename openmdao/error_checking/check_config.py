@@ -470,31 +470,6 @@ _all_checks.update({
 })
 
 
-def check_config(problem, logger=None, checks=None):
-    """
-    Perform optional error checks on a Problem.
-
-    Parameters
-    ----------
-    problem : Problem
-        The Problem being checked.
-    logger : object
-        Logging object.
-    checks : list of str or None
-        List of specific checks to be performed.
-    """
-    logger = logger if logger else get_logger('check_config', use_format=True)
-
-    if checks is None:
-        checks = sorted(_default_checks)
-
-    for c in checks:
-        if c not in _all_checks:
-            print("WARNING: '%s' is not a recognized check." % c)
-            continue
-        _all_checks[c](problem, logger)
-
-
 #
 # Command line interface functions
 #
@@ -541,7 +516,7 @@ def _check_config_cmd(options):
             if not options.checks:
                 options.checks = sorted(_default_checks)
 
-            check_config(prob, logger, options.checks)
+            prob.check_config(logger, options.checks)
 
         exit()
 

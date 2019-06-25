@@ -25,7 +25,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
-from openmdao.error_checking.check_config import check_config
+from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
 from openmdao.utils.record_util import create_local_meta
@@ -38,6 +38,7 @@ from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.utils.logger_utils import get_logger
 import openmdao.utils.coloring as coloring_mod
 
 try:
@@ -950,7 +951,7 @@ class Problem(object):
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
         if self._check and self.comm.rank == 0:
-            check_config(self, self._logger)
+            self.check_config(self._logger)
 
         if self._setup_status < 2:
             self._setup_status = 2
@@ -1690,6 +1691,28 @@ class Problem(object):
                 self[name] = outputs[name]
 
         return
+
+    def check_config(self, logger=None, checks=None):
+        """
+        Perform optional error checks on a Problem.
+
+        Parameters
+        ----------
+        logger : object
+            Logging object.
+        checks : list of str or None
+            List of specific checks to be performed.
+        """
+        logger = logger if logger else get_logger('check_config', use_format=True)
+
+        if checks is None:
+            checks = sorted(_default_checks)
+
+        for c in checks:
+            if c not in _all_checks:
+                print("WARNING: '%s' is not a recognized check." % c)
+                continue
+            _all_checks[c](self, logger)
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,

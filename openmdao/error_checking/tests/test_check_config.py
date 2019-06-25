@@ -10,7 +10,7 @@ from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitCompone
     LinearBlockGS, NonlinearBlockGS, SqliteRecorder
 
 from openmdao.utils.logger_utils import TestLogger
-from openmdao.error_checking.check_config import get_sccs_topo, check_config
+from openmdao.error_checking.check_config import get_sccs_topo
 
 
 class MyComp(ExecComp):
@@ -37,7 +37,7 @@ class TestCheckConfig(unittest.TestCase):
         testlogger = TestLogger()
         p.setup(check=False, logger=testlogger)
         p.final_setup()
-        check_config(p, logger=testlogger, checks=['unconnected_inputs'])
+        p.check_config(logger=testlogger, checks=['unconnected_inputs'])
 
         expected = (
             "The following inputs are not connected:\n"
@@ -78,7 +78,7 @@ class TestCheckConfig(unittest.TestCase):
         testlogger = TestLogger()
         p.setup(check=False, logger=testlogger)
         p.final_setup()
-        check_config(p, logger=testlogger, checks=['cycles', 'out_of_order'])
+        p.check_config(logger=testlogger, checks=['cycles', 'out_of_order'])
 
         expected_info = (
             "The following groups contain cycles:\n"
@@ -125,7 +125,7 @@ class TestCheckConfig(unittest.TestCase):
         testlogger = TestLogger()
         p.setup(check=False, logger=testlogger)
         p.final_setup()
-        check_config(p, logger=testlogger, checks=['cycles', 'out_of_order'])
+        p.check_config(logger=testlogger, checks=['cycles', 'out_of_order'])
 
         expected_info = (
             "The following groups contain cycles:\n"
@@ -274,7 +274,7 @@ class TestCheckConfig(unittest.TestCase):
         testlogger = TestLogger()
         p.setup(check=False, logger=testlogger)
         p.final_setup()
-        check_config(p, logger=testlogger, checks=['cycles', 'out_of_order', 'unconnected_inputs'])
+        p.check_config(logger=testlogger, checks=['cycles', 'out_of_order', 'unconnected_inputs'])
 
         expected_info = (
             "The following groups contain cycles:\n"
