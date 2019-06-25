@@ -24,7 +24,8 @@ determined by running the following command:
     :cmd: openmdao check -h
 
 By default, the output of all checks will be written to a file called 'openmdao_checks.out' in
-addition to `stdout`.
+addition to `stdout`.  Checks can also be performed by calling the `check_config` method on
+your problem object.
 
 
 The OpenMDAO `Group` API includes three methods that are invoked during the `setup` process: `setup`, `configure`, and
