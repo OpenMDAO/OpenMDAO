@@ -35,9 +35,8 @@ class TestCheckConfig(unittest.TestCase):
         G4.add_subsystem("C4", ExecComp('y=x*2.0+v'))
 
         testlogger = TestLogger()
-        p.setup(check=False, logger=testlogger)
+        p.setup(check='all', logger=testlogger)
         p.final_setup()
-        p.check_config(logger=testlogger, checks=['unconnected_inputs'])
 
         expected = (
             "The following inputs are not connected:\n"
@@ -76,9 +75,8 @@ class TestCheckConfig(unittest.TestCase):
         root.nonlinear_solver = NonlinearBlockGS()
 
         testlogger = TestLogger()
-        p.setup(check=False, logger=testlogger)
+        p.setup(check=['cycles', 'out_of_order'], logger=testlogger)
         p.final_setup()
-        p.check_config(logger=testlogger, checks=['cycles', 'out_of_order'])
 
         expected_info = (
             "The following groups contain cycles:\n"
@@ -123,9 +121,8 @@ class TestCheckConfig(unittest.TestCase):
         root.nonlinear_solver = NonlinearBlockGS()
 
         testlogger = TestLogger()
-        p.setup(check=False, logger=testlogger)
+        p.setup(check=['cycles', 'out_of_order'], logger=testlogger)
         p.final_setup()
-        p.check_config(logger=testlogger, checks=['cycles', 'out_of_order'])
 
         expected_info = (
             "The following groups contain cycles:\n"
@@ -272,9 +269,8 @@ class TestCheckConfig(unittest.TestCase):
         root.nonlinear_solver = NonlinearBlockGS()
 
         testlogger = TestLogger()
-        p.setup(check=False, logger=testlogger)
+        p.setup(check=['cycles', 'out_of_order', 'unconnected_inputs'], logger=testlogger)
         p.final_setup()
-        p.check_config(logger=testlogger, checks=['cycles', 'out_of_order', 'unconnected_inputs'])
 
         expected_info = (
             "The following groups contain cycles:\n"

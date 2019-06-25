@@ -508,10 +508,10 @@ def _check_config_cmd(options):
     def _check_config(prob):
         if not MPI or MPI.COMM_WORLD.rank == 0:
             if options.outfile is None:
-                logger = get_logger('check_config', use_format=True)
+                logger = get_logger('check_config', out_stream='stdout',
+                                    out_file=None, use_format=True)
             else:
-                outfile = open(options.outfile, 'w')
-                logger = get_logger('check_config', out_stream=outfile, use_format=True)
+                logger = get_logger('check_config', out_file=options.outfile, use_format=True)
 
             if not options.checks:
                 options.checks = sorted(_default_checks)

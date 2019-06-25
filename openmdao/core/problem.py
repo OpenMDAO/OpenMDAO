@@ -4,6 +4,7 @@ from __future__ import division, print_function
 
 import sys
 import os
+import logging
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -951,7 +952,11 @@ class Problem(object):
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
         if self._check and self.comm.rank == 0:
-            self.check_config(self._logger)
+            if self._check is True:
+                checks = _default_checks
+            else:
+                checks = self._check
+            self.check_config(self._logger, checks=checks)
 
         if self._setup_status < 2:
             self._setup_status = 2
@@ -1692,7 +1697,7 @@ class Problem(object):
 
         return
 
-    def check_config(self, logger=None, checks=None):
+    def check_config(self, logger=None, checks=None, out_file='openmdao_checks.out'):
         """
         Perform optional error checks on a Problem.
 
@@ -1702,16 +1707,23 @@ class Problem(object):
             Logging object.
         checks : list of str or None
             List of specific checks to be performed.
+        out_file : str or None
+            If not None, output will be written to this file in addition to stdout.
         """
-        logger = logger if logger else get_logger('check_config', use_format=True)
+        if logger is None:
+            logger = get_logger('check_config', out_file=out_file, use_format=True)
 
         if checks is None:
             checks = sorted(_default_checks)
+        elif checks == 'all':
+            checks = sorted(_all_checks)
 
         for c in checks:
             if c not in _all_checks:
-                print("WARNING: '%s' is not a recognized check." % c)
+                print("WARNING: '%s' is not a recognized check.  Available checks are: %s" %
+                      (c, sorted(_all_checks)))
                 continue
+            logger.info('checking %s' % c)
             _all_checks[c](self, logger)
 
 

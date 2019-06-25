@@ -40,7 +40,7 @@ model.add_design_var('source.I')
 model.add_objective('circuit.D1.I')
 
 p.setup()
-p.check_config(checks=['unconnected_inputs'])
+p.check_config(checks=['unconnected_inputs'], out_file=None)
 
 # set some initial guesses
 p['circuit.n1.V'] = 10.
