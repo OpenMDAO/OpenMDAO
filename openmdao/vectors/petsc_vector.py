@@ -126,7 +126,7 @@ class PETScVector(DefaultVector):
             dup_slice = self._dup_slice
             if dup_slice is None:
 
-                # Here, we are find the indices that are not locally owned so that we can
+                # Here, we find the indices that are not locally owned so that we can
                 # temporarilly zero them out for the norm calculation.
                 dup_slice = []
                 abs2meta = system._var_allprocs_abs2meta
@@ -140,12 +140,12 @@ class PETScVector(DefaultVector):
 
             if self._ncol == 1:
                 data_cache = self._data.copy()
-                self._petsc.array = self._data
+                self._petsc.array = data_cache
                 self._petsc.array[dup_slice] = 0.0
                 distributed_norm = self._petsc.norm()
 
                 # Reset petsc array
-                self._petsc.array = data_cache
+                self._petsc.array = self._data
 
                 return distributed_norm
 
