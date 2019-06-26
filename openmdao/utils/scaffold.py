@@ -2,6 +2,8 @@
 Support functions for the 'openmdao scaffold' command.
 """
 
+import os
+
 _explicit_template = '''
 import numpy as np
 
@@ -71,6 +73,7 @@ class {class_name}(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         partials['foo', 'bar'] = 1
+
 '''
 
 _implicit_template = '''
@@ -179,9 +182,29 @@ class {class_name}(ImplicitComponent):
 
         else:  # rev
             d_residuals['bar'] = d_outputs['bar']
+
 '''
 
+_test_template = '''
+"""Test the {class_name}."""
 
+import unittest
+
+import numpy as np
+
+import openmdao.api as om
+
+
+class Test{class_name}(unittest.TestCase):
+
+    def test_basic(self):
+        pass
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+'''
 
 def _scaffold_setup_parser(parser):
     """
@@ -210,7 +233,10 @@ def _scaffold_exec(options):
     options : argparse Namespace
         Command line options.
     """
-    outfile = options.file[0]
+    outfile = os.path.splitext(options.file[0])[0]
+    compfile = outfile + '.py'
+    testfile = 'test_' + compfile
+
     if options.explicit and options.implicit:
         raise RuntimeError("Component cannot be both implicit and explicit.")
 
@@ -221,5 +247,8 @@ def _scaffold_exec(options):
     else:
         raise RuntimeError("Component must be either implicit or explicit.")
 
-    with open(outfile, 'w') as f:
+    with open(compfile, 'w') as f:
         f.write(template.format(class_name=options.class_name))
+
+    with open(testfile, 'w') as f:
+        f.write(_test_template.format(class_name=options.class_name))
