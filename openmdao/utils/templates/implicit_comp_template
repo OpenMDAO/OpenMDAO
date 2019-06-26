@@ -1,0 +1,107 @@
+
+
+import numpy as np
+
+from openmdao.core.implicitcomponent import ImplicitComponent
+
+
+class {class_name}(ImplicitComponent):
+    """
+    <class description here>
+
+    Attributes
+    ----------
+    ...
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Intialize this component.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
+        """
+        super({class_name}, self).__init__(**kwargs)
+        # set attributes here...
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('myopt', default=1, types=int, desc='My option.')
+
+    def setup(self):
+        """
+        Add inputs and outputs and declare partials.
+        """
+        self.add_input(name='foo', shape=None, units=None)
+        self.add_output(name='bar', shape=None, units=None)
+
+        self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
+
+        # Set up the derivatives.
+        self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        """
+        <describe apply_nonlinear here>
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        residuals : Vector
+            unscaled, dimensional residuals written to via residuals[key]
+        """
+        residuals['bar'] = 1
+
+    def solve_nonlinear(self, inputs, outputs):
+        """
+        <describe solve_nonlinear here>
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
+        outputs['bar'] = inputs['foo']
+
+    def linearize(self, inputs, outputs, partials):
+        """
+        Compute the non-constant partial derivatives.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        partials : partial Jacobian
+            sub-jac components written to partials[output_name, input_name]
+        """
+        partials['bar', 'foo'] = inputs['foo']
+
+    def solve_linear(self, d_outputs, d_residuals, mode):
+        """
+        <describe solve_linear here>
+
+        Parameters
+        ----------
+        d_outputs : Vector
+            unscaled, dimensional quantities read via d_outputs[key]
+        d_residuals : Vector
+            unscaled, dimensional quantities read via d_residuals[key]
+        mode : str
+            either 'fwd' or 'rev'
+        """
+        if mode == 'fwd':
+            d_outputs['bar'] = d_residuals['bar']
+
+        else:  # rev
+            d_residuals['bar'] = d_outputs['bar']

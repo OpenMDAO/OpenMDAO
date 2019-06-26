@@ -1,0 +1,69 @@
+
+import numpy as np
+
+from openmdao.core.explicitcomponent import ExplicitComponent
+
+
+class {class_name}(ExplicitComponent):
+    """
+    <class description here>
+
+    Attributes
+    ----------
+    ...
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Intialize this component.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Component options.
+        """
+        super({class_name}, self).__init__(**kwargs)
+        # set attributes here...
+
+    def initialize(self):
+        """
+        Declare options.
+        """
+        self.options.declare('myopt', default=1, types=int, desc='My option.')
+
+    def setup(self):
+        """
+        Declare inputs, outputs, and partial derivatives.
+        """
+        pass
+
+        self.add_input(name='foo', shape=None, units=None)
+        self.add_output(name='bar', shape=None, units=None)
+
+        self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
+
+    def compute(self, inputs, outputs):
+        """
+        <Describe compute here>
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
+        outputs['bar'] = inputs['foo']
+
+    def compute_partials(self, inputs, partials):
+        """
+        Compute the partial derivatives.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
+        """
+        partials['foo', 'bar'] = 1
