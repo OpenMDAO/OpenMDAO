@@ -15,6 +15,8 @@ import unittest
 import traceback
 from docutils import nodes
 
+from collections import namedtuple
+
 from six import StringIO
 from six.moves import range, zip, cStringIO as cStringIO
 
@@ -34,6 +36,11 @@ sqlite_file = 'feature_docs_unit_test_db.sqlite'    # name of the sqlite databas
 table_name = 'feature_unit_tests'   # name of the table to be queried
 
 _sub_runner = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'run_sub.py')
+
+
+# an input block consists of a block of code and a tag that identifies the start of any
+# output from that code in the output stream (via inserted print('>>>>>#') statements)
+InputBlock = namedtuple('InputBlock', 'code tag')
 
 
 class skipped_or_failed_node(nodes.Element):
@@ -410,16 +417,29 @@ def split_source_into_input_blocks(src, debug=False):
     for line in src.splitlines():
         if 'print(">>>>>' in line:
             tag = line[7:-2]
-            input_blocks.append(('\n'.join(current_block), tag))
+            code = '\n'.join(current_block)
+            if debug:
+                print('------------')
+                print('------------')
+                print('split_source_into_input_blocks. tag:', tag)
+                print('input_blocks:')
+                from pprint import pprint
+                pprint(input_blocks)
+                print('------------')
+                pprint(('\n'.join(current_block), tag))
+                print('------------')
+                print('------------')
+            input_blocks.append(InputBlock(code, tag))
             current_block = []
         else:
             current_block.append(line)
 
     if current_block and current_block[0]:
         print('Extra Input Block:')
+        code = '\n'.join(current_block)
         from pprint import pprint
         pprint(current_block)
-        input_blocks.append(('\n'.join(current_block), 'EXTRA?'))
+        input_blocks.append(InputBlock(code, 'EXTRA'))
 
     return input_blocks
 
@@ -439,16 +459,17 @@ def insert_output_start_stop_indicators(src):
         String with output demarked.
     """
     lines = src.split('\n')
-    print_producing = ['.setup(',
-                       'print(',
-                       '.run_model(',
-                       '.run_driver(',
-                       '.check_partials(',
-                       '.check_totals(',
-                       '.list_inputs(',
-                       '.list_outputs(',
-                       '.list_problem_vars(',
-                       ]
+    print_producing = [
+        '.setup(',
+        'print(',
+        '.run_model(',
+        '.run_driver(',
+        '.check_partials(',
+        '.check_totals(',
+        '.list_inputs(',
+        '.list_outputs(',
+        '.list_problem_vars(',
+    ]
 
     newlines = []
     input_block_number = 0
@@ -498,36 +519,36 @@ def insert_output_start_stop_indicators(src):
     return '\n'.join(newlines)
 
 
-def clean_up_empty_output_blocks(input_blocks, output_blocks):
+def consolidate_input_blocks(input_blocks, output_blocks):
     """
-    Some of the blocks do not generate output. We only want to have
-    input blocks that have outputs.
+    Merge any input blocks for which there is no corresponding output
+    with subsequent blocks that do have output.
     """
-
     new_input_blocks = []
-    new_output_blocks = []
-    current_in_block = ''
+    new_code = ''
 
-    for in_block, out_block in zip(input_blocks, output_blocks):
-        if current_in_block and not current_in_block.endswith('\n'):
-            current_in_block += '\n'
-        current_in_block += in_block
-        if out_block:
-            current_in_block = remove_leading_trailing_whitespace_lines(current_in_block)
-            out_block = remove_leading_trailing_whitespace_lines(out_block)
-            new_input_blocks.append(current_in_block)
-            new_output_blocks.append(out_block)
-            current_in_block = ''
+    for (code, tag) in input_blocks:
+        if tag not in output_blocks:
+            if new_code and not new_code.endswith('\n'):
+                new_code += '\n'
+            new_code += code
+        elif new_code:
+            if new_code and not new_code.endswith('\n'):
+                new_code += '\n'
+            new_code = remove_leading_trailing_whitespace_lines(new_code+code)
+            new_input_blocks.append(InputBlock(new_code, tag))
+            new_code = ''
+        else:
+            new_input_blocks.append(InputBlock(code, tag))
 
-    # if there was no output, return the one input block and empty output block
-    if current_in_block:
-        new_input_blocks.append(current_in_block)
-        new_output_blocks.append('')
+    # trailing input with no corresponding output
+    if new_code:
+        new_input_blocks.append(InputBlock(code, 'EXTRA'))
 
-    return new_input_blocks, new_output_blocks
+    return new_input_blocks
 
 
-def extract_output_blocks(run_output):
+def extract_output_blocks(run_output, debug=False):
     """
     Identify and extract outputs from source.
 
@@ -542,7 +563,7 @@ def extract_output_blocks(run_output):
         output blocks keyed on tags like ">>>>>4"
     """
     if isinstance(run_output, list):
-        return sync_multi_output_blocks(run_output)
+        return sync_multi_output_blocks(run_output, debug=debug)
 
     output_blocks = {}
     output_block = None
@@ -560,7 +581,7 @@ def extract_output_blocks(run_output):
         print('Extra Output Block:')
         from pprint import pprint
         pprint(output_block)
-        output_blocks['EXTRA?'] = '\n'.join(output_block)
+        output_blocks['EXTRA'] = '\n'.join(output_block)
 
     return output_blocks
 
@@ -612,31 +633,43 @@ def dedent(src):
     return ''
 
 
-def sync_multi_output_blocks(run_output):
+def sync_multi_output_blocks(run_output, debug=False):
     """
     Combine output from different procs into the same output blocks.
 
     Parameters
     ----------
-    run_output : list of str
+    run_output : list of dict
         List of outputs from individual procs.
 
     Returns
     -------
     dict
-        List of synced output blocks from all procs.
+        Synced output blocks from all procs.
     """
     if run_output:
-        split_blocks = [extract_output_blocks(outp) for outp in run_output]
+        # for each proc's run output, get a dict of output blocks keyed by tag
+        proc_output_blocks = [extract_output_blocks(outp) for outp in run_output]
+
+        if debug:
+            print('proc_output_blocks:')
+            from pprint import pprint
+            pprint(proc_output_blocks)
 
         synced_blocks = {}
 
-        for i, outp in enumerate(split_blocks):
+        for i, outp in enumerate(proc_output_blocks):
             for tag in outp:
-                if tag in synced_blocks:
-                    synced_blocks[tag] += "(rank %d) %s" % (i, outp[tag])
-                else:
-                    synced_blocks[tag] = "(rank %d) %s" % (i, outp[tag])
+                if outp[tag].strip():
+                    if tag in synced_blocks:
+                        synced_blocks[tag] += "(rank %d) %s\n" % (i, outp[tag])
+                    else:
+                        synced_blocks[tag] = "(rank %d) %s\n" % (i, outp[tag])
+
+        if debug:
+            print('synced_blocks:')
+            from pprint import pprint
+            pprint(synced_blocks)
 
         return synced_blocks
     else:
@@ -804,25 +837,16 @@ def get_interleaved_io_nodes(input_blocks, output_blocks):
     nodelist = []
     n = 1
 
-    for (inp, tag) in input_blocks:
-        input_node = nodes.literal_block(inp, inp)
+    for (code, tag) in input_blocks:
+        input_node = nodes.literal_block(code, code)
         input_node['language'] = 'python'
         nodelist.append(input_node)
         if tag in output_blocks:
             outp = cgiesc.escape(output_blocks[tag])
-            output_node = in_or_out_node(kind="Out", number=n, text=outp)
-            nodelist.append(output_node)
+            if (outp.strip()):
+                output_node = in_or_out_node(kind="Out", number=n, text=outp)
+                nodelist.append(output_node)
         n += 1
-
-    # output_blocks = [cgiesc.escape(ob) for ob in output_blocks]
-    # for input_block, output_block in zip(input_blocks, output_blocks):
-    #     input_node = nodes.literal_block(input_block, input_block)
-    #     input_node['language'] = 'python'
-    #     nodelist.append(input_node)
-    #     if len(output_block) > 0:
-    #         output_node = in_or_out_node(kind="Out", number=n, text=output_block)
-    #         nodelist.append(output_node)
-    #     n += 1
 
     return nodelist
 

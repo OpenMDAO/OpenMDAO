@@ -15,7 +15,7 @@ from openmdao.docs._utils.docutil import get_source_code, remove_docstrings, \
     remove_initial_empty_lines, replace_asserts_with_prints, \
     strip_header, dedent, insert_output_start_stop_indicators, run_code, \
     get_skip_output_node, get_interleaved_io_nodes, get_output_block_node, \
-    split_source_into_input_blocks, extract_output_blocks, clean_up_empty_output_blocks, node_setup
+    split_source_into_input_blocks, extract_output_blocks, consolidate_input_blocks, node_setup
 
 
 _plot_count = 0
@@ -169,7 +169,7 @@ class EmbedCodeDirective(Directive):
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
             elif 'interleave' in layout:
-                debug = is_test and 'list_inputs' in method_name
+                debug = is_test and ('list_inputs' in method_name or 'TestParallelDOEFeature' in class_name)
 
                 if is_test:
                     start = len(self_code) + len(setup_code)
@@ -178,28 +178,28 @@ class EmbedCodeDirective(Directive):
                 else:
                     input_blocks = split_source_into_input_blocks(code_to_run)
 
-                output_blocks = extract_output_blocks(run_outputs)
+                output_blocks = extract_output_blocks(run_outputs, debug=debug)
 
                 if debug:
                     from pprint import pprint
-                    print('---------')
+                    print('-----------------------------------------------------------------------')
+                    print('-----------------------------------------------------------------------')
+                    print('code_to_run:')
                     print(code_to_run)
                     print('---------')
+                    print('input_blocks:')
                     pprint(input_blocks)
                     print('---------')
-                    print(run_outputs)
+                    print('run_outputs:')
+                    pprint(run_outputs)
                     print('---------')
+                    print('output_blocks:')
                     pprint(output_blocks)
                     print('---------')
 
-                # # the last input block may not produce any output
-                # if len(output_blocks) == len(input_blocks) - 1:
-                #     output_blocks.append('')
-
-                # # Need to deal with the cases when there is no output for a given input block
-                # # Merge an input block with the previous block and throw away the output block
-                # input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks,
-                #                                                            output_blocks)
+                # Merge any input blocks for which there is no corresponding output
+                # with subsequent input blocks that do have output
+                input_blocks = consolidate_input_blocks(input_blocks, output_blocks)
 
             if 'plot' in layout:
                 if not os.path.isfile(plot_file_abs):
