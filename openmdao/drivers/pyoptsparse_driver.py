@@ -204,6 +204,7 @@ class pyOptSparseDriver(Driver):
         self.iter_count = 0
         fwd = problem._mode == 'fwd'
         optimizer = self.options['optimizer']
+        self._quantities = []
 
         self._check_for_missing_objective()
 
