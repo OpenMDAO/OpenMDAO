@@ -29,18 +29,18 @@ class {class_name}(ExplicitComponent):
         """
         Declare options.
         """
-        self.options.declare('myopt', default=1, types=int, desc='My option.')
+        # self.options.declare('myopt', default=1, types=int, desc='My option.')
+        pass
 
     def setup(self):
         """
         Declare inputs, outputs, and partial derivatives.
         """
-        pass
+        # self.add_input(name='foo', shape=None, units=None)
+        # self.add_output(name='bar', shape=None, units=None)
 
-        self.add_input(name='foo', shape=None, units=None)
-        self.add_output(name='bar', shape=None, units=None)
-
-        self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
+        # self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
+       pass
 
     def compute(self, inputs, outputs):
         """
@@ -53,7 +53,8 @@ class {class_name}(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        outputs['bar'] = inputs['foo']
+        # outputs['bar'] = inputs['foo']
+        pass
 
     def compute_partials(self, inputs, partials):
         """
@@ -66,4 +67,5 @@ class {class_name}(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        partials['foo', 'bar'] = 1
+        # partials['foo', 'bar'] = 1
+        pass

@@ -30,19 +30,21 @@ class {class_name}(ImplicitComponent):
         """
         Declare options.
         """
-        self.options.declare('myopt', default=1, types=int, desc='My option.')
+        # self.options.declare('myopt', default=1, types=int, desc='My option.')
+        pass
 
     def setup(self):
         """
         Add inputs and outputs and declare partials.
         """
-        self.add_input(name='foo', shape=None, units=None)
-        self.add_output(name='bar', shape=None, units=None)
+        # self.add_input(name='foo', shape=None, units=None)
+        # self.add_output(name='bar', shape=None, units=None)
 
-        self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
+        # self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
 
-        # Set up the derivatives.
-        self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
+        # # Set up the derivatives.
+        # self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
+        pass
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
@@ -57,7 +59,8 @@ class {class_name}(ImplicitComponent):
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
         """
-        residuals['bar'] = 1
+        # residuals['bar'] = 1
+        pass
 
     def solve_nonlinear(self, inputs, outputs):
         """
@@ -70,7 +73,8 @@ class {class_name}(ImplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        outputs['bar'] = inputs['foo']
+        # outputs['bar'] = inputs['foo']
+        pass
 
     def linearize(self, inputs, outputs, partials):
         """
@@ -85,7 +89,34 @@ class {class_name}(ImplicitComponent):
         partials : partial Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        partials['bar', 'foo'] = inputs['foo']
+        # partials['bar', 'foo'] = inputs['foo']
+        pass
+
+    def apply_linear(self, inputs, outputs, d_inputs, d_outputs, d_residuals, mode):
+        r"""
+        Compute jac-vector product. The model is assumed to be in an unscaled state.
+
+        If mode is:
+            'fwd': (d_inputs, d_outputs) \|-> d_residuals
+
+            'rev': d_residuals \|-> (d_inputs, d_outputs)
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        d_inputs : Vector
+            see inputs; product must be computed only if var_name in d_inputs
+        d_outputs : Vector
+            see outputs; product must be computed only if var_name in d_outputs
+        d_residuals : Vector
+            see outputs
+        mode : str
+            either 'fwd' or 'rev'
+        """
+        pass
 
     def solve_linear(self, d_outputs, d_residuals, mode):
         """
@@ -99,9 +130,11 @@ class {class_name}(ImplicitComponent):
             unscaled, dimensional quantities read via d_residuals[key]
         mode : str
             either 'fwd' or 'rev'
-        """
-        if mode == 'fwd':
-            d_outputs['bar'] = d_residuals['bar']
 
-        else:  # rev
-            d_residuals['bar'] = d_outputs['bar']
+        If mode is:
+            'fwd': d_outputs -> d_residuals
+
+            'rev': d_residuals -> d_outputs
+
+        """
+        pass
