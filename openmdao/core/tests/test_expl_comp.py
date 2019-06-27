@@ -34,7 +34,7 @@ class RectangleComp(om.ExplicitComponent):
         outputs['area'] = inputs['length'] * inputs['width']
 
 
-class RectangleCompWithTags(ExplicitComponent):
+class RectangleCompWithTags(om.ExplicitComponent):
     """
     A simple Explicit Component that also has input and output with tags.
     """
