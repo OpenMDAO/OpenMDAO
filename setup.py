@@ -121,7 +121,7 @@ setup(
         ],
         'openmdao.docs': ['*.py', '_utils/*.py'],
         'openmdao.recorders': ['tests/legacy_sql/*.sql'],
-        'openmdao.utils': ['unit_library.ini'],
+        'openmdao.utils': ['unit_library.ini', 'scaffolding_templates/*'],
         'openmdao.test_suite': [
             '*.py',
             '*/*.py',

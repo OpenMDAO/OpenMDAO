@@ -527,7 +527,7 @@ def openmdao_cmd():
     parser = argparse.ArgumentParser(description='OpenMDAO Command Line Tools',
                                      epilog='Use -h after any sub-command for sub-command help.')
 
-    subs = parser.add_subparsers()
+    subs = parser.add_subparsers(title='Tools', metavar='')
     for p, (parser_setup_func, cmd, help_str) in sorted(chain(_post_setup_map.items(),
                                                               _non_post_setup_map.items())):
         subp = subs.add_parser(p, help=help_str)

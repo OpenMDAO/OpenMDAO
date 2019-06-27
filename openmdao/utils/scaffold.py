@@ -14,9 +14,9 @@ def _scaffold_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='output file.')
+    parser.add_argument('file', nargs='?', help='output file.')
     parser.add_argument('-c', '--class', action='store', dest='class_name', default='MyComp',
-                        help='Name of the component class.')
+                        required=True, help='Name of the component class.')
     parser.add_argument('-e', '--explicit', action='store_true', dest='explicit',
                         help="Generate an ExplicitComponent.")
     parser.add_argument('-i', '--implicit', action='store_true', dest='implicit',
@@ -32,11 +32,27 @@ def _scaffold_exec(options):
     options : argparse Namespace
         Command line options.
     """
-    outfile = os.path.splitext(options.file[0])[0]
+    if options.file is None:
+        # construct file name
+
+        # split on camel case names
+        chars = []
+        cname = options.class_name
+        for i in range(len(cname)):
+            if cname[i] == cname[i].upper():
+                if i > 0 and chars[-1] != chars[-1].upper():
+                    chars.append('_')
+                chars.append(cname[i])
+            else:
+                chars.append(cname[i])
+        outfile = ''.join(chars).lower()
+    else:
+        outfile = os.path.splitext(options.file[0])[0]
     compfile = outfile + '.py'
     testfile = 'test_' + compfile
 
-    templates_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+    templates_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 'scaffolding_templates')
 
     if options.explicit and options.implicit:
         raise RuntimeError("Component cannot be both implicit and explicit.")
