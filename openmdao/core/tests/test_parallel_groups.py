@@ -18,6 +18,7 @@ from openmdao.test_suite.groups.parallel_groups import \
 
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.logger_utils import TestLogger
+from openmdao.error_checking.check_config import _default_checks
 
 
 
@@ -271,9 +272,13 @@ class TestParallelGroups(unittest.TestCase):
             self.assertEqual(len(testlogger.get('error')), 1)
             self.assertTrue(testlogger.contains('warning',
                                                 "Only want to see this on rank 0"))
-            self.assertEqual(len(testlogger.get('info')), 1)
+            self.assertEqual(len(testlogger.get('info')), len(_default_checks) + 1)
             self.assertTrue(msg in testlogger.get('error')[0])
-            self.assertTrue(msg in testlogger.get('info')[0])
+            for info in testlogger.get('info'):
+                if msg in info:
+                    break
+            else:
+                self.fail("Didn't find '%s' in info messages." % msg)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
