@@ -169,11 +169,29 @@ class EmbedCodeDirective(Directive):
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
             elif 'interleave' in layout:
+                ##### DEBUG #####
                 debug = is_test and ('list_inputs' in method_name or 'TestParallelDOEFeature' in class_name)
+                if debug:
+                    print('-----------------------------------------------------------------------')
+                    print('debugging', class_name, method_name)
+                    print('-----------------------------------------------------------------------')
 
                 if is_test:
+                    if debug:
+                        print('self_code:', len(self_code))
+                        print(self_code)
+                        print('---------')
+                        print('setup_code:', len(setup_code))
+                        print(setup_code)
+                        print('---------')
+                    # FIXME: start and end are not valid, don't account for inserted indicators
                     start = len(self_code) + len(setup_code)
                     end = len(code_to_run) - len(teardown_code)
+                    if debug:
+                        print('start:', start, 'end:', end)
+                        print('---------')
+                        print(code_to_run[start:end])
+                        print('---------')
                     input_blocks = split_source_into_input_blocks(code_to_run[start:end], debug=debug)
                 else:
                     input_blocks = split_source_into_input_blocks(code_to_run)
@@ -182,8 +200,6 @@ class EmbedCodeDirective(Directive):
 
                 if debug:
                     from pprint import pprint
-                    print('-----------------------------------------------------------------------')
-                    print('-----------------------------------------------------------------------')
                     print('code_to_run:')
                     print(code_to_run)
                     print('---------')
@@ -199,7 +215,7 @@ class EmbedCodeDirective(Directive):
 
                 # Merge any input blocks for which there is no corresponding output
                 # with subsequent input blocks that do have output
-                input_blocks = consolidate_input_blocks(input_blocks, output_blocks)
+                input_blocks = consolidate_input_blocks(input_blocks, output_blocks, debug=debug)
 
             if 'plot' in layout:
                 if not os.path.isfile(plot_file_abs):

@@ -407,6 +407,8 @@ def split_source_into_input_blocks(src, debug=False):
     """
     if debug:
         print('---------')
+        print('split_source_into_input_blocks()')
+        print('---------')
         print(src)
         print('---------')
 
@@ -519,26 +521,45 @@ def insert_output_start_stop_indicators(src):
     return '\n'.join(newlines)
 
 
-def consolidate_input_blocks(input_blocks, output_blocks):
+def consolidate_input_blocks(input_blocks, output_blocks, debug=False):
     """
     Merge any input blocks for which there is no corresponding output
     with subsequent blocks that do have output.
+
+    Remove any leading and trailing blank lines from all input blocks.
     """
     new_input_blocks = []
     new_code = ''
 
+    if debug:
+        print('consolidate_input_blocks')
+
     for (code, tag) in input_blocks:
+        if debug:
+            print('----------------')
+            print(code)
+            print('---')
+            print(tag)
+            print('---')
         if tag not in output_blocks:
             if new_code and not new_code.endswith('\n'):
                 new_code += '\n'
             new_code += code
+            if debug:
+                print('adding to next block')
         elif new_code:
             if new_code and not new_code.endswith('\n'):
                 new_code += '\n'
             new_code = remove_leading_trailing_whitespace_lines(new_code+code)
             new_input_blocks.append(InputBlock(new_code, tag))
+            if debug:
+                print('consolidated block:')
+                print(new_code)
             new_code = ''
         else:
+            code = remove_leading_trailing_whitespace_lines(code)
+            if debug:
+                print('stripped block')
             new_input_blocks.append(InputBlock(code, tag))
 
     # trailing input with no corresponding output
