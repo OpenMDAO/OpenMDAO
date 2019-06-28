@@ -679,7 +679,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_design_var('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "'': When adding design var 'z', %s should have size 1 but instead has size 2." % name)
+                             "SellarDerivatives: When adding design var 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_constraint_size_err(self):
 
@@ -693,7 +693,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_constraint('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "'': When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
+                             "SellarDerivatives: When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_size_err(self):
 
@@ -707,7 +707,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_objective('z', index=1, **args)
             self.assertEqual(str(context.exception),
-                             "'': When adding objective 'z', %s should have size 1 but instead has size 2." % name)
+                             "SellarDerivatives: When adding objective 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_invalid_name(self):
 

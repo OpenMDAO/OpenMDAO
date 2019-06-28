@@ -35,7 +35,7 @@ FD_COEFFS = {
 _full_slice = slice(None)
 
 
-def _generate_fd_coeff(form, order):
+def _generate_fd_coeff(form, order, system):
     """
     Create an FDForm namedtuple containing the deltas, coefficients, and current coefficient.
 
@@ -45,6 +45,8 @@ def _generate_fd_coeff(form, order):
         Requested form of FD (e.g. 'forward', 'central', 'backward').
     order : int
         The order of accuracy of the requested FD scheme.
+    system : System
+        Containing system.
 
     Returns
     -------
@@ -56,8 +58,8 @@ def _generate_fd_coeff(form, order):
         fd_form = FD_COEFFS[form, order]
     except KeyError:
         # TODO: Automatically generate requested form and store in dict.
-        msg = 'Finite Difference form="{}" and order={} are not supported'
-        raise ValueError(msg.format(form, order))
+        raise ValueError('{}: Finite Difference form="{}" and order={} are not '
+                         'supported'.format(system.name4msg, form, order))
     return fd_form
 
 
@@ -97,7 +99,7 @@ class FiniteDifference(ApproximationScheme):
         super(FiniteDifference, self).__init__()
         self._starting_ins = self._starting_outs = self._results_tmp = None
 
-    def add_approximation(self, abs_key, kwargs):
+    def add_approximation(self, abs_key, system, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
@@ -105,6 +107,8 @@ class FiniteDifference(ApproximationScheme):
         ----------
         abs_key : tuple(str,str)
             Absolute name pairing of (of, wrt) for the derivative.
+        system : System
+            Containing System.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
@@ -116,8 +120,9 @@ class FiniteDifference(ApproximationScheme):
             if form in DEFAULT_ORDER:
                 options['order'] = DEFAULT_ORDER[options['form']]
             else:
-                msg = "'{}' is not a valid form of finite difference; must be one of {}"
-                raise ValueError(msg.format(form, list(DEFAULT_ORDER.keys())))
+                raise ValueError("{}: '{}' is not a valid form of finite difference; must be "
+                                 "one of {}".format(system.name4msg, form,
+                                                    list(DEFAULT_ORDER.keys())))
 
         key = (abs_key[1], options['form'], options['order'],
                options['step'], options['step_calc'], options['directional'])
@@ -150,7 +155,7 @@ class FiniteDifference(ApproximationScheme):
         # A central second order accurate approximation for the first derivative would be stored
         # as deltas = [-2, -1, 1, 2] * h, coeffs = [1/12, -2/3, 2/3 , -1/12] * 1/h,
         # current_coeff = 0.
-        fd_form = _generate_fd_coeff(form, order)
+        fd_form = _generate_fd_coeff(form, order, system)
 
         if step_calc == 'rel':
             if wrt in system._outputs._views_flat:

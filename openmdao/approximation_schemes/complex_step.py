@@ -48,7 +48,7 @@ class ComplexStep(ApproximationScheme):
         # Only used when nested under complex step.
         self._fd = None
 
-    def add_approximation(self, abs_key, kwargs):
+    def add_approximation(self, abs_key, system, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
@@ -56,6 +56,8 @@ class ComplexStep(ApproximationScheme):
         ----------
         abs_key : tuple(str,str)
             Absolute name pairing of (of, wrt) for the derivative.
+        system : System
+            Containing System.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
@@ -115,7 +117,7 @@ class ComplexStep(ApproximationScheme):
                 empty = {}
                 for lst in itervalues(self._exec_dict):
                     for apprx in lst:
-                        fd.add_approximation(apprx[0], empty)
+                        fd.add_approximation(apprx[0], system, empty)
 
             self._fd.compute_approximations(system, jac, total=total)
             return

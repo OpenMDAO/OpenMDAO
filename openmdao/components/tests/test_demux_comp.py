@@ -29,7 +29,7 @@ class TestDemuxCompOptions(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.setup()
         self.assertEqual(str(ctx.exception),
-                         "Invalid axis (1) for variable 'a' of shape (10,)")
+                         "demux_comp: Invalid axis (1) for variable 'a' of shape (10,)")
 
     def test_axis_with_wrong_size(self):
         nn = 10
@@ -53,7 +53,7 @@ class TestDemuxCompOptions(unittest.TestCase):
         with self.assertRaises(RuntimeError) as ctx:
             p.setup()
         self.assertEqual(str(ctx.exception),
-                         "Variable 'a' cannot be demuxed along axis 1. Axis size is "
+                         "demux_comp: Variable 'a' cannot be demuxed along axis 1. Axis size is "
                          "7 but vec_size is 10.")
 
 

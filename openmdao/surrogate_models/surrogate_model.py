@@ -27,7 +27,7 @@ class SurrogateModel(object):
         """
         self.trained = False
 
-        self.options = OptionsDictionary()
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
         self._declare_options()
         self.options.update(kwargs)
 

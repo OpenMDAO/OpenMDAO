@@ -307,18 +307,18 @@ class System(object):
             Keyword arguments that will be mapped into the System options.
         """
         self.name = ''
-        self.pathname = ''
+        self.pathname = None
         self.comm = None
 
         # System options
-        self.options = OptionsDictionary()
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
                              desc='Linear solver(s) in this group, if using an assembled '
                                   'jacobian, will use this type.')
 
         # Case recording options
-        self.recording_options = OptionsDictionary()
+        self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
         self.recording_options.declare('record_inputs', types=bool, default=True,
                                        desc='Set to True to record inputs at the system level')
         self.recording_options.declare('record_outputs', types=bool, default=True,
@@ -449,6 +449,22 @@ class System(object):
         self._lin_vec_names = []
         self._coloring_info = _DEFAULT_COLORING_META.copy()
         self._first_call_to_linearize = True   # will check in first call to _linearize
+
+    @property
+    def name4msg(self):
+        """
+        Our instance pathname, if available, or our class name.  For use in error messages.
+
+        Returns
+        -------
+        str
+            Either our instance pathname or class name.
+        """
+        if self.pathname is not None:
+            return self.pathname
+        if self.name:
+            return type(self).__name__ + '({})'.format(self.name)
+        return type(self).__name__
 
     def _declare_options(self):
         """
@@ -1028,7 +1044,7 @@ class System(object):
             else:  # no approx derivs found
                 simple_warning("%s: No approx partials found but coloring was requested.  "
                                "Declaring ALL partials as approx (method='%s')" %
-                               (self.pathname, self._coloring_info['method']))
+                               (self.name4msg, self._coloring_info['method']))
                 try:
                     self.declare_partials('*', '*', method=self._coloring_info['method'])
                 except AttributeError:  # this system must be a group
@@ -1250,7 +1266,7 @@ class System(object):
                 fname = self.get_approx_coloring_fname()
             else:
                 fname = coloring
-            print("%s: loading coloring from file %s" % (self.pathname, fname))
+            print("%s: loading coloring from file %s" % (self.name4msg, fname))
             info['coloring'] = coloring = Coloring.load(fname)
             if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
                 raise RuntimeError("Loaded coloring has different wrt_patterns (%s) than "
@@ -1298,8 +1314,8 @@ class System(object):
         """
         num_par_fd = self._num_par_fd
         if comm.size < num_par_fd:
-            raise ValueError("'%s': num_par_fd must be <= communicator size (%d)" %
-                             (self.pathname, comm.size))
+            raise ValueError("%s: num_par_fd must be <= communicator size (%d)" %
+                             (self.name4msg, comm.size))
 
         self._full_comm = comm
 
@@ -1901,7 +1917,7 @@ class System(object):
                     call = 'promotes_%ss' % io_types[0]
                 raise RuntimeError("%s: '%s' failed to find any matches for the following "
                                    "names or patterns: %s." %
-                                   (self.pathname, call, sorted(not_found)))
+                                   (self.name4msg, call, sorted(not_found)))
 
         maps = {'input': {}, 'output': {}}
 
@@ -2440,8 +2456,8 @@ class System(object):
                                        ['ref', 'ref0', 'scaler', 'adder', 'upper', 'lower']):
                 if isinstance(item, np.ndarray):
                     if item.size != size:
-                        raise ValueError("'%s': When adding design var '%s', %s should have size "
-                                         "%d but instead has size %d." % (self.pathname, name,
+                        raise ValueError("%s: When adding design var '%s', %s should have size "
+                                         "%d but instead has size %d." % (self.name4msg, name,
                                                                           item_name, size,
                                                                           item.size))
 
@@ -2611,8 +2627,8 @@ class System(object):
             for item, item_name in zip(vlist, nlist):
                 if isinstance(item, np.ndarray):
                     if item.size != size:
-                        raise ValueError("'%s': When adding %s '%s', %s should have size "
-                                         "%d but instead has size %d." % (self.pathname, tname,
+                        raise ValueError("%s: When adding %s '%s', %s should have size "
+                                         "%d but instead has size %d." % (self.name4msg, tname,
                                                                           name, item_name, size,
                                                                           item.size))
         resp['name'] = name

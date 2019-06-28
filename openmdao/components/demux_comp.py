@@ -79,13 +79,13 @@ class DemuxComp(ExplicitComponent):
             axis = kwgs.pop('axis')
 
             if axis >= len(shape):
-                raise RuntimeError("Invalid axis ({0}) for variable '{2}' of "
-                                   "shape {1}".format(axis, shape, var))
+                raise RuntimeError("{}: Invalid axis ({}) for variable '{}' of "
+                                   "shape {}".format(self.name4msg, axis, var, shape))
 
-            if options['shape'][axis] != vec_size:
-                raise RuntimeError("Variable '{0}' cannot be demuxed along axis {1}. Axis size is "
-                                   "{2} but vec_size is {3}.".format(var, axis, shape[axis],
-                                                                     vec_size))
+            if shape[axis] != vec_size:
+                raise RuntimeError("{}: Variable '{}' cannot be demuxed along axis {}. Axis size "
+                                   "is {} but vec_size is {}.".format(self.name4msg, var, axis,
+                                                                      shape[axis], vec_size))
 
             self.add_input(var, **kwgs)
 

@@ -202,14 +202,14 @@ class Problem(object):
         self._rec_mgr = RecordingManager()
 
         # General options
-        self.options = OptionsDictionary()
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.update(options)
 
         # Case recording options
-        self.recording_options = OptionsDictionary()
+        self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
@@ -1287,7 +1287,8 @@ class Problem(object):
 
                 all_fd_options[c_name][local_wrt] = fd_options
 
-                approximations[fd_options['method']].add_approximation(abs_key, fd_options)
+                approximations[fd_options['method']].add_approximation(abs_key, self.model,
+                                                                       fd_options)
 
             approx_jac = {}
             for approximation in itervalues(approximations):

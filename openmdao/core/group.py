@@ -311,6 +311,9 @@ class Group(System):
         self.pathname = pathname
         self._problem_options = prob_options
 
+        self.options._parent_name = self.name4msg
+        self.recording_options._parent_name = self.name4msg
+
         if self._num_par_fd > 1:
             info = self._coloring_info
             if comm.size > 1:
@@ -318,12 +321,12 @@ class Group(System):
                 if self._owns_approx_jac or info['coloring'] is not None:
                     comm = self._setup_par_fd_procs(comm)
                 else:
-                    msg = "'%s': num_par_fd = %d but FD is not active." % (self.pathname,
-                                                                           self._num_par_fd)
+                    msg = "%s: num_par_fd = %d but FD is not active." % (self.name4msg,
+                                                                         self._num_par_fd)
                     raise RuntimeError(msg)
             elif not MPI:
-                msg = ("'%s': MPI is not active but num_par_fd = %d. No parallel finite difference "
-                       "will be performed." % (self.pathname, self._num_par_fd))
+                msg = ("%s: MPI is not active but num_par_fd = %d. No parallel finite difference "
+                       "will be performed." % (self.name4msg, self._num_par_fd))
                 simple_warning(msg)
 
         self.comm = comm
@@ -357,10 +360,10 @@ class Group(System):
             except ProcAllocationError as err:
                 subs = self._subsystems_allprocs
                 if err.sub_inds is None:
-                    raise RuntimeError("%s: %s" % (self.pathname, err.msg))
+                    raise RuntimeError("%s: %s" % (self.name4msg, err.msg))
                 else:
                     raise RuntimeError("%s: MPI process allocation failed: %s for the following "
-                                       "subsystems: %s" % (self.pathname, err.msg,
+                                       "subsystems: %s" % (self.name4msg, err.msg,
                                                            [subs[i].name for i in err.sub_inds]))
 
             self._subsystems_myproc = [self._subsystems_allprocs[ind] for ind in sub_inds]
@@ -837,9 +840,9 @@ class Group(System):
                 inparts = abs_in.split('.')
                 in_subsys = inparts[:-1]
                 if out_subsys == in_subsys:
-                    raise RuntimeError("Output and input are in the same System " +
-                                       "for connection in '%s' from '%s' to '%s'." %
-                                       (self.pathname, prom_out, prom_in))
+                    raise RuntimeError("%s: Output and input are in the same System " +
+                                       "for connection from '%s' to '%s'." %
+                                       (self.name4msg, prom_out, prom_in))
 
                 if src_indices is not None and abs_in in abs2meta:
                     meta = abs2meta[abs_in]
@@ -847,7 +850,7 @@ class Group(System):
                         raise RuntimeError("%s: src_indices has been defined "
                                            "in both connect('%s', '%s') "
                                            "and add_input('%s', ...)." %
-                                           (self.pathname, prom_out,
+                                           (self.name4msg, prom_out,
                                             prom_in, prom_in))
                     meta['src_indices'] = np.atleast_1d(src_indices)
                     meta['flat_src_indices'] = flat_src_indices
@@ -1507,12 +1510,12 @@ class Group(System):
             missing = oldset - newset
             if missing:
                 msg.append("%s: %s expected in subsystem order and not found." %
-                           (self.pathname, sorted(missing)))
+                           (self.name4msg, sorted(missing)))
 
             extra = newset - oldset
             if extra:
                 msg.append("%s: subsystem(s) %s found in subsystem order but don't exist." %
-                           (self.pathname, sorted(extra)))
+                           (self.name4msg, sorted(extra)))
 
             raise ValueError('\n'.join(msg))
 
@@ -1520,7 +1523,7 @@ class Group(System):
         if len(newset) < len(new_order):
             dupes = [key for key, val in iteritems(Counter(new_order)) if val > 1]
             raise ValueError("%s: Duplicate name(s) found in subsystem order list: %s" %
-                             (self.pathname, sorted(dupes)))
+                             (self.name4msg, sorted(dupes)))
 
         subsystems[:] = [olddict[name] for name in new_order]
 
@@ -1997,9 +2000,8 @@ class Group(System):
 
         if self._coloring_info['coloring'] is _DYN_COLORING and self._owns_approx_of:
             if not wrt_colors_matched:
-                raise ValueError("Invalid 'wrt' variable(s) specified for colored approx "
-                                 "partial options on Group "
-                                 "'{}': {}.".format(self.pathname, wrt_color_patterns))
+                raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx "
+                                 "partial options: {}.".format(self.name4msg, wrt_color_patterns))
 
     def _setup_approx_partials(self):
         """
@@ -2056,7 +2058,7 @@ class Group(System):
                 meta['shape'] = shape
                 meta['value'] = np.zeros(shape)
 
-            approx.add_approximation(key, meta)
+            approx.add_approximation(key, self, meta)
 
         if self.pathname:
             # we're taking semi-total derivs for this group. Update _owns_approx_of

@@ -233,18 +233,15 @@ def _get_viewer_data(data_source):
 
     scc = nx.strongly_connected_components(G)
 
-    seen = set()
     for strong_comp in scc:
-        if len(strong_comp) > 1:
-            strongset = set(strong_comp)
-            sys_pathnames_list.extend(strong_comp)
-            for name in strong_comp:
-                sys_pathnames_dict[name] = len(sys_pathnames_dict)
+        sys_pathnames_list.extend(strong_comp)
+        for name in strong_comp:
+            sys_pathnames_dict[name] = len(sys_pathnames_dict)
 
-            edge_orders = [(u, orders[u], v, orders[v]) for u, v in G.edges(strong_comp)
-                           if u in strongset and v in strongset]
-
-            for src, exe_src, tgt, exe_tgt in edge_orders:
+        for src, tgt in G.edges(strong_comp):
+            if src in strong_comp and tgt in strong_comp:
+                exe_src = orders[src]
+                exe_tgt = orders[tgt]
                 if exe_tgt < exe_src:
                     exe_low = exe_tgt
                     exe_high = exe_src
@@ -252,34 +249,20 @@ def _get_viewer_data(data_source):
                     exe_low = exe_src
                     exe_high = exe_tgt
 
-                edges_list = [(sys_pathnames_dict[s], sys_pathnames_dict[t])
-                              for s, order_s, t, order_t in edge_orders
-                              if exe_low <= order_s <= exe_high
-                              and exe_low <= order_t <= exe_high and not (s == src and t == tgt)]
-
-                if edges_list:
-                    for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
-                        for vtgt in vtgtlist:
-                            conn = (vsrc, vtgt)
-                            if conn not in seen:
-                                connections_list.append({'src': vsrc, 'tgt': vtgt,
-                                                         'cycle_arrows': edges_list})
-                                seen.add(conn)
-                else:
-                    for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
-                        for vtgt in vtgtlist:
-                            conn = (vsrc, vtgt)
-                            if conn not in seen:
-                                connections_list.append({'src': vsrc, 'tgt': vtgt})
-                                seen.add(conn)
-        else:
-            for edge in chain(G.edges(strong_comp), G.in_edges(strong_comp)):
-                for vsrc, vtgtlist in iteritems(G.get_edge_data(edge[0], edge[1])['conns']):
+                edges_list = []
+                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
                     for vtgt in vtgtlist:
-                        conn = (vsrc, vtgt)
-                        if conn not in seen:
-                            connections_list.append({'src': vsrc, 'tgt': vtgt})
-                            seen.add(conn)
+                        connections_list.append({'src': vsrc, 'tgt': vtgt,
+                                                 'cycle_arrows': edges_list})
+
+                for s, t in G.edges(strong_comp):
+                    if exe_low <= orders[s] <= exe_high and exe_low <= orders[t] <= exe_high and not (s == src and t == tgt):
+                        edges_list.append((sys_pathnames_dict[s], sys_pathnames_dict[t]))
+
+            else:  # edge is out of the SCC
+                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                    for vtgt in vtgtlist:
+                        connections_list.append({'src': vsrc, 'tgt': vtgt})
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list

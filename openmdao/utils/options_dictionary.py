@@ -23,20 +23,25 @@ class OptionsDictionary(object):
     _dict : dict of dict
         Dictionary of entries. Each entry is a dictionary consisting of value, values,
         types, desc, lower, and upper.
+    _parent_name : str or None
+        If defined, prepend this name to beginning of all exceptions.
     _read_only : bool
         If True, no options can be set after declaration.
     """
 
-    def __init__(self, read_only=False):
+    def __init__(self, parent_name=None, read_only=False):
         """
         Initialize all attributes.
 
         Parameters
         ----------
+        parent_name : str
+            Name or class name of System that owns this OptionsDictionary
         read_only : bool
             If True, setting (via __setitem__ or update) is not permitted.
         """
         self._dict = {}
+        self._parent_name = parent_name
         self._read_only = read_only
 
     def __repr__(self):
@@ -179,6 +184,23 @@ class OptionsDictionary(object):
 
         return '\n'.join(text)
 
+    def _raise(self, msg, exc_type=RuntimeError):
+        """
+        Raise the given exception type, with parent's name prepended to the message.
+
+        Parameters
+        ----------
+        msg : str
+            The error message.
+        exc_type : class
+            The type of the exception to be raised.
+        """
+        if self._parent_name is None:
+            full_msg = msg
+        else:
+            full_msg = '{}: {}'.format(self._parent_name, msg)
+        raise exc_type(full_msg)
+
     def _assert_valid(self, name, value):
         """
         Check whether the given value is valid, where the key has already been declared.
@@ -206,8 +228,9 @@ class OptionsDictionary(object):
                 if value not in values:
                     if isinstance(value, string_types):
                         value = "'{}'".format(value)
-                    raise ValueError("Value ({}) of option '{}' "
-                                     "is not one of {}.".format(value, name, values))
+                    self._raise("Value ({}) of option '{}' is not one of {}.".format(value, name,
+                                                                                     values),
+                                ValueError)
             # If only types is declared
             elif types is not None:
                 if not isinstance(value, types):
@@ -218,22 +241,25 @@ class OptionsDictionary(object):
 
                     if isinstance(types, (set, tuple, list)):
                         typs = tuple([type_.__name__ for type_ in types])
-                        raise TypeError("Value ({}) of option '{}' has type '{}', but one of "
-                                        "types {} was expected.".format(value, name, vtype, typs))
+                        self._raise("Value ({}) of option '{}' has type '{}', but one of "
+                                    "types {} was expected.".format(value, name, vtype, typs),
+                                    TypeError)
                     else:
-                        raise TypeError("Value ({}) of option '{}' has type '{}', but type '{}' "
-                                        "was expected.".format(value, name, vtype, types.__name__))
+                        self._raise("Value ({}) of option '{}' has type '{}', but type '{}' "
+                                    "was expected.".format(value, name, vtype, types.__name__),
+                                    TypeError)
 
             if upper is not None:
                 if value > upper:
-                    raise ValueError("Value ({}) of option '{}' "
-                                     "exceeds maximum allowed value of {}.".format(value, name,
-                                                                                   upper))
+                    self._raise("Value ({}) of option '{}' "
+                                "exceeds maximum allowed value of {}.".format(value, name, upper),
+                                ValueError)
             if lower is not None:
                 if value < lower:
-                    raise ValueError("Value ({}) of option '{}' "
-                                     "is less than minimum allowed value of {}.".format(value, name,
-                                                                                        lower))
+                    self._raise("Value ({}) of option '{}' "
+                                "is less than minimum allowed value of {}.".format(value, name,
+                                                                                   lower),
+                                ValueError)
 
         # General function test
         if meta['check_valid'] is not None:
@@ -279,16 +305,15 @@ class OptionsDictionary(object):
             types = type_
 
         if values is not None and not isinstance(values, (set, list, tuple)):
-            raise TypeError("In declaration of option '%s', the 'values' arg must be of type None,"
-                            " list, or tuple - not %s." % (name, values))
+            self._raise("In declaration of option '%s', the 'values' arg must be of type None,"
+                        " list, or tuple - not %s." % (name, values), TypeError)
 
         if types is not None and not isinstance(types, (type, set, list, tuple)):
-            raise TypeError("In declaration of option '%s', the 'types' arg must be None, a type "
-                            "or a tuple - not %s." % (name, types))
+            self._raise("In declaration of option '%s', the 'types' arg must be None, a type "
+                        "or a tuple - not %s." % (name, types), TypeError)
 
         if types is not None and values is not None:
-            raise RuntimeError("'types' and 'values' were both specified for option '%s'." %
-                               name)
+            self._raise("'types' and 'values' were both specified for option '%s'." % name)
 
         if types is bool:
             values = (True, False)
@@ -379,10 +404,10 @@ class OptionsDictionary(object):
         except KeyError:
             # The key must have been declared.
             msg = "Option '{}' cannot be set because it has not been declared."
-            raise KeyError(msg.format(name))
+            self._raise(msg.format(name), KeyError)
 
         if self._read_only:
-            raise KeyError("Tried to set read-only option '{}'.".format(name))
+            self._raise("Tried to set read-only option '{}'.".format(name), KeyError)
 
         self._assert_valid(name, value)
 
@@ -409,6 +434,6 @@ class OptionsDictionary(object):
             if meta['has_been_set']:
                 return meta['value']
             else:
-                raise RuntimeError("Option '{}' is required but has not been set.".format(name))
+                self._raise("Option '{}' is required but has not been set.".format(name))
         except KeyError:
-            raise KeyError("Option '{}' cannot be found".format(name))
+            self._raise("Option '{}' cannot be found".format(name), KeyError)

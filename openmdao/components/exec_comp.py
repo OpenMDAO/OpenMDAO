@@ -229,7 +229,7 @@ class ExecComp(ExplicitComponent):
         """
         if not self._exprs:
             raise RuntimeError("%s: No valid expressions provided to ExecComp(): %s."
-                               % (self.pathname, self._exprs))
+                               % (self.name4msg, self._exprs))
         outs = set()
         allvars = set()
         exprs = self._exprs
@@ -252,14 +252,14 @@ class ExecComp(ExplicitComponent):
             if arg not in allvars:
                 raise RuntimeError("%s: arg '%s' in call to ExecComp() "
                                    "does not refer to any variable in the "
-                                   "expressions %s" % (self.pathname,
+                                   "expressions %s" % (self.name4msg,
                                                        arg, exprs))
             if isinstance(val, dict):
                 diff = set(val.keys()) - _allowed_meta
                 if diff:
                     raise RuntimeError("%s: the following metadata names were not "
                                        "recognized for variable '%s': %s" %
-                                       (self.pathname, arg, sorted(diff)))
+                                       (self.name4msg, arg, sorted(diff)))
 
                 kwargs2[arg] = val.copy()
 
@@ -268,7 +268,7 @@ class ExecComp(ExplicitComponent):
                         raise RuntimeError("%s: units of '%s' have been specified for "
                                            "variable '%s', but units of '%s' have been "
                                            "specified for the entire component." %
-                                           (self.pathname, val['units'], arg, units))
+                                           (self.name4msg, val['units'], arg, units))
                     else:
                         kwargs2[arg]['units'] = units
 
@@ -277,12 +277,12 @@ class ExecComp(ExplicitComponent):
                         raise RuntimeError("%s: shape of %s has been specified for "
                                            "variable '%s', but shape of %s has been "
                                            "specified for the entire component." %
-                                           (self.pathname, val['shape'], arg, shape))
+                                           (self.name4msg, val['shape'], arg, shape))
                     elif 'value' in val and np.atleast_1d(val['value']).shape != shape:
                         raise RuntimeError("%s: value of shape %s has been specified for "
                                            "variable '%s', but shape of %s has been "
                                            "specified for the entire component." %
-                                           (self.pathname, np.atleast_1d(val['value']).shape,
+                                           (self.name4msg, np.atleast_1d(val['value']).shape,
                                             arg, shape))
                     else:
                         init_vals[arg] = np.ones(shape)
@@ -297,7 +297,7 @@ class ExecComp(ExplicitComponent):
                     elif np.atleast_1d(init_vals[arg]).shape != val['shape']:
                         raise RuntimeError("%s: shape of %s has been specified for variable "
                                            "'%s', but a value of shape %s has been provided." %
-                                           (self.pathname, str(val['shape']), arg,
+                                           (self.name4msg, str(val['shape']), arg,
                                             str(np.atleast_1d(init_vals[arg]).shape)))
                     del kwargs2[arg]['shape']
             else:
@@ -329,7 +329,7 @@ class ExecComp(ExplicitComponent):
                         if oval.size != ival.size:
                             raise RuntimeError("%s: vectorize is True but partial(%s, %s) is not "
                                                "square (shape=(%d, %d))." %
-                                               (self.pathname, out, inp, oval.size, ival.size))
+                                               (self.name4msg, out, inp, oval.size, ival.size))
                         # partial will be declared as diagonal
                         inds = np.arange(oval.size, dtype=int)
                     else:
@@ -348,7 +348,7 @@ class ExecComp(ExplicitComponent):
                 compiled.append(compile(expr, expr, 'exec'))
             except Exception:
                 raise RuntimeError("%s: failed to compile expression '%s'." %
-                                   (self.pathname, exprs[i]))
+                                   (self.name4msg, exprs[i]))
         return compiled
 
     def _parse_for_out_vars(self, s):
@@ -358,7 +358,7 @@ class ExecComp(ExplicitComponent):
             if v in _expr_dict:
                 raise NameError("%s: cannot assign to variable '%s' "
                                 "because it's already defined as an internal "
-                                "function or constant." % (self.pathname, v))
+                                "function or constant." % (self.name4msg, v))
         return vnames
 
     def _parse_for_vars(self, s):
@@ -368,13 +368,13 @@ class ExecComp(ExplicitComponent):
         for v in vnames:
             if v in _disallowed_names:
                 raise NameError("%s: cannot use variable name '%s' because "
-                                "it's a reserved keyword." % (self.pathname, v))
+                                "it's a reserved keyword." % (self.name4msg, v))
             if v in _expr_dict:
                 expvar = _expr_dict[v]
                 if callable(expvar):
                     raise NameError("%s: cannot use '%s' as a variable because "
                                     "it's already defined as an internal "
-                                    "function." % (self.pathname, v))
+                                    "function." % (self.name4msg, v))
                 else:
                     to_remove.append(v)
         return vnames.difference(to_remove)
