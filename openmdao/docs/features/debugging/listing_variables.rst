@@ -129,7 +129,7 @@ more than one tag, you use a list of strings.
     openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple_var_tags
     :layout: interleave
 
-That example showed how to add tags when using the :code:`add_input` and :code`add_output` methods. You can also
+This example showed how to add tags when using the :code:`add_input` and :code:`add_output` methods. You can also
 add tags to :code:`IndepVarComp` and :code:`ExecComp` Components using code like this:
 
 ::
@@ -140,10 +140,11 @@ add tags to :code:`IndepVarComp` and :code:`ExecComp` Components using code like
 
     ec = om.ExecComp('y=x+z+1.',
                       x={'value': 1.0, 'units': 'm', 'tags': 'tagx'},
-                      y={'units': 'm', 'tags': ['tagy','tagq']},
+                      y={'units': 'm', 'tags': ['tagy','tagm']},
                       z={'value': 2.0, 'tags': 'tagz'},
                       ))
 
+Note that outputs of :code:`IndepVarComp` are always tagged with :code:`indep_var_comp`.
 
 *List Residuals Above a Tolerance*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
