@@ -295,10 +295,10 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
 
     def test_list_inputs_outputs_with_tags(self):
-        prob = Problem()
+        prob = om.Problem()
         model = prob.model
 
-        indep = model.add_subsystem('indep', IndepVarComp())
+        indep = model.add_subsystem('indep', om.IndepVarComp())
         indep.add_discrete_output('x', 11)
 
         model.add_subsystem('expl', ModCompEx(3))

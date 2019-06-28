@@ -48,12 +48,12 @@ class IndepVarComp(ExplicitComponent):
         self._indep_external = []
         self._indep_external_discrete = []
 
-        if not 'tags' in kwargs:
+        if 'tags' not in kwargs:
             kwargs['tags'] = []
         else:
             if isinstance(kwargs['tags'], str):
                 kwargs['tags'] = [kwargs['tags'], ]
-        kwargs['tags'].append('indep_var_comp') # Tag all indep var comps this way
+        kwargs['tags'].append('indep_var_comp')  # Tag all indep var comps this way
 
         # A single variable is declared during instantiation
         if isinstance(name, string_types):

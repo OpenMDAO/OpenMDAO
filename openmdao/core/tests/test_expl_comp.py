@@ -688,7 +688,7 @@ class ExplCompTestCase(unittest.TestCase):
                                     print_arrays=True)
 
     def test_simple_var_tags(self):
-        prob = Problem(RectangleCompWithTags())
+        prob = om.Problem(RectangleCompWithTags())
         prob.setup(check=False)
         prob.run_model()
 

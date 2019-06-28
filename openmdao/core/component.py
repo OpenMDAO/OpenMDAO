@@ -25,9 +25,9 @@ import openmdao.utils.coloring as coloring_mod
 
 # the following metadata will be accessible for vars on all procs
 global_meta_names = {
-    'input': ('units', 'shape', 'size', 'distributed','tags'),
+    'input': ('units', 'shape', 'size', 'distributed', 'tags'),
     'output': ('units', 'shape', 'size',
-               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper','tags'),
+               'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags'),
 }
 
 _full_slice = slice(None)
