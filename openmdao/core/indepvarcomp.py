@@ -48,6 +48,13 @@ class IndepVarComp(ExplicitComponent):
         self._indep_external = []
         self._indep_external_discrete = []
 
+        if not 'tags' in kwargs:
+            kwargs['tags'] = []
+        else:
+            if isinstance(kwargs['tags'], str):
+                kwargs['tags'] = [kwargs['tags'], ]
+        kwargs['tags'].append('indep_var_comp') # Tag all indep var comps this way
+
         # A single variable is declared during instantiation
         if isinstance(name, string_types):
             self._indep.append((name, val, kwargs))
@@ -142,12 +149,15 @@ class IndepVarComp(ExplicitComponent):
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
-        tags : str or list of strs or tuple of strs
+        tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
-            list_outputs and also when listing results from case recorders.
+            list_outputs.
         """
         if res_ref is None:
             res_ref = ref
+
+        if tags is not None and not isinstance(tags, (str, list)):
+            raise TypeError('The tags argument should be a str, list, or tuple')
 
         if not tags:
             tags = []
@@ -173,10 +183,18 @@ class IndepVarComp(ExplicitComponent):
             The initial value of the variable being added in user-defined units. Default is 1.0.
         desc : str
             description of the variable.
-        tags : str or list of strs or tuple of strs
+        tags : str or list of strs
             User defined tags that can be used to filter what gets listed when calling
-            list_outputs and also when listing results from case recorders.
+            list_outputs.
         """
+        if tags is not None and not isinstance(tags, (str, list)):
+            raise TypeError('The tags argument should be a str, list, or tuple')
+
+        if not tags:
+            tags = []
+        elif isinstance(tags, str):
+            tags = [tags, ]
+
         kwargs = {'desc': desc, 'tags': tags}
         self._indep_external_discrete.append((name, val, kwargs))
 

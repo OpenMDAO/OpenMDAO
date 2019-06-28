@@ -105,19 +105,25 @@ class TestIndepVarComp(unittest.TestCase):
         prob.run_model()
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(out_stream=None)
+        outputs = prob.model.list_outputs(values=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('indep_var', {'value': [1.]}),
+            ('indep_var', {}),
+        ])
+
+        # Outputs with automatically added indep_var_comp tag
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="indep_var_comp")
+        self.assertEqual(sorted(outputs), [
+            ('indep_var', {}),
         ])
 
         # Outputs with tag
-        outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('indep_var', {'value': [1.]}),
+            ('indep_var', {}),
         ])
 
         # Outputs with wrong tag
-        outputs = prob.model.list_outputs(out_stream=None, tags="tag_wrong")
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
 
     def test_add_output_with_tags(self):

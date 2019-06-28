@@ -2953,7 +2953,7 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        tags : str or list of strs or tuple of strs
+        tags : str or list of strs
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
@@ -3083,7 +3083,7 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
-        tags : str or list of strs or tuple of strs
+        tags : str or list of strs
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.

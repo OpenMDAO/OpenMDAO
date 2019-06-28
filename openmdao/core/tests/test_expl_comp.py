@@ -765,49 +765,49 @@ class ExplCompTestCase(unittest.TestCase):
         prob.run_model()
 
         # Inputs no tags
-        inputs = prob.model.list_inputs(out_stream=None)
+        inputs = prob.model.list_inputs(values=False, out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('length', {'value': [1.]}),
-            ('width', {'value': [1.]}),
+            ('length', {}),
+            ('width', {}),
         ])
 
         # Inputs with tags
-        inputs = prob.model.list_inputs(out_stream=None, tags="tag1")
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag1")
         self.assertEqual(sorted(inputs), [
-            ('length', {'value': [1.]}),
+            ('length', {}),
         ])
 
         # Inputs with multiple tags
-        inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag2"])
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags=["tag1", "tag2"])
         self.assertEqual(sorted(inputs), [
-            ('length', {'value': [1.]}),
-            ('width', {'value': [1.]}),
+            ('length', {}),
+            ('width', {}),
         ])
 
         # Inputs with tag that does not match
-        inputs = prob.model.list_inputs(out_stream=None, tags="tag3")
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag3")
         self.assertEqual(sorted(inputs), [])
 
         # Outputs no tags
-        outputs = prob.model.list_outputs(out_stream=None)
+        outputs = prob.model.list_outputs(values=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('area', {'value': [1.]}),
+            ('area', {}),
         ])
 
         # Outputs with tags
-        outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
         self.assertEqual(sorted(outputs), [
-            ('area', {'value': [1.]}),
+            ('area', {}),
         ])
 
         # Outputs with multiple tags
-        outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag3"])
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags=["tag1", "tag3"])
         self.assertEqual(sorted(outputs), [
-            ('area', {'value': [1.]}),
+            ('area', {}),
         ])
 
         # Outputs with tag that does not match
-        outputs = prob.model.list_outputs(out_stream=None, tags="tag3")
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag3")
         self.assertEqual(sorted(outputs), [])
 
 

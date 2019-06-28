@@ -122,12 +122,27 @@ you can enable the display of promoted names by setting the optional argument,
 When you add inputs and outputs to components, you can optionally set tags on the variables. These tags can then be
 used to filter what variables are printed and returned by the :code:`System.list_inputs` and :code:`System.list_outputs`
 methods. Each of those methods has an optional argument :code:`tags` for that purpose. Here is a simple example to show
-you how this works. Notice that if you only have one tag, you can set the :code:`tags` to a string. If you have more
-than one tag, you use a list of strings.
+you how this works. Notice that if you only have one tag, you can set the argument :code:`tags` to a string. If you have
+more than one tag, you use a list of strings.
 
 .. embed-code::
     openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_feature_simple_var_tags
     :layout: interleave
+
+That example showed how to add tags when using the :code:`add_input` and :code`add_output` methods. You can also
+add tags to :code:`IndepVarComp` and :code:`ExecComp` Components using code like this:
+
+::
+
+    comp = IndepVarComp('indep_var', tags='tag1')
+
+::
+
+    ec = om.ExecComp('y=x+z+1.',
+                      x={'value': 1.0, 'units': 'm', 'tags': 'tagx'},
+                      y={'units': 'm', 'tags': ['tagy','tagq']},
+                      z={'value': 2.0, 'tags': 'tagz'},
+                      ))
 
 
 *List Residuals Above a Tolerance*

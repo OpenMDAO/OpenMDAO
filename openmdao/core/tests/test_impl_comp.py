@@ -190,26 +190,29 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(text.count('comp3.'), 3)
         self.assertEqual(text.count('value'), 1)
 
-    def test_list_inputs_with_tag(self):
+    def test_list_inputs_with_tags(self):
         self.prob.run_model()
 
-        inputs = self.prob.model.list_inputs(hierarchical=False, out_stream=None)
+        # No tags
+        inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('comp2.a', {'value': [1.]}),
-            ('comp2.b', {'value': [-4.]}),
-            ('comp2.c', {'value': [3.]}),
-            ('comp3.a', {'value': [1.]}),
-            ('comp3.b', {'value': [-4.]}),
-            ('comp3.c', {'value': [3.]})
+            ('comp2.a', {}),
+            ('comp2.b', {}),
+            ('comp2.c', {}),
+            ('comp3.a', {}),
+            ('comp3.b', {}),
+            ('comp3.c', {})
         ])
 
-        inputs = self.prob.model.list_inputs(hierarchical=False, out_stream=None, tags='tag_a')
+        # With tag
+        inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None, tags='tag_a')
         self.assertEqual(sorted(inputs), [
-            ('comp2.a', {'value': [1.]}),
-            ('comp3.a', {'value': [1.]}),
+            ('comp2.a', {}),
+            ('comp3.a', {}),
         ])
 
-        inputs = self.prob.model.list_inputs(hierarchical=False, out_stream=None, tags='tag_wrong')
+        # Wrong tag
+        inputs = self.prob.model.list_inputs(values=False, hierarchical=False, out_stream=None, tags='tag_wrong')
         self.assertEqual(sorted(inputs), [])
 
     def test_list_inputs_prom_name(self):
@@ -249,18 +252,22 @@ class ImplicitCompTestCase(unittest.TestCase):
     def test_list_explicit_outputs_with_tags(self):
         self.prob.run_model()
 
+        # No tags
         outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None)
         self.assertEqual(sorted(outputs), [
             ('comp2.x', {'value': [3.]}),
             ('comp3.x', {'value': [3.]}),
         ])
 
+        # With tag
         outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None,
                                                tags="tag_x")
         self.assertEqual(sorted(outputs), [
             ('comp2.x', {'value': [3.]}),
             ('comp3.x', {'value': [3.]}),
         ])
+
+        # Wrong tag
         outputs = self.prob.model.list_outputs(explicit=False, hierarchical=False, out_stream=None,
                                                tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
