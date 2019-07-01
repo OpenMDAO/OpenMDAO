@@ -98,7 +98,7 @@ class IndepVarComp(ExplicitComponent):
             raise RuntimeError("{}: No outputs (independent variables) have been declared. "
                                "They must either be declared during "
                                "instantiation or by calling add_output or add_discrete_output "
-                               "afterwards.".format(self.name4msg))
+                               "afterwards.".format(self.msginfo))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None):

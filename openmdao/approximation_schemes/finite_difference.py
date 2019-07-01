@@ -59,7 +59,7 @@ def _generate_fd_coeff(form, order, system):
     except KeyError:
         # TODO: Automatically generate requested form and store in dict.
         raise ValueError('{}: Finite Difference form="{}" and order={} are not '
-                         'supported'.format(system.name4msg, form, order))
+                         'supported'.format(system.msginfo, form, order))
     return fd_form
 
 
@@ -121,7 +121,7 @@ class FiniteDifference(ApproximationScheme):
                 options['order'] = DEFAULT_ORDER[options['form']]
             else:
                 raise ValueError("{}: '{}' is not a valid form of finite difference; must be "
-                                 "one of {}".format(system.name4msg, form,
+                                 "one of {}".format(system.msginfo, form,
                                                     list(DEFAULT_ORDER.keys())))
 
         key = (abs_key[1], options['form'], options['order'],

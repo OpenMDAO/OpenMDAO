@@ -75,14 +75,14 @@ class AddSubtractComp(ExplicitComponent):
             self._add_systems.append((output_name, input_names, vec_size, length, val,
                                       scaling_factors, kwargs))
         elif isinstance(output_name, collections.Iterable):
-            raise NotImplementedError(self.name4msg + ': Declaring multiple addition systems '
+            raise NotImplementedError(self.msginfo + ': Declaring multiple addition systems '
                                       'on initiation is not implemented.'
                                       'Use a string to name a single addition relationship or use '
                                       'multiple add_output calls')
         elif output_name is None:
             pass
         else:
-            raise ValueError(self.name4msg + ": first argument to adder init must be either of "
+            raise ValueError(self.msginfo + ": first argument to adder init must be either of "
                              "type `str' or 'None'")
 
     def initialize(self):
@@ -162,7 +162,7 @@ class AddSubtractComp(ExplicitComponent):
         """
         Use add_equation instead of add_output to define equation systems.
         """
-        raise NotImplementedError(self.name4msg + ': Use add_equation method, not add_output '
+        raise NotImplementedError(self.msginfo + ': Use add_equation method, not add_output '
                                   'method to create an addition/subtraction relation')
 
     def setup(self):
@@ -181,7 +181,7 @@ class AddSubtractComp(ExplicitComponent):
                 scaling_factors = np.ones(len(input_names))
 
             if len(scaling_factors) != len(input_names):
-                raise ValueError(self.name4msg + ': Scaling factors list needs to be same length '
+                raise ValueError(self.msginfo + ': Scaling factors list needs to be same length '
                                  'as input names')
             if length == 1:
                 shape = (vec_size,)

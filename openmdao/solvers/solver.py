@@ -161,7 +161,7 @@ class Solver(object):
         self._solver_info = None
 
         # Solver options
-        self.options = OptionsDictionary(parent_name=self.name4msg)
+        self.options = OptionsDictionary(parent_name=self.msginfo)
         self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
@@ -174,7 +174,7 @@ class Solver(object):
                              desc="When True, AnalysisError will be raised if we don't converge.")
 
         # Case recording options
-        self.recording_options = OptionsDictionary(parent_name=self.name4msg)
+        self.recording_options = OptionsDictionary(parent_name=self.msginfo)
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
                                        solver level')
@@ -199,7 +199,7 @@ class Solver(object):
         self._norm0 = 0.0
 
         # What the solver supports.
-        self.supports = OptionsDictionary(parent_name=self.name4msg)
+        self.supports = OptionsDictionary(parent_name=self.msginfo)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('implicit_components', types=bool, default=False)
 
@@ -211,7 +211,7 @@ class Solver(object):
         self.cite = ""
 
     @property
-    def name4msg(self):
+    def msginfo(self):
         """
         Return info to prepend to messages.
 
@@ -222,7 +222,7 @@ class Solver(object):
         """
         if self._system is None:
             return type(self).__name__
-        return '{} in {}'.format(type(self).__name__, self._system.name4msg)
+        return '{} in {}'.format(type(self).__name__, self._system.msginfo)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -270,7 +270,7 @@ class Solver(object):
         self._recording_iter = system._recording_iter
 
         if system.pathname:
-            parent_name = "%s in %s" % (type(self).__name__, system.name4msg)
+            parent_name = "%s in %s" % (type(self).__name__, system.msginfo)
             self.options._parent_name = parent_name
             self.recording_options._parent_name = parent_name
             self.supports._parent_name = parent_name

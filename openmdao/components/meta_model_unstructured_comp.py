@@ -119,7 +119,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
                 raise RuntimeError("%s: First dimension of input '%s' must be %d"
-                                   % (self.name4msg, name, vec_size))
+                                   % (self.msginfo, name, vec_size))
             input_size = metadata['value'][0].size
         else:
             input_size = metadata['value'].size
@@ -168,7 +168,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         if vec_size > 1:
             if metadata['shape'][0] != vec_size:
                 raise RuntimeError("%s: First dimension of output '%s' must be %d"
-                                   % (self.name4msg, name, vec_size))
+                                   % (self.msginfo, name, vec_size))
             output_shape = metadata['shape'][1:]
             if len(output_shape) == 0:
                 output_shape = 1
@@ -562,12 +562,12 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 msg = "{}: Each variable must have the same number"\
                       " of training points. Expected {} but found {} "\
                       "points for '{}'."\
-                      .format(self.name4msg, num_sample, len(val), name)
+                      .format(self.msginfo, num_sample, len(val), name)
                 raise RuntimeError(msg)
 
         if len(missing_training_data) > 0:
             msg = "%s: The following training data sets must be " \
-                  "provided as options: " % self.name4msg + \
+                  "provided as options: " % self.msginfo + \
                   str(missing_training_data)
             raise RuntimeError(msg)
 
@@ -605,7 +605,7 @@ class MetaModelUnStructuredComp(ExplicitComponent):
             surrogate = self._metadata(name).get('surrogate')
             if surrogate is None:
                 raise RuntimeError("%s: No surrogate specified for output '%s'"
-                                   % (self.name4msg, name))
+                                   % (self.msginfo, name))
             else:
                 surrogate.train(self._training_input,
                                 self._training_output[name])

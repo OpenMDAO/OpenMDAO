@@ -87,7 +87,7 @@ class MuxComp(ExplicitComponent):
 
             if ax > in_dimension:
                 raise ValueError('{3}: Cannot mux a {0}D inputs for {2} along axis greater '
-                                 'than {0} ({1})'.format(in_dimension, ax, var, self.name4msg))
+                                 'than {0} ({1})'.format(in_dimension, ax, var, self.msginfo))
 
             self.add_output(name=var,
                             val=options['val'],

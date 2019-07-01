@@ -762,11 +762,11 @@ class MetaModelStructuredComp(ExplicitComponent):
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
                 errmsg = "{}: Error interpolating output '{}' because input '{}' " \
                     "was out of bounds ('{}', '{}') with " \
-                    "value '{}'".format(self.name4msg, out_name, varname_causing_error,
+                    "value '{}'".format(self.msginfo, out_name, varname_causing_error,
                                         err.lower, err.upper, err.value)
                 raise_from(AnalysisError(errmsg), None)
             except ValueError as err:
-                raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.name4msg,
+                raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
                                                                                    out_name,
                                                                                    str(err)))
             outputs[out_name] = val

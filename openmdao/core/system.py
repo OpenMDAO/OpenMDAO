@@ -451,7 +451,7 @@ class System(object):
         self._first_call_to_linearize = True   # will check in first call to _linearize
 
     @property
-    def name4msg(self):
+    def msginfo(self):
         """
         Our instance pathname, if available, or our class name.  For use in error messages.
 
@@ -683,7 +683,7 @@ class System(object):
             return None
         if method not in _supported_methods:
             msg = '{}: Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(self.name4msg, method,
+            raise ValueError(msg.format(self.msginfo, method,
                              [m for m in _supported_methods if m != 'exact']))
         if method not in self._approx_schemes:
             self._approx_schemes[method] = _supported_methods[method]()
@@ -961,7 +961,7 @@ class System(object):
             If True, display sparsity with coloring info after generating coloring.
         """
         if method not in ('fd', 'cs'):
-            raise RuntimeError("{}: method must be one of ['fd', 'cs'].".format(self.name4msg))
+            raise RuntimeError("{}: method must be one of ['fd', 'cs'].".format(self.msginfo))
 
         self._has_approx = True
         approx = self._get_approx_scheme(method)
@@ -1047,7 +1047,7 @@ class System(object):
             else:  # no approx derivs found
                 simple_warning("%s: No approx partials found but coloring was requested.  "
                                "Declaring ALL partials as approx (method='%s')" %
-                               (self.name4msg, self._coloring_info['method']))
+                               (self.msginfo, self._coloring_info['method']))
                 try:
                     self.declare_partials('*', '*', method=self._coloring_info['method'])
                 except AttributeError:  # this system must be a group
@@ -1269,12 +1269,12 @@ class System(object):
                 fname = self.get_approx_coloring_fname()
             else:
                 fname = coloring
-            print("%s: loading coloring from file %s" % (self.name4msg, fname))
+            print("%s: loading coloring from file %s" % (self.msginfo, fname))
             info['coloring'] = coloring = Coloring.load(fname)
             if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
                 raise RuntimeError("%s: Loaded coloring has different wrt_patterns (%s) than "
                                    "declared ones (%s)." %
-                                   (self.name4msg, coloring._meta['wrt_patterns'],
+                                   (self.msginfo, coloring._meta['wrt_patterns'],
                                     info['wrt_patterns']))
             info.update(info['coloring']._meta)
             approx = self._get_approx_scheme(info['method'])
@@ -1319,7 +1319,7 @@ class System(object):
         num_par_fd = self._num_par_fd
         if comm.size < num_par_fd:
             raise ValueError("%s: num_par_fd must be <= communicator size (%d)" %
-                             (self.name4msg, comm.size))
+                             (self.msginfo, comm.size))
 
         self._full_comm = comm
 
@@ -1470,7 +1470,7 @@ class System(object):
                 dim1 = global_size // high_size
                 if global_size % high_size != 0:
                     raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                                       "with local shape %s" % (self.name4msg, abs_name,
+                                       "with local shape %s" % (self.msginfo, abs_name,
                                                                 global_size, local_shape))
                 global_shape = tuple([dim1] + list(high_dims))
             else:
@@ -1647,7 +1647,7 @@ class System(object):
         if not alloc_complex and 'cs' in self._approx_schemes:
             raise RuntimeError("{}: In order to activate complex step during reconfiguration, "
                                "you need to set 'force_alloc_complex' to True during setup. e.g. "
-                               "'problem.setup(force_alloc_complex=True)'".format(self.name4msg))
+                               "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
 
         vector_class = self._vector_class
 
@@ -1821,7 +1821,7 @@ class System(object):
         if asm_jac is not None:
             if self.matrix_free:
                 raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
-                                   "subcomponent." % self.name4msg)
+                                   "subcomponent." % self.msginfo)
 
         if recurse:
             for subsys in self._subsystems_myproc:
@@ -1920,14 +1920,14 @@ class System(object):
                     call = 'promotes_%ss' % io_types[0]
                 raise RuntimeError("%s: '%s' failed to find any matches for the following "
                                    "names or patterns: %s." %
-                                   (self.name4msg, call, sorted(not_found)))
+                                   (self.msginfo, call, sorted(not_found)))
 
         maps = {'input': {}, 'output': {}}
 
         if self._var_promotes['input'] or self._var_promotes['output']:
             if self._var_promotes['any']:
                 raise RuntimeError("%s: 'promotes' cannot be used at the same time as "
-                                   "'promotes_inputs' or 'promotes_outputs'." % self.name4msg)
+                                   "'promotes_inputs' or 'promotes_outputs'." % self.msginfo)
             resolve(self._var_promotes['input'], ('input',), maps, prom_names)
             resolve(self._var_promotes['output'], ('output',), maps, prom_names)
         else:
@@ -2137,7 +2137,7 @@ class System(object):
         """
         if self._inputs is None:
             raise RuntimeError("{}: Cannot get vectors because setup has not yet been "
-                               "called.".format(self.name4msg))
+                               "called.".format(self.msginfo))
 
         return self._inputs, self._outputs, self._residuals
 
@@ -2157,10 +2157,10 @@ class System(object):
         """
         if self._inputs is None:
             raise RuntimeError("{}: Cannot get vectors because setup has not yet been "
-                               "called.".format(self.name4msg))
+                               "called.".format(self.msginfo))
 
         if vec_name not in self._vectors['input']:
-            raise ValueError("%s: There is no linear vector named %s" % (self.name4msg, vec_name))
+            raise ValueError("%s: There is no linear vector named %s" % (self.msginfo, vec_name))
 
         return (self._vectors['input'][vec_name],
                 self._vectors['output'][vec_name],
@@ -2394,11 +2394,11 @@ class System(object):
         """
         if name in self._design_vars or name in self._static_design_vars:
             msg = "{}: Design Variable '{}' already exists."
-            raise RuntimeError(msg.format(self.name4msg, name))
+            raise RuntimeError(msg.format(self.msginfo, name))
 
         # Name must be a string
         if not isinstance(name, string_types):
-            raise TypeError('{}: The name argument should be a string, got {}'.format(self.name4msg,
+            raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
 
         # Convert ref/ref0 to ndarray/float as necessary
@@ -2453,7 +2453,7 @@ class System(object):
             if not (isinstance(indices, Iterable) and
                     all([isinstance(i, Integral) for i in indices])):
                 raise ValueError("{}: If specified, design var indices must be a sequence of "
-                                 "integers.".format(self.name4msg))
+                                 "integers.".format(self.msginfo))
 
             indices = np.atleast_1d(indices)
             dvs['size'] = size = len(indices)
@@ -2464,7 +2464,7 @@ class System(object):
                 if isinstance(item, np.ndarray):
                     if item.size != size:
                         raise ValueError("%s: When adding design var '%s', %s should have size "
-                                         "%d but instead has size %d." % (self.name4msg, name,
+                                         "%d but instead has size %d." % (self.msginfo, name,
                                                                           item_name, size,
                                                                           item.size))
 
@@ -2530,18 +2530,18 @@ class System(object):
         # Name must be a string
         if not isinstance(name, string_types):
             raise TypeError('{}: The name argument should be a string, '
-                            'got {}'.format(self.name4msg, name))
+                            'got {}'.format(self.msginfo, name))
 
         # Type must be a string and one of 'con' or 'obj'
         if not isinstance(type_, string_types):
-            raise TypeError('{}: The type argument should be a string'.format(self.name4msg))
+            raise TypeError('{}: The type argument should be a string'.format(self.msginfo))
         elif type_ not in ('con', 'obj'):
             raise ValueError('{}: The type must be one of \'con\' or \'obj\': '
-                             'Got \'{}\' instead'.format(self.name4msg, name))
+                             'Got \'{}\' instead'.format(self.msginfo, name))
 
         if name in self._responses or name in self._static_responses:
             typemap = {'con': 'Constraint', 'obj': 'Objective'}
-            msg = "{}: {} '{}' already exists.".format(self.name4msg, typemap[type_], name)
+            msg = "{}: {} '{}' already exists.".format(self.msginfo, typemap[type_], name)
             raise RuntimeError(msg.format(name))
 
         # Convert ref/ref0 to ndarray/float as necessary
@@ -2554,13 +2554,13 @@ class System(object):
         # A constraint cannot be an equality and inequality constraint
         if equals is not None and (lower is not None or upper is not None):
             msg = "{}: Constraint '{}' cannot be both equality and inequality."
-            raise ValueError(msg.format(self.name4msg, name))
+            raise ValueError(msg.format(self.msginfo, name))
 
         # If given, indices must be a sequence
         if (indices is not None and not (
                 isinstance(indices, Iterable) and all([isinstance(i, Integral) for i in indices]))):
             raise ValueError("{}: If specified, response indices must be a sequence of "
-                             "integers.".format(self.name4msg))
+                             "integers.".format(self.msginfo))
 
         if self._static_mode:
             responses = self._static_responses
@@ -2636,7 +2636,7 @@ class System(object):
                 if isinstance(item, np.ndarray):
                     if item.size != size:
                         raise ValueError("%s: When adding %s '%s', %s should have size "
-                                         "%d but instead has size %d." % (self.name4msg, tname,
+                                         "%d but instead has size %d." % (self.msginfo, tname,
                                                                           name, item_name, size,
                                                                           item.size))
         resp['name'] = name
@@ -2771,7 +2771,7 @@ class System(object):
         """
         if index is not None and not isinstance(index, int):
             raise TypeError('{}: If specified, objective index must be '
-                            'an int.'.format(self.name4msg))
+                            'an int.'.format(self.msginfo))
         self.add_response(name, type_='obj', scaler=scaler, adder=adder,
                           ref=ref, ref0=ref0, index=index,
                           parallel_deriv_color=parallel_deriv_color,
@@ -2808,7 +2808,7 @@ class System(object):
                               iteritems(self._design_vars))
         except KeyError as err:
             msg = "{}: Output not found for design variable {}."
-            raise RuntimeError(msg.format(self.name4msg, str(err)))
+            raise RuntimeError(msg.format(self.msginfo, str(err)))
 
         if get_sizes:
             # Size them all
@@ -2863,7 +2863,7 @@ class System(object):
                               iteritems(self._responses))
         except KeyError as err:
             msg = "{}: Output not found for response {}."
-            raise RuntimeError(msg.format(self.name4msg, str(err)))
+            raise RuntimeError(msg.format(self.msginfo, str(err)))
 
         if get_sizes:
             # Size them all
@@ -2988,7 +2988,7 @@ class System(object):
         """
         if self._inputs is None:
             raise RuntimeError("{}: Unable to list inputs until model has "
-                               "been run.".format(self.name4msg))
+                               "been run.".format(self.msginfo))
 
         meta = self._var_abs2meta
         inputs = []
@@ -3093,7 +3093,7 @@ class System(object):
         """
         if self._outputs is None:
             raise RuntimeError("{}: Unable to list outputs until model has "
-                               "been run.".format(self.name4msg))
+                               "been run.".format(self.msginfo))
 
         # Only gathering up values and metadata from this proc, if MPI
         meta = self._var_abs2meta  # This only includes metadata for this process.
@@ -3174,7 +3174,7 @@ class System(object):
         elif implicit:
             return impl_outputs
         else:
-            raise RuntimeError(self.name4msg +
+            raise RuntimeError(self.msginfo +
                                ': You have excluded both Explicit and Implicit components.')
 
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, out_stream):
@@ -3380,7 +3380,7 @@ class System(object):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        raise NotImplementedError(self.name4msg + ": _apply_linear has not been overridden")
+        raise NotImplementedError(self.msginfo + ": _apply_linear has not been overridden")
 
     def _solve_linear(self, vec_names, mode, rel_systems):
         """
@@ -3444,7 +3444,7 @@ class System(object):
             Flag indicating if the recorder should be added to all the subsystems.
         """
         if MPI:
-            raise RuntimeError(self.name4msg + ": Recording of Systems when running parallel "
+            raise RuntimeError(self.msginfo + ": Recording of Systems when running parallel "
                                "code is not supported yet")
 
         self._rec_mgr.append(recorder)
@@ -3467,7 +3467,7 @@ class System(object):
             if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
                               '_solve_nonlinear']:
                 raise ValueError("{}: {} must be one of: '_apply_linear, _apply_nonlinear, "
-                                 "_solve_linear, _solve_nonlinear'".format(self.name4msg, method))
+                                 "_solve_linear, _solve_nonlinear'".format(self.msginfo, method))
 
             if 'nonlinear' in method:
                 inputs, outputs, residuals = self.get_nonlinear_vectors()

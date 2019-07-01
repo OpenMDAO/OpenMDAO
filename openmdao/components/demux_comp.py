@@ -80,11 +80,11 @@ class DemuxComp(ExplicitComponent):
 
             if axis >= len(shape):
                 raise RuntimeError("{}: Invalid axis ({}) for variable '{}' of "
-                                   "shape {}".format(self.name4msg, axis, var, shape))
+                                   "shape {}".format(self.msginfo, axis, var, shape))
 
             if shape[axis] != vec_size:
                 raise RuntimeError("{}: Variable '{}' cannot be demuxed along axis {}. Axis size "
-                                   "is {} but vec_size is {}.".format(self.name4msg, var, axis,
+                                   "is {} but vec_size is {}.".format(self.msginfo, var, axis,
                                                                       shape[axis], vec_size))
 
             self.add_input(var, **kwgs)

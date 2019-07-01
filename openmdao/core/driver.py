@@ -180,7 +180,7 @@ class Driver(object):
         self.options.update(kwargs)
 
     @property
-    def name4msg(self):
+    def msginfo(self):
         """
         Return info to prepend to messages.
 

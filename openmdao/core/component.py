@@ -169,8 +169,8 @@ class Component(System):
         self.pathname = pathname
         self._problem_options = prob_options
 
-        self.options._parent_name = self.name4msg
-        self.recording_options._parent_name = self.name4msg
+        self.options._parent_name = self.msginfo
+        self.recording_options._parent_name = self.msginfo
 
         orig_comm = comm
         if self._num_par_fd > 1:
@@ -178,7 +178,7 @@ class Component(System):
                 comm = self._setup_par_fd_procs(comm)
             elif not MPI:
                 msg = ("%s: MPI is not active but num_par_fd = %d. No parallel finite difference "
-                       "will be performed." % (self.name4msg, self._num_par_fd))
+                       "will be performed." % (self.msginfo, self._num_par_fd))
                 simple_warning(msg)
 
         self.comm = comm
@@ -207,7 +207,7 @@ class Component(System):
         # used by the system setup).
         if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
                                                                 self._approx_schemes):
-            raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.name4msg)
+            raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
 
         # check here if declare_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
@@ -220,7 +220,7 @@ class Component(System):
                 method = self._coloring_info['method']
                 simple_warning("%s: declare_coloring or use_fixed_coloring was called but no approx"
                                " partials were declared.  Declaring all partials as approximated "
-                               "using default metadata and method='%s'." % (self.name4msg, method))
+                               "using default metadata and method='%s'." % (self.msginfo, method))
                 self.declare_partials('*', '*', method=method)
 
         self._static_mode = True
@@ -380,7 +380,7 @@ class Component(System):
         # error if nothing matched
         if not matches_prom:
             raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx partial "
-                             "options: {}.".format(self.name4msg, wrt_patterns))
+                             "options: {}.".format(self.msginfo, wrt_patterns))
 
         info['wrt_matches_prom'] = matches_prom
         info['wrt_matches'] = [rel_name2abs_name(self, n) for n in matches_prom]
@@ -456,27 +456,27 @@ class Component(System):
 
         # First, type check all arguments
         if not isinstance(name, str):
-            raise TypeError('%s: The name argument should be a string.' % self.name4msg)
+            raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not name:
-            raise NameError('%s: The name argument should be a non-empty string.' % self.name4msg)
+            raise NameError('%s: The name argument should be a non-empty string.' % self.msginfo)
         if not _valid_var_name(name):
-            raise NameError("%s: '%s' is not a valid input name." % (self.name4msg, name))
+            raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             raise TypeError('%s: The val argument should be a float, list, tuple, ndarray or '
-                            'Iterable' % self.name4msg)
+                            'Iterable' % self.msginfo)
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
-                            "a '%s' was given" % (self.name4msg, type(shape)))
+                            "a '%s' was given" % (self.msginfo, type(shape)))
         if src_indices is not None and not isinstance(src_indices, (int, list, tuple,
                                                                     ndarray, Iterable)):
             raise TypeError('%s: The src_indices argument should be an int, list, '
-                            'tuple, ndarray or Iterable' % self.name4msg)
+                            'tuple, ndarray or Iterable' % self.msginfo)
         if units is not None and not isinstance(units, str):
-            raise TypeError('%s: The units argument should be a str or None' % self.name4msg)
+            raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
 
         # Check that units are valid
         if units is not None and not valid_units(units):
-            raise ValueError("%s: The units '%s' are invalid" % (self.name4msg, units))
+            raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
 
         metadata = {}
 
@@ -506,7 +506,7 @@ class Component(System):
 
         # Disallow dupes
         if name in var_rel2meta:
-            raise ValueError("{}: Variable name '{}' already exists.".format(self.name4msg, name))
+            raise ValueError("{}: Variable name '{}' already exists.".format(self.msginfo, name))
 
         var_rel2meta[name] = metadata
         var_rel_names['input'].append(name)
@@ -533,11 +533,11 @@ class Component(System):
         """
         # First, type check all arguments
         if not isinstance(name, str):
-            raise TypeError('%s: The name argument should be a string.' % self.name4msg)
+            raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not name:
-            raise NameError('%s: The name argument should be a non-empty string.' % self.name4msg)
+            raise NameError('%s: The name argument should be a non-empty string.' % self.msginfo)
         if not _valid_var_name(name):
-            raise NameError("%s: '%s' is not a valid input name." % (self.name4msg, name))
+            raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
 
         metadata = {
             'value': val,
@@ -552,7 +552,7 @@ class Component(System):
 
         # Disallow dupes
         if name in var_rel2meta:
-            raise ValueError("{}: Variable name '{}' already exists.".format(self.name4msg, name))
+            raise ValueError("{}: Variable name '{}' already exists.".format(self.msginfo, name))
 
         var_rel2meta[name] = self._var_discrete['input'][name] = metadata
 
@@ -615,34 +615,34 @@ class Component(System):
             units = None
 
         if not isinstance(name, str):
-            raise TypeError('%s: The name argument should be a string.' % self.name4msg)
+            raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not name:
-            raise NameError('%s: The name argument should be a non-empty string.' % self.name4msg)
+            raise NameError('%s: The name argument should be a non-empty string.' % self.msginfo)
         if not _valid_var_name(name):
-            raise NameError("%s: '%s' is not a valid output name." % (self.name4msg, name))
+            raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.name4msg)
+            raise TypeError(msg % self.msginfo)
         if not isscalar(ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = '%s: The ref argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.name4msg)
+            raise TypeError(msg % self.msginfo)
         if not isscalar(ref0) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = '%s: The ref0 argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.name4msg)
+            raise TypeError(msg % self.msginfo)
         if not isscalar(res_ref) and not isinstance(val, (list, tuple, ndarray, Iterable)):
             msg = '%s: The res_ref argument should be a float, list, tuple, ndarray or Iterable'
-            raise TypeError(msg % self.name4msg)
+            raise TypeError(msg % self.msginfo)
         if shape is not None and not isinstance(shape, (int, tuple, list, np.integer)):
             raise TypeError("%s: The shape argument should be an int, tuple, or list but "
-                            "a '%s' was given" % (self.name4msg, type(shape)))
+                            "a '%s' was given" % (self.msginfo, type(shape)))
         if units is not None and not isinstance(units, str):
-            raise TypeError('%s: The units argument should be a str or None' % self.name4msg)
+            raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
         if res_units is not None and not isinstance(res_units, str):
-            raise TypeError('%s: The res_units argument should be a str or None' % self.name4msg)
+            raise TypeError('%s: The res_units argument should be a str or None' % self.msginfo)
 
         # Check that units are valid
         if units is not None and not valid_units(units):
-            raise ValueError("%s: The units '%s' are invalid" % (self.name4msg, units))
+            raise ValueError("%s: The units '%s' are invalid" % (self.msginfo, units))
 
         metadata = {}
 
@@ -673,7 +673,7 @@ class Component(System):
                 it = atleast_1d(item)
                 if it.shape != metadata['shape']:
                     raise ValueError("{}: When adding output '{}', expected shape {} but got "
-                                     "shape {} for argument '{}'.".format(self.name4msg, name,
+                                     "shape {} for argument '{}'.".format(self.msginfo, name,
                                                                           metadata['shape'],
                                                                           it.shape, item_name))
 
@@ -712,7 +712,7 @@ class Component(System):
 
         # Disallow dupes
         if name in var_rel2meta:
-            raise ValueError("{}: Variable name '{}' already exists.".format(self.name4msg, name))
+            raise ValueError("{}: Variable name '{}' already exists.".format(self.msginfo, name))
 
         var_rel2meta[name] = metadata
         var_rel_names['output'].append(name)
@@ -738,11 +738,11 @@ class Component(System):
             metadata for added variable
         """
         if not isinstance(name, str):
-            raise TypeError('%s: The name argument should be a string.' % self.name4msg)
+            raise TypeError('%s: The name argument should be a string.' % self.msginfo)
         if not name:
-            raise NameError('%s: The name argument should be a non-empty string.' % self.name4msg)
+            raise NameError('%s: The name argument should be a non-empty string.' % self.msginfo)
         if not _valid_var_name(name):
-            raise NameError("%s: '%s' is not a valid output name." % (self.name4msg, name))
+            raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
 
         metadata = {
             'value': val,
@@ -757,7 +757,7 @@ class Component(System):
 
         # Disallow dupes
         if name in var_rel2meta:
-            raise ValueError("{}: Variable name '{}' already exists.".format(self.name4msg, name))
+            raise ValueError("{}: Variable name '{}' already exists.".format(self.msginfo, name))
 
         var_rel2meta[name] = self._var_discrete['output'][name] = metadata
 
@@ -789,10 +789,10 @@ class Component(System):
             of_pattern, of_matches = of_bundle
             wrt_pattern, wrt_matches = wrt_bundle
             if not of_matches:
-                raise ValueError('{}: No matches were found for of="{}"'.format(self.name4msg,
+                raise ValueError('{}: No matches were found for of="{}"'.format(self.msginfo,
                                                                                 of_pattern))
             if not wrt_matches:
-                raise ValueError('{}: No matches were found for wrt="{}"'.format(self.name4msg,
+                raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
                                                                                  wrt_pattern))
 
             info = self._subjacs_info
@@ -857,7 +857,7 @@ class Component(System):
             method_func = _supported_methods[method]
         except KeyError:
             msg = '{}: d({})/d({}): method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(self.name4msg, of, wrt, method, sorted(_supported_methods)))
+            raise ValueError(msg.format(self.msginfo, of, wrt, method, sorted(_supported_methods)))
 
         if isinstance(of, list):
             of = tuple(of)
@@ -870,7 +870,7 @@ class Component(System):
         # If only one of rows/cols is specified
         if (rows is None) ^ (cols is None):
             raise ValueError('{}: d({})/d({}): If one of rows/cols is specified, then '
-                             'both must be specified.'.format(self.name4msg, of, wrt))
+                             'both must be specified.'.format(self.msginfo, of, wrt))
 
         if dependent:
             meta['value'] = val
@@ -884,7 +884,7 @@ class Component(System):
                     raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
                                        "with rows and cols, which should be arrays of equal length,"
                                        " but rows is length {} while cols is length "
-                                       "{}.".format(self.name4msg, of, wrt, len(rows), len(cols)))
+                                       "{}.".format(self.msginfo, of, wrt, len(rows), len(cols)))
 
                 # Check for repeated rows/cols indices.
                 idxset = set(zip(rows, cols))
@@ -892,7 +892,7 @@ class Component(System):
                     dups = [n for n, val in iteritems(Counter(zip(rows, cols))) if val > 1]
                     raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
                                        "with rows and cols that specify the following duplicate "
-                                       "subjacobian entries: {}.".format(self.name4msg, of, wrt,
+                                       "subjacobian entries: {}.".format(self.msginfo, of, wrt,
                                                                          sorted(dups)))
 
         if method_func is not None:
@@ -906,7 +906,7 @@ class Component(System):
             # If rows/cols is specified
             if rows is not None or cols is not None:
                 raise ValueError("{}: d({})/d({}): Sparse FD specification not supported "
-                                 "yet.".format(self.name4msg, of, wrt))
+                                 "yet.".format(self.msginfo, of, wrt))
         else:
             default_opts = ()
 
@@ -915,19 +915,19 @@ class Component(System):
                 meta['step'] = step
             else:
                 raise RuntimeError("{}: d({})/d({}): 'step' is not a valid option for "
-                                   "'{}'".format(self.name4msg, of, wrt, method))
+                                   "'{}'".format(self.msginfo, of, wrt, method))
         if form:
             if 'form' in default_opts:
                 meta['form'] = form
             else:
                 raise RuntimeError("{}: d({})/d({}): 'form' is not a valid option for "
-                                   "'{}'".format(self.name4msg, of, wrt, method))
+                                   "'{}'".format(self.msginfo, of, wrt, method))
         if step_calc:
             if 'step_calc' in default_opts:
                 meta['step_calc'] = step_calc
             else:
                 raise RuntimeError("{}: d({})/d({}): 'step_calc' is not a valid option "
-                                   "for '{}'".format(self.name4msg, of, wrt, method))
+                                   "for '{}'".format(self.msginfo, of, wrt, method))
 
         return meta
 
@@ -1013,26 +1013,26 @@ class Component(System):
         supported_methods = ('fd', 'cs')
         if method not in supported_methods:
             msg = "{}: Method '{}' is not supported, method must be one of {}"
-            raise ValueError(msg.format(self.name4msg, method, supported_methods))
+            raise ValueError(msg.format(self.msginfo, method, supported_methods))
 
         if step and not isinstance(step, (int, float)):
             msg = "{}: The value of 'step' must be numeric, but '{}' was specified."
-            raise ValueError(msg.format(self.name4msg, step))
+            raise ValueError(msg.format(self.msginfo, step))
 
         supported_step_calc = ('abs', 'rel')
         if step_calc and step_calc not in supported_step_calc:
             msg = "{}: The value of 'step_calc' must be one of {}, but '{}' was specified."
-            raise ValueError(msg.format(self.name4msg, supported_step_calc, step_calc))
+            raise ValueError(msg.format(self.msginfo, supported_step_calc, step_calc))
 
         if not isinstance(wrt, (string_types, list, tuple)):
             msg = "{}: The value of 'wrt' must be a string or list of strings, but a type " \
                   "of '{}' was provided."
-            raise ValueError(msg.format(self.name4msg, type(wrt).__name__))
+            raise ValueError(msg.format(self.msginfo, type(wrt).__name__))
 
         if not isinstance(directional, bool):
             msg = "{}: The value of 'directional' must be True or False, but a type " \
                   "of '{}' was provided."
-            raise ValueError(msg.format(self.name4msg, type(directional).__name__))
+            raise ValueError(msg.format(self.msginfo, type(directional).__name__))
 
         wrt_list = [wrt] if isinstance(wrt, string_types) else wrt
         self._declared_partial_checks.append((wrt_list, method, form, step, step_calc,
@@ -1081,7 +1081,7 @@ class Component(System):
 
         if invalid_wrt:
             msg = "{}: Invalid 'wrt' variables specified for check_partial options: {}."
-            raise ValueError(msg.format(self.name4msg, invalid_wrt))
+            raise ValueError(msg.format(self.msginfo, invalid_wrt))
 
         return opts
 
@@ -1115,7 +1115,7 @@ class Component(System):
 
                 if rows.shape != cols.shape:
                     raise ValueError('{}: d({})/d({}): rows and cols must have the same shape,'
-                                     ' rows: {}, cols: {}'.format(self.name4msg, of, wrt,
+                                     ' rows: {}, cols: {}'.format(self.msginfo, of, wrt,
                                                                   rows.shape, cols.shape))
 
                 if is_scalar:
@@ -1131,7 +1131,7 @@ class Component(System):
                     if rows.shape != val.shape:
                         raise ValueError('{}: d({})/d({}): If rows and cols are specified, val '
                                          'must be a scalar or have the same shape, val: {}, '
-                                         'rows/cols: {}'.format(self.name4msg, of, wrt,
+                                         'rows/cols: {}'.format(self.msginfo, of, wrt,
                                                                 val.shape, rows.shape))
                 else:
                     val = np.zeros_like(rows, dtype=float)
@@ -1139,10 +1139,10 @@ class Component(System):
                 if rows.size > 0:
                     if rows.min() < 0:
                         msg = '{}: d({})/d({}): row indices must be non-negative'
-                        raise ValueError(msg.format(self.name4msg, of, wrt))
+                        raise ValueError(msg.format(self.msginfo, of, wrt))
                     if cols.min() < 0:
                         msg = '{}: d({})/d({}): col indices must be non-negative'
-                        raise ValueError(msg.format(self.name4msg, of, wrt))
+                        raise ValueError(msg.format(self.msginfo, of, wrt))
                     rows_max = rows.max()
                     cols_max = cols.max()
                 else:
@@ -1166,10 +1166,10 @@ class Component(System):
             of_pattern, of_matches = of_bundle
             wrt_pattern, wrt_matches = wrt_bundle
             if not of_matches:
-                raise ValueError('{}: No matches were found for of="{}"'.format(self.name4msg,
+                raise ValueError('{}: No matches were found for of="{}"'.format(self.msginfo,
                                                                                 of_pattern))
             if not wrt_matches:
-                raise ValueError('{}: No matches were found for wrt="{}"'.format(self.name4msg,
+                raise ValueError('{}: No matches were found for wrt="{}"'.format(self.msginfo,
                                                                                  wrt_pattern))
 
             for rel_key in product(of_matches, wrt_matches):
@@ -1205,7 +1205,7 @@ class Component(System):
                 if rows_max >= shape[0] or cols_max >= shape[1]:
                     of, wrt = rel_key
                     msg = '{}: d({})/d({}): Expected {}x{} but declared at least {}x{}'
-                    raise ValueError(msg.format(self.name4msg, of, wrt, shape[0], shape[1],
+                    raise ValueError(msg.format(self.msginfo, of, wrt, shape[0], shape[1],
                                                 rows_max + 1, cols_max + 1))
 
                 self._check_partials_meta(abs_key, meta['value'],
@@ -1269,7 +1269,7 @@ class Component(System):
             if val_out > out_size or val_in > in_size:
                 of, wrt = abs_key2rel_key(self, abs_key)
                 msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
-                raise ValueError(msg.format(self.name4msg, of, wrt, out_size, in_size,
+                raise ValueError(msg.format(self.msginfo, of, wrt, out_size, in_size,
                                             val_out, val_in))
 
     def _set_approx_partials_meta(self):
