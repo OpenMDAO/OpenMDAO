@@ -16,3 +16,4 @@ Sometimes things don't work. We have a set of tools and methods that you can use
     debugging_drivers.rst
     debugging_solvers.rst
     profiling/index.rst
+    controlling_mpi.rst
