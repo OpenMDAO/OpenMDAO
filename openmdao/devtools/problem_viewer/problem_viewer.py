@@ -281,14 +281,22 @@ def _get_viewer_data(data_source):
 
 def view_tree(*args, **kwargs):
     """
-    view_tree was renamed to view_model, but left here for backwards compatibility
+    view_tree was renamed to n2, but left here for backwards compatibility
     """
-    warn_deprecation("view_tree is deprecated. Please switch to view_model.")
-    view_model(*args, **kwargs)
+    warn_deprecation("view_tree is deprecated. Please switch to n2.")
+    n2(*args, **kwargs)
 
 
-def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False,
-               title=None, use_declare_partial_info=False):
+def view_model(*args, **kwargs):
+    """
+    view_model was renamed to n2, but left here for backwards compatibility
+    """
+    warn_deprecation("view_model is deprecated. Please switch to n2.")
+    n2(*args, **kwargs)
+
+
+def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
+       title=None, use_declare_partial_info=False):
     """
     Generates an HTML file containing a tree viewer.
 

@@ -43,7 +43,7 @@ This can be caused by several different things:
 
     - You did run :ref:`check_partials()<feature_check_partials>`, right?!!!
     - Check for missing or incorrect data connections to one or more components.
-        * Use the :ref:`N2 diagram<om-command-view_model>` to inspect your model hierarchy and connections in a matrix format.
+        * Use the :ref:`N2 diagram<om-command-n2>` to inspect your model hierarchy and connections in a matrix format.
         * Use the :ref:`connection viewer <om-command-view_connections>` in a list format.
     - Use :ref:`list_outputs()<list_outputs>` to look at the state variable values and see if anything has taken on a bad value (e.g. 0 or 1e500) that causes the derivative to be ill-defined.
     - Seriously, run :ref:`check_partials()<feature_check_partials>` and look carefully at the output!
@@ -80,10 +80,10 @@ Things to try to help convergence
 Use the BoundsEnforceLS line search to enforce upper and lower bounds
 ---------------------------------------------------------------------
 
-Sometimes the Newton solver will take bad steps along the way to convergence. 
-For example, you might have a pressure value in your model that needs to stay positive always. 
-In that case you can :ref:`set upper and lower bounds<declaring-variables>` on that specific output value and then add 
-the :ref:`BoundsEnforceLS line search<feature_bounds_enforce>` to the newton solver so it will respect those bounds. 
+Sometimes the Newton solver will take bad steps along the way to convergence.
+For example, you might have a pressure value in your model that needs to stay positive always.
+In that case you can :ref:`set upper and lower bounds<declaring-variables>` on that specific output value and then add
+the :ref:`BoundsEnforceLS line search<feature_bounds_enforce>` to the newton solver so it will respect those bounds.
 
 
 Check if you're running into a variable bound
@@ -99,6 +99,6 @@ indication that the Newton step is repeatedly bumping into the same bound over a
 You can set :ref:`options['print_bound_enforce']=True<feature_bounds_enforce>` to have the linesearch report which variables are hitting their bounds.
 
 If you see that you are butting up against a variable bound, then you have to consider if that bound is really necessary.
-Sometimes a newton solver needs to pass through that invalid space on the way to finding the answer, and if can't then it won't be able to converge. 
-If you have something like pressure, that really can't be negative ever perhaps because you are taking a log of it, then you have no choice but to make a lower bound of 0. 
+Sometimes a newton solver needs to pass through that invalid space on the way to finding the answer, and if can't then it won't be able to converge.
+If you have something like pressure, that really can't be negative ever perhaps because you are taking a log of it, then you have no choice but to make a lower bound of 0.
 However, if you just set the bounds to be something that is physically realistic, its possible that the bounds are overly constrictive and you need to loosen them up in order to get convergence.

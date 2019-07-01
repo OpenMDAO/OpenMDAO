@@ -64,18 +64,18 @@ To see lists of the available and default checks, run the following command:
     :cmd: openmdao check -h
 
 
-.. _om-command-view_model:
+.. _om-command-n2:
 
-openmdao view_model
+openmdao n2
 ###################
 
-The :code:`openmdao view_model` command will generate an :math:`N^2` diagram of the model that is
+The :code:`openmdao n2` command will generate an :math:`N^2` diagram of the model that is
 viewable in a browser, for example:
 
 
 .. code-block:: none
 
-    openmdao view_model circuit.py
+    openmdao n2 circuit.py
 
 
 will generate an :math:`N^2` diagram like the one below.

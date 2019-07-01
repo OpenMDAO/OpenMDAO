@@ -36,7 +36,7 @@ class EmbedN2Directive(Directive):
 
         html_name = os.path.join(os.getcwd(), (os.path.basename(path_to_model).split('.')[0] + "_n2.html"))
 
-        cmd = subprocess.Popen(['openmdao', 'view_model', np, '--no_browser', '--embed', '-o' + html_name])
+        cmd = subprocess.Popen(['openmdao', 'n2', np, '--no_browser', '--embed', '-o' + html_name])
         cmd_out, cmd_err = cmd.communicate()
 
         rst = ViewList()
