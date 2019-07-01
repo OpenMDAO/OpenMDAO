@@ -240,7 +240,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        expected_msg = "dupcomp: declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
+        expected_msg = "DupPartialsComp (dupcomp): d(x)/d(c): declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
 
         self.assertEqual(expected_msg, str(cm.exception))
 

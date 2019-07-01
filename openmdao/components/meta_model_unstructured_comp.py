@@ -560,8 +560,8 @@ class MetaModelUnStructuredComp(ExplicitComponent):
                 num_sample = len(val)
             elif len(val) != num_sample:
                 msg = "{}: Each variable must have the same number"\
-                      " of training points. Expected {0} but found {1} "\
-                      "points for '{2}'."\
+                      " of training points. Expected {} but found {} "\
+                      "points for '{}'."\
                       .format(self.name4msg, num_sample, len(val), name)
                 raise RuntimeError(msg)
 

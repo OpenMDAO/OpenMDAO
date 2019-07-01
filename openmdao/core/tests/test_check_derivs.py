@@ -968,7 +968,7 @@ class TestProblemCheckPartials(unittest.TestCase):
             comp.set_check_partial_options(wrt=np.array([1.0]))
 
         self.assertEqual(str(cm.exception),
-                         "The value of 'wrt' must be a string or list of strings, but a "
+                         "ParaboloidTricky (comp): The value of 'wrt' must be a string or list of strings, but a "
                          "type of 'ndarray' was provided.")
 
         # check invalid method
@@ -976,7 +976,7 @@ class TestProblemCheckPartials(unittest.TestCase):
             comp.set_check_partial_options(wrt=['*'], method='foo')
 
         self.assertEqual(str(cm.exception),
-                         "Method 'foo' is not supported, method must be one of ('fd', 'cs')")
+                         "ParaboloidTricky (comp): Method 'foo' is not supported, method must be one of ('fd', 'cs')")
 
         # check invalid form
         comp._declared_partial_checks = []
@@ -998,14 +998,14 @@ class TestProblemCheckPartials(unittest.TestCase):
             comp.set_check_partial_options(wrt=['*'], step='foo')
 
         self.assertEqual(str(cm.exception),
-                         "The value of 'step' must be numeric, but 'foo' was specified.")
+                         "ParaboloidTricky (comp): The value of 'step' must be numeric, but 'foo' was specified.")
 
         # check invalid step_calc
         with self.assertRaises(ValueError) as cm:
             comp.set_check_partial_options(wrt=['*'], step_calc='foo')
 
         self.assertEqual(str(cm.exception),
-                         "The value of 'step_calc' must be one of ('abs', 'rel'), "
+                         "ParaboloidTricky (comp): The value of 'step_calc' must be one of ('abs', 'rel'), "
                          "but 'foo' was specified.")
 
         # check invalid wrt
@@ -1015,8 +1015,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
-        self.assertEqual(str(cm.exception), "Invalid 'wrt' variable specified "
-                         "for check_partial options on Component 'comp': 'z'.")
+        self.assertEqual(str(cm.exception), "ParaboloidTricky (comp): Invalid 'wrt' variables specified "
+                         "for check_partial options: ['z'].")
 
         # check multiple invalid wrt
         comp._declared_partial_checks = []
@@ -1025,8 +1025,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             prob.check_partials()
 
-        self.assertEqual(str(cm.exception), "Invalid 'wrt' variables specified "
-                         "for check_partial options on Component 'comp': ['a', 'b', 'c'].")
+        self.assertEqual(str(cm.exception), "ParaboloidTricky (comp): Invalid 'wrt' variables specified "
+                         "for check_partial options: ['a', 'b', 'c'].")
 
     def test_compact_print_formatting(self):
         class MyCompShortVarNames(om.ExplicitComponent):

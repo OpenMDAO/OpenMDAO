@@ -207,7 +207,7 @@ class Component(System):
         # used by the system setup).
         if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
                                                                 self._approx_schemes):
-            raise RuntimeError("'%s': num_par_fd is > 1 but no FD is active." % self.name4msg)
+            raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.name4msg)
 
         # check here if declare_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
@@ -506,8 +506,7 @@ class Component(System):
 
         # Disallow dupes
         if name in var_rel2meta:
-            msg = "{}: Variable name '{}' already exists.".format(self.name4msg, name)
-            raise ValueError(msg)
+            raise ValueError("{}: Variable name '{}' already exists.".format(self.name4msg, name))
 
         var_rel2meta[name] = metadata
         var_rel_names['input'].append(name)
@@ -553,8 +552,7 @@ class Component(System):
 
         # Disallow dupes
         if name in var_rel2meta:
-            msg = "{}: Variable name '{}' already exists.".format(self.name4msg, name)
-            raise ValueError(msg)
+            raise ValueError("{}: Variable name '{}' already exists.".format(self.name4msg, name))
 
         var_rel2meta[name] = self._var_discrete['input'][name] = metadata
 
@@ -714,8 +712,7 @@ class Component(System):
 
         # Disallow dupes
         if name in var_rel2meta:
-            msg = "{}: Variable name '{}' already exists.".format(self.name4msg, name)
-            raise ValueError(msg)
+            raise ValueError("{}: Variable name '{}' already exists.".format(self.name4msg, name))
 
         var_rel2meta[name] = metadata
         var_rel_names['output'].append(name)
@@ -859,8 +856,8 @@ class Component(System):
         try:
             method_func = _supported_methods[method]
         except KeyError:
-            msg = '{}: Method "{}" is not supported, method must be one of {}'
-            raise ValueError(msg.format(self.name4msg, method, list(_supported_methods)))
+            msg = '{}: d({})/d({}): method "{}" is not supported, method must be one of {}'
+            raise ValueError(msg.format(self.name4msg, of, wrt, method, sorted(_supported_methods)))
 
         if isinstance(of, list):
             of = tuple(of)
@@ -872,8 +869,8 @@ class Component(System):
 
         # If only one of rows/cols is specified
         if (rows is None) ^ (cols is None):
-            raise ValueError('{}: For partial ({}, {}), if one of rows/cols is specified, then '
-                             'both must be specified'.format(self.name4msg, of, wrt))
+            raise ValueError('{}: d({})/d({}): If one of rows/cols is specified, then '
+                             'both must be specified.'.format(self.name4msg, of, wrt))
 
         if dependent:
             meta['value'] = val
@@ -884,18 +881,19 @@ class Component(System):
                 # First, check the length of rows and cols to catch this easy mistake and give a
                 # clear message.
                 if len(cols) != len(rows):
-                    msg = "{}: declare_partials has been called with rows and cols, which" + \
-                          " should be arrays of equal length, but rows is length {} while " + \
-                          "cols is length {}."
-                    raise RuntimeError(msg.format(self.name4msg, len(rows), len(cols)))
+                    raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
+                                       "with rows and cols, which should be arrays of equal length,"
+                                       " but rows is length {} while cols is length "
+                                       "{}.".format(self.name4msg, of, wrt, len(rows), len(cols)))
 
                 # Check for repeated rows/cols indices.
                 idxset = set(zip(rows, cols))
                 if len(rows) - len(idxset) > 0:
                     dups = [n for n, val in iteritems(Counter(zip(rows, cols))) if val > 1]
-                    raise RuntimeError("{}: declare_partials has been called with rows and cols "
-                                       "that specify the following duplicate subjacobian entries: "
-                                       "{}.".format(self.name4msg, sorted(dups)))
+                    raise RuntimeError("{}: d({})/d({}): declare_partials has been called "
+                                       "with rows and cols that specify the following duplicate "
+                                       "subjacobian entries: {}.".format(self.name4msg, of, wrt,
+                                                                         sorted(dups)))
 
         if method_func is not None:
             # we're doing approximations
@@ -907,7 +905,8 @@ class Component(System):
 
             # If rows/cols is specified
             if rows is not None or cols is not None:
-                raise ValueError('%s: Sparse FD specification not supported yet.' % self.name4msg)
+                raise ValueError("{}: d({})/d({}): Sparse FD specification not supported "
+                                 "yet.".format(self.name4msg, of, wrt))
         else:
             default_opts = ()
 
@@ -915,20 +914,20 @@ class Component(System):
             if 'step' in default_opts:
                 meta['step'] = step
             else:
-                raise RuntimeError("%s: 'step' is not a valid option for '%s'" % (self.name4msg,
-                                                                                  method))
+                raise RuntimeError("{}: d({})/d({}): 'step' is not a valid option for "
+                                   "'{}'".format(self.name4msg, of, wrt, method))
         if form:
             if 'form' in default_opts:
                 meta['form'] = form
             else:
-                raise RuntimeError("%s: 'form' is not a valid option for '%s'" % (self.name4msg,
-                                                                                  method))
+                raise RuntimeError("{}: d({})/d({}): 'form' is not a valid option for "
+                                   "'{}'".format(self.name4msg, of, wrt, method))
         if step_calc:
             if 'step_calc' in default_opts:
                 meta['step_calc'] = step_calc
             else:
-                raise RuntimeError("%s: 'step_calc' is not a valid option for '%s'" %
-                                   (self.name4msg, method))
+                raise RuntimeError("{}: d({})/d({}): 'step_calc' is not a valid option "
+                                   "for '{}'".format(self.name4msg, of, wrt, method))
 
         return meta
 
@@ -1023,7 +1022,7 @@ class Component(System):
         supported_step_calc = ('abs', 'rel')
         if step_calc and step_calc not in supported_step_calc:
             msg = "{}: The value of 'step_calc' must be one of {}, but '{}' was specified."
-            raise ValueError(msg.format(sself.name4msg, upported_step_calc, step_calc))
+            raise ValueError(msg.format(self.name4msg, supported_step_calc, step_calc))
 
         if not isinstance(wrt, (string_types, list, tuple)):
             msg = "{}: The value of 'wrt' must be a string or list of strings, but a type " \
@@ -1115,8 +1114,9 @@ class Component(System):
                 cols = np.array(cols, dtype=INT_DTYPE, copy=False)
 
                 if rows.shape != cols.shape:
-                    raise ValueError('rows and cols must have the same shape,'
-                                     ' rows: {}, cols: {}'.format(rows.shape, cols.shape))
+                    raise ValueError('{}: d({})/d({}): rows and cols must have the same shape,'
+                                     ' rows: {}, cols: {}'.format(self.name4msg, of, wrt,
+                                                                  rows.shape, cols.shape))
 
                 if is_scalar:
                     val = np.full(rows.size, val, dtype=float)
@@ -1129,9 +1129,10 @@ class Component(System):
                     val = val.astype(safe_dtype, copy=False)
 
                     if rows.shape != val.shape:
-                        raise ValueError('If rows and cols are specified, val must be a scalar or '
-                                         'have the same shape, val: {}, '
-                                         'rows/cols: {}'.format(val.shape, rows.shape))
+                        raise ValueError('{}: d({})/d({}): If rows and cols are specified, val '
+                                         'must be a scalar or have the same shape, val: {}, '
+                                         'rows/cols: {}'.format(self.name4msg, of, wrt,
+                                                                val.shape, rows.shape))
                 else:
                     val = np.zeros_like(rows, dtype=float)
 

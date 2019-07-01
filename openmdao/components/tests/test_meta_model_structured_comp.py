@@ -888,7 +888,7 @@ class TestRegularGridMap(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.run_and_check_derivs(self.prob)
         self.assertEqual(str(context.exception),
-                         "Error interpolating output 'f' in comp:\n"
+                         "MetaModelStructuredComp (comp): Error interpolating output 'f':\n"
                          "The requested sample points xi have dimension 3, "
                          "but this RegularGridInterp has dimension 0")
 
@@ -928,7 +928,7 @@ class TestRegularGridMap(unittest.TestCase):
         # The interpolating output name is given as a regexp because the exception could
         #   happen with f or g first. The order those are evaluated comes from the keys of
         #   dict so no guarantee on the order except for Python 3.6 !
-        msg = "Error interpolating output '[f|g]' in 'comp' because input 'comp.z' was " \
+        msg = "MetaModelStructuredComp \(comp\): Error interpolating output '[f|g]' because input 'comp.z' was " \
               "out of bounds \('.*', '.*'\) with value '9.0'"
         with assertRaisesRegex(self, om.AnalysisError, msg):
             self.run_and_check_derivs(self.prob)
@@ -1072,7 +1072,7 @@ class TestRegularGridMap(unittest.TestCase):
         with self.assertRaises(om.AnalysisError) as cm:
             p.run_model()
 
-        msg = ("Error interpolating output 'y' in 'MM' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
+        msg = ("MMComp (MM): Error interpolating output 'y' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
         self.assertEqual(str(cm.exception), msg)
 
 

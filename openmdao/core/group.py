@@ -229,8 +229,8 @@ class Group(System):
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
                         if meta_out['distributed']:
-                            raise RuntimeError("vector scalers with distrib vars "
-                                               "not supported yet.")
+                            raise RuntimeError("{}: vector scalers with distrib vars "
+                                               "not supported yet.".format(self.name4msg))
 
                         if src_indices.ndim != 1:
                             src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
@@ -609,9 +609,9 @@ class Group(System):
 
         for prom_name, abs_list in iteritems(allprocs_prom2abs_list['output']):
             if len(abs_list) > 1:
-                raise RuntimeError("Output name '%s' refers to "
-                                   "multiple outputs: %s." %
-                                   (prom_name, sorted(abs_list)))
+                raise RuntimeError("{}: Output name '{}' refers to "
+                                   "multiple outputs: {}.".format(self.name4msg, prom_name,
+                                                                  sorted(abs_list)))
 
         # If running in parallel, allgather
         if self.comm.size > 1:
@@ -820,14 +820,14 @@ class Group(System):
             if (prom_out not in allprocs_prom2abs_list_out and
                     prom_out not in self._var_allprocs_discrete['output']):
                 raise NameError(
-                    "Output '%s' does not exist for connection in '%s' from '%s' to '%s'." %
-                    (prom_out, self.pathname, prom_out, prom_in))
+                    "%s: Output '%s' does not exist for connection in '%s' from '%s' to '%s'." %
+                    (self.name4msg, prom_out, self.pathname, prom_out, prom_in))
 
             if (prom_in not in allprocs_prom2abs_list_in and
                     prom_in not in self._var_allprocs_discrete['input']):
                 raise NameError(
-                    "Input '%s' does not exist for connection in '%s' from '%s' to '%s'." %
-                    (prom_in, self.pathname, prom_out, prom_in))
+                    "%s: Input '%s' does not exist for connection from '%s' to '%s'." %
+                    (self.name4msg, prom_in, prom_out, prom_in))
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
@@ -840,24 +840,26 @@ class Group(System):
                 inparts = abs_in.split('.')
                 in_subsys = inparts[:-1]
                 if out_subsys == in_subsys:
-                    raise RuntimeError("%s: Output and input are in the same System " +
-                                       "for connection from '%s' to '%s'." %
-                                       (self.name4msg, prom_out, prom_in))
+                    raise RuntimeError("{}: Output and input are in the same System "
+                                       "for connection from '{}' to '{}'.".format(self.name4msg,
+                                                                                  prom_out,
+                                                                                  prom_in))
 
                 if src_indices is not None and abs_in in abs2meta:
                     meta = abs2meta[abs_in]
                     if meta['src_indices'] is not None:
-                        raise RuntimeError("%s: src_indices has been defined "
-                                           "in both connect('%s', '%s') "
-                                           "and add_input('%s', ...)." %
-                                           (self.name4msg, prom_out,
-                                            prom_in, prom_in))
+                        raise RuntimeError("{}: src_indices has been defined "
+                                           "in both connect('{}', '{}') "
+                                           "and add_input('{}', ...).".format(self.name4msg,
+                                                                              prom_out, prom_in,
+                                                                              prom_in))
                     meta['src_indices'] = np.atleast_1d(src_indices)
                     meta['flat_src_indices'] = flat_src_indices
 
                 if abs_in in abs_in2out:
-                    raise RuntimeError("Input '%s' cannot be connected to '%s' because it's already"
-                                       " connected to '%s'" % (abs_in, abs_out, abs_in2out[abs_in]))
+                    raise RuntimeError("%s: Input '%s' cannot be connected to '%s' because it's "
+                                       "already connected to '%s'" % (self.name4msg, abs_in,
+                                                                      abs_out, abs_in2out[abs_in]))
 
                 abs_in2out[abs_in] = abs_out
 
@@ -894,8 +896,8 @@ class Group(System):
             dup_info = [(n, srcs) for n, srcs in iteritems(dup_info) if len(srcs) > 1]
             if dup_info:
                 msg = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
-                raise RuntimeError("The following inputs have multiple connections: %s" %
-                                   ", ".join(msg))
+                raise RuntimeError("%s: The following inputs have multiple connections: %s" %
+                                   (self.name4msg, ", ".join(msg)))
 
         # If running in parallel, allgather
         if self.comm.size > 1:
@@ -960,8 +962,8 @@ class Group(System):
                     if abs_in in allprocs_discrete_in:
                         self._conn_discrete_in2out[abs_in] = abs_out
                     elif abs_out in allprocs_discrete_out:
-                        raise RuntimeError("Can't connect discrete output '%s' to continuous "
-                                           "input '%s'." % (abs_out, abs_in))
+                        raise RuntimeError("%s: Can't connect discrete output '%s' to continuous "
+                                           "input '%s'." % (self.name4msg, abs_out, abs_in))
                     else:
                         abs_in2out[abs_in] = abs_out
 
@@ -1021,12 +1023,13 @@ class Group(System):
             try:
                 out_type = self._var_allprocs_discrete['output'][abs_out]['type']
             except KeyError:
-                raise RuntimeError("Can't connect discrete output '%s' to continuous "
-                                   "input '%s'." % (abs_out, abs_in))
+                raise RuntimeError("%s: Can't connect discrete output '%s' to continuous "
+                                   "input '%s'." % (self.name4msg, abs_out, abs_in))
             if not issubclass(in_type, out_type):
-                raise RuntimeError("Type '%s' of output '%s' is"
+                raise RuntimeError("%s: Type '%s' of output '%s' is"
                                    " incompatible with type '%s' of input '%s'." %
-                                   (out_type.__name__, abs_out, in_type.__name__, abs_in))
+                                   (self.name4msg, out_type.__name__, abs_out,
+                                    in_type.__name__, abs_in))
 
         # check unit/shape compatibility, but only for connections that are
         # either owned by (implicit) or declared by (explicit) this Group.
@@ -1040,18 +1043,18 @@ class Group(System):
 
             if out_units:
                 if not in_units:
-                    simple_warning("Output '%s' with units of '%s' is "
+                    simple_warning("%s: Output '%s' with units of '%s' is "
                                    "connected to input '%s' which has no"
-                                   " units." % (abs_out, out_units, abs_in))
+                                   " units." % (self.name4msg, abs_out, out_units, abs_in))
                 elif not is_compatible(in_units, out_units):
-                    raise RuntimeError("Output units of '%s' for '%s' are"
+                    raise RuntimeError("%s: Output units of '%s' for '%s' are"
                                        " incompatible with input units of "
                                        "'%s' for '%s'." %
-                                       (out_units, abs_out, in_units, abs_in))
+                                       (self.name4msg, out_units, abs_out, in_units, abs_in))
             elif in_units is not None:
-                simple_warning("Input '%s' with units of '%s' is "
+                simple_warning("%s: Input '%s' with units of '%s' is "
                                "connected to output '%s' which has "
-                               "no units." % (abs_in, in_units, abs_out))
+                               "no units." % (self.name4msg, abs_in, in_units, abs_out))
 
             # check shape compatibility
             if abs_in in abs2meta and abs_out in abs2meta:
@@ -1068,9 +1071,9 @@ class Group(System):
                     # out_shape != in_shape is allowed if
                     # there's no ambiguity in storage order
                     if not array_connection_compatible(in_shape, out_shape):
-                        msg = ("The source and target shapes do not match or are ambiguous"
+                        msg = ("%s: The source and target shapes do not match or are ambiguous"
                                " for the connection '%s' to '%s'. Expected %s but got %s.")
-                        raise ValueError(msg % (abs_out, abs_in,
+                        raise ValueError(msg % (self.name4msg, abs_out, abs_in,
                                                 tuple([int(s) for s in in_shape]),
                                                 tuple([int(s) for s in out_shape])))
 
@@ -1080,11 +1083,12 @@ class Group(System):
                     # initial dimensions of indices shape must be same shape as target
                     for idx_d, inp_d in zip(src_indices.shape, in_shape):
                         if idx_d != inp_d:
-                            msg = ("The source indices %s do not specify a "
+                            msg = ("%s: The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
                                    "'%s'. The target shape is "
                                    "%s but indices are %s.")
-                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
+                            raise ValueError(msg % (self.name4msg,
+                                                    str(src_indices).replace('\n', ''),
                                                     abs_out, abs_in,
                                                     in_shape, src_indices.shape))
 
@@ -1092,11 +1096,12 @@ class Group(System):
                     if len(src_indices.shape) > len(in_shape):
                         source_dimensions = src_indices.shape[len(in_shape)]
                         if source_dimensions != len(out_shape):
-                            msg = ("The source indices %s do not specify a "
+                            msg = ("%s: The source indices %s do not specify a "
                                    "valid shape for the connection '%s' to "
                                    "'%s'. The source has %d "
                                    "dimensions but the indices expect %d.")
-                            raise ValueError(msg % (str(src_indices).replace('\n', ''),
+                            raise ValueError(msg % (self.name4msg,
+                                                    str(src_indices).replace('\n', ''),
                                                     abs_out, abs_in,
                                                     len(out_shape), source_dimensions))
                     else:
@@ -1114,12 +1119,13 @@ class Group(System):
                         else:
                             bad_idx = None
                         if bad_idx is not None:
-                            msg = ("The source indices do not specify "
+                            msg = ("%s: The source indices do not specify "
                                    "a valid index for the connection "
                                    "'%s' to '%s'. Index "
                                    "'%d' is out of range for a flat source "
                                    "of size %d.")
-                            raise ValueError(msg % (abs_out, abs_in, bad_idx, out_size))
+                            raise ValueError(msg % (self.name4msg, abs_out, abs_in, bad_idx,
+                                                    out_size))
                         if src_indices.ndim > 1:
                             abs2meta[abs_in]['src_indices'] = \
                                 abs2meta[abs_in]['src_indices'].flatten()
@@ -1130,12 +1136,13 @@ class Group(System):
                             if src_indices.size > 0:
                                 for i in src_indices[..., d].flat:
                                     if abs(i) >= d_size:
-                                        msg = ("The source indices do not specify "
+                                        msg = ("%s: The source indices do not specify "
                                                "a valid index for the connection "
                                                "'%s' to '%s'. Index "
                                                "'%d' is out of range for source "
                                                "dimension of size %d.")
-                                        raise ValueError(msg % (abs_out, abs_in, i, d_size))
+                                        raise ValueError(msg % (self.name4msg, abs_out, abs_in, i,
+                                                                d_size))
 
     def _transfer(self, vec_name, mode, isub=None):
         """
@@ -1369,23 +1376,23 @@ class Group(System):
             same time, and get the reference back.
         """
         if inspect.isclass(subsys):
-            raise TypeError("Subsystem '%s' should be an instance, "
-                            "but a class object was found." % name)
+            raise TypeError("%s: Subsystem '%s' should be an instance, but a %s class object was "
+                            "found." % (self.name4msg, name, subsys.__name__))
 
         for sub in chain(self._subsystems_allprocs,
                          self._static_subsystems_allprocs):
             if name == sub.name:
-                raise RuntimeError("Subsystem name '%s' is already used." %
-                                   name)
+                raise RuntimeError("%s: Subsystem name '%s' is already used." %
+                                   (self.name4msg, name))
 
         if hasattr(self, name) and not isinstance(getattr(self, name), System):
             # replacing a subsystem is ok (e.g. resetup) but no other attribute
-            raise RuntimeError("Group '%s' already has an attribute '%s'." %
-                               (self.name, name))
+            raise RuntimeError("%s: Can't add subsystem '%s' because an attribute with that name "
+                               "already exits." % (self.name4msg, name))
 
         match = namecheck_rgx.match(name)
         if match is None or match.group() != name:
-            raise NameError("'%s' is not a valid system name." % name)
+            raise NameError("%s: '%s' is not a valid sub-system name." % (self.name4msg, name))
 
         subsys.name = subsys.pathname = name
 
@@ -1393,7 +1400,7 @@ class Group(System):
            isinstance(promotes_inputs, string_types) or \
            isinstance(promotes_outputs, string_types):
             raise RuntimeError("%s: promotes must be an iterator of strings and/or tuples."
-                               % self.name)
+                               % self.name4msg)
         if promotes:
             subsys._var_promotes['any'] = promotes
         if promotes_inputs:
@@ -1410,13 +1417,13 @@ class Group(System):
 
         if not isinstance(min_procs, int) or min_procs < 1:
             raise TypeError("%s: min_procs must be an int > 0 but (%s) was given." %
-                            (self.name, min_procs))
+                            (self.name4msg, min_procs))
         if max_procs is not None and (not isinstance(max_procs, int) or max_procs < min_procs):
             raise TypeError("%s: max_procs must be None or an int >= min_procs but (%s) was given."
-                            % (self.name, max_procs))
+                            % (self.name4msg, max_procs))
         if isinstance(proc_weight, Number) and proc_weight < 0:
             raise TypeError("%s: proc_weight must be a float > 0. but (%s) was given." %
-                            (self.name, proc_weight))
+                            (self.name4msg, proc_weight))
 
         self._proc_info[name] = (min_procs, max_procs, proc_weight)
 
@@ -1448,17 +1455,17 @@ class Group(System):
             if isinstance(tgt_name, string_types):
                 tgt_name = [tgt_name]
             tgt_name.append(src_indices)
-            raise TypeError("src_indices must be an index array, did you mean"
-                            " connect('%s', %s)?" % (src_name, tgt_name))
+            raise TypeError("%s: src_indices must be an index array, did you mean"
+                            " connect('%s', %s)?" % (self.name4msg, src_name, tgt_name))
 
         if isinstance(src_indices, Iterable):
             src_indices = np.atleast_1d(src_indices)
 
         if isinstance(src_indices, np.ndarray):
             if not np.issubdtype(src_indices.dtype, np.integer):
-                raise TypeError("src_indices must contain integers, but src_indices for "
+                raise TypeError("%s: src_indices must contain integers, but src_indices for "
                                 "connection from '%s' to '%s' is %s." %
-                                (src_name, tgt_name, src_indices.dtype.type))
+                                (self.name4msg, src_name, tgt_name, src_indices.dtype.type))
 
         # if multiple targets are given, recursively connect to each
         if not isinstance(tgt_name, string_types) and isinstance(tgt_name, Iterable):
@@ -1470,13 +1477,14 @@ class Group(System):
         for manual_connections in [self._manual_connections, self._static_manual_connections]:
             if tgt_name in manual_connections:
                 srcname = manual_connections[tgt_name][0]
-                raise RuntimeError("Input '%s' is already connected to '%s'." %
-                                   (tgt_name, srcname))
+                raise RuntimeError("%s: Input '%s' is already connected to '%s'." %
+                                   (self.name4msg, tgt_name, srcname))
 
         # source and target should not be in the same system
         if src_name.rsplit('.', 1)[0] == tgt_name.rsplit('.', 1)[0]:
-            raise RuntimeError("Output and input are in the same System for " +
-                               "connection from '%s' to '%s'." % (src_name, tgt_name))
+            raise RuntimeError("{}: Output and input are in the same System for "
+                               "connection from '{}' to '{}'.".format(self.name4msg,
+                                                                      src_name, tgt_name))
 
         if self._static_mode:
             manual_connections = self._static_manual_connections
@@ -1814,7 +1822,8 @@ class Group(System):
                 if name in default_opts:
                     kwargs[name] = attr
                 else:
-                    raise RuntimeError("'%s' is not a valid option for '%s'" % (name, method))
+                    raise RuntimeError("%s: '%s' is not a valid option for '%s'" % (self.name4msg,
+                                                                                    name, method))
 
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs

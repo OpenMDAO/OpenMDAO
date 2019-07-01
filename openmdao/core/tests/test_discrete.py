@@ -307,7 +307,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+                         "Group (<top>): Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_to_float_error(self):
         prob = om.Problem()
@@ -322,7 +322,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+                         "Group (<top>): Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_mismatch_error(self):
         prob = om.Problem()
@@ -337,7 +337,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+                         "Group (<top>): Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
 
     def test_driver_discrete_enforce_int(self):
         # Drivers require discrete vars to be int or ndarrays of int.

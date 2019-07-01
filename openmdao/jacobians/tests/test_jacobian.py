@@ -566,7 +566,7 @@ class TestJacobian(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Comp1())
 
-        msg = "comp: declare_partials has been called with rows and cols, which" + \
+        msg = "Comp1 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
               " should be arrays of equal length, but rows is length 2 while " + \
               "cols is length 1."
         with assertRaisesRegex(self, RuntimeError, msg):
@@ -576,7 +576,7 @@ class TestJacobian(unittest.TestCase):
         model = prob.model
         model.add_subsystem('comp', Comp2())
 
-        msg = "comp: declare_partials has been called with rows and cols, which" + \
+        msg = "Comp2 \(comp\): d\(y\)/d\(x\): declare_partials has been called with rows and cols, which" + \
             " should be arrays of equal length, but rows is length 1 while " + \
             "cols is length 2."
         with assertRaisesRegex(self, RuntimeError, msg):
