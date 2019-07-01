@@ -238,7 +238,7 @@ Other Commands
 openmdao call_tree
 ##################
 
-The :code:`openmdao call_tree` takes the full module path of a class method and displays the
+The :code:`openmdao call_tree` command takes the full module path of a class method and displays the
 call tree for that method.  It's purpose is to show which class 'owns' the specified method
 call and any other 'self.*' methods that it calls.  Note that it shows all of the methods called,
 regardless of the result of conditionals within any function, so the displayed tree does not
@@ -250,6 +250,22 @@ Here's an example:
 .. embed-shell-cmd::
     :cmd: openmdao call_tree openmdao.api.LinearBlockGS.solve
 
+
+.. _om-command-scaffold:
+
+openmdao scaffold
+#################
+
+The :code:`openmdao scaffold` command generates simple scaffolding, or 'skeleton' code for
+an explicit or implicit component.  In addition, it will generate the scaffolding for a simple
+test file of that component.  The available options are as follows:
+
+.. embed-shell-cmd::
+    :cmd: openmdao scaffold -h
+
+
+This command is only an initial attempt to provide this sort of functionality and any user
+feedback describing how to improve it is welcome.
 
 
 Using Commands under MPI
