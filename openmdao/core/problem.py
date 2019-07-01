@@ -1911,9 +1911,10 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                                                                             nan,
                                                                             nan)
                     else:
-                        derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fwd_norm,
-                                                                            rev_error / fwd_norm,
-                                                                            fwd_rev_error / fwd_norm)
+                        rel_err = ErrorTuple(fwd_error / fwd_norm,
+                                             rev_error / fwd_norm,
+                                             fwd_rev_error / fwd_norm)
+                        derivative_info['rel error'] = rel_err
 
             else:
                 if totals:
