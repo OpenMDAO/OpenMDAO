@@ -469,7 +469,7 @@ def _post_setup_exec(options):
 
 # All post-setup functions go here.
 # this dict should contain names mapped to tuples of the form:
-#   (setup_parser_func, func)
+#   (setup_parser_func, func, description)
 _post_setup_map = {
     'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
                          'Connection viewer showing values and source/target units.'),
