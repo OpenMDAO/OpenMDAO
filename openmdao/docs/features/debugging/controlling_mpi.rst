@@ -10,8 +10,9 @@ execution continues normally without MPI support:
 
   ``Unable to import mpi4py. Parallel processing unavailable.``
 
-This can be unfortunate if MPI processing was desired, so behavior can be
-modified by setting the environment variable :code:`OPENMDAO_REQUIRE_MPI`:
+Continuing can be problematic if MPI processing was intended, so this behavior
+can be modified by setting the environment variable
+:code:`OPENMDAO_REQUIRE_MPI`:
 
 - A value of :code:`True` (or :code:`Yes`, :code:`1`, or
   :code:`Always`; case-insensitive) will raise an exception if mpi4py fails to
