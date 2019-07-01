@@ -194,6 +194,11 @@ class ParDerivTestCase(unittest.TestCase):
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
+        # Piggyback to make sure the distributed norm calculation is correct.
+        vec = prob.model._vectors['residual']['c2.y']
+        norm_val = vec.get_norm()
+        assert_rel_error(self, norm_val, 6.480740698, 1e-6)
+
 
 @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class DecoupledTestCase(unittest.TestCase):

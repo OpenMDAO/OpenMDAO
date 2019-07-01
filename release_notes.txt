@@ -1,4 +1,30 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.8.0
+
+June 27, 2019
+
+Bug Fixes: 
+----------
+- Fixed a bug in PETScVector norm calculation, which was totally wrong for serial models combined
+  with distributed ones 
+- Fixed a bug with the solver debug_print option when output file already existed
+- Fixed the incorrect Shockley diode equation in the Circuit example 
+- Fixed a few small bugs in group level FD  
+
+New Features: 
+-------------
+- Stopped reporting a warning for a corner case regarding promoted inputs that are connected inside
+  their owning group, because everyone hated it! 
+- Optional normalization of input variables to multifi_cokriging 
+- New matplotlib based sparsity matrix viewer for coloring of partial and total derivatives 
+- Preferred import style now changed to `import openmdao.api as om`
+- Discrete variables now show up when calling the list_input/list_output functions 
+- Discrete variables now show up in view_model 
+- ScipyOptimizeDriver now raises an exception when the objective is missing
+- A legend can be optionally added to the XDSM diagram. Not shown by default.
+  *** contributed by Peter Onodi ***
+
+################################################################################################
 Release Notes for OpenMDAO 2.7.1
 
 May 30, 2019
