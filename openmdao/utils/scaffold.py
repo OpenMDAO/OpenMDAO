@@ -16,7 +16,8 @@ def _scaffold_setup_parser(parser):
     """
     parser.add_argument('file', nargs='?', help='output file.')
     parser.add_argument('-c', '--class', action='store', dest='class_name', default='MyComp',
-                        required=True, help='Name of the component class.')
+                        required=True, help='Name of the component class.  If an output file '
+                        'is not provided, this name will be used to generate the output file name.')
     parser.add_argument('-e', '--explicit', action='store_true', dest='explicit',
                         help="Generate an ExplicitComponent.")
     parser.add_argument('-i', '--implicit', action='store_true', dest='implicit',

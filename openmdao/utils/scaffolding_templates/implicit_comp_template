@@ -41,9 +41,6 @@ class {class_name}(ImplicitComponent):
         # self.add_output(name='bar', shape=None, units=None)
 
         # self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
-
-        # # Set up the derivatives.
-        # self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
         pass
 
     def apply_nonlinear(self, inputs, outputs, residuals):
