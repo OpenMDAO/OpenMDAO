@@ -108,12 +108,16 @@ class TestViewModelData(unittest.TestCase):
         # check expected connections, after mapping cycle_arrows indices back to pathnames
         connections = sorted(model_viewer_data['connections_list'], key=lambda x: (x['tgt'], x['src']))
         for conn in connections:
-            if 'cycle_arrows' in conn:
+            if 'cycle_arrows' in conn and conn['cycle_arrows']:
                 cycle_arrows = []
                 for src, tgt in conn['cycle_arrows']:
                     cycle_arrows.append(' '.join([pathnames[src], pathnames[tgt]]))
                 conn['cycle_arrows'] = sorted(cycle_arrows)
-        self.assertListEqual(connections, self.expected_conns)
+        self.assertEqual(len(connections), len(self.expected_conns))
+        for c, ex in zip(connections, self.expected_conns):
+            self.assertEqual(c['src'], ex['src'])
+            self.assertEqual(c['tgt'], ex['tgt'])
+            self.assertEqual(c.get('cycle_arrows', []), ex.get('cycle_arrows', []))
 
         # check expected abs2prom map
         self.assertDictEqual(model_viewer_data['abs2prom'], self.expected_abs2prom)
@@ -150,7 +154,11 @@ class TestViewModelData(unittest.TestCase):
                 for src, tgt in conn['cycle_arrows']:
                     cycle_arrows.append(' '.join([pathnames[src], pathnames[tgt]]))
                 conn['cycle_arrows'] = sorted(cycle_arrows)
-        self.assertListEqual(connections, self.expected_conns)
+        self.assertEqual(len(connections), len(self.expected_conns))
+        for c, ex in zip(connections, self.expected_conns):
+            self.assertEqual(c['src'], ex['src'])
+            self.assertEqual(c['tgt'], ex['tgt'])
+            self.assertEqual(c.get('cycle_arrows', []), ex.get('cycle_arrows', []))
 
         # check expected abs2prom map
         self.assertDictEqual(model_viewer_data['abs2prom'], self.expected_abs2prom)

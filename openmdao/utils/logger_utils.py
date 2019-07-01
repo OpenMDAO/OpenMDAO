@@ -9,7 +9,7 @@ import logging
 _loggers = {}
 
 
-def _set_handler(logger, stream, level, use_format):
+def _set_handler(logger, handler, level, use_format):
     """
     Set the StreamHandler for logger.
 
@@ -17,19 +17,13 @@ def _set_handler(logger, stream, level, use_format):
     ----------
     logger : object
         Logger object.
-    stream : 'stdout', 'stderr' or file-like
-        output stream to which logger output will be directed.
+    handler : logging handler
+        handler to add to the logger
     level : int
         Logging level for this logger. Default is logging.INFO (level 20).
     use_format : bool
         Set to True to use the openmdao format "Level: message".
     """
-    if stream == 'stdout':
-        stream = sys.stdout
-    elif stream == 'stderr':
-        stream = sys.stderr
-    handler = logging.StreamHandler(stream)
-
     # set a format which is simpler for console use
     if use_format:
         formatter = logging.Formatter('%(levelname)s: %(message)s')
@@ -40,7 +34,7 @@ def _set_handler(logger, stream, level, use_format):
 
 
 def get_logger(name='default_logger', level=logging.INFO, use_format=False,
-               out_stream='stdout', lock=None):
+               out_stream='stdout', out_file=None, lock=None):
     """
     Return a logger that writes to an I/O stream.
 
@@ -56,6 +50,8 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
         (applied only when creating a new logger or setting a new stream).
     out_stream : 'stdout', 'stderr' or file-like
         output stream to which logger output will be directed.
+    out_file : str or None
+        If not None, add a FileHandler to write to this file.
     lock : bool
         if True, do not allow the handler to be changed until unlocked.
         if False, unlock the handler for the logger.
@@ -65,37 +61,46 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
     <logging.Logger>
         Logger that writes to a stream and adheres to requested settings.
     """
+    if out_stream == 'stdout':
+        out_stream = sys.stdout
+    elif out_stream == 'stderr':
+        out_stream = sys.stderr
+
     if name in _loggers:
         # use existing logger
         info = _loggers[name]
         logger = info['logger']
         stream = info['stream']
+        ofile = info['file']
         locked = info['locked']
 
         unlock = lock is False
 
         # redirect log to new stream (if not locked)
-        if out_stream != stream and (not locked or unlock):
+        if (out_stream != stream or ofile != out_file) and (not locked or unlock):
             for handler in logger.handlers:
                 logger.removeHandler(handler)
             if out_stream:
-                _set_handler(logger, out_stream, level, use_format)
+                _set_handler(logger, logging.StreamHandler(out_stream), level, use_format)
+            if out_file:
+                _set_handler(logger, logging.FileHandler(out_file, mode='w'), level, use_format)
             info['stream'] = out_stream
+            info['file'] = out_file
 
         # update locked status
         info['locked'] = lock
     else:
         # create new logger
         logger = logging.getLogger(name)
-
         if out_stream:
-            _set_handler(logger, out_stream, level, use_format)
-
-        logger.setLevel(level)
+            _set_handler(logger, logging.StreamHandler(out_stream), level, use_format)
+        if out_file:
+            _set_handler(logger, logging.FileHandler(out_file, mode='w'), level, use_format)
 
         _loggers[name] = {
             'logger': logger,
             'stream': out_stream,
+            'file': out_file,
             'locked': lock
         }
 

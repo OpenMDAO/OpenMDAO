@@ -256,6 +256,12 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertEqual(prob.driver._quantities, ['comp.f_xy'])
 
+        # make sure multiple driver runs don't grow the list of _quantities
+        quants = copy.copy(prob.driver._quantities)
+        for i in range(5):
+            prob.run_driver()
+            self.assertEqual(quants, prob.driver._quantities)
+
     def test_simple_paraboloid_equality(self):
 
         prob = om.Problem()
