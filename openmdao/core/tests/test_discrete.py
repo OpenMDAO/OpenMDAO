@@ -609,7 +609,7 @@ class DiscretePromTestCase(unittest.TestCase):
             else:
                 yield name
 
-        # add a test to see if discrete vars show up in view_model
+        # add a test to see if discrete vars show up in n2
         data = _get_viewer_data(prob)
         findvars = [
             'indep.x',
