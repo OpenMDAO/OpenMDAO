@@ -5,15 +5,16 @@ from distutils.version import LooseVersion
 import unittest
 from copy import deepcopy
 from six.moves import cStringIO
+
 import numpy as np
 import scipy
 from scipy.sparse.linalg import gmres
 
-from openmdao.api import Problem, Group, ImplicitComponent, IndepVarComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class CacheLinearTestCase(unittest.TestCase): 
+class CacheLinearTestCase(unittest.TestCase):
 
     def test_feature_cache_linear(self):
 
@@ -22,10 +23,10 @@ class CacheLinearTestCase(unittest.TestCase):
         import scipy
         from scipy.sparse.linalg import gmres
 
-        from openmdao.api import ImplicitComponent, Group, IndepVarComp, Problem
+        import openmdao.api as om
 
 
-        class QuadraticComp(ImplicitComponent):
+        class QuadraticComp(om.ImplicitComponent):
             """
             A Simple Implicit Component representing a Quadratic Equation.
 
@@ -88,31 +89,30 @@ class CacheLinearTestCase(unittest.TestCase):
                     else:
                         d_residuals['states'] = gmres(self.state_jac, d_outputs['states'], x0=d_residuals['states'], atol='legacy')[0]
 
-        p = Problem()
-        p.model = Group()
-        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['a', 'b', 'c'])
+        p = om.Problem()
+        p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes_outputs=['a', 'b', 'c'])
         indeps.add_output('a', 1.)
         indeps.add_output('b', 4.)
         indeps.add_output('c', 1.)
         p.model.add_subsystem('quad', QuadraticComp(), promotes_inputs=['a', 'b', 'c'], promotes_outputs=['states'])
+        p.model.add_subsystem('obj', om.ExecComp('y = (x[1]-x[0])**2', x=np.ones(2)))
+        p.model.connect('states', 'obj.x')
 
         p.model.add_design_var('a', cache_linear_solution=True)
         p.model.add_constraint('states', upper=10)
-
+        p.model.add_objective('obj.y')
 
         p.setup(mode='fwd')
-        p.run_model()
+        p.run_driver()
 
-        assert_rel_error(self, p['states'], [-0.26794919, -4.], 1e-6)
-
-        derivs = p.compute_totals(of=['states'], wrt=['a'])
-        assert_rel_error(self, derivs['states', 'a'], [[-0.02072594],[4.]], 1e-6)
-
-        p['a'] = 4
-        derivs = p.compute_totals(of=['states'], wrt=['a'])
-        assert_rel_error(self, derivs['states', 'a'], [[-0.02072594],[4.]], 1e-6)
+        print(p['a'], p['b'], p['c'])
+        print(p['states'])
+        assert_rel_error(self, p['obj.y'], 0.25029766, 1e-3)
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     unittest.main()
 

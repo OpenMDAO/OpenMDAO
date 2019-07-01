@@ -292,6 +292,7 @@ def config_summary(problem, stream=sys.stdout):
     else:
         global_max_depth = max_depth
 
+    # this gives us a printer that only prints on rank 0
     printer = _get_printer(problem.comm, stream)
 
     printer("============== Problem Summary ============")

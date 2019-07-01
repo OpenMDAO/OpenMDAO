@@ -11,13 +11,12 @@ from distutils.version import LooseVersion
 
 import numpy as np
 
-from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, LinearBlockGS, \
-    ExecComp, ExplicitComponent, PETScVector, ScipyKrylov, NonlinearBlockGS
-from openmdao.utils.mpi import MPI
+import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
     SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped, FanInGrouped
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.mpi import MPI
 
 
 if MPI:
@@ -34,10 +33,10 @@ class ParDerivTestCase(unittest.TestCase):
 
     def test_fan_in_serial_sets_rev(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanInGrouped()
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.sub.linear_solver = LinearBlockGS()
+        prob.model.linear_solver = om.LinearBlockGS()
+        prob.model.sub.linear_solver = om.LinearBlockGS()
 
         prob.model.add_design_var('iv.x1')
         prob.model.add_design_var('iv.x2')
@@ -55,10 +54,10 @@ class ParDerivTestCase(unittest.TestCase):
 
     def test_fan_in_serial_sets_fwd(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanInGrouped()
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.sub.linear_solver = LinearBlockGS()
+        prob.model.linear_solver = om.LinearBlockGS()
+        prob.model.sub.linear_solver = om.LinearBlockGS()
 
         prob.model.add_design_var('iv.x1')
         prob.model.add_design_var('iv.x2')
@@ -76,10 +75,10 @@ class ParDerivTestCase(unittest.TestCase):
 
     def test_fan_out_serial_sets_fwd(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanOutGrouped()
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.sub.linear_solver = LinearBlockGS()
+        prob.model.linear_solver = om.LinearBlockGS()
+        prob.model.sub.linear_solver = om.LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0)
@@ -97,10 +96,10 @@ class ParDerivTestCase(unittest.TestCase):
 
     def test_fan_out_serial_sets_rev(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanOutGrouped()
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.sub.linear_solver = LinearBlockGS()
+        prob.model.linear_solver = om.LinearBlockGS()
+        prob.model.sub.linear_solver = om.LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0)
@@ -118,10 +117,10 @@ class ParDerivTestCase(unittest.TestCase):
 
     def test_fan_in_parallel_sets_fwd(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanInGrouped()
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.sub.linear_solver = LinearBlockGS()
+        prob.model.linear_solver = om.LinearBlockGS()
+        prob.model.sub.linear_solver = om.LinearBlockGS()
 
         prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
         prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
@@ -140,10 +139,10 @@ class ParDerivTestCase(unittest.TestCase):
 
     def test_debug_print_option_totals_color(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanInGrouped()
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.sub.linear_solver = LinearBlockGS()
+        prob.model.linear_solver = om.LinearBlockGS()
+        prob.model.sub.linear_solver = om.LinearBlockGS()
 
         prob.model.add_design_var('iv.x1', parallel_deriv_color='par_dv')
         prob.model.add_design_var('iv.x2', parallel_deriv_color='par_dv')
@@ -176,10 +175,10 @@ class ParDerivTestCase(unittest.TestCase):
 
     def test_fan_out_parallel_sets_rev(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = FanOutGrouped()
-        prob.model.linear_solver = LinearBlockGS()
-        prob.model.sub.linear_solver = LinearBlockGS()
+        prob.model.linear_solver = om.LinearBlockGS()
+        prob.model.sub.linear_solver = om.LinearBlockGS()
 
         prob.model.add_design_var('iv.x')
         prob.model.add_constraint('c2.y', upper=0.0, parallel_deriv_color='par_resp')
@@ -195,6 +194,11 @@ class ParDerivTestCase(unittest.TestCase):
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
 
+        # Piggyback to make sure the distributed norm calculation is correct.
+        vec = prob.model._vectors['residual']['c2.y']
+        norm_val = vec.get_norm()
+        assert_rel_error(self, norm_val, 6.480740698, 1e-6)
+
 
 @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class DecoupledTestCase(unittest.TestCase):
@@ -203,24 +207,24 @@ class DecoupledTestCase(unittest.TestCase):
 
     def setup_model(self):
         asize = self.asize
-        prob = Problem()
+        prob = om.Problem()
         root = prob.model
-        root.linear_solver = LinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
 
-        Indep1 = root.add_subsystem('Indep1', IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        Indep2 = root.add_subsystem('Indep2', IndepVarComp('x', np.arange(asize+2, dtype=float)+1.0))
-        G1 = root.add_subsystem('G1', ParallelGroup())
-        G1.linear_solver = LinearBlockGS()
+        Indep1 = root.add_subsystem('Indep1', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        Indep2 = root.add_subsystem('Indep2', om.IndepVarComp('x', np.arange(asize+2, dtype=float)+1.0))
+        G1 = root.add_subsystem('G1', om.ParallelGroup())
+        G1.linear_solver = om.LinearBlockGS()
 
-        c1 = G1.add_subsystem('c1', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
-                                                  x=np.zeros(asize), y=np.zeros(asize)))
-        c2 = G1.add_subsystem('c2', ExecComp('y = x[:%d] * 2.0' % asize,
-                                        x=np.zeros(asize+2), y=np.zeros(asize)))
+        c1 = G1.add_subsystem('c1', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
+                                                x=np.zeros(asize), y=np.zeros(asize)))
+        c2 = G1.add_subsystem('c2', om.ExecComp('y = x[:%d] * 2.0' % asize,
+                                                x=np.zeros(asize+2), y=np.zeros(asize)))
 
-        Con1 = root.add_subsystem('Con1', ExecComp('y = x * 5.0',
-                                          x=np.zeros(asize), y=np.zeros(asize)))
-        Con2 = root.add_subsystem('Con2', ExecComp('y = x * 4.0',
-                                          x=np.zeros(asize), y=np.zeros(asize)))
+        Con1 = root.add_subsystem('Con1', om.ExecComp('y = x * 5.0',
+                                                      x=np.zeros(asize), y=np.zeros(asize)))
+        Con2 = root.add_subsystem('Con2', om.ExecComp('y = x * 4.0',
+                                                      x=np.zeros(asize), y=np.zeros(asize)))
         root.connect('Indep1.x', 'G1.c1.x')
         root.connect('Indep2.x', 'G1.c2.x')
         root.connect('G1.c1.y', 'Con1.x')
@@ -337,22 +341,22 @@ class IndicesTestCase(unittest.TestCase):
 
     def setup_model(self, mode):
         asize = 3
-        prob = Problem()
+        prob = om.Problem()
         root = prob.model
-        root.linear_solver = LinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
 
-        p = root.add_subsystem('p', IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        G1 = root.add_subsystem('G1', ParallelGroup())
-        G1.linear_solver = LinearBlockGS()
+        p = root.add_subsystem('p', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        G1 = root.add_subsystem('G1', om.ParallelGroup())
+        G1.linear_solver = om.LinearBlockGS()
 
-        c2 = G1.add_subsystem('c2', ExecComp('y = x * 2.0',
-                                        x=np.zeros(asize), y=np.zeros(asize)))
-        c3 = G1.add_subsystem('c3', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
-                                        x=np.zeros(asize), y=np.zeros(asize)))
-        c4 = root.add_subsystem('c4', ExecComp('y = x * 4.0',
-                                          x=np.zeros(asize), y=np.zeros(asize)))
-        c5 = root.add_subsystem('c5', ExecComp('y = x * 5.0',
-                                          x=np.zeros(asize), y=np.zeros(asize)))
+        c2 = G1.add_subsystem('c2', om.ExecComp('y = x * 2.0',
+                                                x=np.zeros(asize), y=np.zeros(asize)))
+        c3 = G1.add_subsystem('c3', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
+                                                x=np.zeros(asize), y=np.zeros(asize)))
+        c4 = root.add_subsystem('c4', om.ExecComp('y = x * 4.0',
+                                                  x=np.zeros(asize), y=np.zeros(asize)))
+        c5 = root.add_subsystem('c5', om.ExecComp('y = x * 5.0',
+                                                  x=np.zeros(asize), y=np.zeros(asize)))
 
         prob.model.add_design_var('p.x', indices=[1, 2])
         prob.model.add_constraint('c4.y', upper=0.0, indices=[1], parallel_deriv_color='par_resp')
@@ -393,30 +397,30 @@ class IndicesTestCase2(unittest.TestCase):
 
     def setup_model(self, mode):
         asize = 3
-        prob = Problem()
+        prob = om.Problem()
         root = prob.model
 
-        root.linear_solver = LinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
 
-        G1 = root.add_subsystem('G1', ParallelGroup())
-        G1.linear_solver = LinearBlockGS()
+        G1 = root.add_subsystem('G1', om.ParallelGroup())
+        G1.linear_solver = om.LinearBlockGS()
 
-        par1 = G1.add_subsystem('par1', Group())
-        par1.linear_solver = LinearBlockGS()
-        par2 = G1.add_subsystem('par2', Group())
-        par2.linear_solver = LinearBlockGS()
+        par1 = G1.add_subsystem('par1', om.Group())
+        par1.linear_solver = om.LinearBlockGS()
+        par2 = G1.add_subsystem('par2', om.Group())
+        par2.linear_solver = om.LinearBlockGS()
 
-        p1 = par1.add_subsystem('p', IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        p2 = par2.add_subsystem('p', IndepVarComp('x', np.arange(asize, dtype=float)+10.0))
+        p1 = par1.add_subsystem('p', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        p2 = par2.add_subsystem('p', om.IndepVarComp('x', np.arange(asize, dtype=float)+10.0))
 
-        c2 = par1.add_subsystem('c2', ExecComp('y = x * 2.0',
-                                        x=np.zeros(asize), y=np.zeros(asize)))
-        c3 = par2.add_subsystem('c3', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
-                                        x=np.zeros(asize), y=np.zeros(asize)))
-        c4 = par1.add_subsystem('c4', ExecComp('y = x * 4.0',
-                                          x=np.zeros(asize), y=np.zeros(asize)))
-        c5 = par2.add_subsystem('c5', ExecComp('y = x * 5.0',
-                                          x=np.zeros(asize), y=np.zeros(asize)))
+        c2 = par1.add_subsystem('c2', om.ExecComp('y = x * 2.0',
+                                                  x=np.zeros(asize), y=np.zeros(asize)))
+        c3 = par2.add_subsystem('c3', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
+                                                  x=np.zeros(asize), y=np.zeros(asize)))
+        c4 = par1.add_subsystem('c4', om.ExecComp('y = x * 4.0',
+                                                  x=np.zeros(asize), y=np.zeros(asize)))
+        c5 = par2.add_subsystem('c5', om.ExecComp('y = x * 5.0',
+                                                  x=np.zeros(asize), y=np.zeros(asize)))
 
         prob.model.add_design_var('G1.par1.p.x', indices=[1, 2])
         prob.model.add_design_var('G1.par2.p.x', indices=[1, 2])
@@ -466,24 +470,24 @@ class MatMatTestCase(unittest.TestCase):
 
     def setup_model(self):
         asize = self.asize
-        prob = Problem()
+        prob = om.Problem()
         root = prob.model
-        root.linear_solver = LinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
 
-        p1 = root.add_subsystem('p1', IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        p2 = root.add_subsystem('p2', IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
-        G1 = root.add_subsystem('G1', ParallelGroup())
-        G1.linear_solver = LinearBlockGS()
+        p1 = root.add_subsystem('p1', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        p2 = root.add_subsystem('p2', om.IndepVarComp('x', np.arange(asize, dtype=float)+1.0))
+        G1 = root.add_subsystem('G1', om.ParallelGroup())
+        G1.linear_solver = om.LinearBlockGS()
 
-        c1 = G1.add_subsystem('c1', ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
+        c1 = G1.add_subsystem('c1', om.ExecComp('y = ones(3).T*x.dot(arange(3.,6.))',
+                                                x=np.zeros(asize), y=np.zeros(asize)))
+        c2 = G1.add_subsystem('c2', om.ExecComp('y = x * 2.0',
+                                                x=np.zeros(asize), y=np.zeros(asize)))
+
+        c3 = root.add_subsystem('c3', om.ExecComp('y = x * 5.0',
                                                   x=np.zeros(asize), y=np.zeros(asize)))
-        c2 = G1.add_subsystem('c2', ExecComp('y = x * 2.0',
-                                        x=np.zeros(asize), y=np.zeros(asize)))
-
-        c3 = root.add_subsystem('c3', ExecComp('y = x * 5.0',
-                                          x=np.zeros(asize), y=np.zeros(asize)))
-        c4 = root.add_subsystem('c4', ExecComp('y = x * 4.0',
-                                          x=np.zeros(asize), y=np.zeros(asize)))
+        c4 = root.add_subsystem('c4', om.ExecComp('y = x * 4.0',
+                                                  x=np.zeros(asize), y=np.zeros(asize)))
         root.connect('p1.x', 'G1.c1.x')
         root.connect('p2.x', 'G1.c2.x')
         root.connect('G1.c1.y', 'c3.x')
@@ -568,7 +572,7 @@ class MatMatTestCase(unittest.TestCase):
         assert_rel_error(self, J['c4.y', 'p2.x'], expected, 1e-6)
 
 
-class SumComp(ExplicitComponent):
+class SumComp(om.ExplicitComponent):
     def __init__(self, size):
         super(SumComp, self).__init__()
         self.size = size
@@ -586,7 +590,7 @@ class SumComp(ExplicitComponent):
         partials['y', 'x'] = np.ones(inputs['x'].size)
 
 
-class SlowComp(ExplicitComponent):
+class SlowComp(om.ExplicitComponent):
     """
     Component with a delay that multiplies the input by a multiplier.
     """
@@ -614,17 +618,17 @@ class SlowComp(ExplicitComponent):
         super(SlowComp, self)._apply_linear(jac, vec_names, rel_systems, mode, scope_out, scope_in)
 
 
-class PartialDependGroup(Group):
+class PartialDependGroup(om.Group):
     def setup(self):
         size = 4
 
-        Indep1 = self.add_subsystem('Indep1', IndepVarComp('x', np.arange(size, dtype=float)+1.0))
+        Indep1 = self.add_subsystem('Indep1', om.IndepVarComp('x', np.arange(size, dtype=float)+1.0))
         Comp1 = self.add_subsystem('Comp1', SumComp(size))
-        pargroup = self.add_subsystem('ParallelGroup1', ParallelGroup())
+        pargroup = self.add_subsystem('ParallelGroup1', om.ParallelGroup())
 
-        self.linear_solver = LinearBlockGS()
+        self.linear_solver = om.LinearBlockGS()
         self.linear_solver.options['iprint'] = -1
-        pargroup.linear_solver = LinearBlockGS()
+        pargroup.linear_solver = om.LinearBlockGS()
         pargroup.linear_solver.options['iprint'] = -1
 
         delay = .1
@@ -653,7 +657,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         import numpy as np
 
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 
         size = 4
@@ -662,7 +666,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         wrt = ['Indep1.x']
 
         # run first in fwd mode
-        p = Problem(model=PartialDependGroup())
+        p = om.Problem(model=PartialDependGroup())
         p.setup(mode='rev')
         p.run_model()
 
@@ -676,7 +680,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
 
         import numpy as np
 
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.core.tests.test_parallel_derivatives import PartialDependGroup
 
         size = 4
@@ -685,7 +689,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         wrt = ['Indep1.x']
 
         # run first in fwd mode
-        p = Problem(model=PartialDependGroup())
+        p = om.Problem(model=PartialDependGroup())
         p.setup(mode='fwd')
         p.run_model()
 
@@ -697,7 +701,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         assert_rel_error(self, J['ParallelGroup1.Con2.y']['Indep1.x'][0], np.ones(size)*-3., 1e-6)
 
         # now run in rev mode and compare times for deriv calculation
-        p = Problem(model=PartialDependGroup())
+        p = om.Problem(model=PartialDependGroup())
         p.setup(check=False, mode='rev')
 
         p.run_model()
@@ -718,29 +722,29 @@ class CleanupTestCase(unittest.TestCase):
     # to converge.  The problem was due to garbage in the doutputs vector that
     # was coming from transfers to irrelevant variables during Group._apply_linear.
     def setUp(self):
-        p = self.p = Problem()
+        p = self.p = om.Problem()
         root = p.model
-        root.linear_solver = LinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
         root.linear_solver.options['err_on_maxiter'] = True
 
-        inputs = root.add_subsystem("inputs", IndepVarComp("x", 1.0))
-        G1 = root.add_subsystem("G1", Group())
-        dparam = G1.add_subsystem("dparam", ExecComp("y = .5*x"))
-        G1_inputs = G1.add_subsystem("inputs", IndepVarComp("x", 1.5))
-        start = G1.add_subsystem("start", ExecComp("y = .7*x"))
-        timecomp = G1.add_subsystem("time", ExecComp("y = -.2*x"))
+        inputs = root.add_subsystem("inputs", om.IndepVarComp("x", 1.0))
+        G1 = root.add_subsystem("G1", om.Group())
+        dparam = G1.add_subsystem("dparam", om.ExecComp("y = .5*x"))
+        G1_inputs = G1.add_subsystem("inputs", om.IndepVarComp("x", 1.5))
+        start = G1.add_subsystem("start", om.ExecComp("y = .7*x"))
+        timecomp = G1.add_subsystem("time", om.ExecComp("y = -.2*x"))
 
-        G2 = G1.add_subsystem("G2", Group())
+        G2 = G1.add_subsystem("G2", om.Group())
         stage_step = G2.add_subsystem("stage_step",
-                                      ExecComp("y = -0.1*x + .5*x2 - .4*x3 + .9*x4"))
-        ode = G2.add_subsystem("ode", ExecComp("y = .8*x - .6*x2"))
-        dummy = G2.add_subsystem("dummy", IndepVarComp("x", 1.3))
+                                      om.ExecComp("y = -0.1*x + .5*x2 - .4*x3 + .9*x4"))
+        ode = G2.add_subsystem("ode", om.ExecComp("y = .8*x - .6*x2"))
+        dummy = G2.add_subsystem("dummy", om.IndepVarComp("x", 1.3))
 
-        step = G1.add_subsystem("step", ExecComp("y = -.2*x + .4*x2 - .4*x3"))
-        output = G1.add_subsystem("output", ExecComp("y = .6*x"))
+        step = G1.add_subsystem("step", om.ExecComp("y = -.2*x + .4*x2 - .4*x3"))
+        output = G1.add_subsystem("output", om.ExecComp("y = .6*x"))
 
-        con = root.add_subsystem("con", ExecComp("y = .2 * x"))
-        obj = root.add_subsystem("obj", ExecComp("y = .3 * x"))
+        con = root.add_subsystem("con", om.ExecComp("y = .2 * x"))
+        obj = root.add_subsystem("obj", om.ExecComp("y = .3 * x"))
 
         root.connect("inputs.x", "G1.dparam.x")
 

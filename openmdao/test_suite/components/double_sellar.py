@@ -1,14 +1,12 @@
-from openmdao.core.group import Group
-from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.linear.direct import DirectSolver
+import openmdao.api as om
+
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.test_suite.components.sellar import SellarImplicitDis1
-
 # TODO -- Need to convert these over to use `setup` after we have two setup
 # phases split up and have the ability to change driver settings
 
 
-class SubSellar(Group):
+class SubSellar(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
         super(SubSellar, self).__init__(**kwargs)
@@ -19,7 +17,7 @@ class SubSellar(Group):
                            promotes=['z', 'y1', 'y2'])
 
 
-class DoubleSellar(Group):
+class DoubleSellar(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
         super(DoubleSellar, self).__init__(**kwargs)
@@ -31,11 +29,11 @@ class DoubleSellar(Group):
         self.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        self.nonlinear_solver = NewtonSolver()
-        self.linear_solver = DirectSolver()
+        self.nonlinear_solver = om.NewtonSolver()
+        self.linear_solver = om.DirectSolver()
 
 
-class SubSellarImplicit(Group):
+class SubSellarImplicit(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
         super(SubSellarImplicit, self).__init__(**kwargs)
@@ -46,7 +44,7 @@ class SubSellarImplicit(Group):
                            promotes=['z', 'y1', 'y2'])
 
 
-class DoubleSellarImplicit(Group):
+class DoubleSellarImplicit(om.Group):
 
     def __init__(self, units=None, scaling=None, **kwargs):
         super(DoubleSellarImplicit, self).__init__(**kwargs)
@@ -58,5 +56,5 @@ class DoubleSellarImplicit(Group):
         self.connect('g2.y2', 'g1.x')
 
         # Converge the outer loop with Gauss Seidel, with a looser tolerance.
-        self.nonlinear_solver = NewtonSolver()
-        self.linear_solver = DirectSolver()
+        self.nonlinear_solver = om.NewtonSolver()
+        self.linear_solver = om.DirectSolver()

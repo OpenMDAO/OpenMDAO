@@ -21,7 +21,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.add_subsystem('g', g)
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # -------------------------------------------------------------------
 
@@ -66,7 +66,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.add_subsystem('g', g, promotes=['*'])
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # -------------------------------------------------------------------
 
@@ -109,7 +109,7 @@ class TestGetSetVariables(unittest.TestCase):
         p = Problem()
         model = p.model
         model.add_subsystem('g', g)
-        p.setup(check=False)
+        p.setup()
 
         # -------------------------------------------------------------------
 
@@ -199,7 +199,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.add_subsystem('g', g, promotes=['*'])
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -274,7 +274,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.add_subsystem('g', g)
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # -------------------------------------------------------------------
 
@@ -291,7 +291,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
 
         # -------------------------------------------------------------------
@@ -304,7 +304,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Start from a clean state again
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         with self.assertRaises(Exception) as context:
             self.assertEqual(p['g.x'], 5.0)
@@ -327,7 +327,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
 
         with self.assertRaises(Exception) as context:
@@ -352,7 +352,7 @@ class TestGetSetVariables(unittest.TestCase):
         model.connect('x', 'g.x')
 
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         # inputs (g.x is connected to x)
         p['g.x'] = 5.0
@@ -362,7 +362,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
 
         # inputs (g.x is connected to x)
@@ -372,7 +372,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Final test, the getitem
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
 
         with self.assertRaises(Exception) as context:
             self.assertEqual(p['g.x'], 5.0)
@@ -389,7 +389,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Repeat test for post final_setup when vectors are allocated.
         p = Problem(model)
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
 
         with self.assertRaises(Exception) as context:

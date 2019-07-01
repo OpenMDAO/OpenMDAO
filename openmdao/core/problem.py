@@ -4,6 +4,7 @@ from __future__ import division, print_function
 
 import sys
 import os
+import logging
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -25,7 +26,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
-from openmdao.error_checking.check_config import check_config
+from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
 from openmdao.utils.record_util import create_local_meta
@@ -38,6 +39,7 @@ from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.utils.logger_utils import get_logger
 import openmdao.utils.coloring as coloring_mod
 
 try:
@@ -921,7 +923,8 @@ class Problem(object):
         coloring = driver._coloring_info['coloring']
         if coloring is coloring_mod._STD_COLORING_FNAME:
             coloring = driver._get_static_coloring()
-        if coloring and coloring is not coloring_mod._DYN_COLORING and coloring_mod._use_sparsity:
+        if (coloring and coloring is not coloring_mod._DYN_COLORING and
+                coloring_mod._use_total_sparsity):
             # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
             if coloring._fwd and coloring._rev:
@@ -949,7 +952,11 @@ class Problem(object):
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
         if self._check and self.comm.rank == 0:
-            check_config(self, self._logger)
+            if self._check is True:
+                checks = _default_checks
+            else:
+                checks = self._check
+            self.check_config(self._logger, checks=checks)
 
         if self._setup_status < 2:
             self._setup_status = 2
@@ -1128,7 +1135,7 @@ class Problem(object):
                                 dinputs.set_const(0.0)
                                 dstate.set_const(0.0)
 
-                                # Dictionary access returns a scaler for 1d input, and we
+                                # Dictionary access returns a scalar for 1d input, and we
                                 # need a vector for clean code, so use _views_flat.
                                 flat_view[idx] = 1.0
 
@@ -1345,8 +1352,9 @@ class Problem(object):
         compact_print : bool
             Set to True to just print the essentials, one line per unknown-param pair.
         driver_scaling : bool
-            Set to True to scale derivative values by the quantities specified when the desvars and
-            responses were added. Default if False, which is unscaled.
+            When True, return derivatives that are scaled according to either the adder and scaler
+            or the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is False, which is unscaled.
         abs_err_tol : float
             Threshold value for absolute error.  Errors about this value will have a '*' displayed
             next to them in output, making them easy to search for. Default is 1.0E-6.
@@ -1457,8 +1465,9 @@ class Problem(object):
         debug_print : bool
             Set to True to print out some debug information during linear solve.
         driver_scaling : bool
-            Set to True to scale derivative values by the quantities specified when the desvars and
-            responses were added. Default if False, which is unscaled.
+            When True, return derivatives that are scaled according to either the adder and scaler
+            or the ref and ref0 values that were specified when add_design_var, add_objective, and
+            add_constraint were called on the model. Default is False, which is unscaled.
 
         Returns
         -------
@@ -1687,6 +1696,35 @@ class Problem(object):
                 self[name] = outputs[name]
 
         return
+
+    def check_config(self, logger=None, checks=None, out_file='openmdao_checks.out'):
+        """
+        Perform optional error checks on a Problem.
+
+        Parameters
+        ----------
+        logger : object
+            Logging object.
+        checks : list of str or None
+            List of specific checks to be performed.
+        out_file : str or None
+            If not None, output will be written to this file in addition to stdout.
+        """
+        if logger is None:
+            logger = get_logger('check_config', out_file=out_file, use_format=True)
+
+        if checks is None:
+            checks = sorted(_default_checks)
+        elif checks == 'all':
+            checks = sorted(_all_checks)
+
+        for c in checks:
+            if c not in _all_checks:
+                print("WARNING: '%s' is not a recognized check.  Available checks are: %s" %
+                      (c, sorted(_all_checks)))
+                continue
+            logger.info('checking %s' % c)
+            _all_checks[c](self, logger)
 
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,

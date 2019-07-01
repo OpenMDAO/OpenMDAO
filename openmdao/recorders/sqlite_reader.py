@@ -414,9 +414,9 @@ class SqliteCaseReader(BaseCaseReader):
             raise RuntimeError('No cases recorded for %s' % source)
 
         if case.inputs:
-            dct['inputs'] = list(case.inputs.keys())
+            dct['inputs'] = list(case.inputs)
         if case.outputs:
-            dct['outputs'] = list(case.outputs.keys())
+            dct['outputs'] = list(case.outputs)
 
         return dct
 

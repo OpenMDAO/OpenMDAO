@@ -2,9 +2,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem
+import openmdao.api as om
 from openmdao.test_suite.components.quad_implicit import QuadraticComp
-
 
 
 class TestQuadImplicit(unittest.TestCase):
@@ -13,10 +12,10 @@ class TestQuadImplicit(unittest.TestCase):
 
     def test_check_partials_for_docs(self):
 
-        from openmdao.api import Problem
+        import openmdao.api as om
         from openmdao.test_suite.components.quad_implicit import QuadraticComp
 
-        p = Problem()
+        p = om.Problem()
 
         p.model.add_subsystem('quad', QuadraticComp())
 
@@ -25,7 +24,7 @@ class TestQuadImplicit(unittest.TestCase):
         p.check_partials(compact_print=True)
 
     def test_check_partials(self):
-        p = Problem()
+        p = om.Problem()
 
         p.model.add_subsystem('quad', QuadraticComp())
 

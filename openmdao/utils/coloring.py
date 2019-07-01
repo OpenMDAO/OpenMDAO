@@ -10,6 +10,7 @@ import warnings
 import json
 import pickle
 import inspect
+import traceback
 from collections import OrderedDict, defaultdict
 from itertools import combinations, chain
 from distutils.version import LooseVersion
@@ -45,7 +46,13 @@ CITATIONS = """
 # If False, don't use it regardless.
 # The command line total_coloring and sparsity commands make this False when generating a
 # new coloring and/or sparsity.
-_use_sparsity = True
+_use_total_sparsity = True
+
+# If this is True, then IF partial/semi-total coloring is specified, use it.
+# If False, don't use it regardless.
+# The command line partial_coloring command makes this False when generating a
+# new partial/semi-total coloring.
+_use_partial_sparsity = True
 
 # If True, ignore use_fixed_coloring if the coloring passed to it is _STD_COLORING_FNAME.
 # This is used when the 'openmdao partial_coloring' or 'openmdao total_coloring' commands
@@ -101,10 +108,6 @@ class Coloring(object):
         Row indices of nonzero entries in the full jac sparsity matrix.
     _nzcols : ndarray of int
         Column indices of nonzero entries in the full jac sparsity matrix.
-    _coloring_time : float or None
-        If known, the time it took to compute the coloring.
-    _sparsity_time : float or None
-        If known, the time it took to compute the sparsity.
     _pct_nonzero : float
         If known, percentage of nonzero vs total array entries.
     _fwd : tuple (col_lists, row_maps) or None
@@ -151,8 +154,6 @@ class Coloring(object):
         self._col_vars = col_vars
         self._col_var_sizes = col_var_sizes
 
-        self._coloring_time = None
-        self._sparsity_time = None
         self._fwd = None
         self._rev = None
         self._meta = {}
@@ -462,18 +463,31 @@ class Coloring(object):
             print("\nTotal colors vs. total size: %d vs %s  (%.1f%% improvement)" %
                   (tot_colors, tot_size, pct))
 
+        meta = self._meta
         print()
-        if self._sparsity_time is not None:
-            print("Time to compute sparsity: %f sec." % self._sparsity_time)
-        if self._coloring_time is not None:
-            print("Time to compute coloring: %f sec." % self._coloring_time)
+        good_tol = meta.get('good_tol')
+        if good_tol is not None:
+            print("\nSparsity computed using tolerance: %g" % meta['good_tol'])
+            print("Most common number of zero entries (%d of %d) repeated %d times out of %d "
+                  "tolerances tested.\n" % (meta['zero_entries'], meta['J_size'],
+                                            meta['nz_matches'], meta['n_tested']))
 
-    def display(self):
+        sparsity_time = meta.get('sparsity_time')
+        if sparsity_time is not None:
+            print("Time to compute sparsity: %f sec." % sparsity_time)
+
+        coloring_time = meta.get('coloring_time')
+        if coloring_time is not None:
+            print("Time to compute coloring: %f sec." % coloring_time)
+
+    def display_txt(self):
         """
-        Display the structure of a boolean array with coloring info for each nonzero value.
+        Print the structure of a boolean array with coloring info for each nonzero value.
 
         Forward mode colored nonzeros are denoted by 'f', reverse mode nonzeros by 'r',
         overlapping nonzeros by 'O' and uncolored nonzeros by 'x'.  Zeros are denoted by '.'.
+        Note that x's and O's should never appear unless there is a bug in the coloring
+        algorithm.
 
         If names and sizes of row and column vars are known, print the name of the row var
         alongside each row and print the names of the column vars, aligned with each column,
@@ -550,6 +564,172 @@ class Coloring(object):
         if has_overlap:
             raise RuntimeError("Internal coloring bug: jacobian has entries where fwd and rev "
                                "colorings overlap!")
+
+    def display(self):
+        """
+        Display a plot of the sparsity pattern, showing grouping by color.
+        """
+        try:
+            from matplotlib import pyplot, patches, axes, cm
+            from matplotlib.artist import getp
+            from matplotlib.offsetbox import AnchoredText
+        except ImportError:
+            print("matplotlib is not installed so the coloring viewer is not available. The ascii "
+                  "based coloring viewer can be accessed by calling display_txt() on the Coloring "
+                  "object or by using 'openmdao view_coloring --jtext <your_coloring_file>' from "
+                  "the command line.")
+            return
+
+        nrows, ncols = self._shape
+        aspect_ratio = ncols / nrows
+        J = np.ones((nrows, ncols, 3), dtype=float)
+
+        tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
+
+        size = 10
+        if nrows > ncols:
+            mult = nrows / size
+            ysize = nrows / mult
+            xsize = ysize * aspect_ratio
+        else:
+            mult = ncols / size
+            xsize = ncols / mult
+            ysize = xsize / aspect_ratio
+
+        xsize = max(1, int(xsize))
+        ysize = max(1, int(ysize))
+
+        fig = pyplot.figure(figsize=(xsize, ysize))  # in inches
+        ax = pyplot.gca()
+
+        # hide tic marks/labels
+        ax.axes.get_xaxis().set_ticks([])
+        ax.axes.get_yaxis().set_ticks([])
+
+        if self._row_vars is not None and self._col_vars is not None:
+            # map row/col to corresponding var names
+            entry_xnames = np.zeros(ncols, dtype=int)
+            entry_ynames = np.zeros(nrows, dtype=int)
+            entry_xcolors = np.zeros(ncols, dtype=int)
+            entry_ycolors = np.zeros(nrows, dtype=int)
+
+            # pick two colors for our checkerboard pattern
+            sjcolors = [cm.get_cmap('Greys')(0.3), cm.get_cmap('Greys')(0.4)]
+
+            colstart = colend = 0
+            for i, cvsize in enumerate(self._col_var_sizes):
+                colend += cvsize
+                entry_xnames[colstart:colend] = i
+                colstart = colend
+
+            # we have var name/size info, so mark rows/cols with their respective variable names
+            rowstart = rowend = 0
+            for ridx, rvsize in enumerate(self._row_var_sizes):
+                rowend += rvsize
+                entry_ynames[rowstart:rowend] = ridx
+
+                colstart = colend = 0
+                for cidx, cvsize in enumerate(self._col_var_sizes):
+                    colend += cvsize
+                    # display grid that breaks up the Jacobian into subjacs by variable pairs.
+                    # using (ridx+cidx)%2 will give us a nice checkerboard pattern
+                    J[rowstart:rowend, colstart:colend] = sjcolors[(ridx + cidx) % 2][:3]
+                    colstart = colend
+
+                rowstart = rowend
+
+            def on_press(event):
+                if event.inaxes == ax:
+                    ix = int(event.xdata)
+                    iy = int(event.ydata)
+
+                    if event.xdata - ix >= .5:
+                        ix += 1
+                    ix = max(0, ix)
+                    ix = min(ncols, ix)
+
+                    if event.ydata - iy >= .5:
+                        iy += 1
+                    iy = max(0, iy)
+                    iy = min(nrows, iy)
+
+                    # if J[iy, ix] is not one of the background 'checkerboard' colors, then it
+                    # must be either forward or reverse colored.
+                    if np.all(J[iy, ix] == sjcolors[0][:3]) or np.all(J[iy, ix] == sjcolors[1][:3]):
+                        color_str = ''
+                    else:
+                        # display the color number because sometimes certain colormap colors look
+                        # too similar to the eye.
+                        if entry_xcolors[ix] != 0:
+                            color_str = 'Color: %d (fwd)' % entry_xcolors[ix]
+                        else:
+                            color_str = 'Color: %d (rev)' % entry_ycolors[iy]
+
+                    # because we have potentially really long pathnames, we just print
+                    # the 'of' and 'wrt' variables to the console instead of trying to display
+                    # them on the plot.
+                    print('\nJ[%d, %d]  %s' % (iy, ix, color_str),
+                          '\nOF:', self._row_vars[entry_ynames[iy]],
+                          '\nWRT:', self._col_vars[entry_xnames[ix]])
+
+            def on_resize(event):
+                fig.tight_layout()
+
+            # set up event handling
+            fig.canvas.mpl_connect('button_press_event', on_press)
+            fig.canvas.mpl_connect('resize_event', on_resize)
+
+        color_arrays = []
+        if self._fwd:
+            # winter is a blue/green color map
+            cmap = cm.get_cmap('winter')
+
+            icol = 1
+            full_rows = np.arange(nrows, dtype=int)
+            col2row = self._fwd[1]
+            for i, grp in enumerate(self._fwd[0]):
+                for c in grp:
+                    rows = col2row[c]
+                    if rows is None:
+                        rows = full_rows
+                    idx = icol / fwd_solves
+                    for r in rows:
+                        J[r, c][:] = cmap(idx)[:3]
+                    if i == 0:  # group 0 are uncolored (each col has different color)
+                        icol += 1
+                    entry_xcolors[c] = icol
+                icol += 1
+
+        if self._rev:
+            # autumn_r is a red/yellow color map
+            cmap = cm.get_cmap('autumn_r')
+
+            icol = 1
+            full_cols = np.arange(ncols, dtype=int)
+            row2col = self._rev[1]
+            for i, grp in enumerate(self._rev[0]):
+                for r in grp:
+                    cols = row2col[r]
+                    if cols is None:
+                        cols = full_cols
+                    idx = icol / rev_solves
+                    for c in cols:
+                        J[r, c][:] = cmap(idx)[:3]
+                    if i == 0:  # group 0 are uncolored (each col has different color)
+                        icol += 1
+                    entry_ycolors[r] = icol
+                icol += 1
+
+        typ = self._meta['type'].upper()[0] + self._meta['type'][1:]
+
+        ax.set_title("%s Jacobian Coloring (%d x %d)\n%d fwd colors, %d rev colors "
+                     "(%.1f%% improvement)" %
+                     (typ, self._shape[0], self._shape[1], fwd_solves, rev_solves, pct))
+
+        pyplot.imshow(J, interpolation="none")
+        fig.tight_layout()
+
+        pyplot.show()
 
     def get_dense_sparsity(self):
         """
@@ -988,7 +1168,7 @@ def MNCO_bidir(J):
 
     # check_coloring(J, coloring)
 
-    coloring._coloring_time = time.time() - start_time
+    coloring._meta['coloring_time'] = time.time() - start_time
 
     return coloring
 
@@ -999,6 +1179,8 @@ def _tol_sweep(arr, tol=1e-15, orders=20):
 
     Sweeps over tolerances +- 'orders' orders of magnitude around tol and picks the most
     stable one (one corresponding to the most repeated number of nonzero entries).
+
+    The array 'arr' must not contain negative numbers.
 
     Parameters
     ----------
@@ -1011,43 +1193,59 @@ def _tol_sweep(arr, tol=1e-15, orders=20):
 
     Returns
     -------
-    float
-        Chosen tolerance.
-    int
-        Number of repeated nonzero counts for the given tolerance.
-    int
-        Number of tolerances tested in the sweep.
-    int
-        Number of zero entries at chosen tolerance.
+    dict
+        Info about the tolerance and how it was determined.
     """
-    if orders is None:  # skip the sweep. Just use the tolerance given.
-        return tol, 1, 1, arr[arr <= tol].size
+    if orders is None:   # skip the sweep. Just use the tolerance given.
+        good_tol = tol
+        nz_matches = n_tested = 1
+    else:
+        nzeros = []
+        itol = tol * 10.**orders
+        smallest = tol / 10.**orders
+        n_tested = 0
+        while itol >= smallest:
+            if itol < 1.:
+                rows, cols = np.nonzero(arr > itol)
+                if nzeros and nzeros[-1][1] == len(rows):
+                    nzeros[-1][0].append(itol)
+                else:
+                    nzeros.append(([itol], len(rows)))
+                n_tested += 1
+            itol /= 10.
 
-    nzeros = defaultdict(list)
-    itol = tol * 10.**orders
-    smallest = tol / 10.**orders
-    n_tested = 0
-    while itol >= smallest:
-        if itol < 1.:
-            num_zero = arr[arr <= itol].size
-            nzeros[num_zero].append(itol)
-            n_tested += 1
-        itol /= 10.
+        # pick lowest tolerance corresponding to the most repeated number of 'zero' entries
+        sorted_items = sorted(nzeros, key=lambda x: len(x[0]), reverse=True)
+        nz_matches = len(sorted_items[0][0])
 
-    # pick lowest tolerance corresponding to the most repeated number of 'zero' entries
-    sorted_items = sorted(nzeros.items(), key=lambda x: len(x[1]), reverse=True)
-    n_matching = len(sorted_items[0][1])
+        if nz_matches <= 1:
+            lst = []
+            for itols, nz in sorted_items:
+                entry = ", ".join(['%3.1g' % tol for tol in itols])
+                if len(itols) > 1:
+                    entry = "[%s]" % entry
+                lst.append("(%s, %d)" % (entry, nz))
 
-    if n_matching <= 1:
-        raise RuntimeError("Could not find more than 1 tolerance to match any number of nonzeros. "
-                           "This indicates that your tolerance sweep of +- %d orders, starting "
-                           "from %s is not big enough.  To get a 'stable' sparsity pattern, "
-                           "try re-running with a larger tolerance sweep.\nNonzeros found for "
-                           "each tolerance: %s" % (orders, tol, sorted_items))
+            raise RuntimeError("Could not find more than 1 tolerance to match any number of "
+                               "nonzeros. This indicates that your tolerance sweep of +- %d "
+                               "orders, starting from %s is not big enough.  To get a 'stable' "
+                               "sparsity pattern, try re-running with a larger tolerance sweep.\n"
+                               "Nonzeros found for each tolerance: [%s]" %
+                               (orders, tol, ", ".join(lst)))
 
-    good_tol = sorted_items[0][1][-1]
+        good_tol = sorted_items[0][0][-1]
 
-    return good_tol, n_matching, n_tested, sorted_items[0][0]
+    info = {
+        'tol': tol,
+        'orders': orders,
+        'good_tol': good_tol,
+        'nz_matches': nz_matches,
+        'n_tested': n_tested,
+        'zero_entries': arr[arr <= good_tol].size,
+        'J_size': arr.size,
+    }
+
+    return info
 
 
 @contextmanager
@@ -1136,21 +1334,21 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
                 fullJ += np.abs(J)
         elapsed = time.time() - start_time
 
-    fullJ /= num_full_jacs
+    fullJ *= (1.0 / num_full_jacs)
 
-    good_tol, nz_matches, n_tested, zero_entries = _tol_sweep(fullJ, tol, orders)
+    info = _tol_sweep(fullJ, tol, orders)
+    info['num_full_jacs'] = num_full_jacs
+    info['sparsity_time'] = elapsed
+    info['type'] = 'total'
 
-    print("\nUsing tolerance: %g" % good_tol)
-    print("Most common number of zero entries (%d of %d) repeated %d times out of %d tolerances "
-          "tested.\n" % (zero_entries, fullJ.size, nz_matches, n_tested))
     print("Full total jacobian was computed %d times, taking %f seconds." % (num_full_jacs,
                                                                              elapsed))
     print("Total jacobian shape:", fullJ.shape, "\n")
 
     boolJ = np.zeros(fullJ.shape, dtype=bool)
-    boolJ[fullJ > good_tol] = True
+    boolJ[fullJ > info['good_tol']] = True
 
-    return boolJ, elapsed
+    return boolJ, info
 
 
 def _jac2subjac_sparsity(J, ofs, wrts, of_sizes, wrt_sizes):
@@ -1348,7 +1546,7 @@ def _compute_coloring(J, mode):
     else:
         coloring._rev = (col_groups, col2rows)
 
-    coloring._coloring_time = time.time() - start_time
+    coloring._meta['coloring_time'] = time.time() - start_time
 
     return coloring
 
@@ -1422,7 +1620,7 @@ def compute_total_coloring(problem, mode=None,
                                                       num_full_jacs=num_full_jacs, tol=tol,
                                                       orders=orders)[0]
         else:
-            J, sparsity_time = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol,
+            J, sparsity_info = _get_bool_total_jac(problem, num_full_jacs=num_full_jacs, tol=tol,
                                                    orders=orders, setup=setup,
                                                    run_model=run_model)
             coloring = _compute_coloring(J, mode)
@@ -1430,10 +1628,9 @@ def compute_total_coloring(problem, mode=None,
             coloring._row_var_sizes = of_sizes
             coloring._col_vars = wrts
             coloring._col_var_sizes = wrt_sizes
-            coloring._sparsity_time = sparsity_time
 
             # save metadata we used to create the coloring
-            coloring._meta = {'num_full_jacs': num_full_jacs, 'tol': tol, 'orders': orders}
+            coloring._meta.update(sparsity_info)
 
             driver._total_jac = None
 
@@ -1522,7 +1719,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
                                       setup=False, run_model=run_model, fname=fname)
 
     if driver._coloring_info['show_sparsity']:
-        coloring.display()
+        coloring.display_txt()
     if driver._coloring_info['show_summary']:
         coloring.summary()
 
@@ -1544,19 +1741,18 @@ def _total_coloring_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', action='store', dest='outfile', help='output file (pickle format)')
-    parser.add_argument('-n', action='store', dest='num_jacs',
-                        default=_DEF_COMP_SPARSITY_ARGS['num_full_jacs'], type=int,
+    parser.add_argument('-n', action='store', dest='num_jacs', type=int,
                         help='number of times to repeat derivative computation when '
                         'computing sparsity')
-    parser.add_argument('--orders', action='store', dest='orders',
-                        default=_DEF_COMP_SPARSITY_ARGS['orders'], type=int,
+    parser.add_argument('--orders', action='store', dest='orders', type=int,
                         help='Number of orders (+/-) used in the tolerance sweep.')
-    parser.add_argument('-t', '--tol', action='store', dest='tolerance',
-                        default=_DEF_COMP_SPARSITY_ARGS['tol'], type=float,
+    parser.add_argument('-t', '--tol', action='store', dest='tolerance', type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final jacobian used to "
                         "compute the coloring.")
+    parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
+                        help="Display a text-based visualization of the colored jacobian.")
     parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
                         help="Exclude the sparsity structure from the coloring data structure.")
     parser.add_argument('--profile', action='store_true', dest='profile',
@@ -1581,19 +1777,25 @@ def _total_coloring_cmd(options):
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context
 
-    global _use_sparsity
+    global _use_total_sparsity
 
-    _use_sparsity = False
+    _use_total_sparsity = False
 
     def _total_coloring(prob):
-        global _use_sparsity
-
         if prob.model._use_derivatives:
             Problem._post_setup_func = None  # avoid recursive loop
             if options.outfile:
                 outfile = os.path.abspath(options.outfile)
             else:
                 outfile = os.path.join(prob.options['coloring_dir'], 'total_coloring.pkl')
+
+            color_info = prob.driver._coloring_info
+            if options.tolerance is None:
+                options.tolerance = color_info['tol']
+            if options.orders is None:
+                options.orders = color_info['orders']
+            if options.num_jacs is None:
+                options.num_jacs = color_info['num_full_jacs']
 
             with profiling('coloring_profile.out') if options.profile else do_nothing_context():
                 coloring = compute_total_coloring(prob,
@@ -1602,6 +1804,8 @@ def _total_coloring_cmd(options):
                                                   orders=options.orders,
                                                   setup=False, run_model=True, fname=outfile)
 
+            if options.show_sparsity_text:
+                coloring.display_txt()
             if options.show_sparsity:
                 coloring.display()
             coloring.summary()
@@ -1629,9 +1833,6 @@ def _partial_coloring_setup_parser(parser):
                         help='compute a coloring for instances of the given class. '
                         'This option may be be used multiple times to specify multiple classes. '
                         'Class name can optionally contain the full module path.')
-    parser.add_argument('--first_only', action='store_true', dest='first_only',
-                        help="If using the --class option, only generate coloring for the first "
-                        "instance found for each class.")
     parser.add_argument('--compute_decl_partials', action='store_true', dest='compute_decls',
                         help="Display declare_partials() calls required to specify computed "
                         "sparsity.")
@@ -1650,8 +1851,9 @@ def _partial_coloring_setup_parser(parser):
     parser.add_argument('--tol', action='store', dest='tol', default=1.e-15, type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
-                        help="Display a visualization of the final jacobian used to "
-                        "compute the coloring.")
+                        help="Display a visualization of the colored jacobian.")
+    parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
+                        help="Display a text-based visualization of the colored jacobian.")
     parser.add_argument('--profile', action='store_true', dest='profile',
                         help="Do profiling on the coloring process.")
 
@@ -1659,9 +1861,6 @@ def _partial_coloring_setup_parser(parser):
 def _get_partial_coloring_kwargs(options):
     if options.system != '' and options.classes:
         raise RuntimeError("Can't specify --system and --class together.")
-    if options.classes:
-        if not options.norecurse:
-            raise RuntimeError("Can't specify --class if recurse option is set.")
 
     kwargs = {}
     names = ('method', 'form', 'step', 'num_full_jacs', 'perturb_size', 'tol')
@@ -1693,19 +1892,23 @@ def _partial_coloring_cmd(options):
     from openmdao.devtools.debug import profiling
     from openmdao.utils.general_utils import do_nothing_context
 
-    global _use_sparsity, _force_dyn_coloring
+    global _use_partial_sparsity, _force_dyn_coloring
 
-    _use_sparsity = False
+    _use_partial_sparsity = False
     _force_dyn_coloring = True
 
     def _show(system, options, coloring):
+        if options.show_sparsity_text and not coloring._meta.get('show_sparsity'):
+            coloring.display_txt()
+            print('\n')
+
         if options.show_sparsity and not coloring._meta.get('show_sparsity'):
             coloring.display()
             print('\n')
 
         if not coloring._meta.get('show_summary'):
-            print("Approx coloring for '%s' (class %s)\n" % (system.pathname,
-                                                             type(system).__name__))
+            print("\nApprox coloring for '%s' (class %s)\n" % (system.pathname,
+                                                               type(system).__name__))
             coloring.summary()
             print('\n')
 
@@ -1730,25 +1933,33 @@ def _partial_coloring_cmd(options):
                     raise RuntimeError("Can't find system with pathname '%s'." % options.system)
 
                 kwargs = _get_partial_coloring_kwargs(options)
+                recurse = not options.norecurse
 
                 if options.classes:
                     to_find = set(options.classes)
+                    found = set()
+                    kwargs['recurse'] = False
                     for s in system.system_iter(include_self=True, recurse=True):
                         for c in options.classes:
                             klass = s.__class__.__name__
                             mod = s.__class__.__module__
                             if c == klass or c == '.'.join([mod, klass]):
                                 if c in to_find:
-                                    to_find.remove(c)
-                                coloring = s._compute_approx_coloring(**kwargs)[0]
-                                _show(s, options, coloring)
-                                break
-                        if not to_find and options.first_only:
-                            break
+                                    found.add(c)
+                                try:
+                                    coloring = s._compute_approx_coloring(**kwargs)[0]
+                                except Exception:
+                                    tb = traceback.format_exc()
+                                    print("The following error occurred while attempting to "
+                                          "compute coloring for %s:\n %s" % (s.pathname, tb))
+                                else:
+                                    _show(s, options, coloring)
+                                if options.norecurse:
+                                    break
                     else:
-                        if to_find:
+                        if to_find - found:
                             raise RuntimeError("Failed to find any instance of classes %s" %
-                                               sorted(to_find))
+                                               sorted(to_find - found))
                 else:
                     colorings = system._compute_approx_coloring(**kwargs)
 
@@ -1762,6 +1973,7 @@ def _partial_coloring_cmd(options):
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
+
     return _partial_coloring
 
 
@@ -1800,9 +2012,9 @@ def _sparsity_cmd(options):
         The post-setup hook function.
     """
     from openmdao.core.problem import Problem
-    global _use_sparsity
+    global _use_total_sparsity
 
-    _use_sparsity = False
+    _use_total_sparsity = False
 
     def _sparsity(prob):
         Problem._post_setup_func = None  # avoid recursive loop
@@ -1837,8 +2049,9 @@ def _view_coloring_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='coloring file.')
     parser.add_argument('-j', action='store_true', dest='show_sparsity',
-                        help="Display a visualization of the final sparsity matrix used to "
-                        "compute the coloring.")
+                        help="Display a visualization of the colored jacobian.")
+    parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
+                        help="Display a text-based visualization of the colored jacobian.")
     parser.add_argument('-s', action='store_true', dest='subjac_sparsity',
                         help="Display sparsity patterns for subjacs.")
     parser.add_argument('-m', action='store_true', dest='show_meta',
@@ -1858,6 +2071,9 @@ def _view_coloring_exec(options):
         Command line options.
     """
     coloring = Coloring.load(options.file[0])
+    if options.show_sparsity_text:
+        coloring.display_txt()
+
     if options.show_sparsity:
         coloring.display()
 

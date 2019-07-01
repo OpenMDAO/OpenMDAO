@@ -1,9 +1,11 @@
 from __future__ import division
+
 import numpy as np
-from openmdao.api import ExplicitComponent
+
+import openmdao.api as om
 
 
-class MomentOfInertiaComp(ExplicitComponent):
+class MomentOfInertiaComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)

@@ -8,21 +8,21 @@ from openmdao.utils.assert_utils import assert_rel_error
 class TestParaboloidTLDR(unittest.TestCase):
 
     def test_tldr(self):
-        from openmdao.api import Problem, ScipyOptimizeDriver, ExecComp, IndepVarComp
+        import openmdao.api as om
 
         # build the model
-        prob = Problem()
-        indeps = prob.model.add_subsystem('indeps', IndepVarComp())
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', 3.0)
         indeps.add_output('y', -4.0)
 
-        prob.model.add_subsystem('paraboloid', ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
+        prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3'))
 
         prob.model.connect('indeps.x', 'paraboloid.x')
         prob.model.connect('indeps.y', 'paraboloid.y')
 
         # setup the optimization
-        prob.driver = ScipyOptimizeDriver()
+        prob.driver = om.ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)

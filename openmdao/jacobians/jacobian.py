@@ -246,7 +246,9 @@ class Jacobian(object):
             assert subjac_info['rows'] is None
             rows, cols, shape = subjac_info['sparsity']
             r = np.zeros(shape)
-            r[rows, cols] = rand(len(rows)) + 1.0
+            val = rand(len(rows))
+            val += 1.0
+            r[rows, cols] = val
         else:
             r = rand(*subjac.shape)
             r += 1.0
@@ -347,15 +349,14 @@ class Jacobian(object):
                     else:
                         J[roffset:rend, coffset:cend] = summ[key]
 
-        # normalize by number of saved jacs, giving a sort of 'average' jac
-        J /= num_full_jacs
+        J *= (1.0 / num_full_jacs)
 
-        good_tol, _, _, _ = _tol_sweep(J, tol, orders)
+        tol_info = _tol_sweep(J, tol, orders)
 
         boolJ = np.zeros(J.shape, dtype=bool)
-        boolJ[J > good_tol] = True
+        boolJ[J > tol_info['good_tol']] = True
 
-        return boolJ
+        return boolJ, tol_info
 
     def set_complex_step_mode(self, active):
         """

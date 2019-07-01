@@ -1,7 +1,7 @@
 from __future__ import division
 import numpy as np
 
-from openmdao.api import Group, IndepVarComp
+import openmdao.api as om
 
 from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp import MomentOfInertiaComp
 from openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp import LocalStiffnessMatrixComp
@@ -11,7 +11,7 @@ from openmdao.test_suite.test_examples.beam_optimization.components.compliance_c
 from openmdao.test_suite.test_examples.beam_optimization.components.volume_comp import VolumeComp
 
 
-class BeamGroup(Group):
+class BeamGroup(om.Group):
 
     def initialize(self):
         self.options.declare('E')
@@ -31,7 +31,7 @@ class BeamGroup(Group):
         force_vector = np.zeros(2 * num_nodes)
         force_vector[-2] = -1.
 
-        inputs_comp = IndepVarComp()
+        inputs_comp = om.IndepVarComp()
         inputs_comp.add_output('h', shape=num_elements)
         self.add_subsystem('inputs_comp', inputs_comp)
 

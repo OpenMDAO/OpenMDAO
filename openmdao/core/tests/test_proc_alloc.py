@@ -158,7 +158,7 @@ class ProcTestCase3(unittest.TestCase):
         model.add_design_var('indep.x')
         model.add_objective('objective.y')
 
-        p.setup(check=False)
+        p.setup()
         p.final_setup()
 
         all_inds = _get_which_procs(p.model)

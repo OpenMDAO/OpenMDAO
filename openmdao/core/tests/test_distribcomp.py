@@ -5,7 +5,7 @@ import time
 
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, Group, ExecComp, ParallelGroup
+import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
@@ -23,7 +23,7 @@ else:
     commsize = 1
 
 
-class InOutArrayComp(ExplicitComponent):
+class InOutArrayComp(om.ExplicitComponent):
 
     def initialize(self):
         self.options.declare('arr_size', types=int, default=10,
@@ -43,7 +43,7 @@ class InOutArrayComp(ExplicitComponent):
         outputs['outvec'] = inputs['invec'] * 2.
 
 
-class DistribCompSimple(ExplicitComponent):
+class DistribCompSimple(om.ExplicitComponent):
     """Uses 2 procs but takes full input vars"""
 
     def initialize(self):
@@ -75,7 +75,7 @@ class DistribCompSimple(ExplicitComponent):
             outputs['outvec'] = inputs['invec'] * 0.75
 
 
-class DistribInputComp(ExplicitComponent):
+class DistribInputComp(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
 
     def initialize(self):
@@ -107,7 +107,7 @@ class DistribInputComp(ExplicitComponent):
         self.add_output('outvec', np.ones(arr_size, float), shape=np.int32(arr_size))
 
 
-class DistribOverlappingInputComp(ExplicitComponent):
+class DistribOverlappingInputComp(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices"""
 
     def initialize(self):
@@ -151,7 +151,7 @@ class DistribOverlappingInputComp(ExplicitComponent):
                        src_indices=np.arange(start, end, dtype=int))
 
 
-class DistribInputDistribOutputComp(ExplicitComponent):
+class DistribInputDistribOutputComp(om.ExplicitComponent):
     """Uses 2 procs and takes input var slices."""
 
     def initialize(self):
@@ -179,7 +179,7 @@ class DistribInputDistribOutputComp(ExplicitComponent):
         self.add_output('outvec', np.ones(sizes[rank], float))
 
 
-class DistribNoncontiguousComp(ExplicitComponent):
+class DistribNoncontiguousComp(om.ExplicitComponent):
     """Uses 2 procs and takes non-contiguous input var slices and has output
     var slices as well
     """
@@ -207,7 +207,7 @@ class DistribNoncontiguousComp(ExplicitComponent):
         self.add_output('outvec', np.ones(len(idxs), float))
 
 
-class DistribGatherComp(ExplicitComponent):
+class DistribGatherComp(om.ExplicitComponent):
     """Uses 2 procs gathers a distrib input into a full output"""
 
     def initialize(self):
@@ -242,7 +242,7 @@ class DistribGatherComp(ExplicitComponent):
         self.add_output('outvec', np.ones(arr_size, float))
 
 
-class NonDistribGatherComp(ExplicitComponent):
+class NonDistribGatherComp(om.ExplicitComponent):
     """Uses 2 procs gathers a distrib output into a full input"""
 
     def initialize(self):
@@ -265,7 +265,7 @@ class NOMPITests(unittest.TestCase):
     def test_distrib_idx_in_full_out(self):
         size = 11
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
@@ -276,7 +276,7 @@ class NOMPITests(unittest.TestCase):
               "available. The default non-distributed vectors will be used."
 
         with assert_warning(UserWarning, msg):
-            p.setup(check=False)
+            p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -296,13 +296,13 @@ class MPITests(unittest.TestCase):
     def test_distrib_full_in_out(self):
         size = 11
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribCompSimple(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -316,13 +316,13 @@ class MPITests(unittest.TestCase):
     def test_distrib_idx_in_full_out(self):
         size = 11
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
 
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -336,15 +336,15 @@ class MPITests(unittest.TestCase):
     def test_distrib_1D_dist_output(self):
         size = 11
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
-        C3 = top.add_subsystem("C3", ExecComp("y=x", x=np.zeros(size*commsize),
-                                              y=np.zeros(size*commsize)))
+        C3 = top.add_subsystem("C3", om.ExecComp("y=x", x=np.zeros(size*commsize),
+                                                 y=np.zeros(size*commsize)))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.x')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -359,14 +359,14 @@ class MPITests(unittest.TestCase):
         # normal comp to distrib comp to distrb gather comp
         size = 3
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -381,14 +381,14 @@ class MPITests(unittest.TestCase):
         # take even input indices in 0 rank and odd ones in 1 rank
         size = 11
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribNoncontiguousComp(arr_size=size))
         C3 = top.add_subsystem("C3", DistribGatherComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -417,12 +417,12 @@ class MPITests(unittest.TestCase):
         # entries are distributed to multiple processes
         size = 11
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribOverlappingInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -443,14 +443,14 @@ class MPITests(unittest.TestCase):
         # automagically gather the full vector without declaring src_indices
         size = 11
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
         C3 = top.add_subsystem("C3", NonDistribGatherComp(size=size))
         top.connect('C1.outvec', 'C2.invec')
         top.connect('C2.outvec', 'C3.invec')
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -469,7 +469,7 @@ class DeprecatedMPITests(unittest.TestCase):
 
     def test_distrib_idx_in_full_out_deprecated(self):
 
-        class DeprecatedDistribInputComp(ExplicitComponent):
+        class DeprecatedDistribInputComp(om.ExplicitComponent):
             """Deprecated version of DistribInputComp, uses attribute instead of option."""
 
             def __init__(self, arr_size=11):
@@ -500,7 +500,7 @@ class DeprecatedMPITests(unittest.TestCase):
 
         size = 11
 
-        p = Problem()
+        p = om.Problem()
         top = p.model
 
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
@@ -525,9 +525,9 @@ class DeprecatedMPITests(unittest.TestCase):
 
         if PETScVector is None:
             with assert_warning(UserWarning, msg):
-                p.setup(check=False)
+                p.setup()
         else:
-            p.setup(check=False)
+            p.setup()
 
         p.final_setup()
 
@@ -547,12 +547,12 @@ class ProbRemoteTests(unittest.TestCase):
     def test_prob_getitem_err(self):
         size = 3
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
-        par = top.add_subsystem('par', ParallelGroup())
+        par = top.add_subsystem('par', om.ParallelGroup())
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
-        p.setup(check=False)
+        p.setup()
 
         # Conclude setup but don't run model.
         p.final_setup()
@@ -593,7 +593,7 @@ class MPIFeatureTests(unittest.TestCase):
     def test_distribcomp_feature(self):
         import numpy as np
 
-        from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp
+        import openmdao.api as om
         from openmdao.utils.mpi import MPI
         from openmdao.utils.array_utils import evenly_distrib_idxs
 
@@ -603,7 +603,7 @@ class MPIFeatureTests(unittest.TestCase):
         rank = MPI.COMM_WORLD.rank
         size = 15
 
-        class DistribComp(ExplicitComponent):
+        class DistribComp(om.ExplicitComponent):
             def initialize(self):
                 self.options['distributed'] = True
 
@@ -632,7 +632,7 @@ class MPIFeatureTests(unittest.TestCase):
                 else:
                     outputs['outvec'] = inputs['invec'] * -3.0
 
-        class Summer(ExplicitComponent):
+        class Summer(om.ExplicitComponent):
             """Sums a distributed input."""
 
             def initialize(self):
@@ -668,9 +668,9 @@ class MPIFeatureTests(unittest.TestCase):
 
                 outputs['out'] = total[0]
 
-        p = Problem(model=Group())
+        p = om.Problem()
         top = p.model
-        top.add_subsystem("indep", IndepVarComp('x', np.zeros(size)))
+        top.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
         top.add_subsystem("C2", DistribComp(size=size))
         top.add_subsystem("C3", Summer(size=size))
 
@@ -693,9 +693,9 @@ class TestGroupMPI(unittest.TestCase):
     def test_promote_distrib(self):
         import numpy as np
 
-        from openmdao.api import Problem, ExplicitComponent, IndepVarComp
+        import openmdao.api as om
 
-        class MyComp(ExplicitComponent):
+        class MyComp(om.ExplicitComponent):
             def setup(self):
                 # decide what parts of the array we want based on our rank
                 if self.comm.rank == 0:
@@ -711,9 +711,9 @@ class TestGroupMPI(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = np.sum(inputs['x'])*2.0
 
-        p = Problem()
+        p = om.Problem()
 
-        p.model.add_subsystem('indep', IndepVarComp('x', np.arange(5, dtype=float)),
+        p.model.add_subsystem('indep', om.IndepVarComp('x', np.arange(5, dtype=float)),
                               promotes_outputs=['x'])
 
         p.model.add_subsystem('C1', MyComp(),

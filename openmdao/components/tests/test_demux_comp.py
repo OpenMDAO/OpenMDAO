@@ -4,10 +4,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
-
-from openmdao.api import DemuxComp
 
 
 class TestDemuxCompOptions(unittest.TestCase):
@@ -15,14 +13,14 @@ class TestDemuxCompOptions(unittest.TestCase):
     def test_invalid_axis(self):
         nn = 10
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(nn,))
 
         p.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['a'])
 
-        demux_comp = p.model.add_subsystem(name='demux_comp', subsys=DemuxComp(vec_size=nn))
+        demux_comp = p.model.add_subsystem(name='demux_comp', subsys=om.DemuxComp(vec_size=nn))
 
         demux_comp.add_var('a', shape=(nn,), axis=1)
 
@@ -32,19 +30,19 @@ class TestDemuxCompOptions(unittest.TestCase):
             p.setup()
         self.assertEqual(str(ctx.exception),
                          "Invalid axis (1) for variable 'a' of shape (10,)")
-            
+
     def test_axis_with_wrong_size(self):
         nn = 10
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(nn, 7))
         ivc.add_output(name='b', shape=(3, nn))
 
         p.model.add_subsystem(name='ivc', subsys=ivc, promotes_outputs=['a', 'b'])
 
-        demux_comp = p.model.add_subsystem(name='demux_comp', subsys=DemuxComp(vec_size=nn))
+        demux_comp = p.model.add_subsystem(name='demux_comp', subsys=om.DemuxComp(vec_size=nn))
 
         demux_comp.add_var('a', shape=(nn, 7), axis=1)
         demux_comp.add_var('b', shape=(3, nn), axis=1)
@@ -64,9 +62,9 @@ class TestDemuxComp1D(unittest.TestCase):
     def setUp(self):
         self.nn = 10
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn,))
         ivc.add_output(name='b', shape=(self.nn,))
 
@@ -75,7 +73,7 @@ class TestDemuxComp1D(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         demux_comp = self.p.model.add_subsystem(name='demux_comp',
-                                                subsys=DemuxComp(vec_size=self.nn))
+                                                subsys=om.DemuxComp(vec_size=self.nn))
 
         demux_comp.add_var('a', shape=(self.nn,))
         demux_comp.add_var('b', shape=(self.nn,))
@@ -111,9 +109,9 @@ class TestDemuxComp2D(unittest.TestCase):
     def setUp(self):
         self.nn = 10
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 7))
         ivc.add_output(name='b', shape=(3, self.nn))
 
@@ -122,7 +120,7 @@ class TestDemuxComp2D(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         demux_comp = self.p.model.add_subsystem(name='demux_comp',
-                                                subsys=DemuxComp(vec_size=self.nn))
+                                                subsys=om.DemuxComp(vec_size=self.nn))
 
         demux_comp.add_var('a', shape=(self.nn, 7), axis=0)
         demux_comp.add_var('b', shape=(3, self.nn), axis=1)
@@ -154,14 +152,15 @@ class TestDemuxComp2D(unittest.TestCase):
         assert_check_partials(cpd, atol=1.0E-8, rtol=1.0E-8)
 
 
-class TestForDocs(unittest.TestCase):
+class TestFeature(unittest.TestCase):
 
     def test(self):
         """
         An example demonstrating a trivial use case of DemuxComp
         """
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp, DemuxComp, ExecComp
+
+        import openmdao.api as om
         from openmdao.utils.assert_utils import assert_rel_error
 
         # The number of elements to be demuxed
@@ -170,9 +169,9 @@ class TestForDocs(unittest.TestCase):
         # The size of each element to be demuxed
         m = 100
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='pos_ecef', shape=(m, 3), units='km')
 
         p.model.add_subsystem(name='ivc',
@@ -180,15 +179,15 @@ class TestForDocs(unittest.TestCase):
                               promotes_outputs=['pos_ecef'])
 
         mux_comp = p.model.add_subsystem(name='demux',
-                                         subsys=DemuxComp(vec_size=n))
+                                         subsys=om.DemuxComp(vec_size=n))
 
         mux_comp.add_var('pos', shape=(m, n), axis=1, units='km')
 
         p.model.add_subsystem(name='longitude_comp',
-                              subsys=ExecComp('long = atan(y/x)',
-                                              x={'value': np.ones(m), 'units': 'km'},
-                                              y={'value': np.ones(m), 'units': 'km'},
-                                              long={'value': np.ones(m), 'units': 'rad'}))
+                              subsys=om.ExecComp('long = atan(y/x)',
+                                                 x={'value': np.ones(m), 'units': 'km'},
+                                                 y={'value': np.ones(m), 'units': 'km'},
+                                                 long={'value': np.ones(m), 'units': 'rad'}))
 
         p.model.connect('demux.pos_0', 'longitude_comp.x')
         p.model.connect('demux.pos_1', 'longitude_comp.y')

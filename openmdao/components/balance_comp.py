@@ -67,7 +67,7 @@ class BalanceComp(ImplicitComponent):
 
         .. code-block:: python
 
-            prob = Problem(model=Group())
+            prob = Problem()
             bal = BalanceComp()
             bal.add_balance('x', val=1.0)
             tgt = IndepVarComp(name='y_tgt', val=2)
@@ -88,7 +88,7 @@ class BalanceComp(ImplicitComponent):
 
         .. code-block:: python
 
-            prob = Problem(model=Group())
+            prob = Problem()
             bal = BalanceComp('x', val=1.0)
             tgt = IndepVarComp(name='y_tgt', val=2)
             exec_comp = ExecComp('y=x**2')

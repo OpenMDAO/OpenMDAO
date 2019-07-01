@@ -4,16 +4,16 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, Group, IndepVarComp
-from openmdao.components.add_subtract_comp import AddSubtractComp
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+
 
 class TestAddSubtractCompScalars(unittest.TestCase):
 
     def setUp(self):
         self.nn = 1
-        self.p = Problem(model=Group())
-        ivc = IndepVarComp()
+        self.p = om.Problem()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn,))
         ivc.add_output(name='b', shape=(self.nn,))
 
@@ -22,7 +22,7 @@ class TestAddSubtractCompScalars(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
-                                   subsys=AddSubtractComp())
+                                   subsys=om.AddSubtractComp())
         adder.add_equation('adder_output',['input_a','input_b'])
 
         self.p.model.connect('a', 'add_subtract_comp.input_a')
@@ -46,14 +46,15 @@ class TestAddSubtractCompScalars(unittest.TestCase):
         partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
+
 class TestAddSubtractCompNx1(unittest.TestCase):
 
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn,))
         ivc.add_output(name='b', shape=(self.nn,))
 
@@ -62,7 +63,7 @@ class TestAddSubtractCompNx1(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
-                                   subsys=AddSubtractComp())
+                                   subsys=om.AddSubtractComp())
         adder.add_equation('adder_output',['input_a','input_b'],vec_size=self.nn)
 
         self.p.model.connect('a', 'add_subtract_comp.input_a')
@@ -92,9 +93,9 @@ class TestAddSubtractCompNx3(unittest.TestCase):
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3))
         ivc.add_output(name='b', shape=(self.nn, 3))
 
@@ -103,7 +104,7 @@ class TestAddSubtractCompNx3(unittest.TestCase):
                                    promotes_outputs=['a', 'b'])
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
-                                   subsys=AddSubtractComp())
+                                   subsys=om.AddSubtractComp())
         adder.add_equation('adder_output',['input_a','input_b'],vec_size=self.nn,length=3)
 
         self.p.model.connect('a', 'add_subtract_comp.input_a')
@@ -127,14 +128,15 @@ class TestAddSubtractCompNx3(unittest.TestCase):
         partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
+
 class TestAddSubtractMultipleInputs(unittest.TestCase):
 
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3))
         ivc.add_output(name='b', shape=(self.nn, 3))
         ivc.add_output(name='c', shape=(self.nn, 3))
@@ -144,7 +146,7 @@ class TestAddSubtractMultipleInputs(unittest.TestCase):
                                    promotes_outputs=['a', 'b','c'])
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
-                                   subsys=AddSubtractComp())
+                                   subsys=om.AddSubtractComp())
         adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3)
 
         self.p.model.connect('a', 'add_subtract_comp.input_a')
@@ -171,14 +173,15 @@ class TestAddSubtractMultipleInputs(unittest.TestCase):
         partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
+
 class TestAddSubtractScalingFactors(unittest.TestCase):
 
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3))
         ivc.add_output(name='b', shape=(self.nn, 3))
         ivc.add_output(name='c', shape=(self.nn, 3))
@@ -188,7 +191,7 @@ class TestAddSubtractScalingFactors(unittest.TestCase):
                                    promotes_outputs=['a', 'b','c'])
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
-                                   subsys=AddSubtractComp())
+                                   subsys=om.AddSubtractComp())
         adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,scaling_factors=[2.,1.,-1])
 
         self.p.model.connect('a', 'add_subtract_comp.input_a')
@@ -215,14 +218,15 @@ class TestAddSubtractScalingFactors(unittest.TestCase):
         partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
+
 class TestAddSubtractUnits(unittest.TestCase):
 
     def setUp(self):
         self.nn = 5
 
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3),units='ft')
         ivc.add_output(name='b', shape=(self.nn, 3),units='m')
         ivc.add_output(name='c', shape=(self.nn, 3),units='m')
@@ -232,7 +236,7 @@ class TestAddSubtractUnits(unittest.TestCase):
                                    promotes_outputs=['a', 'b','c'])
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
-                                   subsys=AddSubtractComp())
+                                   subsys=om.AddSubtractComp())
         adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,units='ft')
 
         self.p.model.connect('a', 'add_subtract_comp.input_a')
@@ -260,13 +264,14 @@ class TestAddSubtractUnits(unittest.TestCase):
         partials = self.p.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
 
+
 class TestWrongScalingFactorCount(unittest.TestCase):
 
     def setUp(self):
         self.nn = 5
-        self.p = Problem(model=Group())
+        self.p = om.Problem()
 
-        ivc = IndepVarComp()
+        ivc = om.IndepVarComp()
         ivc.add_output(name='a', shape=(self.nn, 3))
         ivc.add_output(name='b', shape=(self.nn, 3))
         ivc.add_output(name='c', shape=(self.nn, 3))
@@ -276,7 +281,7 @@ class TestWrongScalingFactorCount(unittest.TestCase):
                                    promotes_outputs=['a', 'b','c'])
 
         adder=self.p.model.add_subsystem(name='add_subtract_comp',
-                                   subsys=AddSubtractComp())
+                                   subsys=om.AddSubtractComp())
         adder.add_equation('adder_output',['input_a','input_b','input_c'],vec_size=self.nn,length=3,scaling_factors=[1,-1])
 
         self.p.model.connect('a', 'add_subtract_comp.input_a')
@@ -287,34 +292,36 @@ class TestWrongScalingFactorCount(unittest.TestCase):
     def test_for_exception(self):
         self.assertRaises(ValueError,self.p.setup)
 
-class TestForDocs(unittest.TestCase):
+
+class TestFeature(unittest.TestCase):
 
     def test(self):
         """
         A simple example to compute the resultant force on an aircraft and demonstrate the AddSubtract component
         """
         import numpy as np
-        from openmdao.api import Problem, Group, IndepVarComp, AddSubtractComp
-        from openmdao.utils.assert_utils import assert_rel_error
+
+        import openmdao.api as om
 
         n = 3
 
-        p = Problem(model=Group())
+        p = om.Problem()
 
-        ivc = IndepVarComp()
-        #the vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
-        ivc.add_output(name='thrust', shape=(n,2),units='kN')
-        ivc.add_output(name='drag', shape=(n,2),units='kN')
-        ivc.add_output(name='lift', shape=(n,2),units='kN')
-        ivc.add_output(name='weight', shape=(n,2),units='kN')
+        ivc = om.IndepVarComp()
+        # The vector represents forces at 3 time points (rows) in 2 dimensional plane (cols)
+        ivc.add_output(name='thrust', shape=(n, 2), units='kN')
+        ivc.add_output(name='drag', shape=(n, 2), units='kN')
+        ivc.add_output(name='lift', shape=(n, 2), units='kN')
+        ivc.add_output(name='weight', shape=(n, 2), units='kN')
         p.model.add_subsystem(name='ivc',
                               subsys=ivc,
                               promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
 
-        #construct an adder/subtracter here. create a relationship through the add_equation method
-        adder = AddSubtractComp()
-        adder.add_equation('total_force',input_names=['thrust','drag','lift','weight'],vec_size=n,length=2, scaling_factors=[1,-1,1,-1], units='kN')
-        #note the scaling factors. we assume all forces are positive sign upstream
+        # Construct an adder/subtracter here. create a relationship through the add_equation method
+        adder = om.AddSubtractComp()
+        adder.add_equation('total_force', input_names=['thrust', 'drag', 'lift', 'weight'],
+                           vec_size=n, length=2, scaling_factors=[1, -1, 1, -1], units='kN')
+        # Note the scaling factors. we assume all forces are positive sign upstream
 
         p.model.add_subsystem(name='totalforcecomp', subsys=adder)
 
@@ -325,18 +332,18 @@ class TestForDocs(unittest.TestCase):
 
         p.setup()
 
-        #set thrust to exceed drag, weight to equal lift for this scenario
-        p['thrust'][:,0] = [500, 600, 700]
-        p['drag'][:,0] = [400, 400, 400]
-        p['weight'][:,1] = [1000, 1001, 1002]
-        p['lift'][:,1] = [1000, 1000, 1000]
+        # Set thrust to exceed drag, weight to equal lift for this scenario
+        p['thrust'][:, 0] = [500, 600, 700]
+        p['drag'][:, 0] = [400, 400, 400]
+        p['weight'][:, 1] = [1000, 1001, 1002]
+        p['lift'][:, 1] = [1000, 1000, 1000]
 
         p.run_model()
 
         # print(p.get_val('totalforcecomp.total_force', units='kN'))
 
         # Verify the results
-        expected_i = np.array([[100, 200, 300],[0, -1, -2]]).T
+        expected_i = np.array([[100, 200, 300], [0, -1, -2]]).T
         assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'), expected_i)
 
 
