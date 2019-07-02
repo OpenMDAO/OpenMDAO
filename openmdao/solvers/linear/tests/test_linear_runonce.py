@@ -43,7 +43,7 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         # Test that using options that should not exist in class cause an error
         solver = om.LinearRunOnce()
 
-        msg = "\"Option '%s' cannot be set because it has not been declared.\""
+        msg = "\"LinearRunOnce: Option '%s' cannot be set because it has not been declared.\""
 
         for option in ['atol', 'rtol', 'maxiter', 'err_on_maxiter']:
             with self.assertRaises(KeyError) as context:

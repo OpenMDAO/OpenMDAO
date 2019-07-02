@@ -760,14 +760,15 @@ class MetaModelStructuredComp(ExplicitComponent):
                 val = self.interps[out_name](pt)
             except OutOfBoundsError as err:
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
-                errmsg = "Error interpolating output '{}' in '{}' because input '{}' " \
+                errmsg = "{}: Error interpolating output '{}' because input '{}' " \
                     "was out of bounds ('{}', '{}') with " \
-                    "value '{}'".format(out_name, self.pathname, varname_causing_error,
+                    "value '{}'".format(self.msginfo, out_name, varname_causing_error,
                                         err.lower, err.upper, err.value)
                 raise_from(AnalysisError(errmsg), None)
             except ValueError as err:
-                raise ValueError("Error interpolating output '%s' in %s:\n%s" %
-                                 (out_name, self.pathname, str(err)))
+                raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
+                                                                                   out_name,
+                                                                                   str(err)))
             outputs[out_name] = val
 
     def compute_partials(self, inputs, partials):

@@ -31,7 +31,7 @@ class TestMuxCompOptions(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             p.setup()
         self.assertEqual(str(ctx.exception),
-                         'Cannot mux a 1D inputs for a along axis greater than 1 (2)')
+                         'MuxComp (mux_comp): Cannot mux a 1D inputs for a along axis greater than 1 (2)')
 
     def test_invalid_axis_1D(self):
         nn = 10
@@ -62,7 +62,7 @@ class TestMuxCompOptions(unittest.TestCase):
         with self.assertRaises(ValueError) as ctx:
             p.setup()
         self.assertEqual(str(ctx.exception),
-                         'Cannot mux a 1D inputs for b along axis greater than 1 (2)')
+                         'MuxComp (mux_comp): Cannot mux a 1D inputs for b along axis greater than 1 (2)')
 
 
 class TestMuxCompScalar(unittest.TestCase):
