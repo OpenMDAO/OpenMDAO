@@ -516,7 +516,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(ctx.exception),
-                         "System '' has a NewtonSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
+                         "Group (<top>) has a NewtonSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
 
     def test_discrete_err_broyden(self):
         prob = self._setup_model(om.BroydenSolver)
@@ -525,7 +525,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(ctx.exception),
-                         "System '' has a BroydenSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
+                         "Group (<top>) has a BroydenSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
 
 
 class DiscretePromTestCase(unittest.TestCase):

@@ -203,7 +203,7 @@ class ScipyOptimizeDriver(Driver):
         # Raises error if multiple objectives are not supported, but more objectives were defined.
         if not self.supports['multiple_objectives'] and len(self._objs) > 1:
             msg = '{} currently does not support multiple objectives.'
-            raise RuntimeError(msg.format(self.__class__.__name__))
+            raise RuntimeError(msg.format(self.msginfo))
 
         # Since COBYLA does not support bounds, we
         #   need to add to the _cons metadata for any bounds that

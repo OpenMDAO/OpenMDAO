@@ -124,8 +124,8 @@ class Jacobian(object):
         if abs_key in self._subjacs_info:
             return self._subjacs_info[abs_key]['value']
         else:
-            msg = 'Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(key[0], key[1]))
+            msg = '{}: Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
     def __setitem__(self, key, subjac):
         """
@@ -143,8 +143,8 @@ class Jacobian(object):
 
             # You can only set declared subjacobians.
             if abs_key not in self._subjacs_info:
-                msg = 'Variable name pair ("{}", "{}") must first be declared.'
-                raise KeyError(msg.format(key[0], key[1]))
+                msg = '{}: Variable name pair ("{}", "{}") must first be declared.'
+                raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
             subjacs_info = self._subjacs_info[abs_key]
 
@@ -173,15 +173,29 @@ class Jacobian(object):
                 else:
                     # Sparse subjac
                     if subjac.shape != (1,) and subjac.shape != rows.shape:
-                        raise ValueError("Sub-jacobian for key %s has "
+                        raise ValueError("{}: Sub-jacobian for key %s has "
                                          "the wrong shape (%s), expected (%s)." %
-                                         (abs_key, subjac.shape, rows.shape))
+                                         (self.msginfo, abs_key, subjac.shape, rows.shape))
 
                 subjacs_info['value'][:] = subjac
 
         else:
-            msg = 'Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(key[0], key[1]))
+            msg = '{}: Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+
+    @property
+    def msginfo(self):
+        """
+        Return info to prepend to messages.
+
+        Returns
+        -------
+        str
+            Info to prepend to messages.
+        """
+        if self._system is None:
+            return type(self).__name__
+        return '{} in {}'.format(type(self).__name__, self._system.msginfo)
 
     def _update(self, system):
         """
@@ -345,7 +359,8 @@ class Jacobian(object):
                         cols = meta['cols'] + coffset
                         J[rows, cols] = summ[key]
                     elif issparse(summ[key]):
-                        raise NotImplementedError("don't support scipy sparse arrays yet")
+                        raise NotImplementedError("{}: scipy sparse arrays are not "
+                                                  "supported yet.".format(self.msginfo))
                     else:
                         J[roffset:rend, coffset:cend] = summ[key]
 

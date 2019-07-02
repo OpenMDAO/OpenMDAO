@@ -270,7 +270,7 @@ class Solver(object):
         self._recording_iter = system._recording_iter
 
         if system.pathname:
-            parent_name = "%s in %s" % (type(self).__name__, system.msginfo)
+            parent_name = self.msginfo
             self.options._parent_name = parent_name
             self.recording_options._parent_name = parent_name
             self.supports._parent_name = parent_name
@@ -646,8 +646,8 @@ class NonlinearSolver(Solver):
         Raise an exception if any discrete outputs exist in our System.
         """
         if self._system._var_allprocs_discrete['output']:
-            raise RuntimeError("System '%s' has a %s solver and contains discrete outputs %s." %
-                               (self._system.pathname, type(self).__name__,
+            raise RuntimeError("%s has a %s solver and contains discrete outputs %s." %
+                               (self._system.msginfo, type(self).__name__,
                                 sorted(self._system._var_allprocs_discrete['output'])))
 
     def _print_exc_debug_info(self):
@@ -753,8 +753,8 @@ class LinearSolver(Solver):
         """
         super(LinearSolver, self)._setup_solvers(system, depth)
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
-            raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
-                               "jacobians." % (self.SOLVER, system.pathname))
+            raise RuntimeError("Linear solver %s doesn't support assembled "
+                               "jacobians." % self.msginfo)
 
     def solve(self, vec_names, mode, rel_systems=None):
         """

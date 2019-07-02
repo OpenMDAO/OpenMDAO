@@ -181,7 +181,7 @@ class PETScKrylov(LinearSolver):
             dictionary of options set by the instantiating class/script.
         """
         if PETSc is None:
-            raise RuntimeError("PETSc is not available.")
+            raise RuntimeError("{}: PETSc is not available.".format(self.msginfo))
 
         super(PETScKrylov, self).__init__(**kwargs)
 
@@ -341,8 +341,8 @@ class PETScKrylov(LinearSolver):
         options = self.options
 
         if self._system.under_complex_step:
-            msg = 'PETScKrylov solver is not supported under complex step.'
-            raise RuntimeError(msg)
+            raise RuntimeError('{}: PETScKrylov solver is not supported under '
+                               'complex step.'.format(self.msginfo))
 
         maxiter = options['maxiter']
         atol = options['atol']

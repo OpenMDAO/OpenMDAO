@@ -63,8 +63,8 @@ def format_singular_error(err, system, mtx):
             varname = system._var_abs2prom['output'][name]
             break
 
-    msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
-    return msg.format(system.pathname, loc_txt, varname)
+    msg = "Singular entry found in {} for {} associated with state/residual '{}'."
+    return msg.format(system.msginfo, loc_txt, varname)
 
 
 def format_singular_csc_error(system, matrix):
@@ -112,8 +112,8 @@ def format_singular_csc_error(system, matrix):
             varname = system._var_abs2prom['output'][name]
             break
 
-    msg = "Singular entry found in '{}' for {} associated with state/residual '{}'."
-    return msg.format(system.pathname, loc_txt, varname)
+    msg = "Singular entry found in {} for {} associated with state/residual '{}'."
+    return msg.format(system.msginfo, loc_txt, varname)
 
 
 def format_nan_error(system, matrix):
@@ -148,8 +148,8 @@ def format_nan_error(system, matrix):
                 varname.append("'%s'" % relname)
                 break
 
-    msg = "NaN entries found in '{}' for rows associated with states/residuals [{}]."
-    return msg.format(system.pathname, ', '.join(varname))
+    msg = "NaN entries found in {} for rows associated with states/residuals [{}]."
+    return msg.format(system.msginfo, ', '.join(varname))
 
 
 class DirectSolver(LinearSolver):
@@ -270,10 +270,10 @@ class DirectSolver(LinearSolver):
                 # calling scipy.sparse.linalg.splu on a COO actually transposes
                 # the matrix during conversion to csc prior to LU decomp
                 raise RuntimeError("Direct solver is not compatible with matrix type "
-                                   "COOMatrix in system '%s'." % system.pathname)
+                                   "COOMatrix in %s." % system.msginfo)
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in system '%s'." % (type(mtx), system.pathname))
+                                   " in %s." % (type(mtx), system.msginfo))
 
         else:
             mtx = self._build_mtx()
@@ -339,7 +339,7 @@ class DirectSolver(LinearSolver):
                         reraise(*sys.exc_info())
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in system '%s'." % (type(mtx), system.pathname))
+                                   " in %s." % (type(mtx), system.msginfo))
 
         else:
             mtx = self._build_mtx()
