@@ -93,7 +93,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob = om.Problem(RectangleGroup())
         prob.setup()
 
-        msg = "RectangleGroup (<top>): Unable to list inputs until model has been run."
+        msg = "RectangleGroup (<model>): Unable to list inputs until model has been run."
         try:
             prob.model.list_inputs()
         except Exception as err:
@@ -101,7 +101,7 @@ class ExplCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
-        msg = "RectangleGroup (<top>): Unable to list outputs until model has been run."
+        msg = "RectangleGroup (<model>): Unable to list outputs until model has been run."
         try:
             prob.model.list_outputs()
         except Exception as err:

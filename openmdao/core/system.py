@@ -461,7 +461,7 @@ class System(object):
             Either our instance pathname or class name.
         """
         if self.pathname == '':
-            return '{} (<top>)'.format(type(self).__name__)
+            return '{} (<model>)'.format(type(self).__name__)
         if self.pathname is not None:
             return '{} ({})'.format(type(self).__name__, self.pathname)
         if self.name:

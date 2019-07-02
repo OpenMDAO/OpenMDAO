@@ -458,7 +458,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # the valid range for the source
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
-        expected = ("Group (<top>): The source indices do not specify a valid index for the "
+        expected = ("Group (<model>): The source indices do not specify a valid index for the "
                     "connection 'idvp.arrout' to 'arraycomp.inp1'. "
                     "Index '100000' is out of range for source dimension of "
                     "size 5.")
@@ -557,7 +557,7 @@ class TestShapes(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "Group (<top>): The source and target shapes do not match or are ambiguous "
+                         "Group (<model>): The source and target shapes do not match or are ambiguous "
                          "for the connection 'indep.x' to 'C1.x'. Expected (5, 2) but "
                          "got (1, 10, 1, 1).")
 
@@ -586,7 +586,7 @@ class TestMultiConns(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "Group (<top>): The following inputs have multiple connections: "
+                         "Group (<model>): The following inputs have multiple connections: "
                          "sub.c2.y from ['indeps.y', 'sub.c1.y']")
 
     def test_mixed_conns_same_level(self):
@@ -609,7 +609,7 @@ class TestMultiConns(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(context.exception),
-                         "Group (<top>): Input 'c2.y' cannot be connected to 'indeps.x' "
+                         "Group (<model>): Input 'c2.y' cannot be connected to 'indeps.x' "
                          "because it's already connected to 'c1.y'")
 
 

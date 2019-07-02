@@ -231,14 +231,14 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.model.add_subsystem('_bad_name', om.Group())
         self.assertEqual(str(err.exception),
-                         "Group (<top>): '_bad_name' is not a valid sub-system name.")
+                         "Group (<model>): '_bad_name' is not a valid sub-system name.")
 
         # 'name', 'pathname', 'comm' and 'options' are reserved names
         for reserved in ['name', 'pathname', 'comm', 'options']:
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, om.Group())
             self.assertEqual(str(err.exception),
-                             "Group (<top>): Can't add subsystem '%s' because an attribute with that name already exits." %
+                             "Group (<model>): Can't add subsystem '%s' because an attribute with that name already exits." %
                              reserved)
 
     def test_group_nested(self):
@@ -550,7 +550,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "Group (<top>): src_indices has been defined in both "
+                         "Group (<model>): src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
     def test_connect_src_indices(self):
@@ -921,22 +921,22 @@ class TestGroup(unittest.TestCase):
             model.set_order(['indeps', 'C2', 'junk', 'C1', 'C3'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<top>): subsystem(s) ['junk'] found in subsystem order but don't exist.")
+                         "Group (<model>): subsystem(s) ['junk'] found in subsystem order but don't exist.")
 
         # Missing
         with self.assertRaises(ValueError) as cm:
             model.set_order(['indeps', 'C2', 'C3'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<top>): ['C1'] expected in subsystem order and not found.")
+                         "Group (<model>): ['C1'] expected in subsystem order and not found.")
 
         # Extra and Missing
         with self.assertRaises(ValueError) as cm:
             model.set_order(['indeps', 'C2', 'junk', 'C1', 'junk2'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<top>): ['C3'] expected in subsystem order and not found.\n"
-                         "Group (<top>): subsystem(s) ['junk', 'junk2'] found in subsystem order "
+                         "Group (<model>): ['C3'] expected in subsystem order and not found.\n"
+                         "Group (<model>): subsystem(s) ['junk', 'junk2'] found in subsystem order "
                          "but don't exist.")
 
         # Dupes
@@ -944,7 +944,7 @@ class TestGroup(unittest.TestCase):
             model.set_order(['indeps', 'C2', 'C1', 'C3', 'C1'])
 
         self.assertEqual(str(cm.exception),
-                         "Group (<top>): Duplicate name(s) found in subsystem order list: ['C1']")
+                         "Group (<model>): Duplicate name(s) found in subsystem order list: ['C1']")
 
     def test_set_order_init_subsystems(self):
         prob = om.Problem()
@@ -1190,7 +1190,7 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        msg = "Group (<top>): Output 'src.x2' with units of 'degC' is connected " \
+        msg = "Group (<model>): Output 'src.x2' with units of 'degC' is connected " \
               "to input 'tgt.x' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -1222,7 +1222,7 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        msg = "Group (<top>): Input 'tgt.x' with units of 'degC' is " \
+        msg = "Group (<model>): Input 'tgt.x' with units of 'degC' is " \
               "connected to output 'src.x2' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -1240,7 +1240,7 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        msg = "Group (<top>): Input 'tgt.y' with units of 'degC' is " \
+        msg = "Group (<model>): Input 'tgt.y' with units of 'degC' is " \
               "connected to output 'src.y' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -1361,7 +1361,7 @@ class TestConnect(unittest.TestCase):
                               src_indices=[[4, 5], [7, 9]],
                               flat_src_indices=True)
         except Exception as err:
-            self.assertEqual(str(err), "Group (<top>): The source indices do not specify a valid index "
+            self.assertEqual(str(err), "Group (<model>): The source indices do not specify a valid index "
                                        "for the connection 'indeps.x' to 'C1.x'. "
                                        "Index '9' is out of range for a flat source of size 9.")
         else:
@@ -1373,7 +1373,7 @@ class TestConnect(unittest.TestCase):
                               src_indices=[[4, 5], [7, 9]],
                               flat_src_indices=True, promotes=['x'])
         except Exception as err:
-            self.assertEqual(str(err), "Group (<top>): The source indices do not specify a valid index "
+            self.assertEqual(str(err), "Group (<model>): The source indices do not specify a valid index "
                                        "for the connection 'indeps.x' to 'C1.x'. "
                                        "Index '9' is out of range for a flat source of size 9.")
         else:
@@ -1385,7 +1385,7 @@ class TestConnect(unittest.TestCase):
                               src_indices=[[-10, 5], [7, 8]],
                               flat_src_indices=True)
         except Exception as err:
-            self.assertEqual(str(err), "Group (<top>): The source indices do not specify a valid index "
+            self.assertEqual(str(err), "Group (<model>): The source indices do not specify a valid index "
                                        "for the connection 'indeps.x' to 'C1.x'. "
                                        "Index '-10' is out of range for a flat source of size 9.")
         else:

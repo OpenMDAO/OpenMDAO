@@ -155,7 +155,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
     def test_list_inputs_before_run(self):
-        msg = "Group (<top>): Unable to list inputs until model has been run."
+        msg = "Group (<model>): Unable to list inputs until model has been run."
         try:
             self.prob.model.list_inputs()
         except Exception as err:
@@ -164,7 +164,7 @@ class ImplicitCompTestCase(unittest.TestCase):
             self.fail("Exception expected")
 
     def test_list_outputs_before_run(self):
-        msg = "Group (<top>): Unable to list outputs until model has been run."
+        msg = "Group (<model>): Unable to list outputs until model has been run."
         try:
             self.prob.model.list_outputs()
         except Exception as err:
