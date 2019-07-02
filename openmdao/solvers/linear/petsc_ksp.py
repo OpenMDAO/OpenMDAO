@@ -180,10 +180,10 @@ class PETScKrylov(LinearSolver):
         **kwargs : dict
             dictionary of options set by the instantiating class/script.
         """
+        super(PETScKrylov, self).__init__(**kwargs)
+
         if PETSc is None:
             raise RuntimeError("{}: PETSc is not available.".format(self.msginfo))
-
-        super(PETScKrylov, self).__init__(**kwargs)
 
         # initialize dictionary of KSP instances (keyed on vector name)
         self._ksp = {}
