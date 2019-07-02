@@ -3,6 +3,8 @@ A collection of functions for modifying source code that is embeded into the Sph
 """
 from __future__ import print_function
 
+from pprint import pprint
+
 import sys
 import os
 import re
@@ -422,14 +424,8 @@ def split_source_into_input_blocks(src, debug=False):
             code = '\n'.join(current_block)
             if debug:
                 print('------------')
-                print('------------')
                 print('split_source_into_input_blocks. tag:', tag)
-                print('input_blocks:')
-                from pprint import pprint
-                pprint(input_blocks)
-                print('------------')
                 pprint(('\n'.join(current_block), tag))
-                print('------------')
                 print('------------')
             input_blocks.append(InputBlock(code, tag))
             current_block = []
@@ -437,11 +433,15 @@ def split_source_into_input_blocks(src, debug=False):
             current_block.append(line)
 
     if current_block and current_block[0]:
-        print('Extra Input Block:')
-        code = '\n'.join(current_block)
-        from pprint import pprint
-        pprint(current_block)
-        input_blocks.append(InputBlock(code, 'EXTRA'))
+        if debug:
+            print('Unpaired Input Block:')
+            code = '\n'.join(current_block)
+            pprint(current_block)
+        input_blocks.append(InputBlock(code, ''))
+
+    if debug:
+        print('input_blocks:')
+        pprint(input_blocks)
 
     return input_blocks
 
@@ -529,7 +529,7 @@ def consolidate_input_blocks(input_blocks, output_blocks, debug=False):
     Remove any leading and trailing blank lines from all input blocks.
     """
     new_input_blocks = []
-    new_code = ''
+    new_block = ''
 
     if debug:
         print('consolidate_input_blocks')
@@ -542,29 +542,40 @@ def consolidate_input_blocks(input_blocks, output_blocks, debug=False):
             print(tag)
             print('---')
         if tag not in output_blocks:
-            if new_code and not new_code.endswith('\n'):
-                new_code += '\n'
-            new_code += code
+            if new_block and not new_block.endswith('\n'):
+                new_block += '\n'
+            new_block += code
             if debug:
                 print('adding to next block')
-        elif new_code:
-            if new_code and not new_code.endswith('\n'):
-                new_code += '\n'
-            new_code = remove_leading_trailing_whitespace_lines(new_code+code)
-            new_input_blocks.append(InputBlock(new_code, tag))
+        elif new_block:
+            if new_block and not new_block.endswith('\n'):
+                new_block += '\n'
+            new_block += code
+            new_block = remove_leading_trailing_whitespace_lines(new_block)
+            new_input_blocks.append(InputBlock(new_block, tag))
             if debug:
                 print('consolidated block:')
-                print(new_code)
-            new_code = ''
+                print(new_block)
+            new_block = ''
         else:
             code = remove_leading_trailing_whitespace_lines(code)
+            new_input_blocks.append(InputBlock(code, tag))
             if debug:
                 print('stripped block')
-            new_input_blocks.append(InputBlock(code, tag))
 
     # trailing input with no corresponding output
-    if new_code:
-        new_input_blocks.append(InputBlock(code, 'EXTRA'))
+    if new_block:
+        new_block = remove_leading_trailing_whitespace_lines(new_block)
+        new_input_blocks.append(InputBlock(new_block, ''))
+        if debug:
+            print('FINAL consolidated block:')
+            print(new_block)
+
+    if debug:
+        print('new input blocks:')
+        print('-----------------')
+        pprint(new_input_blocks)
+        print('-----------------')
 
     return new_input_blocks
 
@@ -593,16 +604,18 @@ def extract_output_blocks(run_output, debug=False):
         if output_block is None:
             output_block = []
         if line[:5] == '>>>>>':
-            output_blocks[line] = '\n'.join(output_block)
+            output = ('\n'.join(output_block)).strip()
+            if output:
+                output_blocks[line] = output
             output_block = None
         else:
             output_block.append(line)
 
     if output_block is not None:
-        print('Extra Output Block:')
-        from pprint import pprint
-        pprint(output_block)
-        output_blocks['EXTRA'] = '\n'.join(output_block)
+        if debug:
+            print('Unpaired Output Block:')
+            pprint(output_block)
+        output_blocks[''] = '\n'.join(output_block)
 
     return output_blocks
 
@@ -616,7 +629,7 @@ def strip_header(src):
     Parameters
     ----------
     src : str
-        sourec code for method
+        source code for method
     """
     lines = src.split('\n')
     first_len = None
@@ -641,7 +654,7 @@ def dedent(src):
     Parameters
     ----------
     src : str
-        sourec code for method
+        source code with leading blank lines removed
     """
 
     lines = src.split('\n')
@@ -674,7 +687,6 @@ def sync_multi_output_blocks(run_output, debug=False):
 
         if debug:
             print('proc_output_blocks:')
-            from pprint import pprint
             pprint(proc_output_blocks)
 
         synced_blocks = {}
@@ -689,7 +701,6 @@ def sync_multi_output_blocks(run_output, debug=False):
 
         if debug:
             print('synced_blocks:')
-            from pprint import pprint
             pprint(synced_blocks)
 
         return synced_blocks
@@ -807,10 +818,11 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
 
                 try:
                     exec(code_to_run, globals_dict)
-                except Exception:
-                    # print code (with line numbers) to facilitate debugging
-                    for n, line in enumerate(code_to_run.split('\n')):
-                        print('%4d: %s' % (n, line), file=stderr)
+                except Exception as err:
+                    if not isinstance(err, unittest.SkipTest):
+                        # print code (with line numbers) to facilitate debugging
+                        for n, line in enumerate(code_to_run.split('\n')):
+                            print('%4d: %s' % (n, line), file=stderr)
                     raise
                 finally:
                     sys.stdout = stdout
