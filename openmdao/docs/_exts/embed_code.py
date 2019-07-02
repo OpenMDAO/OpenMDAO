@@ -93,7 +93,7 @@ class EmbedCodeDirective(Directive):
             raise self.directive_error(2, str(err))
 
         #
-        # script, test or plot?
+        # script, test and/or plot?
         #
         is_script = path.endswith('.py')
 
@@ -189,57 +189,45 @@ class EmbedCodeDirective(Directive):
         else:
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
+
             elif 'interleave' in layout:
-                ##### DEBUG #####
-                # debug = is_test and 'list_inputs' in method_name
-                # debug = is_test and 'TestParallelDOEFeature' in class_name and 'test_uniform' in method_name
-                # debug = is_test and 'ListFeatureTestCase' in class_name and 'setUp' in method_name
-                debug = False
-
-                if debug:
-                    print('-----------------------------------------------------------------------')
-                    print('debugging', class_name, method_name)
-                    print('-----------------------------------------------------------------------')
-
                 if is_test:
-                    if debug:
-                        print('self_code:', len(self_code))
-                        print(self_code)
-                        print('---------')
-                        print('setup_code:', len(setup_code))
-                        print(setup_code)
-                        print('---------')
-                    # FIXME: start and end are not valid, don't account for inserted indicators
                     start = len(self_code) + len(setup_code)
                     end = len(code_to_run) - len(teardown_code)
-                    if debug:
-                        print('code_to_run ( start:', start, 'end:', end, ')')
-                        print('---------')
-                        print(code_to_run[start:end])
-                        print('---------')
-                    input_blocks = split_source_into_input_blocks(code_to_run[start:end], debug=debug)
+                    input_blocks = split_source_into_input_blocks(code_to_run[start:end])
                 else:
                     input_blocks = split_source_into_input_blocks(code_to_run)
 
-                output_blocks = extract_output_blocks(run_outputs, debug=debug)
+                output_blocks = extract_output_blocks(run_outputs)
 
-                if debug:
+                if 'Trailing' in output_blocks:
+                    print('Error processing', path)
+                    print('=======================================================')
                     print('code_to_run:')
+                    print('------------')
                     print(code_to_run)
-                    print('---------')
-                    print('input_blocks:')
-                    pprint(input_blocks)
-                    print('---------')
-                    print('run_outputs:')
-                    pprint(run_outputs)
-                    print('---------')
-                    print('output_blocks:')
-                    pprint(output_blocks)
-                    print('---------')
+                    print('-------')
+                    print('output:')
+                    print('-------')
+                    print(run_outputs)
+                    print('-------------')
+                    print('input blocks:')
+                    print('-------------')
+                    for ib in input_blocks:
+                        print(ib.code)
+                        print(ib.tag)
+                        print('-------')
+                    print('output blocks:')
+                    print('--------------')
+                    for ob in output_blocks:
+                        print('key:', ob)
+                        print(output_blocks[ob])
+                        print('-------')
+                    raise RuntimeError('Trailing output')
 
                 # Merge any input blocks for which there is no corresponding output
                 # with subsequent input blocks that do have output
-                input_blocks = consolidate_input_blocks(input_blocks, output_blocks, debug=debug)
+                input_blocks = consolidate_input_blocks(input_blocks, output_blocks)
 
             if 'plot' in layout:
                 if not os.path.isfile(plot_file_abs):

@@ -393,7 +393,7 @@ def is_output_node(node):
     return False
 
 
-def split_source_into_input_blocks(src, debug=False):
+def split_source_into_input_blocks(src):
     """
     Split source into blocks; the splits occur at inserted prints.
 
@@ -407,41 +407,21 @@ def split_source_into_input_blocks(src, debug=False):
     list
         List of input code sections.
     """
-    if debug:
-        print('---------')
-        print('split_source_into_input_blocks()')
-        print('---------')
-        print(src)
-        print('---------')
-
     input_blocks = []
-
     current_block = []
 
     for line in src.splitlines():
         if 'print(">>>>>' in line:
             tag = line[7:-2]
             code = '\n'.join(current_block)
-            if debug:
-                print('------------')
-                print('split_source_into_input_blocks. tag:', tag)
-                pprint(('\n'.join(current_block), tag))
-                print('------------')
             input_blocks.append(InputBlock(code, tag))
             current_block = []
         else:
             current_block.append(line)
 
-    if current_block and current_block[0]:
-        if debug:
-            print('Unpaired Input Block:')
-            code = '\n'.join(current_block)
-            pprint(current_block)
+    if len(current_block) > 0:
+        code = '\n'.join(current_block)
         input_blocks.append(InputBlock(code, ''))
-
-    if debug:
-        print('input_blocks:')
-        pprint(input_blocks)
 
     return input_blocks
 
@@ -521,7 +501,7 @@ def insert_output_start_stop_indicators(src):
     return '\n'.join(newlines)
 
 
-def consolidate_input_blocks(input_blocks, output_blocks, debug=False):
+def consolidate_input_blocks(input_blocks, output_blocks):
     """
     Merge any input blocks for which there is no corresponding output
     with subsequent blocks that do have output.
@@ -531,56 +511,34 @@ def consolidate_input_blocks(input_blocks, output_blocks, debug=False):
     new_input_blocks = []
     new_block = ''
 
-    if debug:
-        print('consolidate_input_blocks')
-
     for (code, tag) in input_blocks:
-        if debug:
-            print('----------------')
-            print(code)
-            print('---')
-            print(tag)
-            print('---')
         if tag not in output_blocks:
+            # no output, add to new consolidated block
             if new_block and not new_block.endswith('\n'):
                 new_block += '\n'
             new_block += code
-            if debug:
-                print('adding to next block')
         elif new_block:
+            # add current input to new consolidated block and save
             if new_block and not new_block.endswith('\n'):
                 new_block += '\n'
             new_block += code
             new_block = remove_leading_trailing_whitespace_lines(new_block)
             new_input_blocks.append(InputBlock(new_block, tag))
-            if debug:
-                print('consolidated block:')
-                print(new_block)
             new_block = ''
         else:
+            # just strip leading/trailing from input block
             code = remove_leading_trailing_whitespace_lines(code)
             new_input_blocks.append(InputBlock(code, tag))
-            if debug:
-                print('stripped block')
 
     # trailing input with no corresponding output
     if new_block:
         new_block = remove_leading_trailing_whitespace_lines(new_block)
         new_input_blocks.append(InputBlock(new_block, ''))
-        if debug:
-            print('FINAL consolidated block:')
-            print(new_block)
-
-    if debug:
-        print('new input blocks:')
-        print('-----------------')
-        pprint(new_input_blocks)
-        print('-----------------')
 
     return new_input_blocks
 
 
-def extract_output_blocks(run_output, debug=False):
+def extract_output_blocks(run_output):
     """
     Identify and extract outputs from source.
 
@@ -595,7 +553,7 @@ def extract_output_blocks(run_output, debug=False):
         output blocks keyed on tags like ">>>>>4"
     """
     if isinstance(run_output, list):
-        return sync_multi_output_blocks(run_output, debug=debug)
+        return sync_multi_output_blocks(run_output)
 
     output_blocks = {}
     output_block = None
@@ -612,10 +570,9 @@ def extract_output_blocks(run_output, debug=False):
             output_block.append(line)
 
     if output_block is not None:
-        if debug:
-            print('Unpaired Output Block:')
-            pprint(output_block)
-        output_blocks[''] = '\n'.join(output_block)
+        # It is possible to have trailing output
+        # (e.g. warning/error messages from run wrapped in a try/except)
+        output_blocks['Trailing'] = output_block
 
     return output_blocks
 
@@ -667,7 +624,7 @@ def dedent(src):
     return ''
 
 
-def sync_multi_output_blocks(run_output, debug=False):
+def sync_multi_output_blocks(run_output):
     """
     Combine output from different procs into the same output blocks.
 
@@ -685,10 +642,6 @@ def sync_multi_output_blocks(run_output, debug=False):
         # for each proc's run output, get a dict of output blocks keyed by tag
         proc_output_blocks = [extract_output_blocks(outp) for outp in run_output]
 
-        if debug:
-            print('proc_output_blocks:')
-            pprint(proc_output_blocks)
-
         synced_blocks = {}
 
         for i, outp in enumerate(proc_output_blocks):
@@ -698,10 +651,6 @@ def sync_multi_output_blocks(run_output, debug=False):
                         synced_blocks[tag] += "(rank %d) %s\n" % (i, outp[tag])
                     else:
                         synced_blocks[tag] = "(rank %d) %s\n" % (i, outp[tag])
-
-        if debug:
-            print('synced_blocks:')
-            pprint(synced_blocks)
 
         return synced_blocks
     else:
@@ -819,8 +768,8 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
                 try:
                     exec(code_to_run, globals_dict)
                 except Exception as err:
+                    # for actual errors, print code (with line numbers) to facilitate debugging
                     if not isinstance(err, unittest.SkipTest):
-                        # print code (with line numbers) to facilitate debugging
                         for n, line in enumerate(code_to_run.split('\n')):
                             print('%4d: %s' % (n, line), file=stderr)
                     raise
@@ -874,12 +823,16 @@ def get_interleaved_io_nodes(input_blocks, output_blocks):
         input_node = nodes.literal_block(code, code)
         input_node['language'] = 'python'
         nodelist.append(input_node)
-        if tag in output_blocks:
+        if tag and tag in output_blocks:
             outp = cgiesc.escape(output_blocks[tag])
             if (outp.strip()):
                 output_node = in_or_out_node(kind="Out", number=n, text=outp)
                 nodelist.append(output_node)
         n += 1
+
+    if 'Trailing' in output_blocks:
+        output_node = in_or_out_node(kind="Out", number=n, text=output_blocks['Trailing'])
+        nodelist.append(output_node)
 
     return nodelist
 
