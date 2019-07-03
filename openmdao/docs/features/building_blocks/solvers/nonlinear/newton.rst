@@ -93,8 +93,8 @@ NewtonSolver Option Examples
 
 **err_on_non_converge**
 
-  If you set this to True, then when the doesn't converge, either by hitting the iteration limit without meeting the tolerance
-  criteria, or by encountering a NaN or inf, thenit
+  If you set this to True, then when the solver doesn't converge, either by hitting the iteration limit
+  without meeting the tolerance criteria, or by encountering a NaN or inf, it
   will raise an AnalysisError exception. This is mainly important when coupled with a higher-level solver or
   driver (e.g., `pyOptSparseDriver`)that can handle the AnalysisError by adapting the stepsize and retrying.
 
