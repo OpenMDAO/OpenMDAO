@@ -513,7 +513,7 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
     def test_undeclared_options(self):
         # Test that using options that should not exist in class, cause an
         # error if they are set when instantiating BoundsEnforceLS.
-        # atol, rtol, maxiter, and err_on_maxiter are not used in BoundsEnforceLS
+        # atol, rtol, maxiter, and err_on_non_converge are not used in BoundsEnforceLS
 
         with self.assertRaises(KeyError) as context:
             om.BoundsEnforceLS(bound_enforcement='scalar', atol=1.0)
@@ -534,9 +534,9 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
                                                  "has not been declared.\"")
 
         with self.assertRaises(KeyError) as context:
-            om.BoundsEnforceLS(bound_enforcement='scalar', err_on_maxiter=True)
+            om.BoundsEnforceLS(bound_enforcement='scalar', err_on_non_converge=True)
 
-        self.assertEqual(str(context.exception), "\"BoundsEnforceLS: Option 'err_on_maxiter' cannot be set because it "
+        self.assertEqual(str(context.exception), "\"BoundsEnforceLS: Option 'err_on_non_converge' cannot be set because it "
                                                  "has not been declared.\"")
 
 

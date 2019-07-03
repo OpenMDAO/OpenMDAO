@@ -90,7 +90,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         msg = "\"DirectSolver: Option '%s' cannot be set because it has not been declared.\""
 
-        for option in ['atol', 'rtol', 'maxiter', 'err_on_maxiter']:
+        for option in ['atol', 'rtol', 'maxiter', 'err_on_non_converge']:
             with self.assertRaises(KeyError) as context:
                 solver.options[option] = 1
 

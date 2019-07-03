@@ -14,6 +14,7 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -170,7 +171,9 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
-        self.options.declare('err_on_maxiter', types=bool, default=False,
+        self.options.declare('err_on_maxiter', types=bool, default=None, allow_none=True,
+                             desc="Deprecated. Use 'err_on_non_converge'.")
+        self.options.declare('err_on_non_converge', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
 
         # Case recording options
@@ -315,6 +318,13 @@ class Solver(object):
             'res': myresiduals
         }
 
+        # Raise a deprecation warning for changed option.
+        if 'err_on_maxiter' in self.options and self.options['err_on_maxiter'] is not None:
+            self.options['err_on_non_converge'] = self.options['err_on_maxiter']
+            warn_deprecation("The 'err_on_maxiter' options provides backwards compatibility "
+                             "with earlier version of OpenMDAO; use options['err_on_non_converge'] "
+                             "instead.")
+
     def _set_solver_print(self, level=2, type_='all'):
         """
         Control printing for solvers and subsolvers in the model.
@@ -397,18 +407,35 @@ class Solver(object):
 
         if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             prefix = self._solver_info.prefix + self.SOLVER
-            if np.isinf(norm) or np.isnan(norm) or (norm > atol and norm / norm0 > rtol):
+
+            # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
+            # conditionals.
+            if np.isinf(norm) or np.isnan(norm):
+                msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
+                      "iterations."
                 if iprint > -1:
-                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
                     print(prefix + msg.format(self.SOLVER, self._system.pathname,
                                               self._iter_count))
 
                 # Raise AnalysisError if requested.
-                if self.options['err_on_maxiter']:
-                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+                if self.options['err_on_non_converge']:
                     raise AnalysisError(msg.format(self.SOLVER, self._system.pathname,
                                                    self._iter_count))
 
+            # Solver hit maxiter without meeting desired tolerances.
+            elif (norm > atol and norm / norm0 > rtol):
+                msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, self._system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname,
+                                                   self._iter_count))
+
+            # Solver converged
             elif iprint == 1:
                 print(prefix + ' Converged in {} iterations'.format(self._iter_count))
             elif iprint == 2:

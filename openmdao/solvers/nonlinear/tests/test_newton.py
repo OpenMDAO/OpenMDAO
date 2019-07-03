@@ -732,7 +732,7 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-    def test_err_on_maxiter(self):
+    def test_err_on_maxiter_deprecated(self):
         # Raise AnalysisError when it fails to converge
 
         prob = om.Problem()
@@ -746,10 +746,59 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(level=0)
 
+        msg = "The 'err_on_maxiter' options provides backwards compatibility " + \
+        "with earlier version of OpenMDAO; use options['err_on_non_converge'] " + \
+        "instead."
+        #prob.final_setup()
+
+        with assert_warning(DeprecationWarning, msg):
+            prob.final_setup()
+
+        with self.assertRaises(om.AnalysisError) as context:
+            prob.run_model()
+
+        msg = "Solver 'NL: Newton' on system '' failed to converge in 1 iterations."
+        self.assertEqual(str(context.exception), msg)
+
+    def test_err_on_non_converge(self):
+        # Raise AnalysisError when it fails to converge
+
+        prob = om.Problem()
+        nlsolver = om.NewtonSolver()
+        prob.model = SellarDerivatives(nonlinear_solver=nlsolver,
+                                       linear_solver=om.LinearBlockGS())
+
+        nlsolver.options['err_on_non_converge'] = True
+        nlsolver.options['maxiter'] = 1
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
         with self.assertRaises(om.AnalysisError) as context:
             prob.run_driver()
 
         msg = "Solver 'NL: Newton' on system '' failed to converge in 1 iterations."
+        self.assertEqual(str(context.exception), msg)
+
+    def test_err_message_inf_nan(self):
+
+        prob = om.Problem()
+        nlsolver = om.NewtonSolver()
+        prob.model = SellarDerivatives(nonlinear_solver=nlsolver,
+                                       linear_solver=om.LinearBlockGS())
+
+        nlsolver.options['err_on_non_converge'] = True
+        nlsolver.options['maxiter'] = 1
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        prob['x'] = np.nan
+
+        with self.assertRaises(om.AnalysisError) as context:
+            prob.run_model()
+
+        msg = "Solver 'NL: Newton' on system '': residuals contain 'inf' or 'NaN' after 0 iterations."
         self.assertEqual(str(context.exception), msg)
 
     def test_relevancy_for_newton(self):
@@ -1007,7 +1056,7 @@ class TestNewtonFeatures(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-    def test_feature_err_on_maxiter(self):
+    def test_feature_err_on_non_converge(self):
         import numpy as np
 
         import openmdao.api as om
@@ -1033,7 +1082,7 @@ class TestNewtonFeatures(unittest.TestCase):
 
         nlgbs = model.nonlinear_solver = om.NewtonSolver()
         nlgbs.options['maxiter'] = 1
-        nlgbs.options['err_on_maxiter'] = True
+        nlgbs.options['err_on_non_converge'] = True
 
         prob.setup()
 

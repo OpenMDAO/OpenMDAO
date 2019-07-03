@@ -264,7 +264,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
 
         nlgbs = model.nonlinear_solver = om.NonlinearBlockGS()
         nlgbs.options['maxiter'] = 2
-        nlgbs.options['err_on_maxiter'] = True
+        nlgbs.options['err_on_non_converge'] = True
 
         prob.setup()
         prob.set_solver_print(level=0)
