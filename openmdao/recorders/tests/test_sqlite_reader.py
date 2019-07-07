@@ -2342,6 +2342,52 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
         self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
 
+    def test_feature_list_inputs_and_outputs(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar import SellarProblem
+
+        import numpy as np
+        prob = SellarProblem()
+
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+        prob.model.recording_options['record_residuals'] = True
+
+        prob.setup()
+
+        d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComp)
+        d1.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
+        d1.add_recorder(recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+
+        expected_inputs_case = {
+            'd1.z': {'value': [5., 2.]},
+            'd1.x': {'value': [1.]},
+            'd1.y2': {'value': [12.27257053]}
+        }
+        expected_outputs_case = {
+            'd1.y1': {'value': [25.545485893882876]},
+        }
+
+        system_cases = cr.list_cases('root.d1')
+
+        case = cr.get_case(system_cases[1])
+
+        inputs_case = sorted( case.list_inputs(values=True, units=False, hierarchical=True,
+                                       out_stream=None))
+
+        assert_rel_error(self, inputs_case[0][1]['value'], [1.], tolerance=1e-10) # d1.x
+        assert_rel_error(self, inputs_case[1][1]['value'], [12.27257053], tolerance=1e-10) # d1.y2
+        assert_rel_error(self, inputs_case[2][1]['value'], [5., 2.], tolerance=1e-10) # d1.z
+
+        outputs_case = case.list_outputs(values=True, units=True, hierarchical=True,
+                                       out_stream=None)
+
+        assert_rel_error(self, outputs_case[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
 
 class TestPromotedToAbsoluteMap(unittest.TestCase):
     def setUp(self):
