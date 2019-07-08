@@ -38,7 +38,7 @@ table_name = 'feature_unit_tests'   # name of the table to be queried
 _sub_runner = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'run_sub.py')
 
 
-# an input block consists of a block of code and a tag that identifies the start of any
+# an input block consists of a block of code and a tag that marks the end of any
 # output from that code in the output stream (via inserted print('>>>>>#') statements)
 InputBlock = namedtuple('InputBlock', 'code tag')
 
@@ -585,7 +585,7 @@ def strip_header(src):
     Parameters
     ----------
     src : str
-        source code for method
+        source code
     """
     lines = src.split('\n')
     first_len = None
@@ -610,7 +610,7 @@ def dedent(src):
     Parameters
     ----------
     src : str
-        source code with leading blank lines removed
+        source code
     """
 
     lines = src.split('\n')
