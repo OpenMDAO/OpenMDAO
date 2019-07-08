@@ -3,8 +3,6 @@ A collection of functions for modifying source code that is embeded into the Sph
 """
 from __future__ import print_function
 
-from pprint import pprint
-
 import sys
 import os
 import re
@@ -412,7 +410,7 @@ def split_source_into_input_blocks(src):
 
     for line in src.splitlines():
         if 'print(">>>>>' in line:
-            tag = line[7:-2]
+            tag = line.split('"')[1]
             code = '\n'.join(current_block)
             input_blocks.append(InputBlock(code, tag))
             current_block = []
@@ -420,6 +418,7 @@ def split_source_into_input_blocks(src):
             current_block.append(line)
 
     if len(current_block) > 0:
+        # final input block, with no associated output
         code = '\n'.join(current_block)
         input_blocks.append(InputBlock(code, ''))
 
@@ -442,8 +441,8 @@ def insert_output_start_stop_indicators(src):
     """
     lines = src.split('\n')
     print_producing = [
-        '.setup(',
         'print(',
+        '.setup(',
         '.run_model(',
         '.run_driver(',
         '.check_partials(',
@@ -571,7 +570,7 @@ def extract_output_blocks(run_output):
 
     if output_block is not None:
         # It is possible to have trailing output
-        # (e.g. warning/error messages from run wrapped in a try/except)
+        # (e.g. if the last print_producing statement is in a try block)
         output_blocks['Trailing'] = output_block
 
     return output_blocks

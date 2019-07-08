@@ -105,6 +105,7 @@ display of the values by setting the optional argument, :code:`values`, to `Fals
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_for_docs_list_no_values
     :layout: interleave
 
+
 *List Names and Promoted Name*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -115,6 +116,7 @@ you can enable the display of promoted names by setting the optional argument,
 .. embed-code::
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_prom_names
     :layout: interleave
+
 
 *List Residuals Above a Tolerance*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -133,24 +135,24 @@ In some cases, it might be convenient to only list variables whose residuals abo
 The :code:`list_outputs()` method has many options to also display units, shape, bounds (lower and upper), and
 scaling (res, res0, and res_ref) for the variables.
 
-
 .. embed-code::
     openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_for_feature_docs_list_vars_options
     :layout: interleave
 
 
-*Write Full Array Values*
-~~~~~~~~~~~~~~~~~~~~~~~~~
+*Print Array Values*
+~~~~~~~~~~~~~~~~~~~~
 
-The :code:`list_inputs()` and :code:`list_outputs()` methods both have a :code:`print_arrays` option. The default is
-False. When set to False, in the tabular display, only the value of the array norm will appear. The norm is
-surrounded by vertical bars to indicate that it is a norm. When the option is set to True, there will also be a display
-of full values of the array below the row. The format is affected by the values set with :code:`numpy.set_printoptions`.
-
+The :code:`list_inputs()` and :code:`list_outputs()` methods both have a :code:`print_arrays` option.
+By default, this option is set to False and only the norm of the array will appear in the tabular display. 
+The norm value is surrounded by vertical bars to indicate that it is a norm. 
+When the option is set to True, the complete value of the array will also be a displayed below the row. 
+The format is affected by the values set with :code:`numpy.set_printoptions`.
 
 .. embed-code::
     openmdao.core.tests.test_expl_comp.ExplCompTestCase.test_for_docs_array_list_vars_options
     :layout: interleave
+
 
 *Listing Problem Variables*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -161,7 +163,7 @@ constraint, and objective variables.
 .. automethod:: openmdao.core.problem.Problem.list_problem_vars
     :noindex:
 
-The user can optionally print out a variety of metadata. In this example, all the metadata is printed. The
+You can optionally print out a variety of metadata. In this example, all the metadata is printed. The
 :code:`print_arrays` option is also set to true so that full array values are printed.
 
 

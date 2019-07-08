@@ -1700,8 +1700,7 @@ class TestProblem(unittest.TestCase):
                                           'indices', 'adder', 'scaler',
                                           'parallel_deriv_color',
                                           'vectorize_derivs',
-                                          'cache_linear_solution'],
-                               )
+                                          'cache_linear_solution'])
 
 class NestedProblemTestCase(unittest.TestCase):
 

@@ -1002,14 +1002,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         case = cr.get_case(system_cases[1])
 
-        inputs_case = case.list_inputs(values=True, units=True, hierarchical=True,
-                                       out_stream=None)
+        inputs = case.list_inputs(values=True, out_stream=None)
 
-        for o in inputs_case:
-            vals = o[1]
-            name = o[0]
+        for name, meta in inputs:
             expected = expected_inputs_case[name]
-            np.testing.assert_almost_equal(vals['value'], expected['value'])
+            np.testing.assert_almost_equal(meta['value'], expected['value'])
 
     def test_get_vars(self):
         prob = SellarProblem()

@@ -1,5 +1,3 @@
-from pprint import pprint
-
 import unittest
 from docutils import nodes
 from docutils.parsers.rst import Directive
@@ -139,8 +137,6 @@ class EmbedCodeDirective(Directive):
                 # for interleaving, we need to mark input/output blocks
                 if 'interleave' in layout:
                     source = insert_output_start_stop_indicators(source)
-                    if setup_code:
-                        setup_code = insert_output_start_stop_indicators(setup_code)
 
                 code_to_run = '\n'.join([self_code, setup_code, source, teardown_code]).strip()
             except Exception:
@@ -200,32 +196,7 @@ class EmbedCodeDirective(Directive):
 
                 output_blocks = extract_output_blocks(run_outputs)
 
-                if 'Trailing' in output_blocks:
-                    print('Error processing', path)
-                    print('=======================================================')
-                    print('code_to_run:')
-                    print('------------')
-                    print(code_to_run)
-                    print('-------')
-                    print('output:')
-                    print('-------')
-                    print(run_outputs)
-                    print('-------------')
-                    print('input blocks:')
-                    print('-------------')
-                    for ib in input_blocks:
-                        print(ib.code)
-                        print(ib.tag)
-                        print('-------')
-                    print('output blocks:')
-                    print('--------------')
-                    for ob in output_blocks:
-                        print('key:', ob)
-                        print(output_blocks[ob])
-                        print('-------')
-                    raise RuntimeError('Trailing output')
-
-                # Merge any input blocks for which there is no corresponding output
+                # Merge any input blocks for which there are no corresponding output
                 # with subsequent input blocks that do have output
                 input_blocks = consolidate_input_blocks(input_blocks, output_blocks)
 
