@@ -196,7 +196,7 @@ class EmbedCodeDirective(Directive):
 
                 output_blocks = extract_output_blocks(run_outputs)
 
-                # Merge any input blocks for which there are no corresponding output
+                # Merge any input blocks for which there is no corresponding output
                 # with subsequent input blocks that do have output
                 input_blocks = consolidate_input_blocks(input_blocks, output_blocks)
 
