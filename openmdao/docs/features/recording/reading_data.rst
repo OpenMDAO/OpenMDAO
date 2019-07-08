@@ -12,7 +12,7 @@ A :ref:`CaseReader<iterating_case_data>` provides access to the data for a parti
 Example of Getting Variable Data from Case Recording of a Driver
 ----------------------------------------------------------------
 
-Here are the methods typically used when retrieving data from the recording of a `Driver` case recorder.
+Here are the methods typically used when retrieving data from the recording of a `Driver`.
 
 .. automethod:: openmdao.recorders.case.Case.get_objectives
     :noindex:
@@ -36,7 +36,7 @@ from the first driver iteration.
 Getting Variable Data from Case Recording of a Problem
 ------------------------------------------------------
 
-Here are the methods typically used when retrieving data from the recording of a `Problem` case recorder.
+Here are the methods typically used when retrieving data from the recording of a `Problem`.
 
 .. automethod:: openmdao.recorders.case.Case.list_inputs
     :noindex:
