@@ -9,10 +9,10 @@ A :ref:`CaseReader<iterating_case_data>` provides access to the data for a parti
 
 `Case` objects have a number of attributes and methods for accessing variables and their values.
 
-Getting Variable Data from Case Recording of a Driver
------------------------------------------------------
+Example of Getting Variable Data from Case Recording of a Driver
+----------------------------------------------------------------
 
-Here are the methods to use when retrieving data from the recording of a `Driver` case recorder.
+Here are the methods typically used when retrieving data from the recording of a `Driver` case recorder.
 
 .. automethod:: openmdao.recorders.case.Case.get_objectives
     :noindex:
@@ -36,7 +36,7 @@ from the first driver iteration.
 Getting Variable Data from Case Recording of a Problem
 ------------------------------------------------------
 
-Here are the methods to use when retrieving data from the recording of a `Problem` case recorder.
+Here are the methods typically used when retrieving data from the recording of a `Problem` case recorder.
 
 .. automethod:: openmdao.recorders.case.Case.list_inputs
     :noindex:
@@ -53,7 +53,7 @@ The following example shows how to use these methods.
 Getting Derivative Data from a Case
 -----------------------------------
 
-A driver has the ability to record derivatives but it is not enabled by default. If you do enable 
+A driver has the ability to record derivatives but it is not enabled by default. If you do enable
 this option, the recorded cases will have a value for the :code:`jacobian`.
 
 .. embed-code::
