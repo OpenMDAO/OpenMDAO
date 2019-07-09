@@ -725,7 +725,7 @@ class CleanupTestCase(unittest.TestCase):
         p = self.p = om.Problem()
         root = p.model
         root.linear_solver = om.LinearBlockGS()
-        root.linear_solver.options['err_on_maxiter'] = True
+        root.linear_solver.options['err_on_non_converge'] = True
 
         inputs = root.add_subsystem("inputs", om.IndepVarComp("x", 1.0))
         G1 = root.add_subsystem("G1", om.Group())
