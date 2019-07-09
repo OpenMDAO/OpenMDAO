@@ -87,7 +87,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=None, derivs=True,
-            recorder=None, has_lin_constraint=True, vectorize=True, partial_coloring=False,
+            recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
             **options):
 
     p = om.Problem(model=CounterGroup())
@@ -109,25 +109,25 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     if partial_coloring:
         arctan_yox = DynPartialsComp(SIZE)
     else:
-        arctan_yox = om.ExecComp('g=arctan(y/x)', vectorize=vectorize,
+        arctan_yox = om.ExecComp('g=arctan(y/x)', has_diag_partials=has_diag_partials,
                                  g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE))
 
     p.model.add_subsystem('arctan_yox', arctan_yox)
 
     p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-    p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=vectorize,
+    p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=has_diag_partials,
                                                g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
     thetas = np.linspace(0, np.pi/4, SIZE)
-    p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=vectorize,
+    p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=has_diag_partials,
                                                    g=np.ones(SIZE), x=np.ones(SIZE),
                                                    theta=thetas))
-    p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=vectorize,
+    p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=has_diag_partials,
                                                          g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                          odd=np.ones(SIZE//2)))
 
-    p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=vectorize, g=np.ones(SIZE), x=np.ones(SIZE)))
+    p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=has_diag_partials, g=np.ones(SIZE), x=np.ones(SIZE)))
 
     IND = np.arange(SIZE, dtype=int)
     ODD_IND = IND[1::2]  # all odd indices
@@ -277,7 +277,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False, has_lin_constraint=False, method='cs')
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', has_lin_constraint=False,
-                          vectorize=True, print_results=False,
+                          has_diag_partials=True, print_results=False,
                           dynamic_total_coloring=True, method='cs')
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -296,7 +296,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False, has_lin_constraint=False, method='cs')
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', has_lin_constraint=False,
-                          vectorize=True, print_results=False,
+                          has_diag_partials=True, print_results=False,
                           dynamic_total_coloring=True, method='fd')
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
@@ -467,23 +467,23 @@ class SimulColoringScipyTestCase(unittest.TestCase):
                                           -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
         indeps.add_output('r', .7)
 
-        p.model.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', vectorize=True,
+        p.model.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', has_diag_partials=True,
                                                         g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
         p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
                                                    g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
         thetas = np.linspace(0, np.pi/4, SIZE)
-        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=True,
+        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
                                                        g=np.ones(SIZE), x=np.ones(SIZE),
                                                        theta=thetas))
-        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=True,
+        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
                                                              g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                              odd=np.ones(SIZE//2)))
 
-        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
@@ -574,18 +574,18 @@ class SimulColoringScipyTestCase(unittest.TestCase):
 
         p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
                                                    g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
         thetas = np.linspace(0, np.pi/4, SIZE)
-        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=True,
+        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
                                                        g=np.ones(SIZE), x=np.ones(SIZE),
                                                        theta=thetas))
-        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=True,
+        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
                                                              g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                              odd=np.ones(SIZE//2)))
 
-        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices

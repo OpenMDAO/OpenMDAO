@@ -770,27 +770,27 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._jacobian['y', 'x'], expect, 0.00001)
 
-    def test_vectorize_error(self):
+    def test_has_diag_partials_error(self):
         p = om.Problem()
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(3)))
         model.add_design_var('indep.x')
 
         mat = np.arange(15).reshape((3,5))
-        model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', vectorize=True, A=mat, x=np.ones(5), y=np.ones(3)))
+        model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', has_diag_partials=True, A=mat, x=np.ones(5), y=np.ones(3)))
         model.connect('indep.x', 'comp.x')
 
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (comp): vectorize is True but partial(y, A) is not square (shape=(3, 15)).")
+                         "ExecComp (comp): has_diag_partials is True but partial(y, A) is not square (shape=(3, 15)).")
 
-    def test_vectorize_shape_only(self):
+    def test_has_diag_partials_shape_only(self):
         p = om.Problem()
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', vectorize=True,
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True,
                                                 x={'shape': (5,)}, y={'shape': (5,)}))
         model.connect('indep.x', 'comp.x')
 
@@ -801,7 +801,7 @@ class TestExecComp(unittest.TestCase):
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
-    def test_feature_vectorize(self):
+    def test_feature_has_diag_partials(self):
         import numpy as np
         import openmdao.api as om
 
@@ -809,7 +809,7 @@ class TestExecComp(unittest.TestCase):
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', vectorize=True, x=np.ones(5), y=np.ones(5)))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True, x=np.ones(5), y=np.ones(5)))
         model.connect('indep.x', 'comp.x')
 
         p.setup()

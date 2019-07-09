@@ -10,6 +10,7 @@ from six.moves import range
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
+from openmdao.utils.general_utils import warn_deprecation
 
 # regex to check for variable names.
 VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
@@ -20,7 +21,7 @@ _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'flat_src_indices'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'vectorize', 'units', 'shape'}
+_disallowed_names = {'has_diag_partials', 'vectorize', 'units', 'shape'}
 
 
 def check_option(option, value):
@@ -67,7 +68,7 @@ class ExecComp(ExplicitComponent):
         List of expressions.
     _codes : list
         List of code objects.
-    _vectorize : bool
+    _has_diag_partials : bool
         If True, treat all array/array partials as diagonal if both arrays have size > 1.
         All arrays with size > 1 must have the same flattened size or an exception will be raised.
     _units : str or None
@@ -82,7 +83,7 @@ class ExecComp(ExplicitComponent):
         """
         Declare options.
         """
-        self.options.declare('vectorize', types=bool, default=False,
+        self.options.declare('has_diag_partials', types=bool, default=False,
                              desc='If True, treat all array/array partials as diagonal if both '
                                   'arrays have size > 1. All arrays with size > 1 must have the '
                                   'same flattened size or an exception will be raised.')
@@ -206,6 +207,12 @@ class ExecComp(ExplicitComponent):
                                  'units': 'ft'})
         """
         # separate disallowed var names from kwargs, pass them as options to __init__
+        if 'vectorize' in kwargs:
+            warn_deprecation("The 'vectorize' option is deprecated.  "
+                             "Please use 'has_diag_partials' instead.")
+            kwargs['has_diag_partials'] = kwargs['vectorize']
+            del kwargs['vectorize']
+
         options = {}
         for name in _disallowed_names:
             if name in kwargs:
@@ -317,7 +324,7 @@ class ExecComp(ExplicitComponent):
             else:
                 self.add_input(var, val, **meta)
 
-        if self.options['vectorize']:
+        if self.options['has_diag_partials']:
             # check that sizes of any input/output vars match or one of them is size 1
             osorted = sorted(self._var_rel_names['output'])
             for inp in sorted(self._var_rel_names['input']):
@@ -327,8 +334,8 @@ class ExecComp(ExplicitComponent):
                     oval = init_vals[out]
                     if (iarray and isinstance(oval, ndarray) and oval.size > 1):
                         if oval.size != ival.size:
-                            raise RuntimeError("%s: vectorize is True but partial(%s, %s) is not "
-                                               "square (shape=(%d, %d))." %
+                            raise RuntimeError("%s: has_diag_partials is True but partial(%s, %s) "
+                                               "is not square (shape=(%d, %d))." %
                                                (self.msginfo, out, inp, oval.size, ival.size))
                         # partial will be declared as diagonal
                         inds = np.arange(oval.size, dtype=int)
@@ -434,7 +441,7 @@ class ExecComp(ExplicitComponent):
         step = self.complex_stepsize * 1j
         out_names = self._var_allprocs_prom2abs_list['output']
         inv_stepsize = 1.0 / self.complex_stepsize
-        vectorize = self.options['vectorize']
+        has_diag_partials = self.options['has_diag_partials']
 
         for param in inputs:
 
@@ -443,7 +450,7 @@ class ExecComp(ExplicitComponent):
             psize = pval.size
             pwrap[param] = np.asarray(pval, npcomplex)
 
-            if vectorize or psize == 1:
+            if has_diag_partials or psize == 1:
                 # set a complex param value
                 pwrap[param] += step
 
