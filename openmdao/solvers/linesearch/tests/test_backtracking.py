@@ -518,25 +518,25 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         with self.assertRaises(KeyError) as context:
             om.BoundsEnforceLS(bound_enforcement='scalar', atol=1.0)
 
-        self.assertEqual(str(context.exception), "\"Option 'atol' cannot be set because it "
+        self.assertEqual(str(context.exception), "\"BoundsEnforceLS: Option 'atol' cannot be set because it "
                                                  "has not been declared.\"")
 
         with self.assertRaises(KeyError) as context:
             om.BoundsEnforceLS(bound_enforcement='scalar', rtol=2.0)
 
-        self.assertEqual(str(context.exception), "\"Option 'rtol' cannot be set because it "
+        self.assertEqual(str(context.exception), "\"BoundsEnforceLS: Option 'rtol' cannot be set because it "
                                                  "has not been declared.\"")
 
         with self.assertRaises(KeyError) as context:
             om.BoundsEnforceLS(bound_enforcement='scalar', maxiter=1)
 
-        self.assertEqual(str(context.exception), "\"Option 'maxiter' cannot be set because it "
+        self.assertEqual(str(context.exception), "\"BoundsEnforceLS: Option 'maxiter' cannot be set because it "
                                                  "has not been declared.\"")
 
         with self.assertRaises(KeyError) as context:
             om.BoundsEnforceLS(bound_enforcement='scalar', err_on_maxiter=True)
 
-        self.assertEqual(str(context.exception), "\"Option 'err_on_maxiter' cannot be set because it "
+        self.assertEqual(str(context.exception), "\"BoundsEnforceLS: Option 'err_on_maxiter' cannot be set because it "
                                                  "has not been declared.\"")
 
 

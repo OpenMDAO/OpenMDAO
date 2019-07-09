@@ -342,7 +342,7 @@ class DefaultVector(Vector):
         """
         slices = {}
         start = end = 0
-        for name in self._system._var_abs_names[self._typ]:
+        for name in self._system._var_relevant_names[self._name][self._typ]:
             end += self._views_flat[name].size
             slices[name] = slice(start, end)
             start = end

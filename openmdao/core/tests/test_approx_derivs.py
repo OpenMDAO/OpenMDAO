@@ -849,6 +849,54 @@ class TestGroupCSMPI(unittest.TestCase):
         assert_rel_error(self, J['sum.y', 'sub.sub1.p1.x'], [[2.0]], 1.0e-6)
         assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x'], [[4.0]], 1.0e-6)
 
+    def test_newton_with_direct_solver(self):
+        # Make sure this works under mpi with bug fixed in norm calculation.
+
+        if not PETScVector:
+            raise unittest.SkipTest("PETSc is not installed")
+
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = om.NewtonSolver()
+        sub.linear_solver = om.DirectSolver(assemble_jac=False)
+        sub.nonlinear_solver.options['atol'] = 1e-10
+        sub.nonlinear_solver.options['rtol'] = 1e-10
+
+        model.approx_totals(method='cs')
+
+        prob.setup(check=False, local_vector_class=PETScVector)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
+        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+
+        wrt = ['z', 'x']
+        of = ['obj', 'con1', 'con2']
+
+        J = prob.compute_totals(of=of, wrt=wrt, return_format='flat_dict')
+        assert_rel_error(self, J['obj', 'z'][0][0], 9.61001056, 1.0e-6)
+        assert_rel_error(self, J['obj', 'z'][0][1], 1.78448534, 1.0e-6)
+        assert_rel_error(self, J['obj', 'x'][0][0], 2.98061391, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][0], -9.61002186, 1.0e-6)
+        assert_rel_error(self, J['con1', 'z'][0][1], -0.78449158, 1.0e-6)
+        assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
+
 
 @unittest.skipIf(MPI and not PETScVector, "only run under MPI if we have PETSc.")
 class TestGroupFDMPI(unittest.TestCase):
@@ -1836,7 +1884,7 @@ class TestComponentComplexStep(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             model.resetup(setup_mode='reconf')
 
-        msg = "In order to activate complex step during reconfiguration, " \
+        msg = "TestImplCompArrayDense (sub.comp): In order to activate complex step during reconfiguration, " \
               "you need to set 'force_alloc_complex' to True during setup. " \
               "e.g. 'problem.setup(force_alloc_complex=True)'"
         self.assertEqual(str(context.exception), msg)

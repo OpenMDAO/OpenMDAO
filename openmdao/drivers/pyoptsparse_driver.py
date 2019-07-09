@@ -204,6 +204,7 @@ class pyOptSparseDriver(Driver):
         self.iter_count = 0
         fwd = problem._mode == 'fwd'
         optimizer = self.options['optimizer']
+        self._quantities = []
 
         self._check_for_missing_objective()
 
@@ -366,8 +367,7 @@ class pyOptSparseDriver(Driver):
                           hotStart=self.hotstart_file)
 
             else:
-                msg = "SNOPT's internal finite difference can only be used with SNOPT"
-                raise Exception(msg)
+                raise Exception("SNOPT's internal finite difference can only be used with SNOPT")
         else:
 
             # Use OpenMDAO's differentiator for the gradient

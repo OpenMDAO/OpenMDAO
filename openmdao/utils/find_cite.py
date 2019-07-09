@@ -7,7 +7,6 @@ import sys
 
 from six import iteritems
 
-from openmdao.utils.logger_utils import get_logger
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.

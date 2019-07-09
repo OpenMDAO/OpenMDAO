@@ -50,8 +50,8 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MetaModelUnStructuredComp: The following training data sets must be "
-               "provided as options for sin_mm: ['train:x', 'train:f_x']")
+        msg = ("MetaModelUnStructuredComp (sin_mm): The following training data sets must be "
+               "provided as options: ['train:x', 'train:f_x']")
         self.assertEqual(str(cm.exception), msg)
 
         # train the surrogate and check predicted value
@@ -82,7 +82,7 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("Metamodel 'sin_mm': No surrogate specified for output 'f_x'")
+        msg = ("MetaModelUnStructuredComp (sin_mm): No surrogate specified for output 'f_x'")
         self.assertEqual(str(cm.exception), msg)
 
     def test_sin_metamodel_preset_data(self):
@@ -351,7 +351,7 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected = ("MetaModelUnStructuredComp: Each variable must have the same number"
+        expected = ("MetaModelUnStructuredComp (mm): Each variable must have the same number"
                     " of training points. Expected 4 but found"
                     " 2 points for 'y'.")
 
@@ -379,7 +379,7 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected = ("MetaModelUnStructuredComp: Each variable must have the same number"
+        expected = ("MetaModelUnStructuredComp (mm): Each variable must have the same number"
                     " of training points. Expected 4 but found"
                     " 2 points for 'f'.")
         self.assertEqual(str(cm.exception), expected)
@@ -702,12 +702,12 @@ class MetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             mm.add_input('x', np.zeros(2))
         self.assertEqual(str(cm.exception),
-                         "Metamodel: First dimension of input 'x' must be 3")
+                         "MetaModelUnStructuredComp: First dimension of input 'x' must be 3")
 
         with self.assertRaises(RuntimeError) as cm:
             mm.add_output('y', np.zeros(4))
         self.assertEqual(str(cm.exception),
-                         "Metamodel: First dimension of output 'y' must be 3")
+                         "MetaModelUnStructuredComp: First dimension of output 'y' must be 3")
 
     def test_metamodel_subclass_optimize(self):
         class Trig(om.MetaModelUnStructuredComp):

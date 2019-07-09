@@ -216,19 +216,19 @@ class TestJacobianFeatures(unittest.TestCase):
 
     @parameterized.expand([
         ({'of': 'f', 'wrt': 'z', 'val': np.ones((1, 5))},
-         'simple: d\(f\)/d\(z\): Expected 1x4 but val is 1x5'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): Expected 1x4 but val is 1x5'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, -1, 4], 'cols': [0, 0, 0]},
-         'simple: d\(f\)/d\(z\): row indices must be non-negative'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): row indices must be non-negative'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, -1, 4]},
-         'simple: d\(f\)/d\(z\): col indices must be non-negative'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): col indices must be non-negative'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0], 'cols': [0, 4]},
-         'simple: d\(f\)/d\(z\): Expected 1x4 but declared at least 1x5'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): Expected 1x4 but declared at least 1x5'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 10]},
-         'If one of rows/cols is specified, then both must be specified'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified.'),
         ({'of': 'f', 'wrt': 'z', 'cols': [0, 10]},
-         'If one of rows/cols is specified, then both must be specified'),
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified.'),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val': [0, 1]},
-         'If rows and cols are specified, val must be a scalar or have the same shape, '
+         'SimpleCompKwarg \(simple\): d\(f\)/d\(z\): If rows and cols are specified, val must be a scalar or have the same shape, '
          'val: \(2L?,\), rows/cols: \(3L?,\)'),
     ])
     def test_bad_sizes(self, partials_kwargs, error_msg):
@@ -247,10 +247,10 @@ class TestJacobianFeatures(unittest.TestCase):
         self.assertRegexpMatches(str(ex.exception), error_msg)
 
     @parameterized.expand([
-        ({'of': 'q', 'wrt': 'z'}, 'No matches were found for of="q"'),
-        ({'of': 'f?', 'wrt': 'x'}, 'No matches were found for of="f?"'),
-        ({'of': 'f', 'wrt': 'q'}, 'No matches were found for wrt="q"'),
-        ({'of': 'f', 'wrt': 'x?'}, 'No matches were found for wrt="x?"'),
+        ({'of': 'q', 'wrt': 'z'}, 'SimpleCompKwarg (simple): No matches were found for of="q"'),
+        ({'of': 'f?', 'wrt': 'x'}, 'SimpleCompKwarg (simple): No matches were found for of="f?"'),
+        ({'of': 'f', 'wrt': 'q'}, 'SimpleCompKwarg (simple): No matches were found for wrt="q"'),
+        ({'of': 'f', 'wrt': 'x?'}, 'SimpleCompKwarg (simple): No matches were found for wrt="x?"'),
     ])
     def test_bad_names(self, partials_kwargs, error_msg):
         comp = SimpleCompKwarg(partials_kwargs)

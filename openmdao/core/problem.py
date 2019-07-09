@@ -4,6 +4,7 @@ from __future__ import division, print_function
 
 import sys
 import os
+import logging
 
 from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
@@ -25,7 +26,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.solvers.solver import SolverInfo
-from openmdao.error_checking.check_config import check_config
+from openmdao.error_checking.check_config import _default_checks, _all_checks
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data
 from openmdao.utils.record_util import create_local_meta
@@ -38,6 +39,7 @@ from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
+from openmdao.utils.logger_utils import get_logger
 import openmdao.utils.coloring as coloring_mod
 
 try:
@@ -202,14 +204,14 @@ class Problem(object):
         self._rec_mgr = RecordingManager()
 
         # General options
-        self.options = OptionsDictionary()
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.update(options)
 
         # Case recording options
-        self.recording_options = OptionsDictionary()
+        self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
@@ -950,7 +952,11 @@ class Problem(object):
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
         if self._check and self.comm.rank == 0:
-            check_config(self, self._logger)
+            if self._check is True:
+                checks = _default_checks
+            else:
+                checks = self._check
+            self.check_config(self._logger, checks=checks)
 
         if self._setup_status < 2:
             self._setup_status = 2
@@ -1287,7 +1293,8 @@ class Problem(object):
 
                 all_fd_options[c_name][local_wrt] = fd_options
 
-                approximations[fd_options['method']].add_approximation(abs_key, fd_options)
+                approximations[fd_options['method']].add_approximation(abs_key, self.model,
+                                                                       fd_options)
 
             approx_jac = {}
             for approximation in itervalues(approximations):
@@ -1691,6 +1698,35 @@ class Problem(object):
 
         return
 
+    def check_config(self, logger=None, checks=None, out_file='openmdao_checks.out'):
+        """
+        Perform optional error checks on a Problem.
+
+        Parameters
+        ----------
+        logger : object
+            Logging object.
+        checks : list of str or None
+            List of specific checks to be performed.
+        out_file : str or None
+            If not None, output will be written to this file in addition to stdout.
+        """
+        if logger is None:
+            logger = get_logger('check_config', out_file=out_file, use_format=True)
+
+        if checks is None:
+            checks = sorted(_default_checks)
+        elif checks == 'all':
+            checks = sorted(_all_checks)
+
+        for c in checks:
+            if c not in _all_checks:
+                print("WARNING: '%s' is not a recognized check.  Available checks are: %s" %
+                      (c, sorted(_all_checks)))
+                continue
+            logger.info('checking %s' % c)
+            _all_checks[c](self, logger)
+
 
 def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out_stream,
                               compact_print, system_list, global_options, totals=False,
@@ -1871,9 +1907,15 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 else:
                     # If fd_norm is zero, let's use fwd_norm as the divisor for relative
                     # check. That way we don't accidentally squelch a legitimate problem.
-                    derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fwd_norm,
-                                                                        rev_error / fwd_norm,
-                                                                        fwd_rev_error / fwd_norm)
+                    if totals:
+                        derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fwd_norm,
+                                                                            nan,
+                                                                            nan)
+                    else:
+                        rel_err = ErrorTuple(fwd_error / fwd_norm,
+                                             rev_error / fwd_norm,
+                                             fwd_rev_error / fwd_norm)
+                        derivative_info['rel error'] = rel_err
 
             else:
                 if totals:

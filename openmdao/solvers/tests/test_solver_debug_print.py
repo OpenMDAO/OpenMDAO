@@ -260,7 +260,7 @@ class TestNonlinearSolversIsolated(unittest.TestCase):
         self.assertTrue(target in output, msg=target + "NOT FOUND IN" + output)
 
         # Make sure exception is unchanged.
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
+        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust'."
         self.assertEqual(expected_msg, str(cm.exception))
 
 

@@ -49,7 +49,8 @@ class NonlinearBlockGS(NonlinearSolver):
         super(NonlinearBlockGS, self)._setup_solvers(system, depth)
 
         if len(system._subsystems_allprocs) != len(system._subsystems_myproc):
-            raise RuntimeError('Nonlinear Gauss-Seidel cannot be used on a parallel group.')
+            raise RuntimeError('{}: Nonlinear Gauss-Seidel cannot be used on a '
+                               'parallel group.'.format(self.msginfo))
 
     def _declare_options(self):
         """

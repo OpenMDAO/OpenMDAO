@@ -121,7 +121,7 @@ class DistributedRecorderTest(unittest.TestCase):
         try:
             prob.model.add_recorder(self.recorder)
         except RuntimeError as err:
-            msg = "Recording of Systems when running parallel code is not supported yet"
+            msg = "Group: Recording of Systems when running parallel code is not supported yet"
             self.assertEqual(str(err), msg)
         else:
             self.fail('RuntimeError expected.')

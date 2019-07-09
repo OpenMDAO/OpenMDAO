@@ -161,7 +161,7 @@ class Solver(object):
         self._solver_info = None
 
         # Solver options
-        self.options = OptionsDictionary()
+        self.options = OptionsDictionary(parent_name=self.msginfo)
         self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
@@ -174,7 +174,7 @@ class Solver(object):
                              desc="When True, AnalysisError will be raised if we don't converge.")
 
         # Case recording options
-        self.recording_options = OptionsDictionary()
+        self.recording_options = OptionsDictionary(parent_name=self.msginfo)
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
                                        solver level')
@@ -199,7 +199,7 @@ class Solver(object):
         self._norm0 = 0.0
 
         # What the solver supports.
-        self.supports = OptionsDictionary()
+        self.supports = OptionsDictionary(parent_name=self.msginfo)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('implicit_components', types=bool, default=False)
 
@@ -209,6 +209,20 @@ class Solver(object):
         self._rec_mgr = RecordingManager()
 
         self.cite = ""
+
+    @property
+    def msginfo(self):
+        """
+        Return info to prepend to messages.
+
+        Returns
+        -------
+        str
+            Info to prepend to messages.
+        """
+        if self._system is None:
+            return type(self).__name__
+        return '{} in {}'.format(type(self).__name__, self._system.msginfo)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -254,6 +268,12 @@ class Solver(object):
         self._depth = depth
         self._solver_info = system._solver_info
         self._recording_iter = system._recording_iter
+
+        if system.pathname:
+            parent_name = self.msginfo
+            self.options._parent_name = parent_name
+            self.recording_options._parent_name = parent_name
+            self.supports._parent_name = parent_name
 
         if isinstance(self, LinearSolver) and not system._use_derivatives:
             return
@@ -626,8 +646,8 @@ class NonlinearSolver(Solver):
         Raise an exception if any discrete outputs exist in our System.
         """
         if self._system._var_allprocs_discrete['output']:
-            raise RuntimeError("System '%s' has a %s solver and contains discrete outputs %s." %
-                               (self._system.pathname, type(self).__name__,
+            raise RuntimeError("%s has a %s solver and contains discrete outputs %s." %
+                               (self._system.msginfo, type(self).__name__,
                                 sorted(self._system._var_allprocs_discrete['output'])))
 
     def _print_exc_debug_info(self):
@@ -733,8 +753,8 @@ class LinearSolver(Solver):
         """
         super(LinearSolver, self)._setup_solvers(system, depth)
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
-            raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
-                               "jacobians." % (self.SOLVER, system.pathname))
+            raise RuntimeError("Linear solver %s doesn't support assembled "
+                               "jacobians." % self.msginfo)
 
     def solve(self, vec_names, mode, rel_systems=None):
         """
