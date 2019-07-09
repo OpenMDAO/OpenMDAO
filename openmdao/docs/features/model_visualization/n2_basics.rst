@@ -81,7 +81,6 @@ Problem as Data Source
 
     p.setup()
 
-    import openmdao.api as om
     om.n2(p)
 
 Case Recorder as Data Source
@@ -89,14 +88,12 @@ Case Recorder as Data Source
 
 .. code::
 
-    r = SqliteRecorder('circuit.sqlite')
+    r = om.SqliteRecorder('circuit.sqlite')
     p.driver.add_recorder(r)
 
     p.setup()
     p.final_setup()
     r.shutdown()
-
-    import openmdao.api as om
 
     om.n2('circuit.sqlite', outfile='circuit.html')
 

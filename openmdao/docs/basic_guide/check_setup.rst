@@ -35,7 +35,7 @@ but forgot to issue one of the connections then your problem wouldn't run correc
 When you see that incorrect answer, the first thing you should do is check your setup via the :ref:`openmdao <om-command>` command.
 
 .. embed-shell-cmd::
-    :cmd: openmdao check sellar.py
+    :cmd: openmdao check -c all sellar.py
     :dir: ../test_suite/scripts
 
 

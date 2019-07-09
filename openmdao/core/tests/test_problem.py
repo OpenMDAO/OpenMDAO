@@ -510,7 +510,6 @@ class TestProblem(unittest.TestCase):
         prob.run_model()
         assert_rel_error(self, prob['f_xy'], 22.0, 1e-6)
 
-        # skip the setup error checking
         prob.setup()
         prob['x'] = 4
         prob['y'] = 8.
@@ -1700,8 +1699,8 @@ class TestProblem(unittest.TestCase):
                                           'indices', 'adder', 'scaler',
                                           'parallel_deriv_color',
                                           'vectorize_derivs',
-                                          'cache_linear_solution'],
-                               )
+                                          'cache_linear_solution'])
+
 
 class NestedProblemTestCase(unittest.TestCase):
 

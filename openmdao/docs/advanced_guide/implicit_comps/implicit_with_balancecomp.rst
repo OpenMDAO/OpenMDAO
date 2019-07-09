@@ -70,13 +70,14 @@ as follows:
     openmdao n2 <your_python_script>
 
 
-You can do the same thing programmatically by adding the following to your python script:
+You can do the same thing programmatically by calling the 
+:func:`n2 <openmdao.devtools.problem_viewer.problem_viewer.n2>` 
+function in your python script (after setup):
 
 .. code::
 
     p.setup()
 
-    import openmdao.api as om
     om.n2(p)
 
 Here is what the resulting visualization would look like for the above model:
