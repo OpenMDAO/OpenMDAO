@@ -106,7 +106,7 @@ Functions from the math library are available for use in the expression strings.
 ExecComp Example: Variable Properties
 -------------------------------------
 
-You can also declare properties like 'units', 'upper', or 'lower' on the inputs and outputs. In this 
+You can also declare properties like 'units', 'upper', or 'lower' on the inputs and outputs. In this
 example we declare all our inputs to be inches to trigger conversion from a variable expressed in feet
 in one connection source.
 
@@ -114,23 +114,24 @@ in one connection source.
     openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_metadata
     :layout: interleave
 
-ExecComp Example: Vectorized
-----------------------------
+ExecComp Example: Diagonal Partials
+-----------------------------------
 
 If all of your ExecComp's array inputs and array outputs are the same size and happen to have
-diagonal partials, you can create a vectorized ExecComp by specifying a `vectorize=True` argument
-to `__init__` or via the component options. This will cause the ExecComp to solve for its partials 
+diagonal partials, you can make computation of derivatives for your ExecComp faster by specifying a
+`has_diag_partials=True` argument
+to `__init__` or via the component options. This will cause the ExecComp to solve for its partials
 by complex stepping all entries of an array input at once instead of looping over each entry individually.
 
 .. embed-code::
-    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_vectorize
+    openmdao.components.tests.test_exec_comp.TestExecComp.test_feature_has_diag_partials
     :layout: interleave
 
 ExecComp Example: Options
 -------------------------
 
 Other options that can apply to all the variables in the component are variable shape and units.
-These can also be set as a keyword argument in the constructor or via the component options. In the 
+These can also be set as a keyword argument in the constructor or via the component options. In the
 following example the variables all share the same shape, which is specified in the constructor, and
 common units that are specified by setting the option.
 
