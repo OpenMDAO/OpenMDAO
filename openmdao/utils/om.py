@@ -501,7 +501,8 @@ _post_setup_map = {
 _non_post_setup_map = {
     'n2': (_n2_setup_parser, _n2_cmd, 'Display an interactive N2 diagram of the problem.'),
     'view_model': (_n2_setup_parser, _view_model_cmd,
-        'Display an interactive N2 diagram of the problem. (Deprecated, please use n2 instead.)'),
+                   'Display an interactive N2 diagram of the problem. '
+                   '(Deprecated, please use n2 instead.)'),
     'trace': (_itrace_setup_parser, _itrace_exec, 'Dump trace output.'),
     'call_tree': (_calltree_setup_parser, _calltree_exec,
                   "Display the call tree for the specified class method and all 'self' class "
