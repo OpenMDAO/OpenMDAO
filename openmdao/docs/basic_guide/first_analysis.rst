@@ -82,8 +82,6 @@ The start of the run script is denoted by the following statement:
 
 :code:`if __name__ == '__main__':`
 
-At the top of our run script, we import the remaining OpenMDAO classes that we will need to define our problem.
-
 All OpenMDAO models are built up from a hierarchy of :ref:`Group <openmdao.core.group.py>` instances that organize the components.
 In this example, the hierarchy is very simple, consisting of a single root group that holds two components.
 The first component is an :ref:`IndepVarComp <openmdao.core.indepvarcomp.py>` instance.
@@ -112,8 +110,6 @@ In this case, there are no units on the source (i.e. `des_vars.x`).
 .. code::
 
     if __name__ == "__main__":
-        import openmdao.api as om
-
         model = om.Group()
         ivc = om.IndepVarComp()
         ivc.add_output('x', 3.0)

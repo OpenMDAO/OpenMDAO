@@ -515,6 +515,8 @@ def _check_config_cmd(options):
 
             if not options.checks:
                 options.checks = sorted(_default_checks)
+            elif 'all' in options.checks:
+                options.checks = sorted(_all_checks)
 
             prob.check_config(logger, options.checks)
 
