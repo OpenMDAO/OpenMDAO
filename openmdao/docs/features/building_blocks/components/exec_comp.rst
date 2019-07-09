@@ -115,7 +115,7 @@ in one connection source.
     :layout: interleave
 
 ExecComp Example: Diagonal Partials
-----------------------------
+-----------------------------------
 
 If all of your ExecComp's array inputs and array outputs are the same size and happen to have
 diagonal partials, you can make computation of derivatives for your ExecComp faster by specifying a
