@@ -2353,6 +2353,40 @@ class TestProblemCheckTotals(unittest.TestCase):
                 "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
         self.assertEqual(str(cm.exception), msg)
 
+    def test_fd_zero_check(self):
+
+        class BadComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 3.0)
+                self.add_output('y', 3.0)
+
+                self.declare_partials('y', 'x')
+
+            def compute(self, inputs, outputs):
+                pass
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = 3.0 * inputs['x'] + 5
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p', om.IndepVarComp('x', 3.0))
+        model.add_subsystem('comp', BadComp())
+        model.connect('p.x', 'comp.x')
+
+        model.add_design_var('p.x')
+        model.add_objective('comp.y')
+
+        prob.setup()
+        prob.run_model()
+
+        # This test verifies fix of a TypeError (division by None)
+        J = prob.check_totals(out_stream=None)
+        assert_rel_error(self, J['comp.y', 'p.x']['J_fwd'], [[14.0]], 1e-6)
+        assert_rel_error(self, J['comp.y', 'p.x']['J_fd'], [[0.0]], 1e-6)
+
 
 @unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
