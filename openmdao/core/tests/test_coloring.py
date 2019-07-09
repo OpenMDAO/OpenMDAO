@@ -146,7 +146,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
         del options['method']
 
     if 'dynamic_total_coloring' in options:
-        p.driver.declare_coloring()
+        p.driver.declare_coloring(tol=1e-15)
         del options['dynamic_total_coloring']
 
     p.driver.options.update(options)

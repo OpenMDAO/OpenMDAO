@@ -68,8 +68,8 @@ _DYN_COLORING = object()
 
 # default values related to the computation of a sparsity matrix
 _DEF_COMP_SPARSITY_ARGS = {
-    'tol': 1e-15,
-    'orders': 15,
+    'tol': 1e-25,
+    'orders': None,
     'num_full_jacs': 3,
     'perturb_size': 1e-9,
     'show_summary': True,
@@ -1173,7 +1173,7 @@ def MNCO_bidir(J):
     return coloring
 
 
-def _tol_sweep(arr, tol=1e-15, orders=20):
+def _tol_sweep(arr, tol=_DEF_COMP_SPARSITY_ARGS['tol'], orders=_DEF_COMP_SPARSITY_ARGS['orders']):
     """
     Find best tolerance 'around' tol to choose nonzero values of arr.
 
@@ -1212,7 +1212,7 @@ def _tol_sweep(arr, tol=1e-15, orders=20):
                 else:
                     nzeros.append(([itol], len(rows)))
                 n_tested += 1
-            itol /= 10.
+            itol *= .1
 
         # pick lowest tolerance corresponding to the most repeated number of 'zero' entries
         sorted_items = sorted(nzeros, key=lambda x: len(x[0]), reverse=True)
@@ -1258,6 +1258,8 @@ def _compute_total_coloring_context(top):
     top : System
         Top of the system hierarchy where coloring will be done.
     """
+    np.random.seed(41)  # set seed for consistency
+
     for system in top.system_iter(recurse=True, include_self=True):
         if system.matrix_free:
             raise RuntimeError("%s: simultaneous coloring does not currently work with matrix free "
@@ -1334,7 +1336,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
                 fullJ += np.abs(J)
         elapsed = time.time() - start_time
 
-    fullJ *= (1.0 / num_full_jacs)
+    fullJ *= (1.0 / np.max(fullJ))
 
     info = _tol_sweep(fullJ, tol, orders)
     info['num_full_jacs'] = num_full_jacs
