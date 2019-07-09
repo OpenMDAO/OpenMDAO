@@ -254,7 +254,7 @@ def _get_viewer_data(data_source):
                 edges_list = [
                     (sys_pathnames_dict[s], sys_pathnames_dict[t]) for s, t in G.edges(strong_comp)
                     if exe_low <= orders[s] <= exe_high and exe_low <= orders[t] <= exe_high and
-                            not (s == src and t == tgt) and t in sys_pathnames_dict
+                            not (s == src and t == tgt)
                 ]
                 for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
                     for vtgt in vtgtlist:
