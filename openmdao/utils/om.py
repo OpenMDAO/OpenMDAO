@@ -29,6 +29,7 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _sparsity_setup_parser, _sparsity_cmd, _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
+from openmdao.utils.general_utils import warn_deprecation
 
 
 def _n2_setup_parser(parser):
@@ -80,6 +81,11 @@ def _n2_cmd(options):
         n2(filename, outfile=options.outfile, title=options.title,
            show_browser=not options.no_browser, embeddable=options.embeddable,
            use_declare_partial_info=options.use_declare_partial_info)
+
+
+def _view_model_cmd(options):
+    warn_deprecation("The 'view_model' command has been deprecated. Use 'n2' instead.")
+    _n2_cmd(options)
 
 
 def _xdsm_setup_parser(parser):
@@ -494,6 +500,9 @@ _post_setup_map = {
 # Other non-post-setup functions go here
 _non_post_setup_map = {
     'n2': (_n2_setup_parser, _n2_cmd, 'Display an interactive N2 diagram of the problem.'),
+    'view_model': (_n2_setup_parser, _view_model_cmd,
+                   'Display an interactive N2 diagram of the problem. '
+                   '(Deprecated, please use n2 instead.)'),
     'trace': (_itrace_setup_parser, _itrace_exec, 'Dump trace output.'),
     'call_tree': (_calltree_setup_parser, _calltree_exec,
                   "Display the call tree for the specified class method and all 'self' class "
