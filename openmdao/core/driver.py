@@ -162,14 +162,9 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = {
-            'coloring': None,
-            'show_summary': True,
-            'show_sparsity': False,
-            'tol': 1e-15,
-            'orders': 20,
-            'num_full_jacs': 3,
-        }
+        self._coloring_info = coloring_mod._DEF_COMP_SPARSITY_ARGS.copy()
+        self._coloring_info['coloring'] = None
+
         self._total_jac_sparsity = None
         self._res_jacs = {}
         self._total_jac = None
