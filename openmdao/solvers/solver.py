@@ -321,7 +321,7 @@ class Solver(object):
         # Raise a deprecation warning for changed option.
         if 'err_on_maxiter' in self.options and self.options['err_on_maxiter'] is not None:
             self.options['err_on_non_converge'] = self.options['err_on_maxiter']
-            warn_deprecation("The 'err_on_maxiter' options provides backwards compatibility "
+            warn_deprecation("The 'err_on_maxiter' option provides backwards compatibility "
                              "with earlier version of OpenMDAO; use options['err_on_non_converge'] "
                              "instead.")
 

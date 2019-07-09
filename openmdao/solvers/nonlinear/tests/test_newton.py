@@ -746,7 +746,7 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.set_solver_print(level=0)
 
-        msg = "The 'err_on_maxiter' options provides backwards compatibility " + \
+        msg = "The 'err_on_maxiter' option provides backwards compatibility " + \
         "with earlier version of OpenMDAO; use options['err_on_non_converge'] " + \
         "instead."
         #prob.final_setup()
