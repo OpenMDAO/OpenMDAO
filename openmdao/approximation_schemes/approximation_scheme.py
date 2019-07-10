@@ -139,7 +139,7 @@ class ApproximationScheme(object):
 
         is_total = isinstance(system, Group)
 
-        system._update_wrt_matches()
+        system._update_wrt_matches(system._coloring_info)
         wrt_matches = system._coloring_info['wrt_matches']
 
         data = None

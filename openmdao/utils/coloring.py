@@ -76,6 +76,7 @@ _DEF_COMP_SPARSITY_ARGS = {
     'show_sparsity': False,
 }
 
+
 # numpy versions before 1.12 don't use the 'axis' arg passed to count_nonzero and always
 # return an int instead of an array of ints, so create our own function for those versions.
 if LooseVersion(np.__version__) >= LooseVersion("1.12"):
@@ -373,17 +374,12 @@ class Coloring(object):
         driver : Driver
             Current driver object.
         """
-        ofs = driver._get_ordered_nl_responses()
-        of_sizes = _get_response_sizes(driver, ofs)
-        wrts = list(driver._designvars)
-        wrt_sizes = _get_desvar_sizes(driver, wrts)
-        if (self._row_var_sizes != of_sizes or self._row_vars != ofs
-                or self._col_var_sizes != wrt_sizes or self._col_vars != wrts):
-            raise RuntimeError("Current total coloring configuration does not match the "
-                               "configuration of the current driver. Make sure you don't have "
-                               "different problems that have the same coloring directory.  Set "
-                               "the coloring directory by setting the value of "
-                               "`problem.options['coloring_dir']`.")
+        of_names = driver._get_ordered_nl_responses()
+        of_sizes = _get_response_sizes(driver, of_names)
+        wrt_names = list(driver._designvars)
+        wrt_sizes = _get_desvar_sizes(driver, wrt_names)
+
+        self._config_check_msgs(of_names, of_sizes, wrt_names, wrt_sizes, driver)
 
     def _check_config_partial(self, system):
         """
@@ -395,27 +391,75 @@ class Coloring(object):
             System being colored.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
+        info = {'coloring': None, 'wrt_patterns': self._meta['wrt_patterns']}
+        system._update_wrt_matches(info)
         if system.pathname:
             wrt_matches = ['.'.join((system.pathname, n))
-                           for n in self._meta['wrt_matches_prom']]
+                           for n in info['wrt_matches_prom']]
             # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
             ordered_wrt_info = \
                 system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
         else:
             ordered_of_info = list(system._jacobian_of_iter())
-            ordered_wrt_info = list(system._jacobian_wrt_iter(self._meta['wrt_matches']))
+            ordered_wrt_info = list(system._jacobian_wrt_iter(info['wrt_matches']))
 
-        ordered_of_names = [t[0] for t in ordered_of_info]
-        ordered_wrt_names = [t[0] for t in ordered_wrt_info]
+        of_names = [t[0] for t in ordered_of_info]
+        wrt_names = [t[0] for t in ordered_wrt_info]
 
-        if (ordered_of_names != self._row_vars or ordered_wrt_names != self._col_vars):
-            # TODO: add comparison of sizes
-            raise RuntimeError("%s: Current coloring configuration does not match the "
-                               "configuration of the current driver. Make sure you don't have "
-                               "different problems that have the same coloring directory.  Set "
-                               "the coloring directory by setting the value of "
-                               "`problem.options['coloring_dir']`." % system.pathname)
+        of_sizes = [t[2] - t[1] for t in ordered_of_info]
+        wrt_sizes = [t[2] - t[1] for t in ordered_wrt_info]
+
+        self._config_check_msgs(of_names, of_sizes, wrt_names, wrt_sizes, system)
+
+    def _config_check_msgs(self, of_names, of_sizes, wrt_names, wrt_sizes, obj):
+        msg_suffix = ("Make sure you don't have different problems that have the same coloring "
+                      "directory. Set the coloring directory by setting the value of "
+                      "problem.options['coloring_dir'].")
+
+        msg = ["%s: Current coloring configuration does not match the "
+               "configuration of the current model." % obj.msginfo]
+
+        if of_names != self._row_vars:
+            of_diff = set(of_names) - set(self._row_vars)
+            if of_diff:
+                msg.append('The following row vars were added: %s.' % sorted(of_diff))
+            else:
+                of_diff = set(self._row_vars) - set(of_names)
+                if of_diff:
+                    msg.append('The following row vars were removed: %s.' % sorted(of_diff))
+                else:
+                    msg.append('The row vars have changed order.')
+
+        if wrt_names != self._col_vars:
+            wrt_diff = set(wrt_names) - set(self._col_vars)
+            if wrt_diff:
+                msg.append('The following column vars were added: %s.' % sorted(wrt_diff))
+            else:
+                wrt_diff = set(self._col_vars) - set(wrt_names)
+                if wrt_diff:
+                    msg.append('The following column vars were removed: %s.' % sorted(wrt_diff))
+                else:
+                    msg.append('The column vars have changed order.')
+
+        # check sizes
+        changed_sizes = []
+        if of_names == self._row_vars:
+            for i, (my_sz, sz) in enumerate(zip(self._row_var_sizes, of_sizes)):
+                if my_sz != sz:
+                    changed_sizes.append(of_names[i])
+
+        if wrt_names == self._col_vars:
+            for i, (my_sz, sz) in enumerate(zip(self._col_var_sizes, wrt_sizes)):
+                if my_sz != sz:
+                    changed_sizes.append(wrt_names[i])
+
+        if changed_sizes:
+            msg.append('The following variables have changed sizes: %s.' % sorted(changed_sizes))
+
+        if len(msg) > 1:
+            msg.append(msg_suffix)
+            raise RuntimeError(' '.join(msg))
 
     def __repr__(self):
         """
