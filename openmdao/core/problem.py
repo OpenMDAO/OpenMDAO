@@ -39,7 +39,7 @@ from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.utils.logger_utils import get_logger
+from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 
 try:
@@ -951,12 +951,16 @@ class Problem(object):
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
 
-        if self._check and self.comm.rank == 0:
+        if self._check:
             if self._check is True:
                 checks = _default_checks
             else:
                 checks = self._check
-            self.check_config(self._logger, checks=checks)
+            if self.comm.rank == 0:
+                logger = self._logger
+            else:
+                logger = TestLogger()
+            self.check_config(logger, checks=checks)
 
         if self._setup_status < 2:
             self._setup_status = 2
