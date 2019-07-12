@@ -423,24 +423,24 @@ class Coloring(object):
         if of_names != self._row_vars:
             of_diff = set(of_names) - set(self._row_vars)
             if of_diff:
-                msg.append('The following row vars were added: %s.' % sorted(of_diff))
+                msg.append('   The following row vars were added: %s.' % sorted(of_diff))
             else:
                 of_diff = set(self._row_vars) - set(of_names)
                 if of_diff:
-                    msg.append('The following row vars were removed: %s.' % sorted(of_diff))
+                    msg.append('   The following row vars were removed: %s.' % sorted(of_diff))
                 else:
-                    msg.append('The row vars have changed order.')
+                    msg.append('   The row vars have changed order.')
 
         if wrt_names != self._col_vars:
             wrt_diff = set(wrt_names) - set(self._col_vars)
             if wrt_diff:
-                msg.append('The following column vars were added: %s.' % sorted(wrt_diff))
+                msg.append('   The following column vars were added: %s.' % sorted(wrt_diff))
             else:
                 wrt_diff = set(self._col_vars) - set(wrt_names)
                 if wrt_diff:
-                    msg.append('The following column vars were removed: %s.' % sorted(wrt_diff))
+                    msg.append('   The following column vars were removed: %s.' % sorted(wrt_diff))
                 else:
-                    msg.append('The column vars have changed order.')
+                    msg.append('   The column vars have changed order.')
 
         # check sizes
         changed_sizes = []
@@ -455,11 +455,11 @@ class Coloring(object):
                     changed_sizes.append(wrt_names[i])
 
         if changed_sizes:
-            msg.append('The following variables have changed sizes: %s.' % sorted(changed_sizes))
+            msg.append('   The following variables have changed sizes: %s.' % sorted(changed_sizes))
 
         if len(msg) > 1:
             msg.append(msg_suffix)
-            raise RuntimeError(' '.join(msg))
+            raise RuntimeError('\n'.join(msg))
 
     def __repr__(self):
         """
