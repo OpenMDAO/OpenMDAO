@@ -1279,7 +1279,7 @@ class Problem(object):
                     fd_options['form'] = form
                     fd_options['step_calc'] = step_calc
 
-                if step:
+                if step and requested_method == method:
                     fd_options['step'] = step
                 else:
                     fd_options['step'] = defaults['step']
