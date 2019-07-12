@@ -950,6 +950,7 @@ class Problem(object):
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
+        self._solver_print_cache = []
 
         if self._check:
             if self._check is True:
