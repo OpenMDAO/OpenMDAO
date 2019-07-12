@@ -1976,11 +1976,15 @@ class Group(System):
             for tup in super(Group, self)._jacobian_wrt_iter(wrt_matches):
                 yield tup
 
-    def _update_wrt_matches(self):
+    def _update_wrt_matches(self, info):
         """
         Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
+
+        Parameters
+        ----------
+        info : dict
+            Coloring metadata dict.
         """
-        info = self._coloring_info
         if not (self._owns_approx_of or self.pathname):
             return
 
@@ -2007,7 +2011,7 @@ class Group(System):
         baselen = len(self.pathname) + 1 if self.pathname else 0
         info['wrt_matches_prom'] = [n[baselen:] for n in wrt_colors_matched]
 
-        if self._coloring_info['coloring'] is _DYN_COLORING and self._owns_approx_of:
+        if info['coloring'] is _DYN_COLORING and self._owns_approx_of:
             if not wrt_colors_matched:
                 raise ValueError("{}: Invalid 'wrt' variable(s) specified for colored approx "
                                  "partial options: {}.".format(self.msginfo, wrt_color_patterns))

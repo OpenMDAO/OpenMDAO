@@ -366,11 +366,15 @@ class Component(System):
             of, wrt = key
             self._declare_partials(of, wrt, dct)
 
-    def _update_wrt_matches(self):
+    def _update_wrt_matches(self, info):
         """
         Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
+
+        Parameters
+        ----------
+        info : dict
+            Coloring metadata dict.
         """
-        info = self._coloring_info
         ofs, allwrt = self._get_partials_varlists()
         wrt_patterns = info['wrt_patterns']
         matches_prom = set()

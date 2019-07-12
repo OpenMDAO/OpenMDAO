@@ -1105,7 +1105,7 @@ class System(object):
 
         sparsity_time = time.time() - sparsity_start_time
 
-        self._update_wrt_matches()
+        self._update_wrt_matches(self._coloring_info)
 
         ordered_of_info = list(self._jacobian_of_iter())
         ordered_wrt_info = list(self._jacobian_wrt_iter(info['wrt_matches']))
@@ -2311,7 +2311,7 @@ class System(object):
         """
         if (self._coloring_info['coloring'] is not None and
                 self._coloring_info['wrt_matches'] is None):
-            self._update_wrt_matches()
+            self._update_wrt_matches(self._coloring_info)
 
         # if coloring has been specified, we don't want to have multiple
         # approximations for the same subjac, so don't register any new
