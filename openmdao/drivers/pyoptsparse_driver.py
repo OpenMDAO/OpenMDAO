@@ -468,7 +468,6 @@ class pyOptSparseDriver(Driver):
 
         # print("Functions calculated")
         # print(dv_dict)
-        # print(func_dict)
 
         return func_dict, fail
 
