@@ -98,9 +98,9 @@ class TestAssertUtils(unittest.TestCase):
 
     def test_feature_assert_check_partials_exception_expected(self):
         import numpy as np
-        from openmdao.api import ExplicitComponent, Problem
+        import openmdao.api as om
         from openmdao.utils.assert_utils import assert_check_partials
-        class MyComp(ExplicitComponent):
+        class MyComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -119,7 +119,7 @@ class TestAssertUtils(unittest.TestCase):
                 J['y', 'x1'] = np.array([4.0])
                 J['y', 'x2'] = np.array([40])
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = MyComp()
 
         prob.set_solver_print(level=0)
