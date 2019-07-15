@@ -111,7 +111,7 @@ class TestIndepVarComp(unittest.TestCase):
         ])
 
         # Outputs with automatically added indep_var_comp tag
-        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="indep_var_comp")
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="indep_var")
         self.assertEqual(sorted(outputs), [
             ('indep_var', {}),
         ])
@@ -151,8 +151,8 @@ class TestIndepVarComp(unittest.TestCase):
             ('indep_var_1', {'value': [1.]}),
         ])
 
-        # Outputs with the indep_var_comp tags
-        outputs = prob.model.list_outputs(out_stream=None, tags="indep_var_comp")
+        # Outputs with the indep_var tags
+        outputs = prob.model.list_outputs(out_stream=None, tags="indep_var")
         self.assertEqual(sorted(outputs), [
             ('indep_var_1', {'value': [1.]}),
             ('indep_var_2', {'value': [2.]}),
