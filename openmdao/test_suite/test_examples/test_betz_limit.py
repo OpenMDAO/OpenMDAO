@@ -217,19 +217,18 @@ class TestBetzLimit(unittest.TestCase):
 
     def test_betz_with_var_tags(self):
         import openmdao.api as om
-        from six import iteritems
 
-        class ActuatorDisc(om.ExplicitComponent):
+        class ActuatorDiscWithTags(om.ExplicitComponent):
             """Simple wind turbine model based on actuator disc theory"""
 
             def setup(self):
 
                 # Inputs
                 self.add_input('a', 0.5, desc="Induced Velocity Factor", tags="advanced")
-                self.add_input('Area', 10.0, units="m**2", desc="Rotor disc area", tags="beginner")
+                self.add_input('Area', 10.0, units="m**2", desc="Rotor disc area", tags="basic")
                 self.add_input('rho', 1.225, units="kg/m**3", desc="air density", tags="advanced")
                 self.add_input('Vu', 10.0, units="m/s",
-                               desc="Freestream air velocity, upstream of rotor", tags="beginner")
+                               desc="Freestream air velocity, upstream of rotor", tags="basic")
 
                 # Outputs
                 self.add_output('Vr', 0.0, units="m/s",
@@ -302,37 +301,15 @@ class TestBetzLimit(unittest.TestCase):
                 J['power', 'Vu'] = 6.0 * Area * Vu**2 * a * rho * one_minus_a**2
 
 
-        def get_beginner_inputs(prob):
-            """Helper function for beginners using this model"""
-            vars = prob.model.list_inputs(out_stream=None, tags="beginner", units=True, shape=True)
-            return vars
-
-        def get_beginner_outputs(prob):
-            """Helper function for beginners using this model"""
-            vars = prob.model.list_outputs(out_stream=None, tags="beginner", units=True, shape=True)
-            return vars
-
-        def print_vars(label, vars):
-            indent = ' '*4
-            print()
-            print(label)
-            print(len(label)*'=')
-            for name, meta in vars:
-                print()
-                print(indent + name)
-                print(indent + len(name)*'-')
-                for meta_name, meta_value in iteritems(meta):
-                    print('{}{}: {}'.format(indent*2, meta_name, meta_value))
-
         # build the model
         prob = om.Problem()
         indeps = prob.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
         indeps.add_output('a', .5, tags="advanced")
-        indeps.add_output('Area', 10.0, units='m**2', tags="beginner")
+        indeps.add_output('Area', 10.0, units='m**2', tags="basic")
         indeps.add_output('rho', 1.225, units='kg/m**3', tags="advanced")
-        indeps.add_output('Vu', 10.0, units='m/s', tags="beginner")
+        indeps.add_output('Vu', 10.0, units='m/s', tags="basic")
 
-        prob.model.add_subsystem('a_disk', ActuatorDisc(),
+        prob.model.add_subsystem('a_disk', ActuatorDiscWithTags(),
                                 promotes_inputs=['a', 'Area', 'rho', 'Vu'])
 
         # setup the optimization
@@ -347,11 +324,11 @@ class TestBetzLimit(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        beginner_vars = get_beginner_inputs(prob)
-        print_vars('Beginner Inputs', beginner_vars)
+        prob.model.list_inputs(tags='basic', units=True, shape=True)
+        prob.model.list_inputs(tags=['basic','advanced'], units=True, shape=True)
 
-        beginner_vars = get_beginner_outputs(prob)
-        print_vars('Beginner Outputs', beginner_vars)
+        prob.model.list_outputs(tags='basic', units=False, shape=False)
+        prob.model.list_outputs(tags=['basic','advanced'], units=False, shape=False)
 
     def test_betz_derivatives(self):
         import openmdao.api as om
