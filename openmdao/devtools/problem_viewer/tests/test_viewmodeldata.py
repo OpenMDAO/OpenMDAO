@@ -10,7 +10,7 @@ from tempfile import mkdtemp
 
 from openmdao.core.problem import Problem
 from openmdao.test_suite.components.sellar import SellarStateConnection
-from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data, view_model
+from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data, n2
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.utils.shell_proc import check_call
 
@@ -108,12 +108,16 @@ class TestViewModelData(unittest.TestCase):
         # check expected connections, after mapping cycle_arrows indices back to pathnames
         connections = sorted(model_viewer_data['connections_list'], key=lambda x: (x['tgt'], x['src']))
         for conn in connections:
-            if 'cycle_arrows' in conn:
+            if 'cycle_arrows' in conn and conn['cycle_arrows']:
                 cycle_arrows = []
                 for src, tgt in conn['cycle_arrows']:
                     cycle_arrows.append(' '.join([pathnames[src], pathnames[tgt]]))
                 conn['cycle_arrows'] = sorted(cycle_arrows)
-        self.assertListEqual(connections, self.expected_conns)
+        self.assertEqual(len(connections), len(self.expected_conns))
+        for c, ex in zip(connections, self.expected_conns):
+            self.assertEqual(c['src'], ex['src'])
+            self.assertEqual(c['tgt'], ex['tgt'])
+            self.assertEqual(c.get('cycle_arrows', []), ex.get('cycle_arrows', []))
 
         # check expected abs2prom map
         self.assertDictEqual(model_viewer_data['abs2prom'], self.expected_abs2prom)
@@ -150,26 +154,30 @@ class TestViewModelData(unittest.TestCase):
                 for src, tgt in conn['cycle_arrows']:
                     cycle_arrows.append(' '.join([pathnames[src], pathnames[tgt]]))
                 conn['cycle_arrows'] = sorted(cycle_arrows)
-        self.assertListEqual(connections, self.expected_conns)
+        self.assertEqual(len(connections), len(self.expected_conns))
+        for c, ex in zip(connections, self.expected_conns):
+            self.assertEqual(c['src'], ex['src'])
+            self.assertEqual(c['tgt'], ex['tgt'])
+            self.assertEqual(c.get('cycle_arrows', []), ex.get('cycle_arrows', []))
 
         # check expected abs2prom map
         self.assertDictEqual(model_viewer_data['abs2prom'], self.expected_abs2prom)
 
-    def test_view_model_from_problem(self):
+    def test_n2_from_problem(self):
         """
         Test that an n2 html file is generated from a Problem.
         """
         p = Problem()
         p.model = SellarStateConnection()
         p.setup()
-        view_model(p, outfile=self.problem_html_filename, show_browser=DEBUG)
+        n2(p, outfile=self.problem_html_filename, show_browser=DEBUG)
 
         # Check that the html file has been created and has something in it.
         self.assertTrue(os.path.isfile(self.problem_html_filename),
                         (self.problem_html_filename + " is not a valid file."))
         self.assertGreater(os.path.getsize(self.problem_html_filename), 100)
 
-    def test_view_model_from_sqlite(self):
+    def test_n2_from_sqlite(self):
         """
         Test that an n2 html file is generated from a sqlite file.
         """
@@ -180,7 +188,7 @@ class TestViewModelData(unittest.TestCase):
         p.setup()
         p.final_setup()
         r.shutdown()
-        view_model(self.sqlite_db_filename2, outfile=self.sqlite_html_filename, show_browser=DEBUG)
+        n2(self.sqlite_db_filename2, outfile=self.sqlite_html_filename, show_browser=DEBUG)
 
         # Check that the html file has been created and has something in it.
         self.assertTrue(os.path.isfile(self.sqlite_html_filename),
@@ -188,24 +196,24 @@ class TestViewModelData(unittest.TestCase):
         self.assertGreater(os.path.getsize(self.sqlite_html_filename), 100)
 
         # Check that there are no errors when running from the command line with a recording.
-        check_call('openmdao view_model --no_browser %s' % self.sqlite_db_filename2)
+        check_call('openmdao n2 --no_browser %s' % self.sqlite_db_filename2)
 
-    def test_view_model_command(self):
+    def test_n2_command(self):
         """
         Check that there are no errors when running from the command line with a script.
         """
         from openmdao.test_suite.scripts import sellar
         filename = os.path.abspath(sellar.__file__).replace('.pyc', '.py')  # PY2
-        check_call('openmdao view_model --no_browser %s' % filename)
+        check_call('openmdao n2 --no_browser %s' % filename)
 
-    def test_view_model_set_title(self):
+    def test_n2_set_title(self):
         """
         Test that an n2 html file is generated from a Problem.
         """
         p = Problem()
         p.model = SellarStateConnection()
         p.setup()
-        view_model(p, outfile=self.problem_html_filename, show_browser=DEBUG,
+        n2(p, outfile=self.problem_html_filename, show_browser=DEBUG,
                    title="Sellar State Connection")
 
         # Check that the html file has been created and has something in it.

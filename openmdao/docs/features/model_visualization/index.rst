@@ -12,5 +12,6 @@ a model.
 .. toctree::
     :maxdepth: 1
 
+    view_connections.rst
     n2_basics.rst
     n2_details.rst

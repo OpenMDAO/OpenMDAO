@@ -21,7 +21,7 @@ p.model.add_subsystem('constraint', om.ExecComp('g=Cl'), promotes=['*'])
 
 p.setup()
 
-om.view_model(p, outfile='aerostruct_n2.html', embeddable=True, show_browser=False)
+om.n2(p, outfile='aerostruct_n2.html', embeddable=True, show_browser=False)
 
 
 

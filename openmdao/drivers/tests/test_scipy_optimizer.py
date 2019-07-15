@@ -1729,6 +1729,7 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
 
         import openmdao.api as om
+        np.random.seed(6)
 
         size = 3  # size of the design variable
 

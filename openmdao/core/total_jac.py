@@ -1315,7 +1315,7 @@ class _TotalJacInfo(object):
             model._setup_jacobians(recurse=False)
             model._setup_approx_partials()
             if model._coloring_info['coloring'] is not None:
-                model._update_wrt_matches()
+                model._update_wrt_matches(model._coloring_info)
 
         # Linearize Model
         model._linearize(model._assembled_jac,

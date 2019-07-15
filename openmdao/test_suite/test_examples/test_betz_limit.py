@@ -197,6 +197,7 @@ class TestBetzLimit(unittest.TestCase):
 
         prob.model.add_design_var('a', lower=0., upper=1.)
         prob.model.add_design_var('Area', lower=0., upper=1.)
+
         # negative one so we maximize the objective
         prob.model.add_objective('a_disk.Cp', scaler=-1)
 
@@ -209,12 +210,10 @@ class TestBetzLimit(unittest.TestCase):
         # minimum value
         assert_rel_error(self, prob['a_disk.Cp'], 16./27., 1e-4)
         assert_rel_error(self, prob['a'], 0.33333, 1e-4)
+
         # There is a bug in scipy version < 1.0 that causes this value to be wrong.
         if LooseVersion(scipy.__version__) >= LooseVersion("1.0"):
             assert_rel_error(self, prob['Area'], 1.0, 1e-4)
-        else:
-            msg = "Outdated version of Scipy detected; this problem does not solve properly."
-            raise unittest.SkipTest(msg)
 
     def test_betz_with_var_tags(self):
         import openmdao.api as om

@@ -19,23 +19,23 @@ class CircleOpt(om.Group):
                                           -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
         indeps.add_output('r', .7)
 
-        self.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', vectorize=True,
+        self.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', has_diag_partials=True,
                                                      g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
         self.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-        self.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+        self.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
                                                 g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
 
         thetas = np.linspace(0, np.pi/4, SIZE)
-        self.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=True,
+        self.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
                                                     g=np.ones(SIZE), x=np.ones(SIZE),
                                                     theta=thetas))
-        self.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=True,
+        self.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
                                                           g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                           odd=np.ones(SIZE//2)))
 
-        self.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        self.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices

@@ -167,8 +167,8 @@ class BroydenSolver(NonlinearSolver):
         # Check names of states.
         bad_names = [name for name in states if name not in prom]
         if len(bad_names) > 0:
-            msg = "The following variable names were not found: {}"
-            raise ValueError(msg.format(', '.join(bad_names)))
+            msg = "{}: The following variable names were not found: {}"
+            raise ValueError(msg.format(self.msginfo, ', '.join(bad_names)))
 
         # Size linear system
         outputs = system._outputs
@@ -195,8 +195,8 @@ class BroydenSolver(NonlinearSolver):
             # Can only use DirectSolver here.
             from openmdao.solvers.linear.direct import DirectSolver
             if not isinstance(self.linear_solver, DirectSolver):
-                msg = "Linear solver must be DirectSolver when solving the full model."
-                raise ValueError(msg.format(', '.join(bad_names)))
+                msg = "{}: Linear solver must be DirectSolver when solving the full model."
+                raise ValueError(msg.format(self.msginfo, ', '.join(bad_names)))
 
             return
 

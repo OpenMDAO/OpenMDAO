@@ -265,7 +265,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "C1: No valid expressions provided to ExecComp(): [].")
+                         "ExecComp (C1): No valid expressions provided to ExecComp(): [].")
 
     def test_colon_vars(self):
         prob = om.Problem()
@@ -273,7 +273,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "C1: failed to compile expression 'y=foo:bar+1.'.")
+                         "ExecComp (C1): failed to compile expression 'y=foo:bar+1.'.")
 
     def test_bad_kwargs(self):
         prob = om.Problem()
@@ -281,7 +281,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "C1: arg 'xx' in call to ExecComp() does not refer to any variable "
+                         "ExecComp (C1): arg 'xx' in call to ExecComp() does not refer to any variable "
                          "in the expressions ['y=x+1.']")
 
     def test_bad_kwargs_meta(self):
@@ -291,7 +291,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "C1: the following metadata names were not recognized for "
+                         "ExecComp (C1): the following metadata names were not recognized for "
                          "variable 'x': ['high', 'low', 'val']")
 
     def test_name_collision_const(self):
@@ -300,7 +300,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "C1: cannot assign to variable 'e' because it's already defined "
+                         "ExecComp (C1): cannot assign to variable 'e' because it's already defined "
                          "as an internal function or constant.")
 
     def test_name_collision_func(self):
@@ -309,7 +309,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "C1: cannot assign to variable 'sin' because it's already defined "
+                         "ExecComp (C1): cannot assign to variable 'sin' because it's already defined "
                          "as an internal function or constant.")
 
     def test_func_as_rhs_var(self):
@@ -318,7 +318,7 @@ class TestExecComp(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
         self.assertEqual(str(context.exception),
-                         "C1: cannot use 'sin' as a variable because it's already defined "
+                         "ExecComp (C1): cannot use 'sin' as a variable because it's already defined "
                          "as an internal function.")
 
     def test_mixed_type(self):
@@ -399,7 +399,7 @@ class TestExecComp(unittest.TestCase):
                                                        units=2.0))
 
         self.assertEqual(str(cm.exception),
-                         "Value (2.0) of option 'units' has type 'float', "
+                         "ExecComp: Value (2.0) of option 'units' has type 'float', "
                          "but type 'str' was expected.")
 
     def test_units_varname_str(self):
@@ -425,7 +425,7 @@ class TestExecComp(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(cm.exception),
-                         "C1: cannot use variable name 'units' because it's a reserved keyword.")
+                         "ExecComp (C1): cannot use variable name 'units' because it's a reserved keyword.")
 
     def test_common_units(self):
         # all variables in the ExecComp have the same units
@@ -468,7 +468,7 @@ class TestExecComp(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(cm.exception),
-                         "C1: units of 'km' have been specified for variable 'x', but "
+                         "ExecComp (C1): units of 'km' have been specified for variable 'x', but "
                          "units of 'm' have been specified for the entire component.")
 
     def test_shape_and_value(self):
@@ -504,7 +504,7 @@ class TestExecComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
-                         "comp: shape of (5,) has been specified for variable 'x', "
+                         "ExecComp (comp): shape of (5,) has been specified for variable 'x', "
                          "but a value of shape (1,) has been provided.")
 
     def test_common_shape(self):
@@ -555,7 +555,7 @@ class TestExecComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('L,', ','),  # L on Windows
-                         "comp: shape of (10,) has been specified for variable 'y', "
+                         "ExecComp (comp): shape of (10,) has been specified for variable 'y', "
                          "but shape of (5,) has been specified for the entire component.")
 
     def test_common_shape_conflicting_value(self):
@@ -572,7 +572,7 @@ class TestExecComp(unittest.TestCase):
             p.setup()
 
         self.assertEqual(str(context.exception).replace('1L,', '1,'),  # 1L on Windows
-                         "comp: value of shape (1,) has been specified for variable 'x', "
+                         "ExecComp (comp): value of shape (1,) has been specified for variable 'x', "
                          "but shape of (5,) has been specified for the entire component.")
 
     def test_math(self):
@@ -770,27 +770,27 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._jacobian['y', 'x'], expect, 0.00001)
 
-    def test_vectorize_error(self):
+    def test_has_diag_partials_error(self):
         p = om.Problem()
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(3)))
         model.add_design_var('indep.x')
 
         mat = np.arange(15).reshape((3,5))
-        model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', vectorize=True, A=mat, x=np.ones(5), y=np.ones(3)))
+        model.add_subsystem('comp', om.ExecComp('y=A.dot(x)', has_diag_partials=True, A=mat, x=np.ones(5), y=np.ones(3)))
         model.connect('indep.x', 'comp.x')
 
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "comp: vectorize is True but partial(y, A) is not square (shape=(3, 15)).")
+                         "ExecComp (comp): has_diag_partials is True but partial(y, A) is not square (shape=(3, 15)).")
 
-    def test_vectorize_shape_only(self):
+    def test_has_diag_partials_shape_only(self):
         p = om.Problem()
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', vectorize=True,
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True,
                                                 x={'shape': (5,)}, y={'shape': (5,)}))
         model.connect('indep.x', 'comp.x')
 
@@ -863,7 +863,7 @@ class TestExecComp(unittest.TestCase):
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag_wrong")
         self.assertEqual(sorted(outputs), [])
 
-    def test_feature_vectorize(self):
+    def test_feature_has_diag_partials(self):
         import numpy as np
         import openmdao.api as om
 
@@ -871,7 +871,7 @@ class TestExecComp(unittest.TestCase):
         model = p.model
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(5)))
 
-        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', vectorize=True, x=np.ones(5), y=np.ones(5)))
+        model.add_subsystem('comp', om.ExecComp('y=3.0*x + 2.5', has_diag_partials=True, x=np.ones(5), y=np.ones(5)))
         model.connect('indep.x', 'comp.x')
 
         p.setup()

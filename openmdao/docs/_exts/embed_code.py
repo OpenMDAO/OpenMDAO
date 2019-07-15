@@ -1,4 +1,3 @@
-
 import unittest
 from docutils import nodes
 from docutils.parsers.rst import Directive
@@ -15,15 +14,18 @@ from openmdao.docs._utils.docutil import get_source_code, remove_docstrings, \
     remove_initial_empty_lines, replace_asserts_with_prints, \
     strip_header, dedent, insert_output_start_stop_indicators, run_code, \
     get_skip_output_node, get_interleaved_io_nodes, get_output_block_node, \
-    split_source_into_input_blocks, extract_output_blocks, clean_up_empty_output_blocks, node_setup
+    split_source_into_input_blocks, extract_output_blocks, consolidate_input_blocks, node_setup
 
 
 _plot_count = 0
 
+plotting_functions = ['\.show\(', 'partial_deriv_plot\(']
+
 
 class EmbedCodeDirective(Directive):
-    """EmbedCodeDirective is a custom directive to allow blocks of
-     python code to be shown in feature docs.  An example usage would look like this:
+    """
+    EmbedCodeDirective is a custom directive to allow blocks of
+    python code to be shown in feature docs.  An example usage would look like this:
 
     .. embed-code::
         openmdao.test.whatever.method
@@ -54,23 +56,10 @@ class EmbedCodeDirective(Directive):
     def run(self):
         global _plot_count
 
+        #
+        # error checking
+        #
         allowed_layouts = set(['code', 'output', 'interleave', 'plot'])
-
-        path = self.arguments[0]
-        is_script = path.endswith('.py')
-
-        try:
-            source, indent, module, class_ = get_source_code(path)
-        except Exception as err:
-            # Generally means the source couldn't be inspected or imported. Raise as a Directive
-            # warning (level 2 in docutils).
-            # This way, the sphinx build does not terminate if, for example, you are building on
-            # an environment where mpi or pyoptsparse are missing.
-            raise self.directive_error(2, str(err))
-
-        is_test = class_ is not None and inspect.isclass(class_) and issubclass(class_, unittest.TestCase)
-        plotting_functions = ['\.show\(', 'partial_deriv_plot\(']
-        shows_plot = re.compile('|'.join(plotting_functions)).search(source)
 
         if 'layout' in self.options:
             layout = [s.strip() for s in self.options['layout'].split(',')]
@@ -79,15 +68,36 @@ class EmbedCodeDirective(Directive):
 
         if len(layout) > len(set(layout)):
             raise SphinxError("No duplicate layout entries allowed.")
+
         bad = [n for n in layout if n not in allowed_layouts]
         if bad:
             raise SphinxError("The following layout options are invalid: %s" % bad)
+
         if 'interleave' in layout and ('code' in layout or 'output' in layout):
             raise SphinxError("The interleave option is mutually exclusive to the code "
                               "and output options.")
 
-        remove_docstring = 'strip-docstrings' in self.options
-        do_run = 'output' in layout or 'interleave' in layout or 'plot' in layout
+        #
+        # Get the source code
+        #
+        path = self.arguments[0]
+        try:
+            source, indent, module, class_ = get_source_code(path)
+        except Exception as err:
+            # Generally means the source couldn't be inspected or imported.
+            # Raise as a Directive warning (level 2 in docutils).
+            # This way, the sphinx build does not terminate if, for example, you are building on
+            # an environment where mpi or pyoptsparse are missing.
+            raise self.directive_error(2, str(err))
+
+        #
+        # script, test and/or plot?
+        #
+        is_script = path.endswith('.py')
+
+        is_test = class_ is not None and inspect.isclass(class_) and issubclass(class_, unittest.TestCase)
+
+        shows_plot = re.compile('|'.join(plotting_functions)).search(source)
 
         if 'plot' in layout:
             plot_dir = os.getcwd()
@@ -99,8 +109,10 @@ class EmbedCodeDirective(Directive):
                 # remove any existing plot file
                 os.remove(plot_file_abs)
 
+        #
         # Modify the source prior to running
-        if remove_docstring:
+        #
+        if 'strip-docstrings' in self.options:
             source = remove_docstrings(source)
 
         if is_test:
@@ -122,21 +134,28 @@ class EmbedCodeDirective(Directive):
                 teardown_code = '' if method_name == 'tearDown' else dedent(strip_header(
                     remove_docstrings(inspect.getsource(getattr(class_, 'tearDown')))))
 
-                code_to_run = '\n'.join([self_code, setup_code, source, teardown_code])
+                # for interleaving, we need to mark input/output blocks
+                if 'interleave' in layout:
+                    source = insert_output_start_stop_indicators(source)
+
+                code_to_run = '\n'.join([self_code, setup_code, source, teardown_code]).strip()
             except Exception:
                 err = traceback.format_exc()
                 raise SphinxError("Problem with embed of " + path + ": \n" + str(err))
         else:
             if indent > 0:
                 source = dedent(source)
+            if 'interleave' in layout:
+                source = insert_output_start_stop_indicators(source)
             code_to_run = source[:]
 
-        if 'interleave' in layout:
-            code_to_run = insert_output_start_stop_indicators(code_to_run)
-
-        # Run the source (if necessary)
+        #
+        # Run the code (if necessary)
+        #
         skipped = failed = False
-        if do_run:
+
+        if 'output' in layout or 'interleave' in layout or 'plot' in layout:
+
             imports_not_required = 'imports-not-required' in self.options
 
             if shows_plot:
@@ -149,42 +168,37 @@ class EmbedCodeDirective(Directive):
                 if 'plot' in layout:
                     code_to_run = code_to_run + ('\nmatplotlib.pyplot.savefig("%s")' % plot_file_abs)
 
-                skipped, failed, run_outputs = \
-                    run_code(code_to_run, path, module=module, cls=class_,
-                             shows_plot=True, imports_not_required=imports_not_required)
-            else:
-                skipped, failed, run_outputs = \
-                    run_code(code_to_run, path, module=module, cls=class_,
-                             imports_not_required=imports_not_required)
+            skipped, failed, run_outputs = run_code(code_to_run, path, module=module, cls=class_,
+                                                    imports_not_required=imports_not_required,
+                                                    shows_plot=shows_plot)
 
+        #
+        # Handle output
+        #
         if failed:
             # Failed cases raised as a Directive warning (level 2 in docutils).
             # This way, the sphinx build does not terminate if, for example, you are building on
             # an environment where mpi or pyoptsparse are missing.
             raise self.directive_error(2, run_outputs)
-
         elif skipped:
             io_nodes = [get_skip_output_node(run_outputs)]
         else:
             if 'output' in layout:
                 output_blocks = run_outputs if isinstance(run_outputs, list) else [run_outputs]
+
             elif 'interleave' in layout:
                 if is_test:
-                    start = len(self_code) + len(setup_code) + 1
+                    start = len(self_code) + len(setup_code)
                     end = len(code_to_run) - len(teardown_code)
                     input_blocks = split_source_into_input_blocks(code_to_run[start:end])
                 else:
                     input_blocks = split_source_into_input_blocks(code_to_run)
+
                 output_blocks = extract_output_blocks(run_outputs)
 
-                # the last input block may not produce any output
-                if len(output_blocks) == len(input_blocks) - 1:
-                    output_blocks.append('')
-
-                # Need to deal with the cases when there is no output for a given input block
-                # Merge an input block with the previous block and throw away the output block
-                input_blocks, output_blocks = clean_up_empty_output_blocks(input_blocks,
-                                                                           output_blocks)
+                # Merge any input blocks for which there is no corresponding output
+                # with subsequent input blocks that do have output
+                input_blocks = consolidate_input_blocks(input_blocks, output_blocks)
 
             if 'plot' in layout:
                 if not os.path.isfile(plot_file_abs):
@@ -202,7 +216,9 @@ class EmbedCodeDirective(Directive):
                                     self.state_machine)
                 plot_nodes = fig.run()
 
+        #
         # create a list of document nodes to return based on layout
+        #
         doc_nodes = []
         skip_fail_shown = False
         for opt in layout:

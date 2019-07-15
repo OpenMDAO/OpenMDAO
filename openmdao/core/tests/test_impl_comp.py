@@ -155,20 +155,20 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
     def test_list_inputs_before_run(self):
-        msg = "Unable to list inputs until model has been run."
+        msg = "Group (<model>): Unable to list inputs until model has been run."
         try:
             self.prob.model.list_inputs()
         except Exception as err:
-            self.assertTrue(msg == str(err))
+            self.assertEqual(str(err), msg)
         else:
             self.fail("Exception expected")
 
     def test_list_outputs_before_run(self):
-        msg = "Unable to list outputs until model has been run."
+        msg = "Group (<model>): Unable to list outputs until model has been run."
         try:
             self.prob.model.list_outputs()
         except Exception as err:
-            self.assertTrue(msg == str(err))
+            self.assertEqual(str(err), msg)
         else:
             self.fail("Exception expected")
 
@@ -1097,6 +1097,7 @@ class ListFeatureTestCase(unittest.TestCase):
         prob.model.list_outputs(prom_name=True)
 
     def test_list_return_value(self):
+        # list inputs
         inputs = prob.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
             ('sub.comp2.a', {'value': [1.]}),
@@ -1116,14 +1117,14 @@ class ListFeatureTestCase(unittest.TestCase):
         ])
 
     def test_for_docs_list_no_values(self):
+        # list inputs
         inputs = prob.model.list_inputs(values=False)
-        print(inputs)
 
         # list only explicit outputs
         outputs = prob.model.list_outputs(implicit=False, values=False)
-        print(outputs)
 
     def test_list_no_values(self):
+        # list inputs
         inputs = prob.model.list_inputs(values=False)
         self.assertEqual([n[0] for n in sorted(inputs)], [
             'sub.comp2.a',
@@ -1198,7 +1199,6 @@ class ListFeatureTestCase(unittest.TestCase):
         group.connect('comp1.b', 'sub.comp3.b')
         group.connect('comp1.c', 'sub.comp3.c')
 
-        global prob
         prob = om.Problem(model=group)
         prob.setup()
 

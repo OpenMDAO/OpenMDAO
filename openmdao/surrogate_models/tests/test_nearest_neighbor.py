@@ -11,7 +11,7 @@ class TestNearestNeighbor(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             NearestNeighbor(interpolant_type='junk')
 
-        expected_msg = "Value ('junk') of option 'interpolant_type' is not one of " \
+        expected_msg = "NearestNeighbor: Value ('junk') of option 'interpolant_type' is not one of " \
                        "['linear', 'weighted', 'rbf']."
         self.assertEqual(expected_msg, str(cm.exception))
 

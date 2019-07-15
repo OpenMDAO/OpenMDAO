@@ -40,32 +40,32 @@ script that runs the model or a case recording file that was created when runnin
     the script will terminate after :code:`final_setup` and will not actually run the model.
 
 
-The :code:`openmdao view_model` command will generate an N2 diagram of the model that is
+The :code:`openmdao n2` command will generate an N2 diagram of the model that is
 viewable in a browser, for example:
 
 .. code-block:: none
 
-    openmdao view_model openmdao/test_suite/scripts/circuit_with_unconnected_input.py
+    openmdao n2 openmdao/test_suite/scripts/circuit_with_unconnected_input.py
 
 will generate an N2 diagram like the one below.
 
 .. embed-n2::
     ../test_suite/scripts/circuit_with_unconnected_input.py
 
-The :code:`openmdao view_model` has several options:
+The :code:`openmdao n2` has several options:
 
 .. embed-shell-cmd::
-    :cmd: openmdao view_model -h
+    :cmd: openmdao n2 -h
 
 
 From a Script
 -------------
 
-.. _script_view_model:
+.. _script_n2:
 
-You can do the same thing programmatically by calling the :code:`view_model` function.
+You can do the same thing programmatically by calling the :code:`n2` function.
 
-.. autofunction:: openmdao.devtools.problem_viewer.problem_viewer.view_model
+.. autofunction:: openmdao.devtools.problem_viewer.problem_viewer.n2
    :noindex:
 
 Notice that the data source can be either a :code:`Problem` or case recorder database containing
@@ -81,31 +81,28 @@ Problem as Data Source
 
     p.setup()
 
-    import openmdao.api as om
-    om.view_model(p)
+    om.n2(p)
 
 Case Recorder as Data Source
 ****************************
 
 .. code::
 
-    r = SqliteRecorder('circuit.sqlite')
+    r = om.SqliteRecorder('circuit.sqlite')
     p.driver.add_recorder(r)
 
     p.setup()
     p.final_setup()
     r.shutdown()
 
-    import openmdao.api as om
-
-    om.view_model('circuit.sqlite', outfile='circuit.html')
+    om.n2('circuit.sqlite', outfile='circuit.html')
 
 
 In the latter case, you could view the N2 diagram at a later time using the command:
 
 .. code-block:: none
 
-    openmdao view_model circuit.sqlite
+    openmdao n2 circuit.sqlite
 
 
 For more details on N2 diagrams, see the :ref:`N2 Details<n2_details>` section.

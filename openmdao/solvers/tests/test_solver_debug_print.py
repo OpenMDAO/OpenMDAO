@@ -105,7 +105,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         nl = model.circuit.nonlinear_solver = solver()
 
         nl.options['debug_print'] = True
-        nl.options['err_on_maxiter'] = True
+        nl.options['err_on_non_converge'] = True
 
         if name == 'NonlinearBlockGS':
             nl.options['use_apply_nonlinear'] = True
@@ -172,7 +172,7 @@ class TestNonlinearSolvers(unittest.TestCase):
 
         nl.options['iprint'] = 2
         nl.options['debug_print'] = True
-        nl.options['err_on_maxiter'] = True
+        nl.options['err_on_non_converge'] = True
 
         # set some poor initial guesses so that we don't converge
         p['circuit.n1.V'] = 10.
@@ -260,7 +260,7 @@ class TestNonlinearSolversIsolated(unittest.TestCase):
         self.assertTrue(target in output, msg=target + "NOT FOUND IN" + output)
 
         # Make sure exception is unchanged.
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
+        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust'."
         self.assertEqual(expected_msg, str(cm.exception))
 
 

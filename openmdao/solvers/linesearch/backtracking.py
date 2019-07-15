@@ -91,7 +91,8 @@ class BoundsEnforceLS(NonlinearSolver):
         opt.undeclare("atol")
         opt.undeclare("rtol")
         opt.undeclare("maxiter")
-        opt.undeclare("err_on_maxiter")
+        opt.undeclare("err_on_maxiter")    # Deprecated option.
+        opt.undeclare("err_on_non_converge")
 
     def _solve(self):
         """

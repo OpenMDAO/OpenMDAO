@@ -112,7 +112,7 @@ class Driver(object):
         self._responses = None
 
         # Driver options
-        self.options = OptionsDictionary()
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.options.declare('debug_print', types=list, check_valid=_check_debug_print_opts_valid,
                              desc="List of what type of Driver variables to print at each "
@@ -121,7 +121,7 @@ class Driver(object):
                              default=[])
 
         # Case recording options
-        self.recording_options = OptionsDictionary()
+        self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.recording_options.declare('record_model_metadata', types=bool, default=True,
                                        desc='Record metadata for all Systems in the model')
@@ -147,7 +147,7 @@ class Driver(object):
                                        desc='Set to True to record inputs at the driver level')
 
         # What the driver supports.
-        self.supports = OptionsDictionary()
+        self.supports = OptionsDictionary(parent_name=type(self).__name__)
         self.supports.declare('inequality_constraints', types=bool, default=False)
         self.supports.declare('equality_constraints', types=bool, default=False)
         self.supports.declare('linear_constraints', types=bool, default=False)
@@ -162,14 +162,9 @@ class Driver(object):
         self.iter_count = 0
         self.cite = ""
 
-        self._coloring_info = {
-            'coloring': None,
-            'show_summary': True,
-            'show_sparsity': False,
-            'tol': 1e-15,
-            'orders': 20,
-            'num_full_jacs': 3,
-        }
+        self._coloring_info = coloring_mod._DEF_COMP_SPARSITY_ARGS.copy()
+        self._coloring_info['coloring'] = None
+
         self._total_jac_sparsity = None
         self._res_jacs = {}
         self._total_jac = None
@@ -178,6 +173,18 @@ class Driver(object):
 
         self._declare_options()
         self.options.update(kwargs)
+
+    @property
+    def msginfo(self):
+        """
+        Return info to prepend to messages.
+
+        Returns
+        -------
+        str
+            Info to prepend to messages.
+        """
+        return type(self).__name__
 
     def add_recorder(self, recorder):
         """

@@ -233,18 +233,24 @@ def _get_viewer_data(data_source):
 
     scc = nx.strongly_connected_components(G)
 
-    seen = set()
     for strong_comp in scc:
         if len(strong_comp) > 1:
-            strongset = set(strong_comp)
+            # these IDs are only used when back edges are present
             sys_pathnames_list.extend(strong_comp)
             for name in strong_comp:
                 sys_pathnames_dict[name] = len(sys_pathnames_dict)
 
-            edge_orders = [(u, orders[u], v, orders[v]) for u, v in G.edges(strong_comp)
-                           if u in strongset and v in strongset]
+        for src, tgt in G.edges(strong_comp):
+            if src in strong_comp and tgt in strong_comp:
+                if src in orders:
+                    exe_src = orders[src]
+                else:
+                    exe_src = orders[src] = -1
+                if tgt in orders:
+                    exe_tgt = orders[tgt]
+                else:
+                    exe_tgt = orders[tgt] = -1
 
-            for src, exe_src, tgt, exe_tgt in edge_orders:
                 if exe_tgt < exe_src:
                     exe_low = exe_tgt
                     exe_high = exe_src
@@ -252,34 +258,20 @@ def _get_viewer_data(data_source):
                     exe_low = exe_src
                     exe_high = exe_tgt
 
-                edges_list = [(sys_pathnames_dict[s], sys_pathnames_dict[t])
-                              for s, order_s, t, order_t in edge_orders
-                              if exe_low <= order_s <= exe_high
-                              and exe_low <= order_t <= exe_high and not (s == src and t == tgt)]
-
-                if edges_list:
-                    for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
-                        for vtgt in vtgtlist:
-                            conn = (vsrc, vtgt)
-                            if conn not in seen:
-                                connections_list.append({'src': vsrc, 'tgt': vtgt,
-                                                         'cycle_arrows': edges_list})
-                                seen.add(conn)
-                else:
-                    for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
-                        for vtgt in vtgtlist:
-                            conn = (vsrc, vtgt)
-                            if conn not in seen:
-                                connections_list.append({'src': vsrc, 'tgt': vtgt})
-                                seen.add(conn)
-        else:
-            for edge in chain(G.edges(strong_comp), G.in_edges(strong_comp)):
-                for vsrc, vtgtlist in iteritems(G.get_edge_data(edge[0], edge[1])['conns']):
+                edges_list = [
+                    (sys_pathnames_dict[s], sys_pathnames_dict[t]) for s, t in G.edges(strong_comp)
+                    if s in orders and exe_low <= orders[s] <= exe_high and t in orders and
+                        exe_low <= orders[t] <= exe_high and
+                        not (s == src and t == tgt) and t in sys_pathnames_dict
+                ]
+                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
                     for vtgt in vtgtlist:
-                        conn = (vsrc, vtgt)
-                        if conn not in seen:
-                            connections_list.append({'src': vsrc, 'tgt': vtgt})
-                            seen.add(conn)
+                        connections_list.append({'src': vsrc, 'tgt': vtgt,
+                                                 'cycle_arrows': edges_list})
+            else:  # edge is out of the SCC
+                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                    for vtgt in vtgtlist:
+                        connections_list.append({'src': vsrc, 'tgt': vtgt})
 
     data_dict['sys_pathnames_list'] = sys_pathnames_list
     data_dict['connections_list'] = connections_list
@@ -297,14 +289,22 @@ def _get_viewer_data(data_source):
 
 def view_tree(*args, **kwargs):
     """
-    view_tree was renamed to view_model, but left here for backwards compatibility
+    view_tree was renamed to n2, but left here for backwards compatibility
     """
-    warn_deprecation("view_tree is deprecated. Please switch to view_model.")
-    view_model(*args, **kwargs)
+    warn_deprecation("view_tree is deprecated. Please switch to n2.")
+    n2(*args, **kwargs)
 
 
-def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=False,
-               title=None, use_declare_partial_info=False):
+def view_model(*args, **kwargs):
+    """
+    view_model was renamed to n2, but left here for backwards compatibility
+    """
+    warn_deprecation("view_model is deprecated. Please switch to n2.")
+    n2(*args, **kwargs)
+
+
+def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
+       title=None, use_declare_partial_info=False):
     """
     Generates an HTML file containing a tree viewer.
 
@@ -335,6 +335,10 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
         is assumed.
 
     """
+    # if MPI is active only display one copy of the viewer
+    if MPI and MPI.COMM_WORLD.rank != 0:
+        return
+
     # grab the model viewer data
     model_data = _get_viewer_data(data_source)
     options = {}
@@ -343,9 +347,6 @@ def view_model(data_source, outfile='n2.html', show_browser=True, embeddable=Fal
 
     model_data = 'var modelData = %s' % json.dumps(model_data, default=make_serializable)
 
-    # if MPI is active only display one copy of the viewer
-    if MPI and MPI.COMM_WORLD.rank != 0:
-        return
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
     vis_dir = os.path.join(code_dir, "visualization")

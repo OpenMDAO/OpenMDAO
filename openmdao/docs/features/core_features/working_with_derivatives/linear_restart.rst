@@ -9,8 +9,10 @@ Restarting Linear Solutions for Expensive Linear Solves
 .. note that components that implement their own solve linear are responsible for their own restart!
 .. Tell them where to find the restart vector in reverse and forward modes
 
-When using iterative linear solvers, it is often desirable to use the converged solution from a previous linear solve as the initial guess for the current one.
-There is some memory cost associated with this feature, because the solution for each quantity of interest will be saved separately.
+When using iterative linear solvers, it is often desirable to use the converged solution from a
+previous linear solve as the initial guess for the current one.
+There is some memory cost associated with this feature, because the solution for each quantity of
+interest will be saved separately.
 However, the benefit is reduced computational cost for the subsequent linear solves.
 
 .. note::
@@ -18,11 +20,13 @@ However, the benefit is reduced computational cost for the subsequent linear sol
     This feature should not be used when using the :ref:`DirectSolver<directsolver>` at the top level of your model.
     It won't offer any computational savings in that situation.
 
-To use this feature, provide :code:`cache_linear_solution=True` as an argument to :ref:`add_design_var()<feature_add_design_var>`,
+To use this feature, provide :code:`cache_linear_solution=True` as an argument to
+:ref:`add_design_var()<feature_add_design_var>`,
 :ref:`add_objective()<feature_add_objective>`, or :ref:`add_constraint()<feature_add_constraint>`.
 
-If you are using one of the OpenMDAO iterative solvers (:ref:`ScipyKrylov<scipyiterativesolver>`, :ref:`PETScKrylov<petscKrylov>`,
-:ref:`LinearBlockGS<linearblockgs>`, or :ref:`LinearBlockJac<linearblockjac>`), then simply adding that argument is enough to activate this feature.
+If you are using one of the OpenMDAO iterative solvers (:ref:`ScipyKrylov<scipyiterativesolver>`,
+:ref:`PETScKrylov<petscKrylov>`, :ref:`LinearBlockGS<linearblockgs>`, or :ref:`LinearBlockJac<linearblockjac>`),
+then simply adding that argument is enough to activate this feature.
 
 If you have implemented the :code:`solve_linear()` method for an :ref:`ImplicitComponent<comp-type-3-implicitcomp>`,
 then you will need to make sure to use the provided guess solution in your implementation.
@@ -38,3 +42,12 @@ The restart is passed in via the :code:`x0` argument to gmres.
     openmdao.core.tests.test_feature_cache_linear_solution.CacheLinearTestCase.test_feature_cache_linear
     :layout: code, output
 
+
+.. note::
+
+    In the example shown above, the model is solving for derivatives in 'fwd' mode, specified
+    by `p.setup(mode='fwd')`.  In that case the `cache_linear_solution` arg may be passed when adding
+    design variables as shown above with `p.model.add_design_var('a', cache_linear_solution=True)`.
+    However, if the model were to solve for derivatives in 'rev' mode instead, then
+    the `cache_linear_solution` arg would be applied to the objective and/or the constraint variables.
+    For example, `p.model.add_constraint('states', upper=10, cache_linear_solution=True)`.

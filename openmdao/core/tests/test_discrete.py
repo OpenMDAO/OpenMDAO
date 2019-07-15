@@ -353,7 +353,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+                         "Group (<model>): Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_to_float_error(self):
         prob = om.Problem()
@@ -368,7 +368,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+                         "Group (<model>): Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_mismatch_error(self):
         prob = om.Problem()
@@ -383,7 +383,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+                         "Group (<model>): Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
 
     def test_driver_discrete_enforce_int(self):
         # Drivers require discrete vars to be int or ndarrays of int.
@@ -562,7 +562,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(ctx.exception),
-                         "System '' has a NewtonSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
+                         "Group (<model>) has a NewtonSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
 
     def test_discrete_err_broyden(self):
         prob = self._setup_model(om.BroydenSolver)
@@ -571,7 +571,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(ctx.exception),
-                         "System '' has a BroydenSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
+                         "Group (<model>) has a BroydenSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
 
 
 class DiscretePromTestCase(unittest.TestCase):
@@ -655,7 +655,7 @@ class DiscretePromTestCase(unittest.TestCase):
             else:
                 yield name
 
-        # add a test to see if discrete vars show up in view_model
+        # add a test to see if discrete vars show up in n2
         data = _get_viewer_data(prob)
         findvars = [
             'indep.x',

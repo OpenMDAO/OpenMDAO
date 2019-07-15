@@ -704,14 +704,14 @@ class TestGroupFiniteDifference(unittest.TestCase):
                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
         indeps.add_output('r', .7)
 
-        arctan_yox = om.ExecComp('g=arctan(y/x)', vectorize=True,
+        arctan_yox = om.ExecComp('g=arctan(y/x)', has_diag_partials=True,
                                  g=np.ones(10), x=np.ones(10), y=np.ones(10))
 
         p.model.add_subsystem('arctan_yox', arctan_yox)
 
         p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
                                                    g=np.ones(10), x=np.ones(10), y=np.ones(10)))
 
         p.model.connect('r', ('circle.r', 'r_con.r'))
@@ -756,25 +756,25 @@ class TestGroupFiniteDifference(unittest.TestCase):
                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
         indeps.add_output('r', .7)
 
-        arctan_yox = om.ExecComp('g=arctan(y/x)', vectorize=True,
+        arctan_yox = om.ExecComp('g=arctan(y/x)', has_diag_partials=True,
                                  g=np.ones(10), x=np.ones(10), y=np.ones(10))
 
         p.model.add_subsystem('arctan_yox', arctan_yox)
 
         p.model.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
-        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', vectorize=True,
+        p.model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
                                                    g=np.ones(10), x=np.ones(10), y=np.ones(10)))
 
         thetas = np.linspace(0, np.pi/4, 10)
-        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', vectorize=True,
+        p.model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
                                                        g=np.ones(10), x=np.ones(10),
                                                        theta=thetas))
-        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', vectorize=True,
+        p.model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
                                                              g=np.ones(10//2), even=np.ones(10//2),
                                                              odd=np.ones(10//2)))
 
-        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', vectorize=True, g=np.ones(10), x=np.ones(10)))
+        p.model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(10), x=np.ones(10)))
 
         IND = np.arange(10, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
@@ -1884,7 +1884,7 @@ class TestComponentComplexStep(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             model.resetup(setup_mode='reconf')
 
-        msg = "In order to activate complex step during reconfiguration, " \
+        msg = "TestImplCompArrayDense (sub.comp): In order to activate complex step during reconfiguration, " \
               "you need to set 'force_alloc_complex' to True during setup. " \
               "e.g. 'problem.setup(force_alloc_complex=True)'"
         self.assertEqual(str(context.exception), msg)

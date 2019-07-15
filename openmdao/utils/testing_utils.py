@@ -1,13 +1,11 @@
 """Define utils for use in testing."""
 
-import os
-import shutil
-import tempfile
-
-from openmdao.utils.mpi import MPI
-
 
 def _new_setup(self):
+    import os
+    import tempfile
+
+    from openmdao.utils.mpi import MPI
     self.startdir = os.getcwd()
     if MPI is None:
         self.tempdir = tempfile.mkdtemp(prefix='testdir-')
@@ -23,6 +21,10 @@ def _new_setup(self):
 
 
 def _new_teardown(self):
+    import os
+    import shutil
+
+    from openmdao.utils.mpi import MPI
     if hasattr(self, 'original_tearDown'):
         self.original_tearDown()
 
