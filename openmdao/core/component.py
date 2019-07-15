@@ -19,7 +19,7 @@ from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, find_matches, simple_warning
+    warn_deprecation, find_matches, simple_warning, convert_user_defined_tags_to_set
 import openmdao.utils.coloring as coloring_mod
 
 
@@ -478,7 +478,7 @@ class Component(System):
             raise ValueError("The units '%s' are invalid" % units)
 
         if tags is not None and not isinstance(tags, (str, list)):
-            raise TypeError('The tags argument should be a str, list, or tuple')
+            raise TypeError('The tags argument should be a str or list')
 
         metadata = {}
 
@@ -498,9 +498,7 @@ class Component(System):
         metadata['desc'] = desc
         metadata['distributed'] = self.options['distributed']
 
-        if isinstance(tags, str):
-            tags = [tags, ]
-        metadata['tags'] = tags
+        metadata['tags'] = convert_user_defined_tags_to_set(tags)
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -549,10 +547,9 @@ class Component(System):
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid input name." % name)
         if tags is not None and not isinstance(tags, (str, list)):
-            raise TypeError('The tags argument should be a str, list, or tuple')
+            raise TypeError('The tags argument should be a str or list')
 
-        if isinstance(tags, str):
-            tags = [tags, ]
+        tags = convert_user_defined_tags_to_set(tags)
 
         metadata = {
             'value': val,
@@ -616,7 +613,7 @@ class Component(System):
         res_ref : float or ndarray
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is 1.
-        tags : str or list of strs
+        tags : str or list of strs or set of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
 
@@ -664,8 +661,8 @@ class Component(System):
         if units is not None and not valid_units(units):
             raise ValueError("The units '%s' are invalid" % units)
 
-        if tags is not None and not isinstance(tags, (str, list)):
-            raise TypeError('The tags argument should be a str, list, or tuple')
+        if tags is not None and not isinstance(tags, (str, set, list)):
+            raise TypeError('The tags argument should be a str, set, or list')
 
         metadata = {}
 
@@ -725,9 +722,7 @@ class Component(System):
 
         metadata['distributed'] = self.options['distributed']
 
-        if isinstance(tags, str):
-            tags = [tags, ]
-        metadata['tags'] = tags
+        metadata['tags'] = convert_user_defined_tags_to_set(tags)
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -759,7 +754,7 @@ class Component(System):
             The initial value of the variable being added.
         desc : str
             description of the variable.
-        tags : str or list of strs
+        tags : str or list of strs or set of strs
             User defined tags that can be used to filter what gets listed when calling
             list_inputs and list_outputs.
 
@@ -774,11 +769,10 @@ class Component(System):
             raise NameError('The name argument should be a non-empty string.')
         if not _valid_var_name(name):
             raise NameError("'%s' is not a valid output name." % name)
-        if tags is not None and not isinstance(tags, (str, list)):
-            raise TypeError('The tags argument should be a str, list, or tuple')
+        if tags is not None and not isinstance(tags, (str, set, list)):
+            raise TypeError('The tags argument should be a str, set, or list')
 
-        if isinstance(tags, str):
-            tags = [tags, ]
+        tags = convert_user_defined_tags_to_set(tags)
 
         metadata = {
             'value': val,
