@@ -2133,10 +2133,18 @@ class Group(System):
         # add all systems as nodes in the graph so they'll be there even if
         # unconnected.
         if comps_only:
-            graph.add_nodes_from(s.pathname for s in
-                                 self.system_iter(recurse=True, typ=Component))
+            systems = [s.pathname for s in self.system_iter(recurse=True, typ=Component)]
         else:
-            graph.add_nodes_from(s.pathname for s in self._subsystems_allprocs)
+            systems = [s.pathname for s in self._subsystems_myproc]
+
+        if MPI:
+            sysbyproc = self.comm.allgather(systems)
+
+            systems = set()
+            for slist in sysbyproc:
+                systems.update(slist)
+
+        graph.add_nodes_from(systems)
 
         edge_data = defaultdict(lambda: defaultdict(list))
 

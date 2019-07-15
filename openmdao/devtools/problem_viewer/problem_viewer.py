@@ -242,8 +242,15 @@ def _get_viewer_data(data_source):
 
         for src, tgt in G.edges(strong_comp):
             if src in strong_comp and tgt in strong_comp:
-                exe_src = orders[src]
-                exe_tgt = orders[tgt]
+                if src in orders:
+                    exe_src = orders[src]
+                else:
+                    exe_src = orders[src] = -1
+                if tgt in orders:
+                    exe_tgt = orders[tgt]
+                else:
+                    exe_tgt = orders[tgt] = -1
+
                 if exe_tgt < exe_src:
                     exe_low = exe_tgt
                     exe_high = exe_src
@@ -253,8 +260,9 @@ def _get_viewer_data(data_source):
 
                 edges_list = [
                     (sys_pathnames_dict[s], sys_pathnames_dict[t]) for s, t in G.edges(strong_comp)
-                    if exe_low <= orders[s] <= exe_high and exe_low <= orders[t] <= exe_high and
-                            not (s == src and t == tgt) and t in sys_pathnames_dict
+                    if s in orders and exe_low <= orders[s] <= exe_high and t in orders and
+                        exe_low <= orders[t] <= exe_high and
+                        not (s == src and t == tgt) and t in sys_pathnames_dict
                 ]
                 for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
                     for vtgt in vtgtlist:
@@ -327,6 +335,10 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         is assumed.
 
     """
+    # if MPI is active only display one copy of the viewer
+    if MPI and MPI.COMM_WORLD.rank != 0:
+        return
+
     # grab the model viewer data
     model_data = _get_viewer_data(data_source)
     options = {}
@@ -335,9 +347,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     model_data = 'var modelData = %s' % json.dumps(model_data, default=make_serializable)
 
-    # if MPI is active only display one copy of the viewer
-    if MPI and MPI.COMM_WORLD.rank != 0:
-        return
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
     vis_dir = os.path.join(code_dir, "visualization")

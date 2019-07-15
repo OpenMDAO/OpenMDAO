@@ -19,7 +19,8 @@ except ImportError:
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
-
+from openmdao.utils.logger_utils import TestLogger
+from openmdao.error_checking.check_config import _check_hanging_inputs
 
 class SimpleGroup(om.Group):
 
@@ -202,6 +203,52 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p['comp1.b'], 6.0)
         self.assertEqual(p['comp2.b'], 9.0)
+
+    def test_double_promote_conns(self):
+        p = om.Problem()
+        gouter = p.model.add_subsystem('gouter', om.Group())
+        gouter.add_subsystem('couter', om.ExecComp('xx = a * 3.'), promotes_outputs=['xx'])
+        g = gouter.add_subsystem('g', om.Group(), promotes_inputs=[('x', 'xx')])
+        g.add_subsystem('ivc', om.IndepVarComp('x', 2.), promotes_outputs=['x'])
+        g.add_subsystem('c0', om.ExecComp('y = 2*x'), promotes_inputs=['x'])
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(str(cm.exception),
+                         "Group (gouter): The following inputs have multiple connections: gouter.g.c0.x from ['gouter.couter.xx', 'gouter.g.ivc.x']")
+
+    def test_double_promote_one_conn(self):
+        p = om.Problem()
+        gouter = p.model.add_subsystem('gouter', om.Group())
+        gouter.add_subsystem('couter', om.ExecComp('xx = a * 3.'))
+        g = gouter.add_subsystem('g', om.Group(), promotes_inputs=[('x', 'xx')])
+        g.add_subsystem('ivc', om.IndepVarComp('x', 2.), promotes_outputs=['x'])
+        g.add_subsystem('c0', om.ExecComp('y = 2*x'), promotes_inputs=['x'])
+
+        p.setup()
+
+        self.assertEqual(p.model._conn_global_abs_in2out['gouter.g.c0.x'], 'gouter.g.ivc.x')
+
+    def test_check_unconn_inputs_w_promote_rename(self):
+        p = om.Problem()
+        gouter = p.model.add_subsystem('gouter', om.Group())
+        gouter.add_subsystem('couter', om.ExecComp('xx = a * 3.'))
+        g = gouter.add_subsystem('g', om.Group(), promotes_inputs=['xx'])
+        g.add_subsystem('ivc', om.IndepVarComp('x', 2.), promotes_outputs=['x'])
+        g.add_subsystem('c0', om.ExecComp('y = 2*x'), promotes_inputs=[('x', 'xx')])
+
+        p.setup()
+
+        logger = TestLogger()
+        _check_hanging_inputs(p, logger)
+        for w in logger.get('warning'):
+            if 'The following inputs are not connected:' in w:
+                if "gouter.couter.a" in w and "gouter.xx: ['gouter.g.c0.x']" in w:
+                    break
+        else:
+            self.fail("Expected warning not found.")
+        self.assertEqual(p.model._conn_global_abs_in2out, {})
 
     def test_subsys_attributes(self):
         p = om.Problem()
