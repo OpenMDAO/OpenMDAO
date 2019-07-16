@@ -801,6 +801,68 @@ class TestExecComp(unittest.TestCase):
 
         assert_almost_equal(J, np.eye(5)*3., decimal=6)
 
+    def test_tags(self):
+        prob = om.Problem(model=om.Group())
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 100.0, units='cm'))
+        C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x+z+1.',
+                                                     x={'value': 1.0, 'units': 'm', 'tags': 'tagx'},
+                                                     y={'units': 'm', 'tags': ['tagy','tagq']},
+                                                     z={'value': 2.0, 'tags': 'tagz'},
+                                                     ))
+        prob.model.connect('indep.x', 'C1.x')
+
+        prob.setup(check=False)
+
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        # Inputs no tags
+        inputs = prob.model.list_inputs(values=False, out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('C1.x', {}),
+            ('C1.z', {}),
+        ])
+
+        # Inputs with tags
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tagx")
+        self.assertEqual(sorted(inputs), [
+            ('C1.x', {}),
+        ])
+
+        # Inputs with multiple tags
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags=["tagx", "tagz"])
+        self.assertEqual(sorted(inputs), [
+            ('C1.x', {}),
+            ('C1.z', {}),
+        ])
+
+        # Inputs with tag that does not match
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag_wrong")
+        self.assertEqual(sorted(inputs), [])
+
+        # Outputs no tags
+        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('C1.y', {}),
+            ('indep.x', {}),
+        ])
+
+        # Outputs with tags
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tagy")
+        self.assertEqual(sorted(outputs), [
+            ('C1.y', {}),
+        ])
+
+        # Outputs with multiple tags
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags=["tagy", "tagx"])
+        self.assertEqual(sorted(outputs), [
+            ('C1.y', {}),
+        ])
+
+        # Outputs with tag that does not match
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag_wrong")
+        self.assertEqual(sorted(outputs), [])
+
     def test_feature_has_diag_partials(self):
         import numpy as np
         import openmdao.api as om

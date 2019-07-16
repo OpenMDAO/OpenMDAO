@@ -7,7 +7,7 @@ import collections
 from six import string_types
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, convert_user_defined_tags_to_set
 
 
 class IndepVarComp(ExplicitComponent):
@@ -47,6 +47,15 @@ class IndepVarComp(ExplicitComponent):
         self._indep = []
         self._indep_external = []
         self._indep_external_discrete = []
+
+        if 'tags' not in kwargs:
+            kwargs['tags'] = set()
+        else:
+            if not isinstance(kwargs['tags'], (str, set, list)):
+                raise TypeError('The tags argument should be a str, set, or list')
+
+        kwargs['tags'] = convert_user_defined_tags_to_set(kwargs['tags'])
+        kwargs['tags'].add('indep_var')  # Tag all indep var comps this way
 
         # A single variable is declared during instantiation
         if isinstance(name, string_types):
@@ -101,7 +110,7 @@ class IndepVarComp(ExplicitComponent):
                                "afterwards.".format(self.msginfo))
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None):
+                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
         """
         Add an independent variable to this component.
 
@@ -142,16 +151,26 @@ class IndepVarComp(ExplicitComponent):
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_outputs.
         """
         if res_ref is None:
             res_ref = ref
 
+        if tags is not None and not isinstance(tags, (str, list)):
+            raise TypeError('The tags argument should be a str or list')
+
+        tags = convert_user_defined_tags_to_set(tags)
+        tags.add('indep_var')
+
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
-                  'res_ref': res_ref}
+                  'res_ref': res_ref, 'tags': tags
+                  }
         self._indep_external.append((name, val, kwargs))
 
-    def add_discrete_output(self, name, val, desc=''):
+    def add_discrete_output(self, name, val, desc='', tags=None):
         """
         Add an output variable to the component.
 
@@ -163,8 +182,16 @@ class IndepVarComp(ExplicitComponent):
             The initial value of the variable being added in user-defined units. Default is 1.0.
         desc : str
             description of the variable.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed when calling
+            list_outputs.
         """
-        kwargs = {'desc': desc}
+        if tags is not None and not isinstance(tags, (str, list)):
+            raise TypeError('The tags argument should be a str or list')
+
+        tags = convert_user_defined_tags_to_set(tags)
+
+        kwargs = {'desc': desc, 'tags': tags}
         self._indep_external_discrete.append((name, val, kwargs))
 
     def _linearize(self, jac=None, sub_do_ln=False):

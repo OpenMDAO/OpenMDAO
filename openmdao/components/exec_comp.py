@@ -18,7 +18,7 @@ VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
 # Names of metadata entries allowed for ExecComp variables.
 _allowed_meta = {'value', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
-                 'flat_src_indices'}
+                 'flat_src_indices', 'tags'}
 
 # Names that are not allowed for input or output variables (keywords for options)
 _disallowed_names = {'has_diag_partials', 'vectorize', 'units', 'shape'}

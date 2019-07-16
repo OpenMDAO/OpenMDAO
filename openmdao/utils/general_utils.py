@@ -764,3 +764,54 @@ def make_serializable(o):
         return make_serializable(o.__class__.__name__)
     else:
         return o
+
+
+def filter_var_based_on_tags(filtering_tags, var_metadata):
+    """
+    Given the tags to filter on, and the metadata of the var, determine if it should be filtered.
+
+    Parameters
+    ----------
+    filtering_tags : str or list of strs
+        User defined tags that can be used to filter what gets listed. Only inputs with the
+        given tags will be listed.
+    var_metadata : dict
+        Dict of metadata about the var.
+
+    Returns
+    -------
+    bool
+        True if the var should be filtered and therefore not listed.
+    """
+    if filtering_tags:
+        var_tags = var_metadata['tags']
+        if not var_tags:
+            return True
+        if not (set(filtering_tags) & var_tags):
+            return True
+
+    return False
+
+
+def convert_user_defined_tags_to_set(tags):
+    """
+    Convert user defined tag which could be None, str, or list to a set.
+
+    Parameters
+    ----------
+    tags : None, str, or list of strs
+        User defined tags that can be used to filter what gets listed.
+
+    Returns
+    -------
+    set
+        True if the var should be filtered and therefore not listed.
+    """
+    if not tags:
+        return set()
+    elif isinstance(tags, str):
+        return {tags}
+    elif isinstance(tags, set):
+        return tags
+    else:  # must be str
+        return set(tags)

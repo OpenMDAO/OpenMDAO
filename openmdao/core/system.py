@@ -28,6 +28,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.general_utils import filter_var_based_on_tags, convert_user_defined_tags_to_set
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -2950,6 +2951,7 @@ class System(object):
                     shape=False,
                     hierarchical=True,
                     print_arrays=False,
+                    tags=None,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
@@ -2977,6 +2979,10 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed. Only inputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -2993,7 +2999,22 @@ class System(object):
         meta = self._var_abs2meta
         inputs = []
 
+        tags = convert_user_defined_tags_to_set(tags)
+        # if isinstance(tags, str):
+        #     tags = [tags, ]
+
         for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
+
+            # Filter based on tags
+            if filter_var_based_on_tags(tags, meta[var_name]):
+                continue
+            # if tags:
+            #     var_tags = meta[var_name]['tags']
+            #     if not var_tags:
+            #         continue
+            #     if not (set(tags) & set(var_tags)):
+            #         continue
+
             var_meta = {}
             if values:
                 var_meta['value'] = val
@@ -3008,6 +3029,18 @@ class System(object):
 
         if self._discrete_inputs:
             for var_name, val in iteritems(self._discrete_inputs):
+
+                # Filter based on tags
+                if filter_var_based_on_tags(tags, self._discrete_inputs._dict[var_name]):
+                    continue
+                #
+                # if tags:
+                #     var_tags = self._discrete_inputs._dict[var_name]['tags']
+                #     if not var_tags:
+                #         continue
+                #     if not (set(tags) & set(var_tags)):
+                #         continue
+
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
@@ -3041,6 +3074,7 @@ class System(object):
                      scaling=False,
                      hierarchical=True,
                      print_arrays=False,
+                     tags=None,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -3082,6 +3116,10 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed. Only outputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3099,11 +3137,18 @@ class System(object):
         meta = self._var_abs2meta  # This only includes metadata for this process.
         states = self._list_states()
 
+        tags = convert_user_defined_tags_to_set(tags)
+
         # Go though the hierarchy. Printing Systems
         # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
         for var_name, val in iteritems(self._outputs._views):
+
+            # Filter based on tags
+            if filter_var_based_on_tags(tags, meta[var_name]):
+                continue
+
             if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
                 continue
 
@@ -3133,6 +3178,10 @@ class System(object):
 
         if self._discrete_outputs and not residuals_tol:
             for var_name, val in iteritems(self._discrete_outputs):
+                # Filter based on tags
+                if filter_var_based_on_tags(tags, self._discrete_outputs._dict[var_name]):
+                    continue
+
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
