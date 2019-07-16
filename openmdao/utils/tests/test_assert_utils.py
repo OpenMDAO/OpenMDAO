@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp, DirectSolver
+import openmdao.api as om
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -13,11 +13,8 @@ from openmdao.utils.assert_utils import assert_check_partials, assert_no_approx_
 class TestAssertUtils(unittest.TestCase):
 
     def test_assert_check_partials_no_exception_expected(self):
-        import numpy as np
-        from openmdao.api import Problem, ExplicitComponent
-        from openmdao.utils.assert_utils import assert_check_partials
 
-        class MyComp(ExplicitComponent):
+        class MyComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -35,7 +32,7 @@ class TestAssertUtils(unittest.TestCase):
                 J['y', 'x1'] = np.array([3.0])
                 J['y', 'x2'] = np.array([4.0])
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = MyComp()
 
         prob.set_solver_print(level=0)
@@ -48,7 +45,8 @@ class TestAssertUtils(unittest.TestCase):
         assert_check_partials(data, atol, rtol)
 
     def test_assert_check_partials_exception_expected(self):
-        class MyComp(ExplicitComponent):
+
+        class MyComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
                 self.add_input('x2', 5.0)
@@ -66,7 +64,7 @@ class TestAssertUtils(unittest.TestCase):
                 J['y', 'x1'] = np.array([4.0])
                 J['y', 'x2'] = np.array([40])
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = MyComp()
 
         prob.set_solver_print(level=0)
@@ -97,9 +95,11 @@ class TestAssertUtils(unittest.TestCase):
             self.fail('Exception expected.')
 
     def test_feature_assert_check_partials_exception_expected(self):
+
         import numpy as np
         import openmdao.api as om
         from openmdao.utils.assert_utils import assert_check_partials
+
         class MyComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x1', 3.0)
@@ -138,7 +138,7 @@ class TestAssertUtils(unittest.TestCase):
 
     def test_assert_no_approx_partials_exception_expected(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarNoDerivativesCS()
 
         prob.setup()
@@ -160,7 +160,7 @@ class TestAssertUtils(unittest.TestCase):
 
     def test_assert_no_approx_partials_exception_not_expected(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = DoubleSellar()
 
         prob.setup()
@@ -169,7 +169,7 @@ class TestAssertUtils(unittest.TestCase):
 
     def test_assert_no_dict_jacobians_exception_expected(self):
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model = SellarNoDerivativesCS()
 
         prob.setup()
@@ -186,8 +186,8 @@ class TestAssertUtils(unittest.TestCase):
 
     def test_assert_no_dict_jacobians_exception_not_expected(self):
 
-        model = Group(assembled_jac_type='dense')
-        ivc = IndepVarComp()
+        model = om.Group(assembled_jac_type='dense')
+        ivc = om.IndepVarComp()
         ivc.add_output('x', 3.0)
         ivc.add_output('y', -4.0)
         model.add_subsystem('des_vars', ivc)
@@ -196,9 +196,54 @@ class TestAssertUtils(unittest.TestCase):
         model.connect('des_vars.x', 'parab_comp.x')
         model.connect('des_vars.y', 'parab_comp.y')
 
-        prob = Problem(model)
-        prob.model.linear_solver = DirectSolver(assemble_jac=True)
+        prob = om.Problem(model)
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
 
         prob.setup()
 
         assert_no_dict_jacobians(prob.model, include_self=True, recurse=True)
+
+    def test_assert_check_partials_nan(self):
+        # Due to a bug, this case passed the assert when it should not have.
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', 3.0)
+
+                self.add_output('y', 5.5)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def compute(self, inputs, outputs):
+                # Introduce an error.
+                outputs['y'] = 3.0 * inputs['x']
+
+            def compute_partials(self, inputs, partials):
+                partials['y', 'x'] = np.nan
+
+        prob = om.Problem()
+        prob.model = MyComp()
+
+        prob.set_solver_print(level=0)
+
+        prob.setup()
+        prob.run_model()
+
+        data = prob.check_partials(out_stream=None)
+
+        atol = 1.e-6
+        rtol = 1.e-6
+
+        try:
+            assert_check_partials(data, atol, rtol)
+        except ValueError as err:
+            err_string = str(err)
+            self.assertEqual(err_string.count('Assert Check Partials failed for the following Components'), 1)
+            self.assertEqual(err_string.count('fwd-fd'), 1)
+            self.assertEqual(err_string.count('nan'), 1)
+        else:
+            self.fail('Exception expected.')
+
+
+if __name__ == "__main__":
+    unittest.main()
