@@ -1,4 +1,5 @@
 import base64
+import inspect
 import json
 import os
 from collections import OrderedDict
@@ -347,9 +348,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     model_data = 'var modelData = %s' % json.dumps(model_data, default=make_serializable)
 
-
-    code_dir = os.path.dirname(os.path.abspath(__file__))
-    vis_dir = os.path.join(code_dir, "visualization")
+    import openmdao
+    openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
+    vis_dir = os.path.join(openmdao_dir, "visualization")
     libs_dir = os.path.join(vis_dir, "libs")
     src_dir = os.path.join(vis_dir, "src")
     style_dir = os.path.join(vis_dir, "style")
