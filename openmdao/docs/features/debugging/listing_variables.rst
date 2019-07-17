@@ -117,6 +117,42 @@ you can enable the display of promoted names by setting the optional argument,
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_prom_names
     :layout: interleave
 
+*List Variables Filtered by Tags*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When you add inputs and outputs to components, you can optionally set tags on the variables. These tags can then be
+used to filter what variables are printed and returned by the :code:`System.list_inputs` and :code:`System.list_outputs`
+methods. Each of those methods has an optional argument :code:`tags` for that purpose.
+
+Here is a simple example to show you how this works. Imagine that a model-builder builds a model with some set of
+variables they expect other non-model-builder users to vary. They want to classify the inputs into
+two sets: "beginner" and "advanced". The model-builder would like to write some functions that query the model
+for the set of `beginner` and `advanced` inputs and do some stuff with those lists (like make fancy formatted outputs or something).
+
+
+.. embed-code::
+    openmdao.test_suite.test_examples.test_betz_limit.TestBetzLimit.test_betz_with_var_tags
+    :layout: interleave
+
+Notice that if you only have one tag, you can set the argument :code:`tags` to a string. If you have
+more than one tag, you use a list of strings.
+
+This example showed how to add tags when using the :code:`add_input` and :code:`add_output` methods. You can also
+add tags to :code:`IndepVarComp` and :code:`ExecComp` Components using code like this:
+
+::
+
+    comp = IndepVarComp('indep_var', tags='tag1')
+
+::
+
+    ec = om.ExecComp('y=x+z+1.',
+                      x={'value': 1.0, 'units': 'm', 'tags': 'tagx'},
+                      y={'units': 'm', 'tags': ['tagy','tagm']},
+                      z={'value': 2.0, 'tags': 'tagz'},
+                      ))
+
+Note that outputs of :code:`IndepVarComp` are always tagged with :code:`indep_var_comp`.
 
 *List Residuals Above a Tolerance*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
