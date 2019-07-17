@@ -1109,7 +1109,7 @@ class TestSqliteRecorder(unittest.TestCase):
             try:
                 ln = nl.linear_solver = solver()
             except RuntimeError as err:
-                if str(err) == 'PETSc is not available.':
+                if str(err).endswith('PETSc is not available.'):
                     continue
                 else:
                     raise err
@@ -1816,7 +1816,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         # access list of connections stored in metadata
         connections = sorted(cr.problem_metadata['connections_list'], key=lambda x: (x['tgt'], x['src']))
-        
+
         self.assertEqual('\n'.join([conn['src']+'\t'+conn['tgt'] for conn in connections]),
                          '\n'.join(["d1.y1\tcon_cmp1.y1",
                                     "d2.y2\tcon_cmp2.y2",

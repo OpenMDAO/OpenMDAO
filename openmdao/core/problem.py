@@ -39,7 +39,7 @@ from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
-from openmdao.utils.logger_utils import get_logger
+from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
 
 try:
@@ -204,14 +204,14 @@ class Problem(object):
         self._rec_mgr = RecordingManager()
 
         # General options
-        self.options = OptionsDictionary()
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.options.declare('coloring_dir', types=str,
                              default=os.path.join(os.getcwd(), 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.update(options)
 
         # Case recording options
-        self.recording_options = OptionsDictionary()
+        self.recording_options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
@@ -950,13 +950,18 @@ class Problem(object):
         # Now that setup has been called, we can set the iprints.
         for items in self._solver_print_cache:
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
+        self._solver_print_cache = []
 
-        if self._check and self.comm.rank == 0:
+        if self._check:
             if self._check is True:
                 checks = _default_checks
             else:
                 checks = self._check
-            self.check_config(self._logger, checks=checks)
+            if self.comm.rank == 0:
+                logger = self._logger
+            else:
+                logger = TestLogger()
+            self.check_config(logger, checks=checks)
 
         if self._setup_status < 2:
             self._setup_status = 2
@@ -1293,7 +1298,8 @@ class Problem(object):
 
                 all_fd_options[c_name][local_wrt] = fd_options
 
-                approximations[fd_options['method']].add_approximation(abs_key, fd_options)
+                approximations[fd_options['method']].add_approximation(abs_key, self.model,
+                                                                       fd_options)
 
             approx_jac = {}
             for approximation in itervalues(approximations):
@@ -1906,9 +1912,15 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
                 else:
                     # If fd_norm is zero, let's use fwd_norm as the divisor for relative
                     # check. That way we don't accidentally squelch a legitimate problem.
-                    derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fwd_norm,
-                                                                        rev_error / fwd_norm,
-                                                                        fwd_rev_error / fwd_norm)
+                    if totals:
+                        derivative_info['rel error'] = rel_err = ErrorTuple(fwd_error / fwd_norm,
+                                                                            nan,
+                                                                            nan)
+                    else:
+                        rel_err = ErrorTuple(fwd_error / fwd_norm,
+                                             rev_error / fwd_norm,
+                                             fwd_rev_error / fwd_norm)
+                        derivative_info['rel error'] = rel_err
 
             else:
                 if totals:

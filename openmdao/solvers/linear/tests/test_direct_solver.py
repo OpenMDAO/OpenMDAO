@@ -88,9 +88,9 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         # Test that using options that should not exist in class cause an error
         solver = om.DirectSolver()
 
-        msg = "\"Option '%s' cannot be set because it has not been declared.\""
+        msg = "\"DirectSolver: Option '%s' cannot be set because it has not been declared.\""
 
-        for option in ['atol', 'rtol', 'maxiter', 'err_on_maxiter']:
+        for option in ['atol', 'rtol', 'maxiter', 'err_on_non_converge']:
             with self.assertRaises(KeyError) as context:
                 solver.options[option] = 1
 
@@ -224,7 +224,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
+        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for column associated with state/residual 'thrust'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -240,7 +240,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        expected_msg = "dupcomp: declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
+        expected_msg = "DupPartialsComp (dupcomp): d(x)/d(c): declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -278,7 +278,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for column associated with state/residual 'thrust'."
+        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for column associated with state/residual 'thrust'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -315,7 +315,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' for row associated with state/residual 'thrust'."
+        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -381,7 +381,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -414,7 +414,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -447,7 +447,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -476,7 +476,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in '' for rows associated with states/residuals ['c5.y']."
+        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['c5.y']."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -505,7 +505,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in '' for row associated with state/residual 'c5.y'."
+        expected_msg = "Singular entry found in Group (<model>) for row associated with state/residual 'c5.y'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -535,7 +535,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in '' for column associated with state/residual 'c5.y'."
+        expected_msg = "Singular entry found in Group (<model>) for column associated with state/residual 'c5.y'."
 
         self.assertEqual(expected_msg, str(cm.exception))
 

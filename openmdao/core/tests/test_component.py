@@ -143,12 +143,12 @@ class TestExplicitComponent(unittest.TestCase):
 
         # Test some forbidden names.
         invalid_names = ['a.b', 'a*b', 'a?b', 'a!', '[a', 'b]']
-        invalid_error = "'%s' is not a valid %s name."
+        invalid_error = "ExplicitComponent: '%s' is not a valid %s name."
 
         nostr_names = [3, None, object, object()]
-        nostr_error = "The name argument should be a string."
+        nostr_error = "ExplicitComponent: The name argument should be a string."
 
-        empty_error = "The name argument should be a non-empty string."
+        empty_error = "ExplicitComponent: The name argument should be a non-empty string."
 
         for func in add_input_methods:
             for name in invalid_names:

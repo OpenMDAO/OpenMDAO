@@ -44,7 +44,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MultiFiMetaModelUnStructured 'mm': No surrogate specified for output 'y'")
+        msg = ("MultiFiMetaModelUnStructuredComp (mm): No surrogate specified for output 'y'")
         self.assertEqual(str(cm.exception), msg)
 
         # Wrong number of input samples
@@ -72,7 +72,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MultiFiMetaModelUnStructured: Each variable must have the same number of training points. Expected 3 but found 4 points for 'x2'.")
+        msg = ("MultiFiMetaModelUnStructuredComp (mm): Each variable must have the same number of training points. Expected 3 but found 4 points for 'x2'.")
         self.assertEqual(str(cm.exception), msg)
 
         # Wrong number of output samples
@@ -100,7 +100,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        msg = ("MultiFiMetaModelUnStructured: Each variable must have the same number of training points. Expected 3 but found 4 points for 'y'.")
+        msg = ("MultiFiMetaModelUnStructuredComp (mm): Each variable must have the same number of training points. Expected 3 but found 4 points for 'y'.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_inputs_wrt_nfidelity(self):

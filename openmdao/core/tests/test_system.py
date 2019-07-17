@@ -29,12 +29,12 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             inputs, outputs, residuals = model.get_nonlinear_vectors()
         self.assertEqual(str(cm.exception),
-                         "Cannot get vectors because setup has not yet been called.")
+                         "Group: Cannot get vectors because setup has not yet been called.")
 
         with self.assertRaises(Exception) as cm:
             d_inputs, d_outputs, d_residuals = model.get_linear_vectors('vec')
         self.assertEqual(str(cm.exception),
-                         "Cannot get vectors because setup has not yet been called.")
+                         "Group: Cannot get vectors because setup has not yet been called.")
 
         p.setup()
         p.run_model()
@@ -85,7 +85,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             d_inputs, d_outputs, d_residuals = model.get_linear_vectors('bad_name')
         self.assertEqual(str(cm.exception),
-                         "There is no linear vector named %s" % 'bad_name')
+                         "Group (<model>): There is no linear vector named %s" % 'bad_name')
 
     def test_set_checks_shape(self):
         indep = IndepVarComp()

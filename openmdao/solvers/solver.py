@@ -14,6 +14,7 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.recorders.recording_manager import RecordingManager
+from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
@@ -161,7 +162,7 @@ class Solver(object):
         self._solver_info = None
 
         # Solver options
-        self.options = OptionsDictionary()
+        self.options = OptionsDictionary(parent_name=self.msginfo)
         self.options.declare('maxiter', types=int, default=10,
                              desc='maximum number of iterations')
         self.options.declare('atol', default=1e-10,
@@ -170,11 +171,13 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
-        self.options.declare('err_on_maxiter', types=bool, default=False,
+        self.options.declare('err_on_maxiter', types=bool, default=None, allow_none=True,
+                             desc="Deprecated. Use 'err_on_non_converge'.")
+        self.options.declare('err_on_non_converge', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
 
         # Case recording options
-        self.recording_options = OptionsDictionary()
+        self.recording_options = OptionsDictionary(parent_name=self.msginfo)
         self.recording_options.declare('record_abs_error', types=bool, default=True,
                                        desc='Set to True to record absolute error at the \
                                        solver level')
@@ -199,7 +202,7 @@ class Solver(object):
         self._norm0 = 0.0
 
         # What the solver supports.
-        self.supports = OptionsDictionary()
+        self.supports = OptionsDictionary(parent_name=self.msginfo)
         self.supports.declare('gradients', types=bool, default=False)
         self.supports.declare('implicit_components', types=bool, default=False)
 
@@ -209,6 +212,20 @@ class Solver(object):
         self._rec_mgr = RecordingManager()
 
         self.cite = ""
+
+    @property
+    def msginfo(self):
+        """
+        Return info to prepend to messages.
+
+        Returns
+        -------
+        str
+            Info to prepend to messages.
+        """
+        if self._system is None:
+            return type(self).__name__
+        return '{} in {}'.format(type(self).__name__, self._system.msginfo)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -255,6 +272,12 @@ class Solver(object):
         self._solver_info = system._solver_info
         self._recording_iter = system._recording_iter
 
+        if system.pathname:
+            parent_name = self.msginfo
+            self.options._parent_name = parent_name
+            self.recording_options._parent_name = parent_name
+            self.supports._parent_name = parent_name
+
         if isinstance(self, LinearSolver) and not system._use_derivatives:
             return
 
@@ -294,6 +317,13 @@ class Solver(object):
             'out': myoutputs,
             'res': myresiduals
         }
+
+        # Raise a deprecation warning for changed option.
+        if 'err_on_maxiter' in self.options and self.options['err_on_maxiter'] is not None:
+            self.options['err_on_non_converge'] = self.options['err_on_maxiter']
+            warn_deprecation("The 'err_on_maxiter' option provides backwards compatibility "
+                             "with earlier version of OpenMDAO; use options['err_on_non_converge'] "
+                             "instead.")
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -377,18 +407,35 @@ class Solver(object):
 
         if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             prefix = self._solver_info.prefix + self.SOLVER
-            if np.isinf(norm) or np.isnan(norm) or (norm > atol and norm / norm0 > rtol):
+
+            # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
+            # conditionals.
+            if np.isinf(norm) or np.isnan(norm):
+                msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
+                      "iterations."
                 if iprint > -1:
-                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
                     print(prefix + msg.format(self.SOLVER, self._system.pathname,
                                               self._iter_count))
 
                 # Raise AnalysisError if requested.
-                if self.options['err_on_maxiter']:
-                    msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+                if self.options['err_on_non_converge']:
                     raise AnalysisError(msg.format(self.SOLVER, self._system.pathname,
                                                    self._iter_count))
 
+            # Solver hit maxiter without meeting desired tolerances.
+            elif (norm > atol and norm / norm0 > rtol):
+                msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
+
+                if iprint > -1:
+                    print(prefix + msg.format(self.SOLVER, self._system.pathname,
+                                              self._iter_count))
+
+                # Raise AnalysisError if requested.
+                if self.options['err_on_non_converge']:
+                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname,
+                                                   self._iter_count))
+
+            # Solver converged
             elif iprint == 1:
                 print(prefix + ' Converged in {} iterations'.format(self._iter_count))
             elif iprint == 2:
@@ -626,8 +673,8 @@ class NonlinearSolver(Solver):
         Raise an exception if any discrete outputs exist in our System.
         """
         if self._system._var_allprocs_discrete['output']:
-            raise RuntimeError("System '%s' has a %s solver and contains discrete outputs %s." %
-                               (self._system.pathname, type(self).__name__,
+            raise RuntimeError("%s has a %s solver and contains discrete outputs %s." %
+                               (self._system.msginfo, type(self).__name__,
                                 sorted(self._system._var_allprocs_discrete['output'])))
 
     def _print_exc_debug_info(self):
@@ -733,8 +780,8 @@ class LinearSolver(Solver):
         """
         super(LinearSolver, self)._setup_solvers(system, depth)
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
-            raise RuntimeError("Linear solver '%s' in system '%s' doesn't support assembled "
-                               "jacobians." % (self.SOLVER, system.pathname))
+            raise RuntimeError("Linear solver %s doesn't support assembled "
+                               "jacobians." % self.msginfo)
 
     def solve(self, vec_names, mode, rel_systems=None):
         """

@@ -68,13 +68,14 @@ _DYN_COLORING = object()
 
 # default values related to the computation of a sparsity matrix
 _DEF_COMP_SPARSITY_ARGS = {
-    'tol': 1e-15,
-    'orders': 15,
+    'tol': 1e-25,
+    'orders': None,
     'num_full_jacs': 3,
     'perturb_size': 1e-9,
     'show_summary': True,
     'show_sparsity': False,
 }
+
 
 # numpy versions before 1.12 don't use the 'axis' arg passed to count_nonzero and always
 # return an int instead of an array of ints, so create our own function for those versions.
@@ -373,17 +374,12 @@ class Coloring(object):
         driver : Driver
             Current driver object.
         """
-        ofs = driver._get_ordered_nl_responses()
-        of_sizes = _get_response_sizes(driver, ofs)
-        wrts = list(driver._designvars)
-        wrt_sizes = _get_desvar_sizes(driver, wrts)
-        if (self._row_var_sizes != of_sizes or self._row_vars != ofs
-                or self._col_var_sizes != wrt_sizes or self._col_vars != wrts):
-            raise RuntimeError("Current total coloring configuration does not match the "
-                               "configuration of the current driver. Make sure you don't have "
-                               "different problems that have the same coloring directory.  Set "
-                               "the coloring directory by setting the value of "
-                               "`problem.options['coloring_dir']`.")
+        of_names = driver._get_ordered_nl_responses()
+        of_sizes = _get_response_sizes(driver, of_names)
+        wrt_names = list(driver._designvars)
+        wrt_sizes = _get_desvar_sizes(driver, wrt_names)
+
+        self._config_check_msgs(of_names, of_sizes, wrt_names, wrt_sizes, driver)
 
     def _check_config_partial(self, system):
         """
@@ -395,27 +391,75 @@ class Coloring(object):
             System being colored.
         """
         # check the contents (vars and sizes) of the input and output vectors of system
+        info = {'coloring': None, 'wrt_patterns': self._meta['wrt_patterns']}
+        system._update_wrt_matches(info)
         if system.pathname:
             wrt_matches = ['.'.join((system.pathname, n))
-                           for n in self._meta['wrt_matches_prom']]
+                           for n in info['wrt_matches_prom']]
             # for partial and semi-total derivs, convert to promoted names
             ordered_of_info = system._jac_var_info_abs2prom(system._jacobian_of_iter())
             ordered_wrt_info = \
                 system._jac_var_info_abs2prom(system._jacobian_wrt_iter(wrt_matches))
         else:
             ordered_of_info = list(system._jacobian_of_iter())
-            ordered_wrt_info = list(system._jacobian_wrt_iter(self._meta['wrt_matches']))
+            ordered_wrt_info = list(system._jacobian_wrt_iter(info['wrt_matches']))
 
-        ordered_of_names = [t[0] for t in ordered_of_info]
-        ordered_wrt_names = [t[0] for t in ordered_wrt_info]
+        of_names = [t[0] for t in ordered_of_info]
+        wrt_names = [t[0] for t in ordered_wrt_info]
 
-        if (ordered_of_names != self._row_vars or ordered_wrt_names != self._col_vars):
-            # TODO: add comparison of sizes
-            raise RuntimeError("%s: Current coloring configuration does not match the "
-                               "configuration of the current driver. Make sure you don't have "
-                               "different problems that have the same coloring directory.  Set "
-                               "the coloring directory by setting the value of "
-                               "`problem.options['coloring_dir']`." % system.pathname)
+        of_sizes = [t[2] - t[1] for t in ordered_of_info]
+        wrt_sizes = [t[2] - t[1] for t in ordered_wrt_info]
+
+        self._config_check_msgs(of_names, of_sizes, wrt_names, wrt_sizes, system)
+
+    def _config_check_msgs(self, of_names, of_sizes, wrt_names, wrt_sizes, obj):
+        msg_suffix = ("Make sure you don't have different problems that have the same coloring "
+                      "directory. Set the coloring directory by setting the value of "
+                      "problem.options['coloring_dir'].")
+
+        msg = ["%s: Current coloring configuration does not match the "
+               "configuration of the current model." % obj.msginfo]
+
+        if of_names != self._row_vars:
+            of_diff = set(of_names) - set(self._row_vars)
+            if of_diff:
+                msg.append('   The following row vars were added: %s.' % sorted(of_diff))
+            else:
+                of_diff = set(self._row_vars) - set(of_names)
+                if of_diff:
+                    msg.append('   The following row vars were removed: %s.' % sorted(of_diff))
+                else:
+                    msg.append('   The row vars have changed order.')
+
+        if wrt_names != self._col_vars:
+            wrt_diff = set(wrt_names) - set(self._col_vars)
+            if wrt_diff:
+                msg.append('   The following column vars were added: %s.' % sorted(wrt_diff))
+            else:
+                wrt_diff = set(self._col_vars) - set(wrt_names)
+                if wrt_diff:
+                    msg.append('   The following column vars were removed: %s.' % sorted(wrt_diff))
+                else:
+                    msg.append('   The column vars have changed order.')
+
+        # check sizes
+        changed_sizes = []
+        if of_names == self._row_vars:
+            for i, (my_sz, sz) in enumerate(zip(self._row_var_sizes, of_sizes)):
+                if my_sz != sz:
+                    changed_sizes.append(of_names[i])
+
+        if wrt_names == self._col_vars:
+            for i, (my_sz, sz) in enumerate(zip(self._col_var_sizes, wrt_sizes)):
+                if my_sz != sz:
+                    changed_sizes.append(wrt_names[i])
+
+        if changed_sizes:
+            msg.append('   The following variables have changed sizes: %s.' % sorted(changed_sizes))
+
+        if len(msg) > 1:
+            msg.append(msg_suffix)
+            raise RuntimeError('\n'.join(msg))
 
     def __repr__(self):
         """
@@ -1173,7 +1217,7 @@ def MNCO_bidir(J):
     return coloring
 
 
-def _tol_sweep(arr, tol=1e-15, orders=20):
+def _tol_sweep(arr, tol=_DEF_COMP_SPARSITY_ARGS['tol'], orders=_DEF_COMP_SPARSITY_ARGS['orders']):
     """
     Find best tolerance 'around' tol to choose nonzero values of arr.
 
@@ -1212,7 +1256,7 @@ def _tol_sweep(arr, tol=1e-15, orders=20):
                 else:
                     nzeros.append(([itol], len(rows)))
                 n_tested += 1
-            itol /= 10.
+            itol *= .1
 
         # pick lowest tolerance corresponding to the most repeated number of 'zero' entries
         sorted_items = sorted(nzeros, key=lambda x: len(x[0]), reverse=True)
@@ -1258,6 +1302,8 @@ def _compute_total_coloring_context(top):
     top : System
         Top of the system hierarchy where coloring will be done.
     """
+    np.random.seed(41)  # set seed for consistency
+
     for system in top.system_iter(recurse=True, include_self=True):
         if system.matrix_free:
             raise RuntimeError("%s: simultaneous coloring does not currently work with matrix free "
@@ -1334,7 +1380,7 @@ def _get_bool_total_jac(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_full_ja
                 fullJ += np.abs(J)
         elapsed = time.time() - start_time
 
-    fullJ *= (1.0 / num_full_jacs)
+    fullJ *= (1.0 / np.max(fullJ))
 
     info = _tol_sweep(fullJ, tol, orders)
     info['num_full_jacs'] = num_full_jacs

@@ -130,7 +130,7 @@ class ProcTestCase3(unittest.TestCase):
         try:
             p = _build_model(nsubs=4, min_procs=[1,2,2,1])
         except Exception as err:
-            self.assertEqual(str(err), "par: MPI process allocation failed: can't meet min_procs required because the sum of the min procs required exceeds the procs allocated and the min procs required is > 1 for the following subsystems: ['C1', 'C2']")
+            self.assertEqual(str(err), "ParallelGroup (par): MPI process allocation failed: can't meet min_procs required because the sum of the min procs required exceeds the procs allocated and the min procs required is > 1 for the following subsystems: ['C1', 'C2']")
         else:
             self.fail("Exception expected.")
 
@@ -201,7 +201,7 @@ class ProcTestCase6(unittest.TestCase):
         try:
             p = _build_model(nsubs=3, max_procs=[1, 2, 2])
         except Exception as err:
-            self.assertEqual(str(err), "par: too many MPI procs allocated. Comm is size 6 but can only use 5.")
+            self.assertEqual(str(err), "ParallelGroup (par): too many MPI procs allocated. Comm is size 6 but can only use 5.")
         else:
             self.fail("Exception expected.")
 

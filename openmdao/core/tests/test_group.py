@@ -19,7 +19,8 @@ except ImportError:
 import openmdao.api as om
 from openmdao.test_suite.components.sellar import SellarDis2
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
-
+from openmdao.utils.logger_utils import TestLogger
+from openmdao.error_checking.check_config import _check_hanging_inputs
 
 class SimpleGroup(om.Group):
 
@@ -78,8 +79,8 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp', om.IndepVarComp)
         except TypeError as err:
-            self.assertEqual(str(err), "Subsystem 'comp' should be an instance, "
-                                       "but a class object was found.")
+            self.assertEqual(str(err), "Group: Subsystem 'comp' should be an instance, "
+                                       "but a IndepVarComp class object was found.")
         else:
             self.fail('Exception expected.')
 
@@ -92,7 +93,7 @@ class TestGroup(unittest.TestCase):
         try:
             p.model.add_subsystem('comp2', om.ExecComp('b=2*a'))
         except Exception as err:
-            self.assertEqual(str(err), "Subsystem name 'comp2' is already used.")
+            self.assertEqual(str(err), "Group: Subsystem name 'comp2' is already used.")
         else:
             self.fail('Exception expected.')
 
@@ -203,6 +204,52 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp1.b'], 6.0)
         self.assertEqual(p['comp2.b'], 9.0)
 
+    def test_double_promote_conns(self):
+        p = om.Problem()
+        gouter = p.model.add_subsystem('gouter', om.Group())
+        gouter.add_subsystem('couter', om.ExecComp('xx = a * 3.'), promotes_outputs=['xx'])
+        g = gouter.add_subsystem('g', om.Group(), promotes_inputs=[('x', 'xx')])
+        g.add_subsystem('ivc', om.IndepVarComp('x', 2.), promotes_outputs=['x'])
+        g.add_subsystem('c0', om.ExecComp('y = 2*x'), promotes_inputs=['x'])
+
+        with self.assertRaises(RuntimeError) as cm:
+            p.setup()
+
+        self.assertEqual(str(cm.exception),
+                         "Group (gouter): The following inputs have multiple connections: gouter.g.c0.x from ['gouter.couter.xx', 'gouter.g.ivc.x']")
+
+    def test_double_promote_one_conn(self):
+        p = om.Problem()
+        gouter = p.model.add_subsystem('gouter', om.Group())
+        gouter.add_subsystem('couter', om.ExecComp('xx = a * 3.'))
+        g = gouter.add_subsystem('g', om.Group(), promotes_inputs=[('x', 'xx')])
+        g.add_subsystem('ivc', om.IndepVarComp('x', 2.), promotes_outputs=['x'])
+        g.add_subsystem('c0', om.ExecComp('y = 2*x'), promotes_inputs=['x'])
+
+        p.setup()
+
+        self.assertEqual(p.model._conn_global_abs_in2out['gouter.g.c0.x'], 'gouter.g.ivc.x')
+
+    def test_check_unconn_inputs_w_promote_rename(self):
+        p = om.Problem()
+        gouter = p.model.add_subsystem('gouter', om.Group())
+        gouter.add_subsystem('couter', om.ExecComp('xx = a * 3.'))
+        g = gouter.add_subsystem('g', om.Group(), promotes_inputs=['xx'])
+        g.add_subsystem('ivc', om.IndepVarComp('x', 2.), promotes_outputs=['x'])
+        g.add_subsystem('c0', om.ExecComp('y = 2*x'), promotes_inputs=[('x', 'xx')])
+
+        p.setup()
+
+        logger = TestLogger()
+        _check_hanging_inputs(p, logger)
+        for w in logger.get('warning'):
+            if 'The following inputs are not connected:' in w:
+                if "gouter.couter.a" in w and "gouter.xx: ['gouter.g.c0.x']" in w:
+                    break
+        else:
+            self.fail("Expected warning not found.")
+        self.assertEqual(p.model._conn_global_abs_in2out, {})
+
     def test_subsys_attributes(self):
         p = om.Problem()
 
@@ -231,14 +278,14 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.model.add_subsystem('_bad_name', om.Group())
         self.assertEqual(str(err.exception),
-                         "'_bad_name' is not a valid system name.")
+                         "Group (<model>): '_bad_name' is not a valid sub-system name.")
 
         # 'name', 'pathname', 'comm' and 'options' are reserved names
         for reserved in ['name', 'pathname', 'comm', 'options']:
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, om.Group())
             self.assertEqual(str(err.exception),
-                             "Group '' already has an attribute '%s'." %
+                             "Group (<model>): Can't add subsystem '%s' because an attribute with that name already exits." %
                              reserved)
 
     def test_group_nested(self):
@@ -349,7 +396,7 @@ class TestGroup(unittest.TestCase):
             p.model.add_subsystem('comp1', om.IndepVarComp('x', 5.0),
                                   promotes_outputs='x')
         self.assertEqual(str(err.exception),
-                         ": promotes must be an iterator of strings and/or tuples.")
+                         "Group: promotes must be an iterator of strings and/or tuples.")
 
     def test_group_renames_errors_not_found(self):
         p = om.Problem()
@@ -360,7 +407,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup()
         self.assertEqual(str(err.exception),
-                         "comp1: 'promotes_outputs' failed to find any matches for "
+                         "IndepVarComp (comp1): 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
 
     def test_group_renames_errors_bad_tuple(self):
@@ -425,7 +472,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as err:
             p.setup()
         self.assertEqual(str(err.exception),
-                         "d1: 'promotes_outputs' failed to find any matches for "
+                         "SellarDis2 (d1): 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
 
     def test_group_nested_conn(self):
@@ -550,7 +597,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         ": src_indices has been defined in both "
+                         "Group (<model>): src_indices has been defined in both "
                          "connect('indep.x', 'C1.x') and add_input('C1.x', ...).")
 
     def test_connect_src_indices(self):
@@ -611,7 +658,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "C2: 'promotes_outputs' failed to find any matches for "
+                         "ExecComp (C2): 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['x*'].")
 
     def test_promote_not_found2(self):
@@ -624,7 +671,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "C2: 'promotes_inputs' failed to find any matches for "
+                         "ExecComp (C2): 'promotes_inputs' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
 
     def test_promote_not_found3(self):
@@ -637,7 +684,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "C2: 'promotes' failed to find any matches for "
+                         "ExecComp (C2): 'promotes' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
 
     def test_missing_promote_var(self):
@@ -652,7 +699,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "d1: 'promotes_inputs' failed to find any matches for "
+                         "ExecComp (d1): 'promotes_inputs' failed to find any matches for "
                          "the following names or patterns: ['foo'].")
 
     def test_missing_promote_var2(self):
@@ -667,7 +714,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "d1: 'promotes_outputs' failed to find any matches for "
+                         "ExecComp (d1): 'promotes_outputs' failed to find any matches for "
                          "the following names or patterns: ['bar', 'blammo'].")
 
     def test_promote_src_indices(self):
@@ -921,22 +968,22 @@ class TestGroup(unittest.TestCase):
             model.set_order(['indeps', 'C2', 'junk', 'C1', 'C3'])
 
         self.assertEqual(str(cm.exception),
-                         ": subsystem(s) ['junk'] found in subsystem order but don't exist.")
+                         "Group (<model>): subsystem(s) ['junk'] found in subsystem order but don't exist.")
 
         # Missing
         with self.assertRaises(ValueError) as cm:
             model.set_order(['indeps', 'C2', 'C3'])
 
         self.assertEqual(str(cm.exception),
-                         ": ['C1'] expected in subsystem order and not found.")
+                         "Group (<model>): ['C1'] expected in subsystem order and not found.")
 
         # Extra and Missing
         with self.assertRaises(ValueError) as cm:
             model.set_order(['indeps', 'C2', 'junk', 'C1', 'junk2'])
 
         self.assertEqual(str(cm.exception),
-                         ": ['C3'] expected in subsystem order and not found.\n"
-                         ": subsystem(s) ['junk', 'junk2'] found in subsystem order "
+                         "Group (<model>): ['C3'] expected in subsystem order and not found.\n"
+                         "Group (<model>): subsystem(s) ['junk', 'junk2'] found in subsystem order "
                          "but don't exist.")
 
         # Dupes
@@ -944,7 +991,7 @@ class TestGroup(unittest.TestCase):
             model.set_order(['indeps', 'C2', 'C1', 'C3', 'C1'])
 
         self.assertEqual(str(cm.exception),
-                         ": Duplicate name(s) found in subsystem order list: ['C1']")
+                         "Group (<model>): Duplicate name(s) found in subsystem order list: ['C1']")
 
     def test_set_order_init_subsystems(self):
         prob = om.Problem()
@@ -1150,14 +1197,15 @@ class TestConnect(unittest.TestCase):
             self.prob.setup()
 
     def test_invalid_target(self):
-        msg = "Input 'tgt.z' does not exist for connection " + \
-              "in 'sub' from 'src.x' to 'tgt.z'."
+        msg = "Group (sub): Input 'tgt.z' does not exist for connection from 'src.x' to 'tgt.z'."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
-        with assertRaisesRegex(self, NameError, msg):
+        with self.assertRaises(NameError) as ctx:
             self.prob.setup()
+
+        self.assertEqual(str(ctx.exception), msg)
 
     def test_connect_within_system(self):
         msg = "Output and input are in the same System for connection " + \
@@ -1173,11 +1221,12 @@ class TestConnect(unittest.TestCase):
         sub.add_subsystem('tgt', om.ExecComp('y = x'), promotes_outputs=['y'])
         sub.connect('y', 'tgt.x', src_indices=[1])
 
-        msg = "Output and input are in the same System for connection " + \
-              "in 'sub' from 'y' to 'tgt.x'."
+        msg = "Group (sub): Output and input are in the same System for connection from 'y' to 'tgt.x'."
 
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaises(RuntimeError) as ctx:
             prob.setup()
+
+        self.assertEqual(str(ctx.exception), msg)
 
     def test_connect_units_with_unitless(self):
         prob = om.Problem()
@@ -1188,7 +1237,7 @@ class TestConnect(unittest.TestCase):
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
 
-        msg = "Output 'src.x2' with units of 'degC' is connected " \
+        msg = "Group (<model>): Output 'src.x2' with units of 'degC' is connected " \
               "to input 'tgt.x' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -1220,7 +1269,7 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        msg = "Input 'tgt.x' with units of 'degC' is " \
+        msg = "Group (<model>): Input 'tgt.x' with units of 'degC' is " \
               "connected to output 'src.x2' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -1238,7 +1287,7 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        msg = "Input 'tgt.y' with units of 'degC' is " \
+        msg = "Group (<model>): Input 'tgt.y' with units of 'degC' is " \
               "connected to output 'src.y' which has no units."
 
         with assert_warning(UserWarning, msg):
@@ -1257,7 +1306,7 @@ class TestConnect(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "src: 'promotes' cannot be used at the same time as "
+                         "ExecComp (src): 'promotes' cannot be used at the same time as "
                          "'promotes_inputs' or 'promotes_outputs'.")
 
     def test_mix_promotes_types2(self):
@@ -1268,7 +1317,7 @@ class TestConnect(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "src: 'promotes' cannot be used at the same time as "
+                         "ExecComp (src): 'promotes' cannot be used at the same time as "
                          "'promotes_inputs' or 'promotes_outputs'.")
 
     def test_nested_nested_conn(self):
@@ -1321,7 +1370,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1, 2), (2, 2, 2)],
                          flat_src_indices=False)
 
-        msg = ("The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
+        msg = ("Group (sub): The source indices [[ 2 -1  2] [ 2  2  2]] do not specify a "
                "valid shape for the connection 'sub.src.x' to 'sub.arr.x'. "
                "The source has 2 dimensions but the indices expect 3.")
 
@@ -1337,7 +1386,7 @@ class TestConnect(unittest.TestCase):
         self.sub.connect('src.x', 'arr.x', src_indices=[(2, -1), (4, 4)],
                          flat_src_indices=False)
 
-        msg = ("The source indices do not specify a valid index for the "
+        msg = ("Group (sub): The source indices do not specify a valid index for the "
                "connection 'sub.src.x' to 'sub.arr.x'. Index '4' "
                "is out of range for source dimension of size 3.")
 
@@ -1359,7 +1408,7 @@ class TestConnect(unittest.TestCase):
                               src_indices=[[4, 5], [7, 9]],
                               flat_src_indices=True)
         except Exception as err:
-            self.assertEqual(str(err), "The source indices do not specify a valid index "
+            self.assertEqual(str(err), "Group (<model>): The source indices do not specify a valid index "
                                        "for the connection 'indeps.x' to 'C1.x'. "
                                        "Index '9' is out of range for a flat source of size 9.")
         else:
@@ -1371,7 +1420,7 @@ class TestConnect(unittest.TestCase):
                               src_indices=[[4, 5], [7, 9]],
                               flat_src_indices=True, promotes=['x'])
         except Exception as err:
-            self.assertEqual(str(err), "The source indices do not specify a valid index "
+            self.assertEqual(str(err), "Group (<model>): The source indices do not specify a valid index "
                                        "for the connection 'indeps.x' to 'C1.x'. "
                                        "Index '9' is out of range for a flat source of size 9.")
         else:
@@ -1383,7 +1432,7 @@ class TestConnect(unittest.TestCase):
                               src_indices=[[-10, 5], [7, 8]],
                               flat_src_indices=True)
         except Exception as err:
-            self.assertEqual(str(err), "The source indices do not specify a valid index "
+            self.assertEqual(str(err), "Group (<model>): The source indices do not specify a valid index "
                                        "for the connection 'indeps.x' to 'C1.x'. "
                                        "Index '-10' is out of range for a flat source of size 9.")
         else:

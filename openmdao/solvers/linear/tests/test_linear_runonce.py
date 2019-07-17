@@ -43,14 +43,13 @@ class TestLinearRunOnceSolver(unittest.TestCase):
         # Test that using options that should not exist in class cause an error
         solver = om.LinearRunOnce()
 
-        msg = "\"Option '%s' cannot be set because it has not been declared.\""
+        msg = "\"LinearRunOnce: Option '%s' cannot be set because it has not been declared.\""
 
-        for option in ['atol', 'rtol', 'maxiter', 'err_on_maxiter']:
+        for option in ['atol', 'rtol', 'maxiter', 'err_on_non_converge']:
             with self.assertRaises(KeyError) as context:
                 solver.options[option] = 1
 
             self.assertEqual(str(context.exception), msg % option)
-
 
     def test_feature_solver(self):
         import openmdao.api as om

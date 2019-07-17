@@ -4,7 +4,7 @@ Visualizing The Structure of Your Model
 
 OpenMDAO models can have deep hierarchies of groups and components, with many connections between them.
 Often times, it is helpful to visualize the model structure. OpenMDAO provides a model visualization tool
-that is accessible via the :ref:`openmdao  <om-command-view_model>` command line tool.
+that is accessible via the :ref:`openmdao  <om-command-n2>` command line tool.
 
 For example, if you had built the Sellar problem with a missing connection, and you figured out that there
 was a missing connection by running :ref:`check setup <check_setup_tutorial>`,
@@ -18,7 +18,7 @@ You can generate a visualization of the model in :math:`N^2` form with the follo
 
 .. code-block:: none
 
-    openmdao view_model sellar.py
+    openmdao n2 sellar.py
 
 .. embed-n2::
     ../test_suite/scripts/sellar.py

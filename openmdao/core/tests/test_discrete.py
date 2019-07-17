@@ -26,8 +26,8 @@ class ModCompEx(om.ExplicitComponent):
     def setup(self):
         self.add_input('a', val=10.)
         self.add_output('b', val=0.)
-        self.add_discrete_input('x', val=10)
-        self.add_discrete_output('y', val=0)
+        self.add_discrete_input('x', val=10, tags='tagx')
+        self.add_discrete_output('y', val=0, tags='tagy')
 
     def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
         outputs['b'] = inputs['a']*2.
@@ -40,8 +40,8 @@ class ModCompIm(om.ImplicitComponent):
         self.modval = modval
 
     def setup(self):
-        self.add_discrete_input('x', val=10)
-        self.add_discrete_output('y', val=0)
+        self.add_discrete_input('x', val=10, tags='tagx')
+        self.add_discrete_output('y', val=0, tags='tagy')
 
     def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs, discrete_outputs):
         discrete_outputs['y'] = discrete_inputs['x'] % self.modval
@@ -294,6 +294,52 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(text.count('  impl'), 1)
         self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
 
+    def test_list_inputs_outputs_with_tags(self):
+        prob = om.Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_discrete_output('x', 11)
+
+        model.add_subsystem('expl', ModCompEx(3))
+        model.add_subsystem('impl', ModCompIm(3))
+
+        model.connect('indep.x', ['expl.x', 'impl.x'])
+
+        prob.setup()
+        prob.run_model()
+
+        # list inputs, no tags
+        inputs = prob.model.list_inputs(values=False, out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('expl.a', {}),
+            ('expl.x', {}),
+            ('impl.x', {}),
+        ])
+
+        # list inputs, with tags
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags='tagx')
+        self.assertEqual(sorted(inputs), [
+            ('expl.x', {}),
+            ('impl.x', {}),
+        ])
+
+        # list outputs, no tags
+        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('expl.b', {}),
+            ('expl.y', {}),
+            ('impl.y', {}),
+            ('indep.x', {}),
+        ])
+
+        # list outputs, with tags
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags='tagy')
+        self.assertEqual(sorted(outputs), [
+            ('expl.y', {}),
+            ('impl.y', {}),
+        ])
+
     def test_float_to_discrete_error(self):
         prob = om.Problem()
         model = prob.model
@@ -307,7 +353,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+                         "Group (<model>): Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_to_float_error(self):
         prob = om.Problem()
@@ -322,7 +368,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+                         "Group (<model>): Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
 
     def test_discrete_mismatch_error(self):
         prob = om.Problem()
@@ -337,7 +383,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
+                         "Group (<model>): Type 'str' of output 'indep.x' is incompatible with type 'int' of input 'comp.x'.")
 
     def test_driver_discrete_enforce_int(self):
         # Drivers require discrete vars to be int or ndarrays of int.
@@ -516,7 +562,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(ctx.exception),
-                         "System '' has a NewtonSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
+                         "Group (<model>) has a NewtonSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
 
     def test_discrete_err_broyden(self):
         prob = self._setup_model(om.BroydenSolver)
@@ -525,7 +571,7 @@ class SolverDiscreteTestCase(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(ctx.exception),
-                         "System '' has a BroydenSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
+                         "Group (<model>) has a BroydenSolver solver and contains discrete outputs ['discrete_g.C1.y'].")
 
 
 class DiscretePromTestCase(unittest.TestCase):
@@ -609,7 +655,7 @@ class DiscretePromTestCase(unittest.TestCase):
             else:
                 yield name
 
-        # add a test to see if discrete vars show up in view_model
+        # add a test to see if discrete vars show up in n2
         data = _get_viewer_data(prob)
         findvars = [
             'indep.x',

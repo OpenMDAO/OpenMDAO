@@ -34,6 +34,22 @@ class RectangleComp(om.ExplicitComponent):
         outputs['area'] = inputs['length'] * inputs['width']
 
 
+class RectangleCompWithTags(om.ExplicitComponent):
+    """
+    A simple Explicit Component that also has input and output with tags.
+    """
+
+    def setup(self):
+        self.add_input('length', val=1., tags=["tag1", "tag2"])
+        self.add_input('width', val=1., tags=["tag2"])
+        self.add_output('area', val=1., tags=["tag1"])
+
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        outputs['area'] = inputs['length'] * inputs['width']
+
+
 class RectanglePartial(RectangleComp):
 
     def compute_partials(self, inputs, partials):
@@ -93,15 +109,15 @@ class ExplCompTestCase(unittest.TestCase):
         prob = om.Problem(RectangleGroup())
         prob.setup()
 
-        msg = "Unable to list inputs until model has been run."
+        msg = "RectangleGroup (<model>): Unable to list inputs until model has been run."
         try:
             prob.model.list_inputs()
         except Exception as err:
-            self.assertTrue(msg == str(err))
+            self.assertEqual(str(err), msg)
         else:
             self.fail("Exception expected")
 
-        msg = "Unable to list outputs until model has been run."
+        msg = "RectangleGroup (<model>): Unable to list outputs until model has been run."
         try:
             prob.model.list_outputs()
         except Exception as err:
@@ -670,6 +686,130 @@ class ExplCompTestCase(unittest.TestCase):
                                     scaling=True,
                                     hierarchical=True,
                                     print_arrays=True)
+
+    def test_simple_var_tags(self):
+        prob = om.Problem(RectangleCompWithTags())
+        prob.setup(check=False)
+        prob.run_model()
+
+        # Inputs no tags
+        inputs = prob.model.list_inputs(out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('length', {'value': [1.]}),
+            ('width', {'value': [1.]}),
+        ])
+
+        # Inputs with tags
+        inputs = prob.model.list_inputs(out_stream=None, tags="tag1")
+        self.assertEqual(sorted(inputs), [
+            ('length', {'value': [1.]}),
+        ])
+
+        # Inputs with multiple tags
+        inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag3"])
+        self.assertEqual(sorted(inputs), [
+            ('length', {'value': [1.]}),
+        ])
+        inputs = prob.model.list_inputs(out_stream=None, tags=["tag1", "tag2"])
+        self.assertEqual(sorted(inputs), [
+            ('length', {'value': [1.]}),
+            ('width', {'value': [1.]}),
+        ])
+
+        # Inputs with tag that does not match
+        inputs = prob.model.list_inputs(out_stream=None, tags="tag3")
+        self.assertEqual(sorted(inputs), [])
+
+        # Outputs no tags
+        outputs = prob.model.list_outputs(out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('area', {'value': [1.]}),
+        ])
+
+        # Outputs with tags
+        outputs = prob.model.list_outputs(out_stream=None, tags="tag1")
+        self.assertEqual(sorted(outputs), [
+            ('area', {'value': [1.]}),
+        ])
+
+        # Outputs with multiple tags
+        outputs = prob.model.list_outputs(out_stream=None, tags=["tag1", "tag3"])
+        self.assertEqual(sorted(outputs), [
+            ('area', {'value': [1.]}),
+        ])
+
+        # Outputs with tag that does not match
+        outputs = prob.model.list_outputs(out_stream=None, tags="tag3")
+        self.assertEqual(sorted(outputs), [])
+
+    def test_feature_simple_var_tags(self):
+        from openmdao.api import Problem, ExplicitComponent
+
+        class RectangleCompWithTags(ExplicitComponent):
+            """
+            A simple Explicit Component that also has input and output with tags.
+            """
+
+            def setup(self):
+                self.add_input('length', val=1., tags=["tag1", "tag2"])
+                self.add_input('width', val=1., tags=["tag2"])
+                self.add_output('area', val=1., tags="tag1")
+
+                self.declare_partials('*', '*')
+
+            def compute(self, inputs, outputs):
+                outputs['area'] = inputs['length'] * inputs['width']
+
+        prob = Problem(RectangleCompWithTags())
+        prob.setup(check=False)
+        prob.run_model()
+
+        # Inputs no tags
+        inputs = prob.model.list_inputs(values=False, out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('length', {}),
+            ('width', {}),
+        ])
+
+        # Inputs with tags
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag1")
+        self.assertEqual(sorted(inputs), [
+            ('length', {}),
+        ])
+
+        # Inputs with multiple tags
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags=["tag1", "tag2"])
+        self.assertEqual(sorted(inputs), [
+            ('length', {}),
+            ('width', {}),
+        ])
+
+        # Inputs with tag that does not match
+        inputs = prob.model.list_inputs(values=False, out_stream=None, tags="tag3")
+        self.assertEqual(sorted(inputs), [])
+
+        # Outputs no tags
+        outputs = prob.model.list_outputs(values=False, out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('area', {}),
+        ])
+
+        # Outputs with tags
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag1")
+        self.assertEqual(sorted(outputs), [
+            ('area', {}),
+        ])
+
+        # Outputs with multiple tags
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags=["tag1", "tag3"])
+        self.assertEqual(sorted(outputs), [
+            ('area', {}),
+        ])
+
+        # Outputs with tag that does not match
+        outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag3")
+        self.assertEqual(sorted(outputs), [])
+
 
     def test_compute_inputs_read_only(self):
         class BadComp(TestExplCompSimple):

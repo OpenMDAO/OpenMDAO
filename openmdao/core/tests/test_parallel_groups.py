@@ -21,6 +21,13 @@ from openmdao.utils.logger_utils import TestLogger
 from openmdao.error_checking.check_config import _default_checks
 
 
+class Noisy(ConvergeDiverge):
+    def check_config(self, logger):
+        msg = 'Only want to see this on rank 0'
+        logger.error(msg)
+        logger.warning(msg)
+        logger.info(msg)
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelGroups(unittest.TestCase):
@@ -236,13 +243,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
-    def test_setup_messages(self):
-
-        class Noisy(ConvergeDiverge):
-            def check_config(self, logger):
-                logger.error(msg)
-                logger.warning(msg)
-                logger.info(msg)
+    def test_setup_messages_bad_vec_type(self):
 
         prob = om.Problem(Noisy())
 
@@ -257,11 +258,13 @@ class TestParallelGroups(unittest.TestCase):
         else:
             prob.setup(check=False, mode='fwd')
 
+    def test_setup_messages_only_on_proc0(self):
+        prob = om.Problem(Noisy())
+
         # check that we get setup messages only on proc 0
         msg = 'Only want to see this on rank 0'
         testlogger = TestLogger()
-        prob.setup(check=True, mode='fwd',
-                   logger=testlogger)
+        prob.setup(check=True, mode='fwd', logger=testlogger)
         prob.final_setup()
 
         if prob.comm.rank > 0:

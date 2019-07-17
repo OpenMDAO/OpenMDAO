@@ -82,7 +82,7 @@ class ApproximationScheme(object):
 
         return self._approx_groups, self._colored_approx_groups
 
-    def add_approximation(self, abs_key, kwargs):
+    def add_approximation(self, abs_key, system, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
@@ -90,6 +90,8 @@ class ApproximationScheme(object):
         ----------
         abs_key : tuple(str,str)
             Absolute name pairing of (of, wrt) for the derivative.
+        system : System
+            Containing System.
         kwargs : dict
             Additional keyword arguments, to be interpreted by sub-classes.
         """
@@ -137,7 +139,7 @@ class ApproximationScheme(object):
 
         is_total = isinstance(system, Group)
 
-        system._update_wrt_matches()
+        system._update_wrt_matches(system._coloring_info)
         wrt_matches = system._coloring_info['wrt_matches']
 
         data = None

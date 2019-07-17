@@ -270,7 +270,7 @@ Displayed Component Connectivity
 --------------------------------
 
 Between the search bar and the N2 diagram, there is a note about how the internal connectivity of components is
-controlled. This is controlled from a script using the `use_declare_partial_info` option to the `view_model` function.
+controlled. This is controlled from a script using the `use_declare_partial_info` option to the `n2` function.
 A similar option exists when generating N2 diagrams from the command line.
 
 Legend

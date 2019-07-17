@@ -234,7 +234,7 @@ class TestDesvarOnModel(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), "Output not found for design variable 'junk' in system ''.")
+        self.assertEqual(str(context.exception), "SellarDerivatives (<model>): Output not found for design variable 'junk'.")
 
     def test_desvar_affine_and_scaleradder(self):
 
@@ -340,7 +340,7 @@ class TestDesvarOnModel(unittest.TestCase):
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'The name argument should '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
                                                  'be a string, got 42')
 
     def test_desvar_invalid_bounds(self):
@@ -377,7 +377,7 @@ class TestConstraintOnModel(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
 
-        self.assertEqual(str(context.exception), "Output not found for response 'junk' in system ''.")
+        self.assertEqual(str(context.exception), "SellarDerivatives (<model>): Output not found for response 'junk'.")
 
     def test_constraint_affine_and_scaleradder(self):
 
@@ -457,7 +457,7 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_design_var(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'The name argument should '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
                                                  'be a string, got 42')
 
     def test_constraint_invalid_bounds(self):
@@ -491,7 +491,7 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_constraint(42, lower=-100, upper=100, ref0=-100.0,
                                       ref=100)
 
-        self.assertEqual(str(context.exception), 'The name argument should '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
                                                  'be a string, got 42')
 
     def test_constraint_invalid_bounds(self):
@@ -525,21 +525,21 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices='foo')
 
-        self.assertEqual(str(context.exception), 'If specified, indices must '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices=1)
 
-        self.assertEqual(str(context.exception), 'If specified, indices must '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         with self.assertRaises(ValueError) as context:
             prob.model.add_constraint('con1', lower=0.0, upper=5.0,
                                       indices=[1, 'k'])
 
-        self.assertEqual(str(context.exception), 'If specified, indices must '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, response indices must '
                                                  'be a sequence of integers.')
 
         # passing an iterator for indices should be valid
@@ -556,7 +556,7 @@ class TestConstraintOnModel(unittest.TestCase):
             prob.model.add_constraint('con1', lower=0.0, upper=5.0, equals=3.0,
                                       indices='foo')
 
-        msg = "Constraint 'con1' cannot be both equality and inequality."
+        msg = "SellarDerivatives: Constraint 'con1' cannot be both equality and inequality."
         self.assertEqual(str(context.exception), msg)
 
 
@@ -578,7 +578,7 @@ class TestAddConstraintMPI(unittest.TestCase):
         with self.assertRaises(RuntimeError) as context:
             prob.setup(mode='rev')
 
-        msg = "Output not found for response 'd1.junk' in system 'sub'."
+        msg = "SellarDerivatives (sub): Output not found for response 'd1.junk'."
         self.assertEqual(str(context.exception), msg)
 
 
@@ -597,7 +597,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             prob.setup()
 
         self.assertEqual(str(context.exception),
-                         "Output not found for response 'junk' in system ''.")
+                         "SellarDerivatives (<model>): Output not found for response 'junk'.")
 
     def test_objective_affine_and_scaleradder(self):
 
@@ -679,7 +679,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_design_var('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "'': When adding design var 'z', %s should have size 1 but instead has size 2." % name)
+                             "SellarDerivatives: When adding design var 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_constraint_size_err(self):
 
@@ -693,7 +693,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_constraint('z', indices=[1], **args)
             self.assertEqual(str(context.exception),
-                             "'': When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
+                             "SellarDerivatives: When adding constraint 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_size_err(self):
 
@@ -707,7 +707,7 @@ class TestObjectiveOnModel(unittest.TestCase):
             with self.assertRaises(Exception) as context:
                 prob.model.add_objective('z', index=1, **args)
             self.assertEqual(str(context.exception),
-                             "'': When adding objective 'z', %s should have size 1 but instead has size 2." % name)
+                             "SellarDerivatives: When adding objective 'z', %s should have size 1 but instead has size 2." % name)
 
     def test_objective_invalid_name(self):
 
@@ -719,7 +719,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective(42, ref0=-100.0, ref=100)
 
-        self.assertEqual(str(context.exception), 'The name argument should '
+        self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
                                                  'be a string, got 42')
 
     def test_objective_invalid_index(self):
@@ -732,7 +732,7 @@ class TestObjectiveOnModel(unittest.TestCase):
         with self.assertRaises(TypeError) as context:
             prob.model.add_objective('obj', index='foo')
 
-        self.assertEqual(str(context.exception), 'If specified, index must be an int.')
+        self.assertEqual(str(context.exception), 'SellarDerivatives: If specified, objective index must be an int.')
 
         prob.model.add_objective('obj', index=1)
 
