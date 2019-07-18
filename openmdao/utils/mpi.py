@@ -64,6 +64,8 @@ def use_proc_files():
 if 'OPENMDAO_REQUIRE_MPI' in os.environ:
     if os.environ['OPENMDAO_REQUIRE_MPI'].lower() in ['always', '1', 'true', 'yes']:
         from mpi4py import MPI
+    else:
+        MPI = None
 # If OPENMDAO_REQUIRE_MPI is unset, attempt to import mpi4py, but continue on failure
 # with a notification.
 else:
