@@ -2464,7 +2464,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         text = stream.getvalue()
         self.assertEqual(text.count('2 Explicit Output'), 1)
         # make sure they are in the correct order
-        # disabled until Case orders outputs
+        # FIXME: disabled until Case orders outputs
         # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(8, num_non_empty_lines)
@@ -2538,7 +2538,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
             # make sure they are in the correct order
-            # disabled until Case orders outputs
+            # FIXME: disabled until Case orders outputs
             # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
             self.assertEqual(37, num_non_empty_lines)
