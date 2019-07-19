@@ -2373,18 +2373,6 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         assert_rel_error(self, outputs_case[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
 
-        # Promoted names - no print arrays
-        stream = cStringIO()
-        outputs_case = case.list_outputs(values=True,
-                                         prom_name=True,
-                                         print_arrays=False,
-                                         out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(text.count('    x       |10.0|   x'), 1)
-        self.assertEqual(text.count('    y       |110.0|  y'), 1)
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
-
     def test_feature_list_vars_options(self):
         import openmdao.api as om
         from six.moves import cStringIO
