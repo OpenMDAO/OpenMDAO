@@ -60,6 +60,8 @@ class Vector(object):
         If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
+    _slices : dict
+        Mapping of var name to slice.
     _cplx_data : ndarray
         Actual allocated data under complex step.
     _cplx_views : dict
@@ -134,6 +136,7 @@ class Vector(object):
 
         self._root_vector = None
         self._data = None
+        self._slices = None
 
         # Support for Complex Step
         self._alloc_complex = alloc_complex

@@ -132,9 +132,8 @@ class PETScVector(DefaultVector):
                 abs2meta = system._var_allprocs_abs2meta
                 for name, idx_slice in iteritems(self.get_slice_dict()):
                     owning_rank = system._owning_rank[name]
-                    distributed = abs2meta[name]['distributed']
-                    if not distributed and owning_rank != system.comm.rank:
-                        dup_slice.extend(list(range(idx_slice.start, idx_slice.stop)))
+                    if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
+                        dup_slice.extend(range(idx_slice.start, idx_slice.stop))
 
                 self._dup_slice = dup_slice
 
