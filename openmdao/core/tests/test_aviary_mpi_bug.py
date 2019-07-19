@@ -45,9 +45,7 @@ def _get_problem():
     p.model.add_subsystem('con', om.ExecComp('y1=x1'))
     p.model.connect('des_vars.x', 'con.x1')
 
-    # the real cause of the bug is that force_alloc_complex results in internal petsc
-    # array for the jacobian scatter getting decoupled from the corresponding output or
-    # residual array.  Fix was to recouple them prior to executing the scatter.
+    # the bug only appears if force_alloc_complex is True
     p.setup(mode='auto', force_alloc_complex=True)
 
     p.set_solver_print(level=0)
