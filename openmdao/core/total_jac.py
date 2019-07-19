@@ -1069,8 +1069,8 @@ class _TotalJacInfo(object):
         # PETScVector
         else:
             # somehow the array within the petsc vector object is getting disassociated
-            # from the data array it was created from, so copy the array into the vec
-            # else we get zeros
+            # from the data array it was created from, so reassign the petsc vec array to
+            # the data array.
             self.soln_petsc[mode][vecname].array = self.output_vec[mode][vecname]._data
             self.jac_petsc[mode].array[:] = 0.
             scatter.scatter(self.soln_petsc[mode][vecname],
@@ -1121,8 +1121,8 @@ class _TotalJacInfo(object):
             reduced_derivs = deriv_val[deriv_idxs['linear']]
         else:
             # somehow the array within the petsc vector object is getting disassociated
-            # from the data array it was created from, so copy the array into the vec
-            # else we get zeros
+            # from the data array it was created from, so reassign the petsc vec array to
+            # the data array.
             self.soln_petsc[mode]['linear'].array = self.output_vec[mode]['linear']._data
             self.jac_petsc[mode].array[:] = 0.
             scatter.scatter(self.soln_petsc[mode]['linear'],
