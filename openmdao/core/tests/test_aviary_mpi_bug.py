@@ -1,19 +1,10 @@
-from __future__ import print_function, division, absolute_import
+from __future__ import print_function, division
 
-import sys
 import unittest
-import time
-import random
-from distutils.version import LooseVersion
-from collections import OrderedDict
-from six import iteritems
-from six.moves import cStringIO as StringIO
-
 import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
-from openmdao.utils.assert_utils import assert_rel_error
 
 
 if MPI:
@@ -26,7 +17,7 @@ if MPI:
 def _get_problem():
     p = om.Problem(model=om.Group())
 
-    desvars = p.model.add_subsystem('des_vars', om.IndepVarComp('x', 150))
+    p.model.add_subsystem('des_vars', om.IndepVarComp('x', 150))
 
     sa = p.model.add_subsystem('G1', om.Group())
     sa.add_subsystem('C3', om.ExecComp('y = x', x=6))
