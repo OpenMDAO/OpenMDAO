@@ -292,7 +292,7 @@ class _TotalJacInfo(object):
                         src_vec = PETSc.Vec().createWithArray(
                             self.output_vec[mode][vecname]._data[:, 0].copy(),
                             comm=self.comm)
-                self.soln_petsc[mode][vecname] = (src_vec, src_arr)
+                self.soln_petsc[mode][vecname] = src_vec
 
                 offset = size * rank
                 jac_inds = jac_idxs[vecname]
@@ -1068,8 +1068,12 @@ class _TotalJacInfo(object):
 
         # PETScVector
         else:
+            # somehow the array within the petsc vector object is getting disassociated
+            # from the data array it was created from, so reassign the petsc vec array to
+            # the data array.
+            self.soln_petsc[mode][vecname].array = self.output_vec[mode][vecname]._data
             self.jac_petsc[mode].array[:] = 0.
-            scatter.scatter(self.soln_petsc[mode][vecname][0],
+            scatter.scatter(self.soln_petsc[mode][vecname],
                             self.jac_petsc[mode], addv=False, mode=False)
             if mode == 'fwd':
                 self.J[:, i] = self.jac_petsc[mode].array
@@ -1116,8 +1120,12 @@ class _TotalJacInfo(object):
             deriv_val = self.output_vec[mode]['linear']._data
             reduced_derivs = deriv_val[deriv_idxs['linear']]
         else:
+            # somehow the array within the petsc vector object is getting disassociated
+            # from the data array it was created from, so reassign the petsc vec array to
+            # the data array.
+            self.soln_petsc[mode]['linear'].array = self.output_vec[mode]['linear']._data
             self.jac_petsc[mode].array[:] = 0.
-            scatter.scatter(self.soln_petsc[mode]['linear'][0],
+            scatter.scatter(self.soln_petsc[mode]['linear'],
                             self.jac_petsc[mode], addv=False, mode=False)
             reduced_derivs = self.jac_petsc[mode].array
 
@@ -1165,10 +1173,10 @@ class _TotalJacInfo(object):
             for col, i in enumerate(inds):
                 self.jac_petsc[mode].array[:] = 0.
                 if ncol > 1:
-                    solution[0].array = solution[1][:, col]
+                    solution.array = self.output_vec[mode][vecname]._data[:, col]
                 else:
-                    solution[0].array = solution[1]
-                scatter.scatter(self.soln_petsc[mode][vecname][0],
+                    solution.array = self.output_vec[mode][vecname]._data
+                scatter.scatter(self.soln_petsc[mode][vecname],
                                 self.jac_petsc[mode], addv=False, mode=False)
                 if mode == 'fwd':
                     self.J[:, i] = self.jac_petsc[mode].array
