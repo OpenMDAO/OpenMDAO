@@ -1008,6 +1008,40 @@ class TestSqliteCaseReader(unittest.TestCase):
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['value'], expected['value'])
 
+    def test_getitem(self):
+        prob = SellarProblem()
+        prob.setup()
+
+        prob.add_recorder(self.recorder)
+        prob.run_model()
+
+        prob.record_iteration('runonce')
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        case = cr.get_case('runonce')
+
+        # expected outputs and inputs from running the model once
+        expected = {
+            "x": 1.,
+            "y1": 25.58830237,
+            "y2": 12.05848815,
+            "z": [5., 2.],
+            "obj": 28.58830817,
+            "con1": -22.42830237,
+            "con2": -11.94151185
+        }
+
+        for name in expected:
+            np.testing.assert_almost_equal(case[name], expected[name])
+
+        # asking for nonexistent variable raises KeyError
+        with self.assertRaises(KeyError) as cm:
+            case['foo']
+
+        self.assertEqual(str(cm.exception), "'Variable name \"foo\" not found.'")
+
     def test_get_vars(self):
         prob = SellarProblem()
         prob.setup()
@@ -2373,6 +2407,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         outputs_case = case.list_outputs()
 
         assert_rel_error(self, outputs_case[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
+
 
 class TestPromotedToAbsoluteMap(unittest.TestCase):
     def setUp(self):

@@ -190,6 +190,31 @@ class Case(object):
         """
         return ' '.join([self.source, self.iteration_coordinate, str(self.outputs)])
 
+    def __getitem__(self, name):
+        """
+        Get an output/input variable.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+
+        Returns
+        -------
+        float or ndarray or any python object
+            the requested output/input variable.
+        """
+        if self.outputs is not None:
+            try:
+                return self.outputs[name]
+            except KeyError:
+                if self.inputs is not None:
+                    return self.inputs[name]
+        elif self.inputs is not None:
+            return self.inputs[name]
+
+        raise KeyError('Variable name "%s" not found.' % name)
+
     def get_design_vars(self, scaled=True, use_indices=True):
         """
         Get the values of the design variables, as seen by the driver, for this case.
@@ -717,7 +742,7 @@ class PromotedToAbsoluteMap(dict):
             abs_keys, prom_key = self._deriv_keys(key)
             return super(PromotedToAbsoluteMap, self).__getitem__(prom_key)
 
-        raise KeyError(key)
+        raise KeyError('Variable name "%s" not found.' % key)
 
     def __setitem__(self, key, value):
         """
