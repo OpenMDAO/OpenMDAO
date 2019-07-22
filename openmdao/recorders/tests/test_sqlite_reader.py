@@ -23,6 +23,7 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler
+from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -49,24 +50,12 @@ def count_keys(d):
     return count
 
 
+@use_tempdirs
 class TestSqliteCaseReader(unittest.TestCase):
 
     def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
-
-        self.filename = os.path.join(self.temp_dir, "sqlite_test")
+        self.filename = "sqlite_test"
         self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_bad_filetype(self):
         # Pass a plain text file.
@@ -1012,34 +1001,49 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         prob.add_recorder(self.recorder)
-        prob.run_model()
+        prob.driver.add_recorder(self.recorder)
 
-        prob.record_iteration('runonce')
+        prob.run_driver()
+
+        prob.record_iteration('final')
         prob.cleanup()
 
-        cr = om.CaseReader(self.filename)
-
-        case = cr.get_case('runonce')
-
-        # expected outputs and inputs from running the model once
+        # expected input and output values after run_once
         expected = {
+            # promoted names
             "x": 1.,
             "y1": 25.58830237,
             "y2": 12.05848815,
             "z": [5., 2.],
             "obj": 28.58830817,
             "con1": -22.42830237,
-            "con2": -11.94151185
+            "con2": -11.94151185,
+            # unpromoted output names
+            "px.x": 1.,
+            "pz.z": [5., 2.],
+            "obj_cmp.obj": 28.58830817,
+            "con_cmp1.con1": -22.42830237,
+            "con_cmp2.con2": -11.94151185,
         }
 
+        cr = om.CaseReader(self.filename)
+
+        # driver will record inputs and outputs only at the driver level
+        cases = cr.list_cases('driver')
+        case = cr.get_case(cases[0])
+        for name in expected:
+            if name.startswith('y'):
+                msg = "'Variable name \"%s\" not found.'" % name
+                with self.assertRaises(KeyError) as cm:
+                    case[name]
+                self.assertEqual(str(cm.exception), msg)
+            else:
+                np.testing.assert_almost_equal(case[name], expected[name])
+
+        # problem will record all inputs and outputs (including y1 & y2)
+        case = cr.get_case('final')
         for name in expected:
             np.testing.assert_almost_equal(case[name], expected[name])
-
-        # asking for nonexistent variable raises KeyError
-        with self.assertRaises(KeyError) as cm:
-            case['foo']
-
-        self.assertEqual(str(cm.exception), "'Variable name \"foo\" not found.'")
 
     def test_get_vars(self):
         prob = SellarProblem()
@@ -2009,26 +2013,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                 self.assertEqual(case.source, 'root')
 
 
+@use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
-
-    def setUp(self):
-        import os
-        from tempfile import mkdtemp
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
-
-    def tearDown(self):
-        import os
-        from shutil import rmtree
-        import errno
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_feature_list_cases(self):
         import numpy as np
@@ -2602,20 +2588,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(num_non_empty_lines, 40)
 
 
+@use_tempdirs
 class TestPromotedToAbsoluteMap(unittest.TestCase):
-    def setUp(self):
-        self.dir = mkdtemp()
-        self.original_path = os.getcwd()
-        os.chdir(self.dir)
-
-    def tearDown(self):
-        os.chdir(self.original_path)
-        try:
-            rmtree(self.dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_dict_functionality(self):
         prob = SellarProblem(SellarDerivativesGrouped)
