@@ -449,7 +449,7 @@ class Case(object):
                 if values:
                     outs['value'] = out_vars[name]['value']
                 if prom_name:
-                    outs['prom_name'] = self._var_abs2prom['output'][name]
+                    outs['prom_name'] = self._abs2prom['output'][name]
                 if residuals:
                     outs['resids'] = out_vars[name]['residuals']
                 if units:
