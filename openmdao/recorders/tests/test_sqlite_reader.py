@@ -15,6 +15,7 @@ from six import iteritems, assertRaisesRegex
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
+from openmdao.recorders.case import PromotedToAbsoluteMap
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
@@ -99,6 +100,37 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
         self.assertTrue(isinstance(cr, SqliteCaseReader),
                         msg='CaseReader not returning the correct subclass.')
+
+    def test_case_attributes(self):
+        """ Check that a Case object has all the expected attributes. """
+        prob = SellarProblem()
+        prob.setup()
+
+        prob.driver.add_recorder(self.recorder)
+        prob.run_driver()
+
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        self.assertEqual(case.source, 'driver')
+        self.assertEqual(case.name, 'rank0:Driver|0')
+        self.assertEqual(case.counter, 1)
+        self.assertTrue(isinstance(case.timestamp, float))
+        self.assertEqual(case.success, True)
+        self.assertEqual(case.msg, '')
+        self.assertTrue(isinstance(case.outputs, PromotedToAbsoluteMap))
+        self.assertTrue(isinstance(case.inputs, type(None)))
+        self.assertTrue(isinstance(case.residuals, type(None)))
+        self.assertTrue(isinstance(case.jacobian, type(None)))
+        self.assertEqual(case.parent, None)
+        self.assertEqual(case.abs_err, None)
+        self.assertEqual(case.rel_err, None)
+
+        msg = "'iteration_coordinate' has been deprecated. Use 'name' instead."
+        with assert_warning(DeprecationWarning, msg):
+            case.iteration_coordinate
 
     def test_invalid_source(self):
         """ Tests that the reader returns params correctly. """
@@ -447,7 +479,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         last_counter = 0
         for i, c in enumerate(cr.get_cases()):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.name, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
 
@@ -480,8 +512,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         last_counter = 0
         for i, c in enumerate(cr.get_cases(recurse=True, flat=True)):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
-            if len(c.iteration_coordinate.split('|')) > 2:
+            self.assertEqual(c.name, expected_coords[i])
+            if len(c.name.split('|')) > 2:
                 self.assertEqual(c.parent, expected_coords[i+1])
             else:
                 self.assertEqual(c.parent, None)
@@ -499,7 +531,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         last_counter = 0
         for i, c in enumerate(cr.get_cases('rank0:pyOptSparse_SLSQP|0', recurse=True, flat=True)):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.name, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
 
@@ -519,15 +551,15 @@ class TestSqliteCaseReader(unittest.TestCase):
         count = 0
         for case in cases:
             count += 1
-            coord = case.iteration_coordinate
+            coord = case.name
             self.assertTrue(coord in list(expected_coords.keys()))
             for child_case in cases[case]:
                 count += 1
-                child_coord = child_case.iteration_coordinate
+                child_coord = child_case.name
                 self.assertTrue(child_coord in expected_coords[coord].keys())
                 for grandchild_case in cases[case][child_case]:
                     count += 1
-                    grandchild_coord = grandchild_case.iteration_coordinate
+                    grandchild_coord = grandchild_case.name
                     self.assertTrue(grandchild_coord in expected_coords[coord][child_coord].keys())
 
         self.assertEqual(count, 3)
@@ -569,7 +601,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         last_counter = 0
         for i, c in enumerate(cr.get_cases(source=case.parent, recurse=True, flat=True)):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.name, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
             i += 1
@@ -854,7 +886,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # verify the cases are all there and are as expected
         self.assertEqual(len(cases), len(expected_coords))
         for i, c in enumerate(cases):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.name, expected_coords[i])
 
         #
         # get a list of cases for each source
@@ -884,7 +916,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                     mda_counter += 1
                 if source.startswith('root.'):     # count all cases for/under root solver
                     root_counter += 1
-                self.assertRegexpMatches(case.iteration_coordinate, expected)
+                self.assertRegexpMatches(case.name, expected)
 
         self.assertEqual(counter, global_iterations)
 
@@ -1498,7 +1530,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                           cr._system_cases, cr._problem_cases):
             for key in case_type.list_cases():
                 self.assertTrue(key in case_type._cases)
-                self.assertEqual(key, case_type._cases[key].iteration_coordinate)
+                self.assertEqual(key, case_type._cases[key].name)
 
     def test_caching_cases(self):
         prob = SellarProblem()
@@ -1548,7 +1580,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                           cr._system_cases, cr._problem_cases):
             for key in case_type.list_cases():
                 self.assertTrue(key in case_type._cases)
-                self.assertEqual(key, case_type._cases[key].iteration_coordinate)
+                self.assertEqual(key, case_type._cases[key].name)
 
     def test_reading_driver_cases_with_indices(self):
         # note: size must be an even number
@@ -2032,7 +2064,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             case = cr.get_case(c)
 
 
-            coord = case.iteration_coordinate
+            coord = case.name
             self.assertEqual(coord, expected[i])
 
             # check the source

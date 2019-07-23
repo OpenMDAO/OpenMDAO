@@ -10,10 +10,10 @@ from collections import OrderedDict
 
 import numpy as np
 
-from openmdao.utils.record_util import json_to_np_array
 from openmdao.recorders.sqlite_recorder import blob_to_array
-
+from openmdao.utils.record_util import json_to_np_array
 from openmdao.utils.variable_table import write_var_table
+from openmdao.utils.general_utils import warn_deprecation
 
 _DEFAULT_OUT_STREAM = object()
 
@@ -26,8 +26,8 @@ class Case(object):
     ----------
     source : str
         The unique id of the system/solver/driver/problem that did the recording.
-    iteration_coordinate : str
-        The full unique identifier for this iteration.
+    name : str
+        The unique identifier for this case.
     parent : str
         The iteration coordinate of the parent case for this iteration if any, else None.
     counter : int
@@ -89,17 +89,17 @@ class Case(object):
         self._format_version = data_format
 
         if 'iteration_coordinate' in data.keys():
-            self.iteration_coordinate = data['iteration_coordinate']
-            parts = self.iteration_coordinate.split('|')
+            self.name = data['iteration_coordinate']
+            parts = self.name.split('|')
             if len(parts) > 2:
                 self.parent = '|'.join(parts[:-2])
             else:
                 self.parent = None
         elif 'case_name' in data.keys():
-            self.iteration_coordinate = data['case_name']  # problem cases
+            self.name = data['case_name']  # problem cases
             self.parent = None
         else:
-            self.iteration_coordinate = None
+            self.name = None
             self.parent = None
 
         self.counter = data['counter']
@@ -179,6 +179,19 @@ class Case(object):
         # save VOI dict reference for use by self._scale()
         self._voi_meta = voi_meta
 
+    @property
+    def iteration_coordinate(self):
+        """
+        Deprecate the 'iteration_coordinate' attribute.
+
+        Returns
+        -------
+        str
+            The unique identifier for this case.
+        """
+        warn_deprecation("'iteration_coordinate' has been deprecated. Use 'name' instead.")
+        return self.name
+
     def __str__(self):
         """
         Get string representation of the case.
@@ -188,7 +201,7 @@ class Case(object):
         str
             String representation of the case.
         """
-        return ' '.join([self.source, self.iteration_coordinate, str(self.outputs)])
+        return ' '.join([self.source, self.name, str(self.outputs)])
 
     def __getitem__(self, name):
         """
