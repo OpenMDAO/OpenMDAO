@@ -3008,12 +3008,6 @@ class System(object):
             # Filter based on tags
             if filter_var_based_on_tags(tags, meta[var_name]):
                 continue
-            # if tags:
-            #     var_tags = meta[var_name]['tags']
-            #     if not var_tags:
-            #         continue
-            #     if not (set(tags) & set(var_tags)):
-            #         continue
 
             var_meta = {}
             if values:
@@ -3033,13 +3027,6 @@ class System(object):
                 # Filter based on tags
                 if filter_var_based_on_tags(tags, self._discrete_inputs._dict[var_name]):
                     continue
-                #
-                # if tags:
-                #     var_tags = self._discrete_inputs._dict[var_name]['tags']
-                #     if not var_tags:
-                #         continue
-                #     if not (set(tags) & set(var_tags)):
-                #         continue
 
                 var_meta = {}
                 if values:
