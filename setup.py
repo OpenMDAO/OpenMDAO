@@ -71,9 +71,7 @@ setup(
         'openmdao.components',
         'openmdao.core',
         'openmdao.devtools',
-        'openmdao.devtools.problem_viewer',
         'openmdao.devtools.iprofile_app',
-        'openmdao.devtools.xdsm_viewer',
         'openmdao.docs',
         'openmdao.docs._exts',
         'openmdao.docs._utils',
@@ -95,6 +93,10 @@ setup(
         'openmdao.test_suite.test_examples.beam_optimization.components',
         'openmdao.utils',
         'openmdao.vectors',
+        'openmdao.visualization',
+        'openmdao.visualization.connection_viewer',
+        'openmdao.visualization.n2_viewer',
+        'openmdao.visualization.xdsm_viewer',
         'openmdao.surrogate_models',
         'openmdao.surrogate_models.nn_interpolators'
     ],
@@ -107,7 +109,7 @@ setup(
             'visualization/style/*.woff',
             'visualization/*.html'
         ],
-        'openmdao.devtools.xdsm_viewer': [
+        'openmdao.visualization.xdsm_viewer': [
             'XDSMjs/*',
             'XDSMjs/src/*.js',
             'XDSMjs/build/*.js',

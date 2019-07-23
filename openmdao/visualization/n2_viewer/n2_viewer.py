@@ -1,3 +1,4 @@
+"""Code for generating N2 diagram."""
 import base64
 import inspect
 import json
@@ -24,7 +25,7 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.component import Component
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.devtools.html_utils import read_files, write_script, DiagramWriter
+from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning, make_serializable
 from openmdao.utils.record_util import check_valid_sqlite3_db
@@ -60,7 +61,8 @@ def _get_var_dict(system, typ, name):
     return var_dict
 
 
-def _get_tree_dict(system, component_execution_orders, component_execution_index, is_parallel=False):
+def _get_tree_dict(system, component_execution_orders, component_execution_index,
+                   is_parallel=False):
     """Get a dictionary representation of the system hierarchy."""
     tree_dict = OrderedDict()
     tree_dict['name'] = system.name
@@ -99,7 +101,8 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
         tree_dict['component_type'] = None
         tree_dict['subsystem_type'] = 'group'
         tree_dict['is_parallel'] = is_parallel
-        children = [_get_tree_dict(s, component_execution_orders, component_execution_index, is_parallel)
+        children = [_get_tree_dict(s, component_execution_orders, component_execution_index,
+                                   is_parallel)
                     for s in system._subsystems_myproc]
         if system.comm.size > 1:
             if system._subsystems_myproc:
@@ -141,6 +144,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
     return tree_dict
 
+
 def _get_declare_partials(system):
     """
     Get a list of the declared partials.
@@ -156,7 +160,6 @@ def _get_declare_partials(system):
         A list containing all the declared partials (strings in the form "of > wrt" )
         beginning from the given system on down.
     """
-
     declare_partials_list = []
 
     def recurse_get_partials(system, dpl):
@@ -164,7 +167,7 @@ def _get_declare_partials(system):
         if isinstance(system, Component):
             subjacs = system._subjacs_info
             for abs_key, meta in iteritems(subjacs):
-                dpl.append( "{} > {}".format(abs_key[0], abs_key[1]))
+                dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
         elif isinstance(system, Group):
             for s in system._subsystems_myproc:
                 recurse_get_partials(s, dpl)
@@ -290,7 +293,7 @@ def _get_viewer_data(data_source):
 
 def view_tree(*args, **kwargs):
     """
-    view_tree was renamed to n2, but left here for backwards compatibility
+    view_tree was renamed to n2, but left here for backwards compatibility.
     """
     warn_deprecation("view_tree is deprecated. Please switch to n2.")
     n2(*args, **kwargs)
@@ -298,7 +301,7 @@ def view_tree(*args, **kwargs):
 
 def view_model(*args, **kwargs):
     """
-    view_model was renamed to n2, but left here for backwards compatibility
+    view_model was renamed to n2, but left here for backwards compatibility.
     """
     warn_deprecation("view_model is deprecated. Please switch to n2.")
     n2(*args, **kwargs)
@@ -307,7 +310,7 @@ def view_model(*args, **kwargs):
 def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
        title=None, use_declare_partial_info=False):
     """
-    Generates an HTML file containing a tree viewer.
+    Generate an HTML file containing a tree viewer.
 
     Optionally opens a web browser to view the file.
 
@@ -350,7 +353,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     import openmdao
     openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
-    vis_dir = os.path.join(openmdao_dir, "visualization")
+    vis_dir = os.path.join(openmdao_dir, "visualization/n2_viewer")
     libs_dir = os.path.join(vis_dir, "libs")
     src_dir = os.path.join(vis_dir, "src")
     style_dir = os.path.join(vis_dir, "style")
@@ -388,10 +391,13 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     # Toolbar
     toolbar = h.toolbar
     group1 = toolbar.add_button_group()
-    group1.add_button("Return To Root", uid="returnToRootButtonId", disabled="disabled", content="icon-home")
+    group1.add_button("Return To Root", uid="returnToRootButtonId", disabled="disabled",
+                      content="icon-home")
     group1.add_button("Back", uid="backButtonId", disabled="disabled", content="icon-left-big")
-    group1.add_button("Forward", uid="forwardButtonId", disabled="disabled", content="icon-right-big")
-    group1.add_button("Up One Level", uid="upOneLevelButtonId", disabled="disabled", content="icon-up-big")
+    group1.add_button("Forward", uid="forwardButtonId", disabled="disabled",
+                      content="icon-right-big")
+    group1.add_button("Up One Level", uid="upOneLevelButtonId", disabled="disabled",
+                      content="icon-up-big")
 
     group2 = toolbar.add_button_group()
     group2.add_button("Uncollapse In View Only", uid="uncollapseInViewButtonId",
@@ -432,16 +438,17 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     h.add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
 
     if use_declare_partial_info:
-        h.insert( '{{component_connectivity}}',
-                  'Note: Component internal connectivity computed using derivative declarations')
+        h.insert('{{component_connectivity}}',
+                 'Note: Component internal connectivity computed using derivative declarations')
     else:
-        h.insert( '{{component_connectivity}}',
-                  'Note: Derivative declarations ignored, so dense component connectivity is assumed')
+        h.insert('{{component_connectivity}}',
+                 'Note: Derivative declarations ignored, so dense component '
+                 'connectivity is assumed')
 
     # Write output file
     h.write(outfile)
 
     # open it up in the browser
     if show_browser:
-        from openmdao.devtools.webview import webview
+        from openmdao.utils.webview import webview
         webview(outfile)

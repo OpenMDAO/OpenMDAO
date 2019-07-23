@@ -216,7 +216,7 @@ def record_viewer_data(problem):
 
     # if any recorders were found, get the viewer data and record it
     if recorders:
-        from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+        from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
         viewer_data = _get_viewer_data(problem)
         for recorder in recorders:
             recorder.record_viewer_data(viewer_data)

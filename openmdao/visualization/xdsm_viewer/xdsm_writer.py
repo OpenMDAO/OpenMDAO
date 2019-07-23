@@ -23,9 +23,9 @@ from six import iteritems, string_types
 
 from openmdao.core.problem import Problem
 from openmdao.utils.general_utils import simple_warning
-from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
-from openmdao.devtools.webview import webview
-from openmdao.devtools.xdsm_viewer.html_writer import write_html
+from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
+from openmdao.utils.webview import webview
+from openmdao.visualization.xdsm_viewer.html_writer import write_html
 
 from numpy.distutils.exec_command import find_executable
 
@@ -111,9 +111,21 @@ _DEFAULT_NUMBER_ALIGNMENT = 'horizontal'
 
 
 class BaseXDSMWriter(object):
-    """All XDSM writers have to inherit from this base class."""
+    """
+    All XDSM writers have to inherit from this base class.
+
+    Attributes
+    ----------
+    name : str
+        OpenMDAO component type.
+    extension : str
+        Output file saved with this extension.
+    type_map : str
+        XDSM component type.
+    """
 
     def __init__(self, name):
+        """Initialize."""
         self.name = name
         # This should be a dictionary mapping OpenMDAO system types to XDSM component types.
         # See for example any value in _COMPONENT_TYPE_MAP
@@ -126,36 +138,53 @@ class AbstractXDSMWriter(BaseXDSMWriter):
     Abstract class to define methods for XDSM writers.
 
     All methods should be implemented in child classes.
+
+    Attributes
+    ----------
+    comps : list of dicts
+        List of systems where the list items are dicts indicating type, id, and name.
+    connections : list of dicts
+        List of connections where the list items are dicts indicating 'to', 'from', 'name' of edge.
+    ins : dict ???
+        OpenMDAO component type.
+    processes : list
+        List of process.
     """
+
     def __init__(self, name='abstract_xdsm_writer'):
+        """Initialize."""
         super(AbstractXDSMWriter, self).__init__(name=name)
         self.comps = []
         self.connections = []
-        self.left_outs = {}
-        self.right_outs = {}
         self.ins = {}
         self.processes = []
-        self.process_arrows = []
 
     def add_solver(self, label, name='solver', **kwargs):
+        """Add a solver."""
         pass  # Implement in child class
 
     def add_comp(self, name, label=None, comp_type=None, **kwargs):
+        """Add a component."""
         pass  # Implement in child class
 
     def add_func(self, name, **kwargs):
+        """Add a function."""
         pass  # Implement in child class
 
     def add_driver(self, label, name='opt', driver_type='optimization', **kwargs):
+        """Add a driver."""
         pass  # Implement in child class
 
     def add_input(self, name, label, style='DataIO', stack=False):
+        """Add input connection."""
         pass  # Implement in child class
 
     def add_output(self, name, label, style='DataIO', stack=False, side=_DEFAULT_OUTPUT_SIDE):
+        """Add output connection."""
         pass  # Implement in child class
 
     def add_process(self, systems, arrow=True):
+        """Add process."""
         pass  # Implement in child class
 
     @staticmethod
@@ -169,6 +198,7 @@ class AbstractXDSMWriter(BaseXDSMWriter):
             List of items in the block
         kwargs : dict
             Keyword arguments.
+
         Returns
         -------
             list(str)
@@ -178,7 +208,7 @@ class AbstractXDSMWriter(BaseXDSMWriter):
     @staticmethod
     def format_var_str(name, var_type, superscripts=None):
         """
-        Formats a variable name to include a superscript for the variable type.
+        Format a variable name to include a superscript for the variable type.
 
         Parameters
         ----------
@@ -210,8 +240,30 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
     XDSMjs was created by Remi Lafage. The code and documentation is available at
     https://github.com/OneraHub/XDSMjs
+
+    Attributes
+    ----------
+    driver : str
+        Driver default name.
+    comp_names : list
+        Component names.
+    _ul : str
+        Name of the virtual first element.
+    _br : str
+        Name of the virtual last component.
+    _multi_suffix : str
+        If component ends with this string, it will be treated as a parallel component.
+    reserved_words : tuple
+        Ignored at text formatting.
+    extension : str
+        Output file saved with this extension. Value fixed at 'html' for this class.
+    type_map : str
+        XDSM component type.
+
     """
+
     def __init__(self, name='xdsmjs'):
+        """Initialize."""
         super(XDSMjsWriter, self).__init__(name=name)
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
@@ -313,6 +365,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
     def add_driver(self, label, name='opt', driver_type='optimization', **kwargs):
         """
+        Add a driver.
 
         Parameters
         ----------
@@ -364,11 +417,10 @@ class XDSMjsWriter(AbstractXDSMWriter):
         solver : dict or None, optional
             Solver info.
         """
-
         def recurse(solv, nr, process):
             for i, cmp in enumerate(process):
                 if cmp == solv:
-                    process[i+1:i+1+nr] = [process[i+1:i+1+nr]]
+                    process[i + 1:i + 1 + nr] = [process[i + 1:i + 1 + nr]]
                     return
                 elif isinstance(cmp, list):
                     recurse(solv, nr, cmp)
@@ -387,9 +439,11 @@ class XDSMjsWriter(AbstractXDSMWriter):
         recurse(solver_name, nr_comps, self.processes)  # Mutates self.processes
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
+        """Add an input connection."""
         self.connect(src=self._ul, target=name, label=label)
 
     def add_output(self, name, label=None, style='DataIO', stack=False, side=_DEFAULT_OUTPUT_SIDE):
+        """Add an output connection."""
         if side == "left":
             self.connect(src=name, target=self._ul, label=label)
         else:
@@ -398,7 +452,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
     def collect_data(self):
         """
-        Makes a dictionary with the structure of an XDSMjs JSON file.
+        Make a dictionary with the structure of an XDSMjs JSON file.
 
         Returns
         -------
@@ -409,8 +463,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
     def write(self, filename='xdsmjs', embed_data=True, **kwargs):
         """
-        Writes HTML output file, and depending on the value of "embed_data" a JSON file with the
-        data.
+        Write HTML output file, and depending on value of "embed_data" a JSON file with the data.
 
         If "embed_data" is true, a single standalone HTML file will be generated, which includes
         the data of the XDSM diagram.
@@ -450,8 +503,9 @@ except ImportError:
 else:
 
     class XDSMWriter(XDSM, BaseXDSMWriter):
-        """
+        r"""
         XDSM with some additional semantics.
+
         Creates a TeX file and TiKZ file, and converts it to PDF.
 
         .. note:: On Windows it might be necessary to add the second line in the
@@ -462,11 +516,40 @@ else:
 
            This issue is resolved in the latest version of pyXDSM.
 
+        Attributes
+        ----------
+        name : str
+            OpenMDAO component type.
+        box_stacking : str
+            Controls the appearance of boxes. Possible values are: 'max_chars','vertical',
+            'horizontal','cut_chars','empty'.
+        number_alignment : str
+            Position of number relative to the component label. Possible values are: 'horizontal',
+            'vertical'.
+        add_component_indices : bool
+            If true, display components with numbers.
+        has_legend : bool
+            If true, a legend will be added to the diagram.
+        extension : str
+            Output file saved with this extension. Value fixed at 'pdf' for this class.
+        type_map : str
+            XDSM component type.
+        _comp_indices : dict
+            Maps the component names to their index (position on the matrix diagonal).
+        _styles_used : set
+            Styles in use (needed for legend).
+        _comps : list
+            List of component dictionaries.
+        _loop_ends : list
+            Index of last components in a process.
+        _nr_comps : int
+            Number of components.
         """
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
                      number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False,
                      add_component_indices=True):
+            """Initialize."""
             super(XDSMWriter, self).__init__()
             self.name = name
             # Formatting options
@@ -531,7 +614,8 @@ else:
                 # Now really add the system with the XDSM class' method
                 self.add_system(**comp)
 
-            super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup, **kwargs)
+            super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup,
+                                          **kwargs)
 
         def add_system(self, node_name, style, label, stack=False, faded=False, **kwargs):
             """
@@ -607,7 +691,7 @@ else:
 
         def add_func(self, name, label=None, stack=False, **kwargs):
             """
-            Add a function
+            Add a function.
 
             Parameters
             ----------
@@ -675,7 +759,7 @@ else:
                     for i, item in enumerate(proc):
                         if solver_name == item:  # solver found in an already added process
                             # Delete items belonging to the new process from the others
-                            proc[i+1:i+1+nr] = []
+                            proc[i + 1:i + 1 + nr] = []
                             process_index = index_dct[process_name]
                             # There is a process loop inside, this adds plus one step
                             self._comps[process_index]['step'] += 1
@@ -691,6 +775,7 @@ else:
 
         @staticmethod
         def format_block(names, stacking='vertical', **kwargs):
+            """Format a block."""
             end_str = ', ...'
             max_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
             if stacking == 'vertical':
@@ -741,6 +826,7 @@ else:
 
         @staticmethod
         def format_var_str(name, var_type, superscripts=None):
+            """Format string displaying variable name."""
             if superscripts is None:
                 superscripts = _SUPERSCRIPTS
             sup = superscripts[var_type]
@@ -754,7 +840,7 @@ else:
             return txt.format(first + i, last + i, first + i + 1)
 
         def number_label(self, number, txt, alignment):
-            # Adds an index to the label either above or on the left side.
+            """Add an index to the label either above or on the left side."""
             if number:  # If number is None or empty string, it won't be inserted
                 number_str = '{}: '.format(number)
                 if alignment == 'horizontal':
@@ -772,7 +858,7 @@ else:
 
         def _make_legend(self, title="Legend"):
             """
-            Adds a legend row to the matrix. The labels of this row show the used component types.
+            Add a legend row to the matrix. The labels of this row show the used component types.
 
             Parameters
             ----------
@@ -808,7 +894,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE,
                legend=False, **kwargs):
     """
-    Writes XDSM diagram of an optimization problem.
+    Write XDSM diagram of an optimization problem.
 
     With the 'tex' or 'pdf' output format it uses the pyXDSM package, with 'html'
     output format it uses XDSMjs.
@@ -1133,7 +1219,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 for tgt, conn_vars in iteritems(dct):
                     formatted_conns = format_block(conn_vars)
                     if (src in comp_names) and (tgt in comp_names):
-                        formatted_targets = format_block([x.format_var_str(c, 'target') for c in conn_vars])
+                        formatted_targets = format_block([x.format_var_str(c, 'target')
+                                                          for c in conn_vars])
                         # From solver to components (targets)
                         x.connect(solver_name, tgt, formatted_targets)
                         # From components to solver
@@ -1200,7 +1287,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     for src, dct in iteritems(conns2):
         for tgt, conn_vars in iteritems(dct):
             if src and tgt:
-                stack = show_parallel and (comps_dct[src]['is_parallel'] or comps_dct[tgt]['is_parallel'])
+                stack = show_parallel and \
+                    (comps_dct[src]['is_parallel'] or comps_dct[tgt]['is_parallel'])
                 x.connect(src, tgt, label=format_block(conn_vars), stack=stack)
             else:  # Source or target missing
                 msg = 'Connection "{conn}" from "{src}" to "{tgt}" ignored.'
@@ -1251,7 +1339,7 @@ def _get_cls_name(obj):
 
 
 def _residual_str(name):
-    """Makes a residual symbol."""
+    """Make a residual symbol."""
     return '\\mathcal{R}(%s)' % name
 
 
@@ -1314,6 +1402,7 @@ def _make_rel_path(full_path, model_path, sep='.'):
 def _convert_name(name, recurse=True, subs=None):
     """
     From an absolute path returns the variable name and its owner component in a dict.
+
     Names are also formatted.
 
     Parameters
@@ -1329,7 +1418,6 @@ def _convert_name(name, recurse=True, subs=None):
     -------
         dict(str, str)
     """
-
     def convert(name):
         sep = '.'
         name = name.replace('@', sep)
@@ -1421,6 +1509,7 @@ def _prune_connections(conns, model_path=None, sep='.'):
 def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
     """
     Return the components in the tree, optionally only those within the given model_path.
+
     It also includes the solvers of the subsystems, if "include_solver" is True and not the
     default solvers are assigned to the subsystems.
 
@@ -1523,9 +1612,11 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
 
 def _replace_chars(name, substitutes):
     """
-    Replaces characters in `name` with the substitute characters. If some of the characters are
-    both to be replaced or other characters are replaced with them (e.g.: ? -> !, ! ->#), than
-    it is not safe to give a dictionary as the `substitutes` (because it is unordered).
+    Replace characters in `name` with the substitute characters.
+
+    If some of the characters are both to be replaced or other characters are replaced with them
+    (e.g.: ? -> !, ! ->#), than it is not safe to give a dictionary as the `substitutes`
+    (because it is unordered).
 
     .. warning::
 
@@ -1589,13 +1680,14 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
 
 def _multiline_block(*texts, **kwargs):
     """
-    Makes a string for a multiline block.
+    Make a string for a multiline block.
 
     texts : iterable(str)
         Text strings, each will go to new line
     kwargs : dict
         Unused keywords are ignored.
         "end_char" is the separator at the end of line. Defaults to '' (no separator).
+
     Returns
     -------
        str
@@ -1604,4 +1696,4 @@ def _multiline_block(*texts, **kwargs):
     texts = ['\\text{{{}{}}}'.format(t, end_char) for t in texts]
     template = '$\\begin{{array}}{{{pos}}} {text} \\end{{array}}$'
     new_line = ' \\\\ '
-    return template.format(text=new_line.join(texts), pos='c'*len(texts))
+    return template.format(text=new_line.join(texts), pos='c' * len(texts))

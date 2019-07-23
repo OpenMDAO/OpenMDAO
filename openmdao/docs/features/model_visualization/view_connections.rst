@@ -15,7 +15,7 @@ View Connections from Script
 
 You can also generate a display of model connections from within a script by calling the function :code:`view_connections`.
 
-.. autofunction:: openmdao.devtools.viewconns.view_connections
+.. autofunction:: openmdao.visualization.connection_viewer.viewconns.view_connections
    :noindex:
 
 Here is an example of how this function can be used.

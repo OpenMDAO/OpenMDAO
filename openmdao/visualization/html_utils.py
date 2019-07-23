@@ -10,7 +10,7 @@ _IND = 4  # indentation (spaces)
 
 def head_and_body(head, body, attrs=None):
     """
-    Makes an html element from a head and body.
+    Make an html element from a head and body.
 
     Parameters
     ----------
@@ -21,6 +21,7 @@ def head_and_body(head, body, attrs=None):
     attrs : dict or None
         Attributes of the html element.
         Defaults to None.
+
     Returns
     -------
         str
@@ -34,9 +35,10 @@ def head_and_body(head, body, attrs=None):
     return doc_type + '\n' + index
 
 
-def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False, indent=0, **kwargs):
+def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False, indent=0,
+               **kwargs):
     """
-    Writes an HTML element enclosed in tags.
+    Write an HTML element enclosed in tags.
 
     Parameters
     ----------
@@ -79,7 +81,7 @@ def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False,
 
 def write_div(content='', attrs=None, cls=None, uid=None, indent=0, **kwargs):
     """
-    Writes an HTML div.
+    Write an HTML div.
 
     Parameters
     ----------
@@ -106,6 +108,7 @@ def write_div(content='', attrs=None, cls=None, uid=None, indent=0, **kwargs):
 
 
 def write_style(content='', attrs=None, indent=0, **kwargs):
+    """Write CSS."""
     default = {'type': "text/css"}
     if attrs is None:
         attrs = default
@@ -115,6 +118,7 @@ def write_style(content='', attrs=None, indent=0, **kwargs):
 
 
 def write_script(content='', attrs=None, indent=0, **kwargs):
+    """Write JavaScript."""
     default = {'type': "text/javascript"}
     if attrs is None:
         attrs = default
@@ -124,12 +128,12 @@ def write_script(content='', attrs=None, indent=0, **kwargs):
 
 
 def write_paragraph(content):
-    # Write a paragraph
+    """Write a paragraph."""
     return write_tags(tag='p', content=content)
 
 
 def read_files(filenames, directory, extension):
-    # Reads files (based on filenames) from a directory with a given extension.
+    """Read files (based on filenames) from a directory with a given extension."""
     libs = dict()
     for name in filenames:
         with open(os.path.join(directory, '.'.join([name, extension])), "r") as f:
@@ -140,6 +144,7 @@ def read_files(filenames, directory, extension):
 
 
 def add_button(title, content='', uid=None, indent=0, **kwargs):
+    """Add a button."""
     i = write_tags(tag='i', attrs={'class': content})
     attrs = {'title': title}
     return write_tags('button', cls="myButton", content=i, attrs=attrs, uid=uid,
@@ -148,6 +153,7 @@ def add_button(title, content='', uid=None, indent=0, **kwargs):
 
 def add_dropdown(title, id_naming=None, options=None, button_content='', header=None,
                  uid=None, indent=0, option_formatter=None, **kwargs):
+    """Add a dropdown menu."""
     button = add_button(title=title, content=button_content)
     if header is None:
         header = title
@@ -220,19 +226,21 @@ class UIElement(object):
     """Abstract class for user interface elements."""
 
     def __init__(self, indent=0):
+        """Initialize."""
         self.items = []
         self.indent = indent
 
 
 class ButtonGroup(UIElement):
     """
-    Button group, which consists of buttons and dropdowns. Write it to get the HTML for the
-    button group.
+    Button group, which consists of buttons and dropdowns.
+
+    Write it to get the HTML for the button group.
     """
 
     def add_button(self, title, content='', uid=None, **kwargs):
         """
-        Adds a button to the button group.
+        Add a button to the button group.
 
         Parameters
         ----------
@@ -249,7 +257,7 @@ class ButtonGroup(UIElement):
         -------
             str
         """
-        button = add_button(title, content=content, uid=uid, indent=self.indent+_IND,
+        button = add_button(title, content=content, uid=uid, indent=self.indent + _IND,
                             **kwargs)
         self.items.append(button)
         return button
@@ -257,7 +265,7 @@ class ButtonGroup(UIElement):
     def add_dropdown(self, title, id_naming=None, options=None, button_content='', header=None,
                      uid=None, option_formatter=None, **kwargs):
         """
-        Adds a dropdown to the button group.
+        Add a dropdown to the button group.
 
         Parameters
         ----------
@@ -287,14 +295,14 @@ class ButtonGroup(UIElement):
         """
         dropdown = add_dropdown(title=title, id_naming=id_naming, options=options,
                                 button_content=button_content, header=header,
-                                uid=uid, indent=self.indent+_IND,
+                                uid=uid, indent=self.indent + _IND,
                                 option_formatter=option_formatter, **kwargs)
         self.items.append(dropdown)
         return dropdown
 
     def write(self):
         """
-        Outputs the HTML code.
+        Output the HTML code.
 
         Returns
         -------
@@ -306,18 +314,21 @@ class ButtonGroup(UIElement):
 
 class Toolbar(UIElement):
     """
-    A toolbar consists of button groups. Add button groups, and write it to get the HTML for the
+    A toolbar consists of button groups.
+
+    Add button groups, and write it to get the HTML for the
     toolbar.
     """
 
     def add_button_group(self):
-        button_group = ButtonGroup(indent=self.indent+4)
+        """Add a group of buttons."""
+        button_group = ButtonGroup(indent=self.indent + 4)
         self.items.append(button_group)
         return button_group
 
     def write(self):
         """
-        Outputs the HTML code.
+        Output the HTML code.
 
         Returns
         -------
@@ -329,11 +340,14 @@ class Toolbar(UIElement):
 
 class TemplateWriter(object):
     """
-    Opens an HTML template files, text can be inserted into the template, and writes  anew HTML
+    Writes HTML files using templates.
+
+    Opens an HTML template files, text can be inserted into the template, and writes a new HTML
     file with the replacements.
     """
 
     def __init__(self, filename, embeddable=False, title=None, styles=None):
+        """Initialize."""
         self.filename = filename
         # Load template
         with open(self.filename, "r") as f:
@@ -361,20 +375,25 @@ class TemplateWriter(object):
         self.template = self.template.replace(ref, txt)
 
     def insert(self, ref, txt):
+        """Insert text."""
         self._replace(ref=ref, txt=txt)
 
     def write(self, outfile):
+        """Write the output file."""
         with open(outfile, 'w') as f:  # write output file
             f.write(self.template)
 
 
 class DiagramWriter(TemplateWriter):
     """
-    An HTML diagram writer. The diagram has a toolbar, which can be edited by adding
+    An HTML diagram writer.
+
+    The diagram has a toolbar, which can be edited by adding
     button groups, dropdowns, buttons, etc. to this class.
     """
 
     def __init__(self, filename, embeddable=False, title=None, styles=None):
+        """Initialize."""
         super(DiagramWriter, self).__init__(filename=filename, embeddable=embeddable, title=title,
                                             styles=styles)
         self.toolbar = Toolbar()
@@ -382,7 +401,7 @@ class DiagramWriter(TemplateWriter):
 
     def add_help(self, txt, header='Instructions', footer=''):
         """
-        Adds a modal with instructions.
+        Add a modal with instructions.
 
         Parameters
         ----------
@@ -402,7 +421,7 @@ class DiagramWriter(TemplateWriter):
 
     def write(self, outfile):
         """
-        Writes an HTML output file.
+        Write an HTML output file.
 
         Parameters
         ----------
