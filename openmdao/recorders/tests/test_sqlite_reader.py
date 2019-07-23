@@ -1108,6 +1108,32 @@ class TestSqliteCaseReader(unittest.TestCase):
             else:
                 np.testing.assert_almost_equal(case[name], expected[name])
 
+    def test_get_var(self):
+        indep = om.IndepVarComp()
+        indep.add_output('distance', val=6., units='m')
+        indep.add_output('time', val=3., units='s')
+
+        model = om.Group()
+        model.add_subsystem('c1', indep)
+        model.add_subsystem('c2', SpeedComp())
+        model.add_subsystem('c3', om.ExecComp('f=speed', speed={'units': 'm/s'}, f={'units': 'm/s'}))
+        model.connect('c1.distance', 'c2.distance')
+        model.connect('c1.time', 'c2.time')
+        model.connect('c2.speed', 'c3.speed')
+
+        model.add_recorder(self.recorder)
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+
+        cr = om.CaseReader(self.filename)
+
+        case = cr.get_case(0)
+
+        np.testing.assert_almost_equal(case.get_val('c3.f'), 2.)  # m/s
+        np.testing.assert_almost_equal(case.get_val('c3.f', units='mi/h'), 2*2.237, decimal=3)
+
     def test_get_vars(self):
         prob = SellarProblem()
         prob.setup()

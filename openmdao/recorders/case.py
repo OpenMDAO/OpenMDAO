@@ -14,6 +14,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import json_to_np_array
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
 
@@ -227,6 +228,80 @@ class Case(object):
             return self.inputs[name]
 
         raise KeyError('Variable name "%s" not found.' % name)
+
+
+    def get_val(self, name, units=None, indices=None):
+        """
+        Get an output/input variable.
+
+        Function is used if you want to specify display units.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        units : str, optional
+            Units to convert to before upon return.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to return.
+
+        Returns
+        -------
+        float or ndarray
+            The requested output/input variable.
+        """
+        val = self[name]
+
+        if indices is not None:
+            val = val[indices]
+
+        if units is not None:
+            base_units = self._get_units(name)
+
+            if base_units is None:
+                msg = "Can't express variable '{}' with units of 'None' in units of '{}'."
+                raise TypeError(msg.format(name, units))
+
+            try:
+                scale, offset = get_conversion(base_units, units)
+            except TypeError:
+                msg = "Can't express variable '{}' with units of '{}' in units of '{}'."
+                raise TypeError(msg.format(name, base_units, units))
+
+            val = (val + offset) * scale
+
+        return val
+
+    def _get_units(self, name):
+        """
+        Get the units for a variable name.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+
+        Returns
+        -------
+        str
+            Unit string.
+        """
+        meta = self._abs2meta
+
+        if name in meta:
+            return meta[name]['units']
+
+        proms = self._prom2abs
+
+        if name in proms['output']:
+            abs_name = proms['output'][name]
+            return meta[abs_name]['units']
+        elif name in proms['input']:
+            # TODO: check for unconnected non-unique inputs, and raise error
+            abs_name = proms['input'][name]
+            return meta[abs_name]['units']
+
+        raise KeyError('Variable name "{}" not found.'.format(name))
 
     def get_design_vars(self, scaled=True, use_indices=True):
         """
