@@ -1002,6 +1002,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.add_recorder(self.recorder)
         prob.driver.add_recorder(self.recorder)
+        prob.model.d1.add_recorder(self.recorder)
 
         prob.run_driver()
 
@@ -1024,15 +1025,23 @@ class TestSqliteCaseReader(unittest.TestCase):
             "obj_cmp.obj": 28.58830817,
             "con_cmp1.con1": -22.42830237,
             "con_cmp2.con2": -11.94151185,
+            # unpromoted system names
+            "d1.x": 1.,
+            "d1.y1": 25.58830237,
+            "d1.y2": 12.05848815,
+            "d1.z": [5., 2.],
         }
 
         cr = om.CaseReader(self.filename)
 
-        # driver will record inputs and outputs only at the driver level
-        cases = cr.list_cases('driver')
+        # driver will record design vars, objectives and constraints
+        cases = cr.list_cases('driver', recurse=False)
         case = cr.get_case(cases[0])
+
         for name in expected:
-            if name.startswith('y'):
+            if name[0] in ['y', 'd']:
+                # driver does not record coupling vars y1 & y2
+                # or the lower level inputs and outputs of d1
                 msg = "'Variable name \"%s\" not found.'" % name
                 with self.assertRaises(KeyError) as cm:
                     case[name]
@@ -1040,10 +1049,32 @@ class TestSqliteCaseReader(unittest.TestCase):
             else:
                 np.testing.assert_almost_equal(case[name], expected[name])
 
-        # problem will record all inputs and outputs (including y1 & y2)
+        # problem will record all inputs and outputs at the problem level
         case = cr.get_case('final')
+
         for name in expected:
-            np.testing.assert_almost_equal(case[name], expected[name])
+            if name in ['d1.x', 'd1.y2', 'd1.z']:
+                # problem does not record lower level inputs
+                msg = "'Variable name \"%s\" not found.'" % name
+                with self.assertRaises(KeyError) as cm:
+                    case[name]
+                self.assertEqual(str(cm.exception), msg)
+            else:
+                np.testing.assert_almost_equal(case[name], expected[name])
+
+        # system will record inputs and outputs at the system level
+        cases = cr.list_cases('root.d1')
+        case = cr.get_case(cases[-1])
+
+        for name in expected:
+            if name[0] in ['p', 'o', 'c']:
+                # system d1 does not record params, obj and cons
+                msg = "'Variable name \"%s\" not found.'" % name
+                with self.assertRaises(KeyError) as cm:
+                    case[name]
+                self.assertEqual(str(cm.exception), msg)
+            else:
+                np.testing.assert_almost_equal(case[name], expected[name])
 
     def test_get_vars(self):
         prob = SellarProblem()
