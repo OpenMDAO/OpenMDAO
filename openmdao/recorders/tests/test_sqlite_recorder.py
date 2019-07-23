@@ -25,6 +25,7 @@ from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRe
 from openmdao.recorders.tests.recorder_test_utils import run_driver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import determine_adder_scaler
+from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -53,26 +54,14 @@ class ParaboloidProblem(om.Problem):
         model.add_constraint('c', upper=-15.0)
 
 
+@use_tempdirs
 class TestSqliteRecorder(unittest.TestCase):
 
     def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
-
-        self.filename = os.path.join(self.temp_dir, "sqlite_test")
+        self.filename = "sqlite_test"
         self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
 
         self.eps = 1e-3
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_only_desvars_recorded(self):
         prob = SellarProblem()
@@ -1738,25 +1727,8 @@ class TestSqliteRecorder(unittest.TestCase):
         self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
 
 
+@use_tempdirs
 class TestFeatureSqliteRecorder(unittest.TestCase):
-    def setUp(self):
-        import os
-        from tempfile import mkdtemp
-        self.dir = mkdtemp()
-        self.original_path = os.getcwd()
-        os.chdir(self.dir)
-
-    def tearDown(self):
-        import os
-        import errno
-        from shutil import rmtree
-        os.chdir(self.original_path)
-        try:
-            rmtree(self.dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_feature_simple_driver_recording(self):
         import openmdao.api as om
@@ -2343,29 +2315,11 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
 
 
+@use_tempdirs
 class TestFeatureBasicRecording(unittest.TestCase):
+
     def setUp(self):
-        import os
-        from tempfile import mkdtemp
-
-        self.dir = mkdtemp()
-        self.original_path = os.getcwd()
-        os.chdir(self.dir)
-
         self.record_cases()
-
-    def tearDown(self):
-        import os
-        import errno
-        from shutil import rmtree
-
-        os.chdir(self.original_path)
-        try:
-            rmtree(self.dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def record_cases(self):
         import openmdao.api as om

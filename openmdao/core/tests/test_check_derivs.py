@@ -1814,6 +1814,30 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         data = prob.check_partials()
 
+    def test_set_method_and_step_bug(self):
+        # If a model-builder set his a component to fd, and the global method is cs with a specified
+        # step size, that size is probably unusable, and can lead to false error in the check.
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        prob.model.add_subsystem('p2', om.IndepVarComp('y', 5.0))
+        comp = prob.model.add_subsystem('comp', Paraboloid())
+
+        prob.model.connect('p1.x', 'comp.x')
+        prob.model.connect('p2.y', 'comp.y')
+
+        prob.set_solver_print(level=0)
+
+        comp.set_check_partial_options(wrt='*', method='fd')
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        J = prob.check_partials(compact_print=True, method='cs', step=1e-40, out_stream=None)
+
+        assert_check_partials(J, atol=1e-5, rtol=1e-5)
+
 
 class TestProblemCheckTotals(unittest.TestCase):
 

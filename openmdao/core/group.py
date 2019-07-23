@@ -287,7 +287,11 @@ class Group(System):
             if subsys.matrix_free:
                 self.matrix_free = True
 
-        self.configure()
+        self._static_mode = False
+        try:
+            self.configure()
+        finally:
+            self._static_mode = True
 
     def _setup_procs(self, pathname, comm, mode, prob_options):
         """

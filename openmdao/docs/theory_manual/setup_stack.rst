@@ -64,6 +64,10 @@ recursively from the bottom of the hierarchy to the top, so that at any level, y
 take precedence over those in lower-level ones. Top precedence is given to changes made after calling `setup`
 on the `Problem`.
 
+A second use case for `configure` is issuing connections to subsystems when you need information (e.g. path names)
+that has been set during setup of those subsystems.  Since `configure` runs after `setup` has been
+called on all subsystems, you can be sure that this information will be available.
+
 Here is a quick guide covering what you can do in the `setup` and `configure` methods.
 
 **setup**
@@ -79,6 +83,7 @@ Here is a quick guide covering what you can do in the `setup` and `configure` me
 
 **configure**
 
+ - Issue connections
  - Assign linear and nonlinear solvers to subsystems
  - Change solver settings in subsystems
  - Assign Jacobians to subsystems

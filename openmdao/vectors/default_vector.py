@@ -340,14 +340,16 @@ class DefaultVector(Vector):
         dict
             Mapping of var name to slice.
         """
-        slices = {}
-        start = end = 0
-        for name in self._system._var_relevant_names[self._name][self._typ]:
-            end += self._views_flat[name].size
-            slices[name] = slice(start, end)
-            start = end
+        if self._slices is None:
+            slices = {}
+            start = end = 0
+            for name in self._system._var_relevant_names[self._name][self._typ]:
+                end += self._views_flat[name].size
+                slices[name] = slice(start, end)
+                start = end
+            self._slices = slices
 
-        return slices
+        return self._slices
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
