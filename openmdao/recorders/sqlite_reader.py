@@ -426,7 +426,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname, iteration_coordinate}
+        source : {'problem', 'driver', component pathname, solver pathname, case_name}
             If not None, only cases originating from the specified source or case are returned.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
@@ -490,14 +490,14 @@ class SqliteCaseReader(BaseCaseReader):
                     cases = []
                     source_cases = case_table.get_cases(source)
                     for case in source_cases:
-                        cases += self._list_cases_recurse_flat(case.iteration_coordinate)
+                        cases += self._list_cases_recurse_flat(case.name)
                     return cases
                 else:
                     # return nested dict of cases from the source and child cases
                     cases = OrderedDict()
                     source_cases = case_table.get_cases(source)
                     for case in source_cases:
-                        cases.update(self._list_cases_recurse_nested(case.iteration_coordinate))
+                        cases.update(self._list_cases_recurse_nested(case.name))
                     return cases
             elif '|' in source:
                 # source is a coordinate
@@ -592,7 +592,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         cases = OrderedDict()
         children = OrderedDict()
-        cases[parent_case.iteration_coordinate] = children
+        cases[parent_case.name] = children
 
         # return all cases in the global iteration table that precede the given case
         # and whose coordinate is prefixed by the given coordinate
@@ -620,7 +620,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname, iteration_coordinate}
+        source : {'problem', 'driver', component pathname, solver pathname, case_name}
             Identifies which cases to return.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
@@ -1159,7 +1159,7 @@ class DriverCases(CaseTable):
                             self._format_version)
 
                 if cache:
-                    self._cases[case.iteration_coordinate] = case
+                    self._cases[case.name] = case
 
                 yield case
 
