@@ -2105,14 +2105,14 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         cr = om.CaseReader('cases.sql')
 
-        case_ids = cr.list_cases()
+        case_names = cr.list_cases()
 
-        self.assertEqual(len(case_ids), driver.iter_count)
-        self.assertEqual(case_ids, ['rank0:ScipyOptimize_SLSQP|%d' % i for i in range(driver.iter_count)])
+        self.assertEqual(len(case_names), driver.iter_count)
+        self.assertEqual(case_names, ['rank0:ScipyOptimize_SLSQP|%d' % i for i in range(driver.iter_count)])
         self.assertEqual('', '')
 
-        for case_id in case_ids:
-            case = cr.get_case(case_id)
+        for name in case_names:
+            case = cr.get_case(name)
             self.assertEqual(case, case)
 
     def test_feature_get_cases(self):
@@ -2421,6 +2421,10 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
         self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
 
+        # you can also access the variables directly from the case object
+        self.assertEqual((case['obj'], case['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
+        self.assertEqual((case['x'], case['px.x']), (dvs['px.x'], dvs['x']))
+
     def test_feature_list_inputs_and_outputs(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarProblem
@@ -2446,15 +2450,15 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         case = cr.get_case(system_cases[1])
 
-        inputs_case = sorted(case.list_inputs())
+        case_inputs = sorted(case.list_inputs())
 
-        assert_rel_error(self, inputs_case[0][1]['value'], [1.], tolerance=1e-10) # d1.x
-        assert_rel_error(self, inputs_case[1][1]['value'], [12.27257053], tolerance=1e-10) # d1.y2
-        assert_rel_error(self, inputs_case[2][1]['value'], [5., 2.], tolerance=1e-10) # d1.z
+        assert_rel_error(self, case_inputs[0][1]['value'], [1.], tolerance=1e-10) # d1.x
+        assert_rel_error(self, case_inputs[1][1]['value'], [12.27257053], tolerance=1e-10) # d1.y2
+        assert_rel_error(self, case_inputs[2][1]['value'], [5., 2.], tolerance=1e-10) # d1.z
 
-        outputs_case = case.list_outputs(prom_name=True)
+        case_outputs = case.list_outputs(prom_name=True)
 
-        assert_rel_error(self, outputs_case[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
+        assert_rel_error(self, case_outputs[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
 
     def test_case_array_list_vars_options(self):
         import openmdao.api as om
