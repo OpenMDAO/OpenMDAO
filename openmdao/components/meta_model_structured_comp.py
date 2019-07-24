@@ -74,32 +74,11 @@ class _RegularGridInterp(object):
 
     Attributes
     ----------
-    _xi : ndarray
-        Current evaluation point.
-    values : array_like, shape (m1, ..., mn, ...)
-        The data on the regular grid in n dimensions.
     bounds_error : bool
         If True, when interpolated values are requested outside of the
         domain of the input data, a ValueError is raised.
         If False, then `fill_value` is used.
         Default is True (raise an exception).
-    _gmethod : string
-        Name of interpolation method used to compute the last gradient.
-    _spline_dim_error : bool
-        If spline_dim_error=True and an order `k` spline interpolation method
-        is used, then if any dimension has fewer points than `k` + 1, an error
-        will be raised. If spline_dim_error=False, then the spline interpolant
-        order will be reduced as needed on a per-dimension basis. Default
-        is True (raise an exception).
-    _interp_config : dict
-        Configuration object that stores limitations of each interpolation
-        method.
-    method : string
-        Name of interpolation method.
-    _all_gradients : ndarray
-        Cache of computed gradients.
-    _ki : list
-        Interpolation order to be used in each dimension.
     fill_value : float
         If provided, the value to use for points outside of the
         interpolation domain. If None, values outside
@@ -109,13 +88,30 @@ class _RegularGridInterp(object):
         Default is `np.nan`.
     grid : tuple
         Collection of points that determine the regular grid.
-
-    Methods
-    -------
-    __call__
-    gradient
-    methods
-
+    method : string
+        Name of interpolation method.
+    training_data_gradients : bool
+        When True, training data may change in between calls, so interpolators cannnot be
+        cached.
+    values : array_like, shape (m1, ..., mn, ...)
+        The data on the regular grid in n dimensions.
+    _all_gradients : ndarray
+        Cache of computed gradients.
+    _gmethod : string
+        Name of interpolation method used to compute the last gradient.
+    _interp_config : dict
+        Configuration object that stores limitations of each interpolation
+        method.
+    _ki : list
+        Interpolation order to be used in each dimension.
+    _spline_dim_error : bool
+        If spline_dim_error=True and an order `k` spline interpolation method
+        is used, then if any dimension has fewer points than `k` + 1, an error
+        will be raised. If spline_dim_error=False, then the spline interpolant
+        order will be reduced as needed on a per-dimension basis. Default
+        is True (raise an exception).
+    _xi : ndarray
+        Current evaluation point.
     """
 
     @staticmethod
@@ -168,8 +164,7 @@ class _RegularGridInterp(object):
         method : str, optional
             The method of interpolation to perform. Supported are 'slinear',
             'cubic',  and 'quintic'. This parameter will become
-            the default for the object's
-            ``__call__`` method. Default is "linear".
+            the default for the object's interpolate method. Default is "linear".
         bounds_error : bool, optional
             If True, when interpolated values are requested outside of the
             domain of the input data, a ValueError is raised.
@@ -254,7 +249,7 @@ class _RegularGridInterp(object):
         self._spline_dim_error = spline_dim_error
         self._gmethod = None
 
-    def __call__(self, xi, method=None, compute_gradients=True):
+    def interpolate(self, xi, method=None, compute_gradients=True):
         """
         Interpolate at the sample coordinates.
 
@@ -311,7 +306,7 @@ class _RegularGridInterp(object):
                     raise OutOfBoundsError("One of the requested xi is out of bounds",
                                            i, value, self.grid[i][0], self.grid[i][-1])
 
-        indices, norm_distances, out_of_bounds = self._find_indices(xi.T)
+        indices, out_of_bounds = self._find_indices(xi.T)
 
         ki = self._ki
         if method != self.method:
@@ -512,8 +507,6 @@ class _RegularGridInterp(object):
         """
         # find relevant edges between which xi are situated
         indices = []
-        # compute distance to lower edge in unity units
-        norm_distances = []
         # check for out of bounds xi
         out_of_bounds = np.zeros((xi.shape[1]), dtype=bool)
         # iterate through dimensions
@@ -522,12 +515,11 @@ class _RegularGridInterp(object):
             i[i < 0] = 0
             i[i > grid.size - 2] = grid.size - 2
             indices.append(i)
-            norm_distances.append((x - grid[i]) /
-                                  (grid[i + 1] - grid[i]))
+
             if not self.bounds_error:
                 out_of_bounds += x < grid[0]
                 out_of_bounds += x > grid[-1]
-        return indices, norm_distances, out_of_bounds
+        return indices, out_of_bounds
 
     def gradient(self, xi, method=None):
         """
@@ -563,7 +555,7 @@ class _RegularGridInterp(object):
                 (not np.array_equal(xi, self._xi)) or \
                 (method != self._gmethod):
             # if not, compute the interpolation to get the gradients
-            self.__call__(xi, method=method)
+            self.interpolate(xi, method=method)
         gradients = self._all_gradients
         gradients = gradients.reshape(np.asarray(xi).shape)
         return gradients
@@ -757,7 +749,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                                                             spline_dim_error=False)
 
             try:
-                val = self.interps[out_name](pt)
+                val = self.interps[out_name].interpolate(pt)
             except OutOfBoundsError as err:
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
                 errmsg = "{}: Error interpolating output '{}' because input '{}' " \

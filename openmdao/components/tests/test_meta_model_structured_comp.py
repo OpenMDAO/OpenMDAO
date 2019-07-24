@@ -439,10 +439,10 @@ class TestRegularGridInterpolator(unittest.TestCase):
 
         for method in self.valid_methods:
             interp = _RegularGridInterp(points, values.tolist(), method=method)
-            v1 = interp(sample.tolist(), compute_gradients=False)
+            v1 = interp.interpolate(sample.tolist(), compute_gradients=False)
 
             interp = _RegularGridInterp(points, values, method=method)
-            v2 = interp(sample, compute_gradients=False)
+            v2 = interp.interpolate(sample, compute_gradients=False)
 
             assert_allclose(v1, v2)
 
@@ -472,21 +472,21 @@ class TestRegularGridInterpolator(unittest.TestCase):
 
         # should operate as normal
         x = [0.5, 0, 1001]
-        result = interp(x)
+        result = interp.interpolate(x)
         assert_almost_equal(result, -0.046325695741704434, decimal=5)
 
         interp = _RegularGridInterp(
             points, values, method='slinear', spline_dim_error=False)
 
-        value1 = interp(x)
+        value1 = interp.interpolate(x)
         # cycle through different methods that require order reduction
         # in the first dimension
-        value2 = interp(x, method='quintic')
+        value2 = interp.interpolate(x, method='quintic')
         interp.gradient(x, method='quintic')
-        value3 = interp(x, method='cubic')
+        value3 = interp.interpolate(x, method='cubic')
         interp.gradient(x, method='cubic')
         # use default method again
-        value4 = interp(x)
+        value4 = interp.interpolate(x)
 
         # values from different methods should be different
         self.assertRaises(AssertionError, assert_equal, value1, value2)
@@ -537,7 +537,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
             points, values, method='cubic')
 
         # value and gradient work as expected
-        result1 = interp(x)
+        result1 = interp.interpolate(x)
         gradient1 = interp.gradient(x)
         result_actual_1 = 0.2630309995970872
         result_gradient_1 = np.array([0.22505535, -0.46465198, 0.02523666])
@@ -546,7 +546,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         assert_almost_equal(gradient1, result_gradient_1)
 
         # changing the method should work as expected
-        result2 = interp(x, method='slinear')
+        result2 = interp.interpolate(x, method='slinear')
         gradient2 = interp.gradient(x, method='slinear')
         result_actual_2 = 0.27801704674026684
         result_gradient_2 = np.array([0.12167214, -0.44221416, -0.00323078])
@@ -556,7 +556,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
 
         # should be able to switch back and get the original results without
         # explicitly setting the method
-        result3 = interp(x)
+        result3 = interp.interpolate(x)
         gradient3 = interp.gradient(x)
         assert_almost_equal(result3, result_actual_1)
         assert_almost_equal(gradient3, result_gradient_1)
@@ -567,12 +567,12 @@ class TestRegularGridInterpolator(unittest.TestCase):
         # values will be cast to float for splines/gradient methods
         # otherwise, will get null vector gradient [0,0,0] at all pts
         x = [-50, 0, 1501]
-        result6 = interp(x)
+        result6 = interp.interpolate(x)
         result_actual_6 = 0.3591176338294626
         assert_almost_equal(result6, result_actual_6)
 
         # should be able to switch and get value and gradient
-        result7 = interp(x, method='quintic')
+        result7 = interp.interpolate(x, method='quintic')
         gradient7 = interp.gradient(x, method='quintic')
         result_actual_7 = 0.6157594079479937
         result_gradient_7 = np.array([-0.35731922, 0.23131539, -0.14088582])
@@ -585,7 +585,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         assert_almost_equal(gradient8, result_gradient_8)
 
         # should be able to switch back to original without setting it
-        result9 = interp(x)
+        result9 = interp.interpolate(x)
         assert_almost_equal(result9, result6)
 
     def test_spline_deriv_xi1d(self):
@@ -632,7 +632,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
             if method == 'slinear':
                 tol = 0.5
             interp = _RegularGridInterp(points, values, method)
-            computed = interp(test_pt, compute_gradients=False)
+            computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
             assert r_err < tol
 
@@ -650,7 +650,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
             interp = _RegularGridInterp(points, values, method,
                                         bounds_error=False,
                                         fill_value=None)
-            computed = interp(test_pt)
+            computed = interp.interpolate(test_pt)
             computed_grad = interp.gradient(test_pt)
             r_err = rel_error(actual, computed)
             assert r_err < tol
@@ -669,7 +669,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
             if method == 'slinear':
                 tol = 0.5
             interp = _RegularGridInterp(points, values, method)
-            computed = interp(test_pt, compute_gradients=False)
+            computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
             assert r_err < tol
 
@@ -683,7 +683,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
             interp = _RegularGridInterp(points, values, method,
                                         bounds_error=False,
                                         fill_value=np.nan)
-            computed = interp(test_pt, compute_gradients=False)
+            computed = interp.interpolate(test_pt, compute_gradients=False)
             assert_array_almost_equal(computed, actual)
 
     def test_invalid_fill_value(self):
@@ -707,7 +707,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         interp = _RegularGridInterp((x, y), values)
 
         with self.assertRaises(OutOfBoundsError) as cm:
-            interp([1, np.nan])
+            interp.interpolate([1, np.nan])
 
         err = cm.exception
 
@@ -767,7 +767,7 @@ class TestRegularGridInterpolator(unittest.TestCase):
         x = [0.5, 0, 0.5, 0.9]
 
         with self.assertRaises(ValueError) as cm:
-            computed = interp(x, method='junk')
+            computed = interp.interpolate(x, method='junk')
 
         msg = ('Method "junk" is not defined. Valid methods are')
         self.assertTrue(str(cm.exception).startswith(msg))
