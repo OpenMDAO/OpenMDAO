@@ -869,6 +869,39 @@ class TestDOEDriver(unittest.TestCase):
         self.assertEqual(x_buckets_filled, all_buckets)
         self.assertEqual(y_buckets_filled, all_buckets)
 
+    def test_record_bug(self):
+        # There was a bug that caused values to be recorded in driver_scaled form.
+
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('x', val=1.)
+
+        model.add_subsystem('obj_comp', om.ExecComp('y=2*x'), promotes=['*'])
+        model.add_subsystem('con_comp', om.ExecComp('z=3*x'), promotes=['*'])
+
+        prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
+
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.recording_options['includes'] = ['*']
+
+        model.add_design_var('x', lower=0., upper=10., ref=3.0)
+        model.add_constraint('z', lower=2.0, scaler=13.0)
+        model.add_objective('y', scaler=-1)
+
+        prob.setup(check=True)
+
+        prob.run_driver()
+
+        cr = om.CaseReader("cases.sql")
+        final_case = cr.list_cases('driver')[-1]
+        outputs = cr.get_case(final_case).outputs
+
+        assert_rel_error(self, outputs['x'], 10.0, 1e-7)
+        assert_rel_error(self, outputs['y'], 20.0, 1e-7)
+        assert_rel_error(self, outputs['z'], 30.0, 1e-7)
+
 
 @unittest.skipUnless(om.PETScVector, "PETSc is required.")
 class TestParallelDOE(unittest.TestCase):
