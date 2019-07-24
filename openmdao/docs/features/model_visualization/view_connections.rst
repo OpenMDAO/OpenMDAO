@@ -21,7 +21,7 @@ You can also generate a display of model connections from within a script by cal
 Here is an example of how this function can be used.
 
 .. embed-code::
-    openmdao.devtools.tests.test_viewconns.TestSellarFeature.test_feature_sellar
+    openmdao.visualization.connection_viewer.tests.test_viewconns.TestSellarFeature.test_feature_sellar
     :layout: interleave
 
 In this example, an HTML file named `sellar_connections.html` is created. This file can then be opened using using your

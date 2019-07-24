@@ -5,7 +5,15 @@ import webbrowser
 
 
 def webview(outfile):
-    """Pop up a web browser for the given file."""
+    """
+    Pop up a web browser for the given file.
+
+    Parameters
+    ----------
+    outfile : str
+        Path to the HTML file to open.
+
+    """
     if sys.platform == 'darwin':
         os.system('open %s' % outfile)
     else:

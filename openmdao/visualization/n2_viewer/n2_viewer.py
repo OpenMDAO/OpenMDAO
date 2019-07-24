@@ -294,6 +294,13 @@ def _get_viewer_data(data_source):
 def view_tree(*args, **kwargs):
     """
     view_tree was renamed to n2, but left here for backwards compatibility.
+
+    Parameters
+    ----------
+    *args : dict
+        Postional args.
+    **kwargs : dict
+        Keyword args.
     """
     warn_deprecation("view_tree is deprecated. Please switch to n2.")
     n2(*args, **kwargs)
@@ -302,6 +309,13 @@ def view_tree(*args, **kwargs):
 def view_model(*args, **kwargs):
     """
     view_model was renamed to n2, but left here for backwards compatibility.
+
+    Parameters
+    ----------
+    *args : dict
+        Postional args.
+    **kwargs : dict
+        Keyword args.
     """
     warn_deprecation("view_model is deprecated. Please switch to n2.")
     n2(*args, **kwargs)
@@ -333,7 +347,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     title : str, optional
         The title for the diagram. Used in the HTML title and also shown on the page.
 
-    use_declare_partial_info: bool, optional
+    use_declare_partial_info : bool, optional
         If True, in the N2 matrix, component internal connectivity computed using derivative
         declarations, otherwise, derivative declarations ignored, so dense component connectivity
         is assumed.

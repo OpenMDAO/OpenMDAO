@@ -117,7 +117,7 @@ class BaseXDSMWriter(object):
     Attributes
     ----------
     name : str
-        OpenMDAO component type.
+        Name of XDSM writer.
     extension : str
         Output file saved with this extension.
     type_map : str
@@ -125,7 +125,14 @@ class BaseXDSMWriter(object):
     """
 
     def __init__(self, name):
-        """Initialize."""
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        name : str
+            Name of this XDSM writer
+        """
         self.name = name
         # This should be a dictionary mapping OpenMDAO system types to XDSM component types.
         # See for example any value in _COMPONENT_TYPE_MAP
@@ -152,7 +159,14 @@ class AbstractXDSMWriter(BaseXDSMWriter):
     """
 
     def __init__(self, name='abstract_xdsm_writer'):
-        """Initialize."""
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        name : str
+            Name of XDSM writer.
+        """
         super(AbstractXDSMWriter, self).__init__(name=name)
         self.comps = []
         self.connections = []
@@ -160,31 +174,107 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         self.processes = []
 
     def add_solver(self, label, name='solver', **kwargs):
-        """Add a solver."""
+        """
+        Add a solver.
+
+        Parameters
+        ----------
+        label : str
+            Label in the XDSM
+        name : str
+            Name of the solver
+        **kwargs : dict
+            Keyword args
+        """
         pass  # Implement in child class
 
-    def add_comp(self, name, label=None, comp_type=None, **kwargs):
-        """Add a component."""
-        pass  # Implement in child class
+    def add_comp(self, name, label=None, stack=False, comp_type=None, **kwargs):
+        """
+        Add a component.
 
-    def add_func(self, name, **kwargs):
-        """Add a function."""
+        Parameters
+        ----------
+        label : str
+            Label in the XDSM, defaults to the name of the component.
+        name : str
+            Name of the component
+        stack : bool
+            True for parallel components.
+            Defaults to False.
+        comp_type : str or None
+            Component type, e.g. explicit, implicit or metamodel
+        **kwargs : dict
+            Keyword args
+        """
         pass  # Implement in child class
 
     def add_driver(self, label, name='opt', driver_type='optimization', **kwargs):
-        """Add a driver."""
+        """
+        Add a driver.
+
+        Parameters
+        ----------
+        label : str
+            Label in the XDSM.
+        name : str
+            Name of the driver.
+        driver_type : str
+            Optimization or DOE.
+            Defaults to "optimization".
+        **kwargs : dict
+            Keyword args
+        """
         pass  # Implement in child class
 
     def add_input(self, name, label, style='DataIO', stack=False):
-        """Add input connection."""
+        """
+        Add input connection.
+
+        Parameters
+        ----------
+        name : str
+            Target name.
+        label : str
+            Label for connection.
+        style : str
+            Formatting style.
+        stack : bool
+            True for parallel.
+            Defaults to False.
+        """
         pass  # Implement in child class
 
     def add_output(self, name, label, style='DataIO', stack=False, side=_DEFAULT_OUTPUT_SIDE):
-        """Add output connection."""
+        """
+        Add output connection.
+
+        Parameters
+        ----------
+        name : str
+            Target name.
+        label : str
+            Label for connection.
+        style : str
+            Formatting style.
+        stack : bool
+            True for parallel.
+            Defaults to False.
+        side : str
+            Location of output, either 'left' or 'right'.
+        """
         pass  # Implement in child class
 
     def add_process(self, systems, arrow=True):
-        """Add process."""
+        """
+        Add process.
+
+        Parameters
+        ----------
+        systems : list
+            List of systems.
+        arrow : bool
+            Show process arrow.
+        """
         pass  # Implement in child class
 
     @staticmethod
@@ -196,7 +286,7 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         ----------
         names : list
             List of items in the block
-        kwargs : dict
+        **kwargs : dict
             Keyword arguments.
 
         Returns
@@ -218,9 +308,11 @@ class AbstractXDSMWriter(BaseXDSMWriter):
             Variable type.
         superscripts : dict or None, optional
             A dictionary mapping variable types to their superscript notation
+
         Returns
         -------
-
+        str
+            Formatted var string.
         """
         if superscripts is None:
             superscripts = _SUPERSCRIPTS
@@ -263,7 +355,14 @@ class XDSMjsWriter(AbstractXDSMWriter):
     """
 
     def __init__(self, name='xdsmjs'):
-        """Initialize."""
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        name : str
+            Name of this XDSM writer
+        """
         super(XDSMjsWriter, self).__init__(name=name)
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
@@ -300,7 +399,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Target system name.
         label : str
             Label to be displayed in the XDSM data block.
-        kwargs : dict
+        **kwargs : dict
             Keyword args
         """
         edge = {'to': self._format_id(target), 'from': self._format_id(src), 'name': label}
@@ -312,11 +411,11 @@ class XDSMjsWriter(AbstractXDSMWriter):
 
         Parameters
         ----------
-        label : str
-            Label in the XDSM
         name : str
             Name of the solver
-        kwargs : dict
+        label : str
+            Label in the XDSM
+        **kwargs : dict
             Keyword args
         """
         self.comp_names.append(self._format_id(name))
@@ -338,30 +437,12 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Defaults to False.
         comp_type : str or None
             Component type, e.g. explicit, implicit or metamodel
-        kwargs : dict
+        **kwargs : dict
             Keyword args
         """
         style = self.type_map.get(comp_type, 'analysis')
         self.comp_names.append(self._format_id(name))
         self.add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
-
-    def add_func(self, name, label=None, stack=False, **kwargs):
-        """
-        Add a function.
-
-        Parameters
-        ----------
-        label : str
-            Label in the XDSM, defaults to the name of the component.
-        name : str
-            Name of the component
-        stack : bool
-            True for parallel.
-            Defaults to False.
-        kwargs : dict
-            Keyword args
-        """
-        self.add_system(node_name=name, style='function', label=label, stack=stack, **kwargs)
 
     def add_driver(self, label, name='opt', driver_type='optimization', **kwargs):
         """
@@ -376,7 +457,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         driver_type : str
             Optimization or DOE.
             Defaults to "optimization".
-        kwargs : dict
+        **kwargs : dict
             Keyword args
         """
         self.driver = self._format_id(name)
@@ -398,7 +479,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         stack : bool
             True for parallel.
             Defaults to False.
-        kwargs : dict
+        **kwargs : dict
             Keyword args
         """
         if label is None:
@@ -439,11 +520,41 @@ class XDSMjsWriter(AbstractXDSMWriter):
         recurse(solver_name, nr_comps, self.processes)  # Mutates self.processes
 
     def add_input(self, name, label=None, style='DataIO', stack=False):
-        """Add an input connection."""
+        """
+        Add input connection.
+
+        Parameters
+        ----------
+        name : str
+            Target name.
+        label : str
+            Label for connection.
+        style : str
+            Formatting style.
+        stack : bool
+            True for parallel.
+            Defaults to False.
+        """
         self.connect(src=self._ul, target=name, label=label)
 
     def add_output(self, name, label=None, style='DataIO', stack=False, side=_DEFAULT_OUTPUT_SIDE):
-        """Add an output connection."""
+        """
+        Add output connection.
+
+        Parameters
+        ----------
+        name : str
+            Target name.
+        label : str
+            Label for connection.
+        style : str
+            Formatting style.
+        stack : bool
+            True for parallel.
+            Defaults to False.
+        side : str
+            Location of output, either 'left' or 'right'.
+        """
         if side == "left":
             self.connect(src=name, target=self._ul, label=label)
         else:
@@ -477,6 +588,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Embed XDSM data into the HTML file.
             If False, a JSON file will be also written.
             Defaults to True.
+        **kwargs : dict
+            Keyword args
         """
         data = self.collect_data()
 
@@ -519,7 +632,7 @@ else:
         Attributes
         ----------
         name : str
-            OpenMDAO component type.
+            Name of XDSM writer.
         box_stacking : str
             Controls the appearance of boxes. Possible values are: 'max_chars','vertical',
             'horizontal','cut_chars','empty'.
@@ -549,7 +662,24 @@ else:
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
                      number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False,
                      add_component_indices=True):
-            """Initialize."""
+            """
+            Initialize.
+
+            Parameters
+            ----------
+            name : str
+                Name of XDSM writer.
+            box_stacking : str
+                Controls the appearance of boxes. Possible values are: 'max_chars','vertical',
+                'horizontal','cut_chars','empty'.
+            number_alignment : str
+                Position of number relative to the component label. Possible values
+                are: 'horizontal', 'vertical'.
+            legend : str
+                If true, a legend will be added to the diagram.
+            add_component_indices : bool
+                If true, display components with numbers.
+            """
             super(XDSMWriter, self).__init__()
             self.name = name
             # Formatting options
@@ -586,7 +716,7 @@ else:
             ----------
             filename : str
                 Name of the file to be written.
-            kwargs : dict
+            **kwargs : dict
                 Keyword args
             """
             build = kwargs.pop('build', False)
@@ -623,7 +753,7 @@ else:
 
             Parameters
             ----------
-            node_name :str
+            node_name : str
                 Name of the system.
             style : str
                 Block formatting style, e.g. Analysis
@@ -633,7 +763,7 @@ else:
                 Defaults to False.
             faded : bool
                 Defaults to False.
-            kwargs : dict
+            **kwargs : dict
                 Keyword arguments.
             """
             super(XDSMWriter, self).add_system(node_name=node_name, style=style, label=label,
@@ -662,7 +792,7 @@ else:
                 Label in the XDSM
             name : str
                 Name of the solver
-            kwargs : dict
+            **kwargs : dict
                 Keyword args
             """
             style = self.type_map['solver']
@@ -683,29 +813,11 @@ else:
                 Defaults to False.
             comp_type : str or None
                 Component type, e.g. explicit, implicit or metamodel
-            kwargs : dict
+            **kwargs : dict
                 Keyword args
             """
             style = self.type_map.get(comp_type, 'Analysis')
             self._add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
-
-        def add_func(self, name, label=None, stack=False, **kwargs):
-            """
-            Add a function.
-
-            Parameters
-            ----------
-            label : str
-                Label in the XDSM, defaults to the name of the component.
-            name : str
-                Name of the component
-            stack : bool
-                True for parallel.
-                Defaults to False.
-            kwargs : dict
-                Keyword args
-            """
-            self._add_system(node_name=name, style='Function', label=label, stack=stack, **kwargs)
 
         def add_driver(self, name, label=None, driver_type='Optimization', **kwargs):
             """
@@ -720,7 +832,7 @@ else:
             driver_type : str
                 Driver type can be "Optimizer" or "DOE".
                 Defaults to "Optimizer"
-            kwargs : dict
+            **kwargs : dict
                 Keyword args
             """
             style = self.type_map.get(driver_type, 'Optimization')
@@ -775,7 +887,25 @@ else:
 
         @staticmethod
         def format_block(names, stacking='vertical', **kwargs):
-            """Format a block."""
+            """
+            Format a block.
+
+            Parameters
+            ----------
+            names : str
+                Names to put into block.
+            stacking : str
+                Controls the appearance of boxes. Possible values are: 'max_chars','vertical',
+                'horizontal','cut_chars','empty'.
+            **kwargs : dict
+                Alternative way to add element attributes. Use with attention, can overwrite
+                some built-in python names as "class" or "id" if misused.
+
+            Returns
+            -------
+            str
+                The block string.
+            """
             end_str = ', ...'
             max_lines = kwargs.pop('box_lines', _MAX_BOX_LINES)
             if stacking == 'vertical':
@@ -826,7 +956,23 @@ else:
 
         @staticmethod
         def format_var_str(name, var_type, superscripts=None):
-            """Format string displaying variable name."""
+            """
+            Format string displaying variable name.
+
+            Parameters
+            ----------
+            name : str
+                Name (label in the block) of the variable.
+            var_type : str
+                Variable type.
+            superscripts : dict or None, optional
+                A dictionary mapping variable types to their superscript notation
+
+            Returns
+            -------
+            str
+                Formatted var string.
+            """
             if superscripts is None:
                 superscripts = _SUPERSCRIPTS
             sup = superscripts[var_type]
@@ -840,7 +986,23 @@ else:
             return txt.format(first + i, last + i, first + i + 1)
 
         def number_label(self, number, txt, alignment):
-            """Add an index to the label either above or on the left side."""
+            """
+            Add an index to the label either above or on the left side.
+
+            Parameters
+            ----------
+            number : None or empty string or int
+                Number value for the label.
+            txt : str
+                Text appended to the number string.
+            alignment : str
+                Indicates alignment of label. Either 'horizontal' or 'vertical'.
+
+            Returns
+            -------
+            str
+                Label to be used for this item.
+            """
             if number:  # If number is None or empty string, it won't be inserted
                 number_str = '{}: '.format(number)
                 if alignment == 'horizontal':
@@ -881,7 +1043,14 @@ else:
             return title_str.format(title=title) + '  &\n'.join(style_strs) + r'\\'
 
         def _build_node_grid(self):
-            """Optionally appends the legend to the node grid."""
+            """
+            Optionally appends the legend to the node grid.
+
+            Returns
+            -------
+            str
+                A grid of the nodes.
+            """
             node_grid = super(XDSMWriter, self)._build_node_grid()
             if self.has_legend:
                 node_grid += self._make_legend()
@@ -963,7 +1132,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
-    add_process_conns: bool
+    add_process_conns : bool
         Add process connections (thin black lines)
         Defaults to True.
     show_parallel : bool
@@ -976,8 +1145,9 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
     legend : bool, optional
         If true, it adds a legend to the diagram.
         Defaults to False.
-    kwargs : dict
+    **kwargs : dict
         Keyword arguments
+
     Returns
     -------
        XDSM or AbstractXDSMWriter
@@ -1104,7 +1274,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to False.
-    add_process_conns: bool
+    add_process_conns : bool
         Add process connections (thin black lines)
         Defaults to True.
     show_parallel : bool
@@ -1125,7 +1295,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     legend : bool, optional
         If true, it adds a legend to the diagram.
         Defaults to False.
-    kwargs : dict
+    **kwargs : dict
         Keyword arguments
 
     Returns
@@ -1684,7 +1854,7 @@ def _multiline_block(*texts, **kwargs):
 
     texts : iterable(str)
         Text strings, each will go to new line
-    kwargs : dict
+    **kwargs : dict
         Unused keywords are ignored.
         "end_char" is the separator at the end of line. Defaults to '' (no separator).
 
