@@ -35,7 +35,7 @@ def head_and_body(head, body, attrs=None):
     return doc_type + '\n' + index
 
 
-def write_tags(tag, content='', attrs=None, cls_attribute=None, uid=None, new_lines=False, indent=0,
+def write_tags(tag, content='', attrs=None, cls_attr=None, uid=None, new_lines=False, indent=0,
                **kwargs):
     """
     Write an HTML element enclosed in tags.
@@ -49,7 +49,7 @@ def write_tags(tag, content='', attrs=None, cls_attribute=None, uid=None, new_li
     attrs : dict or None
         Attributes of the element.
         Defaults to None.
-    cls_attribute : str or None
+    cls_attr : str or None
         The "class" attribute of the element.
     uid : str or None
         The "id" attribute of the element.
@@ -74,8 +74,8 @@ def write_tags(tag, content='', attrs=None, cls_attribute=None, uid=None, new_li
     if attrs is None:
         attrs = {}
     attrs.update(kwargs)
-    if cls_attribute is not None:
-        attrs['class'] = cls_attribute
+    if cls_attr is not None:
+        attrs['class'] = cls_attr
     if uid is not None:
         attrs['id'] = uid
     attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
@@ -84,7 +84,7 @@ def write_tags(tag, content='', attrs=None, cls_attribute=None, uid=None, new_li
     return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep, spaces=spaces)
 
 
-def write_div(content='', attrs=None, cls_attribute=None, uid=None, indent=0, **kwargs):
+def write_div(content='', attrs=None, cls_attr=None, uid=None, indent=0, **kwargs):
     """
     Write an HTML div.
 
@@ -94,7 +94,7 @@ def write_div(content='', attrs=None, cls_attribute=None, uid=None, indent=0, **
         This goes into the body of the element.
     attrs : dict
         Attributes of the element.
-    cls_attribute : str or None
+    cls_attr : str or None
         The "class" attribute of the element.
     uid : str or None
         The "id" attribute of the element.
@@ -108,7 +108,7 @@ def write_div(content='', attrs=None, cls_attribute=None, uid=None, indent=0, **
     -------
         str
     """
-    return write_tags('div', content=content, attrs=attrs, cls_attribute=cls_attribute, uid=uid,
+    return write_tags('div', content=content, attrs=attrs, cls_attr=cls_attr, uid=uid,
                       new_lines=False, indent=indent, **kwargs)
 
 
@@ -243,7 +243,7 @@ def add_button(title, content='', uid=None, indent=0, **kwargs):
     """
     i = write_tags(tag='i', attrs={'class': content})
     attrs = {'title': title}
-    return write_tags('button', cls="myButton", content=i, attrs=attrs, uid=uid,
+    return write_tags('button', cls_attr="myButton", content=i, attrs=attrs, uid=uid,
                       new_lines=True, indent=indent, **kwargs)
 
 
@@ -282,20 +282,20 @@ def add_dropdown(title, id_naming=None, options=None, button_content='', header=
     button = add_button(title=title, content=button_content)
     if header is None:
         header = title
-    items = write_tags(tag='span', cls="fakeLink", content=header)
+    items = write_tags(tag='span', cls_attr="fakeLink", content=header)
 
     if options is not None:
         for option in options:
             if option_formatter is not None:
                 option = option_formatter(option)
             idx = "{}{}".format(id_naming, option)
-            items += write_tags(tag='span', cls="fakeLink", uid=idx, content=option)
+            items += write_tags(tag='span', cls_attr="fakeLink", uid=idx, content=option)
 
     attrs = {'class': 'dropdown-content'}
     menu = write_div(content=items, attrs=attrs, uid=uid)
 
     content = [button, menu]
-    return write_div(content=content, cls='dropdown', indent=indent, **kwargs)
+    return write_div(content=content, cls_attr='dropdown', indent=indent, **kwargs)
 
 
 def add_help(txt, header='Instructions', footer=''):
@@ -315,13 +315,13 @@ def add_help(txt, header='Instructions', footer=''):
     -------
         str
     """
-    header_txt = write_tags(tag='span', cls='close', content='&times;', uid="idSpanModalClose")
+    header_txt = write_tags(tag='span', cls_attr='close', content='&times;', uid="idSpanModalClose")
     header_txt += header
-    head = write_div(content=header_txt, cls="modal-header")
-    foot = write_div(content=footer, cls="modal-footer")
-    body = write_div(content=write_paragraph(txt), cls="modal-body")
-    modal_content = write_div(content=[head, body, foot], cls="modal-content")
-    return write_div(content=modal_content, cls="modal", uid="myModal")
+    head = write_div(content=header_txt, cls_attr="modal-header")
+    foot = write_div(content=footer, cls_attr="modal-footer")
+    body = write_div(content=write_paragraph(txt), cls_attr="modal-body")
+    modal_content = write_div(content=[head, body, foot], cls_attr="modal-content")
+    return write_div(content=modal_content, cls_attr="modal", uid="myModal")
 
 
 def add_title(txt, heading='h1', align='center'):
@@ -451,7 +451,7 @@ class ButtonGroup(UIElement):
             str
         """
         content = '\n\n'.join(self.items)
-        return write_div(content=content, cls="button-group")
+        return write_div(content=content, cls_attr="button-group")
 
 
 class Toolbar(UIElement):
@@ -484,7 +484,7 @@ class Toolbar(UIElement):
             HTML div enclosed in tags.
         """
         content = '\n\n'.join([item.write() for item in self.items])
-        return write_div(content=content, cls="toolbar", uid="toolbarDiv")
+        return write_div(content=content, cls_attr="toolbar", uid="toolbarDiv")
 
 
 class TemplateWriter(object):
