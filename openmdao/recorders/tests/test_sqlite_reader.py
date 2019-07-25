@@ -448,7 +448,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-        prob.driver.opt_settings['ACC'] = 1e-9
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
@@ -822,7 +821,6 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_get_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
-        prob.driver.opt_settings['ACC'] = 1e-9
         prob.driver.add_recorder(self.recorder)
         prob.setup()
 
@@ -1108,27 +1106,59 @@ class TestSqliteCaseReader(unittest.TestCase):
             else:
                 np.testing.assert_almost_equal(case[name], expected[name])
 
-    def test_get_var(self):
-        indep = om.IndepVarComp()
-        indep.add_output('distance', val=6., units='km')
-        indep.add_output('time', val=2., units='h')
+    def test_get_val_with_units_exhaustive(self):
+        import openmdao.api as om
 
         model = om.Group()
-        model.add_subsystem('c1', indep, promotes=['*'])
-        model.add_subsystem('c2', SpeedComp(), promotes=['*'])
+        model.add_subsystem('comp', om.ExecComp('y=x-25.',
+                                                x={'value': 77.0, 'units': 'degF'},
+                                                y={'value': 0.0, 'units': 'degC'}))
+        model.add_subsystem('prom', om.ExecComp('yy=xx-25.',
+                                                xx={'value': 77.0, 'units': 'degF'},
+                                                yy={'value': 0.0, 'units': 'degC'}),
+                            promotes=['xx', 'yy'])
+        model.add_subsystem('acomp', om.ExecComp('y=x-25.',
+                                                 x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                 y={'value': np.array([0., 0.]), 'units': 'degC'}))
+        model.add_subsystem('aprom', om.ExecComp('ayy=axx-25.',
+                                                 axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                 ayy={'value': np.array([0., 0.]), 'units': 'degC'}),
+                            promotes=['axx', 'ayy'])
 
         model.add_recorder(self.recorder)
 
         prob = om.Problem(model)
         prob.setup()
         prob.run_model()
+        prob.cleanup()
 
         cr = om.CaseReader(self.filename)
 
         case = cr.get_case(0)
 
-        np.testing.assert_almost_equal(case.get_val('speed'), 3.)  # km/h
-        np.testing.assert_almost_equal(case.get_val('speed', units='m/h'), 3000.)
+        assert_rel_error(self, prob.get_val('comp.x'), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y'), 52., 1e-6)
+        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 125.6, 1e-6)
+
+        assert_rel_error(self, prob.get_val('xx'), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('xx', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('yy'), 52., 1e-6)
+        assert_rel_error(self, prob.get_val('yy', 'degF'), 125.6, 1e-6)
+
+        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 52., 1e-6)
+        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 125.6, 1e-6)
+
+        assert_rel_error(self, prob.get_val('axx', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
+        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', indices=0), 52., 1e-6)
+        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
 
     def test_get_vars(self):
         prob = SellarProblem()

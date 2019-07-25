@@ -294,21 +294,9 @@ class Case(object):
         proms = self._prom2abs
 
         if name in proms['output']:
-            abs_list = proms['output'][name]
-            if len(abs_list) == 1:
-                abs_name = abs_list[0]
-                return meta[abs_name]['units']
-            else:
-                # TODO: looks like aliased input, must access the connected output?
-                print('------')
-                print('abs_list:')
-                from pprint import pprint
-                pprint(abs_list)
-                print('------')
-                abs_name = None
-                return meta[abs_name]['units']
+            abs_name = proms['output'][name][0]
+            return meta[abs_name]['units']
         elif name in proms['input']:
-            # TODO: check for unconnected non-unique inputs, and raise error?
             abs_name = proms['input'][name]
             return meta[abs_name]['units']
 
