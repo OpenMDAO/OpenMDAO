@@ -285,6 +285,8 @@ class Case(object):
         str
             Unit string.
         """
+        from pprint import pprint
+
         meta = self._abs2meta
 
         if name in meta:
@@ -296,7 +298,14 @@ class Case(object):
             abs_name = proms['output'][name][0]
             return meta[abs_name]['units']
         elif name in proms['input']:
-            abs_name = proms['input'][name]
+            if len(proms['input'][name]) > 1:
+                print(name, ':', proms['input'][name])
+                # looks like an aliased input
+                for abs_name in proms['input'][name]:
+                    print(abs_name, self[abs_name], self._get_units(abs_name))
+
+            # get units for the first abs_name
+            abs_name = proms['input'][name][0]
             return meta[abs_name]['units']
 
         raise KeyError('Variable name "{}" not found.'.format(name))

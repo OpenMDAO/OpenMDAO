@@ -1106,7 +1106,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             else:
                 np.testing.assert_almost_equal(case[name], expected[name])
 
-    def test_get_val_with_units_exhaustive(self):
+    def test_get_val_exhaustive(self):
         import openmdao.api as om
 
         model = om.Group()
@@ -1136,29 +1136,79 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         case = cr.get_case(0)
 
-        assert_rel_error(self, prob.get_val('comp.x'), 77.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', 'degC'), 25.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.y'), 52., 1e-6)
-        assert_rel_error(self, prob.get_val('comp.y', 'degF'), 125.6, 1e-6)
+        assert_rel_error(self, case.get_val('comp.x'), 77.0, 1e-6)
+        assert_rel_error(self, case.get_val('comp.x', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, case.get_val('comp.y'), 52., 1e-6)
+        assert_rel_error(self, case.get_val('comp.y', 'degF'), 125.6, 1e-6)
 
-        assert_rel_error(self, prob.get_val('xx'), 77.0, 1e-6)
-        assert_rel_error(self, prob.get_val('xx', 'degC'), 25.0, 1e-6)
-        assert_rel_error(self, prob.get_val('yy'), 52., 1e-6)
-        assert_rel_error(self, prob.get_val('yy', 'degF'), 125.6, 1e-6)
+        assert_rel_error(self, case.get_val('xx'), 77.0, 1e-6)
+        assert_rel_error(self, case.get_val('xx', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, case.get_val('yy'), 52., 1e-6)
+        assert_rel_error(self, case.get_val('yy', 'degF'), 125.6, 1e-6)
 
-        assert_rel_error(self, prob.get_val('acomp.x', indices=0), 77.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.y', indices=0), 52., 1e-6)
-        assert_rel_error(self, prob.get_val('acomp.y', 'degF', indices=0), 125.6, 1e-6)
+        assert_rel_error(self, case.get_val('acomp.x', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, case.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_rel_error(self, case.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
+        assert_rel_error(self, case.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_rel_error(self, case.get_val('acomp.y', indices=0), 52., 1e-6)
+        assert_rel_error(self, case.get_val('acomp.y', 'degF', indices=0), 125.6, 1e-6)
 
-        assert_rel_error(self, prob.get_val('axx', indices=0), 77.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', indices=1), 95.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
-        assert_rel_error(self, prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
-        assert_rel_error(self, prob.get_val('ayy', indices=0), 52., 1e-6)
-        assert_rel_error(self, prob.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
+        assert_rel_error(self, case.get_val('axx', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, case.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_rel_error(self, case.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
+        assert_rel_error(self, case.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_rel_error(self, case.get_val('ayy', indices=0), 52., 1e-6)
+        assert_rel_error(self, case.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
+
+    def test_get_val_units(self):
+        model = om.Group()
+        model.add_recorder(self.recorder)
+
+        G1 = model.add_subsystem("G1", om.Group(), promotes=['x'])
+        G1.add_subsystem("C0", om.IndepVarComp('x', 1.0, units='m'), promotes=['x'])
+
+        G2 = model.add_subsystem("G2", om.Group(), promotes=['a'])
+        G2.add_subsystem("C1", om.ExecComp('y=m*2.0', m={'units': 'm'}), promotes=[('m', 'a')])
+        G2.add_subsystem("C2", om.ExecComp('y=f*2.0', f={'units': 'ft'}), promotes=[('f', 'a')])
+
+        model.connect('x', 'a')
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        model.list_inputs(prom_name=True, units=True)
+        model.list_outputs(prom_name=True, units=True)
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        assert_rel_error(self, case.get_val('x'), 1., 1e-6)
+        assert_rel_error(self, case.get_val('x', units='ft'), 3.280839895, 1e-6)
+
+        assert_rel_error(self, case.get_val('G1.C0.x'), 1., 1e-6)
+        assert_rel_error(self, case.get_val('G1.C0.x', units='ft'), 3.280839895, 1e-6)
+
+        assert_rel_error(self, case.get_val('G2.C1.m'), 1., 1e-6)
+        assert_rel_error(self, case.get_val('G2.C2.f'), 3.280839895, 1e-6)
+
+        # 'a' is ambiguous.. what units do you want when accessing 'a'?
+        msg = 'The promoted name a is invalid because it refers to multiple inputs: ' + \
+              '[G2.C1.m ,G2.C2.f]. Access the value using the absolute path name or ' + \
+              'the connected output variable instead.'
+
+        with self.assertRaises(NameError) as cm:
+            case['a']
+        self.assertEquals(str(cm.exception), msg)
+
+        with self.assertRaises(NameError) as cm:
+            case.get_val('a')
+        self.assertEquals(str(cm.exception), msg)
+
+        with self.assertRaises(NameError) as cm:
+            case.get_val('a', units='ft')
+        self.assertEquals(str(cm.exception), msg)
 
     def test_get_vars(self):
         prob = SellarProblem()
