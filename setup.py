@@ -101,13 +101,16 @@ setup(
         'openmdao.surrogate_models.nn_interpolators'
     ],
     package_data={
-        'openmdao.devtools': ['*.wpr', '*.html'],
-        'openmdao.devtools.problem_viewer': [
-            'visualization/libs/*.js',
-            'visualization/src/*.js',
-            'visualization/style/*.css',
-            'visualization/style/*.woff',
-            'visualization/*.html'
+        'openmdao.devtools': ['*.wpr',],
+        'openmdao.visualization.n2_viewer': [
+            'libs/*.js',
+            'src/*.js',
+            'style/*.css',
+            'style/*.woff',
+            '*.html'
+        ],
+        'openmdao.visualization.connection_viewer': [
+            '*.html',
         ],
         'openmdao.visualization.xdsm_viewer': [
             'XDSMjs/*',
