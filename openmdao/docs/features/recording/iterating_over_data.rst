@@ -25,12 +25,12 @@ Alternatively, if you just want to iterate over all the cases you can use the :c
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_get_cases
     :layout: code, output
 
-By default, the :code:`list_cases` method will give a complete list of case IDs in the order in which 
+By default, the :code:`list_cases` method will give a complete list of case names in the order in which 
 the cases were executed and :code:`get_cases` will give a recursive nested dictionary of cases and their
 child cases in the order in which they were executed.
 
 The following example demonstrates selecting a case from a case list and processing a nested 
-dictionary of it's child cases.
+dictionary of its child cases.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_get_cases_nested

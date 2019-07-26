@@ -15,6 +15,7 @@ from six import iteritems, assertRaisesRegex
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
+from openmdao.recorders.case import PromotedToAbsoluteMap
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
@@ -23,7 +24,7 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler
-
+from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -50,24 +51,12 @@ def count_keys(d):
     return count
 
 
+@use_tempdirs
 class TestSqliteCaseReader(unittest.TestCase):
 
     def setUp(self):
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
-
-        self.filename = os.path.join(self.temp_dir, "sqlite_test")
+        self.filename = "sqlite_test"
         self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
-
-    def tearDown(self):
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_bad_filetype(self):
         # Pass a plain text file.
@@ -111,6 +100,37 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
         self.assertTrue(isinstance(cr, SqliteCaseReader),
                         msg='CaseReader not returning the correct subclass.')
+
+    def test_case_attributes(self):
+        """ Check that a Case object has all the expected attributes. """
+        prob = SellarProblem()
+        prob.setup()
+
+        prob.driver.add_recorder(self.recorder)
+        prob.run_driver()
+
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        self.assertEqual(case.source, 'driver')
+        self.assertEqual(case.name, 'rank0:Driver|0')
+        self.assertEqual(case.counter, 1)
+        self.assertTrue(isinstance(case.timestamp, float))
+        self.assertEqual(case.success, True)
+        self.assertEqual(case.msg, '')
+        self.assertTrue(isinstance(case.outputs, PromotedToAbsoluteMap))
+        self.assertEqual(case.inputs, None)
+        self.assertEqual(case.residuals, None)
+        self.assertEqual(case.jacobian, None)
+        self.assertEqual(case.parent, None)
+        self.assertEqual(case.abs_err, None)
+        self.assertEqual(case.rel_err, None)
+
+        msg = "'iteration_coordinate' has been deprecated. Use 'name' instead."
+        with assert_warning(DeprecationWarning, msg):
+            case.iteration_coordinate
 
     def test_invalid_source(self):
         """ Tests that the reader returns params correctly. """
@@ -459,7 +479,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         last_counter = 0
         for i, c in enumerate(cr.get_cases()):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.name, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
 
@@ -492,8 +512,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         last_counter = 0
         for i, c in enumerate(cr.get_cases(recurse=True, flat=True)):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
-            if len(c.iteration_coordinate.split('|')) > 2:
+            self.assertEqual(c.name, expected_coords[i])
+            if len(c.name.split('|')) > 2:
                 self.assertEqual(c.parent, expected_coords[i+1])
             else:
                 self.assertEqual(c.parent, None)
@@ -511,7 +531,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         last_counter = 0
         for i, c in enumerate(cr.get_cases('rank0:pyOptSparse_SLSQP|0', recurse=True, flat=True)):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.name, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
 
@@ -531,15 +551,15 @@ class TestSqliteCaseReader(unittest.TestCase):
         count = 0
         for case in cases:
             count += 1
-            coord = case.iteration_coordinate
+            coord = case.name
             self.assertTrue(coord in list(expected_coords.keys()))
             for child_case in cases[case]:
                 count += 1
-                child_coord = child_case.iteration_coordinate
+                child_coord = child_case.name
                 self.assertTrue(child_coord in expected_coords[coord].keys())
                 for grandchild_case in cases[case][child_case]:
                     count += 1
-                    grandchild_coord = grandchild_case.iteration_coordinate
+                    grandchild_coord = grandchild_case.name
                     self.assertTrue(grandchild_coord in expected_coords[coord][child_coord].keys())
 
         self.assertEqual(count, 3)
@@ -581,7 +601,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         last_counter = 0
         for i, c in enumerate(cr.get_cases(source=case.parent, recurse=True, flat=True)):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.name, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
             i += 1
@@ -866,7 +886,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         # verify the cases are all there and are as expected
         self.assertEqual(len(cases), len(expected_coords))
         for i, c in enumerate(cases):
-            self.assertEqual(c.iteration_coordinate, expected_coords[i])
+            self.assertEqual(c.name, expected_coords[i])
 
         #
         # get a list of cases for each source
@@ -896,7 +916,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                     mda_counter += 1
                 if source.startswith('root.'):     # count all cases for/under root solver
                     root_counter += 1
-                self.assertRegexpMatches(case.iteration_coordinate, expected)
+                self.assertRegexpMatches(case.name, expected)
 
         self.assertEqual(counter, global_iterations)
 
@@ -1007,6 +1027,86 @@ class TestSqliteCaseReader(unittest.TestCase):
         for name, meta in inputs:
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['value'], expected['value'])
+
+    def test_getitem(self):
+        prob = SellarProblem()
+        prob.setup()
+
+        prob.add_recorder(self.recorder)
+        prob.driver.add_recorder(self.recorder)
+        prob.model.d1.add_recorder(self.recorder)
+
+        prob.run_driver()
+
+        prob.record_iteration('final')
+        prob.cleanup()
+
+        # expected input and output values after run_once
+        expected = {
+            # promoted names
+            "x": 1.,
+            "y1": 25.58830237,
+            "y2": 12.05848815,
+            "z": [5., 2.],
+            "obj": 28.58830817,
+            "con1": -22.42830237,
+            "con2": -11.94151185,
+            # unpromoted output names
+            "px.x": 1.,
+            "pz.z": [5., 2.],
+            "obj_cmp.obj": 28.58830817,
+            "con_cmp1.con1": -22.42830237,
+            "con_cmp2.con2": -11.94151185,
+            # unpromoted system names
+            "d1.x": 1.,
+            "d1.y1": 25.58830237,
+            "d1.y2": 12.05848815,
+            "d1.z": [5., 2.],
+        }
+
+        cr = om.CaseReader(self.filename)
+
+        # driver will record design vars, objectives and constraints
+        cases = cr.list_cases('driver', recurse=False)
+        case = cr.get_case(cases[0])
+
+        for name in expected:
+            if name[0] in ['y', 'd']:
+                # driver does not record coupling vars y1 & y2
+                # or the lower level inputs and outputs of d1
+                msg = "'Variable name \"%s\" not found.'" % name
+                with self.assertRaises(KeyError) as cm:
+                    case[name]
+                self.assertEqual(str(cm.exception), msg)
+            else:
+                np.testing.assert_almost_equal(case[name], expected[name])
+
+        # problem will record all inputs and outputs at the problem level
+        case = cr.get_case('final')
+
+        for name in expected:
+            if name in ['d1.x', 'd1.y2', 'd1.z']:
+                # problem does not record lower level inputs
+                msg = "'Variable name \"%s\" not found.'" % name
+                with self.assertRaises(KeyError) as cm:
+                    case[name]
+                self.assertEqual(str(cm.exception), msg)
+            else:
+                np.testing.assert_almost_equal(case[name], expected[name])
+
+        # system will record inputs and outputs at the system level
+        cases = cr.list_cases('root.d1')
+        case = cr.get_case(cases[-1])
+
+        for name in expected:
+            if name[0] in ['p', 'o', 'c']:
+                # system d1 does not record params, obj and cons
+                msg = "'Variable name \"%s\" not found.'" % name
+                with self.assertRaises(KeyError) as cm:
+                    case[name]
+                self.assertEqual(str(cm.exception), msg)
+            else:
+                np.testing.assert_almost_equal(case[name], expected[name])
 
     def test_get_vars(self):
         prob = SellarProblem()
@@ -1430,7 +1530,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                           cr._system_cases, cr._problem_cases):
             for key in case_type.list_cases():
                 self.assertTrue(key in case_type._cases)
-                self.assertEqual(key, case_type._cases[key].iteration_coordinate)
+                self.assertEqual(key, case_type._cases[key].name)
 
     def test_caching_cases(self):
         prob = SellarProblem()
@@ -1480,7 +1580,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                           cr._system_cases, cr._problem_cases):
             for key in case_type.list_cases():
                 self.assertTrue(key in case_type._cases)
-                self.assertEqual(key, case_type._cases[key].iteration_coordinate)
+                self.assertEqual(key, case_type._cases[key].name)
 
     def test_reading_driver_cases_with_indices(self):
         # note: size must be an even number
@@ -1964,7 +2064,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             case = cr.get_case(c)
 
 
-            coord = case.iteration_coordinate
+            coord = case.name
             self.assertEqual(coord, expected[i])
 
             # check the source
@@ -1976,26 +2076,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                 self.assertEqual(case.source, 'root')
 
 
+@use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
-
-    def setUp(self):
-        import os
-        from tempfile import mkdtemp
-        self.orig_dir = os.getcwd()
-        self.temp_dir = mkdtemp()
-        os.chdir(self.temp_dir)
-
-    def tearDown(self):
-        import os
-        from shutil import rmtree
-        import errno
-        os.chdir(self.orig_dir)
-        try:
-            rmtree(self.temp_dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_feature_list_cases(self):
         import numpy as np
@@ -2023,14 +2105,14 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         cr = om.CaseReader('cases.sql')
 
-        case_ids = cr.list_cases()
+        case_names = cr.list_cases()
 
-        self.assertEqual(len(case_ids), driver.iter_count)
-        self.assertEqual(case_ids, ['rank0:ScipyOptimize_SLSQP|%d' % i for i in range(driver.iter_count)])
+        self.assertEqual(len(case_names), driver.iter_count)
+        self.assertEqual(case_names, ['rank0:ScipyOptimize_SLSQP|%d' % i for i in range(driver.iter_count)])
         self.assertEqual('', '')
 
-        for case_id in case_ids:
-            case = cr.get_case(case_id)
+        for name in case_names:
+            case = cr.get_case(name)
             self.assertEqual(case, case)
 
     def test_feature_get_cases(self):
@@ -2339,6 +2421,10 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
         self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
 
+        # you can also access the variables directly from the case object
+        self.assertEqual((case['obj'], case['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
+        self.assertEqual((case['x'], case['px.x']), (dvs['px.x'], dvs['x']))
+
     def test_feature_list_inputs_and_outputs(self):
         import openmdao.api as om
         from openmdao.test_suite.components.sellar import SellarProblem
@@ -2364,30 +2450,213 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         case = cr.get_case(system_cases[1])
 
-        inputs_case = sorted( case.list_inputs())
+        case_inputs = sorted(case.list_inputs())
 
-        assert_rel_error(self, inputs_case[0][1]['value'], [1.], tolerance=1e-10) # d1.x
-        assert_rel_error(self, inputs_case[1][1]['value'], [12.27257053], tolerance=1e-10) # d1.y2
-        assert_rel_error(self, inputs_case[2][1]['value'], [5., 2.], tolerance=1e-10) # d1.z
+        assert_rel_error(self, case_inputs[0][1]['value'], [1.], tolerance=1e-10) # d1.x
+        assert_rel_error(self, case_inputs[1][1]['value'], [12.27257053], tolerance=1e-10) # d1.y2
+        assert_rel_error(self, case_inputs[2][1]['value'], [5., 2.], tolerance=1e-10) # d1.z
 
-        outputs_case = case.list_outputs()
+        case_outputs = case.list_outputs(prom_name=True)
 
-        assert_rel_error(self, outputs_case[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
+        assert_rel_error(self, case_outputs[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
 
+    def test_case_array_list_vars_options(self):
+        import openmdao.api as om
+        from six.moves import cStringIO
+        from openmdao.utils.general_utils import printoptions
+
+        class ArrayAdder(om.ExplicitComponent):
+            """
+            Just a simple component that has array inputs and outputs
+            """
+
+            def __init__(self, size):
+                super(ArrayAdder, self).__init__()
+                self.size = size
+
+            def setup(self):
+                self.add_input('x', val=np.zeros(self.size), units='inch')
+                self.add_output('y', val=np.zeros(self.size), units='ft')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] + 10.0
+
+        size = 100  # how many items in the array
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size), units='inch'),
+                                 promotes=['x'])
+        prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
+
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+
+        prob.model.recording_options['record_inputs'] = True
+        prob.model.recording_options['record_outputs'] = True
+        prob.model.recording_options['record_residuals'] = True
+
+        prob.setup()
+
+        prob['x'] = np.ones(size)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        system_cases = cr.list_cases()
+        case = cr.get_case(system_cases[0])
+
+        # logging inputs
+        # out_stream - not hierarchical - extras - no print_arrays
+        stream = cStringIO()
+        case.list_inputs(values=True,
+                         units=True,
+                         hierarchical=False,
+                         print_arrays=False,
+                         out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(1, text.count("1 Input(s) in 'model'"))
+        self.assertEqual(1, text.count('mult.x'))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(5, num_non_empty_lines)
+
+        # out_stream - hierarchical - extras - no print_arrays
+        stream = cStringIO()
+        case.list_inputs(values=True,
+                         units=True,
+                         hierarchical=True,
+                         print_arrays=False,
+                         out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(1, text.count("1 Input(s) in 'model'"))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(7, num_non_empty_lines)
+        self.assertEqual(1, text.count('top'))
+        self.assertEqual(1, text.count('  mult'))
+        self.assertEqual(1, text.count('    x'))
+
+        # logging outputs
+        # out_stream - not hierarchical - extras - no print_arrays
+        stream = cStringIO()
+        case.list_outputs(values=True,
+                          units=True,
+                          shape=True,
+                          bounds=True,
+                          residuals=True,
+                          scaling=True,
+                          hierarchical=False,
+                          print_arrays=False,
+                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('2 Explicit Output'), 1)
+        # make sure they are in the correct order
+        # FIXME: disabled until Case orders outputs
+        # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(8, num_non_empty_lines)
+
+        # Promoted names - no print arrays
+        stream = cStringIO()
+        case.list_outputs(values=True,
+                          prom_name=True,
+                          print_arrays=False,
+                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('    x       |10.0|   x'), 1)
+        self.assertEqual(text.count('    y       |110.0|  y'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 11)
+
+        # Hierarchical - no print arrays
+        stream = cStringIO()
+        case.list_outputs(values=True,
+                          units=True,
+                          shape=True,
+                          bounds=True,
+                          residuals=True,
+                          scaling=True,
+                          hierarchical=True,
+                          print_arrays=False,
+                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('top'), 1)
+        self.assertEqual(text.count('  des_vars'), 1)
+        self.assertEqual(text.count('    x'), 1)
+        self.assertEqual(text.count('  mult'), 1)
+        self.assertEqual(text.count('    y'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 11)
+
+        # Need to explicitly set this to make sure all ways of running this test
+        #   result in the same format of the output. When running this test from the
+        #   top level via testflo, the format comes out different than if the test is
+        #   run individually
+        opts = {
+            'edgeitems': 3,
+            'infstr': 'inf',
+            'linewidth': 75,
+            'nanstr': 'nan',
+            'precision': 8,
+            'suppress': False,
+            'threshold': 1000,
+        }
+
+        from distutils.version import LooseVersion
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            opts['legacy'] = '1.13'
+
+        with printoptions(**opts):
+            # logging outputs
+            # out_stream - not hierarchical - extras - print_arrays
+            stream = cStringIO()
+            case.list_outputs(values=True,
+                              units=True,
+                              shape=True,
+                              bounds=True,
+                              residuals=True,
+                              scaling=True,
+                              hierarchical=False,
+                              print_arrays=True,
+                              out_stream=stream)
+            text = stream.getvalue()
+            self.assertEqual(text.count('2 Explicit Output'), 1)
+            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('resids:'), 2)
+            self.assertEqual(text.count('['), 4)
+            # make sure they are in the correct order
+            # FIXME: disabled until Case orders outputs
+            # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
+            num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+            self.assertEqual(37, num_non_empty_lines)
+
+            # Hierarchical
+            stream = cStringIO()
+            case.list_outputs(values=True,
+                              units=True,
+                              shape=True,
+                              bounds=True,
+                              residuals=True,
+                              scaling=True,
+                              hierarchical=True,
+                              print_arrays=True,
+                              out_stream=stream)
+            text = stream.getvalue()
+            self.assertEqual(text.count('2 Explicit Output'), 1)
+            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('resids:'), 2)
+            self.assertEqual(text.count('['), 4)
+            self.assertEqual(text.count('top'), 1)
+            self.assertEqual(text.count('  des_vars'), 1)
+            self.assertEqual(text.count('    x'), 1)
+            self.assertEqual(text.count('  mult'), 1)
+            self.assertEqual(text.count('    y'), 1)
+            num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+            self.assertEqual(num_non_empty_lines, 40)
+
+
+@use_tempdirs
 class TestPromotedToAbsoluteMap(unittest.TestCase):
-    def setUp(self):
-        self.dir = mkdtemp()
-        self.original_path = os.getcwd()
-        os.chdir(self.dir)
-
-    def tearDown(self):
-        os.chdir(self.original_path)
-        try:
-            rmtree(self.dir)
-        except OSError as e:
-            # If directory already deleted, keep going
-            if e.errno not in (errno.ENOENT, errno.EACCES, errno.EPERM):
-                raise e
 
     def test_dict_functionality(self):
         prob = SellarProblem(SellarDerivativesGrouped)

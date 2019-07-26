@@ -281,22 +281,22 @@ class DOEDriver(Driver):
         filt = self._filtered_vars_to_record
 
         if opts['record_desvars']:
-            des_vars = self.get_design_var_values(filt['des'])
+            des_vars = self.get_design_var_values(driver_scaling=False, filter=filt['des'])
         else:
             des_vars = {}
 
         if opts['record_objectives']:
-            obj_vars = self.get_objective_values(filt['obj'])
+            obj_vars = self.get_objective_values(driver_scaling=False, filter=filt['obj'])
         else:
             obj_vars = {}
 
         if opts['record_constraints']:
-            con_vars = self.get_constraint_values(filt['con'])
+            con_vars = self.get_constraint_values(driver_scaling=False, filter=filt['con'])
         else:
             con_vars = {}
 
         if opts['record_responses']:
-            # res_vars = self.get_response_values(filt['res'])  # not really working yet
+            # res_vars = self.get_response_values(filter=filt['res'])  # not really working yet
             res_vars = {}
         else:
             res_vars = {}
