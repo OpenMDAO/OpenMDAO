@@ -229,7 +229,6 @@ class Case(object):
 
         raise KeyError('Variable name "%s" not found.' % name)
 
-
     def get_val(self, name, units=None, indices=None):
         """
         Get an output/input variable.
