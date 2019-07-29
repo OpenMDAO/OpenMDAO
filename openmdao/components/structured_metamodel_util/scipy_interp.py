@@ -25,7 +25,7 @@ class ScipyGridInterp(GridInterpBase):
 
     The data must be defined on a regular grid; the grid spacing however may be uneven. First,
     third and fifth order spline interpolation are supported. After setting up the interpolator
-    object, the interpolation method (*slinear*, *cubic*, and *quintic*) may be chosen at each
+    object, the interpolation order (*slinear*, *cubic*, and *quintic*) may be chosen at each
     evaluation. Additionally, gradients are provided for the spline interpolation methods.
 
     Attributes
@@ -44,17 +44,17 @@ class ScipyGridInterp(GridInterpBase):
         Default is `np.nan`.
     grid : tuple
         Collection of points that determine the regular grid.
-    method : string
-        Name of interpolation method.
+    order : string
+        Name of interpolation order.
     values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
     _all_gradients : ndarray
         Cache of computed gradients.
-    _gmethod : string
-        Name of interpolation method used to compute the last gradient.
+    _g_order : string
+        Name of interpolation order used to compute the last gradient.
     _interp_config : dict
         Configuration object that stores limitations of each interpolation
-        method.
+        order.
     _ki : list
         Interpolation order to be used in each dimension.
     _spline_dim_error : bool
@@ -67,7 +67,7 @@ class ScipyGridInterp(GridInterpBase):
         Current evaluation point.
     """
 
-    def interpolate(self, xi, method=None, compute_gradients=True):
+    def interpolate(self, xi, order=None, compute_gradients=True):
         """
         Interpolate at the sample coordinates.
 
@@ -75,9 +75,9 @@ class ScipyGridInterp(GridInterpBase):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-        method : str, optional
-            The method of interpolation to perform. Supported are 'slinear', 'cubic', and
-            'quintic'. Default is None, which will use the method defined at the construction
+        order : str, optional
+            The order of interpolation to perform. Supported are 'slinear', 'cubic', and
+            'quintic'. Default is None, which will use the order defined at the construction
             of the interpolation object instance.
         compute_gradients : bool, optional
             If a spline interpolation method is chosen, this determines whether gradient
@@ -91,11 +91,11 @@ class ScipyGridInterp(GridInterpBase):
         # cache latest evaluation point for gradient method's use later
         self._xi = xi
 
-        method = self.method if method is None else method
-        if method not in self._all_methods:
-            all_m = ', '.join(['"' + m + '"' for m in self._all_methods])
-            raise ValueError('Method "%s" is not defined. Valid methods are '
-                             '%s.' % (method, all_m))
+        order = self.order if order is None else order
+        if order not in self._all_orders:
+            all_m = ', '.join(['"' + m + '"' for m in self._all_orders])
+            raise ValueError('order "%s" is not defined. Valid order are '
+                             '%s.' % (order, all_m))
 
         ndim = len(self.grid)
         self.ndim = ndim
@@ -127,10 +127,10 @@ class ScipyGridInterp(GridInterpBase):
         indices, out_of_bounds = self._find_indices(xi.T)
 
         ki = self._ki
-        if method != self.method:
+        if order != self.order:
             # re-validate dimensions vs spline order
 
-            k = self._interp_config[method]
+            k = self._interp_config[order]
             ki = []
             for i, p in enumerate(self.grid):
                 n_p = len(p)
@@ -143,7 +143,7 @@ class ScipyGridInterp(GridInterpBase):
                                         xi,
                                         indices,
                                         interpolator,
-                                        method,
+                                        order,
                                         ki,
                                         compute_gradients=compute_gradients)
 
@@ -152,7 +152,7 @@ class ScipyGridInterp(GridInterpBase):
 
         return result.reshape(xi_shape[:-1] + self.values.shape[ndim:])
 
-    def _evaluate_splines(self, data_values, xi, indices, interpolator, method,
+    def _evaluate_splines(self, data_values, xi, indices, interpolator, order,
                           ki, compute_gradients=True):
         """
         Perform interpolation using the given interpolator.
@@ -167,9 +167,9 @@ class ScipyGridInterp(GridInterpBase):
             Indices for search lookup
         interpolator : <scipy.interpolate.BSpline>
             A BSpline object that is used for interpolation.
-        method : str, optional
-            The method of interpolation to perform. Supported are 'slinear', 'cubic', and
-            'quintic'. Default is None, which will use the method defined at the construction
+        order : str, optional
+            The order of interpolation to perform. Supported are 'slinear', 'cubic', and
+            'quintic'. Default is None, which will use the order defined at the construction
             of the interpolation object instance.
         ki : list
             List of spline interpolation orders.
@@ -245,7 +245,7 @@ class ScipyGridInterp(GridInterpBase):
                                                          x[: i],
                                                          indices,
                                                          interpolator,
-                                                         method,
+                                                         order,
                                                          ki,
                                                          compute_gradients=False)
 
@@ -266,8 +266,8 @@ class ScipyGridInterp(GridInterpBase):
         # Cache the computed gradients for return by the gradient method
         if compute_gradients:
             self._all_gradients = all_gradients
-            # indicate what method was used to compute these
-            self._gmethod = method
+            # indicate what order was used to compute these
+            self._g_order = order
         return result
 
     def _do_spline_fit(self, interpolator, x, y, pt, k, compute_gradients):
@@ -338,7 +338,7 @@ class ScipyGridInterp(GridInterpBase):
                 out_of_bounds += x > grid[-1]
         return indices, out_of_bounds
 
-    def gradient(self, xi, method=None):
+    def gradient(self, xi, order=None):
         """
         Return the computed gradients at the specified point.
 
@@ -353,9 +353,9 @@ class ScipyGridInterp(GridInterpBase):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-        method : str, optional
-            The method of interpolation to perform. Supported are 'slinear',
-            'cubic', and 'quintic'. Default is None, which will use the method
+        order : str, optional
+            The order of interpolation to perform. Supported are 'slinear',
+            'cubic', and 'quintic'. Default is None, which will use the order
             defined at the construction of the interpolation object instance.
 
         Returns
@@ -365,14 +365,14 @@ class ScipyGridInterp(GridInterpBase):
             respect to each value in xi
         """
         # Determine if the needed gradients have been cached already
-        if not method:
-            method = self.method
+        if not order:
+            order = self.order
 
         if (self._xi is None) or \
                 (not np.array_equal(xi, self._xi)) or \
-                (method != self._gmethod):
+                (order != self._g_order):
             # if not, compute the interpolation to get the gradients
-            self.interpolate(xi, method=method)
+            self.interpolate(xi, order=order)
         gradients = self._all_gradients
         gradients = gradients.reshape(np.asarray(xi).shape)
         return gradients

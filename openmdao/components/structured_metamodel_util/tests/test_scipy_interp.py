@@ -259,7 +259,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
             interp = ScipyGridInterp(points, values, method)
             x = np.array([0.9, 0.1])
             interp._xi = x
-            interp._gmethod = method
+            interp._g_order = method
             dy = np.array([0.997901, 0.08915])
             interp._all_gradients = dy
             assert_almost_equal(interp.gradient(x), dy)

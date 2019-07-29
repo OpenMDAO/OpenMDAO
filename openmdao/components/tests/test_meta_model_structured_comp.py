@@ -384,7 +384,7 @@ class SampleMap(object):
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
-class TestMetaModelStructured(unittest.TestCase):
+class TestMetaModelStructuredScipy(unittest.TestCase):
     """
     Tests the regular grid map component. specifically the analytic derivatives
     vs. finite difference estimates.
@@ -407,7 +407,7 @@ class TestMetaModelStructured(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(method='slinear', extrapolate=True)
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, interp_method='scipy')
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -451,7 +451,7 @@ class TestMetaModelStructured(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(method='slinear', extrapolate=True)
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True)
 
         for out in outs:
             comp.add_output(out['name'], out['default'], out['values'])
@@ -517,7 +517,7 @@ class TestMetaModelStructured(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         # Need to make sure extrapolate is False for bounds to be checked
-        comp = om.MetaModelStructuredComp(method='slinear', extrapolate=False)
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=False)
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -558,7 +558,7 @@ class TestMetaModelStructured(unittest.TestCase):
         ivc.add_output('g_train', outs[1]['values'])
 
         comp = om.MetaModelStructuredComp(training_data_gradients=True,
-                                          method='cubic',
+                                          order='cubic',
                                           vec_size=3)
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -601,7 +601,7 @@ class TestMetaModelStructured(unittest.TestCase):
         ivc.add_output('g_train', outs[1]['values'])
 
         comp = om.MetaModelStructuredComp(training_data_gradients=True,
-                                          method='cubic',
+                                          order='cubic',
                                           vec_size=3)
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -613,7 +613,6 @@ class TestMetaModelStructured(unittest.TestCase):
         model.add_subsystem('comp',
                             comp,
                             promotes=["*"])
-
 
         prob = om.Problem(model)
         prob.setup()
@@ -683,9 +682,165 @@ class TestMetaModelStructured(unittest.TestCase):
         msg = ("MMComp (MM): Error interpolating output 'y' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
         self.assertEqual(str(cm.exception), msg)
 
+    def test_deprecated_option(self):
+        prob = om.Problem()
+        model = prob.model
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        outs = mapdata.output_data
+
+        ivc.add_output('x', np.array([-0.3, 0.7, 1.2]))
+        ivc.add_output('y', np.array([0.14, 0.313, 1.41]))
+        ivc.add_output('z', np.array([-2.11, -1.2, 2.01]))
+
+        ivc.add_output('f_train', outs[0]['values'])
+        ivc.add_output('g_train', outs[1]['values'])
+
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          method='cubic',
+                                          vec_size=3)
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('ivc', ivc, promotes=["*"])
+        model.add_subsystem('comp',
+                            comp,
+                            promotes=["*"])
+
+        msg = "The 'method' option provides backwards compatibility " + \
+        "with earlier version of OpenMDAO; use options['order'] " + \
+        "instead."
+
+        with assert_warning(DeprecationWarning, msg):
+            prob.setup()
+
+
+class TestMetaModelOTIS(unittest.TestCase):
+    """
+    Tests the regular grid map component. specifically the analytic derivatives
+    vs. finite difference estimates.
+    """
+
+    def setUp(self):
+
+        model = om.Group()
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', x['default'], units=x['units'])
+        ivc.add_output('y', y['default'], units=y['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, interp_method='otis')
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+        self.prob = om.Problem(model)
+        self.prob.setup()
+        self.prob['x'] = 1.0
+        self.prob['y'] = 0.75
+        self.prob['z'] = -1.7
+
+    def run_and_check_derivs(self, prob, tol=1e-5, verbose=False):
+        """Runs check_partials and compares to analytic derivatives."""
+
+        prob.run_model()
+        derivs = prob.check_partials(out_stream=None)
+
+        for i in derivs['comp'].keys():
+            if verbose:
+                print("Checking derivative pair:", i)
+            if derivs['comp'][i]['J_fwd'].sum() != 0.0:
+                rel_err = max(derivs['comp'][i]['rel error'])
+                self.assertLessEqual(rel_err, tol)
+
+    def test_deriv1(self):
+        # run at default pt
+        self.run_and_check_derivs(self.prob)
+
+        # test output values
+        f, g = self.prob['comp.f'], self.prob['comp.g']
+
+        tol = 1e-6
+        assert_rel_error(self, f, -0.05624571, tol)
+        assert_rel_error(self, g, 1.02068754, tol)
+
+    def test_deriv1_swap(self):
+        # Bugfix test that we can add outputs before inputs.
+
+        model = om.Group()
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', x['default'], units=x['units'])
+        ivc.add_output('y', y['default'], units=y['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True)
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+        prob = om.Problem(model)
+        prob.setup()
+        prob['x'] = 1.0
+        prob['y'] = 0.75
+        prob['z'] = -1.7
+
+        # run at default pt
+        self.run_and_check_derivs(prob)
+
+    def test_deriv2(self):
+        self.prob['x'] = 10.0
+        self.prob['y'] = 0.81
+        self.prob['z'] = 1.1
+        self.run_and_check_derivs(self.prob)
+
+    def test_deriv3(self):
+        self.prob['x'] = 90.0
+        self.prob['y'] = 1.2
+        self.prob['z'] = 2.1
+        self.run_and_check_derivs(self.prob)
+
+    def test_deriv4(self):
+        self.prob['x'] = 65.0
+        self.prob['y'] = 0.951
+        self.prob['z'] = 2.5
+        self.run_and_check_derivs(self.prob)
+
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
-class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
+class TestMetaModelStructuredCompFeature(unittest.TestCase):
 
     @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
     def test_xor(self):
@@ -693,7 +848,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         import openmdao.api as om
 
         # Create regular grid interpolator instance
-        xor_interp = om.MetaModelStructuredComp(method='slinear')
+        xor_interp = om.MetaModelStructuredComp(order='slinear')
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
@@ -743,7 +898,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         print(f.shape)
 
         # Create regular grid interpolator instance
-        interp = om.MetaModelStructuredComp(method='cubic')
+        interp = om.MetaModelStructuredComp(order='cubic')
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
         interp.add_input('p3', 3.14, training_data=p3)
@@ -786,7 +941,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         f = np.sqrt(P1) + P2 * P3
 
         # Create regular grid interpolator instance
-        interp = om.MetaModelStructuredComp(method='cubic', vec_size=2)
+        interp = om.MetaModelStructuredComp(order='cubic', vec_size=2)
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
         interp.add_input('p3', 3.14, training_data=p3)
@@ -829,7 +984,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         print(f.shape)
 
         # Create regular grid interpolator instance
-        interp = om.MetaModelStructuredComp(method='cubic', training_data_gradients=True)
+        interp = om.MetaModelStructuredComp(order='cubic', training_data_gradients=True)
         interp.add_input('p1', 0.5, p1)
         interp.add_input('p2', 0.0, p2)
         interp.add_input('p3', 3.14, p3)
@@ -866,7 +1021,7 @@ class TestMetaModelStructuredCompMapFeature(unittest.TestCase):
         msg = "'MetaModelStructured' has been deprecated. Use 'MetaModelStructuredComp' instead."
 
         with assert_warning(DeprecationWarning, msg):
-            xor_interp = om.MetaModelStructured(method='slinear')
+            xor_interp = om.MetaModelStructured(order='slinear')
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)

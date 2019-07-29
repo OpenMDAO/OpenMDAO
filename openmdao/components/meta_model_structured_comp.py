@@ -6,8 +6,9 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
+from openmdao.components.structured_metamodel_util.otis_interp import OtisGridInterp
 from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
+from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
@@ -76,8 +77,12 @@ class MetaModelStructuredComp(ExplicitComponent):
                                   'training data should be computed.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
-        self.options.declare('method', values=('cubic', 'slinear', 'quintic'),
-                             default="cubic", desc='Spline interpolation order.')
+        self.options.declare('method', values=('cubic', 'slinear', 'quintic'), default=None,
+                             desc='Deprecated, use "order".', allow_none=True)
+        self.options.declare('order', values=('cubic', 'slinear', 'quintic'), default="cubic",
+                             desc='Spline interpolation order.')
+        self.options.declare('interp_method', values=('scipy', 'otis'), default='scipy',
+                             desc='Inerpolation method to use.')
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
         """
@@ -133,13 +138,17 @@ class MetaModelStructuredComp(ExplicitComponent):
         recurse : bool
             Whether to call this method in subsystems.
         """
+        interp_method = self.options['interp_method']
+        if interp_method == 'otis':
+            interp = OtisGridInterp
+        else:
+            interp = ScipyGridInterp
+
         for name, train_data in iteritems(self.training_outputs):
-            self.interps[name] = ScipyGridInterp(self.params,
-                                                  train_data,
-                                                  method=self.options['method'],
-                                                  bounds_error=not self.options['extrapolate'],
-                                                  fill_value=None,
-                                                  spline_dim_error=False)
+            self.interps[name] = interp(self.params, train_data,
+                                        order=self.options['order'],
+                                        bounds_error=not self.options['extrapolate'],
+                                        fill_value=None, spline_dim_error=False)
 
             self._ki = self.interps[name]._ki
 
@@ -147,6 +156,13 @@ class MetaModelStructuredComp(ExplicitComponent):
             self.sh = tuple([self.options['vec_size']] + [i.size for i in self.params])
 
         super(MetaModelStructuredComp, self)._setup_var_data(recurse=recurse)
+
+        # Raise a deprecation warning for changed option.
+        if 'method' in self.options and self.options['method'] is not None:
+            self.options['order'] = self.options['method']
+            warn_deprecation("The 'method' option provides backwards compatibility "
+                             "with earlier version of OpenMDAO; use options['order'] "
+                             "instead.")
 
     def _setup_partials(self, recurse=True):
         """

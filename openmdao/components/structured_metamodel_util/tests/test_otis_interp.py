@@ -29,7 +29,7 @@ class TestOtisGridInterpolator(unittest.TestCase):
             "quintic": 5,
             #"chamfered": 5,
         }
-        self.valid_methods = self.interp_configs.keys()
+        self.valid_orders = self.interp_configs.keys()
 
     #def _get_sample_4d_large(self):
         #def f(x, y, z, w):
@@ -251,7 +251,7 @@ class TestOtisGridInterpolator(unittest.TestCase):
             #interp = ScipyGridInterp(points, values, method)
             #x = np.array([0.9, 0.1])
             #interp._xi = x
-            #interp._gmethod = method
+            #interp._g_order = method
             #dy = np.array([0.997901, 0.08915])
             #interp._all_gradients = dy
             #assert_almost_equal(interp.gradient(x), dy)
@@ -262,11 +262,11 @@ class TestOtisGridInterpolator(unittest.TestCase):
         np.random.seed(1)
         test_pt = np.random.uniform(0, 3, 2)
         actual = func(*test_pt)
-        for method in self.valid_methods:
+        for order in self.valid_orders:
             tol = 1e-2
-            if method == 'slinear':
+            if order == 'slinear':
                 tol = 0.5
-            interp = OtisGridInterp(points, values, method)
+            interp = OtisGridInterp(points, values, order)
             computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
             assert r_err < tol
@@ -299,11 +299,11 @@ class TestOtisGridInterpolator(unittest.TestCase):
         np.random.seed(1)
         test_pt = np.random.uniform(0, 3, 6).reshape(3, 2)
         actual = func(*test_pt.T)
-        for method in self.valid_methods:
+        for order in self.valid_orders:
             tol = 1e-1
-            if method == 'slinear':
+            if order == 'slinear':
                 tol = 0.5
-            interp = OtisGridInterp(points, values, method)
+            interp = OtisGridInterp(points, values, order)
             computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
             assert r_err < tol

@@ -115,7 +115,7 @@ def _qcoff5(x):
 
 def _qcoff3(x):
     """
-    Precompute cubic for quintic spline.
+    Precompute coefficients for cubic spline.
 
     Parameters
     ----------
@@ -333,7 +333,7 @@ class OtisGridInterp(GridInterpBase):
 
     The data must be defined on a regular grid; the grid spacing however may be uneven. First,
     third and fifth order spline interpolation are supported. After setting up the interpolator
-    object, the interpolation method (*slinear*, *cubic*, and *quintic*) may be chosen at each
+    object, the interpolation order (*slinear*, *cubic*, and *quintic*) may be chosen at each
     evaluation. Additionally, gradients are provided for the spline interpolation methods.
 
     Attributes
@@ -352,19 +352,19 @@ class OtisGridInterp(GridInterpBase):
         Default is `np.nan`.
     grid : tuple
         Collection of points that determine the regular grid.
-    method : string
-        Name of interpolation method.
+    order : string
+        Name of interpolation order.
     values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
     _all_gradients : ndarray
         Cache of computed gradients.
     _coeffs : ndarray
         Cached spline coefficients.
-    _gmethod : string
+    _g_order : string
         Name of interpolation method used to compute the last gradient.
     _interp_config : dict
         Configuration object that stores limitations of each interpolation
-        method.
+        order.
     _ki : list
         Interpolation order to be used in each dimension.
     _spline_dim_error : bool
@@ -377,7 +377,7 @@ class OtisGridInterp(GridInterpBase):
         Current evaluation point.
     """
 
-    def __init__(self, points, values, method="slinear", bounds_error=True,
+    def __init__(self, points, values, order="slinear", bounds_error=True,
                  fill_value=np.nan, spline_dim_error=True):
         """
         Initialize instance of interpolation class.
@@ -388,8 +388,8 @@ class OtisGridInterp(GridInterpBase):
             The points defining the regular grid in n dimensions.
         values : array_like, shape (m1, ..., mn, ...)
             The data on the regular grid in n dimensions.
-        method : str, optional
-            The method of interpolation to perform. Supported are 'slinear',
+        order : str, optional
+            The order of interpolation to perform. Supported are 'slinear',
             'cubic',  and 'quintic'. This parameter will become
             the default for the object's interpolate method. Default is "linear".
         bounds_error : bool, optional
@@ -411,18 +411,18 @@ class OtisGridInterp(GridInterpBase):
             order will be reduced as needed on a per-dimension basis. Default
             is True (raise an exception).
         """
-        super(OtisGridInterp, self).__init__(points, values, method=method,
+        super(OtisGridInterp, self).__init__(points, values, order=order,
                                              bounds_error=bounds_error, fill_value=fill_value,
                                              spline_dim_error=spline_dim_error)
 
         # Cache spline coefficients.
         coeffs = []
         for x in self.grid:
-            if method == 'slinear':
+            if order == 'slinear':
                 coef = _qcoff1(x)
-            elif method == 'cubic':
+            elif order == 'cubic':
                 coef = _qcoff3(x)
-            elif method == 'quintic':
+            elif order == 'quintic':
                 coef = _qcoff5(x)
             else:
                 coef = _qcoffc(x)
@@ -431,7 +431,7 @@ class OtisGridInterp(GridInterpBase):
 
         self._coeffs = coeffs
 
-    def _interp_methods(self):
+    def _interp_orders(self):
         """
         Method-specific settings for interpolation and for testing.
 
@@ -441,7 +441,7 @@ class OtisGridInterp(GridInterpBase):
             Valid interpolation name strings.
         dict
             Configuration object that stores limitations of each interpolation
-            method.
+            order.
         """
         interpolator_configs = {
             "slinear": 1,
@@ -450,13 +450,13 @@ class OtisGridInterp(GridInterpBase):
             #"chamfered": 5,
         }
 
-        all_methods = list(interpolator_configs.keys())
+        all_orders = list(interpolator_configs.keys())
 
-        return all_methods, interpolator_configs
+        return all_orders, interpolator_configs
 
-    def methods(self):
+    def orders(self):
         """
-        Return a list of valid interpolation method names.
+        Return a list of valid interpolation order names.
 
         Returns
         -------
@@ -465,7 +465,7 @@ class OtisGridInterp(GridInterpBase):
         """
         return ['slinear', 'cubic', 'quintic', ]#'chamfered']
 
-    def interpolate(self, xi, method=None, compute_gradients=True):
+    def interpolate(self, xi, order=None, compute_gradients=True):
         """
         Interpolate at the sample coordinates.
 
@@ -473,12 +473,12 @@ class OtisGridInterp(GridInterpBase):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-        method : str, optional
-            The method of interpolation to perform. Supported are 'slinear', 'cubic', and
-            'quintic'. Default is None, which will use the method defined at the construction
+        order : str, optional
+            The order of interpolation to perform. Supported are 'slinear', 'cubic', and
+            'quintic'. Default is None, which will use the order defined at the construction
             of the interpolation object instance.
         compute_gradients : bool, optional
-            If a spline interpolation method is chosen, this determines whether gradient
+            If a spline interpolation order is chosen, this determines whether gradient
             calculations should be made and cached. Default is True.
 
         Returns
@@ -489,11 +489,11 @@ class OtisGridInterp(GridInterpBase):
         # cache latest evaluation point for gradient method's use later
         self._xi = xi
 
-        method = self.method if method is None else method
-        if method not in self._all_methods:
-            all_m = ', '.join(['"' + m + '"' for m in self._all_methods])
-            raise ValueError('Method "%s" is not defined. Valid methods are '
-                             '%s.' % (method, all_m))
+        order = self.order if order is None else order
+        if order not in self._all_orders:
+            all_m = ', '.join(['"' + m + '"' for m in self._all_orders])
+            raise ValueError('Order"%s" is not defined. Valid order are '
+                             '%s.' % (order, all_m))
 
         if self.bounds_error:
             for i, p in enumerate(xi.T):
@@ -515,14 +515,44 @@ class OtisGridInterp(GridInterpBase):
         xi = np.atleast_2d(xi)
         n_nodes, nx = xi.shape
         result = np.empty((n_nodes, ))
+        derivs = np.empty((n_nodes, nx))
 
         for j in range(n_nodes):
-            result[j] = self.q_r_evl(self.grid, self._coeffs, self.values, xi[j, :])
+            val, deriv = self.q_r_evl(self.grid, self._coeffs, self.values, xi[j, :])
+            result[j] = val
+            derivs[j, :] = deriv.flatten()
 
+        # Cache derivatives
+        self.derivs = derivs.flatten()
+
+        # TODO: Support out-of-bounds identification.
         #if not self.bounds_error and self.fill_value is not None:
         #   result[out_of_bounds] = self.fill_value
 
         return result
+
+    def gradient(self, xi, order=None):
+        """
+        Return the computed gradients at the specified point.
+
+        The gradients are computed as the interpolation itself is performed,
+        but are cached and returned separately by this method.
+        Parameters
+        ----------
+        xi : ndarray of shape (..., ndim)
+            The coordinates to sample the gridded data at
+        order : str, optional
+            The order of interpolation to perform. Supported are 'slinear',
+            'cubic', and 'quintic'. Default is None, which will use the order
+            defined at the construction of the interpolation object instance.
+
+        Returns
+        -------
+        gradient : ndarray of shape (..., ndim)
+            gradient vector of the gradients of the interpolated values with
+            respect to each value in xi
+        """
+        return self.derivs
 
     def q_r_evl(self, x_data, coeffs, f_data, x_new):
         """
@@ -550,7 +580,8 @@ class OtisGridInterp(GridInterpBase):
 
         nf = f_data.size // np.prod(lengths)
         nx = lengths[-1]
-        f = np.zeros(nf, dtype='float')
+        f = np.zeros(nf)
+        df_dx = np.zeros((nf, nl))
 
         lengths.append(nf)
         f_rs = f_data.reshape(lengths)
@@ -593,13 +624,15 @@ class OtisGridInterp(GridInterpBase):
         coef_flat = coeffs[-1][k1:k1 + 4, ...]
         for l in range(nf):
             if nl == 2:
-                e = self.q1evl(x_data[0], coeffs[0], f_rs[..., k1:k1 + nk, l], x_new[0])
+                e, de_dx = self.q1evl(x_data[0], coeffs[0], f_rs[..., k1:k1 + nk, l], x_new[0])
             else:
-                e = self.q_r_evl(x_data[:-1], coeffs[:-1], f_rs[..., k1:k1 + nk, l], x_new[:-1])
-            val, deriv = self.qs1evl(x_data[-1][k1:k1+nk], coef_flat, e, x_new[-1], ins)
+                e, de_dx = self.q_r_evl(x_data[:-1], coeffs[:-1], f_rs[..., k1:k1 + nk, l],
+                                        x_new[:-1])
+            val, dval_dx = self.qs1evl(x_data[-1][k1:k1+nk], coef_flat, e, de_dx, x_new[-1], ins)
             f[l] = val
+            df_dx[l, :] = dval_dx.flatten()
 
-        return f
+        return f, df_dx
 
     def insrch(self, xt, x):
         """
@@ -677,7 +710,7 @@ class OtisGridInterp(GridInterpBase):
 
         sk = np.zeros(4)
         f = np.zeros(m)
-        df_dh = np.zeros(m)
+        df_dh = np.zeros((m, 1))
 
         if n <= 1:
             f[:] = y[0, :]
@@ -711,9 +744,9 @@ class OtisGridInterp(GridInterpBase):
             f[j] = e[0] + t*(e[1] + t*(e[2] + t*(e[3] + t*(e[4] + t*e[5]))))
             df_dh[j] = eli * (e[1] + 2 * t * (e[2] + 3 * t * (e[3] + 4 * t *(e[4] + 5 * t *e[5]))))
 
-        return f
+        return f, df_dh
 
-    def qs1evl(self, x, a, y, h, interval):
+    def qs1evl(self, x, a, y, dy_dhh, h, interval):
         """
         This is a special version of q1evl that does only 4 points and does not require an interval
         search.
@@ -723,6 +756,8 @@ class OtisGridInterp(GridInterpBase):
         a:  An array of quintic coefficients for each interval of function values
 
         y:  An array of values at the points in the x array to be interpolated
+
+        dy_dhh:  Derivative of points with respect to other independent variables.
 
         h:  The independent variable value at which interpolation is desired
 
@@ -746,12 +781,17 @@ class OtisGridInterp(GridInterpBase):
         s[ns:ns + n] = y[:n]
 
         # Multiply by influence matrix to calculate quintic coefficients
-        e = np.einsum('ij,j->i', a[interval, ...], s)
+        de_ds = a[interval, ...]
+        e = np.einsum('ij,j->i', de_ds, s)
+        de_dhh = np.einsum('ij,jk->ik', de_ds, dy_dhh)
 
         # Calculate function values by evaluating quintic
         f = e[0] + t * (e[1] + t * (e[2] + t * (e[3] + t * (e[4] + t * e[5]))))
         df_dh = eli * (e[1] + 2 * t * (e[2] + 3 * t * (e[3] + 4 * t *(e[4] + 5 * t *e[5]))))
-        return f, df_dh
+        df_dhh = de_dhh[0] + t * (de_dhh[1] + t * (de_dhh[2] + t * (de_dhh[3] + t * (de_dhh[4] +
+                 t * de_dhh[5]))))
+
+        return f, np.hstack((df_dhh, df_dh))
 
 
 
