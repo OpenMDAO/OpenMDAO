@@ -15,7 +15,7 @@ from six import iteritems, assertRaisesRegex
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
-from openmdao.recorders.case import PromotedToAbsoluteMap
+from openmdao.recorders.case import PromAbsDict
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
@@ -120,7 +120,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(isinstance(case.timestamp, float))
         self.assertEqual(case.success, True)
         self.assertEqual(case.msg, '')
-        self.assertTrue(isinstance(case.outputs, PromotedToAbsoluteMap))
+        self.assertTrue(isinstance(case.outputs, PromAbsDict))
         self.assertEqual(case.inputs, None)
         self.assertEqual(case.residuals, None)
         self.assertEqual(case.jacobian, None)
@@ -282,10 +282,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(len(cr.list_cases('root.obj_cmp', recurse=False)), 7)
 
         # Test values from cases
-        second_last_case = cr.get_case('rank0:Driver|0|root._solve_nonlinear|0')
-        np.testing.assert_almost_equal(second_last_case.inputs['y2'], [12.05848815, ])
-        np.testing.assert_almost_equal(second_last_case.outputs['obj'], [28.58830817, ])
-        np.testing.assert_almost_equal(second_last_case.residuals['obj'], [0.0, ],)
+        case = cr.get_case('rank0:Driver|0|root._solve_nonlinear|0')
+        np.testing.assert_almost_equal(case.inputs['d1.y2'], [12.05848815, ])
+        np.testing.assert_almost_equal(case.outputs['obj'], [28.58830817, ])
+        np.testing.assert_almost_equal(case.residuals['obj'], [0.0, ],)
 
         # Test to see if the case keys (iteration coords) come back correctly
         for i, iter_coord in enumerate(cr.list_cases('root.d1', recurse=False)):
@@ -448,7 +448,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-        prob.driver.opt_settings['ACC'] = 1e-9
         driver.recording_options['record_desvars'] = True
         driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
@@ -822,7 +821,6 @@ class TestSqliteCaseReader(unittest.TestCase):
     def test_get_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
-        prob.driver.opt_settings['ACC'] = 1e-9
         prob.driver.add_recorder(self.recorder)
         prob.setup()
 
@@ -1107,6 +1105,121 @@ class TestSqliteCaseReader(unittest.TestCase):
                 self.assertEqual(str(cm.exception), msg)
             else:
                 np.testing.assert_almost_equal(case[name], expected[name])
+
+    def test_get_val_exhaustive(self):
+        import openmdao.api as om
+
+        model = om.Group()
+        model.add_subsystem('comp', om.ExecComp('y=x-25.',
+                                                x={'value': 77.0, 'units': 'degF'},
+                                                y={'value': 0.0, 'units': 'degC'}))
+        model.add_subsystem('prom', om.ExecComp('yy=xx-25.',
+                                                xx={'value': 77.0, 'units': 'degF'},
+                                                yy={'value': 0.0, 'units': 'degC'}),
+                            promotes=['xx', 'yy'])
+        model.add_subsystem('acomp', om.ExecComp('y=x-25.',
+                                                 x={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                 y={'value': np.array([0., 0.]), 'units': 'degC'}))
+        model.add_subsystem('aprom', om.ExecComp('ayy=axx-25.',
+                                                 axx={'value': np.array([77.0, 95.0]), 'units': 'degF'},
+                                                 ayy={'value': np.array([0., 0.]), 'units': 'degC'}),
+                            promotes=['axx', 'ayy'])
+
+        model.add_recorder(self.recorder)
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        case = cr.get_case(0)
+
+        assert_rel_error(self, case.get_val('comp.x'), 77.0, 1e-6)
+        assert_rel_error(self, case.get_val('comp.x', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, case.get_val('comp.y'), 52., 1e-6)
+        assert_rel_error(self, case.get_val('comp.y', 'degF'), 125.6, 1e-6)
+
+        assert_rel_error(self, case.get_val('xx'), 77.0, 1e-6)
+        assert_rel_error(self, case.get_val('xx', 'degC'), 25.0, 1e-6)
+        assert_rel_error(self, case.get_val('yy'), 52., 1e-6)
+        assert_rel_error(self, case.get_val('yy', 'degF'), 125.6, 1e-6)
+
+        assert_rel_error(self, case.get_val('acomp.x', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, case.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
+        assert_rel_error(self, case.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
+        assert_rel_error(self, case.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
+        assert_rel_error(self, case.get_val('acomp.y', indices=0), 52., 1e-6)
+        assert_rel_error(self, case.get_val('acomp.y', 'degF', indices=0), 125.6, 1e-6)
+
+        assert_rel_error(self, case.get_val('axx', indices=0), 77.0, 1e-6)
+        assert_rel_error(self, case.get_val('axx', indices=1), 95.0, 1e-6)
+        assert_rel_error(self, case.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
+        assert_rel_error(self, case.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
+        assert_rel_error(self, case.get_val('ayy', indices=0), 52., 1e-6)
+        assert_rel_error(self, case.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
+
+    def test_get_ambiguous_input(self):
+        model = om.Group()
+        model.add_recorder(self.recorder)
+
+        G1 = model.add_subsystem("G1", om.Group(), promotes=['x'])
+        G1.add_subsystem("C0", om.IndepVarComp('x', 1.0, units='m'), promotes=['x'])
+
+        G2 = model.add_subsystem("G2", om.Group(), promotes=['a'])
+        G2.add_subsystem("C1", om.ExecComp('y=m*2.0', m={'units': 'm'}), promotes=[('m', 'a')])
+        G2.add_subsystem("C2", om.ExecComp('y=f*2.0', f={'units': 'ft'}), promotes=[('f', 'a')])
+
+        model.connect('x', 'a')
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        assert_rel_error(self, case.get_val('x'), 1., 1e-6)
+        assert_rel_error(self, case.get_val('x', units='ft'), 3.280839895, 1e-6)
+
+        assert_rel_error(self, case.get_val('G1.C0.x'), 1., 1e-6)
+        assert_rel_error(self, case.get_val('G1.C0.x', units='ft'), 3.280839895, 1e-6)
+
+        assert_rel_error(self, case.get_val('G2.C1.m'), 1., 1e-6)
+        assert_rel_error(self, case.get_val('G2.C2.f'), 3.280839895, 1e-6)
+
+        # 'a' is ambiguous.. which input do you want when accessing 'a'?
+        msg = "The promoted name 'a' is invalid because it refers to multiple inputs:" + \
+              " ['G2.C1.m', 'G2.C2.f']. Access the value using an absolute path name " + \
+              "or the connected output variable instead."
+
+        with self.assertRaises(RuntimeError) as cm:
+            case['a']
+        self.assertEquals(str(cm.exception), msg)
+
+        with self.assertRaises(RuntimeError) as cm:
+            case.get_val('a')
+        self.assertEquals(str(cm.exception), msg)
+
+        with self.assertRaises(RuntimeError) as cm:
+            case.get_val('a', units='m')
+        self.assertEquals(str(cm.exception), msg)
+
+        with self.assertRaises(RuntimeError) as cm:
+            case.get_val('a', units='ft')
+        self.assertEquals(str(cm.exception), msg)
+
+        # 'a' is ambiguous.. which input's units do you want when accessing 'a'?
+        # (test the underlying function, currently only called from inside get_val)
+        msg = "Can't get units for the promoted name 'a' because it refers to " + \
+              "multiple inputs: ['G2.C1.m', 'G2.C2.f']. Access the units using " + \
+              "an absolute path name."
+
+        with self.assertRaises(RuntimeError) as cm:
+            case._get_units('a')
+        self.assertEquals(str(cm.exception), msg)
 
     def test_get_vars(self):
         prob = SellarProblem()
@@ -1896,11 +2009,19 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_inputs = ['x', 'y1', 'y2', 'z']
         expected_outputs = ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']
 
+        # input values must be accessed using absolute path names
+        expected_inputs_abs = [
+            'mda.d1.x', 'obj_cmp.x',
+            'mda.d2.y1', 'obj_cmp.y1', 'con_cmp1.y1',
+            'mda.d1.y2', 'obj_cmp.y2', 'con_cmp2.y2',
+            'mda.d1.z', 'mda.d2.z', 'obj_cmp.z'
+        ]
+
         self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
 
-        for key in expected_inputs:
+        for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
 
         for key in expected_outputs:
@@ -1924,11 +2045,20 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_inputs = ['x', 'y1', 'y2', 'z']
         expected_outputs = ['y1', 'y2']
 
+        # input values must be accessed using absolute path names
+        expected_inputs_abs = [
+            'mda.d1.x',
+            'mda.d1.y2',
+            'mda.d1.z',
+            'mda.d2.y1',
+            'mda.d2.z'
+        ]
+
         self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
 
-        for key in expected_inputs:
+        for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
 
         for key in expected_outputs:
@@ -2512,6 +2642,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         stream = cStringIO()
         case.list_inputs(values=True,
                          units=True,
+                         prom_name=True,
                          hierarchical=False,
                          print_arrays=False,
                          out_stream=stream)
@@ -2520,11 +2651,13 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(1, text.count('mult.x'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(5, num_non_empty_lines)
+        self.assertEqual(1, text.count('mult.x   |10.0|  inch   x'))
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = cStringIO()
         case.list_inputs(values=True,
                          units=True,
+                         shape=True,
                          hierarchical=True,
                          print_arrays=False,
                          out_stream=stream)
@@ -2534,7 +2667,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(7, num_non_empty_lines)
         self.assertEqual(1, text.count('top'))
         self.assertEqual(1, text.count('  mult'))
-        self.assertEqual(1, text.count('    x'))
+        self.assertEqual(1, text.count('    x    |10.0|  inch   (100'))
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -2656,7 +2789,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
 
 @use_tempdirs
-class TestPromotedToAbsoluteMap(unittest.TestCase):
+class TestPromAbsDict(unittest.TestCase):
 
     def test_dict_functionality(self):
         prob = SellarProblem(SellarDerivativesGrouped)
