@@ -17,6 +17,7 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
+_AMBIGOUS_PROM_NAME = object()
 
 
 class Case(object):
@@ -285,8 +286,6 @@ class Case(object):
         str
             Unit string.
         """
-        from pprint import pprint
-
         meta = self._abs2meta
 
         if name in meta:
@@ -297,14 +296,14 @@ class Case(object):
         if name in proms['output']:
             abs_name = proms['output'][name][0]
             return meta[abs_name]['units']
+
         elif name in proms['input']:
             if len(proms['input'][name]) > 1:
-                print(name, ':', proms['input'][name])
-                # looks like an aliased input
-                for abs_name in proms['input'][name]:
-                    print(abs_name, self[abs_name], self._get_units(abs_name))
+                # The promoted name maps to multiple absolute names, require absolute name.
+                msg = "Can't get units for the promoted name '%s' because it refers to " + \
+                      "multiple inputs: %s. Access the units using an absolute path name."
+                raise NameError(msg % (name, str(proms['input'][name])))
 
-            # get units for the first abs_name
             abs_name = proms['input'][name][0]
             return meta[abs_name]['units']
 
@@ -757,7 +756,13 @@ class PromotedToAbsoluteMap(dict):
             for key in self._keys:
                 if key in abs2prom:
                     prom_key = abs2prom[key]
-                    super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
+                    if prom_key in self:
+                        # We already set a value for this promoted name, which means
+                        # it is an input that maps to multiple absolute names. Set the
+                        # value to AMBIGOUS and require access via absolute name.
+                        super(PromotedToAbsoluteMap, self).__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
+                    else:
+                        super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
                 elif ',' in key:
                     # derivative keys will be a string in the form of 'of,wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
@@ -830,7 +835,14 @@ class PromotedToAbsoluteMap(dict):
 
         elif key in self:
             # promoted name
-            return super(PromotedToAbsoluteMap, self).__getitem__(key)
+            val = super(PromotedToAbsoluteMap, self).__getitem__(key)
+            if val is _AMBIGOUS_PROM_NAME:
+                msg = "The promoted name '%s' is invalid because it refers to multiple " + \
+                      "inputs: %s. Access the value using an absolute path name or the " + \
+                      "connected output variable instead."
+                raise NameError(msg % (key, str(self._prom2abs['input'][key])))
+            else:
+                return val
 
         elif isinstance(key, tuple) or ',' in key:
             # derivative keys can be either (of, wrt) or 'of,wrt'

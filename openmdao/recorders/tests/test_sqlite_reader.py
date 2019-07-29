@@ -1160,7 +1160,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         assert_rel_error(self, case.get_val('ayy', indices=0), 52., 1e-6)
         assert_rel_error(self, case.get_val('ayy', 'degF', indices=0), 125.6, 1e-6)
 
-    def test_get_val_units(self):
+    def test_get_ambiguous_input(self):
         model = om.Group()
         model.add_recorder(self.recorder)
 
@@ -1178,9 +1178,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        model.list_inputs(prom_name=True, units=True)
-        model.list_outputs(prom_name=True, units=True)
-
         cr = om.CaseReader(self.filename)
         case = cr.get_case(0)
 
@@ -1193,10 +1190,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         assert_rel_error(self, case.get_val('G2.C1.m'), 1., 1e-6)
         assert_rel_error(self, case.get_val('G2.C2.f'), 3.280839895, 1e-6)
 
-        # 'a' is ambiguous.. what units do you want when accessing 'a'?
-        msg = 'The promoted name a is invalid because it refers to multiple inputs: ' + \
-              '[G2.C1.m ,G2.C2.f]. Access the value using the absolute path name or ' + \
-              'the connected output variable instead.'
+        # 'a' is ambiguous.. which input do you want when accessing 'a'?
+        msg = "The promoted name 'a' is invalid because it refers to multiple inputs:" + \
+              " ['G2.C1.m', 'G2.C2.f']. Access the value using an absolute path name " + \
+              "or the connected output variable instead."
 
         with self.assertRaises(NameError) as cm:
             case['a']
@@ -1207,7 +1204,21 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEquals(str(cm.exception), msg)
 
         with self.assertRaises(NameError) as cm:
+            case.get_val('a', units='m')
+        self.assertEquals(str(cm.exception), msg)
+
+        with self.assertRaises(NameError) as cm:
             case.get_val('a', units='ft')
+        self.assertEquals(str(cm.exception), msg)
+
+        # 'a' is ambiguous.. which input's units do you want when accessing 'a'?
+        # (test the underlying function, currently only called inside get_val)
+        msg = "Can't get units for the promoted name 'a' because it refers to " + \
+              "multiple inputs: ['G2.C1.m', 'G2.C2.f']. Access the units using " + \
+              "an absolute path name."
+
+        with self.assertRaises(NameError) as cm:
+            case._get_units('a')
         self.assertEquals(str(cm.exception), msg)
 
     def test_get_vars(self):
