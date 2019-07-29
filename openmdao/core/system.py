@@ -3000,8 +3000,6 @@ class System(object):
         inputs = []
 
         tags = convert_user_defined_tags_to_set(tags)
-        # if isinstance(tags, str):
-        #     tags = [tags, ]
 
         for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
 
