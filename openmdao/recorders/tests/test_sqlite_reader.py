@@ -2642,6 +2642,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         stream = cStringIO()
         case.list_inputs(values=True,
                          units=True,
+                         prom_name=True,
                          hierarchical=False,
                          print_arrays=False,
                          out_stream=stream)
@@ -2650,12 +2651,12 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(1, text.count('mult.x'))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(5, num_non_empty_lines)
+        self.assertEqual(1, text.count('mult.x   |10.0|  inch   x'))
 
         # out_stream - hierarchical - extras - no print_arrays
         stream = cStringIO()
         case.list_inputs(values=True,
                          units=True,
-                         prom_name=True,
                          shape=True,
                          hierarchical=True,
                          print_arrays=False,
@@ -2666,7 +2667,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(7, num_non_empty_lines)
         self.assertEqual(1, text.count('top'))
         self.assertEqual(1, text.count('  mult'))
-        self.assertEqual(1, text.count('    x    |10.0|  inch   (100,)  x '))
+        self.assertEqual(1, text.count('    x    |10.0|  inch   (100'))
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
