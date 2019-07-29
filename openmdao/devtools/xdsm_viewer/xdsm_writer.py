@@ -465,12 +465,14 @@ else:
         """
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
-                     number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False,
+                     number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False, class_names=False,
                      add_component_indices=True):
             super(XDSMWriter, self).__init__()
             self.name = name
             # Formatting options
             self.box_stacking = box_stacking
+            self._box_stacking = self.box_stacking
+            self.class_names = class_names
             self.number_alignment = number_alignment
             self.add_component_indices = add_component_indices
             self.has_legend = legend  # If true, a legend will be added to the diagram
@@ -524,7 +526,7 @@ else:
                     if step is not None:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
                     # Add the number
-                    label = self.number_label(i, label, self.number_alignment)
+                    label = self.number_label(i, label, self.number_alignment, cls=comp['class'])
                 # Convert from math mode to regular text
                 comp['label'] = self._textify(label)
                 # Now the label is finished.
@@ -555,7 +557,7 @@ else:
             super(XDSMWriter, self).add_system(node_name=node_name, style=style, label=label,
                                                stack=stack, faded=faded)
 
-        def _add_system(self, node_name, style, label, stack=False, faded=False):
+        def _add_system(self, node_name, style, label, stack=False, faded=False, cls=None):
             # Adds a system dictionary to the components.
             # This dictionary can be modified by other methods.
             self._styles_used.add(style)
@@ -564,7 +566,7 @@ else:
                 label = node_name
             self._comp_indices[node_name] = self._nr_comps
             sys_dct = {'node_name': node_name, 'style': style, 'label': label, 'stack': stack,
-                       'faded': faded, 'index': self._nr_comps}
+                       'faded': faded, 'index': self._nr_comps, 'class': cls}
             self._nr_comps += 1
             self._comps.append(sys_dct)
 
@@ -753,18 +755,28 @@ else:
             txt = '{}, {}$ \\rightarrow $ {}'
             return txt.format(first + i, last + i, first + i + 1)
 
-        def number_label(self, number, txt, alignment):
+        def number_label(self, number, txt, alignment, cls):
             # Adds an index to the label either above or on the left side.
+
+            def format_class_name(name):
+                return '\\textit{%s}' % name
+
+            def multi_ln(txt, number=None):
+                if self.class_names and (cls is not None):
+                    cls_name = format_class_name(cls)
+                    txt = '} \\\\ \\text{'.join([txt, cls_name])
+                if number is not None:
+                    return _multiline_block(number, txt)
+                else:
+                    return _multiline_block(txt)
+
             if number:  # If number is None or empty string, it won't be inserted
                 number_str = '{}: '.format(number)
                 if alignment == 'horizontal':
                     txt = '{}{}'.format(number_str, txt)
-                    if self.box_stacking == 'vertical':
-                        return _multiline_block(txt)
-                    else:
-                        return txt
+                    return multi_ln(txt)
                 elif alignment == 'vertical':
-                    return _multiline_block(number_str, txt)
+                    return multi_ln(txt, number_str)
                 else:
                     return txt  # In case of a wrong setting
             else:
@@ -982,7 +994,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
                 output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', legend=False,
-                **kwargs):
+                class_names=True, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -1039,6 +1051,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     legend : bool, optional
         If true, it adds a legend to the diagram.
         Defaults to False.
+    class_names : bool, optional
+        If true, appends class name of the groups/components to the component blocks of the diagram.
+        Defaults to False.
     kwargs : dict
         Keyword arguments
 
@@ -1063,7 +1078,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             x = XDSMWriter(box_stacking=box_stacking,
                            number_alignment=number_alignment,
                            add_component_indices=add_component_indices,
-                           legend=legend)
+                           legend=legend,
+                           class_names=class_names)
         elif writer.lower() == 'xdsmjs':  # XDSMjs
             x = XDSMjsWriter()
         else:
@@ -1187,7 +1203,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 solver_dcts.append(comp)
         else:  # component or group
             x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                       comp_type=comp['component_type'])
+                       comp_type=comp['component_type'], cls=comp.get('class', None))
 
     # Add process connections
     if add_process_conns:
