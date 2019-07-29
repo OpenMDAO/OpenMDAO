@@ -15,7 +15,7 @@ from six import iteritems, assertRaisesRegex
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
-from openmdao.recorders.case import PromotedToAbsoluteMap
+from openmdao.recorders.case import PromAbsDict
 from openmdao.core.tests.test_units import SpeedComp
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArray
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
@@ -120,7 +120,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertTrue(isinstance(case.timestamp, float))
         self.assertEqual(case.success, True)
         self.assertEqual(case.msg, '')
-        self.assertTrue(isinstance(case.outputs, PromotedToAbsoluteMap))
+        self.assertTrue(isinstance(case.outputs, PromAbsDict))
         self.assertEqual(case.inputs, None)
         self.assertEqual(case.residuals, None)
         self.assertEqual(case.jacobian, None)
@@ -282,10 +282,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(len(cr.list_cases('root.obj_cmp', recurse=False)), 7)
 
         # Test values from cases
-        second_last_case = cr.get_case('rank0:Driver|0|root._solve_nonlinear|0')
-        np.testing.assert_almost_equal(second_last_case.inputs['y2'], [12.05848815, ])
-        np.testing.assert_almost_equal(second_last_case.outputs['obj'], [28.58830817, ])
-        np.testing.assert_almost_equal(second_last_case.residuals['obj'], [0.0, ],)
+        case = cr.get_case('rank0:Driver|0|root._solve_nonlinear|0')
+
+        np.testing.assert_almost_equal(case.inputs['d1.y2'], [12.05848815, ])
+        np.testing.assert_almost_equal(case.outputs['obj'], [28.58830817, ])
+        np.testing.assert_almost_equal(case.residuals['obj'], [0.0, ],)
 
         # Test to see if the case keys (iteration coords) come back correctly
         for i, iter_coord in enumerate(cr.list_cases('root.d1', recurse=False)):
@@ -2009,11 +2010,19 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_inputs = ['x', 'y1', 'y2', 'z']
         expected_outputs = ['con1', 'con2', 'obj', 'x', 'y1', 'y2', 'z']
 
+        # input values must be accessed using absolute path names
+        expected_inputs_abs = [
+            'mda.d1.x', 'obj_cmp.x',
+            'mda.d2.y1', 'obj_cmp.y1', 'con_cmp1.y1',
+            'mda.d1.y2', 'obj_cmp.y2', 'con_cmp2.y2',
+            'mda.d1.z', 'mda.d2.z', 'obj_cmp.z'
+        ]
+
         self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
 
-        for key in expected_inputs:
+        for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
 
         for key in expected_outputs:
@@ -2037,11 +2046,20 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_inputs = ['x', 'y1', 'y2', 'z']
         expected_outputs = ['y1', 'y2']
 
+        # input values must be accessed using absolute path names
+        expected_inputs_abs = [
+            'mda.d1.x',
+            'mda.d1.y2',
+            'mda.d1.z',
+            'mda.d2.y1',
+            'mda.d2.z'
+        ]
+
         self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
 
-        for key in expected_inputs:
+        for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
 
         for key in expected_outputs:
@@ -2638,6 +2656,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         stream = cStringIO()
         case.list_inputs(values=True,
                          units=True,
+                         prom_name=True,
+                         shape=True,
                          hierarchical=True,
                          print_arrays=False,
                          out_stream=stream)
@@ -2647,7 +2667,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(7, num_non_empty_lines)
         self.assertEqual(1, text.count('top'))
         self.assertEqual(1, text.count('  mult'))
-        self.assertEqual(1, text.count('    x'))
+        self.assertEqual(1, text.count('    x    |10.0|  inch   (100,)  x '))
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -2769,7 +2789,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
 
 @use_tempdirs
-class TestPromotedToAbsoluteMap(unittest.TestCase):
+class TestPromAbsDict(unittest.TestCase):
 
     def test_dict_functionality(self):
         prob = SellarProblem(SellarDerivativesGrouped)

@@ -40,13 +40,13 @@ class Case(object):
         Success flag for the case.
     msg : str
         Message associated with the case.
-    outputs : PromotedToAbsoluteMap
+    outputs : PromAbsDict
         Map of outputs to values recorded.
-    inputs : PromotedToAbsoluteMap or None
+    inputs : PromAbsDict or None
         Map of inputs to values recorded, None if not recorded.
-    residuals : PromotedToAbsoluteMap or None
+    residuals : PromAbsDict or None
         Map of outputs to residuals recorded, None if not recorded.
-    jacobian : PromotedToAbsoluteMap or None
+    jacobian : PromAbsDict or None
         Map of (output, input) to derivatives recorded, None if not recorded.
     parent : str
         The full unique identifier for the parent this iteration.
@@ -137,7 +137,7 @@ class Case(object):
             else:
                 inputs = data['inputs']
             if inputs is not None:
-                self.inputs = PromotedToAbsoluteMap(inputs[0], prom2abs, abs2prom, output=False)
+                self.inputs = PromAbsDict(inputs[0], prom2abs, abs2prom, output=False)
 
         if 'outputs' in data.keys():
             if data_format >= 3:
@@ -149,7 +149,7 @@ class Case(object):
             else:
                 outputs = data['outputs']
             if outputs is not None:
-                self.outputs = PromotedToAbsoluteMap(outputs[0], prom2abs, abs2prom)
+                self.outputs = PromAbsDict(outputs[0], prom2abs, abs2prom)
 
         if 'residuals' in data.keys():
             if data_format >= 3:
@@ -161,7 +161,7 @@ class Case(object):
             else:
                 residuals = data['residuals']
             if residuals is not None:
-                self.residuals = PromotedToAbsoluteMap(residuals[0], prom2abs, abs2prom)
+                self.residuals = PromAbsDict(residuals[0], prom2abs, abs2prom)
 
         if 'jacobian' in data.keys():
             if data_format >= 2:
@@ -171,7 +171,7 @@ class Case(object):
             else:
                 jacobian = data['jacobian']
             if jacobian is not None:
-                self.jacobian = PromotedToAbsoluteMap(jacobian[0], prom2abs, abs2prom, output=True)
+                self.jacobian = PromAbsDict(jacobian[0], prom2abs, abs2prom, output=True)
 
         # save var name & meta dict references for use by self._get_variables_of_type()
         self._prom2abs = prom2abs
@@ -322,7 +322,7 @@ class Case(object):
 
         Returns
         -------
-        PromotedToAbsoluteMap
+        PromAbsDict
             Map of variables to their values.
         """
         vals = self._get_variables_of_type('desvar')
@@ -344,7 +344,7 @@ class Case(object):
 
         Returns
         -------
-        PromotedToAbsoluteMap
+        PromAbsDict
             Map of variables to their values.
         """
         vals = self._get_variables_of_type('objective')
@@ -366,7 +366,7 @@ class Case(object):
 
         Returns
         -------
-        PromotedToAbsoluteMap
+        PromAbsDict
             Map of variables to their values.
         """
         vals = self._get_variables_of_type('constraint')
@@ -388,7 +388,7 @@ class Case(object):
 
         Returns
         -------
-        PromotedToAbsoluteMap
+        PromAbsDict
             Map of variables to their values.
         """
         vals = self._get_variables_of_type('response')
@@ -399,7 +399,9 @@ class Case(object):
 
     def list_inputs(self,
                     values=True,
+                    prom_name=False,
                     units=False,
+                    shape=False,
                     hierarchical=True,
                     print_arrays=False,
                     out_stream=_DEFAULT_OUT_STREAM):
@@ -412,8 +414,13 @@ class Case(object):
         ----------
         values : bool, optional
             When True, display/return input values. Default is True.
+        prom_name : bool, optional
+            When True, display/return the promoted name of the variable.
+            Default is False.
         units : bool, optional
             When True, display/return units. Default is False.
+        shape : bool, optional
+            When True, display/return the shape of the value. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -441,13 +448,17 @@ class Case(object):
                     inp_vars[abs_name] = {'value': self.inputs[abs_name]}
 
         if inp_vars is not None and len(inp_vars) > 0:
-            for name in inp_vars:
-                outs = {}
+            for var_name in inp_vars:
+                var_meta = {}
                 if values:
-                    outs['value'] = inp_vars[name]['value']
+                    var_meta['value'] = inp_vars[var_name]['value']
+                if prom_name:
+                    var_meta['prom_name'] = self._abs2prom['input'][var_name]
                 if units:
-                    outs['units'] = meta[name]['units']
-                inputs.append((name, outs))
+                    var_meta['units'] = meta[var_name]['units']
+                if shape:
+                    var_meta['shape'] = inp_vars[var_name]['value'].shape
+                inputs.append((var_name, var_meta))
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -633,18 +644,18 @@ class Case(object):
 
         Returns
         -------
-        PromotedToAbsoluteMap
+        PromAbsDict
             Map of variables to their values.
         """
         if self.outputs is None:
-            return PromotedToAbsoluteMap({}, self._prom2abs, self._abs2prom)
+            return PromAbsDict({}, self._prom2abs, self._abs2prom)
 
         ret_vars = {}
         for var in self.outputs.absolute_names():
             if var_type in self._abs2meta[var]['type']:
                 ret_vars[var] = self.outputs[var]
 
-        return PromotedToAbsoluteMap(ret_vars, self._prom2abs, self._abs2prom)
+        return PromAbsDict(ret_vars, self._prom2abs, self._abs2prom)
 
     def _apply_voi_meta(self, vals, scaled=True, use_indices=True):
         """
@@ -652,7 +663,7 @@ class Case(object):
 
         Parameters
         ----------
-        vals : PromotedToAbsoluteMap
+        vals : PromAbsDict
             Map of variables to their values.
         scaled : bool
             The unique id of the system/solver/driver/problem that did the recording.
@@ -661,7 +672,7 @@ class Case(object):
 
         Returns
         -------
-        PromotedToAbsoluteMap
+        PromAbsDict
             Map of variables to their scaled values.
         """
         for name in vals.absolute_names():
@@ -680,7 +691,7 @@ class Case(object):
         return vals
 
 
-class PromotedToAbsoluteMap(dict):
+class PromAbsDict(dict):
     """
     A dictionary that enables accessing values via absolute or promoted variable names.
 
@@ -713,7 +724,7 @@ class PromotedToAbsoluteMap(dict):
         output : bool
             True if this should map using output variable names, False for input variable names.
         """
-        super(PromotedToAbsoluteMap, self).__init__()
+        super(PromAbsDict, self).__init__()
 
         self._is_output = output
 
@@ -736,18 +747,18 @@ class PromotedToAbsoluteMap(dict):
                     abs_keys, prom_key = self._deriv_keys(key)
                     for abs_key in abs_keys:
                         self._values[abs_key] = values[key]
-                    super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
+                    super(PromAbsDict, self).__setitem__(prom_key, values[key])
                 else:
                     if key in abs2prom:
                         # key is absolute name
                         self._values[key] = values[key]
                         prom_key = abs2prom[key]
-                        super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
+                        super(PromAbsDict, self).__setitem__(prom_key, values[key])
                     elif key in prom2abs:
                         # key is promoted name
                         for abs_key in prom2abs[key]:
                             self._values[abs_key] = values[key]
-                        super(PromotedToAbsoluteMap, self).__setitem__(key, values[key])
+                        super(PromAbsDict, self).__setitem__(key, values[key])
             self._keys = self._values.keys()
         else:
             # numpy structured array, which will always use absolute names
@@ -760,13 +771,13 @@ class PromotedToAbsoluteMap(dict):
                         # We already set a value for this promoted name, which means
                         # it is an input that maps to multiple absolute names. Set the
                         # value to AMBIGOUS and require access via absolute name.
-                        super(PromotedToAbsoluteMap, self).__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
+                        super(PromAbsDict, self).__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
                     else:
-                        super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
+                        super(PromAbsDict, self).__setitem__(prom_key, values[key])
                 elif ',' in key:
                     # derivative keys will be a string in the form of 'of,wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
-                    super(PromotedToAbsoluteMap, self).__setitem__(prom_key, values[key])
+                    super(PromAbsDict, self).__setitem__(prom_key, values[key])
 
     def __str__(self):
         """
@@ -777,7 +788,7 @@ class PromotedToAbsoluteMap(dict):
         str
             String representation of the dictionary.
         """
-        return super(PromotedToAbsoluteMap, self).__str__()
+        return super(PromAbsDict, self).__str__()
 
     def _deriv_keys(self, key):
         """
@@ -835,7 +846,7 @@ class PromotedToAbsoluteMap(dict):
 
         elif key in self:
             # promoted name
-            val = super(PromotedToAbsoluteMap, self).__getitem__(key)
+            val = super(PromAbsDict, self).__getitem__(key)
             if val is _AMBIGOUS_PROM_NAME:
                 msg = "The promoted name '%s' is invalid because it refers to multiple " + \
                       "inputs: %s. Access the value using an absolute path name or the " + \
@@ -847,7 +858,7 @@ class PromotedToAbsoluteMap(dict):
         elif isinstance(key, tuple) or ',' in key:
             # derivative keys can be either (of, wrt) or 'of,wrt'
             abs_keys, prom_key = self._deriv_keys(key)
-            return super(PromotedToAbsoluteMap, self).__getitem__(prom_key)
+            return super(PromAbsDict, self).__getitem__(prom_key)
 
         raise KeyError('Variable name "%s" not found.' % key)
 
@@ -876,18 +887,18 @@ class PromotedToAbsoluteMap(dict):
             for abs_key in abs_keys:
                 self._values[abs_key] = value
 
-            super(PromotedToAbsoluteMap, self).__setitem__(prom_key, value)
+            super(PromAbsDict, self).__setitem__(prom_key, value)
 
         elif key in self._keys:
             # absolute name
             self._values[key] = value
-            super(PromotedToAbsoluteMap, self).__setitem__(abs2prom[key], value)
+            super(PromAbsDict, self).__setitem__(abs2prom[key], value)
         else:
             # promoted name, propagate to all connected absolute names
             for abs_key in prom2abs[key]:
                 if abs_key in self._keys:
                     self._values[abs_key] = value
-            super(PromotedToAbsoluteMap, self).__setitem__(key, value)
+            super(PromAbsDict, self).__setitem__(key, value)
 
     def absolute_names(self):
         """

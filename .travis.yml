@@ -159,7 +159,7 @@ after_success:
 # again, only run coverage operations on the upload machine after success.
 - if [ "$UPLOAD_DOCS" ]; then
     coveralls --rcfile=../../.coveragerc --output=coveralls.json;
-    sed 's/\/home\/travis\/miniconda\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json;
+    sed 's/\/home\/travis\/miniconda\/envs\/PY$PY\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json;
     coveralls --upload=coveralls-upd.json;
   fi
 
