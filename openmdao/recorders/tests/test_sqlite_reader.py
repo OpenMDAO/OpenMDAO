@@ -283,7 +283,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # Test values from cases
         case = cr.get_case('rank0:Driver|0|root._solve_nonlinear|0')
-
         np.testing.assert_almost_equal(case.inputs['d1.y2'], [12.05848815, ])
         np.testing.assert_almost_equal(case.outputs['obj'], [28.58830817, ])
         np.testing.assert_almost_equal(case.residuals['obj'], [0.0, ],)
@@ -1196,29 +1195,29 @@ class TestSqliteCaseReader(unittest.TestCase):
               " ['G2.C1.m', 'G2.C2.f']. Access the value using an absolute path name " + \
               "or the connected output variable instead."
 
-        with self.assertRaises(NameError) as cm:
+        with self.assertRaises(RuntimeError) as cm:
             case['a']
         self.assertEquals(str(cm.exception), msg)
 
-        with self.assertRaises(NameError) as cm:
+        with self.assertRaises(RuntimeError) as cm:
             case.get_val('a')
         self.assertEquals(str(cm.exception), msg)
 
-        with self.assertRaises(NameError) as cm:
+        with self.assertRaises(RuntimeError) as cm:
             case.get_val('a', units='m')
         self.assertEquals(str(cm.exception), msg)
 
-        with self.assertRaises(NameError) as cm:
+        with self.assertRaises(RuntimeError) as cm:
             case.get_val('a', units='ft')
         self.assertEquals(str(cm.exception), msg)
 
         # 'a' is ambiguous.. which input's units do you want when accessing 'a'?
-        # (test the underlying function, currently only called inside get_val)
+        # (test the underlying function, currently only called from inside get_val)
         msg = "Can't get units for the promoted name 'a' because it refers to " + \
               "multiple inputs: ['G2.C1.m', 'G2.C2.f']. Access the units using " + \
               "an absolute path name."
 
-        with self.assertRaises(NameError) as cm:
+        with self.assertRaises(RuntimeError) as cm:
             case._get_units('a')
         self.assertEquals(str(cm.exception), msg)
 

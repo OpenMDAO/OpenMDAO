@@ -302,7 +302,7 @@ class Case(object):
                 # The promoted name maps to multiple absolute names, require absolute name.
                 msg = "Can't get units for the promoted name '%s' because it refers to " + \
                       "multiple inputs: %s. Access the units using an absolute path name."
-                raise NameError(msg % (name, str(proms['input'][name])))
+                raise RuntimeError(msg % (name, str(proms['input'][name])))
 
             abs_name = proms['input'][name][0]
             return meta[abs_name]['units']
@@ -851,7 +851,7 @@ class PromAbsDict(dict):
                 msg = "The promoted name '%s' is invalid because it refers to multiple " + \
                       "inputs: %s. Access the value using an absolute path name or the " + \
                       "connected output variable instead."
-                raise NameError(msg % (key, str(self._prom2abs['input'][key])))
+                raise RuntimeError(msg % (key, str(self._prom2abs['input'][key])))
             else:
                 return val
 
