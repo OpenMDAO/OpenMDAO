@@ -9,7 +9,7 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
 
 scipy_gte_019 = True
 try:
@@ -482,6 +482,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         self.run_and_check_derivs(self.prob)
 
     def test_deriv4(self):
+        # Tests extrapolation.
         self.prob['x'] = 65.0
         self.prob['y'] = 0.951
         self.prob['z'] = 2.5
@@ -833,10 +834,54 @@ class TestMetaModelOTIS(unittest.TestCase):
         self.run_and_check_derivs(self.prob)
 
     def test_deriv4(self):
+        # Tests extrapolation.
         self.prob['x'] = 65.0
         self.prob['y'] = 0.951
         self.prob['z'] = 2.5
         self.run_and_check_derivs(self.prob)
+
+    def test_vec_size(self):
+        prob = om.Problem()
+        model = prob.model
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, _ = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', np.array([x['default'], x['default'], x['default']]),
+                       units=x['units'])
+        ivc.add_output('y', np.array([y['default'], y['default'], y['default']]),
+                       units=x['units'])
+        ivc.add_output('z', np.array([z['default'], z['default'], z['default']]),
+                       units=x['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, vec_size=3,
+                                          interp_method='otis')
+
+        for param in params:
+            comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
+                           param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], np.array([out['default'], out['default'], out['default']]),
+                            out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+
+        prob.setup()
+        prob['x'] = np.array([1.0, 10.0, 90.0])
+        prob['y'] = np.array([0.75, 0.81, 1.2])
+        prob['z'] = np.array([-1.7, 1.1, 2.1])
+
+        prob.run_model()
+
+        partials = prob.check_partials(method='fd', out_stream=None)
+        assert_check_partials(partials)
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")

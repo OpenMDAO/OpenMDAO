@@ -252,7 +252,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         for out_name in self.interps:
             dval = self.interps[out_name].gradient(pt).T
             for i, p in enumerate(self.pnames):
-                partials[out_name, p] = dval[i]
+                partials[out_name, p] = dval[i, :]
 
             if self.options['training_data_gradients']:
                 partials[out_name, "%s_train" % out_name] = dy_ddata

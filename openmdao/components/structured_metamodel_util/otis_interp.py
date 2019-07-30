@@ -523,7 +523,7 @@ class OtisGridInterp(GridInterpBase):
             derivs[j, :] = deriv.flatten()
 
         # Cache derivatives
-        self.derivs = derivs.flatten()
+        self.derivs = derivs
 
         # TODO: Support out-of-bounds identification.
         #if not self.bounds_error and self.fill_value is not None:
@@ -764,7 +764,6 @@ class OtisGridInterp(GridInterpBase):
         interval:  The interval on which h lies
         """
         n = len(x)
-        s = np.zeros(4)
 
         if n <= 1:
             return y[0]
@@ -772,18 +771,23 @@ class OtisGridInterp(GridInterpBase):
         # Normalize the interval from -1 to 1
         eli = 2.0 / (x[interval + 1] - x[interval])
         t = eli * (h - 0.5 * (x[interval + 1] + x[interval]))
-        ns = 0
-
-        if n == 3 and interval > 0:
-            ns = 1
 
         # Assemble local function values
-        s[ns:ns + n] = y[:n]
+        if n == 3 and interval > 0:
+            s = np.zeros((4))
+            ds_dhh = np.zeros((4, dy_dhh.shape[1]))
+            s[1:n + 1] = y[:n]
+            ds_dhh[1:n + 1, :] = dy_dhh[:n, :]
+
+        else:
+            ns = 0
+            s = y[:n]
+            ds_dhh = dy_dhh[:n]
 
         # Multiply by influence matrix to calculate quintic coefficients
         de_ds = a[interval, ...]
         e = np.einsum('ij,j->i', de_ds, s)
-        de_dhh = np.einsum('ij,jk->ik', de_ds, dy_dhh)
+        de_dhh = np.einsum('ij,jk->ik', de_ds, ds_dhh)
 
         # Calculate function values by evaluating quintic
         f = e[0] + t * (e[1] + t * (e[2] + t * (e[3] + t * (e[4] + t * e[5]))))
