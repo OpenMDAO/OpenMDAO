@@ -526,7 +526,9 @@ else:
                     if step is not None:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
                     # Add the number
-                    label = self.number_label(i, label, self.number_alignment, cls=comp['class'])
+                    label = self.finalize_label(i, label, self.number_alignment, cls=comp['class'])
+                else:
+                    label = self.finalize_label(None, label, self.number_alignment, cls=comp['class'])
                 # Convert from math mode to regular text
                 comp['label'] = self._textify(label)
                 # Now the label is finished.
@@ -755,20 +757,18 @@ else:
             txt = '{}, {}$ \\rightarrow $ {}'
             return txt.format(first + i, last + i, first + i + 1)
 
-        def number_label(self, number, txt, alignment, cls):
+        def finalize_label(self, number, txt, alignment, cls=None):
             # Adds an index to the label either above or on the left side.
-
-            def format_class_name(name):
-                return '\\textit{%s}' % name
+            # Class name is also optionally added here
 
             def multi_ln(txt, number=None):
                 if self.class_names and (cls is not None):
-                    cls_name = format_class_name(cls)
-                    txt = '} \\\\ \\text{'.join([txt, cls_name])
-                if number is not None:
-                    return _multiline_block(number, txt)
-                else:
-                    return _multiline_block(txt)
+                    cls_name = '\\textit{%s}' % cls  # Makes it italic
+                    txt = '} \\\\ \\text{'.join([txt, cls_name])  # Formatting for multi-line array
+                elif number is None:
+                    return txt  # No number, no classname, just flows through
+                texts = [number, txt] if number is not None else [txt]
+                return _multiline_block(*texts)
 
             if number:  # If number is None or empty string, it won't be inserted
                 number_str = '{}: '.format(number)
@@ -780,7 +780,7 @@ else:
                 else:
                     return txt  # In case of a wrong setting
             else:
-                return txt
+                return multi_ln(txt)
 
         def _make_legend(self, title="Legend"):
             """
