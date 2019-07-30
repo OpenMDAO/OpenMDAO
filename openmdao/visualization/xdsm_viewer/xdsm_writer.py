@@ -351,10 +351,11 @@ class XDSMjsWriter(AbstractXDSMWriter):
         Output file saved with this extension. Value fixed at 'html' for this class.
     type_map : str
         XDSM component type.
-
+    class_names : bool
+        Include class names of components in diagonal blocks.
     """
 
-    def __init__(self, name='xdsmjs',  class_names=False):
+    def __init__(self, name='xdsmjs', class_names=False):
         """
         Initialize.
 
@@ -362,6 +363,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
         ----------
         name : str
             Name of this XDSM writer
+        class_names : bool
+            Include class names of the components in the diagonal
         """
         super(XDSMjsWriter, self).__init__(name=name)
         self.driver = 'opt'  # Driver default name
@@ -480,7 +483,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         stack : bool
             True for parallel.
             Defaults to False.
-        cls: str or None, optional
+        cls : str or None, optional
             Class name.
             Defaults to None.
         **kwargs : dict
@@ -746,7 +749,8 @@ else:
                     # Add the number
                     label = self.finalize_label(i, label, self.number_alignment, cls=comp['class'])
                 else:
-                    label = self.finalize_label(None, label, self.number_alignment, cls=comp['class'])
+                    label = self.finalize_label(None, label, self.number_alignment,
+                                                cls=comp['class'])
                 # Convert from math mode to regular text
                 comp['label'] = self._textify(label)
                 # Now the label is finished.

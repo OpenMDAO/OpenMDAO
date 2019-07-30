@@ -144,6 +144,7 @@ def _xdsm_setup_parser(parser):
                         help='If true, appends class name of the groups/components to the '
                              'component blocks of the diagram..')
 
+
 def _xdsm_cmd(options):
     """
     Process command line args and call xdsm on the specified file.
