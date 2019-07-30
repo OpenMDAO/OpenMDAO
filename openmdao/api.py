@@ -72,9 +72,9 @@ except ImportError:
     PETScVector = None
 
 # Developer Tools
-from openmdao.devtools.problem_viewer.problem_viewer import view_model, n2
-from openmdao.devtools.viewconns import view_connections
-from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm
+from openmdao.visualization.n2_viewer.n2_viewer import view_model, n2
+from openmdao.visualization.connection_viewer.viewconns import view_connections
+from openmdao.visualization.xdsm_viewer.xdsm_writer import write_xdsm
 
 # Drivers
 try:
@@ -95,7 +95,7 @@ from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.recorders.case_reader import CaseReader
 
 # Visualizations
-from openmdao.utils.visualization import partial_deriv_plot
+from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
 
 # set up tracing or memory profiling if env vars are set.
 import os

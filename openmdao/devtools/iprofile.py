@@ -13,7 +13,7 @@ from six import iteritems, string_types
 
 from openmdao.utils.mpi import MPI
 
-from openmdao.devtools.webview import webview
+from openmdao.utils.webview import webview
 from openmdao.devtools.iprof_utils import func_group, find_qualified_name, _collect_methods, \
      _setup_func_group, _get_methods, _Options
 

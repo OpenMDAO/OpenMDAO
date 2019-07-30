@@ -65,7 +65,7 @@ From a Script
 
 You can do the same thing programmatically by calling the :code:`n2` function.
 
-.. autofunction:: openmdao.devtools.problem_viewer.problem_viewer.n2
+.. autofunction:: openmdao.visualization.n2_viewer.n2_viewer.n2
    :noindex:
 
 Notice that the data source can be either a :code:`Problem` or case recorder database containing
