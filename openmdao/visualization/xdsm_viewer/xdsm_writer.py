@@ -483,9 +483,6 @@ class XDSMjsWriter(AbstractXDSMWriter):
         stack : bool
             True for parallel.
             Defaults to False.
-        cls : str or None, optional
-            Class name of the system.
-            Defaults to None.
         **kwargs : dict
             Keyword args
         """
