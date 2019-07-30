@@ -818,7 +818,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
                add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE,
-               legend=False, **kwargs):
+               legend=False, class_names=True, **kwargs):
     """
     Writes XDSM diagram of an optimization problem.
 
@@ -901,6 +901,9 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
         Defaults to "left".
     legend : bool, optional
         If true, it adds a legend to the diagram.
+        Defaults to False.
+    class_names : bool, optional
+        If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
     kwargs : dict
         Keyword arguments
@@ -994,7 +997,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
                 output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', legend=False,
-                class_names=True, **kwargs):
+                class_names=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 

@@ -141,6 +141,9 @@ def _xdsm_setup_parser(parser):
     parser.add_argument('--legend', action='store_true', dest='legend',
                         help='Position of the outputs on the diagram. Left or right, or a '
                              'Show legend.')
+    parser.add_argument('--class_names', action='store_true', dest='class_names',
+                        help='If true, appends class name of the groups/components to the '
+                             'component blocks of the diagram..')
 
 
 def _xdsm_cmd(options):
@@ -172,6 +175,7 @@ def _xdsm_cmd(options):
                        add_process_conns=not options.no_process_conns,
                        output_side=options.output_side,
                        legend=options.legend,
+                       class_names=options.class_names,
                        **kwargs)
             exit()
 
