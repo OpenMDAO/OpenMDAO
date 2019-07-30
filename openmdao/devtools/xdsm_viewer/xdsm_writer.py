@@ -767,6 +767,8 @@ else:
             # Class name is also optionally added here
 
             def multi_ln(txt, number=None):
+                # Converts text to a multiline block, if an index or class name is added in
+                # separate row.
                 if self.class_names and (cls is not None):
                     cls_name = '\\textit{%s}' % cls  # Makes it italic
                     txt = '} \\\\ \\text{'.join([txt, cls_name])  # Formatting for multi-line array
@@ -994,7 +996,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, build_pdf=build_pdf,
                        show_parallel=show_parallel, driver_type=driver_type,
-                       output_side=output_side, legend=legend, **kwargs)
+                       output_side=output_side, legend=legend, class_names=class_names, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanup=True,
