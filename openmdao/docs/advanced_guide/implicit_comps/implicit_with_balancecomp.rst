@@ -71,7 +71,7 @@ as follows:
 
 
 You can do the same thing programmatically by calling the 
-:func:`n2 <openmdao.devtools.problem_viewer.problem_viewer.n2>` 
+:func:`n2 <openmdao.visualization.n2_viewer.n2_viewer.n2>`
 function in your python script (after setup):
 
 .. code::

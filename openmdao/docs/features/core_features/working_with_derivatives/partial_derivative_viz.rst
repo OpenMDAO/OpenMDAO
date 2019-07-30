@@ -8,7 +8,7 @@ Visually Checking Partial Derivatives with Matrix Diagrams
 The function :code:`partial_deriv_plot` lets you see a visual representation of the values
 returned by :code:`check_partials`.
 
-.. autofunction:: openmdao.utils.visualization.partial_deriv_plot
+.. autofunction:: openmdao.visualization.partial_deriv_plot.partial_deriv_plot
     :noindex:
 
 Here are two examples of its use. Note that in these examples, the :code:`compute_partials` method intentionally

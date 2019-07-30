@@ -7,7 +7,7 @@ import numpy as np
 from numpy.distutils.exec_command import find_executable
 
 import openmdao.api as om
-from openmdao.devtools.xdsm_viewer.html_writer import write_html
+from openmdao.visualization.xdsm_viewer.html_writer import write_html
 from openmdao.test_suite.components.sellar import SellarNoDerivatives, SellarDis1, SellarDis2
 from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.scripts.circuit import Circuit
@@ -1020,7 +1020,7 @@ class TestXDSMjsViewer(unittest.TestCase):
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
 class TestCustomXDSMViewer(unittest.TestCase):
     def test_custom_writer(self):
-        from openmdao.devtools.xdsm_viewer.xdsm_writer import XDSMjsWriter
+        from openmdao.visualization.xdsm_viewer.xdsm_writer import XDSMjsWriter
 
         class CustomWriter(XDSMjsWriter):
             """Customized XDSM writer, based on the XDSMjs writer."""

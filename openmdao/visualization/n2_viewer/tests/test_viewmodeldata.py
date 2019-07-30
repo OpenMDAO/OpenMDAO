@@ -10,7 +10,7 @@ from tempfile import mkdtemp
 
 from openmdao.core.problem import Problem
 from openmdao.test_suite.components.sellar import SellarStateConnection
-from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data, n2
+from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.recorders.sqlite_recorder import SqliteRecorder
 from openmdao.utils.shell_proc import check_call
 

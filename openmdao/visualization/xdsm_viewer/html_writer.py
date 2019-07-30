@@ -7,7 +7,7 @@ import os
 
 from six import itervalues
 
-from openmdao.devtools.html_utils import read_files, write_div, head_and_body, write_script, \
+from openmdao.visualization.html_utils import read_files, write_div, head_and_body, write_script, \
     write_style
 
 _DEFAULT_JSON_FILE = "xdsm.json"  # Used as default name if data is not embedded
@@ -16,7 +16,7 @@ _CHAR_SET = "utf-8"  # HTML character set
 
 def write_html(outfile, source_data=None, data_file=None, embeddable=False):
     """
-    Writes XDSMjs HTML output file, with style and script files embedded.
+    Write XDSMjs HTML output file, with style and script files embedded.
 
     The source data can be the name of a JSON file or a dictionary.
     If a JSON file name is provided, the file will be referenced in the HTML.
@@ -36,7 +36,6 @@ def write_html(outfile, source_data=None, data_file=None, embeddable=False):
         If True, gives a single HTML file that doesn't have the <html>, <DOCTYPE>, <body>
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
     """
-
     # directories
     main_dir = os.path.dirname(os.path.abspath(__file__))
     code_dir = os.path.join(main_dir, 'XDSMjs')
