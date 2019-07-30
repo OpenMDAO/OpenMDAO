@@ -211,7 +211,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
     XDSMjs was created by Remi Lafage. The code and documentation is available at
     https://github.com/OneraHub/XDSMjs
     """
-    def __init__(self, name='xdsmjs'):
+    def __init__(self, name='xdsmjs', class_names=False):
         super(XDSMjsWriter, self).__init__(name=name)
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
@@ -228,6 +228,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
             msg = 'Name not "{}" found in component type mapping, will default to "{}"'
             simple_warning(msg.format(self.name, _DEFAULT_WRITER))
+        self.class_names = class_names
 
     def _format_id(self, name, subs=(('_', ''),)):
         # Changes forbidden characters in the "id" of a component
@@ -330,7 +331,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         style = self.type_map.get(driver_type, 'optimization')
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
-    def add_system(self, node_name, style, label=None, stack=False, **kwargs):
+    def add_system(self, node_name, style, label=None, stack=False, cls=None, **kwargs):
         """
         Add a system.
 
@@ -345,6 +346,9 @@ class XDSMjsWriter(AbstractXDSMWriter):
         stack : bool
             True for parallel.
             Defaults to False.
+        cls: str or None, optional
+            Class name.
+            Defaults to None.
         kwargs : dict
             Keyword args
         """
@@ -352,6 +356,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
             label = node_name
         if stack:  # Parallel block
             style += self._multi_suffix  # Block will be stacked in XDSMjs, if ends with this string
+        if cls is not None:
+            label += '-{}'.format(cls)  # Append class name
         dct = {"type": style, "id": self._format_id(node_name), "name": label}
         self.comps.append(dct)
 
@@ -471,7 +477,6 @@ else:
             self.name = name
             # Formatting options
             self.box_stacking = box_stacking
-            self._box_stacking = self.box_stacking
             self.class_names = class_names
             self.number_alignment = number_alignment
             self.add_component_indices = add_component_indices
