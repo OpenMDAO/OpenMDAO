@@ -213,7 +213,6 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
         for column_name in have_array_values:
             out_stream.write("{}  {}:\n".format(
                 left_column_width * ' ', column_name))
-            out_str = str(var_dict[column_name])
             out_str = pprint.pformat(var_dict[column_name])
             indented_lines = [(left_column_width + indent_inc) * ' ' +
                               s for s in out_str.splitlines()]
