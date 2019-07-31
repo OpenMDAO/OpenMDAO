@@ -67,6 +67,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     tree_dict = OrderedDict()
     tree_dict['name'] = system.name
     tree_dict['type'] = 'subsystem'
+    tree_dict['class'] = system.__class__.__name__
 
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
