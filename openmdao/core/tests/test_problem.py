@@ -1660,11 +1660,11 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
         assertRegex(self, output[6], r'^\s+value:')
-        assertRegex(self, output[7], r'^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[7], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
         assertRegex(self, output[9], r'^\s+lower:')
-        assertRegex(self, output[10], r'^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[10], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
         assertRegex(self, output[12], r'^\s+upper:')
-        assertRegex(self, output[13], r'^\s+\[[0-9. e+-]+\]')
+        assertRegex(self, output[13], r'^\s+array+\(+\[[0-9., e+-]+\]+\)')
 
     def test_feature_list_problem_vars(self):
         import numpy as np

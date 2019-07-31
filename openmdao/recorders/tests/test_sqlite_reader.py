@@ -2761,7 +2761,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
             # FIXME: disabled until Case orders outputs
             # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(37, num_non_empty_lines)
+            self.assertEqual(46, num_non_empty_lines)
 
             # Hierarchical
             stream = cStringIO()
@@ -2785,7 +2785,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(text.count('  mult'), 1)
             self.assertEqual(text.count('    y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(num_non_empty_lines, 40)
+            self.assertEqual(num_non_empty_lines, 49)
 
 
 @use_tempdirs

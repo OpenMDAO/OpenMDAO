@@ -1,8 +1,10 @@
 """
 Utility functions and constants related to writing a table of variable metadata.
 """
-import numpy as np
+import pprint
 from six import iteritems
+
+import numpy as np
 
 column_widths = {
     'value': 20,
@@ -212,6 +214,7 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
             out_stream.write("{}  {}:\n".format(
                 left_column_width * ' ', column_name))
             out_str = str(var_dict[column_name])
+            out_str = pprint.pformat(var_dict[column_name])
             indented_lines = [(left_column_width + indent_inc) * ' ' +
                               s for s in out_str.splitlines()]
             out_stream.write('\n'.join(indented_lines) + '\n')
