@@ -10,7 +10,7 @@ _IND = 4  # indentation (spaces)
 
 def head_and_body(head, body, attrs=None):
     """
-    Makes an html element from a head and body.
+    Make an html element from a head and body.
 
     Parameters
     ----------
@@ -21,6 +21,7 @@ def head_and_body(head, body, attrs=None):
     attrs : dict or None
         Attributes of the html element.
         Defaults to None.
+
     Returns
     -------
         str
@@ -34,9 +35,10 @@ def head_and_body(head, body, attrs=None):
     return doc_type + '\n' + index
 
 
-def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False, indent=0, **kwargs):
+def write_tags(tag, content='', attrs=None, cls_attr=None, uid=None, new_lines=False, indent=0,
+               **kwargs):
     """
-    Writes an HTML element enclosed in tags.
+    Write an HTML element enclosed in tags.
 
     Parameters
     ----------
@@ -47,7 +49,7 @@ def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False,
     attrs : dict or None
         Attributes of the element.
         Defaults to None.
-    cls : str or None
+    cls_attr : str or None
         The "class" attribute of the element.
     uid : str or None
         The "id" attribute of the element.
@@ -56,9 +58,14 @@ def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False,
     indent : int
         Indentation expressed in spaces.
         Defaults to 0.
-    kwargs
+    **kwargs : dict
         Alternative way to add element attributes. Use with attention, can overwrite some in-built
         python names as "class" or "id" if misused.
+
+    Returns
+    -------
+    str
+        HTML element enclosed in tags.
     """
     # Writes an HTML tag with element content and element attributes (given as a dictionary)
     line_sep = '\n' if new_lines else ''
@@ -67,8 +74,8 @@ def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False,
     if attrs is None:
         attrs = {}
     attrs.update(kwargs)
-    if cls is not None:
-        attrs['class'] = cls
+    if cls_attr is not None:
+        attrs['class'] = cls_attr
     if uid is not None:
         attrs['id'] = uid
     attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
@@ -77,9 +84,9 @@ def write_tags(tag, content='', attrs=None, cls=None, uid=None, new_lines=False,
     return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep, spaces=spaces)
 
 
-def write_div(content='', attrs=None, cls=None, uid=None, indent=0, **kwargs):
+def write_div(content='', attrs=None, cls_attr=None, uid=None, indent=0, **kwargs):
     """
-    Writes an HTML div.
+    Write an HTML div.
 
     Parameters
     ----------
@@ -87,13 +94,13 @@ def write_div(content='', attrs=None, cls=None, uid=None, indent=0, **kwargs):
         This goes into the body of the element.
     attrs : dict
         Attributes of the element.
-    cls : str or None
+    cls_attr : str or None
         The "class" attribute of the element.
     uid : str or None
         The "id" attribute of the element.
     indent : int
         Indentation expressed in spaces.
-    kwargs
+    **kwargs : dict
         Alternative way to add element attributes. Use with attention, can overwrite some in-bult
         python names as "class" or "id" if misused.
 
@@ -101,11 +108,33 @@ def write_div(content='', attrs=None, cls=None, uid=None, indent=0, **kwargs):
     -------
         str
     """
-    return write_tags('div', content=content, attrs=attrs, cls=cls, uid=uid, new_lines=False,
-                      indent=indent, **kwargs)
+    return write_tags('div', content=content, attrs=attrs, cls_attr=cls_attr, uid=uid,
+                      new_lines=False, indent=indent, **kwargs)
 
 
 def write_style(content='', attrs=None, indent=0, **kwargs):
+    """
+    Write CSS.
+
+    Parameters
+    ----------
+    content : str or list(str)
+        This goes into the body of the element.
+    attrs : dict or None
+        Attributes of the element.
+        Defaults to None.
+    indent : int
+        Indentation expressed in spaces.
+        Defaults to 0.
+    **kwargs : dict
+        Alternative way to add element attributes. Use with attention, can overwrite some in-built
+        python names as "class" or "id" if misused.
+
+    Returns
+    -------
+    str
+        HTML for this CSS element.
+    """
     default = {'type': "text/css"}
     if attrs is None:
         attrs = default
@@ -115,6 +144,28 @@ def write_style(content='', attrs=None, indent=0, **kwargs):
 
 
 def write_script(content='', attrs=None, indent=0, **kwargs):
+    """
+    Write JavaScript.
+
+    Parameters
+    ----------
+    content : str or list(str)
+        This goes into the body of the element.
+    attrs : dict or None
+        Attributes of the element.
+        Defaults to None.
+    indent : int
+        Indentation expressed in spaces.
+        Defaults to 0.
+    **kwargs : dict
+        Alternative way to add element attributes. Use with attention, can overwrite some in-built
+        python names as "class" or "id" if misused.
+
+    Returns
+    -------
+    str
+        HTML for this JavaScript element.
+    """
     default = {'type': "text/javascript"}
     if attrs is None:
         attrs = default
@@ -124,12 +175,40 @@ def write_script(content='', attrs=None, indent=0, **kwargs):
 
 
 def write_paragraph(content):
-    # Write a paragraph
+    """
+    Write a paragraph.
+
+    Parameters
+    ----------
+    content : str or list(str)
+        This goes into the body of the element.
+
+    Returns
+    -------
+    str
+        HTML for this paragraph.
+    """
     return write_tags(tag='p', content=content)
 
 
 def read_files(filenames, directory, extension):
-    # Reads files (based on filenames) from a directory with a given extension.
+    """
+    Read files (based on filenames) from a directory with a given extension.
+
+    Parameters
+    ----------
+    filenames : list of str
+        List of names of files to read.
+    directory : str
+        Pathname of directory.
+    extension : str
+        Extension of file names.
+
+    Returns
+    -------
+    dict
+        Dict of contents of files read with file names as keys.
+    """
     libs = dict()
     for name in filenames:
         with open(os.path.join(directory, '.'.join([name, extension])), "r") as f:
@@ -140,31 +219,83 @@ def read_files(filenames, directory, extension):
 
 
 def add_button(title, content='', uid=None, indent=0, **kwargs):
+    """
+    Add a button.
+
+    Parameters
+    ----------
+    title : str
+        Title of button.
+    content : str or list(str)
+        This goes into the body of the element.
+    uid : str or None
+        The "id" attribute of the element.
+    indent : int
+        Indentation expressed in spaces.
+    **kwargs : dict
+        Alternative way to add element attributes. Use with attention, can overwrite some in-bult
+        python names as "class" or "id" if misused.
+
+    Returns
+    -------
+    str
+        HTML for this button.
+    """
     i = write_tags(tag='i', attrs={'class': content})
     attrs = {'title': title}
-    return write_tags('button', cls="myButton", content=i, attrs=attrs, uid=uid,
+    return write_tags('button', cls_attr="myButton", content=i, attrs=attrs, uid=uid,
                       new_lines=True, indent=indent, **kwargs)
 
 
 def add_dropdown(title, id_naming=None, options=None, button_content='', header=None,
                  uid=None, indent=0, option_formatter=None, **kwargs):
+    """
+    Add a dropdown menu.
+
+    Parameters
+    ----------
+    title : str
+        Title of button.
+    id_naming : str
+        Prefix for the id's for the items in the menu.
+    options : list
+        List of options for the menu.
+    button_content : str
+        Class of icon fonts used for the menu buttons.
+    header : str
+        Top item in the menu. It describes the purpose of the menu.
+    uid : str or None
+        The "id" attribute of the element.
+    indent : int
+        Indentation expressed in spaces.
+    option_formatter : func
+        Function used to format the displayed menu options using the values from options arg.
+    **kwargs : dict
+        Alternative way to add element attributes. Use with attention, can overwrite some in-bult
+        python names as "class" or "id" if misused.
+
+    Returns
+    -------
+    str
+        HTML for this dropdown.
+    """
     button = add_button(title=title, content=button_content)
     if header is None:
         header = title
-    items = write_tags(tag='span', cls="fakeLink", content=header)
+    items = write_tags(tag='span', cls_attr="fakeLink", content=header)
 
     if options is not None:
         for option in options:
             if option_formatter is not None:
                 option = option_formatter(option)
             idx = "{}{}".format(id_naming, option)
-            items += write_tags(tag='span', cls="fakeLink", uid=idx, content=option)
+            items += write_tags(tag='span', cls_attr="fakeLink", uid=idx, content=option)
 
     attrs = {'class': 'dropdown-content'}
     menu = write_div(content=items, attrs=attrs, uid=uid)
 
     content = [button, menu]
-    return write_div(content=content, cls='dropdown', indent=indent, **kwargs)
+    return write_div(content=content, cls_attr='dropdown', indent=indent, **kwargs)
 
 
 def add_help(txt, header='Instructions', footer=''):
@@ -184,13 +315,13 @@ def add_help(txt, header='Instructions', footer=''):
     -------
         str
     """
-    header_txt = write_tags(tag='span', cls='close', content='&times;', uid="idSpanModalClose")
+    header_txt = write_tags(tag='span', cls_attr='close', content='&times;', uid="idSpanModalClose")
     header_txt += header
-    head = write_div(content=header_txt, cls="modal-header")
-    foot = write_div(content=footer, cls="modal-footer")
-    body = write_div(content=write_paragraph(txt), cls="modal-body")
-    modal_content = write_div(content=[head, body, foot], cls="modal-content")
-    return write_div(content=modal_content, cls="modal", uid="myModal")
+    head = write_div(content=header_txt, cls_attr="modal-header")
+    foot = write_div(content=footer, cls_attr="modal-footer")
+    body = write_div(content=write_paragraph(txt), cls_attr="modal-body")
+    modal_content = write_div(content=[head, body, foot], cls_attr="modal-content")
+    return write_div(content=modal_content, cls_attr="modal", uid="myModal")
 
 
 def add_title(txt, heading='h1', align='center'):
@@ -217,22 +348,40 @@ def add_title(txt, heading='h1', align='center'):
 
 
 class UIElement(object):
-    """Abstract class for user interface elements."""
+    """
+    Abstract class for user interface elements.
+
+    Attributes
+    ----------
+    items: list
+        List of UI elements contained by this element.
+    indent : int
+        Number of spaces for indent.
+    """
 
     def __init__(self, indent=0):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        indent : int
+            Number of spaces to indent.
+        """
         self.items = []
         self.indent = indent
 
 
 class ButtonGroup(UIElement):
     """
-    Button group, which consists of buttons and dropdowns. Write it to get the HTML for the
-    button group.
+    Button group, which consists of buttons and dropdowns.
+
+    Write it to get the HTML for the button group.
     """
 
     def add_button(self, title, content='', uid=None, **kwargs):
         """
-        Adds a button to the button group.
+        Add a button to the button group.
 
         Parameters
         ----------
@@ -242,14 +391,14 @@ class ButtonGroup(UIElement):
             The content of the element.
         uid : str or None
             ID.
-        kwargs : dict
+        **kwargs : dict
             Attributes passed to the button element.
 
         Returns
         -------
             str
         """
-        button = add_button(title, content=content, uid=uid, indent=self.indent+_IND,
+        button = add_button(title, content=content, uid=uid, indent=self.indent + _IND,
                             **kwargs)
         self.items.append(button)
         return button
@@ -257,7 +406,7 @@ class ButtonGroup(UIElement):
     def add_dropdown(self, title, id_naming=None, options=None, button_content='', header=None,
                      uid=None, option_formatter=None, **kwargs):
         """
-        Adds a dropdown to the button group.
+        Add a dropdown to the button group.
 
         Parameters
         ----------
@@ -278,62 +427,96 @@ class ButtonGroup(UIElement):
         option_formatter : None or callable, optional
             Text formatter for the dropdown items. Called with one item.
             Defaults to None.
-        kwargs : dict
+        **kwargs : dict
             Attributes passed to the dropdown element.
 
         Returns
         -------
-            str
+        str
+            HTML for dropdown.
         """
         dropdown = add_dropdown(title=title, id_naming=id_naming, options=options,
                                 button_content=button_content, header=header,
-                                uid=uid, indent=self.indent+_IND,
+                                uid=uid, indent=self.indent + _IND,
                                 option_formatter=option_formatter, **kwargs)
         self.items.append(dropdown)
         return dropdown
 
     def write(self):
         """
-        Outputs the HTML code.
+        Output the HTML code.
 
         Returns
         -------
             str
         """
         content = '\n\n'.join(self.items)
-        return write_div(content=content, cls="button-group")
+        return write_div(content=content, cls_attr="button-group")
 
 
 class Toolbar(UIElement):
     """
-    A toolbar consists of button groups. Add button groups, and write it to get the HTML for the
+    A toolbar consists of button groups.
+
+    Add button groups, and write it to get the HTML for the
     toolbar.
     """
 
     def add_button_group(self):
-        button_group = ButtonGroup(indent=self.indent+4)
+        """
+        Add a group of buttons.
+
+        Returns
+        -------
+            ButtonGroup
+        """
+        button_group = ButtonGroup(indent=self.indent + 4)
         self.items.append(button_group)
         return button_group
 
     def write(self):
         """
-        Outputs the HTML code.
+        Output the HTML code.
 
         Returns
         -------
-            str
+        str
+            HTML div enclosed in tags.
         """
         content = '\n\n'.join([item.write() for item in self.items])
-        return write_div(content=content, cls="toolbar", uid="toolbarDiv")
+        return write_div(content=content, cls_attr="toolbar", uid="toolbarDiv")
 
 
 class TemplateWriter(object):
     """
-    Opens an HTML template files, text can be inserted into the template, and writes  anew HTML
+    Writes HTML files using templates.
+
+    Opens an HTML template files, text can be inserted into the template, and writes a new HTML
     file with the replacements.
+
+    Attributes
+    ----------
+    filename : str
+        Filename of file to write to.
+    template : str
+        Contents of template file.
     """
 
     def __init__(self, filename, embeddable=False, title=None, styles=None):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            Filename of file to write to.
+        embeddable : bool
+            If true, create file so that it can be embedded in a webpage.
+        title : str
+            Title of diagram.
+        styles : dict
+            Dictionary of CSS styles.
+        """
         self.filename = filename
         # Load template
         with open(self.filename, "r") as f:
@@ -361,20 +544,61 @@ class TemplateWriter(object):
         self.template = self.template.replace(ref, txt)
 
     def insert(self, ref, txt):
+        """
+        Insert text.
+
+        Parameters
+        ----------
+        ref : str
+            Reference string in template file.
+        txt : str
+            String used to replace text in template file.
+        """
         self._replace(ref=ref, txt=txt)
 
     def write(self, outfile):
+        """
+        Write the output file.
+
+        Parameters
+        ----------
+        outfile : str
+            Path name for file to write to.
+        """
         with open(outfile, 'w') as f:  # write output file
             f.write(self.template)
 
 
 class DiagramWriter(TemplateWriter):
     """
-    An HTML diagram writer. The diagram has a toolbar, which can be edited by adding
+    An HTML diagram writer.
+
+    The diagram has a toolbar, which can be edited by adding
     button groups, dropdowns, buttons, etc. to this class.
+
+    Attributes
+    ----------
+    toolbar : Toolbar
+        The toolbar with button groups for this diagram.
+    help : Toolbar
+        String of HTML for the help dialog.
     """
 
     def __init__(self, filename, embeddable=False, title=None, styles=None):
+        """
+        Initialize.
+
+        Parameters
+        ----------
+        filename : str
+            Filename to write to.
+        embeddable : bool
+            If true, create file so that it can be embedded in a webpage.
+        title : str
+            Title of diagram.
+        styles : dict
+            Dictionary of CSS styles.
+        """
         super(DiagramWriter, self).__init__(filename=filename, embeddable=embeddable, title=title,
                                             styles=styles)
         self.toolbar = Toolbar()
@@ -382,7 +606,7 @@ class DiagramWriter(TemplateWriter):
 
     def add_help(self, txt, header='Instructions', footer=''):
         """
-        Adds a modal with instructions.
+        Add a modal with instructions.
 
         Parameters
         ----------
@@ -395,14 +619,15 @@ class DiagramWriter(TemplateWriter):
 
         Returns
         -------
-            str
+        str
+            String of HTML for the help dialog.
         """
         self.help = add_help(txt=txt, header=header, footer=footer)
         return self.help
 
     def write(self, outfile):
         """
-        Writes an HTML output file.
+        Write an HTML output file.
 
         Parameters
         ----------

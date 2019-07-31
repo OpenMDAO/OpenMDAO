@@ -1,4 +1,5 @@
 
+"""Define a function to view connections."""
 import os
 import sys
 import json
@@ -13,14 +14,16 @@ import numpy as np
 from openmdao.core.problem import Problem
 from openmdao.utils.units import convert_units
 from openmdao.utils.mpi import MPI
-from openmdao.devtools.webview import webview
+from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
+
 
 def view_connections(root, outfile='connections.html', show_browser=True,
                      src_filter='', tgt_filter='', precision=6):
     """
-    Generates a self-contained html file containing a detailed connection
-    viewer.  Optionally pops up a web browser to view the file.
+    Generate a self-contained html file containing a detailed connection viewer.
+
+    Optionally pops up a web browser to view the file.
 
     Parameters
     ----------
@@ -60,8 +63,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     }
 
     src2tgts = defaultdict(list)
-    units = {n: data.get('units','')
-                for n, data in iteritems(system._var_allprocs_abs2meta)}
+    units = {n: data.get('units', '')
+             for n, data in iteritems(system._var_allprocs_abs2meta)}
     vals = {}
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
@@ -80,7 +83,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
                     val = convert_units(val, units[s], units[t])
 
                 src2tgts[s].append(t)
-            else: # unconnected param
+            else:  # unconnected param
                 val = _get_input(system, t, None)
 
             if isinstance(val, np.ndarray):
@@ -91,7 +94,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             vals[t] = val
 
         noconn_srcs = sorted((n for n in system._var_abs_names['output']
-                                if n not in src2tgts), reverse=True)
+                              if n not in src2tgts), reverse=True)
         for s in noconn_srcs:
             vals[s] = str(system._outputs[s])
 
@@ -111,11 +114,11 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     # reverse sort so that "NO CONNECTION" shows up at the bottom
     src2tgts['NO CONNECTION'] = sorted([t for t in system._var_abs_names['input']
-                                    if t not in connections], reverse=True)
+                                       if t not in connections], reverse=True)
 
-    src_systems = [{'name':n} for n in sorted(src_systems)]
+    src_systems = [{'name': n} for n in sorted(src_systems)]
     src_systems.insert(1, {'name': "NO CONNECTION"})
-    tgt_systems = [{'name':n} for n in sorted(tgt_systems)]
+    tgt_systems = [{'name': n} for n in sorted(tgt_systems)]
     tgt_systems.insert(1, {'name': "NO CONNECTION"})
 
     data = {

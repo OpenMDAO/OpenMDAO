@@ -998,7 +998,11 @@ def get_conversion(old_units, new_units):
     (float, float)
         Conversion factor and offset
     """
-    return _find_unit(old_units).conversion_tuple_to(_find_unit(new_units))
+    new_physical_units = _find_unit(new_units)
+    if new_physical_units is None:
+        raise RuntimeError("Cannot convert to new units: %s" % str(new_units))
+
+    return _find_unit(old_units).conversion_tuple_to(new_physical_units)
 
 
 def convert_units(val, old_units, new_units=None):

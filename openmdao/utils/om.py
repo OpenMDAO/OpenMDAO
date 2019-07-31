@@ -10,8 +10,8 @@ from itertools import chain
 from six import iteritems
 
 from openmdao.core.problem import Problem
-from openmdao.devtools.problem_viewer.problem_viewer import n2
-from openmdao.devtools.viewconns import view_connections
+from openmdao.visualization.n2_viewer.n2_viewer import n2
+from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
@@ -19,7 +19,7 @@ from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_p
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, \
     _mempost_exec, _mempost_setup_parser
 from openmdao.devtools.iprof_utils import _Options
-from openmdao.devtools.xdsm_viewer.xdsm_writer import write_xdsm, \
+from openmdao.visualization.xdsm_viewer.xdsm_writer import write_xdsm, \
     _DEFAULT_BOX_STACKING, _DEFAULT_BOX_WIDTH, _MAX_BOX_LINES, _DEFAULT_OUTPUT_SIDE, _CHAR_SUBS
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.utils.mpi import MPI
@@ -139,8 +139,7 @@ def _xdsm_setup_parser(parser):
                              'dictionary with component types as keys. Component type key can be '
                              '"optimization", "doe" or "default".')
     parser.add_argument('--legend', action='store_true', dest='legend',
-                        help='Position of the outputs on the diagram. Left or right, or a '
-                             'Show legend.')
+                        help='If True, show legend.')
 
 
 def _xdsm_cmd(options):

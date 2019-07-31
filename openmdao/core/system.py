@@ -3000,20 +3000,12 @@ class System(object):
         inputs = []
 
         tags = convert_user_defined_tags_to_set(tags)
-        # if isinstance(tags, str):
-        #     tags = [tags, ]
 
         for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
 
             # Filter based on tags
             if filter_var_based_on_tags(tags, meta[var_name]):
                 continue
-            # if tags:
-            #     var_tags = meta[var_name]['tags']
-            #     if not var_tags:
-            #         continue
-            #     if not (set(tags) & set(var_tags)):
-            #         continue
 
             var_meta = {}
             if values:
@@ -3033,13 +3025,6 @@ class System(object):
                 # Filter based on tags
                 if filter_var_based_on_tags(tags, self._discrete_inputs._dict[var_name]):
                     continue
-                #
-                # if tags:
-                #     var_tags = self._discrete_inputs._dict[var_name]['tags']
-                #     if not var_tags:
-                #         continue
-                #     if not (set(tags) & set(var_tags)):
-                #         continue
 
                 var_meta = {}
                 if values:

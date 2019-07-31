@@ -71,7 +71,7 @@ From a Script
 
 You can do the same thing programmatically by calling the `write_xdsm` function.
 
-.. autofunction:: openmdao.devtools.xdsm_viewer.xdsm_writer.write_xdsm
+.. autofunction:: openmdao.visualization.xdsm_viewer.xdsm_writer.write_xdsm
    :noindex:
 
 Notice that the data source can be either a :code:`Problem` containing the model or
