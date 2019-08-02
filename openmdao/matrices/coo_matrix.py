@@ -260,6 +260,7 @@ class COOMatrix(Matrix):
                 return mat.T.dot(in_vec)
             else:
                 self._pre_update()
+                mat = self._matrix
                 save = mat.data[mask]
                 mat.data[mask] = 0.0
                 val = mat.T.dot(in_vec)
