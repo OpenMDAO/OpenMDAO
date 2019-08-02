@@ -10,7 +10,8 @@ from tempfile import mkdtemp, mkstemp
 from collections import OrderedDict
 
 import numpy as np
-from six import iteritems, assertRaisesRegex
+from six import iteritems, assertRaisesRegex, StringIO
+
 
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
@@ -23,7 +24,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
-from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler
+from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed
@@ -2206,9 +2207,6 @@ class TestSqliteCaseReader(unittest.TestCase):
                 self.assertEqual(case.source, 'root')
 
     def test_case_array_list_vars_options(self):
-        import openmdao.api as om
-        from six.moves import cStringIO
-        from openmdao.utils.general_utils import printoptions
 
         class ArrayAdder(om.ExplicitComponent):
             """
@@ -2254,7 +2252,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # logging inputs
         # out_stream - not hierarchical - extras - no print_arrays
-        stream = cStringIO()
+        stream = StringIO()
         case.list_inputs(values=True,
                          units=True,
                          prom_name=True,
@@ -2269,7 +2267,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(1, text.count('mult.x   |10.0|  inch   x'))
 
         # out_stream - hierarchical - extras - no print_arrays
-        stream = cStringIO()
+        stream = StringIO()
         case.list_inputs(values=True,
                          units=True,
                          shape=True,
@@ -2286,7 +2284,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
-        stream = cStringIO()
+        stream = StringIO()
         case.list_outputs(values=True,
                           units=True,
                           shape=True,
@@ -2305,7 +2303,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(8, num_non_empty_lines)
 
         # Promoted names - no print arrays
-        stream = cStringIO()
+        stream = StringIO()
         case.list_outputs(values=True,
                           prom_name=True,
                           print_arrays=False,
@@ -2317,7 +2315,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(num_non_empty_lines, 11)
 
         # Hierarchical - no print arrays
-        stream = cStringIO()
+        stream = StringIO()
         case.list_outputs(values=True,
                           units=True,
                           shape=True,
@@ -2357,7 +2355,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         with printoptions(**opts):
             # logging outputs
             # out_stream - not hierarchical - extras - print_arrays
-            stream = cStringIO()
+            stream = StringIO()
             case.list_outputs(values=True,
                               units=True,
                               shape=True,
@@ -2376,10 +2374,10 @@ class TestSqliteCaseReader(unittest.TestCase):
             # FIXME: disabled until Case orders outputs
             # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(37, num_non_empty_lines)
+            self.assertEqual(46, num_non_empty_lines)
 
             # Hierarchical
-            stream = cStringIO()
+            stream = StringIO()
             case.list_outputs(values=True,
                               units=True,
                               shape=True,
@@ -2400,7 +2398,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text.count('  mult'), 1)
             self.assertEqual(text.count('    y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(num_non_empty_lines, 40)
+            self.assertEqual(num_non_empty_lines, 49)
 
 
 @use_tempdirs
