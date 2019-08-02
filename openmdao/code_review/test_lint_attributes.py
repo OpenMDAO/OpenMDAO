@@ -143,14 +143,13 @@ class LintAttributesTestCase(unittest.TestCase):
                                     found_in_pc = False
                                     for pc in parent_classes:
                                         pc_class_doc = inspect.getdoc(pc)
-                                        if not pc_class_doc:
-                                            found_in_pc = False
-                                        else:
+                                        if pc_class_doc:
                                             pc_classdoc_matches = classdoc_re.findall(pc_class_doc)
                                             pc_classdoc_varnames_matches = classdoc_varnames_re.findall(pc_classdoc_matches[0]) if(len(pc_classdoc_matches) == 1) else []
                                             if v in pc_classdoc_varnames_matches:
                                                 if(print_info): print("    Documented member `%s` in base class `%s`" % (v, pc.__name__))
                                                 found_in_pc = True
+                                                break
                                     if not found_in_pc:
                                         new_failures.append('Member `{0}` not documented in Attributes section of own class or parent class docstrings'.format(v))
                                 else:
