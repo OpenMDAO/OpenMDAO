@@ -41,7 +41,30 @@ def _print_violations(unknowns, lower, upper):
             print("  Lower:", lower._views_flat[name], '\n')
 
 
-class BoundsEnforceLS(NonlinearSolver):
+class LinesearchSolver(NonlinearSolver):
+    """
+    Base class for line search solvers.
+
+    Attributes
+    ----------
+    _do_subsolve : bool
+        Dictionary holding input and output vectors at start of iteration, if requested.
+    """
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Options dictionary.
+        """
+        super(LinesearchSolver, self).__init__(**kwargs)
+        # Parent solver sets this to control whether to solve subsystems.
+        self._do_subsolve = False
+
+
+class BoundsEnforceLS(LinesearchSolver):
     """
     Bounds enforcement only.
 
@@ -56,20 +79,6 @@ class BoundsEnforceLS(NonlinearSolver):
     """
 
     SOLVER = 'LS: BCHK'
-
-    def __init__(self, **kwargs):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Options dictionary.
-        """
-        super(BoundsEnforceLS, self).__init__(**kwargs)
-
-        # Parent solver sets this to control whether to solve subsystems.
-        self._do_subsolve = False
 
     def _declare_options(self):
         """
@@ -88,11 +97,9 @@ class BoundsEnforceLS(NonlinearSolver):
 
         # Remove unused options from base options here, so that users
         # attempting to set them will get KeyErrors.
-        opt.undeclare("atol")
-        opt.undeclare("rtol")
-        opt.undeclare("maxiter")
-        opt.undeclare("err_on_maxiter")    # Deprecated option.
-        opt.undeclare("err_on_non_converge")
+        # "err_on_maxiter" is a deprecated option
+        for unused_option in ("atol", "rtol", "maxiter", "err_on_maxiter", "err_on_non_converge"):
+            opt.undeclare(unused_option)
 
     def _solve(self):
         """
@@ -135,7 +142,7 @@ class BoundsEnforceLS(NonlinearSolver):
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
 
-class ArmijoGoldsteinLS(NonlinearSolver):
+class ArmijoGoldsteinLS(LinesearchSolver):
     """
     Backtracking line search that terminates using the Armijo-Goldstein condition..
 
@@ -161,10 +168,18 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         """
         super(ArmijoGoldsteinLS, self).__init__(**kwargs)
 
-        # Parent solver sets this to control whether to solve subsystems.
-        self._do_subsolve = False
-
         self._analysis_error_raised = False
+
+    def _line_search_objective(self):
+        """
+        Calculate the objective function of the line search
+
+        Returns
+        -------
+        float
+            Line search objective (residual norm).
+        """
+        return self._iter_get_norm()
 
     def _iter_initialize(self):
         """
@@ -178,34 +193,35 @@ class ArmijoGoldsteinLS(NonlinearSolver):
             error at the first iteration.
         """
         system = self._system
-        self.alpha = self.options['alpha']
+        self.alpha = alpha = self.options['alpha']
 
         u = system._outputs
         du = system._vectors['output']['linear']
-        self.alpha = 1.
 
         self._run_apply()
-        norm0 = self._iter_get_norm()
-        if norm0 == 0.0:
-            norm0 = 1.0
+        phi0 = self._line_search_objective()
+        if phi0 == 0.0:
+            phi0 = 1.0
+        self._phi0 = phi0
 
-        u.add_scal_vec(self.alpha, du)
+        # Initial step length based on the input step length parameter
+        u.add_scal_vec(alpha, du)
 
         if self.options['print_bound_enforce']:
             _print_violations(u, system._lower_bounds, system._upper_bounds)
 
         if self.options['bound_enforcement'] == 'vector':
-            u._enforce_bounds_vector(du, self.alpha, system._lower_bounds, system._upper_bounds)
+            u._enforce_bounds_vector(du, alpha, system._lower_bounds, system._upper_bounds)
         elif self.options['bound_enforcement'] == 'scalar':
-            u._enforce_bounds_scalar(du, self.alpha, system._lower_bounds, system._upper_bounds)
+            u._enforce_bounds_scalar(du, alpha, system._lower_bounds, system._upper_bounds)
         elif self.options['bound_enforcement'] == 'wall':
-            u._enforce_bounds_wall(du, self.alpha, system._lower_bounds, system._upper_bounds)
+            u._enforce_bounds_wall(du, alpha, system._lower_bounds, system._upper_bounds)
 
         try:
             cache = self._solver_info.save_cache()
 
             self._run_apply()
-            norm = self._iter_get_norm()
+            phi = self._line_search_objective()
 
         except AnalysisError as err:
             self._solver_info.restore_cache(cache)
@@ -216,9 +232,9 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                 exc = sys.exc_info()
                 reraise(*exc)
 
-            norm = np.nan
+            phi = np.nan
 
-        return norm0, norm
+        return phi
 
     def _declare_options(self):
         """
@@ -284,41 +300,41 @@ class ArmijoGoldsteinLS(NonlinearSolver):
         Run the iterative solver.
         """
         maxiter = self.options['maxiter']
-        atol = self.options['atol']
-        rtol = self.options['rtol']
-        c = self.options['c']
+        c1 = self.options['c']
+        rho = self.options['rho']
 
         system = self._system
         u = system._outputs
         du = system._vectors['output']['linear']
 
         self._iter_count = 0
-        norm0, norm = self._iter_initialize()
-        self._norm0 = norm0
+        phi = self._iter_initialize()
+        phi0 = self._phi0
 
         # Further backtracking if needed.
         while (self._iter_count < maxiter and
-               ((norm > norm0 - c * self.alpha * norm0) or self._analysis_error_raised)):
+               ((phi > phi0 - c1 * self.alpha * phi0) or self._analysis_error_raised)):
+
             with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
 
                 u.add_scal_vec(-self.alpha, du)
-                if self._iter_count > 0:
-                    self.alpha *= self.options['rho']
-                u.add_scal_vec(self.alpha, du)
 
+                if self._iter_count > 0:
+                    self.alpha *= rho
+                u.add_scal_vec(self.alpha, du)
                 cache = self._solver_info.save_cache()
 
                 try:
                     self._single_iteration()
                     self._iter_count += 1
 
-                    norm = self._iter_get_norm()
+                    phi = self._line_search_objective()
 
                     # With solvers, we want to report the norm AFTER
                     # the iter_execute call, but the i_e call needs to
                     # be wrapped in the with for stack purposes.
-                    rec.abs = norm
-                    rec.rel = norm / norm0
+                    rec.abs = phi
+                    rec.rel = phi / phi0
 
                 except AnalysisError as err:
                     self._solver_info.restore_cache(cache)
@@ -334,4 +350,4 @@ class ArmijoGoldsteinLS(NonlinearSolver):
                         reraise(*exc)
 
             # self._mpi_print(self._iter_count, norm, norm / norm0)
-            self._mpi_print(self._iter_count, norm, self.alpha)
+            self._mpi_print(self._iter_count, phi, self.alpha)
