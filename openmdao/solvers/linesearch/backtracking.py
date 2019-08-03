@@ -172,7 +172,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
     def _line_search_objective(self):
         """
-        Calculate the objective function of the line search
+        Calculate the objective function of the line search.
 
         Returns
         -------
