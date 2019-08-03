@@ -1,4 +1,4 @@
-""" Test for the Backktracking Line Search"""
+""" Test for the Backtracking Line Search"""
 
 import sys
 import unittest
