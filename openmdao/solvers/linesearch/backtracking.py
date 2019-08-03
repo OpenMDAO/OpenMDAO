@@ -50,6 +50,7 @@ class LinesearchSolver(NonlinearSolver):
     _do_subsolve : bool
         Dictionary holding input and output vectors at start of iteration, if requested.
     """
+
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
@@ -70,12 +71,6 @@ class BoundsEnforceLS(LinesearchSolver):
 
     Not so much a linesearch; just check the bounds and if they are violated, then pull back to a
     non-violating point and evaluate.
-
-    Attributes
-    ----------
-    _do_subsolve : bool
-        Flag used by parent solver to tell the line search whether to solve subsystems while
-        backtracking.
     """
 
     SOLVER = 'LS: BCHK'
