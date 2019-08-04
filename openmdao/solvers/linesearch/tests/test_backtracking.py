@@ -1054,6 +1054,37 @@ class TestFeatureLineSearch(unittest.TestCase):
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
+    def test_feature_goldstein(self):
+        import numpy as np
+
+        import openmdao.api as om
+        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
+
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['bound_enforcement'] = 'vector'
+        ls.options['method'] = 'Goldstein'
+
+        top.setup()
+
+        # Test lower bounds: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.
+        top['comp.z'] = 1.6
+        top.run_model()
+
+        for ind in range(3):
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+        self.assertEqual(ls.options['method'], 'Goldstein')
+
 
 if __name__ == "__main__":
     unittest.main()
