@@ -243,9 +243,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         opt['maxiter'] = 5
         opt.declare('c', default=0.1, lower=0.0,
                     desc="Slope parameter for line of sufficient decrease. The "
-                    "larger the step, the more decrease is required to terminate the line search. "
-                    "This parameter is 'c' in: '||res_k|| < ||res_0|| (1 - c * alpha)' for the "
-                    "termination criterion.")
+                    "larger the step, the more decrease is required to terminate the line search.")
         opt.declare(
             'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', the entire vector is backtracked together " +
