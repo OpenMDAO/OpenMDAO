@@ -656,7 +656,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         ls = model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
         # This is pretty bogus, but it ensures that we get a few LS iterations.
-        ls.options['c'] = 100.0
+        ls.options['c'] = 100.0  # FIXME c should be 0 <= c <= 1
 
         prob.set_solver_print(level=0)
 

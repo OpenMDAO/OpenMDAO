@@ -241,7 +241,8 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         super(ArmijoGoldsteinLS, self)._declare_options()
         opt = self.options
         opt['maxiter'] = 5
-        opt.declare('c', default=0.1, desc="Slope parameter for line of sufficient decrease. The "
+        opt.declare('c', default=0.1, lower=0.0,
+                    desc="Slope parameter for line of sufficient decrease. The "
                     "larger the step, the more decrease is required to terminate the line search. "
                     "This parameter is 'c' in: '||res_k|| < ||res_0|| (1 - c * alpha)' for the "
                     "termination criterion.")
@@ -254,7 +255,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
                  "to the bound, and then the backtracking follows the wall - i.e., the " +
                  "violating entries do not change during the line search.")
         opt.declare('rho', default=0.5, lower=0.0, upper=1.0, desc="Contraction factor.")
-        opt.declare('alpha', default=1.0, desc="Initial line search step.")
+        opt.declare('alpha', default=1.0, lower=0.0, desc="Initial line search step.")
         opt.declare('print_bound_enforce', default=False,
                     desc="Set to True to print out names and values of variables that are pulled "
                     "back to their bounds.")
