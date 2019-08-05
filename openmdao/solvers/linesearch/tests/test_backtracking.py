@@ -1083,7 +1083,6 @@ class TestFeatureLineSearch(unittest.TestCase):
 
         for ind in range(3):
             assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
-        self.assertEqual(ls.options['method'], 'Goldstein')
 
 
 if __name__ == "__main__":
