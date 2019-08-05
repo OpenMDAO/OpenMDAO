@@ -1,6 +1,7 @@
 """ Unit tests for the SimpleGADriver Driver."""
 
 import unittest
+import os
 
 import numpy as np
 
@@ -16,10 +17,7 @@ from openmdao.utils.mpi import MPI
 class TestSimpleGA(unittest.TestCase):
 
     def setUp(self):
-        import numpy as np
         np.random.seed(1)
-
-        import os
         os.environ['SimpleGADriver_seed'] = '11'
 
     def test_simple_test_func(self):
@@ -357,6 +355,10 @@ class TestSimpleGA(unittest.TestCase):
 
 class TestDriverOptionsSimpleGA(unittest.TestCase):
 
+    def setUp(self):
+        np.random.seed(1)
+        os.environ['SimpleGADriver_seed'] = '11'
+
     def test_driver_options(self):
         """Tests if Pm and Pc options can be set."""
         prob = om.Problem()
@@ -378,6 +380,10 @@ class TestDriverOptionsSimpleGA(unittest.TestCase):
 
 
 class TestMultiObjectiveSimpleGA(unittest.TestCase):
+
+    def setUp(self):
+        np.random.seed(1)
+        os.environ['SimpleGADriver_seed'] = '11'
 
     def test_multi_obj(self):
 
@@ -483,6 +489,10 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
 
 class TestConstrainedSimpleGA(unittest.TestCase):
+
+    def setUp(self):
+        np.random.seed(1)
+        os.environ['SimpleGADriver_seed'] = '11'
 
     def test_constrained_with_penalty(self):
 
@@ -645,10 +655,7 @@ class MPITestSimpleGA(unittest.TestCase):
     N_PROCS = 2
 
     def setUp(self):
-        import numpy as np
         np.random.seed(1)
-
-        import os
         os.environ['SimpleGADriver_seed'] = '11'
 
     def test_mixed_integer_branin(self):
@@ -792,10 +799,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
     N_PROCS = 4
 
     def setUp(self):
-        import numpy as np
         np.random.seed(1)
-
-        import os
         os.environ['SimpleGADriver_seed'] = '11'
 
     def test_two_branin_parallel_model(self):
