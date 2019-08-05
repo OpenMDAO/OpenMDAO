@@ -48,7 +48,8 @@ class LinesearchSolver(NonlinearSolver):
     Attributes
     ----------
     _do_subsolve : bool
-        Dictionary holding input and output vectors at start of iteration, if requested.
+        Flag used by parent solver to tell the line search whether to solve subsystems while
+        backtracking.
     """
 
     def __init__(self, **kwargs):
