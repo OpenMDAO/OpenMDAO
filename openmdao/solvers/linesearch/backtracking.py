@@ -242,9 +242,9 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         super(ArmijoGoldsteinLS, self)._declare_options()
         opt = self.options
         opt['maxiter'] = 5
-        opt.declare('c', default=0.1, lower=0.0,
-                    desc="Slope parameter for line of sufficient decrease. The "
-                    "larger the step, the more decrease is required to terminate the line search.")
+        opt.declare('c', default=0.1, lower=0.0, desc="Slope parameter for line of sufficient "
+                    "decrease. The larger the step, the more decrease is required to terminate the "
+                    "line search.")
         opt.declare(
             'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', the entire vector is backtracked together " +
