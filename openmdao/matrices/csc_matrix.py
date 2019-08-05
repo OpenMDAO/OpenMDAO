@@ -45,3 +45,21 @@ class CSCMatrix(COOMatrix):
         # because on older versions of scipy, self._coo.tocsc() reuses the row/col arrays and the
         # result is that self._coo.row and self._coo.col get scrambled after csc conversion.
         self._matrix = csc_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
+
+    def _convert_mask(self, mask):
+        """
+        Convert the mask to the format of this sparse matrix (CSC, etc.) from COO.
+
+        Parameters
+        ----------
+        mask : ndarray
+            The mask of indices to zero out.
+
+        Returns
+        -------
+        ndarray
+            The converted mask array.
+        """
+        coo = self._coo
+        csc = csc_matrix((mask, (coo.row, coo.col)), shape=coo.shape)
+        return csc.data
