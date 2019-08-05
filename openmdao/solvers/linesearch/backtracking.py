@@ -307,7 +307,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         fval : float
             Current line search objective value.
         method : str, optional
-            Methodd to caculate stopping condition. Can be "Armijo" or "Goldstein".
+            Method to calculate stopping condition. Can be "Armijo" or "Goldstein".
 
         Returns
         -------
@@ -322,11 +322,11 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         if method == 'armijo':
             return fval <= fval0 + c1 * alpha * df_dalpha
         elif method == 'goldstein':
-            return fval0 + (1-c1) * alpha * df_dalpha <= fval <= fval0 + c1 * alpha * df_dalpha
+            return fval0 + (1 - c1) * alpha * df_dalpha <= fval <= fval0 + c1 * alpha * df_dalpha
 
     def _update_step_length_parameter(self, rho):
         """
-        Updates the step length parameter by multiplying with the contraction factor.
+        Update the step length parameter by multiplying with the contraction factor.
 
         Parameters
         ----------
@@ -362,7 +362,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
                     alpha_old = self.alpha
                     self._update_step_length_parameter(rho)
                     # Moving on the line search with the difference of the old and new step length.
-                    u.add_scal_vec(self.alpha-alpha_old, du)
+                    u.add_scal_vec(self.alpha - alpha_old, du)
                 cache = self._solver_info.save_cache()
 
                 try:
