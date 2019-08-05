@@ -140,7 +140,7 @@ class BoundsEnforceLS(LinesearchSolver):
 
 class ArmijoGoldsteinLS(LinesearchSolver):
     """
-    Backtracking line search that terminates using the Armijo-Goldstein condition..
+    Backtracking line search that terminates using the Armijo-Goldstein condition.
 
     Attributes
     ----------
