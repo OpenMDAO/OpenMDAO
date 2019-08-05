@@ -1681,6 +1681,7 @@ class TestPyoptSparse(unittest.TestCase):
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
+@use_tempdirs
 class TestPyoptSparseFeature(unittest.TestCase):
 
     def setUp(self):
