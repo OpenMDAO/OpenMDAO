@@ -192,7 +192,7 @@ class TestSimpleGA(unittest.TestCase):
         # Material 3 can be anything
 
     def test_mixed_integer_3bar_default_bits(self):
-        # Tests bug where letting openmdao calcualate the bits didn't preserve
+        # Tests bug where letting openmdao calculate the bits didn't preserve
         # integer status unless range was a power of 2.
 
         class ObjPenalty(om.ExplicitComponent):
@@ -722,7 +722,7 @@ class MPITestSimpleGA(unittest.TestCase):
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_mixed_integer_3bar_default_bits(self):
-        # Tests bug where letting openmdao calcualate the bits didn't preserve
+        # Tests bug where letting openmdao calculate the bits didn't preserve
         # integer status unless range was a power of 2.
 
         class ObjPenalty(om.ExplicitComponent):
