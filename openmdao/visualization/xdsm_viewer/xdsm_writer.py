@@ -649,6 +649,8 @@ else:
             If true, display components with numbers.
         has_legend : bool
             If true, a legend will be added to the diagram.
+        class_names : bool
+            If true, appends class name of groups/components to the component blocks of diagram.
         extension : str
             Output file saved with this extension. Value fixed at 'pdf' for this class.
         type_map : str
@@ -681,8 +683,11 @@ else:
             number_alignment : str
                 Position of number relative to the component label. Possible values
                 are: 'horizontal', 'vertical'.
-            legend : str
+            legend : bool
                 If true, a legend will be added to the diagram.
+            class_names : bool, optional
+                If true, appends class name of groups/components to the component blocks of diagram.
+                Defaults to False.
             add_component_indices : bool
                 If true, display components with numbers.
             """
@@ -744,10 +749,11 @@ else:
                     if step is not None:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
                     # Add the number
-                    label = self.finalize_label(i, label, self.number_alignment, cls=comp['class'])
+                    label = self.finalize_label(i, label, self.number_alignment,
+                                                class_name=comp['class'])
                 else:
                     label = self.finalize_label(None, label, self.number_alignment,
-                                                cls=comp['class'])
+                                                class_name=comp['class'])
                 # Convert from math mode to regular text
                 comp['label'] = self._textify(label)
                 # Now the label is finished.
@@ -995,7 +1001,7 @@ else:
             txt = '{}, {}$ \\rightarrow $ {}'
             return txt.format(first + i, last + i, first + i + 1)
 
-        def finalize_label(self, number, txt, alignment, cls=None):
+        def finalize_label(self, number, txt, alignment, class_name=None):
             """
             Add an index to the label either above or on the left side.
 
@@ -1007,7 +1013,7 @@ else:
                 Text appended to the number string.
             alignment : str
                 Indicates alignment of label. Either 'horizontal' or 'vertical'.
-            cls : str or None, optional
+            class_name : str or None, optional
                 Class name.
                 Defaults to None.
 
@@ -1019,8 +1025,8 @@ else:
             def multi_ln(txt, number=None):
                 # Converts text to a multiline block, if an index or class name is added in
                 # separate row.
-                if self.class_names and (cls is not None):
-                    cls_name = '\\textit{%s}' % cls  # Makes it italic
+                if self.class_names and (class_name is not None):
+                    cls_name = '\\textit{%s}' % class_name  # Makes it italic
                     txt = '} \\\\ \\text{'.join([txt, cls_name])  # Formatting for multi-line array
                 elif number is None:
                     return txt  # No number, no classname, just flows through

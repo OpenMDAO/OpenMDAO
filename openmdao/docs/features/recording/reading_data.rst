@@ -50,6 +50,13 @@ The following example shows how to use these methods.
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs
     :layout: interleave
 
+You can also get variable values from a Case like you would from a Problem using dictionary-like access
+or, if you want the value in different units, using the :code:`get_val` method:
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_get_val
+    :layout: interleave
+    
 Getting Derivative Data from a Case
 -----------------------------------
 
