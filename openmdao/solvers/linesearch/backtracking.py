@@ -261,7 +261,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         opt.declare('retry_on_analysis_error', default=True,
                     desc="Backtrack and retry if an AnalysisError is raised.")
         opt.declare('method', default='Armijo', values=['Armijo', 'Goldstein'],
-                    desc="Backtrack and retry if an AnalysisError is raised.")
+                    desc="Method to calculate stopping condition.")
 
     def _single_iteration(self):
         """
