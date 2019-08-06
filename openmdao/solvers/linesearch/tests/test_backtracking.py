@@ -837,8 +837,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
-        ls.options['bound_enforcement'] = 'vector'
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
 
         top.setup()
 
@@ -953,8 +952,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
-        ls.options['bound_enforcement'] = 'vector'
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
         top.setup()
 
@@ -1070,7 +1068,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.linear_solver = om.ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
-        ls.options['bound_enforcement'] = 'vector'
         ls.options['method'] = 'Goldstein'
 
         top.setup()
