@@ -140,7 +140,7 @@ class BoundsEnforceLS(LinesearchSolver):
 
 class ArmijoGoldsteinLS(LinesearchSolver):
     """
-    Backtracking line search that terminates using the Armijo-Goldstein condition..
+    Backtracking line search that terminates using the Armijo-Goldstein condition.
 
     Attributes
     ----------
@@ -199,6 +199,9 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         if phi0 == 0.0:
             phi0 = 1.0
         self._phi0 = phi0
+        # From definition of Newton's method one full step should drive the linearized residuals
+        # to 0, hence the directional derivative is equal to the initial function value.
+        self._dir_derivative = -phi0
 
         # Initial step length based on the input step length parameter
         u.add_scal_vec(alpha, du)
@@ -239,10 +242,9 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         super(ArmijoGoldsteinLS, self)._declare_options()
         opt = self.options
         opt['maxiter'] = 5
-        opt.declare('c', default=0.1, desc="Slope parameter for line of sufficient decrease. The "
-                    "larger the step, the more decrease is required to terminate the line search. "
-                    "This parameter is 'c' in: '||res_k|| < ||res_0|| (1 - c * alpha)' for the "
-                    "termination criterion.")
+        opt.declare('c', default=0.1, lower=0.0, desc="Slope parameter for line of sufficient "
+                    "decrease. The larger the step, the more decrease is required to terminate the "
+                    "line search.")
         opt.declare(
             'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', the entire vector is backtracked together " +
@@ -251,13 +253,15 @@ class ArmijoGoldsteinLS(LinesearchSolver):
                  "as a whole. If this is set to 'wall', only the violating entries are set " +
                  "to the bound, and then the backtracking follows the wall - i.e., the " +
                  "violating entries do not change during the line search.")
-        opt.declare('rho', default=0.5, lower=0.0, upper=1.0, desc="Backtracking multiplier.")
-        opt.declare('alpha', default=1.0, desc="Initial line search step.")
+        opt.declare('rho', default=0.5, lower=0.0, upper=1.0, desc="Contraction factor.")
+        opt.declare('alpha', default=1.0, lower=0.0, desc="Initial line search step.")
         opt.declare('print_bound_enforce', default=False,
                     desc="Set to True to print out names and values of variables that are pulled "
                     "back to their bounds.")
         opt.declare('retry_on_analysis_error', default=True,
                     desc="Backtrack and retry if an AnalysisError is raised.")
+        opt.declare('method', default='Armijo', values=['Armijo', 'Goldstein'],
+                    desc="Method to calculate stopping condition.")
 
     def _single_iteration(self):
         """
@@ -291,13 +295,54 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         else:
             self._run_apply()
 
+    def _stopping_criteria(self, fval, method):
+        """
+        Sufficient decrease criteria for the line search.
+
+        The initial line search objective and the step length parameter are stored in the class
+        instance.
+
+        Parameters
+        ----------
+        fval : float
+            Current line search objective value.
+        method : str, optional
+            Method to calculate stopping condition. Can be "Armijo" or "Goldstein".
+
+        Returns
+        -------
+        bool
+            Stopping condition is satisfied.
+        """
+        method = method.lower()
+        fval0 = self._phi0
+        df_dalpha = self._dir_derivative
+        c1 = self.options['c']
+        alpha = self.alpha
+        if method == 'armijo':
+            return fval <= fval0 + c1 * alpha * df_dalpha
+        elif method == 'goldstein':
+            return fval0 + (1 - c1) * alpha * df_dalpha <= fval <= fval0 + c1 * alpha * df_dalpha
+
+    def _update_step_length_parameter(self, rho):
+        """
+        Update the step length parameter by multiplying with the contraction factor.
+
+        Parameters
+        ----------
+        rho : float
+            Contraction factor
+        """
+        self.alpha *= rho  # update alpha
+
     def _solve(self):
         """
         Run the iterative solver.
         """
-        maxiter = self.options['maxiter']
-        c1 = self.options['c']
-        rho = self.options['rho']
+        options = self.options
+        maxiter = options['maxiter']
+        rho = options['rho']
+        method = options['method']
 
         system = self._system
         u = system._outputs
@@ -309,15 +354,15 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
         # Further backtracking if needed.
         while (self._iter_count < maxiter and
-               ((phi > phi0 - c1 * self.alpha * phi0) or self._analysis_error_raised)):
+               (not self._stopping_criteria(phi, method) or self._analysis_error_raised)):
 
             with Recording('ArmijoGoldsteinLS', self._iter_count, self) as rec:
 
-                u.add_scal_vec(-self.alpha, du)
-
                 if self._iter_count > 0:
-                    self.alpha *= rho
-                u.add_scal_vec(self.alpha, du)
+                    alpha_old = self.alpha
+                    self._update_step_length_parameter(rho)
+                    # Moving on the line search with the difference of the old and new step length.
+                    u.add_scal_vec(self.alpha - alpha_old, du)
                 cache = self._solver_info.save_cache()
 
                 try:
