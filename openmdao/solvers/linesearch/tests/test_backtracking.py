@@ -865,8 +865,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='wall')
-        ls.options['bound_enforcement'] = 'wall'
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='wall')
 
         top.setup()
 
@@ -895,8 +894,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar')
-        ls.options['bound_enforcement'] = 'scalar'
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar')
 
         top.setup()
         top.run_model()
@@ -980,8 +978,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
-        ls.options['bound_enforcement'] = 'wall'
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
 
         top.setup()
 
@@ -1011,7 +1008,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.linear_solver = om.ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
-        ls.options['bound_enforcement'] = 'scalar'
 
         top.setup()
         top.run_model()
