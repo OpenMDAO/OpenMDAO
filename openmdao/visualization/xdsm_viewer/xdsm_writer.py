@@ -351,10 +351,11 @@ class XDSMjsWriter(AbstractXDSMWriter):
         Output file saved with this extension. Value fixed at 'html' for this class.
     type_map : str
         XDSM component type.
-
+    class_names : bool
+        Include class names of components in diagonal blocks.
     """
 
-    def __init__(self, name='xdsmjs'):
+    def __init__(self, name='xdsmjs', class_names=False):
         """
         Initialize.
 
@@ -362,6 +363,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
         ----------
         name : str
             Name of this XDSM writer
+        class_names : bool
+            Include class names of the components in the diagonal
         """
         super(XDSMjsWriter, self).__init__(name=name)
         self.driver = 'opt'  # Driver default name
@@ -379,6 +382,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
             self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
             msg = 'Name not "{}" found in component type mapping, will default to "{}"'
             simple_warning(msg.format(self.name, _DEFAULT_WRITER))
+        self.class_names = class_names
 
     def _format_id(self, name, subs=(('_', ''),)):
         # Changes forbidden characters in the "id" of a component
@@ -464,7 +468,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         style = self.type_map.get(driver_type, 'optimization')
         self.add_system(node_name=name, style=style, label=label, **kwargs)
 
-    def add_system(self, node_name, style, label=None, stack=False, **kwargs):
+    def add_system(self, node_name, style, label=None, stack=False, cls=None, **kwargs):
         """
         Add a system.
 
@@ -486,6 +490,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
             label = node_name
         if stack:  # Parallel block
             style += self._multi_suffix  # Block will be stacked in XDSMjs, if ends with this string
+        if cls is not None:
+            label += '-{}'.format(cls)  # Append class name
         dct = {"type": style, "id": self._format_id(node_name), "name": label}
         self.comps.append(dct)
 
@@ -643,6 +649,8 @@ else:
             If true, display components with numbers.
         has_legend : bool
             If true, a legend will be added to the diagram.
+        class_names : bool
+            If true, appends class name of groups/components to the component blocks of diagram.
         extension : str
             Output file saved with this extension. Value fixed at 'pdf' for this class.
         type_map : str
@@ -660,7 +668,7 @@ else:
         """
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
-                     number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False,
+                     number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False, class_names=False,
                      add_component_indices=True):
             """
             Initialize.
@@ -675,8 +683,11 @@ else:
             number_alignment : str
                 Position of number relative to the component label. Possible values
                 are: 'horizontal', 'vertical'.
-            legend : str
+            legend : bool
                 If true, a legend will be added to the diagram.
+            class_names : bool, optional
+                If true, appends class name of groups/components to the component blocks of diagram.
+                Defaults to False.
             add_component_indices : bool
                 If true, display components with numbers.
             """
@@ -684,6 +695,7 @@ else:
             self.name = name
             # Formatting options
             self.box_stacking = box_stacking
+            self.class_names = class_names
             self.number_alignment = number_alignment
             self.add_component_indices = add_component_indices
             self.has_legend = legend  # If true, a legend will be added to the diagram
@@ -737,7 +749,11 @@ else:
                     if step is not None:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
                     # Add the number
-                    label = self.number_label(i, label, self.number_alignment)
+                    label = self.finalize_label(i, label, self.number_alignment,
+                                                class_name=comp['class'])
+                else:
+                    label = self.finalize_label(None, label, self.number_alignment,
+                                                class_name=comp['class'])
                 # Convert from math mode to regular text
                 comp['label'] = self._textify(label)
                 # Now the label is finished.
@@ -769,7 +785,7 @@ else:
             super(XDSMWriter, self).add_system(node_name=node_name, style=style, label=label,
                                                stack=stack, faded=faded)
 
-        def _add_system(self, node_name, style, label, stack=False, faded=False):
+        def _add_system(self, node_name, style, label, stack=False, faded=False, cls=None):
             # Adds a system dictionary to the components.
             # This dictionary can be modified by other methods.
             self._styles_used.add(style)
@@ -778,7 +794,7 @@ else:
                 label = node_name
             self._comp_indices[node_name] = self._nr_comps
             sys_dct = {'node_name': node_name, 'style': style, 'label': label, 'stack': stack,
-                       'faded': faded, 'index': self._nr_comps}
+                       'faded': faded, 'index': self._nr_comps, 'class': cls}
             self._nr_comps += 1
             self._comps.append(sys_dct)
 
@@ -985,7 +1001,7 @@ else:
             txt = '{}, {}$ \\rightarrow $ {}'
             return txt.format(first + i, last + i, first + i + 1)
 
-        def number_label(self, number, txt, alignment):
+        def finalize_label(self, number, txt, alignment, class_name=None):
             """
             Add an index to the label either above or on the left side.
 
@@ -997,26 +1013,37 @@ else:
                 Text appended to the number string.
             alignment : str
                 Indicates alignment of label. Either 'horizontal' or 'vertical'.
+            class_name : str or None, optional
+                Class name.
+                Defaults to None.
 
             Returns
             -------
             str
                 Label to be used for this item.
             """
+            def multi_ln(txt, number=None):
+                # Converts text to a multiline block, if an index or class name is added in
+                # separate row.
+                if self.class_names and (class_name is not None):
+                    cls_name = '\\textit{%s}' % class_name  # Makes it italic
+                    txt = '} \\\\ \\text{'.join([txt, cls_name])  # Formatting for multi-line array
+                elif number is None:
+                    return txt  # No number, no classname, just flows through
+                texts = [number, txt] if number is not None else [txt]
+                return _multiline_block(*texts)
+
             if number:  # If number is None or empty string, it won't be inserted
                 number_str = '{}: '.format(number)
                 if alignment == 'horizontal':
                     txt = '{}{}'.format(number_str, txt)
-                    if self.box_stacking == 'vertical':
-                        return _multiline_block(txt)
-                    else:
-                        return txt
+                    return multi_ln(txt)
                 elif alignment == 'vertical':
-                    return _multiline_block(number_str, txt)
+                    return multi_ln(txt, number_str)
                 else:
                     return txt  # In case of a wrong setting
             else:
-                return txt
+                return multi_ln(txt)
 
         def _make_legend(self, title="Legend"):
             """
@@ -1061,7 +1088,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
                add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE,
-               legend=False, **kwargs):
+               legend=False, class_names=True, **kwargs):
     """
     Write XDSM diagram of an optimization problem.
 
@@ -1144,6 +1171,9 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
         Defaults to "left".
     legend : bool, optional
         If true, it adds a legend to the diagram.
+        Defaults to False.
+    class_names : bool, optional
+        If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
     **kwargs : dict
         Keyword arguments
@@ -1230,7 +1260,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, build_pdf=build_pdf,
                        show_parallel=show_parallel, driver_type=driver_type,
-                       output_side=output_side, legend=legend, **kwargs)
+                       output_side=output_side, legend=legend, class_names=class_names, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanup=True,
@@ -1238,7 +1268,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
                 output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', legend=False,
-                **kwargs):
+                class_names=False, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -1295,6 +1325,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     legend : bool, optional
         If true, it adds a legend to the diagram.
         Defaults to False.
+    class_names : bool, optional
+        If true, appends class name of the groups/components to the component blocks of the diagram.
+        Defaults to False.
     **kwargs : dict
         Keyword arguments
 
@@ -1319,7 +1352,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             x = XDSMWriter(box_stacking=box_stacking,
                            number_alignment=number_alignment,
                            add_component_indices=add_component_indices,
-                           legend=legend)
+                           legend=legend,
+                           class_names=class_names)
         elif writer.lower() == 'xdsmjs':  # XDSMjs
             x = XDSMjsWriter()
         else:
@@ -1444,7 +1478,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 solver_dcts.append(comp)
         else:  # component or group
             x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                       comp_type=comp['component_type'])
+                       comp_type=comp['component_type'], cls=comp.get('class', None))
 
     # Add process connections
     if add_process_conns:
