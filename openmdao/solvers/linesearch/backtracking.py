@@ -22,11 +22,11 @@ def _print_violations(unknowns, lower, upper):
 
     Parameters
     ----------
-    unknowns : Vector
+    unknowns : <Vector>
         Vector containing the unknowns.
-    lower : Vector
+    lower : <Vector>
         Vector containing the lower bounds.
-    upper : Vector
+    upper : <Vector>
         Vector containing the upper bounds.
     """
     for name, val in iteritems(unknowns._views_flat):
@@ -356,7 +356,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
         system = self._system
         u = system._outputs
-        du = system._vectors['output']['linear']
+        du = system._vectors['output']['linear']  # Newton step
 
         self._iter_count = 0
         phi = self._iter_initialize()
