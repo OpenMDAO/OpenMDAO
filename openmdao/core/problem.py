@@ -3,6 +3,7 @@
 from __future__ import division, print_function
 
 import sys
+import pprint
 import os
 import logging
 
@@ -1423,6 +1424,7 @@ class Problem(object):
         }
         approx = model._owns_approx_jac
         old_jac = model._jacobian
+        old_subjacs = model._subjacs_info.copy()
 
         model.approx_totals(method=method, step=step, form=form,
                             step_calc=step_calc if method is 'fd' else None)
@@ -1434,6 +1436,7 @@ class Problem(object):
         if not approx:
             model._jacobian = old_jac
             model._owns_approx_jac = False
+            model._subjacs_info = old_subjacs
 
         # Assemble and Return all metrics.
         data = {}
@@ -1669,7 +1672,7 @@ class Problem(object):
                 for col_name in have_array_values:
                     print("{}{}:".format((left_column_width + col_spacing) * ' ', col_name))
                     cell = row[col_name]
-                    out_str = str(cell)
+                    out_str = pprint.pformat(cell)
                     indented_lines = [(left_column_width + col_spacing) * ' ' +
                                       s for s in out_str.splitlines()]
                     print('\n'.join(indented_lines) + '\n')

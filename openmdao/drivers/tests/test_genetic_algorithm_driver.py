@@ -1,6 +1,7 @@
 """ Unit tests for the SimpleGADriver Driver."""
 
 import unittest
+import os
 
 import numpy as np
 
@@ -15,9 +16,11 @@ from openmdao.utils.mpi import MPI
 
 class TestSimpleGA(unittest.TestCase):
 
-    def test_simple_test_func(self):
-        np.random.seed(11)
+    def setUp(self):
+        np.random.seed(1)
+        os.environ['SimpleGADriver_seed'] = '11'
 
+    def test_simple_test_func(self):
         class MyComp(om.ExplicitComponent):
 
             def setup(self):
@@ -69,8 +72,6 @@ class TestSimpleGA(unittest.TestCase):
         assert_rel_error(self, prob['px.x'][1], -0.88654333, 1e-4)
 
     def test_mixed_integer_branin(self):
-        np.random.seed(1)
-
         prob = om.Problem()
         model = prob.model
 
@@ -98,8 +99,6 @@ class TestSimpleGA(unittest.TestCase):
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_mixed_integer_branin_discrete(self):
-        np.random.seed(1)
-
         prob = om.Problem()
         model = prob.model
 
@@ -131,13 +130,10 @@ class TestSimpleGA(unittest.TestCase):
         self.assertTrue(isinstance(prob['p.xI'], int))
 
     def test_mixed_integer_3bar(self):
-        np.random.seed(1)
-
         class ObjPenalty(om.ExplicitComponent):
             """
             Weight objective with penalty on stress constraint.
             """
-
             def setup(self):
                 self.add_input('obj', 0.0)
                 self.add_input('stress', val=np.zeros((3, )))
@@ -194,16 +190,13 @@ class TestSimpleGA(unittest.TestCase):
         # Material 3 can be anything
 
     def test_mixed_integer_3bar_default_bits(self):
-        # Tests bug where letting openmdao calcualate the bits didn't preserve integer status unless range
-        # was a power of 2.
-
-        np.random.seed(1)
+        # Tests bug where letting openmdao calculate the bits didn't preserve
+        # integer status unless range was a power of 2.
 
         class ObjPenalty(om.ExplicitComponent):
             """
             Weight objective with penalty on stress constraint.
             """
-
             def setup(self):
                 self.add_input('obj', 0.0)
                 self.add_input('stress', val=np.zeros((3, )))
@@ -260,8 +253,6 @@ class TestSimpleGA(unittest.TestCase):
         # Material 3 can be anything
 
     def test_analysis_error(self):
-        np.random.seed(1)
-
         class ValueErrorComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('x', 1.0)
@@ -364,6 +355,10 @@ class TestSimpleGA(unittest.TestCase):
 
 class TestDriverOptionsSimpleGA(unittest.TestCase):
 
+    def setUp(self):
+        np.random.seed(1)
+        os.environ['SimpleGADriver_seed'] = '11'
+
     def test_driver_options(self):
         """Tests if Pm and Pc options can be set."""
         prob = om.Problem()
@@ -385,6 +380,10 @@ class TestDriverOptionsSimpleGA(unittest.TestCase):
 
 
 class TestMultiObjectiveSimpleGA(unittest.TestCase):
+
+    def setUp(self):
+        np.random.seed(1)
+        os.environ['SimpleGADriver_seed'] = '11'
 
     def test_multi_obj(self):
 
@@ -490,6 +489,10 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
 
 class TestConstrainedSimpleGA(unittest.TestCase):
+
+    def setUp(self):
+        np.random.seed(1)
+        os.environ['SimpleGADriver_seed'] = '11'
 
     def test_constrained_with_penalty(self):
 
@@ -651,9 +654,11 @@ class MPITestSimpleGA(unittest.TestCase):
 
     N_PROCS = 2
 
-    def test_mixed_integer_branin(self):
+    def setUp(self):
         np.random.seed(1)
+        os.environ['SimpleGADriver_seed'] = '11'
 
+    def test_mixed_integer_branin(self):
         prob = om.Problem()
         model = prob.model
 
@@ -684,8 +689,6 @@ class MPITestSimpleGA(unittest.TestCase):
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_two_branin_parallel_model(self):
-        np.random.seed(1)
-
         prob = om.Problem()
         model = prob.model
 
@@ -726,9 +729,8 @@ class MPITestSimpleGA(unittest.TestCase):
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_mixed_integer_3bar_default_bits(self):
-        # Tests bug where letting openmdao calcualate the bits didn't preserve integer status unless range
-        # was a power of 2.
-        np.random.seed(1)
+        # Tests bug where letting openmdao calculate the bits didn't preserve
+        # integer status unless range was a power of 2.
 
         class ObjPenalty(om.ExplicitComponent):
             """
@@ -796,9 +798,11 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
 
     N_PROCS = 4
 
-    def test_two_branin_parallel_model(self):
+    def setUp(self):
         np.random.seed(1)
+        os.environ['SimpleGADriver_seed'] = '11'
 
+    def test_two_branin_parallel_model(self):
         prob = om.Problem()
         model = prob.model
 
@@ -1071,6 +1075,13 @@ class TestFeatureSimpleGA(unittest.TestCase):
 class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
+    def setUp(self):
+        import numpy as np
+        np.random.seed(1)
+
+        import os
+        os.environ['SimpleGADriver_seed'] = '11'
+
     def test_option_parallel(self):
         import openmdao.api as om
         from openmdao.test_suite.components.branin import Branin
@@ -1107,6 +1118,13 @@ class MPIFeatureTests(unittest.TestCase):
 @unittest.skipUnless(MPI, "MPI is required.")
 class MPIFeatureTests4(unittest.TestCase):
     N_PROCS = 4
+
+    def setUp(self):
+        import numpy as np
+        np.random.seed(1)
+
+        import os
+        os.environ['SimpleGADriver_seed'] = '11'
 
     def test_option_procs_per_model(self):
         import openmdao.api as om

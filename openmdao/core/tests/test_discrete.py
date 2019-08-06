@@ -11,7 +11,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
-from openmdao.devtools.problem_viewer.problem_viewer import _get_viewer_data
+from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives

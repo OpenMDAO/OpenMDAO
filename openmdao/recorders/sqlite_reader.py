@@ -12,7 +12,7 @@ from six import PY2, PY3, iteritems, string_types
 from six.moves import range
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
-from openmdao.recorders.case import Case, PromotedToAbsoluteMap
+from openmdao.recorders.case import Case, PromAbsDict
 
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.record_util import check_valid_sqlite3_db, convert_to_np_array
@@ -157,8 +157,8 @@ class SqliteCaseReader(BaseCaseReader):
         con.close()
 
         # create maps to facilitate accessing variable metadata using absolute or promoted name
-        self._output2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 1)
-        self._input2meta = PromotedToAbsoluteMap(self._abs2meta, self._prom2abs, self._abs2prom, 0)
+        self._output2meta = PromAbsDict(self._abs2meta, self._prom2abs, self._abs2prom, 1)
+        self._input2meta = PromAbsDict(self._abs2meta, self._prom2abs, self._abs2prom, 0)
 
         # create helper objects for accessing cases from the three iteration tables and
         # the problem cases table

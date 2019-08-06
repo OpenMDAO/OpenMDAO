@@ -1,4 +1,4 @@
-""" Test for the Backktracking Line Search"""
+""" Test for the Backtracking Line Search"""
 
 import sys
 import unittest
@@ -100,7 +100,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
         ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
         ls.options['maxiter'] = 10
-        ls.options['alpha'] = 10.0
+        ls.options['alpha'] = 1.0
 
         # Setup again because we assigned a new linesearch
         top.setup()
@@ -110,14 +110,16 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
         top['comp.y'] = 0.0
         top['comp.z'] = 1.6
         top.run_model()
-        self.assertTrue(1.5 <= top['comp.z'] <= 1.6)
+        self.assertGreaterEqual(top['comp.z'], 1.5)
+        self.assertLessEqual(top['comp.z'], 1.6)
 
         # Test lower bound: should stop just short of the upper bound
         top['px.x'] = 0.5
         top['comp.y'] = 0.0
         top['comp.z'] = 2.4
         top.run_model()
-        self.assertTrue(2.4 <= top['comp.z'] <= 2.5)
+        self.assertGreaterEqual(top['comp.z'], 2.5)
+        self.assertLessEqual(top['comp.z'], 2.5)
 
 
 class ParaboloidAE(om.ExplicitComponent):
@@ -451,7 +453,8 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
         for ind in range(3):
-            self.assertTrue(1.5 <= top['comp.z'][ind] <= 1.6)
+            self.assertGreaterEqual(top['comp.z'][ind], 1.5)
+            self.assertLessEqual(top['comp.z'][ind], 1.6)
 
         # Test upper bounds: should stop just short of the minimum upper bound
         top['px.x'] = 0.5
@@ -653,7 +656,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         ls = model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
         # This is pretty bogus, but it ensures that we get a few LS iterations.
-        ls.options['c'] = 100.0
+        ls.options['c'] = 100.0  # FIXME c should be 0 <= c <= 1
 
         prob.set_solver_print(level=0)
 
@@ -760,9 +763,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
+        for ind in range(3):
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_armijogoldsteinls_basic(self):
         import numpy as np
@@ -789,9 +791,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
+        for ind in range(3):
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_boundscheck_basic(self):
         import numpy as np
@@ -818,9 +819,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
+        for ind in range(3):
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_boundscheck_vector(self):
         import numpy as np
@@ -837,8 +837,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
-        ls.options['bound_enforcement'] = 'vector'
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
 
         top.setup()
 
@@ -848,9 +847,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
+        for ind in range(3):
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_boundscheck_wall(self):
         import numpy as np
@@ -867,8 +865,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='wall')
-        ls.options['bound_enforcement'] = 'wall'
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='wall')
 
         top.setup()
 
@@ -897,8 +894,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar')
-        ls.options['bound_enforcement'] = 'scalar'
+        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='scalar')
 
         top.setup()
         top.run_model()
@@ -908,10 +904,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
-
-        print(top['comp.z'][0])
-        print(top['comp.z'][1])
-        print(top['comp.z'][2])
 
     def test_feature_print_bound_enforce(self):
         import numpy as np
@@ -940,9 +932,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
+        for ind in range(3):
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_armijo_boundscheck_vector(self):
         import numpy as np
@@ -959,8 +950,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
-        ls.options['bound_enforcement'] = 'vector'
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
 
         top.setup()
 
@@ -970,9 +960,8 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
+        for ind in range(3):
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
     def test_feature_armijo_boundscheck_wall(self):
         import numpy as np
@@ -989,8 +978,7 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.nonlinear_solver.options['maxiter'] = 10
         top.model.linear_solver = om.ScipyKrylov()
 
-        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
-        ls.options['bound_enforcement'] = 'wall'
+        top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='wall')
 
         top.setup()
 
@@ -1020,7 +1008,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top.model.linear_solver = om.ScipyKrylov()
 
         ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar')
-        ls.options['bound_enforcement'] = 'scalar'
 
         top.setup()
         top.run_model()
@@ -1030,10 +1017,6 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.y'] = 0.
         top['comp.z'] = 1.6
         top.run_model()
-
-        print(top['comp.z'][0])
-        print(top['comp.z'][1])
-        print(top['comp.z'][2])
 
     def test_feature_armijo_print_bound_enforce(self):
         import numpy as np
@@ -1062,9 +1045,37 @@ class TestFeatureLineSearch(unittest.TestCase):
         top['comp.z'] = 1.6
         top.run_model()
 
-        assert_rel_error(self, top['comp.z'][0], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][1], [1.5], 1e-8)
-        assert_rel_error(self, top['comp.z'][2], [1.5], 1e-8)
+        for ind in range(3):
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
+
+    def test_feature_goldstein(self):
+        import numpy as np
+
+        import openmdao.api as om
+        from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStatesArrays
+
+        top = om.Problem()
+        top.model.add_subsystem('px', om.IndepVarComp('x', np.ones((3, 1))))
+        top.model.add_subsystem('comp', ImplCompTwoStatesArrays())
+        top.model.connect('px.x', 'comp.x')
+
+        top.model.nonlinear_solver = om.NewtonSolver()
+        top.model.nonlinear_solver.options['maxiter'] = 10
+        top.model.linear_solver = om.ScipyKrylov()
+
+        ls = top.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.options['method'] = 'Goldstein'
+
+        top.setup()
+
+        # Test lower bounds: should go to the lower bound and stall
+        top['px.x'] = 2.0
+        top['comp.y'] = 0.
+        top['comp.z'] = 1.6
+        top.run_model()
+
+        for ind in range(3):
+            assert_rel_error(self, top['comp.z'][ind], [1.5], 1e-8)
 
 
 if __name__ == "__main__":
