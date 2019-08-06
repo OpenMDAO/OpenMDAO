@@ -65,6 +65,24 @@ class LinesearchSolver(NonlinearSolver):
         # Parent solver sets this to control whether to solve subsystems.
         self._do_subsolve = False
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super(LinesearchSolver, self)._declare_options()
+        opt = self.options
+        opt.declare(
+            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
+            desc="If this is set to 'vector', the entire vector is backtracked together " +
+                 "when a bound is violated. If this is set to 'scalar', only the violating " +
+                 "entries are set to the bound and then the backtracking occurs on the vector " +
+                 "as a whole. If this is set to 'wall', only the violating entries are set " +
+                 "to the bound, and then the backtracking follows the wall - i.e., the " +
+                 "violating entries do not change during the line search.")
+        opt.declare('print_bound_enforce', default=False,
+                    desc="Set to True to print out names and values of variables that are pulled "
+                    "back to their bounds.")
+
 
 class BoundsEnforceLS(LinesearchSolver):
     """
@@ -82,14 +100,6 @@ class BoundsEnforceLS(LinesearchSolver):
         """
         super(BoundsEnforceLS, self)._declare_options()
         opt = self.options
-        opt.declare(
-            'bound_enforcement', default='scalar', values=['vector', 'scalar', 'wall'],
-            desc="If this is set to 'vector', then the output vector is backtracked to the "
-            "first point where violation occured. If it is set to 'scalar' or 'wall', then only "
-            "the violated variables are backtracked to their point of violation.")
-        opt.declare('print_bound_enforce', default=False,
-                    desc="Set to True to print out names and values of variables that are pulled "
-                    "back to their bounds.")
 
         # Remove unused options from base options here, so that users
         # attempting to set them will get KeyErrors.
@@ -245,19 +255,8 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         opt.declare('c', default=0.1, lower=0.0, desc="Slope parameter for line of sufficient "
                     "decrease. The larger the step, the more decrease is required to terminate the "
                     "line search.")
-        opt.declare(
-            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
-            desc="If this is set to 'vector', the entire vector is backtracked together " +
-                 "when a bound is violated. If this is set to 'scalar', only the violating " +
-                 "entries are set to the bound and then the backtracking occurs on the vector " +
-                 "as a whole. If this is set to 'wall', only the violating entries are set " +
-                 "to the bound, and then the backtracking follows the wall - i.e., the " +
-                 "violating entries do not change during the line search.")
         opt.declare('rho', default=0.5, lower=0.0, upper=1.0, desc="Contraction factor.")
         opt.declare('alpha', default=1.0, lower=0.0, desc="Initial line search step.")
-        opt.declare('print_bound_enforce', default=False,
-                    desc="Set to True to print out names and values of variables that are pulled "
-                    "back to their bounds.")
         opt.declare('retry_on_analysis_error', default=True,
                     desc="Backtrack and retry if an AnalysisError is raised.")
         opt.declare('method', default='Armijo', values=['Armijo', 'Goldstein'],
