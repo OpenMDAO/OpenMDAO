@@ -86,7 +86,7 @@ class LinesearchSolver(NonlinearSolver):
     def _enforce_bounds(self, step, alpha):
         """
         Enforce lower/upper bounds.
-              
+
         Modifies thee vector of unknowns and th step.
 
         Parameters
@@ -178,9 +178,6 @@ class ArmijoGoldsteinLS(LinesearchSolver):
     ----------
     _analysis_error_raised : bool
         Flag is set to True if a subsystem raises an AnalysisError.
-    _do_subsolve : bool
-        Flag used by parent solver to tell the line search whether to solve subsystems while
-        backtracking.
     """
 
     SOLVER = 'LS: AG'
