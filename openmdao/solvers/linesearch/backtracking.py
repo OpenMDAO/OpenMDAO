@@ -83,6 +83,36 @@ class LinesearchSolver(NonlinearSolver):
                     desc="Set to True to print out names and values of variables that are pulled "
                     "back to their bounds.")
 
+    def _enforce_bounds(self, step, alpha):
+        """
+        Enforce lower/upper bounds.
+              
+        Modifies thee vector of unknowns and th step.
+
+        Parameters
+        ----------
+        step : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        alpha : float
+            Step size parameter.
+        """
+        system = self._system
+        options = self.options
+        u = system._outputs
+        method = options['bound_enforcement']
+        lower = system._lower_bounds
+        upper = system._upper_bounds
+
+        if options['print_bound_enforce']:
+            _print_violations(u, lower, upper)
+
+        if method == 'vector':
+            u._enforce_bounds_vector(step, alpha, lower, upper)
+        elif method == 'scalar':
+            u._enforce_bounds_scalar(step, alpha, lower, upper)
+        elif method == 'wall':
+            u._enforce_bounds_wall(step, alpha, lower, upper)
+
 
 class BoundsEnforceLS(LinesearchSolver):
     """
@@ -125,16 +155,8 @@ class BoundsEnforceLS(LinesearchSolver):
         self._norm0 = norm0
         u += du
 
-        if self.options['print_bound_enforce']:
-            _print_violations(u, system._lower_bounds, system._upper_bounds)
-
         with Recording('BoundsEnforceLS', self._iter_count, self) as rec:
-            if self.options['bound_enforcement'] == 'vector':
-                u._enforce_bounds_vector(du, 1.0, system._lower_bounds, system._upper_bounds)
-            elif self.options['bound_enforcement'] == 'scalar':
-                u._enforce_bounds_scalar(du, 1.0, system._lower_bounds, system._upper_bounds)
-            elif self.options['bound_enforcement'] == 'wall':
-                u._enforce_bounds_wall(du, 1.0, system._lower_bounds, system._upper_bounds)
+            self._enforce_bounds(step=du, alpha=1.0)
 
             self._run_apply()
             norm = self._iter_get_norm()
@@ -216,15 +238,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         # Initial step length based on the input step length parameter
         u.add_scal_vec(alpha, du)
 
-        if self.options['print_bound_enforce']:
-            _print_violations(u, system._lower_bounds, system._upper_bounds)
-
-        if self.options['bound_enforcement'] == 'vector':
-            u._enforce_bounds_vector(du, alpha, system._lower_bounds, system._upper_bounds)
-        elif self.options['bound_enforcement'] == 'scalar':
-            u._enforce_bounds_scalar(du, alpha, system._lower_bounds, system._upper_bounds)
-        elif self.options['bound_enforcement'] == 'wall':
-            u._enforce_bounds_wall(du, alpha, system._lower_bounds, system._upper_bounds)
+        self._enforce_bounds(step=du, alpha=alpha)
 
         try:
             cache = self._solver_info.save_cache()
