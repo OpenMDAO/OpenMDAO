@@ -47,47 +47,47 @@ def _qcoff5(x):
     d32 = x[2] - x[1]
     d21 = x[1] - x[0]
     d31 = x[2] - x[0]
-    b[0, 0] = 1.e0
-    b[1, 0] = -el*(d31+d21)/(d31*d21)
-    b[1, 1] = el*d31/(d32*d21)
-    b[1, 2] = -el*d21/(d31*d32)
-    b[2, 0] = 2.e0*el*el/(d21*d31)
-    b[2, 1] = -2.e0*el*el/(d32*d21)
-    b[2, 2] = 2.e0*el*el/(d32*d31)
-    b[3, 1] = 1.e0
-    b[4, 0] = -el*d32/(d21*d31)
-    b[4, 1] = el*(d32-d21)/(d32*d21)
-    b[4, 2] = el*d21/(d31*d32)
+    b[0, 0] = 1.0
+    b[1, 0] = -el * (d31 + d21) / (d31 * d21)
+    b[1, 1] = el * d31 / (d32 * d21)
+    b[1, 2] = -el * d21 / (d31 * d32)
+    b[2, 0] = 2.0 * el * el / (d21 * d31)
+    b[2, 1] = -2.0 * el * el / (d32 * d21)
+    b[2, 2] = 2.0 * el * el / (d32 * d31)
+    b[3, 1] = 1.0
+    b[4, 0] = -el * d32 / (d21 * d31)
+    b[4, 1] = el * (d32 - d21) / (d32 * d21)
+    b[4, 2] = el * d21 / (d31 * d32)
     b[5, 0] = b[2, 0]
     b[5, 1] = b[2, 1]
     b[5, 2] = b[2, 2]
     a[0, ...] = np.dot(C, b)
 
     for k in range(3, n):
-        el =.5 * (x[k-1]-x[k-2])
+        el =.5 * (x[k - 1] - x[k - 2])
         b[:] = 0.0
-        d21 = x[k-2]-x[k-3]
-        d31 = x[k-1]-x[k-3]
-        d32 = x[k-1]-x[k-2]
-        d42 = x[k]-x[k-2]
-        d43 = x[k]-x[k-1]
-        b[0, 1] = 1.e0
-        b[1, 0] = -el*d32/(d21*d31)
-        b[1, 1] = el*(d32-d21)/(d32*d21)
-        b[1, 2] = el*d21/(d31*d32)
-        b[3, 2] = 1.e0
-        b[4, 1] = -el*d43/(d32*d42)
-        b[4, 2] = el*(d43-d32)/(d43*d32)
-        b[4, 3] = el*d32/(d42*d43)
+        d21 = x[k - 2] - x[k - 3]
+        d31 = x[k - 1] - x[k - 3]
+        d32 = x[k - 1] - x[k - 2]
+        d42 = x[k] - x[k - 2]
+        d43 = x[k] - x[k - 1]
+        b[0, 1] = 1.0
+        b[1, 0] = -el * d32 / (d21 * d31)
+        b[1, 1] = el * (d32 - d21) / (d32 * d21)
+        b[1, 2] = el * d21 / (d31 * d32)
+        b[3, 2] = 1.0
+        b[4, 1] = -el * d43 / (d32 * d42)
+        b[4, 2] = el * (d43 - d32) / (d43 * d32)
+        b[4, 3] = el * d32 / (d42 * d43)
 
         # Second derivative stuff
-        b[2, 0] = el*el*2.e0/(d21*d31)
-        b[2, 1] = -el*el*2.e0/(d32*d21)
-        b[2, 2] = el*el*2.e0/(d31*d32)
-        b[5, 1] = el*el*2.e0/(d32*d42)
-        b[5, 2] = -el*el*2.e0/(d43*d32)
-        b[5, 3] = el*el*2.e0/(d42*d43)
-        a[k-2, ...] = np.dot(C, b)
+        b[2, 0] = el * el * 2.0 / (d21 * d31)
+        b[2, 1] = -el * el * 2.0 / (d32 * d21)
+        b[2, 2] = el * el * 2.0 / (d31 * d32)
+        b[5, 1] = el * el * 2.0 / (d32 * d42)
+        b[5, 2] = -el * el * 2.0 / (d43 * d32)
+        b[5, 3] = el * el * 2.0 / (d42 * d43)
+        a[k - 2, ...] = np.dot(C, b)
 
     # Last interval is quadratic
     el = 0.5 * (x[n-1] - x[n-2])
@@ -96,16 +96,16 @@ def _qcoff5(x):
     d42 = x[n-1] - x[n-3]
     d43 = x[n-1] - x[n-2]
     b[0, 2] = 1.0
-    b[1, 1] = -el*d43/(d32*d42)
-    b[1, 2] = el*(d43-d32)/(d43*d32)
-    b[1, 3] = el*d32/(d42*d43)
+    b[1, 1] = -el * d43 / (d32 * d42)
+    b[1, 2] = el * (d43 - d32) / (d43 * d32)
+    b[1, 3] = el * d32 / (d42 * d43)
     b[3, 3] = 1.0
-    b[4, 1] = el*d43/(d32*d42)
-    b[4, 2] = -el*d42/(d43*d32)
-    b[4, 3] = el*(d43+d42)/(d43*d42)
-    b[2, 1] = 2.0*el*el/(d32*d42)
-    b[2, 2] = -2.0*el*el/(d43*d32)
-    b[2, 3] = 2.0*el*el/(d42*d43)
+    b[4, 1] = el * d43 / (d32 * d42)
+    b[4, 2] = -el * d42 / (d43 * d32)
+    b[4, 3] = el * (d43 + d42) / (d43 * d42)
+    b[2, 1] = 2.0 * el * el / (d32 * d42)
+    b[2, 2] = -2.0 * el * el / (d43 * d32)
+    b[2, 3] = 2.0 * el * el / (d42 * d43)
     b[5, 1] = b[2, 1]
     b[5, 2] = b[2, 2]
     b[5, 3] = b[2, 3]
@@ -133,53 +133,53 @@ def _qcoff3(x):
     a = np.zeros(shape=(n, 6, 4))
 
     # 1st interval is quadratic
-    el = 0.5 * (x[1]-x[0])
-    d32=x[2]-x[1]
-    d21=x[1]-x[0]
-    d31=x[2]-x[0]
-    b[0,0]=1.e0
-    b[1,0]=-el*(d31+d21)/(d31*d21)
-    b[1,1]= el*d31/(d32*d21)
-    b[1,2]=-el*d21/(d31*d32)
-    b[2,0]= 2.e0*el*el/(d21*d31)
-    b[2,1]=-2.e0*el*el/(d32*d21)
-    b[2,2]= 2.e0*el*el/(d32*d31)
-    b[3,1]=1.e0
-    b[4,0]=-el*d32/(d21*d31)
-    b[4,1]= el*(d32-d21)/(d32*d21)
-    b[4,2]= el*d21/(d31*d32)
-    b[5,0]= b[2,0]
-    b[5,1]= b[2,1]
-    b[5,2]= b[2,2]
+    el = 0.5 * (x[1] - x[0])
+    d32 = x[2] - x[1]
+    d21 = x[1] - x[0]
+    d31 = x[2] - x[0]
+    b[0, 0] = 1.0
+    b[1, 0] = -el * (d31 + d21) / (d31 * d21)
+    b[1, 1] =  el * d31 / (d32 * d21)
+    b[1, 2] = -el * d21 / (d31 * d32)
+    b[2, 0] =  2.0 * el * el / (d21 * d31)
+    b[2, 1] = -2.0 * el * el / (d32 * d21)
+    b[2, 2] =  2.0 * el * el / (d32 * d31)
+    b[3, 1] = 1.0
+    b[4, 0] = -el * d32 / (d21 * d31)
+    b[4, 1] =  el * (d32 - d21) / (d32 * d21)
+    b[4, 2] =  el * d21 / (d31 * d32)
+    b[5, 0] =  b[2, 0]
+    b[5, 1] =  b[2, 1]
+    b[5, 2] =  b[2, 2]
     a[0, ...] = np.dot(C, b)
 
     for k in range(3,n):
-        el=.5 * (x[k-1]-x[k-2])
-        b= b * 0.0
-        d21=x[k-2]-x[k-3]
-        d31=x[k-1]-x[k-3]
-        d32=x[k-1]-x[k-2]
-        d42=x[k]-x[k-2]
-        d43=x[k]-x[k-1]
-        b[0,1]= 1.e0
-        b[1,0]=-el*d32/(d21*d31)
-        b[1,1]= el*(d32-d21)/(d32*d21)
-        b[1,2]= el*d21/(d31*d32)
-        b[3,2]= 1.e0
-        b[4,1]=-el*d43/(d32*d42)
-        b[4,2]= el*(d43-d32)/(d43*d32)
-        b[4,3]= el*d32/(d42*d43)
+        el = .5 * (x[k - 1] - x[k - 2])
+        b = b * 0.0
+        d21 = x[k - 2] - x[k - 3]
+        d31 = x[k - 1] - x[k - 3]
+        d32 = x[k - 1] - x[k - 2]
+        d42 = x[k] - x[k - 2]
+        d43 = x[k] - x[k - 1]
+        b[0, 1] = 1.0
+        b[1, 0] = -el * d32 / (d21 * d31)
+        b[1, 1] = el * (d32 - d21) / (d32 * d21)
+        b[1, 2] = el * d21 / (d31 * d32)
+        b[3, 2] = 1.0
+        b[4, 1] = -el * d43 / (d32 * d42)
+        b[4, 2] = el * (d43 - d32) / (d43 * d32)
+        b[4, 3] = el * d32 / (d42 * d43)
 
         # Second derivative stuff
-        b[2,0]=      el*(-4.0*b[1,0]-2.0*b[4,0])/d32
-        b[2,1]=-el*el*6.0/(d32*d32)+el*(-4.0*b[1,1]-2.0*b[4,1])/d32
-        b[2,2]= el*el*6.0/(d32*d32)+el*(-4.0*b[1,2]-2.0*b[4,2])/d32
-        b[2,3]=      el*(-4.0*b[1,3]-2.0*b[4,3])/d32
-        b[5,0]=      el*(2.0*b[1,0]+4.0*b[4,0])/d32
-        b[5,1]= el*el*6.0/(d32*d32)+el*(2.0*b[1,1]+4.0*b[4,1])/d32
-        b[5,2]=-el*el*6.0/(d32*d32)+el*(2.0*b[1,2]+4.0*b[4,2])/d32
-        b[5,3]=      el*(2.0*b[1,3]+4.0*b[4,3])/d32
-        a[k-2, ...] = np.dot(C, b)
+        b[2, 0] =      el * (-4.0 * b[1, 0]-2.0 * b[4, 0]) / d32
+        b[2, 1] = -el * el * 6.0 / (d32 * d32) + el * (-4.0 * b[1, 1] -2.0 * b[4, 1]) / d32
+        b[2, 2] = el * el * 6.0 / (d32 * d32) + el * (-4.0 * b[1, 2] -2.0 * b[4, 2]) / d32
+        b[2, 3] =      el * (-4.0 * b[1, 3]-2.0 * b[4, 3]) / d32
+        b[5, 0] =      el * (2.0 * b[1, 0]+4.0 * b[4, 0]) / d32
+        b[5, 1] = el * el * 6.0 / (d32 * d32) + el * (2.0 * b[1, 1] +4.0 * b[4, 1]) / d32
+        b[5, 2] = -el * el * 6.0 / (d32 * d32) + el * (2.0 * b[1, 2] +4.0 * b[4, 2]) / d32
+        b[5, 3] =      el * (2.0 * b[1, 3]+4.0 * b[4, 3]) / d32
+        a[k - 2, ...] = np.dot(C, b)
 
     # Last interval is quadratic
     el = 0.5 * (x[n-1] - x[n-2])
@@ -187,20 +187,20 @@ def _qcoff3(x):
     d32 = x[n-2] - x[n-3]
     d42 = x[n-1] - x[n-3]
     d43 = x[n-1] - x[n-2]
-    b[0,2]= 1.0
-    b[1,1]=-el*d43/(d32*d42)
-    b[1,2]= el*(d43-d32)/(d43*d32)
-    b[1,3]= el*d32/(d42*d43)
-    b[3,3]= 1.0
-    b[4,1]= el*d43/(d32*d42)
-    b[4,2]=-el*d42/(d43*d32)
-    b[4,3]= el*(d43+d42)/(d43*d42)
-    b[2,1]= 2.0*el*el/(d32*d42)
-    b[2,2]=-2.0*el*el/(d43*d32)
-    b[2,3]= 2.0*el*el/(d42*d43)
-    b[5,1]=b[2,1]
-    b[5,2]=b[2,2]
-    b[5,3]=b[2,3]
+    b[0, 2] = 1.0
+    b[1, 1] = -el * d43 / (d32 * d42)
+    b[1, 2] = el * (d43 - d32) / (d43 * d32)
+    b[1, 3] = el * d32 / (d42 * d43)
+    b[3, 3] = 1.0
+    b[4, 1] = el * d43 / (d32 * d42)
+    b[4, 2] = -el * d42 / (d43 * d32)
+    b[4, 3] = el * (d43 + d42) / (d43 * d42)
+    b[2, 1] = 2.0 * el * el / (d32 * d42)
+    b[2, 2] = -2.0 * el * el / (d43 * d32)
+    b[2, 3] = 2.0 * el * el / (d42 * d43)
+    b[5, 1] = b[2, 1]
+    b[5, 2] = b[2, 2]
+    b[5, 3] = b[2, 3]
     a[n-2, ...] = np.dot(C, b)
     return a
 
@@ -296,13 +296,13 @@ def _qcoffc(x):
         b[:] = 0.0
         el =.5 * (x[k - 1] - x[k - 2])
         d21 = x[k - 2] - x[k - 3]
-        d43 = x[k] - x[k-1]
+        d43 = x[k] - x[k - 1]
         b[0, 1]= 1.0
-        b[1, 0] = -el/d21
-        b[1, 1] = el/d21
+        b[1, 0] = -el / d21
+        b[1, 1] = el / d21
         b[3, 2] = 1.0
-        b[4, 2] = -el/d43
-        b[5, 4] = el/d43
+        b[4, 2] = -el / d43
+        b[5, 4] = el / d43
         a[k - 2, ...] = np.dot(C, b)
 
         b[:] = 0.0
@@ -533,10 +533,11 @@ class OtisGridInterp(GridInterpBase):
 
     def gradient(self, xi, order=None):
         """
-        Return the computed gradients at the specified point.
+        Compute the gradients at the specified point.
 
         The gradients are computed as the interpolation itself is performed,
         but are cached and returned separately by this method.
+
         Parameters
         ----------
         xi : ndarray of shape (..., ndim)
@@ -556,24 +557,27 @@ class OtisGridInterp(GridInterpBase):
 
     def q_r_evl(self, x_data, coeffs, f_data, x_new):
         """
-        Does a 2D quintic spline interpolation.
-        The spline coefficients a are generated by the qcoff routines.
+        Perform a 2D quintic spline interpolation.
 
-        x_data: A list of arrays of values for independent variables at which the points to be
-            interpolated are defined.
+        The spline coefficients a are generated by the _qcoff routines. This method is recursive.
 
-        coeffs: A list of arrays of quintic coefficient dependencies for the first independent variable.  This
-           array should have been generated by a qcoff routine.
+        Parameters
+        ----------
+        x_data : list(ndarray)
+            Values for independent variables at which the point to be interpolated is defined.
+        coeffs : list(ndarray)
+            Quintic coefficient dependencies for the first independent variable.  This array was
+            generated by an _qcoff routine.
+        f_data : ndarray
+            The values to be interpolated. Should be multidimensional based on number of
+            independent variables.
+        x_new:  ndarray
+            The independent value at the which interpolation is desired.
 
-        f_data: The values to be interpolated.  Z should be sized len(x1) x len(x2) x len(x3) x len(x4) x nf.
-           It is reshaped locally.
-
-        x_new:  The value at the first independent variable at which interpolation is desired.
-
-        Returns:
-
-        f:  If y is a 1D array, f is the interpolated value at h
-            If y is a 2D array, f is an array of the interpolated value of each function at h
+        Returns
+        -------
+        ndarray
+            Dependent value interpolated at x_new.
         """
         lengths = [len(item) for item in x_data]
         nl = len(lengths)
@@ -628,7 +632,7 @@ class OtisGridInterp(GridInterpBase):
             else:
                 e, de_dx = self.q_r_evl(x_data[:-1], coeffs[:-1], f_rs[..., k1:k1 + nk, l],
                                         x_new[:-1])
-            val, dval_dx = self.qs1evl(x_data[-1][k1:k1+nk], coef_flat, e, de_dx, x_new[-1], ins)
+            val, dval_dx = self.qs1evl(x_data[-1][k1:k1 + nk], coef_flat, e, de_dx, x_new[-1], ins)
             f[l] = val
             df_dx[l, :] = dval_dx.flatten()
 
@@ -636,16 +640,19 @@ class OtisGridInterp(GridInterpBase):
 
     def insrch(self, xt, x):
         """
-        Inputs:
-           xt : A 1D array of independent variable values, monotonically increasing
+        Find the interval on which x lies.
 
-           x  : A floating point value
-        Returns:
-           k : The interval of xt in which x lies
+        Parameters
+        ----------
+        xt : ndarray
+            Independent variable values, monotonically increasing
+        x : float
+            Value for which the interval is desired.
 
-           k = 0 : x < xt[0]
-           k = i : xt[k] <= x < xt[k+1]
-           k = len(x)-1: xt[-1] <= x
+        Returns
+        -------
+           int
+              The interval of xt in which x lies.
         """
         lxt = len(xt)
 
@@ -657,15 +664,15 @@ class OtisGridInterp(GridInterpBase):
         ilo = 0
         ihi = lxt - 2
 
-        k=ilo+int((x-xt[ilo])*(ihi-ilo)/(xt[ihi+1]-xt[ilo]))
+        k=ilo+int((x - xt[ilo]) * (ihi - ilo) / (xt[ihi + 1] - xt[ilo]))
 
         if k<0 or k>=lxt:
             raise ValueError("Big Trouble in insrch")
 
         # Interval is to the left
-        if x <= xt[k+1]:
+        if x <= xt[k + 1]:
             ig = int(k)
-            for i in range(ig,-1,-1):
+            for i in range(ig, -1, -1):
                 k = i
                 if x > xt[k]:
                     return k
@@ -673,9 +680,9 @@ class OtisGridInterp(GridInterpBase):
         # Interval is to the right
         else:
             ig = k+1
-            for i in range(ig,lxt-1):
+            for i in range(ig, lxt - 1):
                 k = i
-                if x < xt[k+1]:
+                if x < xt[k + 1]:
                     return k
 
         raise ValueError("insrch failed to find interval")
@@ -683,24 +690,25 @@ class OtisGridInterp(GridInterpBase):
     def q1evl(self, x, a, y, h):
         """
         Does a 1D quintic spline interpolation of values defined by the arrays x and y.
-        The spline coefficients a are generated by the qcoff routines.
+        The spline coefficients a are generated by the _qcoff routines.
 
-        Arguments:
+        Parameters
+        ----------
+        x : ndarray
+            Values for independent variables at which the point to be interpolated is defined.
+        a : ndarray
+            An array of quintic coefficients for each interval of function values.
+        y : ndarray
+            The values to be interpolated.
+        h:  float
+            The independent value at the which interpolation is desired.
 
-        x:  An array of monotonically increasing values of the independent variable
-
-        a:  An array of quintic coefficients for each interval of function values
-
-        y:  An array of values at the points in the x array to be interpolated.
-            y is of dimension n x m where n is the length of x and m is the number
-            of functions to be interpolated
-
-        h:  The independent variable value at which interpolation is desired
-
-        Returns:
-
-        f - If y is a 1D array, f is the interpolated value at h
-            If y is a 2D array, f is an array of the interpolated value of each function at h
+        Returns
+        -------
+        float
+            Dependent value interpolated at h.
+        ndarray
+            Gradient of interpolated value with respect to independent h.
         """
 
         n = len(x)
@@ -722,13 +730,13 @@ class OtisGridInterp(GridInterpBase):
         if interval <= 0:
             interval = 0
             inshft = 1
-        elif interval >= n-2:
-            interval = n-2
+        elif interval >= n - 2:
+            interval = n - 2
             inshft = -1
 
         # Normalize the interval from -1 to 1
-        eli = 2.0 / (x[interval+1] - x[interval])
-        t = eli * (h - 0.5 * (x[interval+1]+x[interval]))
+        eli = 2.0 / (x[interval + 1] - x[interval])
+        t = eli * (h - 0.5 * (x[interval + 1] + x[interval]))
         k1 = interval - 1 + inshft
         k2 = min(k1+3, n) + 1
 
@@ -741,7 +749,7 @@ class OtisGridInterp(GridInterpBase):
                     sk[nterm] = y[k, j]
 
             e = np.einsum('ij,j->i', a[interval, ...], sk)
-            f[j] = e[0] + t*(e[1] + t*(e[2] + t*(e[3] + t*(e[4] + t*e[5]))))
+            f[j] = e[0] + t * (e[1] + t * (e[2] + t * (e[3] + t * (e[4] + t * e[5]))))
             df_dh[j] = eli * (e[1] + 2 * t * (e[2] + 3 * t * (e[3] + 4 * t *(e[4] + 5 * t *e[5]))))
 
         return f, df_dh
@@ -751,17 +759,23 @@ class OtisGridInterp(GridInterpBase):
         This is a special version of q1evl that does only 4 points and does not require an interval
         search.
 
-        x:  An array of monotonically increasing values of the independent variable
+        Parameters
+        ----------
+        x : ndarray
+            Values for independent variables at which the point to be interpolated is defined.
+        a : ndarray
+            An array of quintic coefficients for each interval of function values.
+        y : ndarray
+            The values to be interpolated.
+        h:  float
+            The independent value at the which interpolation is desired.
 
-        a:  An array of quintic coefficients for each interval of function values
-
-        y:  An array of values at the points in the x array to be interpolated
-
-        dy_dhh:  Derivative of points with respect to other independent variables.
-
-        h:  The independent variable value at which interpolation is desired
-
-        interval:  The interval on which h lies
+        Returns
+        -------
+        float
+            Dependent value interpolated at h.
+        ndarray
+            Gradient of interpolated value with respect to independent h.
         """
         n = len(x)
 
