@@ -87,7 +87,7 @@ class LinesearchSolver(NonlinearSolver):
         """
         Enforce lower/upper bounds.
 
-        Modifies thee vector of unknowns and th step.
+        Modifies the vector of unknowns and the step.
 
         Parameters
         ----------
