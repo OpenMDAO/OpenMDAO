@@ -2227,6 +2227,12 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
         assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
 
+        # Make sure check_totals cleans up after itself by running it a second time.
+        J = p.check_totals(out_stream=None)
+
+        assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fwd'][0], 17.0, 1e-5)
+        assert_rel_error(self, J[('sub.time.time', 'sub.time_extents.t_duration')]['J_fd'][0], 17.0, 1e-5)
+
     def test_vector_scaled_derivs(self):
 
         prob = om.Problem()

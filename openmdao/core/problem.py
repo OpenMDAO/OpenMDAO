@@ -1424,6 +1424,7 @@ class Problem(object):
         }
         approx = model._owns_approx_jac
         old_jac = model._jacobian
+        old_subjacs = model._subjacs_info.copy()
 
         model.approx_totals(method=method, step=step, form=form,
                             step_calc=step_calc if method is 'fd' else None)
@@ -1435,6 +1436,7 @@ class Problem(object):
         if not approx:
             model._jacobian = old_jac
             model._owns_approx_jac = False
+            model._subjacs_info = old_subjacs
 
         # Assemble and Return all metrics.
         data = {}
