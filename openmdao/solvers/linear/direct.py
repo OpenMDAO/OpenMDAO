@@ -109,7 +109,7 @@ def format_singular_csc_error(system, matrix):
     for j, name in enumerate(system._var_allprocs_abs_names['output']):
         n += varsizes[system._owning_rank[name]][j]
         if loc < n:
-            varname = system._var_abs2prom['output'][name]
+            varname = system._var_allprocs_abs2prom['output'][name]
             break
 
     msg = "Singular entry found in {} for {} associated with state/residual '{}'."

@@ -602,7 +602,7 @@ class Group(System):
                     sub_prom_name = subsys._var_abs2prom[type_][abs_name]
                     abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
 
-                allprocs_abs2prom[type_] = abs2prom[type_]
+                allprocs_abs2prom[type_].update(subsys._var_allprocs_abs2prom[type_])
 
                 # Assemble allprocs_prom2abs_list
                 for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
@@ -622,7 +622,7 @@ class Group(System):
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
-                raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list, abs2prom,
+                raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2prom,
                        allprocs_abs2meta, self._has_output_scaling, self._has_resid_scaling)
             else:
                 raw = (
@@ -641,7 +641,7 @@ class Group(System):
                 allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
-            for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, myproc_abs2prom,
+            for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, all_abs2prom, 
                  myproc_abs2meta, oscale, rscale) in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
@@ -654,7 +654,7 @@ class Group(System):
                     # Assemble in parallel allprocs_abs_names
                     allprocs_abs_names[type_].extend(myproc_abs_names[type_])
                     allprocs_discrete[type_].update(myproc_discrete[type_])
-                    allprocs_abs2prom[type_].update(myproc_abs2prom[type_])
+                    allprocs_abs2prom[type_].update(all_abs2prom[type_])
 
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
