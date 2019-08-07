@@ -18,6 +18,43 @@ from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
 
 
+def loc2error_msg(system, loc_txt, loc):
+    """
+    Given a matrix location, format a coherent error message when matrix is singular.
+
+    Parameters
+    ----------
+    system : <System>
+        System containing the Directsolver.
+    loc_txt : str
+        Either 'row' or 'col'.
+    loc : int
+        Index of row or column.
+
+    Returns
+    -------
+    str
+        New error string.
+    """
+    n = 0
+    varname = "Unknown"
+    varsizes = system._var_sizes['nonlinear']['output']
+    var_inds = system._var_allprocs_abs2idx['nonlinear']
+    for name in system._var_abs_names['output']:
+        if name in system._var_abs2meta:
+            n += varsizes[system._owning_rank[name]][var_inds[name]]
+            if loc < n:
+                varname = system._var_abs2prom['output'][name]
+                break
+
+    if varname == name:
+        names = "'{}'.".format(varname)
+    else:
+        names = "'{}' ('{}').".format(varname, name)
+    msg = "Singular entry found in {} for {} associated with state/residual " + names
+    return msg.format(system.msginfo, loc_txt)
+
+
 def format_singular_error(err, system, mtx):
     """
     Format a coherent error message when the matrix is singular.
@@ -54,21 +91,7 @@ def format_singular_error(err, system, mtx):
     else:
         loc_txt = "column"
 
-    n = 0
-    varname = "Unknown"
-    varsizes = system._var_sizes['nonlinear']['output']
-    for j, name in enumerate(system._var_allprocs_abs_names['output']):
-        n += varsizes[system._owning_rank[name]][j]
-        if loc < n:
-            varname = system._var_allprocs_abs2prom['output'][name]
-            break
-
-    if varname == name:
-        names = "'{}'.".format(varname)
-    else:
-        names = "'{}' ('{}').".format(varname, name)
-    msg = "Singular entry found in {} for {} associated with state/residual " + names
-    return msg.format(system.msginfo, loc_txt)
+    return loc2error_msg(system, loc_txt, loc)
 
 
 def format_singular_csc_error(system, matrix):
@@ -107,21 +130,7 @@ def format_singular_csc_error(system, matrix):
         loc_txt = "column"
         loc = zero_cols[0]
 
-    n = 0
-    varname = "Unknown"
-    varsizes = system._var_sizes['nonlinear']['output']
-    for j, name in enumerate(system._var_allprocs_abs_names['output']):
-        n += varsizes[system._owning_rank[name]][j]
-        if loc < n:
-            varname = system._var_allprocs_abs2prom['output'][name]
-            break
-
-    if varname == name:
-        names = "'{}'.".format(varname)
-    else:
-        names = "'{}' ('{}').".format(varname, name)
-    msg = "Singular entry found in {} for {} associated with state/residual " + names
-    return msg.format(system.msginfo, loc_txt)
+    return loc2error_msg(system, loc_txt, loc)
 
 
 def format_nan_error(system, matrix):
