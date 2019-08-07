@@ -22,11 +22,11 @@ def _print_violations(unknowns, lower, upper):
 
     Parameters
     ----------
-    unknowns : Vector
+    unknowns : <Vector>
         Vector containing the unknowns.
-    lower : Vector
+    lower : <Vector>
         Vector containing the lower bounds.
-    upper : Vector
+    upper : <Vector>
         Vector containing the upper bounds.
     """
     for name, val in iteritems(unknowns._views_flat):
@@ -65,6 +65,54 @@ class LinesearchSolver(NonlinearSolver):
         # Parent solver sets this to control whether to solve subsystems.
         self._do_subsolve = False
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super(LinesearchSolver, self)._declare_options()
+        opt = self.options
+        opt.declare(
+            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
+            desc="If this is set to 'vector', the entire vector is backtracked together " +
+                 "when a bound is violated. If this is set to 'scalar', only the violating " +
+                 "entries are set to the bound and then the backtracking occurs on the vector " +
+                 "as a whole. If this is set to 'wall', only the violating entries are set " +
+                 "to the bound, and then the backtracking follows the wall - i.e., the " +
+                 "violating entries do not change during the line search.")
+        opt.declare('print_bound_enforce', default=False,
+                    desc="Set to True to print out names and values of variables that are pulled "
+                    "back to their bounds.")
+
+    def _enforce_bounds(self, step, alpha):
+        """
+        Enforce lower/upper bounds.
+
+        Modifies the vector of unknowns and the step.
+
+        Parameters
+        ----------
+        step : <Vector>
+            Newton step; the backtracking is applied to this vector in-place.
+        alpha : float
+            Step size parameter.
+        """
+        system = self._system
+        options = self.options
+        u = system._outputs
+        method = options['bound_enforcement']
+        lower = system._lower_bounds
+        upper = system._upper_bounds
+
+        if options['print_bound_enforce']:
+            _print_violations(u, lower, upper)
+
+        if method == 'vector':
+            u._enforce_bounds_vector(step, alpha, lower, upper)
+        elif method == 'scalar':
+            u._enforce_bounds_scalar(step, alpha, lower, upper)
+        elif method == 'wall':
+            u._enforce_bounds_wall(step, alpha, lower, upper)
+
 
 class BoundsEnforceLS(LinesearchSolver):
     """
@@ -82,14 +130,6 @@ class BoundsEnforceLS(LinesearchSolver):
         """
         super(BoundsEnforceLS, self)._declare_options()
         opt = self.options
-        opt.declare(
-            'bound_enforcement', default='scalar', values=['vector', 'scalar', 'wall'],
-            desc="If this is set to 'vector', then the output vector is backtracked to the "
-            "first point where violation occured. If it is set to 'scalar' or 'wall', then only "
-            "the violated variables are backtracked to their point of violation.")
-        opt.declare('print_bound_enforce', default=False,
-                    desc="Set to True to print out names and values of variables that are pulled "
-                    "back to their bounds.")
 
         # Remove unused options from base options here, so that users
         # attempting to set them will get KeyErrors.
@@ -115,16 +155,8 @@ class BoundsEnforceLS(LinesearchSolver):
         self._norm0 = norm0
         u += du
 
-        if self.options['print_bound_enforce']:
-            _print_violations(u, system._lower_bounds, system._upper_bounds)
-
         with Recording('BoundsEnforceLS', self._iter_count, self) as rec:
-            if self.options['bound_enforcement'] == 'vector':
-                u._enforce_bounds_vector(du, 1.0, system._lower_bounds, system._upper_bounds)
-            elif self.options['bound_enforcement'] == 'scalar':
-                u._enforce_bounds_scalar(du, 1.0, system._lower_bounds, system._upper_bounds)
-            elif self.options['bound_enforcement'] == 'wall':
-                u._enforce_bounds_wall(du, 1.0, system._lower_bounds, system._upper_bounds)
+            self._enforce_bounds(step=du, alpha=1.0)
 
             self._run_apply()
             norm = self._iter_get_norm()
@@ -146,9 +178,6 @@ class ArmijoGoldsteinLS(LinesearchSolver):
     ----------
     _analysis_error_raised : bool
         Flag is set to True if a subsystem raises an AnalysisError.
-    _do_subsolve : bool
-        Flag used by parent solver to tell the line search whether to solve subsystems while
-        backtracking.
     """
 
     SOLVER = 'LS: AG'
@@ -206,15 +235,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         # Initial step length based on the input step length parameter
         u.add_scal_vec(alpha, du)
 
-        if self.options['print_bound_enforce']:
-            _print_violations(u, system._lower_bounds, system._upper_bounds)
-
-        if self.options['bound_enforcement'] == 'vector':
-            u._enforce_bounds_vector(du, alpha, system._lower_bounds, system._upper_bounds)
-        elif self.options['bound_enforcement'] == 'scalar':
-            u._enforce_bounds_scalar(du, alpha, system._lower_bounds, system._upper_bounds)
-        elif self.options['bound_enforcement'] == 'wall':
-            u._enforce_bounds_wall(du, alpha, system._lower_bounds, system._upper_bounds)
+        self._enforce_bounds(step=du, alpha=alpha)
 
         try:
             cache = self._solver_info.save_cache()
@@ -245,19 +266,8 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         opt.declare('c', default=0.1, lower=0.0, desc="Slope parameter for line of sufficient "
                     "decrease. The larger the step, the more decrease is required to terminate the "
                     "line search.")
-        opt.declare(
-            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
-            desc="If this is set to 'vector', the entire vector is backtracked together " +
-                 "when a bound is violated. If this is set to 'scalar', only the violating " +
-                 "entries are set to the bound and then the backtracking occurs on the vector " +
-                 "as a whole. If this is set to 'wall', only the violating entries are set " +
-                 "to the bound, and then the backtracking follows the wall - i.e., the " +
-                 "violating entries do not change during the line search.")
         opt.declare('rho', default=0.5, lower=0.0, upper=1.0, desc="Contraction factor.")
         opt.declare('alpha', default=1.0, lower=0.0, desc="Initial line search step.")
-        opt.declare('print_bound_enforce', default=False,
-                    desc="Set to True to print out names and values of variables that are pulled "
-                    "back to their bounds.")
         opt.declare('retry_on_analysis_error', default=True,
                     desc="Backtrack and retry if an AnalysisError is raised.")
         opt.declare('method', default='Armijo', values=['Armijo', 'Goldstein'],
@@ -346,7 +356,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
         system = self._system
         u = system._outputs
-        du = system._vectors['output']['linear']
+        du = system._vectors['output']['linear']  # Newton step
 
         self._iter_count = 0
         phi = self._iter_initialize()
