@@ -60,11 +60,15 @@ def format_singular_error(err, system, mtx):
     for j, name in enumerate(system._var_allprocs_abs_names['output']):
         n += varsizes[system._owning_rank[name]][j]
         if loc < n:
-            varname = system._var_abs2prom['output'][name]
+            varname = system._var_allprocs_abs2prom['output'][name]
             break
 
-    msg = "Singular entry found in {} for {} associated with state/residual '{}'."
-    return msg.format(system.msginfo, loc_txt, varname)
+    if varname == name:
+        names = "'{}'.".format(varname)
+    else:
+        names = "'{}' ('{}').".format(varname, name)
+    msg = "Singular entry found in {} for {} associated with state/residual " + names
+    return msg.format(system.msginfo, loc_txt)
 
 
 def format_singular_csc_error(system, matrix):
@@ -112,8 +116,12 @@ def format_singular_csc_error(system, matrix):
             varname = system._var_allprocs_abs2prom['output'][name]
             break
 
-    msg = "Singular entry found in {} for {} associated with state/residual '{}'."
-    return msg.format(system.msginfo, loc_txt, varname)
+    if varname == name:
+        names = "'{}'.".format(varname)
+    else:
+        names = "'{}' ('{}').".format(varname, name)
+    msg = "Singular entry found in {} for {} associated with state/residual " + names
+    return msg.format(system.msginfo, loc_txt)
 
 
 def format_nan_error(system, matrix):

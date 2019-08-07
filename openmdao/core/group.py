@@ -598,11 +598,13 @@ class Group(System):
                                             iteritems(subsys._var_discrete[type_])})
 
                 # Assemble abs2prom
-                for abs_name in subsys._var_abs_names[type_]:
-                    sub_prom_name = subsys._var_abs2prom[type_][abs_name]
-                    abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
+                sub_loc_proms = subsys._var_abs2prom[type_]
+                sub_proms = subsys._var_allprocs_abs2prom[type_]
+                for abs_name in subsys._var_allprocs_abs_names[type_]:
+                    if abs_name in sub_loc_proms:
+                        abs2prom[type_][abs_name] = var_maps[type_][sub_loc_proms[abs_name]]
 
-                allprocs_abs2prom[type_].update(subsys._var_allprocs_abs2prom[type_])
+                    allprocs_abs2prom[type_][abs_name] = var_maps[type_][sub_proms[abs_name]]
 
                 # Assemble allprocs_prom2abs_list
                 for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
@@ -622,8 +624,9 @@ class Group(System):
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
-                raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2prom,
-                       allprocs_abs2meta, self._has_output_scaling, self._has_resid_scaling)
+                raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list,
+                       allprocs_abs2prom, allprocs_abs2meta, self._has_output_scaling,
+                       self._has_resid_scaling)
             else:
                 raw = (
                     {'input': [], 'output': []},
@@ -641,7 +644,7 @@ class Group(System):
                 allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
-            for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, all_abs2prom, 
+            for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, all_abs2prom,
                  myproc_abs2meta, oscale, rscale) in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
