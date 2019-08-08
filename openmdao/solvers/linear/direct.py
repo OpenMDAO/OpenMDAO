@@ -36,21 +36,23 @@ def loc2error_msg(system, loc_txt, loc):
     str
         New error string.
     """
-    n = 0
+    start = end = 0
     varname = "Unknown"
     varsizes = system._var_sizes['nonlinear']['output']
     var_inds = system._var_allprocs_abs2idx['nonlinear']
     for name in system._var_abs_names['output']:
         if name in system._var_abs2meta:
-            n += varsizes[system._owning_rank[name]][var_inds[name]]
-            if loc < n:
+            end += varsizes[system._owning_rank[name]][var_inds[name]]
+            if loc < end:
                 varname = system._var_abs2prom['output'][name]
                 break
+            start = end
 
     if varname == name:
-        names = "'{}'.".format(varname)
+        names = "'{}' index {}.".format(varname, loc - start)
     else:
-        names = "'{}' ('{}').".format(varname, name)
+        names = "'{}' ('{}') index {}.".format(varname, name, loc - start)
+
     msg = "Singular entry found in {} for {} associated with state/residual " + names
     return msg.format(system.msginfo, loc_txt)
 

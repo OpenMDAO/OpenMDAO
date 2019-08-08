@@ -224,7 +224,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for column associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust')."
+        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for column associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -278,7 +278,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for column associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust')."
+        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for column associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -315,7 +315,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust')."
+        expected_msg = "Singular entry found in Group (thrust_equilibrium_group) for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -505,7 +505,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in Group (<model>) for row associated with state/residual 'c5.y'."
+        expected_msg = "Singular entry found in Group (<model>) for row associated with state/residual 'c5.y' index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -535,7 +535,7 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in Group (<model>) for column associated with state/residual 'c5.y'."
+        expected_msg = "Singular entry found in Group (<model>) for column associated with state/residual 'c5.y' index 0."
 
         self.assertEqual(expected_msg, str(cm.exception))
 

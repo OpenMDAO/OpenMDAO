@@ -180,7 +180,6 @@ class COOMatrix(Matrix):
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
         if isinstance(jac, ndarray):
-            print(key, "idxs:", idxs, 'jac:', jac)
             self._matrix.data[idxs] = jac.flat
         else:  # sparse
             self._matrix.data[idxs] = jac.data
