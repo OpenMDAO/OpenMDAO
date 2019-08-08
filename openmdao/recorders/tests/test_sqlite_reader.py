@@ -2538,6 +2538,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         objs = case.get_objectives()
         cons = case.get_constraints()
         dvs = case.get_design_vars()
+        rsps = case.get_responses()
 
         # keys() will give you the promoted variable names
         self.assertEqual((sorted(objs.keys()), sorted(cons.keys()), sorted(dvs.keys())),
@@ -2550,6 +2551,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         # you can access variable values using either the promoted or the absolute name
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
         self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
+        self.assertEqual((rsps['obj'], rsps['obj_cmp.obj']), (rsps['obj_cmp.obj'], rsps['obj']))
 
         # you can also access the variables directly from the case object
         self.assertEqual((case['obj'], case['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
@@ -2786,6 +2788,42 @@ class TestFeatureSqliteReader(unittest.TestCase):
             self.assertEqual(text.count('    y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
             self.assertEqual(num_non_empty_lines, 40)
+
+    def test_feature_case_get_val(self):
+        import openmdao.api as om
+
+        # build the model
+        prob = om.Problem()
+        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', 3.0, units='inch')
+        indeps.add_output('y', -4.0, units='inch')
+
+        prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3',
+                                                           f={'units': 'inch ** 2'}
+                                                           ))
+
+        prob.model.connect('indeps.x', 'paraboloid.x')
+        prob.model.connect('indeps.y', 'paraboloid.y')
+
+        # setup the optimization
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.model.add_design_var('indeps.x', lower=-50, upper=50)
+        prob.model.add_design_var('indeps.y', lower=-50, upper=50)
+        prob.model.add_objective('paraboloid.f')
+
+        prob.setup()
+        prob.run_driver()
+
+        cr = om.CaseReader("cases.sql")
+
+        cases = cr.list_cases()
+        case = cr.get_case(cases[0])
+        assert_rel_error(self, case.get_val('indeps.x', units='ft'), 0.25, 1e-6)
+        assert_rel_error(self, case.get_val('indeps.x', units='inch'), 3.0, 1e-6)
 
 
 @use_tempdirs
