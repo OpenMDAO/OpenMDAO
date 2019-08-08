@@ -1021,8 +1021,12 @@ class Group(System):
                 self._has_input_scaling = needs_input_scaling
 
         if self._vector_class is None:
-            # our vectors are just local vectors.
-            self._vector_class = self._local_vector_class
+            if MPI is not None and self.comm.size > 1:
+                # we need a uniform norm() value for all ranks so we stay in sync
+                self._vector_class = self._distributed_vector_class
+            else:
+                # our vectors are just local vectors.
+                self._vector_class = self._local_vector_class
 
         # check compatability for any discrete connections
         for abs_in, abs_out in iteritems(self._conn_discrete_in2out):

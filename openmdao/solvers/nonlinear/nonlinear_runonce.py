@@ -46,6 +46,8 @@ class NonlinearRunOnce(NonlinearSolver):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super(NonlinearRunOnce, self)._declare_options()
+
         # Remove unused options from base options here, so that users
         #  attempting to set them will get KeyErrors.
         self.options.undeclare("atol")
