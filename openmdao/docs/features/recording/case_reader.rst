@@ -132,7 +132,15 @@ This code snippet shows how to get the first case.
     case_names = cr.list_cases()
     case = cr.get_case(case_names[0])
 
-You could also loop over all the case names and get access to the cases as shown in this example.
+You could also use the feature of :code:`get_case` where you provide an index into all the cases.
+
+.. code::
+
+    cr = om.CaseReader('cases.sql')
+    case = cr.get_case(0)
+
+
+Finally, looping over all the case names and getting access to the cases is shown in this example.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_cases

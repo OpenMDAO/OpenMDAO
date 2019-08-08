@@ -133,5 +133,6 @@ class MuxComp(ExplicitComponent):
 
         for var in self._vars:
             ax = self._vars[var]['axis']
-            vals = [inputs[self._input_names[var][i]] for i in range(vec_size)]
+            invar = self._input_names[var]
+            vals = [inputs[invar[i]] for i in range(vec_size)]
             outputs[var][...] = np.stack(vals, axis=ax)

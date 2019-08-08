@@ -55,19 +55,18 @@ The following example shows how to use these methods.
 Getting Variable Data from Case By Specifying Variable Name and Units Desired
 -----------------------------------------------------------------------------
 
-Sometimes you want to specify the units of the value of a variable from a case. The :code:`get_val`
-method is provided for that.
+You can also get variable values from a :code:`Case` like you would from a :code:`Problem` using dictionary-like access
+or, if you want the value in different units, using the :code:`get_val` method.
 
 .. automethod:: openmdao.recorders.case.Case.get_val
     :noindex:
 
-This simple example shows how to call the :code:`get_val` method.
+This example shows both methods of getting variable data by name.
 
 .. embed-code::
-    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_case_get_val
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_get_val
     :layout: interleave
-
-
+    
 Getting Derivative Data from a Case
 -----------------------------------
 

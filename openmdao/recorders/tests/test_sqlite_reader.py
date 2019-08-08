@@ -10,7 +10,8 @@ from tempfile import mkdtemp, mkstemp
 from collections import OrderedDict
 
 import numpy as np
-from six import iteritems, assertRaisesRegex
+from six import iteritems, assertRaisesRegex, StringIO
+
 
 import openmdao.api as om
 from openmdao.recorders.sqlite_recorder import format_version
@@ -23,7 +24,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
-from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler
+from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.testing_utils import use_tempdirs
 
 # check that pyoptsparse is installed
@@ -2205,6 +2206,200 @@ class TestSqliteCaseReader(unittest.TestCase):
             else:
                 self.assertEqual(case.source, 'root')
 
+    def test_case_array_list_vars_options(self):
+
+        class ArrayAdder(om.ExplicitComponent):
+            """
+            Just a simple component that has array inputs and outputs
+            """
+
+            def __init__(self, size):
+                super(ArrayAdder, self).__init__()
+                self.size = size
+
+            def setup(self):
+                self.add_input('x', val=np.zeros(self.size), units='inch')
+                self.add_output('y', val=np.zeros(self.size), units='ft')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] + 10.0
+
+        size = 100  # how many items in the array
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size), units='inch'),
+                                 promotes=['x'])
+        prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
+
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+
+        prob.model.recording_options['record_inputs'] = True
+        prob.model.recording_options['record_outputs'] = True
+        prob.model.recording_options['record_residuals'] = True
+
+        prob.setup()
+
+        prob['x'] = np.ones(size)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        system_cases = cr.list_cases()
+        case = cr.get_case(system_cases[0])
+
+        # logging inputs
+        # out_stream - not hierarchical - extras - no print_arrays
+        stream = StringIO()
+        case.list_inputs(values=True,
+                         units=True,
+                         prom_name=True,
+                         hierarchical=False,
+                         print_arrays=False,
+                         out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(1, text.count("1 Input(s) in 'model'"))
+        self.assertEqual(1, text.count('mult.x'))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(5, num_non_empty_lines)
+        self.assertEqual(1, text.count('mult.x   |10.0|  inch   x'))
+
+        # out_stream - hierarchical - extras - no print_arrays
+        stream = StringIO()
+        case.list_inputs(values=True,
+                         units=True,
+                         shape=True,
+                         hierarchical=True,
+                         print_arrays=False,
+                         out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(1, text.count("1 Input(s) in 'model'"))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(7, num_non_empty_lines)
+        self.assertEqual(1, text.count('top'))
+        self.assertEqual(1, text.count('  mult'))
+        self.assertEqual(1, text.count('    x    |10.0|  inch   (100'))
+
+        # logging outputs
+        # out_stream - not hierarchical - extras - no print_arrays
+        stream = StringIO()
+        case.list_outputs(values=True,
+                          units=True,
+                          shape=True,
+                          bounds=True,
+                          residuals=True,
+                          scaling=True,
+                          hierarchical=False,
+                          print_arrays=False,
+                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('2 Explicit Output'), 1)
+        # make sure they are in the correct order
+        # FIXME: disabled until Case orders outputs
+        # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(8, num_non_empty_lines)
+
+        # Promoted names - no print arrays
+        stream = StringIO()
+        case.list_outputs(values=True,
+                          prom_name=True,
+                          print_arrays=False,
+                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('    x       |10.0|   x'), 1)
+        self.assertEqual(text.count('    y       |110.0|  y'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 11)
+
+        # Hierarchical - no print arrays
+        stream = StringIO()
+        case.list_outputs(values=True,
+                          units=True,
+                          shape=True,
+                          bounds=True,
+                          residuals=True,
+                          scaling=True,
+                          hierarchical=True,
+                          print_arrays=False,
+                          out_stream=stream)
+        text = stream.getvalue()
+        self.assertEqual(text.count('top'), 1)
+        self.assertEqual(text.count('  des_vars'), 1)
+        self.assertEqual(text.count('    x'), 1)
+        self.assertEqual(text.count('  mult'), 1)
+        self.assertEqual(text.count('    y'), 1)
+        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+        self.assertEqual(num_non_empty_lines, 11)
+
+        # Need to explicitly set this to make sure all ways of running this test
+        #   result in the same format of the output. When running this test from the
+        #   top level via testflo, the format comes out different than if the test is
+        #   run individually
+        opts = {
+            'edgeitems': 3,
+            'infstr': 'inf',
+            'linewidth': 75,
+            'nanstr': 'nan',
+            'precision': 8,
+            'suppress': False,
+            'threshold': 1000,
+        }
+
+        from distutils.version import LooseVersion
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            opts['legacy'] = '1.13'
+
+        with printoptions(**opts):
+            # logging outputs
+            # out_stream - not hierarchical - extras - print_arrays
+            stream = StringIO()
+            case.list_outputs(values=True,
+                              units=True,
+                              shape=True,
+                              bounds=True,
+                              residuals=True,
+                              scaling=True,
+                              hierarchical=False,
+                              print_arrays=True,
+                              out_stream=stream)
+            text = stream.getvalue()
+            self.assertEqual(text.count('2 Explicit Output'), 1)
+            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('resids:'), 2)
+            self.assertEqual(text.count('['), 4)
+            # make sure they are in the correct order
+            # FIXME: disabled until Case orders outputs
+            # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
+            num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+            self.assertEqual(46, num_non_empty_lines)
+
+            # Hierarchical
+            stream = StringIO()
+            case.list_outputs(values=True,
+                              units=True,
+                              shape=True,
+                              bounds=True,
+                              residuals=True,
+                              scaling=True,
+                              hierarchical=True,
+                              print_arrays=True,
+                              out_stream=stream)
+            text = stream.getvalue()
+            self.assertEqual(text.count('2 Explicit Output'), 1)
+            self.assertEqual(text.count('value:'), 2)
+            self.assertEqual(text.count('resids:'), 2)
+            self.assertEqual(text.count('['), 4)
+            self.assertEqual(text.count('top'), 1)
+            self.assertEqual(text.count('  des_vars'), 1)
+            self.assertEqual(text.count('    x'), 1)
+            self.assertEqual(text.count('  mult'), 1)
+            self.assertEqual(text.count('    y'), 1)
+            num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
+            self.assertEqual(num_non_empty_lines, 49)
+
 
 @use_tempdirs
 class TestFeatureSqliteReader(unittest.TestCase):
@@ -2592,238 +2787,34 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         assert_rel_error(self, case_outputs[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
 
-    def test_case_array_list_vars_options(self):
+    def test_feature_get_val(self):
         import openmdao.api as om
-        from six.moves import cStringIO
-        from openmdao.utils.general_utils import printoptions
 
-        class ArrayAdder(om.ExplicitComponent):
-            """
-            Just a simple component that has array inputs and outputs
-            """
+        model = om.Group()
+        model.add_recorder(om.SqliteRecorder('cases.sql'))
 
-            def __init__(self, size):
-                super(ArrayAdder, self).__init__()
-                self.size = size
+        indep = om.IndepVarComp()
+        indep.add_output('x', val=100., units='m')
+        indep.add_output('t', val=60., units='s')
 
-            def setup(self):
-                self.add_input('x', val=np.zeros(self.size), units='inch')
-                self.add_output('y', val=np.zeros(self.size), units='ft')
+        speed = om.ExecComp('v=x/t', x={'units': 'm'}, t={'units': 's'}, v={'units': 'm/s'})
 
-            def compute(self, inputs, outputs):
-                outputs['y'] = inputs['x'] + 10.0
+        model.add_subsystem('indep', indep, promotes=['x', 't'])
+        model.add_subsystem('speed', speed, promotes=['x', 't', 'v'])
 
-        size = 100  # how many items in the array
-
-        prob = om.Problem()
-
-        prob.model.add_subsystem('des_vars', om.IndepVarComp('x', np.ones(size), units='inch'),
-                                 promotes=['x'])
-        prob.model.add_subsystem('mult', ArrayAdder(size), promotes=['x', 'y'])
-
-        recorder = om.SqliteRecorder("cases.sql")
-        prob.model.add_recorder(recorder)
-
-        prob.model.recording_options['record_inputs'] = True
-        prob.model.recording_options['record_outputs'] = True
-        prob.model.recording_options['record_residuals'] = True
-
+        prob = om.Problem(model)
         prob.setup()
-
-        prob['x'] = np.ones(size)
-
-        prob.run_driver()
+        prob.run_model()
         prob.cleanup()
 
-        cr = om.CaseReader("cases.sql")
-        system_cases = cr.list_cases()
-        case = cr.get_case(system_cases[0])
+        cr = om.CaseReader('cases.sql')
+        case = cr.get_case(0)
 
-        # logging inputs
-        # out_stream - not hierarchical - extras - no print_arrays
-        stream = cStringIO()
-        case.list_inputs(values=True,
-                         units=True,
-                         prom_name=True,
-                         hierarchical=False,
-                         print_arrays=False,
-                         out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(1, text.count("1 Input(s) in 'model'"))
-        self.assertEqual(1, text.count('mult.x'))
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(5, num_non_empty_lines)
-        self.assertEqual(1, text.count('mult.x   |10.0|  inch   x'))
+        assert_rel_error(self, case['x'], 100., 1e-6)
+        assert_rel_error(self, case.get_val('x', units='ft'), 328.0839895, 1e-6)
 
-        # out_stream - hierarchical - extras - no print_arrays
-        stream = cStringIO()
-        case.list_inputs(values=True,
-                         units=True,
-                         shape=True,
-                         hierarchical=True,
-                         print_arrays=False,
-                         out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(1, text.count("1 Input(s) in 'model'"))
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(7, num_non_empty_lines)
-        self.assertEqual(1, text.count('top'))
-        self.assertEqual(1, text.count('  mult'))
-        self.assertEqual(1, text.count('    x    |10.0|  inch   (100'))
-
-        # logging outputs
-        # out_stream - not hierarchical - extras - no print_arrays
-        stream = cStringIO()
-        case.list_outputs(values=True,
-                          units=True,
-                          shape=True,
-                          bounds=True,
-                          residuals=True,
-                          scaling=True,
-                          hierarchical=False,
-                          print_arrays=False,
-                          out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(text.count('2 Explicit Output'), 1)
-        # make sure they are in the correct order
-        # FIXME: disabled until Case orders outputs
-        # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(8, num_non_empty_lines)
-
-        # Promoted names - no print arrays
-        stream = cStringIO()
-        case.list_outputs(values=True,
-                          prom_name=True,
-                          print_arrays=False,
-                          out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(text.count('    x       |10.0|   x'), 1)
-        self.assertEqual(text.count('    y       |110.0|  y'), 1)
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
-
-        # Hierarchical - no print arrays
-        stream = cStringIO()
-        case.list_outputs(values=True,
-                          units=True,
-                          shape=True,
-                          bounds=True,
-                          residuals=True,
-                          scaling=True,
-                          hierarchical=True,
-                          print_arrays=False,
-                          out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('  des_vars'), 1)
-        self.assertEqual(text.count('    x'), 1)
-        self.assertEqual(text.count('  mult'), 1)
-        self.assertEqual(text.count('    y'), 1)
-        num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-        self.assertEqual(num_non_empty_lines, 11)
-
-        # Need to explicitly set this to make sure all ways of running this test
-        #   result in the same format of the output. When running this test from the
-        #   top level via testflo, the format comes out different than if the test is
-        #   run individually
-        opts = {
-            'edgeitems': 3,
-            'infstr': 'inf',
-            'linewidth': 75,
-            'nanstr': 'nan',
-            'precision': 8,
-            'suppress': False,
-            'threshold': 1000,
-        }
-
-        from distutils.version import LooseVersion
-        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
-            opts['legacy'] = '1.13'
-
-        with printoptions(**opts):
-            # logging outputs
-            # out_stream - not hierarchical - extras - print_arrays
-            stream = cStringIO()
-            case.list_outputs(values=True,
-                              units=True,
-                              shape=True,
-                              bounds=True,
-                              residuals=True,
-                              scaling=True,
-                              hierarchical=False,
-                              print_arrays=True,
-                              out_stream=stream)
-            text = stream.getvalue()
-            self.assertEqual(text.count('2 Explicit Output'), 1)
-            self.assertEqual(text.count('value:'), 2)
-            self.assertEqual(text.count('resids:'), 2)
-            self.assertEqual(text.count('['), 4)
-            # make sure they are in the correct order
-            # FIXME: disabled until Case orders outputs
-            # self.assertTrue(text.find("des_vars.x") < text.find('mult.y'))
-            num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(37, num_non_empty_lines)
-
-            # Hierarchical
-            stream = cStringIO()
-            case.list_outputs(values=True,
-                              units=True,
-                              shape=True,
-                              bounds=True,
-                              residuals=True,
-                              scaling=True,
-                              hierarchical=True,
-                              print_arrays=True,
-                              out_stream=stream)
-            text = stream.getvalue()
-            self.assertEqual(text.count('2 Explicit Output'), 1)
-            self.assertEqual(text.count('value:'), 2)
-            self.assertEqual(text.count('resids:'), 2)
-            self.assertEqual(text.count('['), 4)
-            self.assertEqual(text.count('top'), 1)
-            self.assertEqual(text.count('  des_vars'), 1)
-            self.assertEqual(text.count('    x'), 1)
-            self.assertEqual(text.count('  mult'), 1)
-            self.assertEqual(text.count('    y'), 1)
-            num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
-            self.assertEqual(num_non_empty_lines, 40)
-
-    def test_feature_case_get_val(self):
-        import openmdao.api as om
-
-        # build the model
-        prob = om.Problem()
-        indeps = prob.model.add_subsystem('indeps', om.IndepVarComp())
-        indeps.add_output('x', 3.0, units='inch')
-        indeps.add_output('y', -4.0, units='inch')
-
-        prob.model.add_subsystem('paraboloid', om.ExecComp('f = (x-3)**2 + x*y + (y+4)**2 - 3',
-                                                           f={'units': 'inch ** 2'}
-                                                           ))
-
-        prob.model.connect('indeps.x', 'paraboloid.x')
-        prob.model.connect('indeps.y', 'paraboloid.y')
-
-        # setup the optimization
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-
-        prob.model.add_design_var('indeps.x', lower=-50, upper=50)
-        prob.model.add_design_var('indeps.y', lower=-50, upper=50)
-        prob.model.add_objective('paraboloid.f')
-
-        prob.setup()
-        prob.run_driver()
-
-        cr = om.CaseReader("cases.sql")
-
-        cases = cr.list_cases()
-        case = cr.get_case(cases[0])
-        assert_rel_error(self, case.get_val('indeps.x', units='ft'), 0.25, 1e-6)
-        assert_rel_error(self, case.get_val('indeps.x', units='inch'), 3.0, 1e-6)
+        assert_rel_error(self, case['v'], 100./60., 1e-6)
+        assert_rel_error(self, case.get_val('v', units='ft/s'), 5.46807, 1e-6)
 
 
 @use_tempdirs

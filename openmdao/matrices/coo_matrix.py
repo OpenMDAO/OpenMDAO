@@ -287,7 +287,8 @@ class COOMatrix(Matrix):
                     ind1, ind2, _, _ = val
                     mask[ind1:ind2] = False
 
-            return mask
+            # convert the mask indices (if necessary) base on sparse matrix type (CSC, CSR, etc.)
+            return self._convert_mask(mask)
 
     def set_complex_step_mode(self, active):
         """
@@ -307,3 +308,19 @@ class COOMatrix(Matrix):
         else:
             self._coo.data = self._coo.data.real
             self._coo.dtype = np.float
+
+    def _convert_mask(self, mask):
+        """
+        Convert the mask to the format of this sparse matrix (CSC, etc.) from COO.
+
+        Parameters
+        ----------
+        mask : ndarray
+            The mask of indices to zero out.
+
+        Returns
+        -------
+        ndarray
+            The converted mask array.
+        """
+        return mask
