@@ -4,7 +4,7 @@
 Case Reader Object
 ******************
 
-The :class:`CaseRecorder<openmdao.recorders.case_reader.CaseReader>` object is provided to read case recordings no
+The :class:`CaseReader<openmdao.recorders.case_reader.CaseReader>` object is provided to read case recordings no
 matter what case recorder was used.
 Currently, OpenMDAO only supports the :class:`SqliteCaseReader<openmdao.recorders.sqlite_reader.SqliteCaseReader>` case
 recorder. Therefore, all the examples will
@@ -16,11 +16,12 @@ make use of this recorder. OpenMDAO will support other case recorders in the fut
 Determining What Sources and Variables Were Recorded
 ----------------------------------------------------
 
-The :code:`CaseReader` object provides methods to determine which objects in the original problem were responsible
-for recording cases and what variables they recorded.
+The :code:`CaseReader` object provides methods to determine which objects in the original problem were sources
+for recording cases and what variables they recorded. Recording sources can be either drivers, problems,
+components, or solvers.
 
 The :code:`list_sources` method provides a
-list of the names of objects that are the recording sources of the recorded data in the file.
+list of the names of objects that are the sources of recorded data in the file.
 
 .. automethod:: openmdao.recorders.base_case_reader.BaseCaseReader.list_sources
     :noindex:
@@ -41,9 +42,8 @@ Here is an example of their usage.
 Case Names
 ----------
 
-A :code:`CaseReader` object contains a collection of :class:`Case<openmdao.recorders.case.Case>`
-objects, one for each individual recording of an object
-which can be anyone of these objects: driver, problem, component, or solver.
+The :code:`CaseReader` provides access to :code:`Case` objects, each of which encapsulates a data point recorded by
+one of the sources.
 
 :code:`Case` objects are uniquely identified in a case recorder file by their case names. A Case name is a string.
 As an example, here is a case name:
@@ -76,7 +76,7 @@ the cases were executed. You can optionally request cases only from a specific :
 
 .. _list_cases_args:
 
-There are two optional arguments to the :code:`list_cases` method that effect what is returned.
+There are two optional arguments to the :code:`list_cases` method that affect what is returned.
 
     - :code:`recurse`: causes the returned value to include child cases.
 
@@ -85,8 +85,8 @@ There are two optional arguments to the :code:`list_cases` method that effect wh
       the returned value is a nested ordered dict. Otherwise, it is a list.
 
 
-Getting Access to Cases Using get_cases Method
-----------------------------------------------
+Getting Access to Cases
+-----------------------
 
 Getting information from the cases is a two-step process. First, you need to get access to the Case object and then
 you can call a variety of methods on the Case object to get values from it. The second step is described on the
@@ -124,8 +124,8 @@ The :code:`get_case` method returns a :code:`Case` object given a case name.
 .. automethod:: openmdao.recorders.base_case_reader.BaseCaseReader.get_case
     :noindex:
 
-If after getting the list of case names using the :code:`list_cases` method, you determine the case you want information
-from, you can use the :code:`get_case` method to get that case.
+You can use the :code:`get_case` method to get a specific case from the list of case names returned by
+:code:`list_cases`.
 
 This code snippet shows how to get the first case.
 
