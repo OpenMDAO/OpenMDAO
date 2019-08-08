@@ -4,8 +4,10 @@
 Case Reader Object
 ******************
 
-The :code:`CaseReader` object is provided to read case recordings no matter what case recorder was used.
-Currently, OpenMDAO only supports the :code:`SqliteCaseReader` case recorder. Therefore, all the examples will
+The :class:`CaseRecorder<openmdao.recorders.case_reader.CaseReader>` object is provided to read case recordings no
+matter what case recorder was used.
+Currently, OpenMDAO only supports the :class:`SqliteCaseReader<openmdao.recorders.sqlite_reader.SqliteCaseReader>` case
+recorder. Therefore, all the examples will
 make use of this recorder. OpenMDAO will support other case recorders in the future.
 
 .. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.__init__
@@ -18,7 +20,7 @@ The :code:`CaseReader` object provides methods to determine which objects in the
 for recording cases and what variables they recorded.
 
 The :code:`list_sources` method provides a
-list of the names of objects that are the sources of the recorded data in the file.
+list of the names of objects that are the recording sources of the recorded data in the file.
 
 .. automethod:: openmdao.recorders.base_case_reader.BaseCaseReader.list_sources
     :noindex:
@@ -39,7 +41,8 @@ Here is an example of their usage.
 Case Names
 ----------
 
-:code:`CaseReader` object contain a collection of :code:`Case` objects, one for each individual recording of an object
+A :code:`CaseReader` object contains a collection of :class:`Case<openmdao.recorders.case.Case>`
+objects, one for each individual recording of an object
 which can be anyone of these objects: driver, problem, component, or solver.
 
 :code:`Case` objects are uniquely identified in a case recorder file by their case names. A Case name is a string.
@@ -79,7 +82,7 @@ There are two optional arguments to the :code:`list_cases` method that effect wh
 
     - :code:`flat`: works in conjunction with the :code:`recurse` argument to determine if the returned
       results are in the form of a list or nested dict. If recurse=True, flat=False, and there are child cases, then
-      returned value is a nested ordered dict. Otherwise, it is a list.
+      the returned value is a nested ordered dict. Otherwise, it is a list.
 
 
 Getting Access to Cases Using get_cases Method
@@ -132,7 +135,8 @@ This code snippet shows how to get the first case.
     case_names = cr.list_cases()
     case = cr.get_case(case_names[0])
 
-You could also use the feature of :code:`get_case` where you provide an index into all the cases.
+You could also use the feature of :code:`get_case` where you provide an index into all the cases. This snippet shows
+how to get the first case using an index.
 
 .. code::
 

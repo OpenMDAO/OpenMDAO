@@ -4,8 +4,8 @@
 Accessing Recorded Data from Case Objects
 *****************************************
 
-The :code:`Case` object contains all the information about a specific Case recording whether it was recorded by
-a problem, driver, system, or solver. :code:`Case` objects have a number of attributes and methods for accessing variables and their values.
+The :class:`Case<openmdao.recorders.case.Case>` object contains all the information about a specific Case recording whether it was recorded by
+a problem, driver, system, or solver. :code:`Case` objects have a number methods for accessing variables and their values.
 
 Example of Getting Variable Data from Case Recording of a Driver
 ----------------------------------------------------------------
