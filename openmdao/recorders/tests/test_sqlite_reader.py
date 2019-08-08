@@ -478,7 +478,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ]
 
         last_counter = 0
-        for i, c in enumerate(cr.get_cases()):
+        for i, c in enumerate(cr.get_cases(flat=False)):
             self.assertEqual(c.name, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
