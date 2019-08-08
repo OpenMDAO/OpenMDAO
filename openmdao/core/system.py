@@ -3468,7 +3468,7 @@ class System(object):
 
     def add_recorder(self, recorder, recurse=False):
         """
-        Add a recorder to the driver.
+        Add a recorder to the system.
 
         Parameters
         ----------
