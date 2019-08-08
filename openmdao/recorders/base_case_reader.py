@@ -92,12 +92,34 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname}
+        source : {'problem', 'driver', `<component hierarchy location>`,
+            `<solver hierarchy location>`}
             Identifies the source for which to return information.
 
         Returns
         -------
         dict
             {'inputs':[list of keys], 'outputs':[list of keys]}. Does not recurse.
+        """
+        pass
+
+    def list_cases(self, source=None, recurse=True, flat=True):
+        """
+        Iterate over Driver, Solver and System cases in order.
+
+        Parameters
+        ----------
+        source : {'problem', 'driver', component pathname, solver pathname, case_name}
+            If not None, only cases originating from the specified source or case are returned.
+        recurse : bool, optional
+            If True, will enable iterating over all successors in case hierarchy.
+        flat : bool, optional
+            If False and there are child cases, then a nested ordered dictionary
+            is returned rather than an iterator.
+
+        Returns
+        -------
+        iterator or dict
+            An iterator or a nested dictionary of identified cases.
         """
         pass
