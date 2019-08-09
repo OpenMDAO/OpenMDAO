@@ -8,7 +8,7 @@ Driver Recording
 ----------------
 
 A :class:`CaseRecorder<openmdao.recorders.case_recorder.CaseRecorder>` is commonly attached to
-the problem's Driver in order to gain insight into the convergence of the model as the driver 
+the problem's :class:`Driver` in order to gain insight into the convergence of the model as the driver
 finds a solution.  By default, a recorder attached to a driver will record the design variables, 
 constraints and objectives.
 
@@ -60,7 +60,7 @@ System and Solver Recording
 ---------------------------
 
 If you need to focus on a smaller part of your model, it may be useful to attach a case recorder to
-a particular System or Solver. There are slightly different options when recording from these objects.
+a particular :code:`System` or :code:`Solver`. There are slightly different options when recording from these objects.
 
 System Recording Options
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -119,7 +119,7 @@ Recording Options Precedence
 ----------------------------
 
 The recording options that determine what gets recorded can sometime be a little confusing. Here is
-an example that might help. The code shows how the `record_desvars` and `includes` options interact.
+an example that might help. The code shows how the :code:`record_desvars` and :code:`includes` options interact.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_recording_option_precedence

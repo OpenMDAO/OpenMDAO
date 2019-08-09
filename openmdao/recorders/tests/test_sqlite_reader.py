@@ -478,7 +478,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ]
 
         last_counter = 0
-        for i, c in enumerate(cr.get_cases()):
+        for i, c in enumerate(cr.get_cases(flat=False)):
             self.assertEqual(c.name, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
@@ -2733,6 +2733,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         objs = case.get_objectives()
         cons = case.get_constraints()
         dvs = case.get_design_vars()
+        rsps = case.get_responses()
 
         # keys() will give you the promoted variable names
         self.assertEqual((sorted(objs.keys()), sorted(cons.keys()), sorted(dvs.keys())),
@@ -2745,6 +2746,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         # you can access variable values using either the promoted or the absolute name
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
         self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
+        self.assertEqual((rsps['obj'], rsps['obj_cmp.obj']), (rsps['obj_cmp.obj'], rsps['obj']))
 
         # you can also access the variables directly from the case object
         self.assertEqual((case['obj'], case['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))

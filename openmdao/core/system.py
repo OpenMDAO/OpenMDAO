@@ -3288,16 +3288,26 @@ class System(object):
         real_vars = self._var_allprocs_abs_names[in_or_out]
         disc_vars = self._var_allprocs_discrete[in_or_out]
 
-        for subsys in self._subsystems_allprocs:
-            # subsys.pathname will only be defined properly if a subsystem is local,
-            # but subsys.name will be properly defined.
-            path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name
-            path += '.'
+        if self._subsystems_allprocs:
+            for subsys in self._subsystems_allprocs:
+                # subsys.pathname will only be defined properly if a subsystem is local,
+                # but subsys.name will be properly defined.
+                path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name
+                path += '.'
+                for var_name in real_vars:
+                    if var_name in var_dict and var_name.startswith(path):
+                        var_list.append(var_name)
+                for var_name in disc_vars:
+                    if var_name in var_dict and var_name.startswith(path):
+                        var_list.append(var_name)
+        else:
+            # For components with no children, self._subsystems_allprocs is empty.
             for var_name in real_vars:
-                if var_name in var_dict and var_name.startswith(path):
+                if var_name in var_dict:
                     var_list.append(var_name)
+
             for var_name in disc_vars:
-                if var_name in var_dict and var_name.startswith(path):
+                if var_name in var_dict:
                     var_list.append(var_name)
 
         write_var_table(self.pathname, var_list, var_type, var_dict,
@@ -3468,7 +3478,7 @@ class System(object):
 
     def add_recorder(self, recorder, recurse=False):
         """
-        Add a recorder to the driver.
+        Add a recorder to the system.
 
         Parameters
         ----------
