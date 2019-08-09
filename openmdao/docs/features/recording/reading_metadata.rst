@@ -4,7 +4,7 @@
 Accessing Recorded Metadata
 ***************************
 
-In addition to the cases themselves, a :ref:`CaseReader<iterating_case_data>` may also record 
+In addition to the cases themselves, a :ref:`CaseReader<case_reader>` may also record
 certain metadata about the model and it's consituent systems and solvers.
 
 Problem Metadata
