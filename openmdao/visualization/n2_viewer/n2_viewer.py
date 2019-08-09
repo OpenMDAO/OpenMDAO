@@ -452,6 +452,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     h.add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
 
+    """
     if use_declare_partial_info:
         h.insert('{{component_connectivity}}',
                  'Note: Component internal connectivity computed using derivative declarations')
@@ -459,7 +460,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         h.insert('{{component_connectivity}}',
                  'Note: Derivative declarations ignored, so dense component '
                  'connectivity is assumed')
-
+    """
+    
     # Write output file
     h.write(outfile)
 
