@@ -6,12 +6,9 @@ Case Reader Object
 
 The :class:`CaseReader<openmdao.recorders.case_reader.CaseReader>` object is provided to read case recordings no
 matter what case recorder was used.
-Currently, OpenMDAO only supports the :class:`SqliteCaseReader<openmdao.recorders.sqlite_reader.SqliteCaseReader>` case
+Currently, OpenMDAO only supports the :code:`SqliteCaseRecorder` case
 recorder. Therefore, all the examples will
 make use of this recorder. OpenMDAO will support other case recorders in the future.
-
-.. automethod:: openmdao.recorders.sqlite_reader.SqliteCaseReader.__init__
-    :noindex:
 
 Determining What Sources and Variables Were Recorded
 ----------------------------------------------------
@@ -45,7 +42,7 @@ Case Names
 The :code:`CaseReader` provides access to :code:`Case` objects, each of which encapsulates a data point recorded by
 one of the sources.
 
-:code:`Case` objects are uniquely identified in a case recorder file by their case names. A Case name is a string.
+:code:`Case` objects are uniquely identified in a case recorder file by their case names. A case name is a string.
 As an example, here is a case name:
 
     'rank0:ScipyOptimize_SLSQP|1|root._solve_nonlinear|1'
