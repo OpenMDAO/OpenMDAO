@@ -136,5 +136,3 @@ class MuxComp(ExplicitComponent):
             invar = self._input_names[var]
             vals = [inputs[invar[i]] for i in range(vec_size)]
             outputs[var][...] = np.stack(vals, axis=ax)
-
-        print("MUX:", outputs._data)
