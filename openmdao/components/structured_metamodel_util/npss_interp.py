@@ -10,6 +10,11 @@ from openmdao.components.structured_metamodel_util.grid_interp_base import GridI
 from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
 
 
+class NPSSTable(object):
+    
+    def __init__(self, grid, values):
+        
+
 class NPSSGridInterp(GridInterpBase):
     """
     Interpolation on a regular grid in arbitrary dimensions.
