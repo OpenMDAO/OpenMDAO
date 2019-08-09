@@ -8,6 +8,6 @@ Recording Data
     :maxdepth: 1
 
     saving_data.rst
-    iterating_over_data.rst
+    case_reader.rst
     reading_data.rst
     reading_metadata.rst
