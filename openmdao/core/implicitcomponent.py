@@ -298,7 +298,8 @@ class ImplicitComponent(Component):
         if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
             self._assembled_jac._update(self)
 
-    def apply_nonlinear(self, inputs, outputs, residuals):
+    def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
+                        discrete_outputs=None):
         """
         Compute residuals given inputs and outputs.
 
@@ -312,6 +313,10 @@ class ImplicitComponent(Component):
             unscaled, dimensional output variables read via outputs[key]
         residuals : Vector
             unscaled, dimensional residuals written to via residuals[key]
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        discrete_outputs : dict or None
+            If not None, dict containing discrete output values.
         """
         pass
 
