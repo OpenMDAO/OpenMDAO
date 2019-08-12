@@ -884,6 +884,167 @@ class TestMetaModelOTIS(unittest.TestCase):
         assert_check_partials(partials)
 
 
+class TestMetaModelNPSS(unittest.TestCase):
+    """
+    Tests the regular grid map component. specifically the analytic derivatives
+    vs. finite difference estimates.
+    """
+
+    def setUp(self):
+
+        model = om.Group()
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', x['default'], units=x['units'])
+        ivc.add_output('y', y['default'], units=y['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, interp_method='npss')
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+        self.prob = om.Problem(model)
+        self.prob.setup()
+        self.prob['x'] = 1.0
+        self.prob['y'] = 0.75
+        self.prob['z'] = -1.7
+
+    def run_and_check_derivs(self, prob, tol=1e-5, verbose=False):
+        """Runs check_partials and compares to analytic derivatives."""
+
+        prob.run_model()
+        #derivs = prob.check_partials(out_stream=None)
+
+        #for i in derivs['comp'].keys():
+            #if verbose:
+                #print("Checking derivative pair:", i)
+            #if derivs['comp'][i]['J_fwd'].sum() != 0.0:
+                #rel_err = max(derivs['comp'][i]['rel error'])
+                #self.assertLessEqual(rel_err, tol)
+
+    def test_deriv1(self):
+        # run at default pt
+        self.run_and_check_derivs(self.prob)
+
+        # test output values
+        f, g = self.prob['comp.f'], self.prob['comp.g']
+
+        tol = 1e-6
+        assert_rel_error(self, f, -0.05624571, tol)
+        assert_rel_error(self, g, 1.02068754, tol)
+
+    def test_deriv1_swap(self):
+        # Bugfix test that we can add outputs before inputs.
+
+        model = om.Group()
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, z = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', x['default'], units=x['units'])
+        ivc.add_output('y', y['default'], units=y['units'])
+        ivc.add_output('z', z['default'], units=z['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True)
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+        prob = om.Problem(model)
+        prob.setup()
+        prob['x'] = 1.0
+        prob['y'] = 0.75
+        prob['z'] = -1.7
+
+        # run at default pt
+        self.run_and_check_derivs(prob)
+
+    def test_deriv2(self):
+        self.prob['x'] = 10.0
+        self.prob['y'] = 0.81
+        self.prob['z'] = 1.1
+        self.run_and_check_derivs(self.prob)
+
+    def test_deriv3(self):
+        self.prob['x'] = 90.0
+        self.prob['y'] = 1.2
+        self.prob['z'] = 2.1
+        self.run_and_check_derivs(self.prob)
+
+    def test_deriv4(self):
+        # Tests extrapolation.
+        self.prob['x'] = 65.0
+        self.prob['y'] = 0.951
+        self.prob['z'] = 2.5
+        self.run_and_check_derivs(self.prob)
+
+    def test_vec_size(self):
+        prob = om.Problem()
+        model = prob.model
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, _ = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', np.array([x['default'], x['default'], x['default']]),
+                       units=x['units'])
+        ivc.add_output('y', np.array([y['default'], y['default'], y['default']]),
+                       units=x['units'])
+        ivc.add_output('z', np.array([z['default'], z['default'], z['default']]),
+                       units=x['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, vec_size=3,
+                                          interp_method='npss')
+
+        for param in params:
+            comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
+                           param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], np.array([out['default'], out['default'], out['default']]),
+                            out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+
+        prob.setup()
+        prob['x'] = np.array([1.0, 10.0, 90.0])
+        prob['y'] = np.array([0.75, 0.81, 1.2])
+        prob['z'] = np.array([-1.7, 1.1, 2.1])
+
+        prob.run_model()
+
+        partials = prob.check_partials(method='fd', out_stream=None)
+        assert_check_partials(partials)
+
+
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestMetaModelStructuredCompFeature(unittest.TestCase):
 

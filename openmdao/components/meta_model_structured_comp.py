@@ -6,6 +6,7 @@ from six.moves import range
 
 import numpy as np
 
+from openmdao.components.structured_metamodel_util.npss_interp import NPSSGridInterp
 from openmdao.components.structured_metamodel_util.otis_interp import OtisGridInterp
 from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
 from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
@@ -81,7 +82,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                              desc='Deprecated, use "order".', allow_none=True)
         self.options.declare('order', values=('cubic', 'slinear', 'quintic'), default="cubic",
                              desc='Spline interpolation order.')
-        self.options.declare('interp_method', values=('scipy', 'otis'), default='scipy',
+        self.options.declare('interp_method', values=('scipy', 'otis', 'npss'), default='scipy',
                              desc='Inerpolation method to use.')
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
@@ -141,6 +142,8 @@ class MetaModelStructuredComp(ExplicitComponent):
         interp_method = self.options['interp_method']
         if interp_method == 'otis':
             interp = OtisGridInterp
+        elif interp_method == 'npss':
+            interp = NPSSGridInterp
         else:
             interp = ScipyGridInterp
 
