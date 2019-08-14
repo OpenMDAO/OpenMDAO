@@ -294,6 +294,37 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(text.count('  impl'), 1)
         self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
 
+    def test_list_inputs_outputs_promoted(self):
+        model = om.Group()
+
+        indep = om.IndepVarComp()
+        indep.add_discrete_output('x', 11)
+
+        model.add_subsystem('indep', indep, promotes_outputs=['x'])
+
+        model.add_subsystem('expl', ModCompEx(3), promotes_inputs=['x'])
+        model.add_subsystem('impl', ModCompIm(3), promotes_inputs=['x'])
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+
+        #
+        # list outputs, prom_name and print_arrays
+        #
+        stream = StringIO()
+        prob.model.list_outputs(values=True, prom_name=True, out_stream=stream)
+        text = stream.getvalue()
+        print(text)
+
+        self.assertEqual(text.count('top'), 2)        # both implicit & explicit
+        self.assertEqual(text.count('  indep'), 1)
+        self.assertEqual(text.count('    x'), 1)
+        self.assertEqual(text.count('  expl'), 1)
+        self.assertEqual(text.count('    b'), 1)
+        self.assertEqual(text.count('  impl'), 1)
+        self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
+
     def test_list_inputs_outputs_with_tags(self):
         prob = om.Problem()
         model = prob.model
@@ -353,7 +384,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.setup()
         self.assertEqual(str(ctx.exception),
-                         "Group (<model>): Can't connect discrete output 'indep.x' to continuous input 'comp.x'.")
+                         "Group (<model>): Can't connect continuous output 'indep.x' to discrete input 'comp.x'.")
 
     def test_discrete_to_float_error(self):
         prob = om.Problem()

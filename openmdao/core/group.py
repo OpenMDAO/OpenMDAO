@@ -1027,7 +1027,7 @@ class Group(System):
             try:
                 out_type = self._var_allprocs_discrete['output'][abs_out]['type']
             except KeyError:
-                raise RuntimeError("%s: Can't connect discrete output '%s' to continuous "
+                raise RuntimeError("%s: Can't connect continuous output '%s' to discrete "
                                    "input '%s'." % (self.msginfo, abs_out, abs_in))
             if not issubclass(in_type, out_type):
                 raise RuntimeError("%s: Type '%s' of output '%s' is"
