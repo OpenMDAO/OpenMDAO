@@ -304,7 +304,7 @@ class TestNPSSGridInterpolator(unittest.TestCase):
                 tol = 0.5
             from openmdao.components.structured_metamodel_util.otis_interp import OtisGridInterp
             from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
-            interp = OtisGridInterp(points, values, order)
+            interp = NPSSGridInterp(points, values, order)
             computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
             print( actual, computed, r_err)

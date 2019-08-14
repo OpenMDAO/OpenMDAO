@@ -147,6 +147,14 @@ class MetaModelStructuredComp(ExplicitComponent):
         else:
             interp = ScipyGridInterp
 
+        # Raise a deprecation warning for changed option.
+        if 'method' in self.options and self.options['method'] is not None:
+            self.options['order'] = self.options['method']
+            warn_deprecation("The 'method' option provides backwards compatibility "
+                             "with earlier version of OpenMDAO; use options['order'] "
+                             "instead.")
+            self.options['order'] = self.options['method']
+
         for name, train_data in iteritems(self.training_outputs):
             self.interps[name] = interp(self.params, train_data,
                                         order=self.options['order'],
@@ -159,13 +167,6 @@ class MetaModelStructuredComp(ExplicitComponent):
             self.sh = tuple([self.options['vec_size']] + [i.size for i in self.params])
 
         super(MetaModelStructuredComp, self)._setup_var_data(recurse=recurse)
-
-        # Raise a deprecation warning for changed option.
-        if 'method' in self.options and self.options['method'] is not None:
-            self.options['order'] = self.options['method']
-            warn_deprecation("The 'method' option provides backwards compatibility "
-                             "with earlier version of OpenMDAO; use options['order'] "
-                             "instead.")
 
     def _setup_partials(self, recurse=True):
         """

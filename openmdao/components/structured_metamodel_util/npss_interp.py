@@ -382,6 +382,7 @@ class NPSSGridInterp(GridInterpBase):
         derivs = np.empty((n_nodes, nx))
 
         for j in range(n_nodes):
+            print('evaluating', j)
             val = self.table.evaluate(xi[j, :])
             result[j] = val
             #derivs[j, :] = deriv.flatten()
