@@ -49,9 +49,7 @@ class InterpCubic(object):
         self.last_index = -1
         self.second_derivs = None
 
-    def compute_second_derivatives(self, table):
-        grid = table.grid
-        values = table.values
+    def compute_second_derivatives(self, grid, values):
         n = len(grid)
 
         # Natural spline has second deriv=0 at both ends
@@ -76,26 +74,35 @@ class InterpCubic(object):
         grid = table.grid
         subtables = table.subtables
 
-        if not self.second_derivs:
-            self.compute_second_derivatives(table)
-        sec_deriv = self.second_derivs
-
         if len(subtables) > 0:
+            n = len(grid)
+            values = np.zeros(n)
+            for j in range(n):
+                values[j] = subtables[j].evaluate(x[1:])
+
+            self.compute_second_derivatives(table.grid, values)
+            sec_deriv = self.second_derivs
+
             step = grid[idx + 1] - grid[idx]
             a = (grid[idx + 1] - x[0]) / step
             b = (x[0] - grid[idx]) / step
-            return a * subtables[idx].evaluate(x[1:]) + b * subtables[idx+1].evaluate(x[1:]) + \
+            return a * values[idx] + b * values[idx + 1] + \
                    ((a * a * a - a) * sec_deriv[idx] + \
                     (b * b * b - b) * sec_deriv[idx + 1]) * (step * step) / 6.0
 
         else:
             values = table.values
 
+            if self.second_derivs is None:
+                self.compute_second_derivatives(table.grid, values)
+            sec_deriv = self.second_derivs
+
             # Perform the interpolation
             step = grid[idx + 1] - grid[idx]
             a = (grid[idx+1] - x) / step
             b = (x - grid[idx]) / step
-            return a * values[idx] + b * values[idx + 1] + ((a * a * a - a) * sec_deriv[idx] + \
+            return a * values[idx] + b * values[idx + 1] + \
+                   ((a * a * a - a) * sec_deriv[idx] + \
                     (b * b * b - b) * sec_deriv[idx + 1]) * (step * step) / 6.0
 
 
@@ -105,11 +112,10 @@ class NPSSTable(object):
         self.subtables = []
 
         self.grid = grid[0]
-        self.interp = coeffs[0]
+        self.interp = coeffs[0]()
 
         if len(grid) > 1:
             self.values = values[0, :]
-            self.interp = coeffs[0]
 
             nt = len(grid[0])
             for j in range(nt):
@@ -285,9 +291,9 @@ class NPSSGridInterp(GridInterpBase):
         coeffs = []
         for x in self.grid:
             if order == 'slinear':
-                coef = InterpLinear()
+                coef = InterpLinear
             elif order == 'cubic':
-                coef = InterpCubic()
+                coef = InterpCubic
 
             coeffs.append(coef)
 

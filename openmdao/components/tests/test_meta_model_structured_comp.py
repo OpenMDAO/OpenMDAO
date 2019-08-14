@@ -907,7 +907,7 @@ class TestMetaModelNPSS(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, interp_method='npss')
+        comp = om.MetaModelStructuredComp(order='cubic', extrapolate=True, interp_method='npss')
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
