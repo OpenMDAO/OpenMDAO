@@ -436,7 +436,7 @@ class TestConnectionsIndices(unittest.TestCase):
 
         expected = (r"The source and target shapes do not match or are ambiguous for the "
                     r"connection 'idvp.blammo' to 'arraycomp.inp'."
-                    r" Expected \(2.*,\) but got \(1.*,\).")
+                    r" The source shape is \(1.*,\) but the target shape is \(2.*,\).")
 
         with assertRaisesRegex(self, ValueError, expected):
             self.prob.setup()
@@ -558,8 +558,8 @@ class TestShapes(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "Group (<model>): The source and target shapes do not match or are ambiguous "
-                         "for the connection 'indep.x' to 'C1.x'. Expected (5, 2) but "
-                         "got (1, 10, 1, 1).")
+                         "for the connection 'indep.x' to 'C1.x'. The source shape is (1, 10, 1, 1) but "
+                         "the target shape is (5, 2).")
 
 
 class TestMultiConns(unittest.TestCase):
