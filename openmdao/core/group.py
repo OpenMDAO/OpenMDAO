@@ -2,7 +2,11 @@
 from __future__ import division
 
 import os
-from collections import Iterable, Counter, OrderedDict, defaultdict
+from collections import Counter, OrderedDict, defaultdict
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 from itertools import product, chain
 from numbers import Number
 import inspect
