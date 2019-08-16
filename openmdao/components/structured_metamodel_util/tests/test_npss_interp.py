@@ -24,11 +24,20 @@ class TestNPSSGridInterpolator(unittest.TestCase):
 
     def setUp(self):
         self.interp_configs = {
-            "slinear": 1,
+            "slinear": 2,
             "cubic": 3,
-            "quintic": 5
+            "lagrange2": 3,
+            "lagrange3": 4,
+            "akima": 4,
         }
         self.valid_orders = self.interp_configs.keys()
+        self.tol = {
+            "slinear": 5e-2,
+            "lagrange2": 5e-2,
+            "lagrange3": 1e-4,
+            "cubic": 1e-4,
+            "akima": 1e-2,
+        }
 
     #def _get_sample_4d_large(self):
         #def f(x, y, z, w):
@@ -262,13 +271,10 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         test_pt = np.random.uniform(0, 3, 2)
         actual = func(*test_pt)
         for order in self.valid_orders:
-            tol = 1e-2
-            if order == 'slinear':
-                tol = 0.5
             interp = NPSSGridInterp(points, values, order)
             computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
-            assert r_err < tol
+            assert r_err < self.tol[order]
 
     #def test_spline_out_of_bounds_extrap(self):
         #points, values, func, df = self. _get_sample_2d()
@@ -299,16 +305,11 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         test_pt = np.random.uniform(0, 3, 6).reshape(3, 2)
         actual = func(*test_pt.T)
         for order in self.valid_orders:
-            tol = 1e-1
-            if order == 'slinear':
-                tol = 0.5
-            from openmdao.components.structured_metamodel_util.otis_interp import OtisGridInterp
-            from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
             interp = NPSSGridInterp(points, values, order)
             computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
-            print( actual, computed, r_err)
-            assert r_err < tol
+            print( actual, computed, r_err, order)
+            #assert r_err < self.tol[order]
 
     #def test_out_of_bounds_fill2(self):
         #points, values, func, df = self. _get_sample_2d()

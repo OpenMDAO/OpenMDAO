@@ -907,7 +907,7 @@ class TestMetaModelNPSS(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='cubic', extrapolate=True, interp_method='npss')
+        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, interp_method='npss')
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -926,14 +926,14 @@ class TestMetaModelNPSS(unittest.TestCase):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
-        #derivs = prob.check_partials(out_stream=None)
+        derivs = prob.check_partials(out_stream=None)
 
-        #for i in derivs['comp'].keys():
-            #if verbose:
-                #print("Checking derivative pair:", i)
-            #if derivs['comp'][i]['J_fwd'].sum() != 0.0:
-                #rel_err = max(derivs['comp'][i]['rel error'])
-                #self.assertLessEqual(rel_err, tol)
+        for i in derivs['comp'].keys():
+            if verbose:
+                print("Checking derivative pair:", i)
+            if derivs['comp'][i]['J_fwd'].sum() != 0.0:
+                rel_err = max(derivs['comp'][i]['rel error'])
+                self.assertLessEqual(rel_err, tol)
 
     def test_deriv1(self):
         # run at default pt
@@ -964,7 +964,7 @@ class TestMetaModelNPSS(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True)
+        comp = om.MetaModelStructuredComp(order='slinear', interp_method='npss', extrapolate=True)
 
         for out in outs:
             comp.add_output(out['name'], out['default'], out['values'])
@@ -1001,7 +1001,7 @@ class TestMetaModelNPSS(unittest.TestCase):
         self.prob['z'] = 2.5
         self.run_and_check_derivs(self.prob)
 
-    def test_vec_size(self):
+    def test_vectorized_linear(self):
         prob = om.Problem()
         model = prob.model
         ivc = om.IndepVarComp()
@@ -1043,6 +1043,94 @@ class TestMetaModelNPSS(unittest.TestCase):
 
         partials = prob.check_partials(method='fd', out_stream=None)
         assert_check_partials(partials)
+
+    def test_vectorized_lagrange2(self):
+        prob = om.Problem()
+        model = prob.model
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, _ = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', np.array([x['default'], x['default'], x['default']]),
+                       units=x['units'])
+        ivc.add_output('y', np.array([y['default'], y['default'], y['default']]),
+                       units=x['units'])
+        ivc.add_output('z', np.array([z['default'], z['default'], z['default']]),
+                       units=x['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelStructuredComp(order='lagrange2', extrapolate=True, vec_size=3,
+                                          interp_method='npss')
+
+        for param in params:
+            comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
+                           param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], np.array([out['default'], out['default'], out['default']]),
+                            out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+
+        prob.setup()
+        prob['x'] = np.array([1.0, 10.0, 90.0])
+        prob['y'] = np.array([0.75, 0.81, 1.2])
+        prob['z'] = np.array([-1.7, 1.1, 2.1])
+
+        prob.run_model()
+
+        partials = prob.check_partials(method='fd', out_stream=None)
+        # Derivs are large, so ignore atol.
+        assert_check_partials(partials, atol=1e10, rtol=1e-5)
+
+    def test_vectorized_lagrange3(self):
+        prob = om.Problem()
+        model = prob.model
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, _ = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', np.array([x['default'], x['default'], x['default']]),
+                       units=x['units'])
+        ivc.add_output('y', np.array([y['default'], y['default'], y['default']]),
+                       units=x['units'])
+        ivc.add_output('z', np.array([z['default'], z['default'], z['default']]),
+                       units=x['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelStructuredComp(order='lagrange3', extrapolate=True, vec_size=3,
+                                          interp_method='npss')
+
+        for param in params:
+            comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
+                           param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], np.array([out['default'], out['default'], out['default']]),
+                            out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+
+        prob.setup()
+        prob['x'] = np.array([1.0, 10.0, 90.0])
+        prob['y'] = np.array([0.75, 0.81, 1.2])
+        prob['z'] = np.array([-1.7, 1.1, 2.1])
+
+        prob.run_model()
+
+        partials = prob.check_partials(method='fd', out_stream=None)
+        # Derivs are large, so ignore atol.
+        assert_check_partials(partials, atol=1e10, rtol=2e-5)
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")

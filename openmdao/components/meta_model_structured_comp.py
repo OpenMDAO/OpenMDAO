@@ -78,9 +78,9 @@ class MetaModelStructuredComp(ExplicitComponent):
                                   'training data should be computed.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
-        self.options.declare('method', values=('cubic', 'slinear', 'quintic'), default=None,
+        self.options.declare('method', values=('cubic', 'slinear', 'quintic', 'lagrange2', 'lagrange3', 'akima'), default=None,
                              desc='Deprecated, use "order".', allow_none=True)
-        self.options.declare('order', values=('cubic', 'slinear', 'quintic'), default="cubic",
+        self.options.declare('order', values=('cubic', 'slinear', 'quintic', 'lagrange2', 'lagrange3', 'akima'), default="cubic",
                              desc='Spline interpolation order.')
         self.options.declare('interp_method', values=('scipy', 'otis', 'npss'), default='scipy',
                              desc='Inerpolation method to use.')

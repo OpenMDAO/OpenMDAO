@@ -21,12 +21,23 @@ class InterpLinear(object):
         subtables = table.subtables
         slope = self.slope
 
-        if len(subtables) > 0:
+        # Extrapolate high
+        if idx == len(grid) - 1:
+            idx -= 1
 
-            dtmp = subtables[idx].evaluate(x[1:])
-            slope = (subtables[idx + 1].evaluate(x[1:]) - dtmp) / (grid[idx + 1] - grid[idx])
+        if len(subtables) > 0:
+            derivs = np.empty(len(x))
+
+            dtmp, subderiv = subtables[idx].evaluate(x[1:])
+            dtmp2, subderiv2 = subtables[idx + 1].evaluate(x[1:])
+            slope = (dtmp2 - dtmp) / (grid[idx + 1] - grid[idx])
             self.slope = slope
-            return dtmp + (x[0] - grid[idx]) * slope
+
+            derivs[0] = slope
+            dslope_dsub = (subderiv2 - subderiv) / (grid[idx + 1] - grid[idx])
+            derivs[1:] = subderiv + (x[0] - grid[idx]) * dslope_dsub
+
+            return dtmp + (x[0] - grid[idx]) * slope, derivs
 
         else:
             values = table.values
@@ -40,7 +51,302 @@ class InterpLinear(object):
                 self.slope = slope
                 self.last_index = last_index
 
-            return values[idx] + (x - grid[idx]) * slope
+            return values[idx] + (x - grid[idx]) * slope, slope
+
+
+class InterpLagrange2(object):
+
+    def __init__(self):
+        self.last_index = -1
+        self.slope = None
+
+    def interpolate(self, x, idx, table):
+        grid = table.grid
+        subtables = table.subtables
+        slope = self.slope
+
+        # Extrapolate high
+        ngrid = len(grid)
+        if idx > ngrid - 3:
+            idx = ngrid - 3
+        elif idx == ngrid - 1:
+            idx -= 1
+
+        derivs = np.empty(len(x))
+
+        xx1 = x[0] - grid[idx]
+        xx2 = x[0] - grid[idx + 1]
+        xx3 = x[0] - grid[idx + 2]
+
+        if len(subtables) > 0:
+
+            # Checking the lastIndex value here won't help, because our slope is not
+            # guaranteed to be the same as last time even if idx == lastIndex, since
+            # the numerator of the slope comes from lower level tables whose index may
+            # have changed.
+            c12 = grid[idx] - grid[idx + 1]
+            c13 = grid[idx] - grid[idx + 2]
+            c23 = grid[idx + 1] - grid[idx + 2]
+
+            val1, deriv1 = subtables[idx].evaluate(x[1:])
+            val2, deriv2 = subtables[idx + 1].evaluate(x[1:])
+            val3, deriv3 = subtables[idx + 2].evaluate(x[1:])
+
+            q1 = val1 / (c12 * c13)
+            q2 = val2 / (c12 * c23)
+            q3 = val3 / (c13 * c23)
+
+            dq1_dsub = deriv1 / (c12 * c13)
+            dq2_dsub = deriv2 / (c12 * c23)
+            dq3_dsub = deriv3 / (c13 * c23)
+            derivs[1:] = xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + dq3_dsub * xx1 * xx2
+
+        else:
+            values = table.values
+            last_index = self.last_index
+
+            # If the lookup index is the same as last time and it is not '0',
+            # then the slope hasn't changed, so don't need to recalculate.
+            if idx != last_index or last_index == 0:
+                self.last_index = idx
+                c12 = grid[idx] - grid[idx + 1]
+                c13 = grid[idx] - grid[idx + 2]
+                c23 = grid[idx + 1] - grid[idx + 2]
+                q1 = values[idx] / (c12 * c13)
+                q2 = values[idx + 1] / (c12 * c23)
+                q3 = values[idx + 2] / (c13 * c23)
+                self.slope = (q1, q2, q3)
+
+            q1, q2, q3 = self.slope
+
+        derivs[0] = q1 * (2.0 * x[0] - grid[idx + 1] - grid[idx + 2]) - \
+                    q2 * (2.0 * x[0] - grid[idx] - grid[idx + 2]) + \
+                    q3 * (2.0 * x[0] - grid[idx] - grid[idx + 1])
+
+        return xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2, derivs
+
+
+class InterpLagrange3(object):
+
+    def __init__(self):
+        self.last_index = -1
+        self.slope = None
+
+    def interpolate(self, x, idx, table):
+        grid = table.grid
+        subtables = table.subtables
+        slope = self.slope
+
+        # Extrapolate high
+        ngrid = len(grid)
+        if idx > ngrid - 3:
+            idx = ngrid - 3
+        elif idx == 0:
+            idx = 1
+
+        derivs = np.empty(len(x))
+
+        p1 = grid[idx - 1]
+        p2 = grid[idx]
+        p3 = grid[idx + 1]
+        p4 = grid[idx + 2]
+
+        xx1 = x[0] - p1
+        xx2 = x[0] - p2
+        xx3 = x[0] - p3
+        xx4 = x[0] - p4
+
+        if len(subtables) > 0:
+
+            # Checking the lastIndex value here won't help, because our slope is not
+            # guaranteed to be the same as last time even if idx == lastIndex, since
+            # the numerator of the slope comes from lower level tables whose index may
+            # have changed.
+            c12 = p1 - p2
+            c13 = p1 - p3
+            c14 = p1 - p4
+            c23 = p2 - p3
+            c24 = p2 - p4
+            c34 = p3 - p4
+
+            val1, deriv1 = subtables[idx - 1].evaluate(x[1:])
+            val2, deriv2 = subtables[idx].evaluate(x[1:])
+            val3, deriv3 = subtables[idx + 1].evaluate(x[1:])
+            val4, deriv4 = subtables[idx + 2].evaluate(x[1:])
+
+            q1 = val1 / (c12 * c13 * c14)
+            q2 = val2 / (c12 * c23 * c24)
+            q3 = val3 / (c13 * c23 * c34)
+            q4 = val4 / (c14 * c24 * c34)
+
+            dq1_dsub = deriv1 / (c12 * c13 * c14)
+            dq2_dsub = deriv2 / (c12 * c23 * c24)
+            dq3_dsub = deriv3 / (c13 * c23 * c34)
+            dq4_dsub = deriv4 / (c14 * c24 * c34)
+
+            derivs[1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + dq3_dsub * xx1 * xx2) - \
+                dq4_dsub * xx1 * xx2 * xx3
+
+        else:
+            values = table.values
+            last_index = self.last_index
+
+            # If the lookup index is the same as last time and it is not '0',
+            # then the slope hasn't changed, so don't need to recalculate.
+            if idx != last_index or last_index == 0:
+                self.last_index = idx
+
+                c12 = p1 - p2
+                c13 = p1 - p3
+                c14 = p1 - p4
+                c23 = p2 - p3
+                c24 = p2 - p4
+                c34 = p3 - p4
+
+                q1 = values[idx - 1] / (c12 * c13 * c14)
+                q2 = values[idx] / (c12 * c23 * c24)
+                q3 = values[idx + 1] / (c13 * c23 * c34)
+                q4 = values[idx + 2] / (c14 * c24 * c34)
+
+                self.slope = (q1, q2, q3, q4)
+
+            q1, q2, q3, q4 = self.slope
+
+        derivs[0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) + \
+                          p4 * (p2 + p3) + p2 * p3) - \
+                    q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) + \
+                          p4 * (p1 + p3) + p1 * p3) + \
+                    q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) + \
+                          p4 * (p2 + p1) + p2 * p1) - \
+                    q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) + \
+                          p1 * (p2 + p3) + p2 * p3)
+
+        return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, derivs
+
+
+class InterpAkima(object):
+
+    def interpolate(self, x, idx, table):
+        grid = table.grid
+        subtables = table.subtables
+
+        c = 0.0
+        d = 0.0
+        m1 = 0.0
+        m2 = 0.0
+        m4 = 0.0
+        m5 = 0.0
+        extrap = 0
+
+        # Check for extrapolation conditions. if off upper end of table (idx = ient-1)
+        # reset idx to interval lower bracket (ient-2). if off lower end of table
+        # (idx = 0) interval lower bracket already set but need to check if independent
+        # variable is < first value in independent array
+        ngrid = len(grid)
+        if idx == ngrid - 1:
+            idx = ngrid - 2
+            extrap = 1
+        elif idx == 0 and x[0] < grid[0]:
+            extrap = -1
+
+        if len(subtables) > 0:
+            if idx >= 2:
+                val1 = subtables[idx - 2].evaluate(x[1:])
+            if idx >= 1:
+                val2 = subtables[idx - 1].evaluate(x[1:])
+            val3 = subtables[idx].evaluate(x[1:])
+            val4 = subtables[idx + 1].evaluate(x[1:])
+            if idx < ngrid - 2:
+                val5 = subtables[idx + 2].evaluate(x[1:])
+            if idx < ngrid - 3:
+                val6 = subtables[idx + 3].evaluate(x[1:])
+
+        else:
+            values = table.values
+            if idx >= 2:
+                val1 = values[idx - 2]
+            if idx >= 1:
+                val2 = values[idx - 1]
+            val3 = values[idx]
+            val4 = values[idx + 1]
+            if idx < ngrid - 2:
+                val5 = values[idx + 2]
+            if idx < ngrid - 3:
+                val6 = values[idx + 3]
+
+        # Calculate interval slope values
+        #
+        # m1 is the slope of interval (xi-2, xi-1)
+        # m2 is the slope of interval (xi-1, xi)
+        # m3 is the slope of interval (xi, xi+1)
+        # m4 is the slope of interval (xi+1, xi+2)
+        # m5 is the slope of interval (xi+2, xi+3)
+        #
+        # The values of m1, m2, m4 and m5 may be calculated from other slope values
+        # depending on the value of idx
+
+        m3 = (val4 - val3) / (grid[idx + 1] - grid[idx])
+
+        if idx >= 2:
+            m1 = (val2 - val1) / (grid[idx - 1] - grid[idx - 2])
+
+        if idx >= 1:
+            m2 = (val3 - val2) / (grid[idx] - grid[idx - 1])
+
+        if idx < ngrid - 2:
+            m4 = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
+
+        if idx < ngrid - 3:
+            m5 = (val6 - val5) / (grid[idx + 3] - grid[idx + 2])
+
+        if idx == 0:
+            m1 = 3*m3 - 2*m4
+            m2 = 2*m3 - m4
+
+        elif idx == 1:
+            m1 = 2 * m2 - m3
+
+        elif idx == ngrid - 3:
+            m5 = 2 * m4 - m3
+
+        elif idx == ngrid - 2:
+            m4 = 2 * m3 - m2
+            m5 = 3 * m3 - 2 * m2
+
+        # Calculate cubic fit coefficients
+        w2 = abs(m4 - m3)
+        w3 = abs(m2 - m1)
+
+        if w2 + w3 > 0:
+            b = (m2*w2 + m3*w3) / (w2 + w3)
+        else:
+            b = 0.5 * (m2+m3)
+
+        w3 = abs(m5 - m4)
+        w4 = abs(m3 - m2)
+
+        if w3 + w4 > 0:
+            bp1 = (m3*w3 + m4*w4) / (w3 + w4)
+        else:
+            bp1 = 0.5 * (m3+m4)
+
+        if extrap == 0:
+            a = val3
+            c = (3 * m3 - 2 * b - bp1) / (grid[idx+1] - grid[idx])
+            d = (b + bp1 - 2 * m3) / ((grid[idx+1] - grid[idx]) * (grid[idx+1] - grid[idx]))
+            dx = x[0] - grid[idx]
+
+        elif extrap == 1:
+            a = val4
+            b = bp1;
+            dx = x[0] - grid[idx + 1]
+
+        else:
+            a = val3
+            dx = x[0] - grid[0]
+
+        # Evaluate dependent value and exit
+        return a + b * dx + c * (dx * dx) + d * (dx * dx * dx)
 
 
 class InterpCubic(object):
@@ -60,10 +366,9 @@ class InterpCubic(object):
             sig = (grid[i] - grid[i - 1]) / (grid[i + 1] - grid[i - 1])
             prtl = sig * sec_deriv[i - 1] + 2.0
             sec_deriv[i] = (sig - 1.0) / prtl
-            temp[i] = (values[i + 1] - values[i]) / (grid[i + 1] - grid[i]) - \
+            tmp = (values[i + 1] - values[i]) / (grid[i + 1] - grid[i]) - \
                       (values[i] - values[i - 1]) / (grid[i] - grid[i - 1])
-            temp[i] = (6.0 * temp[i] / (grid[i + 1] - grid[i - 1]) - sig*temp[i - 1]) / prtl
-
+            temp[i] = (6.0 * tmp / (grid[i + 1] - grid[i - 1]) - sig*temp[i - 1]) / prtl
 
         for i in range(n - 2, 0, -1):
             sec_deriv[i] = sec_deriv[i] * sec_deriv[i + 1] + temp[i]
@@ -194,12 +499,12 @@ class NPSSTable(object):
         else:
             idx, extrap_switch = self.bracket(x)
 
-        if extrap_switch == 0:
-            result = self.interp.interpolate(x, idx, self)
+        if True or extrap_switch == 0:
+            result, deriv = self.interp.interpolate(x, idx, self)
         else:
             raise NotImplementedError("Still working on extrapolation.")
 
-        return result
+        return result, deriv
 
 
 class NPSSGridInterp(GridInterpBase):
@@ -292,8 +597,14 @@ class NPSSGridInterp(GridInterpBase):
         for x in self.grid:
             if order == 'slinear':
                 coef = InterpLinear
+            elif order == 'lagrange2':
+                coef = InterpLagrange2
+            elif order == 'lagrange3':
+                coef = InterpLagrange3
             elif order == 'cubic':
                 coef = InterpCubic
+            elif order == 'akima':
+                coef = InterpAkima
 
             coeffs.append(coef)
 
@@ -313,7 +624,10 @@ class NPSSGridInterp(GridInterpBase):
             order.
         """
         interpolator_configs = {
-            "slinear": 1,
+            "slinear": 2,
+            "lagrange2": 3,
+            "lagrange3": 4,
+            "akima": 4,
             "cubic": 3,
         }
 
@@ -330,7 +644,7 @@ class NPSSGridInterp(GridInterpBase):
         list
             Valid interpolation name strings.
         """
-        return ['slinear', 'cubic']
+        return ['slinear', 'lagrange2', 'cubic', 'akima']
 
     def interpolate(self, xi, order=None, compute_gradients=True):
         """
@@ -382,16 +696,39 @@ class NPSSGridInterp(GridInterpBase):
         derivs = np.empty((n_nodes, nx))
 
         for j in range(n_nodes):
-            print('evaluating', j)
-            val = self.table.evaluate(xi[j, :])
+            val, deriv = self.table.evaluate(xi[j, :])
             result[j] = val
-            #derivs[j, :] = deriv.flatten()
+            derivs[j, :] = deriv.flatten()
 
         # Cache derivatives
-        #self.derivs = derivs
+        self.derivs = derivs
 
         # TODO: Support out-of-bounds identification.
         #if not self.bounds_error and self.fill_value is not None:
         #   result[out_of_bounds] = self.fill_value
 
         return result
+
+    def gradient(self, xi, order=None):
+        """
+        Compute the gradients at the specified point.
+
+        The gradients are computed as the interpolation itself is performed,
+        but are cached and returned separately by this method.
+
+        Parameters
+        ----------
+        xi : ndarray of shape (..., ndim)
+            The coordinates to sample the gridded data at
+        order : str, optional
+            The order of interpolation to perform. Supported are 'slinear',
+            'cubic', and 'quintic'. Default is None, which will use the order
+            defined at the construction of the interpolation object instance.
+
+        Returns
+        -------
+        gradient : ndarray of shape (..., ndim)
+            gradient vector of the gradients of the interpolated values with
+            respect to each value in xi
+        """
+        return self.derivs
