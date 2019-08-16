@@ -11,11 +11,11 @@ import numpy as np
 
 import openmdao.api as om
 
-from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
 from openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp import LocalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp import MomentOfInertiaComp
-from openmdao.test_suite.test_examples.beam_optimization.components.states_comp import MultiStatesComp
-from openmdao.test_suite.test_examples.beam_optimization.components.stress_comp import MultiStressComp
+from openmdao.test_suite.test_examples.beam_optimization.components.multi_displacements_comp import MultiDisplacementsComp
+from openmdao.test_suite.test_examples.beam_optimization.components.multi_states_comp import MultiStatesComp
+from openmdao.test_suite.test_examples.beam_optimization.components.multi_stress_comp import MultiStressComp
 from openmdao.test_suite.test_examples.beam_optimization.components.volume_comp import VolumeComp
 
 
