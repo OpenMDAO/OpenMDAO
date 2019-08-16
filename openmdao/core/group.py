@@ -593,6 +593,7 @@ class Group(System):
                 allprocs_abs_names[type_].extend(subsys._var_allprocs_abs_names[type_])
                 allprocs_discrete[type_].update({k: v for k, v in
                                                  iteritems(subsys._var_allprocs_discrete[type_])})
+
                 abs_names[type_].extend(subsys._var_abs_names[type_])
                 var_discrete[type_].update({sub_prefix + k: v for k, v in
                                             iteritems(subsys._var_discrete[type_])})
@@ -603,6 +604,12 @@ class Group(System):
                     abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
 
                 allprocs_abs2prom[type_] = abs2prom[type_]
+
+                for abs_name in subsys._var_allprocs_discrete[type_]:
+                    sub_prom_name = subsys._var_abs2prom[type_][abs_name]
+                    abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
+
+                allprocs_abs2prom[type_].update(abs2prom[type_])
 
                 # Assemble allprocs_prom2abs_list
                 for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
