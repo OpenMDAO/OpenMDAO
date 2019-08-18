@@ -35,7 +35,7 @@ class TestCase(unittest.TestCase):
         prob.driver.options['tol'] = 1e-9
         prob.driver.options['disp'] = True
 
-        prob.setup()
+        prob.setup(force_alloc_complex=False)
 
         prob.run_driver()
 
