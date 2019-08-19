@@ -66,9 +66,6 @@ There are 5 components that compute:
     openmdao.test_suite.test_examples.beam_optimization.components.states_comp
 
 .. embed-code::
-    openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp
-
-.. embed-code::
     openmdao.test_suite.test_examples.beam_optimization.components.compliance_comp
 
 .. embed-code::
