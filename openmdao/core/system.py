@@ -127,6 +127,10 @@ class System(object):
         List of absolute names of this system's variables on all procs.
     _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of this system's variables existing on current proc.
+    _var_allprocs_abs_names_discrete : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of this system's discrete variables on all procs.
+    _var_abs_names_discrete : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of this system's discrete variables existing on current proc.
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -354,6 +358,8 @@ class System(object):
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
+        self._var_allprocs_abs_names_discrete = {'input': [], 'output': []}
+        self._var_abs_names_discrete = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}

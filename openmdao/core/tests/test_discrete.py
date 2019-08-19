@@ -442,8 +442,8 @@ class DiscreteTestCase(unittest.TestCase):
         prob.setup()
 
         msg = "Only integer scalars or ndarrays are supported as values " + \
-              "for discrete variables when used as a design variable. A " + \
-              "value of type '%s' was specified."
+              "for discrete variables when used as a design variable. %s " + \
+              "was specified."
 
         # Insert a non integer
         prob['indep.x'] = 3.7
@@ -451,7 +451,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.run_driver()
 
-        self.assertEqual(str(ctx.exception), msg % 'float')
+        self.assertEqual(str(ctx.exception), msg % "A value of type 'float'")
 
         # Insert a float ndarray
         prob['indep.x'] = np.array([3.0])
@@ -459,7 +459,7 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             prob.run_driver()
 
-        self.assertEqual(str(ctx.exception), msg % 'float64')
+        self.assertEqual(str(ctx.exception), msg % "An array of type 'float64'")
 
         # Make sure these work.
 

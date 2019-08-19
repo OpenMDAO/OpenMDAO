@@ -603,13 +603,11 @@ class Group(System):
                     sub_prom_name = subsys._var_abs2prom[type_][abs_name]
                     abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
 
-                allprocs_abs2prom[type_] = abs2prom[type_]
-
-                for abs_name in subsys._var_allprocs_discrete[type_]:
+                for abs_name in subsys._var_abs_names_discrete[type_]:
                     sub_prom_name = subsys._var_abs2prom[type_][abs_name]
                     abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
 
-                allprocs_abs2prom[type_].update(abs2prom[type_])
+                allprocs_abs2prom[type_] = abs2prom[type_]
 
                 # Assemble allprocs_prom2abs_list
                 for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
