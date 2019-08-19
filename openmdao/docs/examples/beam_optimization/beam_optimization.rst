@@ -52,7 +52,7 @@ There are 5 components that compute:
 
 1. moment of inertia for each element
 2. local stiffness matrix for each element
-3. solution of the :math:`Kd=f` linear system augmented with the Lagrange multipliers
+3. displacements from solution of the :math:`Kd=f` linear system augmented with the Lagrange multipliers
 4. compliance
 5. volume
 
