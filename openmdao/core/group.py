@@ -2,7 +2,11 @@
 from __future__ import division
 
 import os
-from collections import Iterable, Counter, OrderedDict, defaultdict
+from collections import Counter, OrderedDict, defaultdict
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 from itertools import product, chain
 from numbers import Number
 import inspect
@@ -1076,10 +1080,12 @@ class Group(System):
                     # there's no ambiguity in storage order
                     if not array_connection_compatible(in_shape, out_shape):
                         msg = ("%s: The source and target shapes do not match or are ambiguous"
-                               " for the connection '%s' to '%s'. Expected %s but got %s.")
+                               " for the connection '%s' to '%s'. "
+                               "The source shape is %s but the target shape is %s.")
                         raise ValueError(msg % (self.msginfo, abs_out, abs_in,
+                                                tuple([int(s) for s in out_shape]),
                                                 tuple([int(s) for s in in_shape]),
-                                                tuple([int(s) for s in out_shape])))
+                                                ))
 
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)
