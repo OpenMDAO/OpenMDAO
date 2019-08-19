@@ -11,11 +11,10 @@ import numpy as np
 
 import openmdao.api as om
 
-from openmdao.test_suite.test_examples.beam_optimization.components.displacements_comp import MultiDisplacementsComp
 from openmdao.test_suite.test_examples.beam_optimization.components.local_stiffness_matrix_comp import LocalStiffnessMatrixComp
 from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp import MomentOfInertiaComp
-from openmdao.test_suite.test_examples.beam_optimization.components.states_comp import MultiStatesComp
-from openmdao.test_suite.test_examples.beam_optimization.components.stress_comp import MultiStressComp
+from openmdao.test_suite.test_examples.beam_optimization.components.multi_states_comp import MultiStatesComp
+from openmdao.test_suite.test_examples.beam_optimization.components.multi_stress_comp import MultiStressComp
 from openmdao.test_suite.test_examples.beam_optimization.components.volume_comp import VolumeComp
 
 
@@ -122,9 +121,6 @@ class MultipointBeamGroup(om.Group):
                                    num_rhs=num_rhs)
             sub.add_subsystem('states_comp', comp)
 
-            comp = MultiDisplacementsComp(num_elements=num_elements, num_rhs=num_rhs)
-            sub.add_subsystem('displacements_comp', comp)
-
             comp = MultiStressComp(num_elements=num_elements, E=E, num_rhs=num_rhs)
             sub.add_subsystem('stress_comp', comp)
 
@@ -133,12 +129,9 @@ class MultipointBeamGroup(om.Group):
                 'parallel.%s.states_comp.K_local' % name)
 
             for k in range(num_rhs):
-                sub.connect(
-                    'states_comp.d_%d' % k,
-                    'displacements_comp.d_%d' % k)
-                sub.connect(
-                    'displacements_comp.displacements_%d' % k,
-                    'stress_comp.displacements_%d' % k)
+                sub.connect('states_comp.d_%d' % k,
+                            'stress_comp.displacements_%d' % k,
+                            src_indices=np.arange(2 *num_nodes))
 
                 comp = om.KSComp(width=num_elements)
                 comp.options['upper'] = max_bending

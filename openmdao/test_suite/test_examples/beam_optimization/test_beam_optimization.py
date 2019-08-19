@@ -2,11 +2,10 @@ from __future__ import print_function, division, absolute_import
 
 import unittest
 
-from openmdao.utils.assert_utils import assert_rel_error
-
 import openmdao.api as om
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
 from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
+from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -129,6 +128,68 @@ class TestCase(unittest.TestCase):
                            0.37369202,  0.36342186,  0.35289066,  0.34008777,  0.32362887,  0.30300358,
                            0.27867837,  0.25204063,  0.22519409,  0.20063906,  0.18088818,  0.16807856,
                            0.16364104], 1e-4)
+
+    def test_complex_step(self):
+        E = 1.
+        L = 1.
+        b = 0.1
+        volume = 0.01
+
+        num_elements = 50
+
+        prob = om.Problem(model=BeamGroup(E=E, L=L, b=b, volume=volume, num_elements=num_elements))
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = True
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        derivs = prob.check_totals(method='cs', out_stream=None)
+        assert_rel_error(self, derivs[('compliance_comp.compliance', 'inputs_comp.h')]['rel error'][0],
+                         0.0, 1e-8)
+        assert_rel_error(self, derivs[('volume_comp.volume', 'inputs_comp.h')]['rel error'][0],
+                         0.0, 1e-8)
+
+        derivs = prob.check_partials(method='cs', out_stream=None)
+        assert_check_partials(derivs, rtol=1e-15)
+
+    def test_complex_step_multipoint(self):
+        E = 1.
+        L = 1.
+        b = 0.1
+        volume = 0.01
+
+        num_cp = 5
+        num_elements = 50
+        num_load_cases = 2
+
+        model = MultipointBeamGroup(E=E, L=L, b=b, volume=volume,
+                                        num_elements=num_elements, num_cp=num_cp,
+                                        num_load_cases=num_load_cases)
+
+        prob = om.Problem(model=model)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+        prob.driver.options['disp'] = True
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.run_model()
+
+        derivs = prob.check_totals(method='cs', out_stream=None)
+        assert_rel_error(self, derivs[('obj_sum.obj', 'inputs_comp.h_cp')]['rel error'][0],
+                         0.0, 1e-8)
+        assert_rel_error(self, derivs[('volume_comp.volume', 'inputs_comp.h_cp')]['rel error'][0],
+                         0.0, 1e-8)
+
+        derivs = prob.check_partials(method='cs', out_stream=None)
+        assert_check_partials(derivs, rtol=1e-15)
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
