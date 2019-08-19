@@ -269,17 +269,23 @@ class DirectSolver(LinearSolver):
                 iproc = system.comm.rank
                 sizes = system._var_sizes['nonlinear']['output'][iproc]
                 owned_sizes = system._owned_sizes
-                self._owned2full_inds = []
+                inds = []
                 start = end = 0
                 for owned_sz, sz in zip(system._owned_sizes[iproc], sizes):
                     if sz == 0:
                         continue
                     end += sz
                     if owned_sz > 0:
-                        self._owned2full_inds.extend(np.arange(start, end, dtype=int))
+                        inds.extend(np.arange(start, end, dtype=int))
                     start = end
-                self._owned2full_inds = np.hstack(self._owned2full_inds)
+                if len(inds) > 1:
+                    self._owned2full_inds = np.hstack(inds)
+                elif inds:
+                    self._owned2full_inds = inds[0]
+                else:
+                    self._owned2full_inds = np.zeros(0, dtype=int)
                 self._owned_size_totals = np.sum(owned_sizes, axis=1)
+
 
             if matrix is None:
                 self._lu = self._lup = None
