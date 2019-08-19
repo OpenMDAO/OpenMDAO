@@ -8,42 +8,54 @@ from scipy.sparse.linalg import splu
 import openmdao.api as om
 
 
-class StatesComp(om.ImplicitComponent):
+class MultiStatesComp(om.ImplicitComponent):
 
     def initialize(self):
         self.options.declare('num_elements', types=int)
         self.options.declare('force_vector', types=np.ndarray)
+        self.options.declare('num_rhs', types=int)
 
     def setup(self):
         num_elements = self.options['num_elements']
         num_nodes = num_elements + 1
         size = 2 * num_nodes + 2
+        num_rhs = self.options['num_rhs']
 
         self.add_input('K_local', shape=(num_elements, 4, 4))
-        self.add_output('d', shape=size)
+        for j in range(num_rhs):
+            self.add_output('d_%d' % j, shape=size)
 
         cols = np.arange(16*num_elements)
         rows = np.repeat(np.arange(4), 4)
         rows = np.tile(rows, num_elements) + np.repeat(np.arange(num_elements), 16) * 2
 
-        self.declare_partials('d', 'K_local', rows=rows, cols=cols)
-        self.declare_partials('d', 'd')
+        for j in range(num_rhs):
+            disp = 'd_%d' % j
+
+            self.declare_partials(disp, 'K_local', rows=rows, cols=cols)
+            self.declare_partials(disp, disp)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
-        force_vector = np.concatenate([self.options['force_vector'], np.zeros(2)])
+        num_rhs = self.options['num_rhs']
 
         self.K = self.assemble_CSC_K(inputs)
-        residuals['d'] = self.K.dot(outputs['d'])  - force_vector
+        for j in range(num_rhs):
+            force_vector = np.concatenate([self.options['force_vector'][:, j], np.zeros(2)])
+            residuals['d_%d' % j] = self.K.dot(outputs['d_%d' % j]) - force_vector
 
     def solve_nonlinear(self, inputs, outputs):
-        force_vector = np.concatenate([self.options['force_vector'], np.zeros(2)])
+        num_rhs = self.options['num_rhs']
 
         self.K = self.assemble_CSC_K(inputs)
         self.lu = splu(self.K)
 
-        outputs['d'] = self.lu.solve(force_vector)
+        for j in range(num_rhs):
+
+            force_vector = np.concatenate([self.options['force_vector'][:, j], np.zeros(2)])
+            outputs['d_%d' % j] = self.lu.solve(force_vector)
 
     def linearize(self, inputs, outputs, jacobian):
+        num_rhs = self.options['num_rhs']
         num_elements = self.options['num_elements']
 
         self.K = self.assemble_CSC_K(inputs)
@@ -52,15 +64,23 @@ class StatesComp(om.ImplicitComponent):
         i_elem = np.tile(np.arange(4), 4)
         i_d = np.tile(i_elem, num_elements) + np.repeat(np.arange(num_elements), 16) * 2
 
-        jacobian['d', 'K_local'] = outputs['d'][i_d]
+        K_dense = self.K.toarray()
 
-        jacobian['d', 'd'] = self.K.toarray()
+        for j in range(num_rhs):
+            disp = 'd_%d' % j
+            jacobian[disp, 'K_local'] = outputs[disp][i_d]
+            jacobian[disp, disp] = K_dense
 
     def solve_linear(self, d_outputs, d_residuals, mode):
-        if mode == 'fwd':
-            d_outputs['d'] = self.lu.solve(d_residuals['d'])
-        else:
-            d_residuals['d'] = self.lu.solve(d_outputs['d'])
+        num_rhs = self.options['num_rhs']
+
+        for j in range(num_rhs):
+            disp = 'd_%d' % j
+
+            if mode == 'fwd':
+                d_outputs[disp] = self.lu.solve(d_residuals[disp])
+            else:
+                d_residuals[disp] = self.lu.solve(d_outputs[disp])
 
     def assemble_CSC_K(self, inputs):
         """
