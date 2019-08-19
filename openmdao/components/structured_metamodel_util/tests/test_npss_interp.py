@@ -26,9 +26,9 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         self.interp_configs = {
             "slinear": 2,
             "cubic": 3,
-            "lagrange2": 3,
-            "lagrange3": 4,
-            "akima": 4,
+            #"lagrange2": 3,
+            #"lagrange3": 4,
+            #"akima": 4,
         }
         self.valid_orders = self.interp_configs.keys()
         self.tol = {

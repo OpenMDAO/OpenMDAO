@@ -16,42 +16,46 @@ class InterpLinear(object):
         self.last_index = -1
         self.slope = 0.0
 
-    def interpolate(self, x, idx, table):
+    def interpolate(self, x, idx, slice_idx, table):
         grid = table.grid
-        subtables = table.subtables
+        subtable = table.subtable
         slope = self.slope
 
         # Extrapolate high
         if idx == len(grid) - 1:
             idx -= 1
 
-        if len(subtables) > 0:
-            derivs = np.empty(len(x))
+        if subtable is not None:
+            nx = len(x)
+            slice_idx.append(slice(idx, idx + 2))
 
-            dtmp, subderiv = subtables[idx].evaluate(x[1:])
-            dtmp2, subderiv2 = subtables[idx + 1].evaluate(x[1:])
-            slope = (dtmp2 - dtmp) / (grid[idx + 1] - grid[idx])
-            self.slope = slope
+            tshape = table.values[tuple(slice_idx)].shape
+            nshape = list(tshape[:-nx])
+            nshape.append(nx)
+            derivs = np.empty(tuple(nshape))
 
-            derivs[0] = slope
-            dslope_dsub = (subderiv2 - subderiv) / (grid[idx + 1] - grid[idx])
-            derivs[1:] = subderiv + (x[0] - grid[idx]) * dslope_dsub
+            dtmp, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
+            slope = (dtmp[..., 1:2] - dtmp[..., 0:1]) / (grid[idx + 1] - grid[idx])
 
-            return dtmp + (x[0] - grid[idx]) * slope, derivs
+            derivs[..., 0:1] = slope
+            dslope_dsub = (subderiv[..., 1, :] - subderiv[..., 0, :]) / (grid[idx + 1] - grid[idx])
+            derivs[..., 1:] = subderiv[..., 0, :] + (x[0] - grid[idx]) * dslope_dsub
+
+            return dtmp[..., 0] + (x[0] - grid[idx]) * slope.flatten(), derivs
 
         else:
-            values = table.values
+            values = table.values[tuple(slice_idx)]
             last_index = self.last_index
 
             # If the lookup index is the same as last time and it is not '0',
             # then the slope hasn't changed, so don't need to recalculate.
             if idx != last_index or lastIndex==0:
                 lastIndex = idx
-                slope = (values[idx + 1] - values[idx]) / (grid[idx + 1] - grid[idx])
+                slope = (values[..., idx + 1] - values[..., idx]) / (grid[idx + 1] - grid[idx])
                 self.slope = slope
                 self.last_index = last_index
 
-            return values[idx] + (x - grid[idx]) * slope, slope
+            return values[..., idx] + (x - grid[idx]) * slope, np.expand_dims(slope, axis=-1)
 
 
 class InterpLagrange2(object):
@@ -352,38 +356,41 @@ class InterpAkima(object):
 class InterpCubic(object):
 
     def __init__(self):
-        self.last_index = -1
         self.second_derivs = None
 
     def compute_second_derivatives(self, grid, values):
         n = len(grid)
 
         # Natural spline has second deriv=0 at both ends
-        sec_deriv = np.zeros(n)
-        temp = np.zeros(n)
+        sec_deriv = np.zeros(values.shape)
+        temp = np.zeros(values.shape)
 
-        for i in range(1, n-1):
-            sig = (grid[i] - grid[i - 1]) / (grid[i + 1] - grid[i - 1])
-            prtl = sig * sec_deriv[i - 1] + 2.0
-            sec_deriv[i] = (sig - 1.0) / prtl
-            tmp = (values[i + 1] - values[i]) / (grid[i + 1] - grid[i]) - \
-                      (values[i] - values[i - 1]) / (grid[i] - grid[i - 1])
-            temp[i] = (6.0 * tmp / (grid[i + 1] - grid[i - 1]) - sig*temp[i - 1]) / prtl
+        sig = (grid[1:n - 1] - grid[:n - 2]) / (grid[2:] - grid[:n - 2])
+
+        vdiff = (values[..., 1:] - values[..., :n - 1]) / (grid[1:] - grid[:n - 1])
+        tmp = 6.0 * (vdiff[..., 1:] - vdiff[..., :n - 2]) / (grid[2:] - grid[:n - 2])
+
+        for i in range(1, n - 1):
+            prtl = sig[i - 1] * sec_deriv[..., i - 1] + 2.0
+            sec_deriv[..., i] = (sig[i - 1] - 1.0) / prtl
+            temp[..., i] = (tmp[..., i - 1] - sig[i - 1] * temp[..., i - 1]) / prtl
 
         for i in range(n - 2, 0, -1):
-            sec_deriv[i] = sec_deriv[i] * sec_deriv[i + 1] + temp[i]
+            sec_deriv[..., i] = sec_deriv[..., i] * sec_deriv[..., i + 1] + temp[..., i]
 
         self.second_derivs = sec_deriv
 
-    def interpolate(self, x, idx, table):
+    def interpolate(self, x, idx, slice_idx, table):
         grid = table.grid
-        subtables = table.subtables
+        subtable = table.subtable
 
-        if len(subtables) > 0:
+        # Extrapolate high
+        if idx == len(grid) - 1:
+            idx -= 1
+
+        if subtable is not None:
             n = len(grid)
-            values = np.zeros(n)
-            for j in range(n):
-                values[j] = subtables[j].evaluate(x[1:])
+            values, _ = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
             self.compute_second_derivatives(table.grid, values)
             sec_deriv = self.second_derivs
@@ -391,9 +398,9 @@ class InterpCubic(object):
             step = grid[idx + 1] - grid[idx]
             a = (grid[idx + 1] - x[0]) / step
             b = (x[0] - grid[idx]) / step
-            return a * values[idx] + b * values[idx + 1] + \
-                   ((a * a * a - a) * sec_deriv[idx] + \
-                    (b * b * b - b) * sec_deriv[idx + 1]) * (step * step) / 6.0
+            return a * values[..., idx] + b * values[..., idx + 1] + \
+                   ((a * a * a - a) * sec_deriv[..., idx] + \
+                    (b * b * b - b) * sec_deriv[..., idx + 1]) * (step * step) / 6.0, None
 
         else:
             values = table.values
@@ -406,29 +413,22 @@ class InterpCubic(object):
             step = grid[idx + 1] - grid[idx]
             a = (grid[idx+1] - x) / step
             b = (x - grid[idx]) / step
-            return a * values[idx] + b * values[idx + 1] + \
-                   ((a * a * a - a) * sec_deriv[idx] + \
-                    (b * b * b - b) * sec_deriv[idx + 1]) * (step * step) / 6.0
+            return a * values[..., idx] + b * values[..., idx + 1] + \
+                   ((a * a * a - a) * sec_deriv[..., idx] + \
+                    (b * b * b - b) * sec_deriv[..., idx + 1]) * (step * step) / 6.0, None
 
 
 class NPSSTable(object):
 
     def __init__(self, grid, values, coeffs):
-        self.subtables = []
+        self.subtable = None
 
         self.grid = grid[0]
         self.interp = coeffs[0]()
+        self.values = values
 
         if len(grid) > 1:
-            self.values = values[0, :]
-
-            nt = len(grid[0])
-            for j in range(nt):
-                subtable = NPSSTable(grid[1:], values[j, :], coeffs[1:])
-                self.subtables.append(subtable)
-
-        else:
-            self.values = values
+            self.subtable = NPSSTable(grid[1:], values, coeffs[1:])
 
         self.last_index = 0
 
@@ -492,7 +492,7 @@ class NPSSTable(object):
 
         return last_index, 0
 
-    def evaluate(self, x):
+    def evaluate(self, x, slice_idx=None):
 
         if len(x) > 0:
             idx, extrap_switch = self.bracket(x[0])
@@ -500,7 +500,9 @@ class NPSSTable(object):
             idx, extrap_switch = self.bracket(x)
 
         if True or extrap_switch == 0:
-            result, deriv = self.interp.interpolate(x, idx, self)
+            if slice_idx is None:
+                slice_idx = []
+            result, deriv = self.interp.interpolate(x, idx, slice_idx, self)
         else:
             raise NotImplementedError("Still working on extrapolation.")
 
@@ -698,7 +700,8 @@ class NPSSGridInterp(GridInterpBase):
         for j in range(n_nodes):
             val, deriv = self.table.evaluate(xi[j, :])
             result[j] = val
-            derivs[j, :] = deriv.flatten()
+            if deriv is not None:
+                derivs[j, :] = deriv.flatten()
 
         # Cache derivatives
         self.derivs = derivs
