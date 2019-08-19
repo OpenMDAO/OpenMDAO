@@ -267,7 +267,7 @@ class Component(System):
                 abs_name = prefix + prom_name
                 metadata = self._var_rel2meta[prom_name]
 
-                # Compute allprocs_abs_names, abs_names
+                # Compute allprocs_abs_names
                 allprocs_abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
@@ -286,7 +286,7 @@ class Component(System):
             for prom_name, val in iteritems(self._var_discrete[type_]):
                 abs_name = prefix + prom_name
 
-                # Compute allprocs_abs_names, abs_names
+                # Compute allprocs_abs_names
                 allprocs_abs_names_discrete[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom

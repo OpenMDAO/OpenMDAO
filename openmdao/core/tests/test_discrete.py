@@ -245,6 +245,7 @@ class DiscreteTestCase(unittest.TestCase):
         stream = StringIO()
         prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
+        print(text)
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
 
@@ -315,7 +316,6 @@ class DiscreteTestCase(unittest.TestCase):
         stream = StringIO()
         prob.model.list_inputs(values=True, prom_name=True, out_stream=stream)
         text = stream.getvalue()
-        print(text)
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
 
@@ -325,7 +325,6 @@ class DiscreteTestCase(unittest.TestCase):
         stream = StringIO()
         prob.model.list_outputs(values=True, prom_name=True, out_stream=stream)
         text = stream.getvalue()
-        print(text)
 
         self.assertEqual(text.count('\ntop'), 2)        # both implicit & explicit
         self.assertEqual(text.count('\n  indep'), 1)
@@ -754,6 +753,56 @@ class DiscreteFeatureTestCase(unittest.TestCase):
 
         # minimum value
         assert_rel_error(self, prob['SolidityComp.blade_solidity'], 0.02984155, 1e-4)
+
+    def test_feature_discrete_implicit(self):
+        import openmdao.api as om
+
+        class ImpWithInitial(om.ImplicitComponent):
+            """
+            An implicit component to solve the quadratic equation: x^2 - 4x + 3
+            (solutions at x=1 and x=3)
+            """
+            def setup(self):
+                self.add_input('a', val=1.)
+                self.add_input('b', val=-4.)
+                self.add_discrete_input('c', val=3)
+                self.add_output('x', val=5.)
+
+                self.declare_partials(of='*', wrt='*')
+
+            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs, discrete_outputs):
+                a = inputs['a']
+                b = inputs['b']
+                c = discrete_inputs['c']
+                x = outputs['x']
+                residuals['x'] = a * x ** 2 + b * x + c
+
+            def linearize(self, inputs, outputs, partials, discrete_inputs, discrete_outputs):
+                a = inputs['a']
+                b = inputs['b']
+                x = outputs['x']
+
+                partials['x', 'a'] = x ** 2
+                partials['x', 'b'] = x
+                partials['x', 'x'] = 2 * a * x + b
+
+            def guess_nonlinear(self, inputs, outputs, resids, discrete_inputs, discrete_outputs):
+                # Default initial state of zero for x takes us to x=1 solution.
+                # Here we set it to a value that will take us to the x=3 solution.
+                outputs['x'] = 5
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', ImpWithInitial())
+
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.ScipyKrylov()
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob['comp.x'], 3., 1e-4)
 
 
 if __name__ == "__main__":
