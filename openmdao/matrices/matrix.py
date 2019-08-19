@@ -25,9 +25,11 @@ class Matrix(object):
         dictionary of sub-jacobian data keyed by (out_name, in_name).
     _metadata : dict
         implementation-specific data for the sub-jacobians.
+    _is_internal : bool
+        If True, this is the int_mtx of an AssembledJacobian.
     """
 
-    def __init__(self, comm):
+    def __init__(self, comm, is_internal):
         """
         Initialize all attributes.
 
@@ -35,11 +37,14 @@ class Matrix(object):
         ----------
         comm : MPI.Comm or <FakeComm>
             communicator of the top-level system that owns the <Jacobian>.
+        is_internal : bool
+            If True, this is the int_mtx of an AssembledJacobian.
         """
         self._comm = comm
         self._matrix = None
         self._submats = OrderedDict()
         self._metadata = OrderedDict()
+        self._is_internal = is_internal
 
     def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
         """
@@ -65,7 +70,7 @@ class Matrix(object):
         """
         self._submats[key] = (info, (irow, icol), src_indices, shape, factor)
 
-    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
+    def _build(self, num_rows, num_cols, system=None):
         """
         Allocate the matrix.
 
@@ -75,10 +80,8 @@ class Matrix(object):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        in_ranges : dict
-            Maps input var name to column range.
-        out_ranges : dict
-            Maps output var name to row range.
+        system : <System>
+            owning system.
         """
         pass
 

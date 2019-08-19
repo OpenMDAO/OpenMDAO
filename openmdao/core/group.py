@@ -18,7 +18,7 @@ import networkx as nx
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System, INT_DTYPE, get_relevant_vars
+from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component, _DictValues, _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
@@ -739,13 +739,17 @@ class Group(System):
                     self.comm.Allgather(sizes_in, sizes[type_])
 
             # compute owning ranks
+            abs2meta = self._var_allprocs_abs2meta
             owns = self._owning_rank
+            self._owned_sizes = self._var_sizes[vec_names[0]]['output'].copy()
             for type_ in ('input', 'output'):
                 sizes = self._var_sizes[vec_names[0]][type_]
                 for i, name in enumerate(self._var_allprocs_abs_names[type_]):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
+                            if type_ is 'output' and not abs2meta[name]['distributed']:
+                                self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
                 if self._var_allprocs_discrete[type_]:
@@ -754,6 +758,8 @@ class Group(System):
                         for n in names:
                             if n not in owns:
                                 owns[n] = i
+        else:
+            self._owned_sizes = self._var_sizes[vec_names[0]]['output']
 
         if self._use_derivatives:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
@@ -1021,7 +1027,7 @@ class Group(System):
                 self._has_input_scaling = needs_input_scaling
 
         if self._vector_class is None:
-            if MPI is not None and self.comm.size > 1:
+            if self.comm.size > 1:
                 # we need a uniform norm() value for all ranks so we stay in sync
                 self._vector_class = self._distributed_vector_class
             else:

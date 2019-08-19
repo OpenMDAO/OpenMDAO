@@ -7,7 +7,6 @@ from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
 
-from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.api import Problem, IndepVarComp, NonlinearBlockGS, ScipyOptimizeDriver, \
     ExecComp, Group, NewtonSolver, ImplicitComponent, ScipyKrylov, ExplicitComponent, ParallelGroup

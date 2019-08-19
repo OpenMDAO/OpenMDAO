@@ -8,7 +8,7 @@ from six import assertRaisesRegex, StringIO, assertRegex, iteritems
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.group import get_relevant_vars
+from openmdao.core.system import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.paraboloid import Paraboloid

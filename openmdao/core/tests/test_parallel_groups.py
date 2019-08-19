@@ -149,6 +149,37 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
+    def test_diamond_direct_solver(self):
+
+        prob = om.Problem()
+        prob.model = Diamond()
+        prob.model.linear_solver = om.DirectSolver()
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+
+        #import wingdbstub
+        prob.run_model()
+
+        assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
+        assert_rel_error(self, prob['c4.y2'], -93.0, 1e-6)
+
+        indep_list = ['iv.x']
+        unknown_list = ['c4.y1', 'c4.y2']
+
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
+        assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
+
+        prob.setup(check=False, mode='rev')
+        prob.run_model()
+
+        assert_rel_error(self, prob['c4.y1'], 46.0, 1e-6)
+        assert_rel_error(self, prob['c4.y2'], -93.0, 1e-6)
+
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
+        assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
+
     def test_converge_diverge(self):
 
         prob = om.Problem()

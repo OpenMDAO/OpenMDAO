@@ -19,7 +19,7 @@ class DenseMatrix(COOMatrix):
     Dense global matrix.
     """
 
-    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
+    def _build(self, num_rows, num_cols, system=None):
         """
         Allocate the matrix.
 
@@ -29,12 +29,10 @@ class DenseMatrix(COOMatrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        in_ranges : dict
-            Maps input var name to column range.
-        out_ranges : dict
-            Maps output var name to row range.
+        system : <System>
+            owning system.
         """
-        super(DenseMatrix, self)._build(num_rows, num_cols, in_ranges, out_ranges)
+        super(DenseMatrix, self)._build(num_rows, num_cols)
         self._coo = self._matrix
 
     def _prod(self, in_vec, mode, ranges, mask=None):

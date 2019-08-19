@@ -433,7 +433,7 @@ class IndicesTestCase2(unittest.TestCase):
         root.connect('G1.par2.c3.y', 'G1.par2.c5.x')
 
         prob.setup(check=False, mode=mode)
-        prob.run_driver()
+        prob.run_model()
 
         return prob
 

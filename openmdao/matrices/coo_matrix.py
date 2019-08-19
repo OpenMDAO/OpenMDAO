@@ -4,7 +4,7 @@ from __future__ import division, print_function
 from collections import Counter, defaultdict
 import numpy as np
 from numpy import ndarray
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, csc_matrix
 
 from six import iteritems
 from six.moves import range
@@ -25,9 +25,11 @@ class COOMatrix(Matrix):
         parent CSC matrix.
     _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
+    _is_internal : bool
+        If True, this is the int_mtx of an AssembledJacobian.
     """
 
-    def __init__(self, comm):
+    def __init__(self, comm, is_internal):
         """
         Initialize all attributes.
 
@@ -35,33 +37,42 @@ class COOMatrix(Matrix):
         ----------
         comm : MPI.Comm or <FakeComm>
             communicator of the top-level system that owns the <Jacobian>.
+        is_internal : bool
+            If True, this is the int_mtx of an AssembledJacobian.
         """
-        super(COOMatrix, self).__init__(comm)
+        super(COOMatrix, self).__init__(comm, is_internal)
         self._mat_range_cache = {}
         self._coo = None
 
-    def _build_sparse(self, num_rows, num_cols):
+    def _build_coo(self, system):
         """
-        Allocate the data, rows, and cols for the sparse matrix.
+        Allocate the data, rows, and cols for the COO matrix.
 
         Parameters
         ----------
-        num_rows : int
-            number of rows in the matrix.
-        num_cols : int
-            number of cols in the matrix.
+        system : <System>
+            Parent system of this matrix.
 
         Returns
         -------
         (ndarray, ndarray, ndarray)
-            data, rows, cols that can be used to construct a sparse matrix.
+            data, rows, cols that can be used to construct a COO matrix.
         """
         submats = self._submats
         metadata = self._metadata
         pre_metadata = self._key_ranges = OrderedDict()
+        if system is None:
+            owns = None
+            iproc = 0
+        else:
+            owns = system._owning_rank
+            iproc = system.comm.rank
 
         start = end = 0
         for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
+            if owns and owns[key[1]] != iproc:
+                continue  # only keep stuff that this rank owns
+
             val = info['value']
             rows = info['rows']
             dense = (rows is None and (val is None or isinstance(val, ndarray)))
@@ -134,7 +145,7 @@ class COOMatrix(Matrix):
 
         return data, rows, cols
 
-    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
+    def _build(self, num_rows, num_cols, system=None):
         """
         Allocate the matrix.
 
@@ -144,12 +155,10 @@ class COOMatrix(Matrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        in_ranges : dict
-            Maps input var name to column range.
-        out_ranges : dict
-            Maps output var name to row range.
+        system : <System>
+            owning system.
         """
-        data, rows, cols = self._build_sparse(num_rows, num_cols)
+        data, rows, cols = self._build_coo(system)
 
         metadata = self._metadata
         for key, (start, end, idxs, jac_type, factor) in iteritems(metadata):
@@ -324,3 +333,22 @@ class COOMatrix(Matrix):
             The converted mask array.
         """
         return mask
+
+    def _get_assembled_matrix(self, system):
+        assert self._is_internal
+        all_mtx = system.comm.gather(self._coo)
+
+        if system.comm.rank == 0:
+            data = []
+            rows = []
+            cols = []
+            for mtx in all_mtx:
+                data.append(mtx.data)
+                rows.append(mtx.row)
+                cols.append(mtx.col)
+
+            data = np.hstack(data)
+            rows = np.hstack(rows)
+            cols = np.hstack(cols)
+
+            return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)

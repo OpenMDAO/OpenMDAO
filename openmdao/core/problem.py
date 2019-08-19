@@ -1468,7 +1468,7 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Format to return the derivatives. Can be 'dict', 'flat_dict', or 'array'.
             Default is a 'flat_dict', which returns them in a dictionary whose keys are
             tuples of form (of, wrt).
         debug_print : bool

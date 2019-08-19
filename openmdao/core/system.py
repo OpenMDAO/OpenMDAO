@@ -156,6 +156,12 @@ class System(object):
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
+    _owned_var_sizes : ndarray
+        Array of local sizes for 'owned' or distributed vars only.
+    _nodup_out_ranges : dict
+        Range of each output/resid in the global non-duplicated array.
+    _nodup2local_out_inds : ndarray
+        Indices that map values from the global non-duplicated array into the local output/resids.
     _var_offsets : {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
         Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
@@ -365,7 +371,10 @@ class System(object):
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
+        self._owned_var_sizes = None
         self._var_offsets = None
+        self._nodup_out_ranges = None
+        self._nodup2local_out_inds = None
 
         self._full_comm = None
 
@@ -1441,6 +1450,7 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_sizes = {}
+        self._owned_var_sizes = None
         self._owning_rank = defaultdict(int)
 
     def _setup_global_shapes(self):
@@ -3698,6 +3708,47 @@ class System(object):
             else:
                 new_list.append((abs2prom_in[abs_name], offset, end, idxs))
         return new_list
+
+    def _get_nodup_out_ranges(self):
+        """
+        Return an ordered dict of global (without duplicates) ranges for each output var.
+
+        Returns
+        -------
+        OrderedDict
+            Tuples of the form (start, end) keyed on variable name.
+        ndarray
+            Index array mapping global non-dup outputs/resids to local outputs/resids.
+        """
+        if self._nodup_out_ranges is None:
+            iproc = self.comm.rank
+            abs2meta = self._var_allprocs_abs2meta
+            sizes = self._var_sizes['linear']['output']
+            owned_sizes = self._owned_sizes
+            owned_offsets = np.zeros(owned_sizes.size, dtype=int)
+            owned_offsets[1:] = np.cumsum(owned_sizes.flat)[:-1]
+            owned_offsets = owned_offsets.reshape(owned_sizes.shape)
+
+            ranges = OrderedDict()
+            for i, name in enumerate(self._var_allprocs_abs_names['output']):
+                sz = owned_sizes[iproc, i]
+                if sz > 0:
+                    irank = iproc
+                else:
+                    for irank in range(self.comm.size):
+                        if owned_sizes[irank, i] > 0:
+                            break
+                start = owned_offsets[irank, i]
+                ranges[name] = (start, start + owned_sizes[irank, i])
+
+            inds = []
+            for n in self._var_abs_names['output']:
+                inds.extend(range(*ranges[n]))
+
+            self._nodup_out_ranges = ranges
+            self._nodup2local_out_inds = np.array(inds, dtype=int)
+
+        return self._nodup_out_ranges, self._nodup2local_out_inds
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

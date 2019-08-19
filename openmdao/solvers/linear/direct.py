@@ -10,12 +10,15 @@ from six.moves import range
 import numpy as np
 import scipy.linalg
 import scipy.sparse.linalg
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.utils.mpi import MPI
+from openmdao.vectors.vector import INT_DTYPE
 
 
 def loc2error_msg(system, loc_txt, loc):
@@ -198,6 +201,8 @@ class DirectSolver(LinearSolver):
         # Use an assembled jacobian by default.
         self.options['assemble_jac'] = True
 
+        self._owned2full_inds = None
+
     def _linearize_children(self):
         """
         Return a flag that is True when we need to call linearize on our subsystems' solvers.
@@ -258,18 +263,48 @@ class DirectSolver(LinearSolver):
 
         if self._assembled_jac is not None:
 
-            mtx = self._assembled_jac._int_mtx
-            ranges = self._assembled_jac._view_ranges[system.pathname]
-            matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+            matrix = self._assembled_jac._get_sys_int_mtx(system)
+
+            if system.comm.size > 1 and self._owned2full_inds is None:
+                iproc = system.comm.rank
+                sizes = system._var_sizes['nonlinear']['output'][iproc]
+                owned_sizes = system._owned_sizes
+                self._owned2full_inds = []
+                start = end = 0
+                for owned_sz, sz in zip(system._owned_sizes[iproc], sizes):
+                    if sz == 0:
+                        continue
+                    end += sz
+                    if owned_sz > 0:
+                        self._owned2full_inds.extend(range(start, end))
+                    start = end
+                self._owned2full_inds = np.array(self._owned2full_inds, dtype=int)
+                self._owned_size_totals = np.sum(owned_sizes, axis=1)
+
+            if matrix is None:
+                self._lu = self._lup = None
+                sz = np.sum(system._owned_sizes)
+                self._nondup_soln_size = sz
 
             # Perform dense or sparse lu factorization.
-            if isinstance(mtx, DenseMatrix):
+            elif isinstance(matrix, csc_matrix):
+                try:
+                    self._lu = scipy.sparse.linalg.splu(matrix)
+                    self._nondup_soln_size = matrix.shape[1]
+                except RuntimeError as err:
+                    if 'exactly singular' in str(err):
+                        raise RuntimeError(format_singular_csc_error(system, matrix))
+                    else:
+                        reraise(*sys.exc_info())
+
+            elif isinstance(matrix, np.ndarray):  # dense
                 # During LU decomposition, detect singularities and warn user.
                 with warnings.catch_warnings():
                     if self.options['err_on_singular']:
                         warnings.simplefilter('error', RuntimeWarning)
                     try:
                         self._lup = scipy.linalg.lu_factor(matrix)
+                        self._nondup_soln_size = matrix.shape[1]
                     except RuntimeWarning as err:
                         raise RuntimeError(format_singular_error(err, system, matrix))
 
@@ -277,26 +312,15 @@ class DirectSolver(LinearSolver):
                     except ValueError as err:
                         raise RuntimeError(format_nan_error(system, matrix))
 
-            elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
-                try:
-                    self._lu = scipy.sparse.linalg.splu(matrix)
-                except RuntimeError as err:
-                    if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singular_csc_error(system, matrix))
-                    else:
-                        reraise(*sys.exc_info())
-
-            elif isinstance(mtx, COOMatrix):
-                # calling scipy.sparse.linalg.splu on a COO actually transposes
-                # the matrix during conversion to csc prior to LU decomp
-                raise RuntimeError("Direct solver is not compatible with matrix type "
-                                   "COOMatrix in %s." % system.msginfo)
+            # Note: calling scipy.sparse.linalg.splu on a COO actually transposes
+            # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(mtx), system.msginfo))
+                                   " in %s." % (type(self._assembled_jac._int_mtx), system.msginfo))
 
         else:
             mtx = self._build_mtx()
+            self._nondup_soln_size = mtx.shape[1]
 
             # During LU decomposition, detect singularities and warn user.
             with warnings.catch_warnings():
@@ -330,12 +354,10 @@ class DirectSolver(LinearSolver):
 
         if self._assembled_jac is not None:
 
-            mtx = self._assembled_jac._int_mtx
-            ranges = self._assembled_jac._view_ranges[system.pathname]
-            matrix = mtx._matrix[ranges[0]:ranges[1], ranges[0]:ranges[1]]
+            matrix = self._assembled_jac._get_sys_int_mtx(system)
 
             # Dense and Sparse matrices have their own inverse method.
-            if isinstance(mtx, DenseMatrix):
+            if isinstance(matrix, np.ndarray):
                 # Detect singularities and warn user.
                 with warnings.catch_warnings():
                     if self.options['err_on_singular']:
@@ -349,7 +371,7 @@ class DirectSolver(LinearSolver):
                     except ValueError as err:
                         raise RuntimeError(format_nan_error(system, matrix))
 
-            elif isinstance(mtx, (CSRMatrix, CSCMatrix)):
+            elif isinstance(matrix, csc_matrix):
                 try:
                     inv_jac = scipy.sparse.linalg.inv(matrix)
                 except RuntimeError as err:
@@ -359,7 +381,7 @@ class DirectSolver(LinearSolver):
                         reraise(*sys.exc_info())
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(mtx), system.msginfo))
+                                   " in %s." % (type(matrix), system.msginfo))
 
         else:
             mtx = self._build_mtx()
@@ -395,41 +417,59 @@ class DirectSolver(LinearSolver):
         rel_systems : set of str
             Names of systems relevant to the current solve.
         """
-        if len(vec_names) > 1:
+        if len(vec_names) > 1 or vec_names[0] != 'linear':
             raise RuntimeError("DirectSolvers with multiple right-hand-sides are not supported.")
 
         self._vec_names = vec_names
 
         system = self._system
+        iproc = system.comm.rank
 
-        for vec_name in vec_names:
-            if vec_name not in system._rel_vec_names:
-                continue
-            self._vec_name = vec_name
-            d_residuals = system._vectors['residual'][vec_name]
-            d_outputs = system._vectors['output'][vec_name]
+        d_residuals = system._vectors['residual']['linear']
+        d_outputs = system._vectors['output']['linear']
 
-            # assign x and b vectors based on mode
-            if mode == 'fwd':
-                x_vec = d_outputs
-                b_vec = d_residuals
-                trans_lu = 0
-                trans_splu = 'N'
-            else:  # rev
-                x_vec = d_residuals
-                b_vec = d_outputs
-                trans_lu = 1
-                trans_splu = 'T'
+        # assign x and b vectors based on mode
+        if mode == 'fwd':
+            x_vec = d_outputs._data
+            b_vec = d_residuals._data
+            trans_lu = 0
+            trans_splu = 'N'
+        else:  # rev
+            x_vec = d_residuals._data
+            b_vec = d_outputs._data
+            trans_lu = 1
+            trans_splu = 'T'
 
-            # AssembledJacobians are unscaled.
-            if self._assembled_jac is not None:
-                with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                    if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
-                        x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data,
-                                                               trans=trans_lu)
-                    else:
-                        x_vec._data[:] = self._lu.solve(b_vec._data, trans_splu)
-
-            # MVP-generated jacobians are scaled.
+        # AssembledJacobians are unscaled.
+        if self._assembled_jac is not None:
+            if system.comm.size > 1:
+                # gather full_b
+                full_b = np.empty(self._nondup_soln_size)
+                system.comm.Gatherv(b_vec[self._owned2full_inds],  # src
+                                    (full_b, self._owned_size_totals),  # dest
+                                    root=0)
             else:
-                x_vec._data[:] = scipy.linalg.lu_solve(self._lup, b_vec._data, trans=trans_lu)
+                full_b = b_vec
+
+            with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+                if iproc == 0:
+                    if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
+                        arr = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
+                    else:
+                        arr = self._lu.solve(full_b, trans_splu)
+
+                if system.comm.size > 1:
+                    if iproc > 0:
+                        arr = np.zeros(full_b.size)
+
+                    # this sends more data than necessary, but the alternative is to use a lot
+                    # of memory on rank 0 to store the chunk that each proc needs.
+                    system.comm.Bcast(arr, root=0)
+                    x_vec[:] = arr[system._get_nodup_out_ranges()[1]]
+                else:
+                    x_vec[:] = arr
+
+        # matrix-vector-product-generated jacobians are scaled.
+        else:
+            # FIXME: fix to work with MPI
+            x_vec[:] = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)

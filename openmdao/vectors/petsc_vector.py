@@ -24,6 +24,9 @@ CITATION = '''@InProceedings{petsc-efficient,
 }'''
 
 
+_full_slice = slice(None)
+
+
 class PETScVector(DefaultVector):
     """
     PETSc Vector implementation for running in parallel.
@@ -186,6 +189,8 @@ class PETScVector(DefaultVector):
         float
             The computed dot product value.
         """
-        # if self._system.comm.size > 1:
-        #     dup_inds = self._get_dup_inds()
-        return self._system.comm.allreduce(np.dot(self._data, vec._data))
+        if self._system.comm.size > 1:
+            dup_inds = self._get_dup_inds()
+        else:
+            dup_inds = _full_slice
+        return self._system.comm.allreduce(np.dot(self._data[dup_inds], vec._data[dup_inds]))
