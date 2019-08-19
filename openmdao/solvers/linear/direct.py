@@ -276,9 +276,9 @@ class DirectSolver(LinearSolver):
                         continue
                     end += sz
                     if owned_sz > 0:
-                        self._owned2full_inds.extend(range(start, end))
+                        self._owned2full_inds.extend(np.arange(start, end, dtype=int))
                     start = end
-                self._owned2full_inds = np.array(self._owned2full_inds, dtype=int)
+                self._owned2full_inds = np.hstack(self._owned2full_inds)
                 self._owned_size_totals = np.sum(owned_sizes, axis=1)
 
             if matrix is None:
