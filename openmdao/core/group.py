@@ -615,11 +615,8 @@ class Group(System):
                                             iteritems(subsys._var_discrete[type_])})
 
                 # Assemble abs2prom
-                for abs_name in subsys._var_abs_names[type_]:
-                    sub_prom_name = subsys._var_abs2prom[type_][abs_name]
-                    abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
-
-                for abs_name in subsys._var_abs_names_discrete[type_]:
+                for abs_name in chain(subsys._var_abs_names[type_],
+                                      subsys._var_abs_names_discrete[type_]):
                     sub_prom_name = subsys._var_abs2prom[type_][abs_name]
                     abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
 
