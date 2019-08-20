@@ -315,7 +315,7 @@ class DiscreteTestCase(unittest.TestCase):
         #
         stream = StringIO()
 
-        with printoptions(precision=0, floatmode='fixed'):
+        with printoptions(precision=0, floatmode='fixed', sign='-'):
             prob.model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
@@ -340,7 +340,7 @@ class DiscreteTestCase(unittest.TestCase):
         #
         stream = StringIO()
 
-        with printoptions(precision=0, floatmode='fixed'):
+        with printoptions(precision=0, floatmode='fixed', sign='-'):
             prob.model.list_outputs(prom_name=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
