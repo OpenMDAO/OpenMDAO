@@ -328,8 +328,8 @@ class DiscreteTestCase(unittest.TestCase):
             "impl.x   11     x",
         ]
 
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i].rstrip(), expected[i])
+        for i in range(len(expected)):
+            self.assertEqual(text[i].split(), expected[i].split())
 
         #
         # list outputs
@@ -363,8 +363,8 @@ class DiscreteTestCase(unittest.TestCase):
             "    y    2      impl.y",
         ]
 
-        for i, line in enumerate(expected):
-            self.assertEqual(text[i].rstrip(), expected[i])
+        for i in range(len(expected)):
+            self.assertEqual(text[i].split(), expected[i].split())
 
     def test_list_inputs_outputs_with_tags(self):
         prob = om.Problem()
