@@ -2,7 +2,11 @@
 
 from __future__ import division
 
-from collections import OrderedDict, Iterable, Counter, defaultdict
+from collections import OrderedDict, Counter, defaultdict
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 from itertools import product
 from six import string_types, iteritems, itervalues
 

@@ -4,7 +4,11 @@ from __future__ import division
 import sys
 import os
 from contextlib import contextmanager
-from collections import OrderedDict, Iterable, defaultdict
+from collections import OrderedDict, defaultdict
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 from fnmatch import fnmatchcase
 import sys
 import os
