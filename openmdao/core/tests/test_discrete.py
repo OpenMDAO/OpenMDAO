@@ -313,25 +313,58 @@ class DiscreteTestCase(unittest.TestCase):
         # list inputs
         #
         stream = StringIO()
-        prob.model.list_inputs(values=True, prom_name=True, out_stream=stream)
-        text = stream.getvalue()
+        prob.model.list_inputs(values=True, hierarchical=False, prom_name=True, out_stream=stream)
 
-        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "3 Input(s) in 'model'",
+            "---------------------",
+            "",
+            "varname  value  prom_name",
+            "-------  -----  ---------",
+            "expl.a   [10.]  expl.a",
+            "expl.x   11     x",
+            "impl.x   11     x",
+        ]
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i].rstrip(), expected[i])
 
         #
         # list outputs
         #
         stream = StringIO()
         prob.model.list_outputs(values=True, prom_name=True, out_stream=stream)
-        text = stream.getvalue()
 
-        self.assertEqual(text.count('\ntop'), 2)        # both implicit & explicit
-        self.assertEqual(text.count('\n  indep'), 1)
-        self.assertEqual(text.count('\n    x'), 1)
-        self.assertEqual(text.count('\n  expl'), 1)
-        self.assertEqual(text.count('\n    b'), 1)
-        self.assertEqual(text.count('\n  impl'), 1)
-        self.assertEqual(text.count('\n    y'), 2)      # both implicit & explicit
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "3 Explicit Output(s) in 'model'",
+            "-------------------------------",
+            "",
+            "varname  value  prom_name",
+            "-------  -----  ---------",
+            "top",
+            "  indep",
+            "    x    11     x",
+            "  expl",
+            "    b    [20.]  expl.b",
+            "    y    2      expl.y",
+            "",
+            "",
+            "1 Implicit Output(s) in 'model'",
+            "-------------------------------",
+            "",
+            "varname  value  prom_name",
+            "-------  -----  ---------",
+            "top",
+            "  impl",
+            "    y    2      impl.y",
+        ]
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i].rstrip(), expected[i])
 
     def test_list_inputs_outputs_with_tags(self):
         prob = om.Problem()
