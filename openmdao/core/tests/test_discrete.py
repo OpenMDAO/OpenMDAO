@@ -245,7 +245,6 @@ class DiscreteTestCase(unittest.TestCase):
         stream = StringIO()
         prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue()
-        print(text)
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
 
