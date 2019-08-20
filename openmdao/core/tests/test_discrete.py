@@ -16,7 +16,6 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.general_utils import printoptions
 
 
 class ModCompEx(om.ExplicitComponent):
@@ -315,8 +314,7 @@ class DiscreteTestCase(unittest.TestCase):
         #
         stream = StringIO()
 
-        with printoptions(precision=0, floatmode='fixed', sign='-'):
-            prob.model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
+        prob.model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -333,15 +331,15 @@ class DiscreteTestCase(unittest.TestCase):
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(text[i].split(), line.split())
+                # compare with all spaces removed
+                self.assertEqual(text[i].replace(' ', ''), line.replace(' ', ''))
 
         #
         # list outputs
         #
         stream = StringIO()
 
-        with printoptions(precision=0, floatmode='fixed', sign='-'):
-            prob.model.list_outputs(prom_name=True, out_stream=stream)
+        prob.model.list_outputs(prom_name=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -371,7 +369,8 @@ class DiscreteTestCase(unittest.TestCase):
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(text[i].split(), line.split())
+                # compare with all spaces removed
+                self.assertEqual(text[i].replace(' ', ''), line.replace(' ', ''))
 
     def test_list_inputs_outputs_with_tags(self):
         prob = om.Problem()
