@@ -328,8 +328,9 @@ class DiscreteTestCase(unittest.TestCase):
             "impl.x   11     x",
         ]
 
-        for i in range(len(expected)):
-            self.assertEqual(text[i].split(), expected[i].split())
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(text[i].split(), line.split())
 
         #
         # list outputs
@@ -363,8 +364,9 @@ class DiscreteTestCase(unittest.TestCase):
             "    y    2      impl.y",
         ]
 
-        for i in range(len(expected)):
-            self.assertEqual(text[i].split(), expected[i].split())
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(text[i].split(), line.split())
 
     def test_list_inputs_outputs_with_tags(self):
         prob = om.Problem()
