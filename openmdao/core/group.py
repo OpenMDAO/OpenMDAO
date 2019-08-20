@@ -597,8 +597,10 @@ class Group(System):
 
             for type_ in ['input', 'output']:
                 # Assemble abs_names and allprocs_abs_names
-                allprocs_abs_names[type_].extend(subsys._var_allprocs_abs_names[type_])
-                allprocs_abs_names_discrete[type_].extend(subsys._var_allprocs_abs_names_discrete[type_])
+                allprocs_abs_names[type_].extend(
+                    subsys._var_allprocs_abs_names[type_])
+                allprocs_abs_names_discrete[type_].extend(
+                    subsys._var_allprocs_abs_names_discrete[type_])
 
                 abs_names[type_].extend(subsys._var_abs_names[type_])
                 abs_names_discrete[type_].extend(subsys._var_abs_names_discrete[type_])
