@@ -67,7 +67,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
         u = np.linspace(0, 3, 50)
         # randomly spaced axis
         np.random.seed(7590)
-        v = np.random.uniform(0, 3, 50)
+        v = np.random.uniform(0, 3, 33)
         v.sort()
 
         points = [u, v]
@@ -314,7 +314,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
             if method == 'slinear':
                 tol = 0.5
             interp = ScipyGridInterp(points, values, method)
-            computed = interp.interpolate(test_pt, compute_gradients=False)
+            computed = interp.interpolate(test_pt, compute_gradients=True)
             r_err = rel_error(actual, computed)
             assert r_err < tol
 
