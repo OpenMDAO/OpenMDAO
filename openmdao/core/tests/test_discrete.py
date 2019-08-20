@@ -16,6 +16,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import printoptions
 
 
 class ModCompEx(om.ExplicitComponent):
@@ -313,7 +314,9 @@ class DiscreteTestCase(unittest.TestCase):
         # list inputs
         #
         stream = StringIO()
-        prob.model.list_inputs(values=True, hierarchical=False, prom_name=True, out_stream=stream)
+
+        with printoptions(precision=0, floatmode='fixed'):
+            prob.model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -336,7 +339,9 @@ class DiscreteTestCase(unittest.TestCase):
         # list outputs
         #
         stream = StringIO()
-        prob.model.list_outputs(values=True, prom_name=True, out_stream=stream)
+
+        with printoptions(precision=0, floatmode='fixed'):
+            prob.model.list_outputs(prom_name=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
