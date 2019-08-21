@@ -201,7 +201,8 @@ class DirectSolver(LinearSolver):
         # Use an assembled jacobian by default.
         self.options['assemble_jac'] = True
 
-        self._owned2full_inds = None
+        self._local2owned_inds = None
+        self._owned_size_totals = None
 
     def _linearize_children(self):
         """
@@ -265,38 +266,19 @@ class DirectSolver(LinearSolver):
 
             matrix = self._assembled_jac._get_sys_int_mtx(system)
 
-            if system.comm.size > 1 and self._owned2full_inds is None:
-                iproc = system.comm.rank
-                sizes = system._var_sizes['nonlinear']['output'][iproc]
-                owned_sizes = system._owned_sizes
-                inds = []
-                start = end = 0
-                for owned_sz, sz in zip(system._owned_sizes[iproc], sizes):
-                    if sz == 0:
-                        continue
-                    end += sz
-                    if owned_sz > 0:
-                        inds.extend(np.arange(start, end, dtype=int))
-                    start = end
-                if len(inds) > 1:
-                    self._owned2full_inds = np.hstack(inds)
-                elif inds:
-                    self._owned2full_inds = inds[0]
-                else:
-                    self._owned2full_inds = np.zeros(0, dtype=int)
-                self._owned_size_totals = np.sum(owned_sizes, axis=1)
-
+            if system.comm.size > 1 and self._owned_size_totals is None:
+                self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
 
             if matrix is None:
                 self._lu = self._lup = None
                 sz = np.sum(system._owned_sizes)
-                self._nondup_soln_size = sz
+                self._nodup_size = sz
 
             # Perform dense or sparse lu factorization.
             elif isinstance(matrix, csc_matrix):
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
-                    self._nondup_soln_size = matrix.shape[1]
+                    self._nodup_size = matrix.shape[1]
                 except RuntimeError as err:
                     if 'exactly singular' in str(err):
                         raise RuntimeError(format_singular_csc_error(system, matrix))
@@ -310,7 +292,7 @@ class DirectSolver(LinearSolver):
                         warnings.simplefilter('error', RuntimeWarning)
                     try:
                         self._lup = scipy.linalg.lu_factor(matrix)
-                        self._nondup_soln_size = matrix.shape[1]
+                        self._nodup_size = matrix.shape[1]
                     except RuntimeWarning as err:
                         raise RuntimeError(format_singular_error(err, system, matrix))
 
@@ -326,7 +308,7 @@ class DirectSolver(LinearSolver):
 
         else:
             mtx = self._build_mtx()
-            self._nondup_soln_size = mtx.shape[1]
+            self._nodup_size = mtx.shape[1]
 
             # During LU decomposition, detect singularities and warn user.
             with warnings.catch_warnings():
@@ -449,9 +431,10 @@ class DirectSolver(LinearSolver):
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
             if system.comm.size > 1:
+                _, nodup2local_inds, local2owned_inds = system._get_nodup_out_ranges()
                 # gather full_b
-                full_b = np.empty(self._nondup_soln_size)
-                system.comm.Gatherv(b_vec[self._owned2full_inds],  # src
+                full_b = np.empty(self._nodup_size)
+                system.comm.Gatherv(b_vec[local2owned_inds],  # src
                                     (full_b, self._owned_size_totals),  # dest
                                     root=0)
             else:
@@ -471,7 +454,7 @@ class DirectSolver(LinearSolver):
                     # this sends more data than necessary, but the alternative is to use a lot
                     # of memory on rank 0 to store the chunk that each proc needs.
                     system.comm.Bcast(arr, root=0)
-                    x_vec[:] = arr[system._get_nodup_out_ranges()[1]]
+                    x_vec[:] = arr[nodup2local_inds]
                 else:
                     x_vec[:] = arr
 

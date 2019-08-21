@@ -46,7 +46,7 @@ class Matrix(object):
         self._metadata = OrderedDict()
         self._is_internal = is_internal
 
-    def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
+    def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None, col_slice=None):
         """
         Declare a sub-jacobian.
 
@@ -67,8 +67,10 @@ class Matrix(object):
             Shape of the specified submatrix.
         factor : float or None
             Unit conversion factor.
+        col_slice : slice or None
+            Column slice of local part of distributed source.
         """
-        self._submats[key] = (info, (irow, icol), src_indices, shape, factor)
+        self._submats[key] = (info, (irow, icol), src_indices, shape, factor, col_slice)
 
     def _build(self, num_rows, num_cols, system=None):
         """

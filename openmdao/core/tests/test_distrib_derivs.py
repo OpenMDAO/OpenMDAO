@@ -4,7 +4,7 @@ import unittest
 import numpy
 
 from openmdao.api import ParallelGroup, Group, Problem, IndepVarComp, \
-    ExecComp, LinearBlockGS, ExplicitComponent, ImplicitComponent, PETScKrylov
+    ExecComp, LinearBlockGS, ExplicitComponent, ImplicitComponent, PETScKrylov, DirectSolver
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_rel_error
@@ -170,20 +170,24 @@ class MPITests2(unittest.TestCase):
 
         prob = Problem()
         prob.model = group
-        prob.model.linear_solver = LinearBlockGS()
+        prob.model.linear_solver = DirectSolver()
         prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
+        
+        #import wingdbstub
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
+        print(J)
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
+        print(J)
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
     @unittest.skipUnless(MPI, "MPI is not active.")

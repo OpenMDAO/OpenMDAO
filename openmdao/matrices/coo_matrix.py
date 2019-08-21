@@ -25,8 +25,8 @@ class COOMatrix(Matrix):
         parent CSC matrix.
     _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
-    _is_internal : bool
-        If True, this is the int_mtx of an AssembledJacobian.
+    _first_gather : bool
+        If True, this is the first time the matrix has been gathered (MPI only).
     """
 
     def __init__(self, comm, is_internal):
@@ -43,6 +43,7 @@ class COOMatrix(Matrix):
         super(COOMatrix, self).__init__(comm, is_internal)
         self._mat_range_cache = {}
         self._coo = None
+        self._first_gather = True
 
     def _build_coo(self, system):
         """
@@ -64,13 +65,16 @@ class COOMatrix(Matrix):
         if system is None:
             owns = None
             iproc = 0
+            abs2meta = None
         else:
             owns = system._owning_rank
             iproc = system.comm.rank
+            abs2meta = system._var_allprocs_abs2meta
 
         start = end = 0
-        for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
-            if owns and owns[key[1]] != iproc:
+        for key, (info, loc, src_indices, shape, factor, col_slice) in iteritems(submats):
+            if owns and not (owns[key[1]] == iproc or abs2meta[key[1]]['distributed']
+                             or col_slice is not None):
                 continue  # only keep stuff that this rank owns
 
             val = info['value']
@@ -97,7 +101,7 @@ class COOMatrix(Matrix):
         cols = np.empty(end, dtype=int)
 
         for key, (start, end, dense, jrows) in iteritems(pre_metadata):
-            info, loc, src_indices, shape, factor = submats[key]
+            info, loc, src_indices, shape, factor, col_slice = submats[key]
             irow, icol = loc
             val = info['value']
             idxs = None
@@ -141,7 +145,7 @@ class COOMatrix(Matrix):
                     rows[start:end] = irows
                     cols[start:end] = icols
 
-            metadata[key] = (start, end, idxs, jac_type, factor)
+            metadata[key] = (start, end, idxs, jac_type, factor, col_slice)
 
         return data, rows, cols
 
@@ -161,13 +165,13 @@ class COOMatrix(Matrix):
         data, rows, cols = self._build_coo(system)
 
         metadata = self._metadata
-        for key, (start, end, idxs, jac_type, factor) in iteritems(metadata):
+        for key, (start, end, idxs, jac_type, factor, col_slice) in iteritems(metadata):
             if idxs is None:
-                metadata[key] = (slice(start, end), jac_type, factor)
+                metadata[key] = (slice(start, end), jac_type, factor, col_slice)
             else:
                 # store reverse indices to avoid copying subjac data during
                 # update_submat.
-                metadata[key] = (np.argsort(idxs) + start, jac_type, factor)
+                metadata[key] = (np.argsort(idxs) + start, jac_type, factor, col_slice)
 
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 
@@ -182,16 +186,16 @@ class COOMatrix(Matrix):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        idxs, jac_type, factor = self._metadata[key]
+        idxs, jac_type, factor, col_slice = self._metadata[key]
         if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
             raise TypeError("Jacobian entry for %s is of different type (%s) than "
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
         if isinstance(jac, ndarray):
-            self._matrix.data[idxs] = jac.flat
+            self._matrix.data[idxs] = jac.flat if col_slice is None else jac[:, col_slice].flat
         else:  # sparse
-            self._matrix.data[idxs] = jac.data
+            self._matrix.data[idxs] = jac.data if col_slice is None else jac[:, col_slice].data
 
         if factor is not None:
             self._matrix.data[idxs] *= factor
@@ -336,19 +340,33 @@ class COOMatrix(Matrix):
 
     def _get_assembled_matrix(self, system):
         assert self._is_internal
-        all_mtx = system.comm.gather(self._coo)
+        if self._first_gather:
+            self._first_gather = False
 
-        if system.comm.rank == 0:
-            data = []
-            rows = []
-            cols = []
-            for mtx in all_mtx:
-                data.append(mtx.data)
-                rows.append(mtx.row)
-                cols.append(mtx.col)
+            # only need to gather the row/col indices the first time. After that we only need
+            # the data.
+            all_mtx = system.comm.gather(self._coo, root=0)
 
-            data = np.hstack(data)
-            rows = np.hstack(rows)
-            cols = np.hstack(cols)
+            if system.comm.rank == 0:
+                data = []
+                rows = []
+                cols = []
+                for i, mtx in enumerate(all_mtx):
+                    data.append(mtx.data)
+                    rows.append(mtx.row)
+                    cols.append(mtx.col)
 
-            return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)
+                data = np.hstack(data)
+                self._gathered_rows = rows = np.hstack(rows)
+                self._gathered_cols = cols = np.hstack(cols)
+
+                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)
+        else:
+            all_data = system.comm.gather(self._coo.data, root=0)
+
+            if system.comm.rank == 0:
+                data = np.hstack(all_data)
+                rows = self._gathered_rows
+                cols = self._gathered_cols
+
+                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)

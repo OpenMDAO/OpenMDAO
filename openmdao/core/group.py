@@ -650,7 +650,9 @@ class Group(System):
                 self._has_resid_scaling |= rscale
 
                 # Assemble in parallel allprocs_abs2meta
-                allprocs_abs2meta.update(myproc_abs2meta)
+                for n in myproc_abs2meta:
+                    if n not in allprocs_abs2meta:
+                        allprocs_abs2meta[n] = myproc_abs2meta[n]
 
                 for type_ in ['input', 'output']:
 

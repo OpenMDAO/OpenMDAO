@@ -124,6 +124,7 @@ class AssembledJacobian(Jacobian):
         iproc = system.comm.rank
         abs2idx = system._var_allprocs_abs2idx['nonlinear']
         in_sizes = system._var_sizes['nonlinear']['input']
+        owned_sizes = system._owned_sizes
         out_ranges = self._out_ranges
         # for non-MPI case, global_out_ranges is out_ranges
         global_out_ranges = self._nodup_out_ranges
@@ -146,7 +147,8 @@ class AssembledJacobian(Jacobian):
             res_size = res_end - res_offset
 
             if wrt_abs_name in abs2prom_out:
-                if check_owns and owns[wrt_abs_name] != iproc:
+                if check_owns and (owns[wrt_abs_name] != iproc and
+                                   not all_meta[wrt_abs_name]['distributed']):
                     continue
                 out_offset, out_end = global_out_ranges[wrt_abs_name]
                 out_size = out_end - out_offset
@@ -154,9 +156,15 @@ class AssembledJacobian(Jacobian):
                 int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
             elif wrt_abs_name in in_ranges:
                 if wrt_abs_name in conns:  # connected input
-                    if check_owns and owns[wrt_abs_name] != iproc:
-                        continue
                     out_abs_name = conns[wrt_abs_name]
+                    if out_abs_name not in global_out_ranges:
+                        continue
+
+                    if check_owns and (owns[wrt_abs_name] != iproc and
+                                       not (all_meta[wrt_abs_name]['distributed'] or
+                                            all_meta[out_abs_name]['distributed'])):
+                        continue
+
                     meta_in = abs2meta[wrt_abs_name]
                     all_out_meta = all_meta[out_abs_name]
                     # calculate unit conversion
@@ -169,14 +177,18 @@ class AssembledJacobian(Jacobian):
                     else:
                         factor = None
 
-                    if out_abs_name not in global_out_ranges:
-                        continue
                     out_offset, out_end = global_out_ranges[out_abs_name]
                     out_size = out_end - out_offset
                     shape = (res_size, out_size)
                     src_indices = abs2meta[wrt_abs_name]['src_indices']
 
-                    if src_indices is not None:
+                    col_slice = None
+                    if src_indices is None:
+                        if all_meta[out_abs_name]['distributed']:
+                            ivar = abs2idx[out_abs_name]
+                            colstart = np.sum(owned_sizes[:iproc, ivar])
+                            col_slice = slice(colstart, colstart + owned_sizes[iproc, ivar])
+                    else:
                         # need to add an entry for d(output)/d(source)
                         # instead of d(output)/d(input)
                         abs_key2 = (res_abs_name, out_abs_name)
@@ -186,8 +198,9 @@ class AssembledJacobian(Jacobian):
                             src_indices = _flatten_src_indices(src_indices, meta_in['shape'],
                                                                all_out_meta['global_shape'],
                                                                all_out_meta['global_size'])
+
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
-                                        src_indices, shape, factor)
+                                        src_indices, shape, factor, col_slice)
 
                 elif not is_top:  # input is connected to something outside current system
                     in_offset, in_end = in_ranges[wrt_abs_name]
@@ -309,7 +322,8 @@ class AssembledJacobian(Jacobian):
             output_names = set(n for n in system._var_abs_names['output']
                                if owned[n] == irank or meta[n]['distributed'])
             input_names = set(n for n in system._var_abs_names['input']
-                              if owned[n] == irank or meta[n]['distributed'])
+                              if owned[n] == irank or meta[n]['distributed'] or
+                              (n in global_conns and meta[global_conns[n]]['distributed']))
 
             rev_conns = defaultdict(list)
             for tgt, src in iteritems(global_conns):
@@ -338,7 +352,6 @@ class AssembledJacobian(Jacobian):
                                     break
                 elif wrtname in input_names:  # wrt is an input
                     if wrtname in global_conns:
-                        src = global_conns[wrtname]
                         iters.append(abs_key)
                     elif ext_mtx is not None:
                         iters_in_ext.append(abs_key)

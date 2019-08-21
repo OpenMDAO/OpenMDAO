@@ -3725,30 +3725,57 @@ class System(object):
             abs2meta = self._var_allprocs_abs2meta
             sizes = self._var_sizes['linear']['output']
             owned_sizes = self._owned_sizes
-            owned_offsets = np.zeros(owned_sizes.size, dtype=int)
-            owned_offsets[1:] = np.cumsum(owned_sizes.flat)[:-1]
-            owned_offsets = owned_offsets.reshape(owned_sizes.shape)
 
             ranges = OrderedDict()
-            for i, name in enumerate(self._var_allprocs_abs_names['output']):
-                sz = owned_sizes[iproc, i]
-                if sz > 0:
-                    irank = iproc
-                else:
-                    for irank in range(self.comm.size):
-                        if owned_sizes[irank, i] > 0:
-                            break
-                start = owned_offsets[irank, i]
-                ranges[name] = (start, start + owned_sizes[irank, i])
-
+            out_views = self._outputs._views
             inds = []
-            for n in self._var_abs_names['output']:
-                inds.extend(range(*ranges[n]))
+
+            # compute offsets into the full non-dup output/resid array
+            offsets = np.zeros(owned_sizes.size, dtype=int)
+            offsets[1:] = np.cumsum(owned_sizes.flat)[:-1]
+            offsets = offsets.reshape(owned_sizes.shape)
+
+            # order ranks with our rank first
+            ordered_ranks = [iproc] + [r for r in range(self.comm.size) if r != iproc]
+
+            # compute ranges/indices into the full non-duplicated output/resid arrays
+            for i, name in enumerate(self._var_allprocs_abs_names['output']):
+                # check each rank (this rank first) for the first nonzero size
+                for irank in ordered_ranks:
+                    size = owned_sizes[irank, i]
+                    if size > 0:
+                        start = offsets[irank, i]
+                        ranges[name] = (start, start + size)
+                        if name in out_views:
+                            inds.append(np.arange(start, start + size, dtype=int))
+                        break
 
             self._nodup_out_ranges = ranges
-            self._nodup2local_out_inds = np.array(inds, dtype=int)
+            self._nodup2local_out_inds = _arraylist2array(inds)
 
-        return self._nodup_out_ranges, self._nodup2local_out_inds
+            # get indices to pull out only the 'owned' values from the local array
+            local2owned_inds = []
+            start = end = 0
+            for owned_sz, sz in zip(owned_sizes[iproc], sizes[iproc]):
+                if sz == 0:
+                    continue
+                end += sz
+                if owned_sz > 0:
+                    local2owned_inds.append(np.arange(start, end, dtype=int))
+                start = end
+
+            self._local2owned_inds = _arraylist2array(local2owned_inds)
+
+        return self._nodup_out_ranges, self._nodup2local_out_inds, self._local2owned_inds
+
+
+def _arraylist2array(lst, dtype=int):
+    if len(lst) > 1:
+        return np.hstack(lst)
+    elif lst:
+        return lst[0]
+
+    return np.zeros(0, dtype=dtype)
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

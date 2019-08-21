@@ -349,7 +349,7 @@ class Component(System):
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         # for a component, all vars are 'owned'
-        self._owned_var_sizes = self._var_sizes['nonlinear']['output']
+        self._owned_sizes = self._var_sizes['nonlinear']['output']
 
         self._setup_global_shapes()
 
