@@ -52,12 +52,12 @@ def count_keys(d):
     return count
 
 
-@use_tempdirs
+# @use_tempdirs
 class TestSqliteCaseReader(unittest.TestCase):
 
     def setUp(self):
         self.filename = "sqlite_test"
-        self.recorder = om.SqliteRecorder(self.filename, record_viewer_data=False)
+        self.recorder = om.SqliteRecorder(self.filename)  # , record_viewer_data=False)
 
     def test_bad_filetype(self):
         # Pass a plain text file.
@@ -1026,6 +1026,152 @@ class TestSqliteCaseReader(unittest.TestCase):
         for name, meta in inputs:
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['value'], expected['value'])
+
+    def test_list_discrete(self):
+        from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
+
+        model = om.Group()
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_discrete_output('x', 11)
+
+        model.add_subsystem('expl', ModCompEx(3))
+        model.add_subsystem('impl', ModCompIm(3))
+
+        model.connect('indep.x', ['expl.x', 'impl.x'])
+
+        model.add_recorder(self.recorder)
+
+        prob = om.Problem(model)
+
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        from pprint import pprint
+        # pprint(cr.problem_metadata)
+        # pprint(cr.system_metadata)
+
+        case = cr.get_case(0)
+
+        print('inputs:')
+        print(case.inputs)
+        print('outputs:')
+        print(case.outputs)
+
+        #
+        # list inputs, not hierarchical
+        #
+        stream = StringIO()
+        case.list_inputs(values=True, hierarchical=False, out_stream=stream)
+        text = stream.getvalue()
+        print(text)
+
+        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
+
+        # make sure they are in the correct order
+        self.assertTrue(text.find('expl.a') < text.find('expl.x') < text.find('impl.x'))
+
+        #
+        # list inputs, hierarchical
+        #
+        stream = StringIO()
+        case.list_inputs(values=True, hierarchical=True, out_stream=stream)
+        text = stream.getvalue()
+        print(text)
+
+        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
+        self.assertEqual(1, text.count('top'))
+        self.assertEqual(1, text.count('  expl'))
+        self.assertEqual(1, text.count('    a'))
+        self.assertEqual(1, text.count('  impl'))
+        self.assertEqual(2, text.count('    x'))      # both implicit & explicit
+
+        #
+        # list outputs, not hierarchical
+        #
+        stream = StringIO()
+        case.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
+        text = stream.getvalue()
+
+        self.assertEqual(text.count('3 Explicit Output'), 1)
+        self.assertEqual(text.count('1 Implicit Output'), 1)
+
+        # make sure they are in the correct order
+        self.assertTrue(text.find('indep.x') < text.find('expl.b') <
+                        text.find('expl.y') < text.find('impl.y'))
+
+        #
+        # list outputs, hierarchical
+        #
+        stream = StringIO()
+        case.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
+        text = stream.getvalue()
+
+        self.assertEqual(text.count('top'), 2)        # both implicit & explicit
+        self.assertEqual(text.count('  indep'), 1)
+        self.assertEqual(text.count('    x'), 1)
+        self.assertEqual(text.count('  expl'), 1)
+        self.assertEqual(text.count('    b'), 1)
+        self.assertEqual(text.count('  impl'), 1)
+        self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
+
+    def test_list_discrete_promoted(self):
+        from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
+
+        model = om.Group()
+
+        indep = om.IndepVarComp()
+        indep.add_discrete_output('x', 11)
+
+        model.add_subsystem('indep', indep, promotes_outputs=['x'])
+
+        model.add_subsystem('expl', ModCompEx(3), promotes_inputs=['x'])
+        model.add_subsystem('impl', ModCompIm(3), promotes_inputs=['x'])
+
+        model.add_recorder(self.recorder)
+
+        prob = om.Problem(model)
+
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        from pprint import pprint
+        pprint(cr.problem_metadata)
+        # pprint(cr.system_metadata)
+
+        case = cr.get_case(0)
+
+        #
+        # list inputs
+        #
+        stream = StringIO()
+        case.list_inputs(values=True, prom_name=True, out_stream=stream)
+        text = stream.getvalue()
+        print(text)
+
+        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
+
+        #
+        # list outputs
+        #
+        stream = StringIO()
+        case.list_outputs(values=True, prom_name=True, out_stream=stream)
+        text = stream.getvalue()
+        print(text)
+
+        self.assertEqual(text.count('\ntop'), 2)        # both implicit & explicit
+        self.assertEqual(text.count('\n  indep'), 1)
+        self.assertEqual(text.count('\n    x'), 1)
+        self.assertEqual(text.count('\n  expl'), 1)
+        self.assertEqual(text.count('\n    b'), 1)
+        self.assertEqual(text.count('\n  impl'), 1)
+        self.assertEqual(text.count('\n    y'), 2)      # both implicit & explicit
 
     def test_getitem(self):
         prob = SellarProblem()
