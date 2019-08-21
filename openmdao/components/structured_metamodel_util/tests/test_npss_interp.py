@@ -238,7 +238,7 @@ class TestNPSSGridInterpolator(unittest.TestCase):
             computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
             print( actual, computed, r_err, order)
-            #assert r_err < self.tol[order]
+            assert r_err < self.tol[order]
 
     #def test_out_of_bounds_fill2(self):
         #points, values, func, df = self. _get_sample_2d()

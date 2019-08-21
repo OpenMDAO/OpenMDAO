@@ -415,9 +415,9 @@ class InterpCubic(object):
         tmp = 6.0 * (vdiff[..., 1:] - vdiff[..., :n - 2]) / (grid[2:] - grid[:n - 2])
 
         for i in range(1, n - 1):
-            prtl = 1.0 / sig[i - 1] * sec_deriv[i - 1] + 2.0
-            sec_deriv[i] = (sig[i - 1] - 1.0) * prtl
-            temp[..., i] = (tmp[..., i - 1] - sig[i - 1] * temp[..., i - 1]) * prtl
+            prtl = sig[i - 1] * sec_deriv[..., i - 1] + 2.0
+            sec_deriv[i] = (sig[i - 1] - 1.0) / prtl
+            temp[..., i] = (tmp[..., i - 1] - sig[i - 1] * temp[..., i - 1]) / prtl
 
         sec_deriv = np.array(np.broadcast_to(sec_deriv, temp.shape))
 
