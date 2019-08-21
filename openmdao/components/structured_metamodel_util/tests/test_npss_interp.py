@@ -26,9 +26,9 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         self.interp_configs = {
             "slinear": 2,
             "cubic": 3,
-            #"lagrange2": 3,
-            #"lagrange3": 4,
-            #"akima": 4,
+            "lagrange2": 3,
+            "lagrange3": 4,
+            "akima": 4,
         }
         self.valid_orders = self.interp_configs.keys()
         self.tol = {
@@ -160,78 +160,7 @@ class TestNPSSGridInterpolator(unittest.TestCase):
             #self.assertRaises(ValueError, ScipyGridInterp, points, values,
                               #method)
 
-    #def test_method_switching(self):
-        ## should be able to switch interpolation methods on each __call__
-        ## and gradient call, without overriding defaults permenantly.
-        ## exceptions and gradient caching should work as expected.
-
-        #np.random.seed(314)
-        #x = np.linspace(-100, 2, 10)
-        #y = np.linspace(-10, 4, 6)
-        #z = np.linspace(1000, 2000, 50)
-
-        #points = [x, y, z]
-        #values = np.random.randn(10, 6, 50)
-
-        #x = [0.5, 0, 1001]
-
-        ## create as cubic
-        #interp = ScipyGridInterp(
-            #points, values, method='cubic')
-
-        ## value and gradient work as expected
-        #result1 = interp.interpolate(x)
-        #gradient1 = interp.gradient(x)
-        #result_actual_1 = 0.2630309995970872
-        #result_gradient_1 = np.array([0.22505535, -0.46465198, 0.02523666])
-
-        #assert_almost_equal(result1, result_actual_1)
-        #assert_almost_equal(gradient1, result_gradient_1)
-
-        ## changing the method should work as expected
-        #result2 = interp.interpolate(x, method='slinear')
-        #gradient2 = interp.gradient(x, method='slinear')
-        #result_actual_2 = 0.27801704674026684
-        #result_gradient_2 = np.array([0.12167214, -0.44221416, -0.00323078])
-
-        #assert_almost_equal(result2, result_actual_2)
-        #assert_almost_equal(gradient2, result_gradient_2)
-
-        ## should be able to switch back and get the original results without
-        ## explicitly setting the method
-        #result3 = interp.interpolate(x)
-        #gradient3 = interp.gradient(x)
-        #assert_almost_equal(result3, result_actual_1)
-        #assert_almost_equal(gradient3, result_gradient_1)
-
-        ## new interpolator and evaluation point
-        #interp = ScipyGridInterp(points, values, method='slinear')
-
-        ## values will be cast to float for splines/gradient methods
-        ## otherwise, will get null vector gradient [0,0,0] at all pts
-        #x = [-50, 0, 1501]
-        #result6 = interp.interpolate(x)
-        #result_actual_6 = 0.3591176338294626
-        #assert_almost_equal(result6, result_actual_6)
-
-        ## should be able to switch and get value and gradient
-        #result7 = interp.interpolate(x, method='quintic')
-        #gradient7 = interp.gradient(x, method='quintic')
-        #result_actual_7 = 0.6157594079479937
-        #result_gradient_7 = np.array([-0.35731922, 0.23131539, -0.14088582])
-        #assert_almost_equal(result7, result_actual_7)
-        #assert_almost_equal(gradient7, result_gradient_7)
-
-        ## switch again; gradient should be different
-        #gradient8 = interp.gradient(x, method='slinear')
-        #result_gradient_8 = np.array([-0.11299396, 0.24352342, -0.07446338])
-        #assert_almost_equal(gradient8, result_gradient_8)
-
-        ## should be able to switch back to original without setting it
-        #result9 = interp.interpolate(x)
-        #assert_almost_equal(result9, result6)
-
-    #def test_spline_deriv_xi1d(self):
+     #def test_spline_deriv_xi1d(self):
         ## tests gradient values
         #points, values, func, df = self. _get_sample_2d()
         #np.random.seed(1234)

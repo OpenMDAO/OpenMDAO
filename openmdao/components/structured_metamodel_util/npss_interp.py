@@ -64,10 +64,10 @@ class InterpLagrange2(object):
         self.last_index = -1
         self.slope = None
 
-    def interpolate(self, x, idx, table):
+    def interpolate(self, x, idx, slice_idx, table):
         grid = table.grid
-        subtables = table.subtables
-        slope = self.slope
+        subtable = table.subtable
+        nx = len(x)
 
         # Extrapolate high
         ngrid = len(grid)
@@ -82,7 +82,14 @@ class InterpLagrange2(object):
         xx2 = x[0] - grid[idx + 1]
         xx3 = x[0] - grid[idx + 2]
 
-        if len(subtables) > 0:
+        if subtable is not None:
+
+            slice_idx.append(slice(idx, idx + 3))
+
+            tshape = table.values[tuple(slice_idx)].shape
+            nshape = list(tshape[:-nx])
+            nshape.append(nx)
+            derivs = np.empty(tuple(nshape))
 
             # Checking the lastIndex value here won't help, because our slope is not
             # guaranteed to be the same as last time even if idx == lastIndex, since
@@ -92,22 +99,25 @@ class InterpLagrange2(object):
             c13 = grid[idx] - grid[idx + 2]
             c23 = grid[idx + 1] - grid[idx + 2]
 
-            val1, deriv1 = subtables[idx].evaluate(x[1:])
-            val2, deriv2 = subtables[idx + 1].evaluate(x[1:])
-            val3, deriv3 = subtables[idx + 2].evaluate(x[1:])
+            subval, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
-            q1 = val1 / (c12 * c13)
-            q2 = val2 / (c12 * c23)
-            q3 = val3 / (c13 * c23)
+            q1 = subval[..., 0] / (c12 * c13)
+            q2 = subval[..., 1] / (c12 * c23)
+            q3 = subval[..., 2] / (c13 * c23)
 
-            dq1_dsub = deriv1 / (c12 * c13)
-            dq2_dsub = deriv2 / (c12 * c23)
-            dq3_dsub = deriv3 / (c13 * c23)
-            derivs[1:] = xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + dq3_dsub * xx1 * xx2
+            dq1_dsub = subderiv[..., 0, :] / (c12 * c13)
+            dq2_dsub = subderiv[..., 1, :]  / (c12 * c23)
+            dq3_dsub = subderiv[..., 2, :] / (c13 * c23)
+
+            derivs[..., 1:] = xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + dq3_dsub * xx1 * xx2
 
         else:
-            values = table.values
+            values = table.values[tuple(slice_idx)]
             last_index = self.last_index
+
+            nshape = list(values.shape[:-1])
+            nshape.append(1)
+            derivs = np.empty(tuple(nshape))
 
             # If the lookup index is the same as last time and it is not '0',
             # then the slope hasn't changed, so don't need to recalculate.
@@ -116,16 +126,16 @@ class InterpLagrange2(object):
                 c12 = grid[idx] - grid[idx + 1]
                 c13 = grid[idx] - grid[idx + 2]
                 c23 = grid[idx + 1] - grid[idx + 2]
-                q1 = values[idx] / (c12 * c13)
-                q2 = values[idx + 1] / (c12 * c23)
-                q3 = values[idx + 2] / (c13 * c23)
+                q1 = values[..., idx] / (c12 * c13)
+                q2 = values[..., idx + 1] / (c12 * c23)
+                q3 = values[..., idx + 2] / (c13 * c23)
                 self.slope = (q1, q2, q3)
 
             q1, q2, q3 = self.slope
 
-        derivs[0] = q1 * (2.0 * x[0] - grid[idx + 1] - grid[idx + 2]) - \
-                    q2 * (2.0 * x[0] - grid[idx] - grid[idx + 2]) + \
-                    q3 * (2.0 * x[0] - grid[idx] - grid[idx + 1])
+        derivs[..., 0] = q1 * (2.0 * x[0] - grid[idx + 1] - grid[idx + 2]) - \
+                         q2 * (2.0 * x[0] - grid[idx] - grid[idx + 2]) + \
+                         q3 * (2.0 * x[0] - grid[idx] - grid[idx + 1])
 
         return xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2, derivs
 
@@ -136,10 +146,10 @@ class InterpLagrange3(object):
         self.last_index = -1
         self.slope = None
 
-    def interpolate(self, x, idx, table):
+    def interpolate(self, x, idx, slice_idx, table):
         grid = table.grid
-        subtables = table.subtables
-        slope = self.slope
+        subtable = table.subtable
+        nx = len(x)
 
         # Extrapolate high
         ngrid = len(grid)
@@ -160,7 +170,14 @@ class InterpLagrange3(object):
         xx3 = x[0] - p3
         xx4 = x[0] - p4
 
-        if len(subtables) > 0:
+        if subtable is not None:
+
+            slice_idx.append(slice(idx - 1, idx + 3))
+
+            tshape = table.values[tuple(slice_idx)].shape
+            nshape = list(tshape[:-nx])
+            nshape.append(nx)
+            derivs = np.empty(tuple(nshape))
 
             # Checking the lastIndex value here won't help, because our slope is not
             # guaranteed to be the same as last time even if idx == lastIndex, since
@@ -173,27 +190,28 @@ class InterpLagrange3(object):
             c24 = p2 - p4
             c34 = p3 - p4
 
-            val1, deriv1 = subtables[idx - 1].evaluate(x[1:])
-            val2, deriv2 = subtables[idx].evaluate(x[1:])
-            val3, deriv3 = subtables[idx + 1].evaluate(x[1:])
-            val4, deriv4 = subtables[idx + 2].evaluate(x[1:])
+            subval, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
-            q1 = val1 / (c12 * c13 * c14)
-            q2 = val2 / (c12 * c23 * c24)
-            q3 = val3 / (c13 * c23 * c34)
-            q4 = val4 / (c14 * c24 * c34)
+            q1 = subval[..., 0] / (c12 * c13 * c14)
+            q2 = subval[..., 1] / (c12 * c23 * c24)
+            q3 = subval[..., 2] / (c13 * c23 * c34)
+            q4 = subval[..., 3] / (c14 * c24 * c34)
 
-            dq1_dsub = deriv1 / (c12 * c13 * c14)
-            dq2_dsub = deriv2 / (c12 * c23 * c24)
-            dq3_dsub = deriv3 / (c13 * c23 * c34)
-            dq4_dsub = deriv4 / (c14 * c24 * c34)
+            dq1_dsub = subderiv[..., 0, :] / (c12 * c13 * c14)
+            dq2_dsub = subderiv[..., 1, :] / (c12 * c23 * c24)
+            dq3_dsub = subderiv[..., 2, :] / (c13 * c23 * c34)
+            dq4_dsub = subderiv[..., 3, :] / (c14 * c24 * c34)
 
-            derivs[1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + dq3_dsub * xx1 * xx2) - \
+            derivs[..., 1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + dq3_dsub * xx1 * xx2) - \
                 dq4_dsub * xx1 * xx2 * xx3
 
         else:
-            values = table.values
+            values = table.values[tuple(slice_idx)]
             last_index = self.last_index
+
+            nshape = list(values.shape[:-1])
+            nshape.append(1)
+            derivs = np.empty(tuple(nshape))
 
             # If the lookup index is the same as last time and it is not '0',
             # then the slope hasn't changed, so don't need to recalculate.
@@ -207,32 +225,32 @@ class InterpLagrange3(object):
                 c24 = p2 - p4
                 c34 = p3 - p4
 
-                q1 = values[idx - 1] / (c12 * c13 * c14)
-                q2 = values[idx] / (c12 * c23 * c24)
-                q3 = values[idx + 1] / (c13 * c23 * c34)
-                q4 = values[idx + 2] / (c14 * c24 * c34)
+                q1 = values[..., idx - 1] / (c12 * c13 * c14)
+                q2 = values[..., idx] / (c12 * c23 * c24)
+                q3 = values[..., idx + 1] / (c13 * c23 * c34)
+                q4 = values[..., idx + 2] / (c14 * c24 * c34)
 
                 self.slope = (q1, q2, q3, q4)
 
             q1, q2, q3, q4 = self.slope
 
-        derivs[0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) + \
-                          p4 * (p2 + p3) + p2 * p3) - \
-                    q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) + \
-                          p4 * (p1 + p3) + p1 * p3) + \
-                    q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) + \
-                          p4 * (p2 + p1) + p2 * p1) - \
-                    q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) + \
-                          p1 * (p2 + p3) + p2 * p3)
+        derivs[..., 0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) + \
+                               p4 * (p2 + p3) + p2 * p3) - \
+                         q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) + \
+                               p4 * (p1 + p3) + p1 * p3) + \
+                         q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) + \
+                               p4 * (p2 + p1) + p2 * p1) - \
+                         q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) + \
+                               p1 * (p2 + p3) + p2 * p3)
 
         return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, derivs
 
 
 class InterpAkima(object):
 
-    def interpolate(self, x, idx, table):
+    def interpolate(self, x, idx, slice_idx, table):
         grid = table.grid
-        subtables = table.subtables
+        subtable = table.subtable
 
         c = 0.0
         d = 0.0
@@ -253,30 +271,56 @@ class InterpAkima(object):
         elif idx == 0 and x[0] < grid[0]:
             extrap = -1
 
-        if len(subtables) > 0:
+        if idx >= 2:
+            low_idx = idx - 2
+        elif idx == 1:
+            low_idx = idx - 1
+        else:
+            low_idx = idx
+
+        if idx < ngrid - 3:
+            high_idx = idx + 3
+        elif idx == ngrid - 3:
+            high_idx = idx + 2
+        else:
+            high_idx = idx + 1
+
+        if subtable is not None:
+
+            slice_idx.append(slice(low_idx, high_idx + 1))
+
+            subval, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
+
+            j = 0
             if idx >= 2:
-                val1 = subtables[idx - 2].evaluate(x[1:])
+                val1 = subval[..., j]
+                j += 1
             if idx >= 1:
-                val2 = subtables[idx - 1].evaluate(x[1:])
-            val3 = subtables[idx].evaluate(x[1:])
-            val4 = subtables[idx + 1].evaluate(x[1:])
+                val2 = subval[..., j]
+                j += 1
+            val3 = subval[..., j]
+            val4 = subval[..., j + 1]
+            j += 2
             if idx < ngrid - 2:
-                val5 = subtables[idx + 2].evaluate(x[1:])
+                val5 = subval[..., j]
+                j += 1
             if idx < ngrid - 3:
-                val6 = subtables[idx + 3].evaluate(x[1:])
+                val6 = subval[..., j]
+                j += 1
 
         else:
-            values = table.values
+            values = table.values[tuple(slice_idx)]
+
             if idx >= 2:
-                val1 = values[idx - 2]
+                val1 = values[..., idx - 2]
             if idx >= 1:
-                val2 = values[idx - 1]
-            val3 = values[idx]
-            val4 = values[idx + 1]
+                val2 = values[..., idx - 1]
+            val3 = values[..., idx]
+            val4 = values[..., idx + 1]
             if idx < ngrid - 2:
-                val5 = values[idx + 2]
+                val5 = values[..., idx + 2]
             if idx < ngrid - 3:
-                val6 = values[idx + 3]
+                val6 = values[..., idx + 3]
 
         # Calculate interval slope values
         #
@@ -321,18 +365,18 @@ class InterpAkima(object):
         w2 = abs(m4 - m3)
         w3 = abs(m2 - m1)
 
-        if w2 + w3 > 0:
-            b = (m2*w2 + m3*w3) / (w2 + w3)
-        else:
-            b = 0.5 * (m2+m3)
+        jj = np.where(w2 + w3  > 0)
+        b = np.atleast_1d(0.5 * (m2+m3))
+        bpos = np.atleast_1d((m2*w2 + m3*w3) / (w2 + w3))
+        b[jj] = bpos[jj]
 
         w3 = abs(m5 - m4)
         w4 = abs(m3 - m2)
 
-        if w3 + w4 > 0:
-            bp1 = (m3*w3 + m4*w4) / (w3 + w4)
-        else:
-            bp1 = 0.5 * (m3+m4)
+        jj = np.where(w3 + w4  > 0)
+        bp1 = np.atleast_1d(0.5 * (m3+m4))
+        bp1pos = np.atleast_1d((m3*w3 + m4*w4) / (w3 + w4))
+        bp1[jj] = bp1pos[jj]
 
         if extrap == 0:
             a = val3
@@ -350,7 +394,7 @@ class InterpAkima(object):
             dx = x[0] - grid[0]
 
         # Evaluate dependent value and exit
-        return a + b * dx + c * (dx * dx) + d * (dx * dx * dx)
+        return a + b * dx + c * (dx * dx) + d * (dx * dx * dx), None
 
 
 class InterpCubic(object):

@@ -1132,6 +1132,50 @@ class TestMetaModelNPSS(unittest.TestCase):
         # Derivs are large, so ignore atol.
         assert_check_partials(partials, atol=1e10, rtol=2e-5)
 
+    def test_vectorized_akima(self):
+        prob = om.Problem()
+        model = prob.model
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, _ = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', np.array([x['default'], x['default'], x['default']]),
+                       units=x['units'])
+        ivc.add_output('y', np.array([y['default'], y['default'], y['default']]),
+                       units=x['units'])
+        ivc.add_output('z', np.array([z['default'], z['default'], z['default']]),
+                       units=x['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelStructuredComp(order='akima', extrapolate=True, vec_size=3,
+                                          interp_method='npss')
+
+        for param in params:
+            comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
+                           param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], np.array([out['default'], out['default'], out['default']]),
+                            out['values'])
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+
+        prob.setup()
+        prob['x'] = np.array([1.0, 10.0, 90.0])
+        prob['y'] = np.array([0.75, 0.81, 1.2])
+        prob['z'] = np.array([-1.7, 1.1, 2.1])
+
+        prob.run_model()
+
+        partials = prob.check_partials(method='fd', out_stream=None)
+        # Derivs are large, so ignore atol.
+        assert_check_partials(partials, atol=1e10, rtol=2e-5)
+
     def test_vectorized_cubic(self):
         prob = om.Problem()
         model = prob.model
