@@ -1165,14 +1165,14 @@ class TestMetaModelNPSS(unittest.TestCase):
 
         model.add_subsystem('comp', comp, promotes=["*"])
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
         prob['x'] = np.array([1.0, 10.0, 90.0])
         prob['y'] = np.array([0.75, 0.81, 1.2])
         prob['z'] = np.array([-1.7, 1.1, 2.1])
 
         prob.run_model()
 
-        partials = prob.check_partials(method='fd', out_stream=None)
+        partials = prob.check_partials(method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
         assert_check_partials(partials, atol=1e10, rtol=2e-5)
 

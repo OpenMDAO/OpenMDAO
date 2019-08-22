@@ -246,11 +246,40 @@ class InterpLagrange3(object):
         return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, derivs
 
 
+def abs_dv(x, x_deriv):
+    """
+    Compute the absolute value of the incoming vector and its derivative.
+
+    Parameters
+    ----------
+    x : ndarray
+        Array to process.
+    x_deriv : ndarray
+        Array of derivatives with same size as x.
+
+    Returns
+    -------
+    ndarray
+        Absolute value of the array.
+    ndarray
+        Derivative value of the array.
+
+    """
+    y = x.copy()
+    y_deriv = x_deriv.copy()
+    idx_neg = np.where(x < 0)
+    y[idx_neg] = -x[idx_neg]
+    y_deriv[idx_neg] = -x_deriv[idx_neg]
+
+    return y, y_deriv
+
+
 class InterpAkima(object):
 
     def interpolate(self, x, idx, slice_idx, table):
         grid = table.grid
         subtable = table.subtable
+        nx = len(x)
 
         c = 0.0
         d = 0.0
@@ -289,27 +318,42 @@ class InterpAkima(object):
 
             slice_idx.append(slice(low_idx, high_idx + 1))
 
+            tshape = table.values[tuple(slice_idx)].shape
+            nshape = list(tshape[:-nx])
+            nshape.append(nx)
+            derivs = np.empty(tuple(nshape))
+
             subval, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
             j = 0
             if idx >= 2:
                 val1 = subval[..., j]
+                dval1 = subderiv[..., j, :]
                 j += 1
             if idx >= 1:
                 val2 = subval[..., j]
+                dval2 = subderiv[..., j, :]
                 j += 1
             val3 = subval[..., j]
             val4 = subval[..., j + 1]
+            dval3 = subderiv[..., j, :]
+            dval4 = subderiv[..., j + 1, :]
             j += 2
             if idx < ngrid - 2:
                 val5 = subval[..., j]
+                dval5 = subderiv[..., j, :]
                 j += 1
             if idx < ngrid - 3:
                 val6 = subval[..., j]
+                dval6 = subderiv[..., j, :]
                 j += 1
 
         else:
             values = table.values[tuple(slice_idx)]
+
+            nshape = list(values.shape[:-1])
+            nshape.append(1)
+            derivs = np.empty(tuple(nshape))
 
             if idx >= 2:
                 val1 = values[..., idx - 2]
@@ -348,8 +392,8 @@ class InterpAkima(object):
             m5 = (val6 - val5) / (grid[idx + 3] - grid[idx + 2])
 
         if idx == 0:
-            m1 = 3*m3 - 2*m4
-            m2 = 2*m3 - m4
+            m1 = 3 * m3 - 2 * m4
+            m2 = 2 * m3 - m4
 
         elif idx == 1:
             m1 = 2 * m2 - m3
@@ -361,40 +405,143 @@ class InterpAkima(object):
             m4 = 2 * m3 - m2
             m5 = 3 * m3 - 2 * m2
 
+        m1 = np.atleast_1d(m1)
+        m2 = np.atleast_1d(m2)
+        m3 = np.atleast_1d(m3)
+        m4 = np.atleast_1d(m4)
+        m5 = np.atleast_1d(m5)
+
         # Calculate cubic fit coefficients
         w2 = abs(m4 - m3)
-        w3 = abs(m2 - m1)
+        w31 = abs(m2 - m1)
 
-        jj = np.where(w2 + w3  > 0)
-        b = np.atleast_1d(0.5 * (m2+m3))
-        bpos = np.atleast_1d((m2*w2 + m3*w3) / (w2 + w3))
-        b[jj] = bpos[jj]
+        # Special case to avoid divide by zero.
+        jj1 = np.where(w2 + w31  > 0)
+        b = 0.5 * (m2 + m3)
+        bpos = np.atleast_1d((m2 * w2 + m3 * w31) / (w2 + w31))
+        #b[jj1] = bpos[jj1]
 
-        w3 = abs(m5 - m4)
-        w4 = abs(m3 - m2)
+        #w32 = abs(m5 - m4)
+        #w4 = abs(m3 - m2)
 
-        jj = np.where(w3 + w4  > 0)
-        bp1 = np.atleast_1d(0.5 * (m3+m4))
-        bp1pos = np.atleast_1d((m3*w3 + m4*w4) / (w3 + w4))
-        bp1[jj] = bp1pos[jj]
+        # Special case to avoid divide by zero.
+        #jj2 = np.where(w32 + w4  > 0)
+        #bp1 = np.atleast_1d(0.5 * (m3 + m4))
+        #bp1pos = np.atleast_1d((m3 * w32 + m4 * w4) / (w32 + w4))
+        #bp1[jj2] = bp1pos[jj2]
 
         if extrap == 0:
-            a = val3
-            c = (3 * m3 - 2 * b - bp1) / (grid[idx+1] - grid[idx])
-            d = (b + bp1 - 2 * m3) / ((grid[idx+1] - grid[idx]) * (grid[idx+1] - grid[idx]))
+            #a = val3
+            #c = (3 * m3 - 2 * b - bp1) / (grid[idx + 1] - grid[idx])
+            #d = (b + bp1 - 2 * m3) / ((grid[idx + 1] - grid[idx]) * (grid[idx + 1] - grid[idx]))
             dx = x[0] - grid[idx]
 
         elif extrap == 1:
-            a = val4
-            b = bp1;
+            #a = val4
+            #b = bp1
             dx = x[0] - grid[idx + 1]
 
         else:
-            a = val3
+            #a = val3
             dx = x[0] - grid[0]
 
+        #derivs[..., 0] = b + 2.0 * c * dx + 3.0 * d * dx * dx
+        derivs[..., 0] = 2 * m4 * dx
+
+        # Propagate derivatives from sub table.
+        if subtable is not None:
+            shape = dval3.shape
+            dm1 = np.zeros(shape)
+            dm2 = np.zeros(shape)
+            dm4 = np.zeros(shape)
+            dm5 = np.zeros(shape)
+            dc = np.zeros(shape)
+            dd = np.zeros(shape)
+
+            dm3 = (dval4 - dval3) / (grid[idx + 1] - grid[idx])
+
+            if idx >= 2:
+                dm1 = (dval2 - dval1) / (grid[idx - 1] - grid[idx - 2])
+
+            if idx >= 1:
+                dm2 = (dval3 - dval2) / (grid[idx] - grid[idx - 1])
+
+            if idx < ngrid - 2:
+                dm4 = (dval5 - dval4) / (grid[idx + 2] - grid[idx + 1])
+
+            if idx < ngrid - 3:
+                dm5 = (dval6 - dval5) / (grid[idx + 3] - grid[idx + 2])
+
+            if idx == 0:
+                dm1 = 3 * dm3 - 2 * dm4
+                dm2 = 2 * dm3 - dm4
+
+            elif idx == 1:
+                dm1 = 2 * dm2 - dm3
+
+            elif idx == ngrid - 3:
+                dm5 = 2 * dm4 - dm3
+
+            elif idx == ngrid - 2:
+                dm4 = 2 * dm3 - dm2
+                dm5 = 3 * dm3 - 2 * dm2
+
+            # Calculate cubic fit coefficients
+            _, dw2 = abs_dv(m4 - m3, dm4 - dm3)
+            _, dw3 = abs_dv(m2 - m1, dm2 - dm1)
+
+            # Special case to avoid divide by zero.
+            if nx > 2:
+                w_extended = np.broadcast_to(np.atleast_1d(w2 + w31), dw3.shape)
+                jj1 = np.where(w_extended  > 0)
+
+            if len(nshape) > 1:
+                w2e = w2[:, np.newaxis]
+                w3e = w31[:, np.newaxis]
+                m2e = m2[:, np.newaxis]
+                m3e = m3[:, np.newaxis]
+            else:
+                w2e = w2
+                w3e = w31
+                m2e = m2
+                m3e = m3
+
+            db = 0.5 * (dm2 + dm3)
+            #dbpos = (dm2 * dw2 + dm3 * dw3) / (dw2 + dw3)
+            dbpos = (dm2 * w2e + m2e * dw2 + dm3 * w3e + m3e * dw3) / (w2e + w3e) - \
+                     (m2e * w2e + m3e * w3e) * (dw2 + dw3) / (w2e + w3e) ** 2
+            #db[jj1] = dbpos[jj1]
+
+            #dw3 = abs(dm5 - dm4)
+            #dw4 = abs(dm3 - dm2)
+
+            ## Special case to avoid divide by zero.
+            #if nx > 2:
+                #w_extended = np.broadcast_to(np.atleast_1d(w32 + w4), dw3.shape)
+                #jj2 = np.where(w_extended  > 0)
+
+            #dbp1 = 0.5 * (dm3 + dm4)
+            #dbp1pos = (dm3 * dw3 + dm4 * dw4) / (dw3 + dw4)
+            #dbp1[jj2] = dbp1pos[jj2]
+
+            #if extrap == 0:
+                #da = dval3
+                #dc = (3 * dm3 - 2 * db - dbp1) / (grid[idx + 1] - grid[idx])
+                #dd = (db + dbp1 - 2 * dm3) / ((grid[idx + 1] - grid[idx]) * (grid[idx + 1] - grid[idx]))
+
+            #elif extrap == 1:
+                #da = dval4
+                #db = dbp1
+
+            #else:
+                #da = dval3
+
+            #derivs[..., 1:] = da + db * dx + dc * (dx * dx) + dd * (dx * dx * dx)
+            derivs[..., 1:] =  dw2 + dm4 * dx * dx
+
         # Evaluate dependent value and exit
-        return a + b * dx + c * (dx * dx) + d * (dx * dx * dx), None
+        #return a + b * dx + c * (dx * dx) + d * (dx * dx * dx), derivs
+        return  w2 + m4 * dx * dx, derivs
 
 
 class InterpCubic(object):
@@ -778,8 +925,8 @@ class NPSSGridInterp(GridInterpBase):
         # TODO: Vectorize.
         xi = np.atleast_2d(xi)
         n_nodes, nx = xi.shape
-        result = np.empty((n_nodes, ))
-        derivs = np.empty((n_nodes, nx))
+        result = np.empty((n_nodes, ), dtype=xi.dtype)
+        derivs = np.empty((n_nodes, nx), dtype=xi.dtype)
 
         for j in range(n_nodes):
             val, deriv = self.table.evaluate(xi[j, :])
