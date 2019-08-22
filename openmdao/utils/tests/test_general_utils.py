@@ -1,5 +1,3 @@
-from __future__ import print_function, division, absolute_import
-
 import unittest
 
 from openmdao.utils.general_utils import remove_whitespace
@@ -7,8 +5,14 @@ from openmdao.utils.general_utils import remove_whitespace
 import re
 import sys
 
-s = ''.join(chr(c) for c in range(sys.maxunicode+1))
-ws = ''.join(re.findall(r'\s', s))
+from six import PY2
+
+if PY2:
+    import string
+    ws = string.whitespace
+else:
+    s = ''.join(chr(c) for c in range(sys.maxunicode+1))
+    ws = ''.join(re.findall(r'\s', s))
 
 
 class TestGeneralUtils(unittest.TestCase):
