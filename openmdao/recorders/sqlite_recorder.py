@@ -18,7 +18,7 @@ from six import iteritems
 
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
-from openmdao.utils.record_util import values_to_array
+from openmdao.utils.record_util import dict_to_named_array
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.core.driver import Driver
@@ -299,22 +299,8 @@ class SqliteRecorder(CaseRecorder):
                 objectives = driver._objs
                 responses = driver._responses
 
-            from pprint import pprint
-            print("system._var_allprocs_abs_names['input']:")
-            print('---------------------------------------')
-            pprint(system._var_allprocs_abs_names['input'])
-
-            print("system._var_allprocs_abs_names_discrete['input']:")
-            print('------------------------------------------------')
-            pprint(system._var_allprocs_abs_names_discrete['input'])
-
             inputs = system._var_allprocs_abs_names['input'] + \
                 system._var_allprocs_abs_names_discrete['input']
-
-            print()
-            print('inputs:')
-            print('-------')
-            pprint(inputs)
 
             outputs = system._var_allprocs_abs_names['output'] + \
                 system._var_allprocs_abs_names_discrete['output']
@@ -350,12 +336,10 @@ class SqliteRecorder(CaseRecorder):
                         except KeyError:
                             self._abs2meta[name] = disc_meta['output'][name].copy()
                         self._abs2meta[name]['type'] = []
-                        if name in states:
-                            self._abs2meta[name]['explicit'] = False
+                        self._abs2meta[name]['explicit'] = name not in states
 
                     if var_type not in self._abs2meta[name]['type']:
                         self._abs2meta[name]['type'].append(var_type)
-                    self._abs2meta[name]['explicit'] = True
 
             for name in inputs:
                 try:
@@ -665,7 +649,7 @@ class SqliteRecorder(CaseRecorder):
         """
         if self.connection:
 
-            data_array = values_to_array(data)
+            data_array = dict_to_named_array(data)
             data_blob = array_to_blob(data_array)
 
             with self.connection as c:

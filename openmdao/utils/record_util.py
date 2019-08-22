@@ -138,59 +138,44 @@ def check_path(path, includes, excludes, include_all_path=False):
     return False
 
 
-def json_to_np_array(vals, abs2meta):
+def deserialize(vals, abs2meta):
     """
-    Convert from a JSON string to a numpy named array.
+    Deserialize recorded data from a JSON formatted string.
+
+    If all data values are arrays then a numpy named array will be returned,
+    otherwise a dictionary mapping variable names to values will be returned.
 
     Parameters
     ----------
     vals : string
-        json string of data
+        JSON encoded data
     abs2meta : dict
-        Dictionary mapping absolute variable names to variable metadata.
+        Dictionary mapping absolute variable names to variable metadata
 
     Returns
     -------
-    array: numpy named array
-        named array containing the same names and values as the input values json string.
+    array: numpy named array or dict
+        Variable names and values parsed from the JSON string
     """
     json_vals = json.loads(vals)
     if json_vals is None:
         return None
 
-    for var in json_vals:
-        json_vals[var] = convert_to_np_array(json_vals[var], var, abs2meta[var]['shape'])
+    named_array = True
 
-    return values_to_array(json_vals)
+    for name, value in iteritems(json_vals):
+        if isinstance(value, list) and 'shape' in abs2meta[name]:
+            json_vals[name] = np.resize(np.array(value), abs2meta[name]['shape'])
+        else:
+            named_array = False
 
-
-def convert_to_np_array(val, varname, shape):
-    """
-    Convert list to numpy array.
-
-    Parameters
-    ----------
-    val : list
-        the list to be converted to an np.array
-    varname : str
-        name of variable to be converted
-    shape : tuple
-        the shape of the resulting np.array
-
-    Returns
-    -------
-    numpy.array :
-        The converted array.
-    """
-    if isinstance(val, list):
-        array = np.array(val)
-        array = np.resize(array, shape)
-        return array
-
-    return val
+    if named_array:
+        return dict_to_named_array(json_vals)
+    else:
+        return json_vals
 
 
-def values_to_array(values):
+def dict_to_named_array(values):
     """
     Convert a dict of variable names and values into a numpy named array.
 
@@ -214,7 +199,7 @@ def values_to_array(values):
 
         for name, value in iteritems(values):
             array[name] = value
-    else:
-        array = None
 
-    return array
+        return array
+    else:
+        return None

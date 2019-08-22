@@ -6,7 +6,7 @@ import json
 
 from contextlib import contextmanager
 
-from openmdao.utils.record_util import format_iteration_coordinate, json_to_np_array
+from openmdao.utils.record_util import format_iteration_coordinate, deserialize
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 
@@ -38,7 +38,7 @@ def get_format_version_abs2meta(db_cur):
 
     f_version = row[0]
 
-    # Need to also get abs2meta so that we can pass it to json_to_np_array
+    # Need to also get abs2meta so that we can pass it to deserialize
     if f_version >= 3:
         abs2meta = json.loads(row[1])
     elif f_version in (1, 2):
@@ -74,7 +74,7 @@ def assertProblemDataRecorded(test, expected, tolerance):
             counter, global_counter, case_name, timestamp, success, msg, outputs_text = row_actual
 
             if f_version >= 3:
-                outputs_actual = json_to_np_array(outputs_text, abs2meta)
+                outputs_actual = deserialize(outputs_text, abs2meta)
             elif f_version in (1, 2):
                 outputs_actual = blob_to_array(outputs_text)
 
@@ -127,8 +127,8 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                 inputs_text, outputs_text = row_actual
 
             if f_version >= 3:
-                inputs_actual = json_to_np_array(inputs_text, abs2meta)
-                outputs_actual = json_to_np_array(outputs_text, abs2meta)
+                inputs_actual = deserialize(inputs_text, abs2meta)
+                outputs_actual = deserialize(outputs_text, abs2meta)
             elif f_version in (1, 2):
                 inputs_actual = blob_to_array(inputs_text)
                 outputs_actual = blob_to_array(outputs_text)
@@ -237,9 +237,9 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
                 outputs_text, residuals_text = row_actual
 
             if f_version >= 3:
-                inputs_actual = json_to_np_array(inputs_text, abs2meta)
-                outputs_actual = json_to_np_array(outputs_text, abs2meta)
-                residuals_actual = json_to_np_array(residuals_text, abs2meta)
+                inputs_actual = deserialize(inputs_text, abs2meta)
+                outputs_actual = deserialize(outputs_text, abs2meta)
+                residuals_actual = deserialize(residuals_text, abs2meta)
             elif f_version in (1, 2):
                 inputs_actual = blob_to_array(inputs_text)
                 outputs_actual = blob_to_array(outputs_text)
@@ -299,8 +299,8 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                 abs_err, rel_err, input_blob, output_text, residuals_text = row_actual
 
             if f_version >= 3:
-                output_actual = json_to_np_array(output_text, abs2meta)
-                residuals_actual = json_to_np_array(residuals_text, abs2meta)
+                output_actual = deserialize(output_text, abs2meta)
+                residuals_actual = deserialize(residuals_text, abs2meta)
             elif f_version in (1, 2):
                 output_actual = blob_to_array(output_text)
                 residuals_actual = blob_to_array(residuals_text)

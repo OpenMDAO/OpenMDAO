@@ -72,6 +72,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     else:
         out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref',
                      'ref0', 'res_ref', 'prom_name')
+
     # Figure out which columns will be displayed
     # Look at any one of the outputs, they should all be the same
     outputs = var_dict[list(var_dict)[0]]

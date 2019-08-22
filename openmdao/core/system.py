@@ -1357,9 +1357,9 @@ class System(object):
 
         if self.recording_options['record_inputs']:
             if self._inputs:
-                print(self._inputs._names)
                 myinputs.update({n for n in self._inputs._names
                                  if check_path(n, incl, excl)})
+
             if len(self._var_discrete['input']) > 0:
                 myinputs.update({n for n in self._var_discrete['input']
                                  if check_path(n, incl, excl)})
@@ -1371,8 +1371,13 @@ class System(object):
             if self._outputs:
                 myoutputs = {n for n in self._outputs._names
                              if n in abs2prom and check_path(abs2prom[n], incl, excl)}
+
             if self.recording_options['record_residuals']:
                 myresiduals = myoutputs  # outputs and residuals have same names
+
+            if len(self._var_discrete['output']) > 0:
+                myoutputs.update({n for n in self._var_discrete['output']
+                                 if check_path(n, incl, excl)})
         elif self.recording_options['record_residuals']:
             if self._residuals:
                 myresiduals = {n for n in self._residuals._names
@@ -3515,10 +3520,6 @@ class System(object):
         """
         Record an iteration of the current System.
         """
-        print('==============================')
-        print(self.msginfo, 'record_iteration')
-        from pprint import pprint
-
         if self._rec_mgr._recorders:
             metadata = create_local_meta(self.pathname)
 
@@ -3539,13 +3540,8 @@ class System(object):
             discrete_inputs = self._discrete_inputs
             discrete_outputs = self._discrete_outputs
 
-            print('discrete_inputs:')
-            pprint(discrete_inputs)
-
             data = {}
             if self.recording_options['record_inputs'] and inputs._names:
-                print('len', len(discrete_inputs))
-                print(self._filtered_vars_to_record)
                 data['i'] = {}
                 if 'i' in self._filtered_vars_to_record:
                     # use filtered inputs
@@ -3567,11 +3563,6 @@ class System(object):
             else:
                 data['i'] = None
 
-            print('----------------------')
-            print("data['i']:")
-            print(data['i'])
-            print('----------------------')
-
             if self.recording_options['record_outputs'] and outputs._names:
                 data['o'] = {}
 
@@ -3581,10 +3572,16 @@ class System(object):
                         if out in outputs._names:
                             data['o'][out] = outputs._views[out]
                         elif out in self._discrete_outputs:
-                            data['i'][inp] = self._discrete_outputs[inp]
+                            data['o'][out] = self._discrete_outputs[out]
                 else:
                     # use all the outputs
-                    data['o'] = outputs._names
+                    if len(discrete_outputs) > 0:
+                        for out in outputs:
+                            data['o'][out] = outputs._views[out]
+                        for inp in discrete_inputs:
+                            data['o'][out] = discrete_inputs[out]
+                    else:
+                        data['o'] = outputs._names
             else:
                 data['o'] = None
 
@@ -3605,7 +3602,6 @@ class System(object):
             self._rec_mgr.record_iteration(self, data, metadata)
 
         self.iter_count += 1
-        print('==============================')
 
     def is_active(self):
         """
