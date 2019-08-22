@@ -8,9 +8,10 @@ import sys
 from six import PY2
 
 if PY2:
-    import string
-    ws = string.whitespace
+    # ASCII whitespace
+    from string import whitespace as ws
 else:
+    # Unicode whitespace
     s = ''.join(chr(c) for c in range(sys.maxunicode+1))
     ws = ''.join(re.findall(r'\s', s))
 
