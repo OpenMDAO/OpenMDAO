@@ -36,21 +36,21 @@ class TestNPSSGridInterpolator(unittest.TestCase):
             "lagrange2": 5e-2,
             "lagrange3": 1e-4,
             "cubic": 1e-4,
-            "akima": 1e-2,
+            "akima": 1e-3,
         }
 
-    #def _get_sample_4d_large(self):
-        #def f(x, y, z, w):
-            #return x**2 + y**2 + z**2 + w**2
-        #X = np.linspace(-10, 10, 6)
-        #Y = np.linspace(-10, 10, 7)
-        #np.random.seed(0)
-        #Z = np.random.uniform(-10, 10, 6)
-        #Z.sort()
-        #W = np.linspace(-10, 10, 8)
-        #points = [X, Y, Z, W]
-        #values = f(*np.meshgrid(*points, indexing='ij'))
-        #return points, values
+    def _get_sample_4d_large(self):
+        def f(x, y, z, w):
+            return x**2 + y**2 + z**2 + w**2
+        X = np.linspace(-10, 10, 6)
+        Y = np.linspace(-10, 10, 7)
+        np.random.seed(0)
+        Z = np.random.uniform(-10, 10, 6)
+        Z.sort()
+        W = np.linspace(-10, 10, 8)
+        points = [X, Y, Z, W]
+        values = f(*np.meshgrid(*points, indexing='ij'))
+        return points, values
 
     def _get_sample_2d(self):
         # test problem with enough points for smooth spline fits
@@ -74,20 +74,20 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         values = f(*np.meshgrid(*points, indexing='ij'))
         return points, values, f, df
 
-    #def test_list_input(self):
-        #points, values = self._get_sample_4d_large()
+    def test_list_input(self):
+        points, values = self._get_sample_4d_large()
 
-        #sample = np.asarray([[0.1, 0.1, 1., .9], [0.2, 0.1, .45, .8],
-                             #[0.5, 0.5, .5, .5]])
+        sample = np.asarray([[0.1, 0.1, 1., .9], [0.2, 0.1, .45, .8],
+                             [0.5, 0.5, .5, .5]])
 
-        #for method in self.valid_methods:
-            #interp = ScipyGridInterp(points, values.tolist(), method=method)
-            #v1 = interp.interpolate(sample.tolist(), compute_gradients=False)
+        for method in self.valid_orders:
+            interp = NPSSGridInterp(points, values.tolist(), order=method)
+            v1 = interp.interpolate(sample.tolist(), compute_gradients=False)
 
-            #interp = ScipyGridInterp(points, values, method=method)
-            #v2 = interp.interpolate(sample, compute_gradients=False)
+            interp = NPSSGridInterp(points, values, order=method)
+            v2 = interp.interpolate(sample, compute_gradients=False)
 
-            #assert_allclose(v1, v2)
+            assert_allclose(v1, v2)
 
     #def test_auto_reduce_spline_order(self):
         ## if a spline method is used and spline_dim_error=False and a dimension
@@ -237,7 +237,6 @@ class TestNPSSGridInterpolator(unittest.TestCase):
             interp = NPSSGridInterp(points, values, order)
             computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
-            print( actual, computed, r_err, order)
             assert r_err < self.tol[order]
 
     #def test_out_of_bounds_fill2(self):
