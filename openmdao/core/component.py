@@ -252,9 +252,14 @@ class Component(System):
         """
         global global_meta_names
         super(Component, self)._setup_var_data()
+
         allprocs_abs_names = self._var_allprocs_abs_names
+        allprocs_abs_names_discrete = self._var_allprocs_abs_names_discrete
+
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+
         abs2prom = self._var_abs2prom
+
         allprocs_abs2meta = self._var_allprocs_abs2meta
         abs2meta = self._var_abs2meta
 
@@ -266,7 +271,7 @@ class Component(System):
                 abs_name = prefix + prom_name
                 metadata = self._var_rel2meta[prom_name]
 
-                # Compute allprocs_abs_names, abs_names
+                # Compute allprocs_abs_names
                 allprocs_abs_names[type_].append(abs_name)
 
                 # Compute allprocs_prom2abs_list, abs2prom
@@ -284,12 +289,22 @@ class Component(System):
 
             for prom_name, val in iteritems(self._var_discrete[type_]):
                 abs_name = prefix + prom_name
+
+                # Compute allprocs_abs_names_discrete
+                allprocs_abs_names_discrete[type_].append(abs_name)
+
+                # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[type_][prom_name] = [abs_name]
+                abs2prom[type_][abs_name] = prom_name
+
+                # Compute allprocs_discrete (metadata for discrete vars)
                 self._var_allprocs_discrete[type_][abs_name] = val
 
-        self._var_allprocs_abs2prom = self._var_abs2prom
+        self._var_allprocs_abs2prom = abs2prom
 
-        self._var_abs_names = self._var_allprocs_abs_names
+        self._var_abs_names = allprocs_abs_names
+        self._var_abs_names_discrete = allprocs_abs_names_discrete
+
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])

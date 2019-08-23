@@ -155,7 +155,7 @@ class BalanceComp(ImplicitComponent):
 
             meta = self.add_output(name, **options['kwargs'])
 
-            n = self._state_vars[name]['size'] = meta['size']
+            n = meta['size']
 
             for s in ('lhs', 'rhs', 'mult'):
                 if options['{0}_name'.format(s)] is None:
