@@ -27,6 +27,7 @@ from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
 from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -1029,8 +1030,6 @@ class TestSqliteCaseReader(unittest.TestCase):
             np.testing.assert_almost_equal(meta['value'], expected['value'])
 
     def test_list_discrete(self):
-        from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
-
         model = om.Group()
 
         indep = model.add_subsystem('indep', om.IndepVarComp())
@@ -1050,7 +1049,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader(self.filename)
-
         case = cr.get_case(0)
 
         #
@@ -1058,59 +1056,186 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         stream = StringIO()
         case.list_inputs(values=True, hierarchical=False, out_stream=stream)
-        text = stream.getvalue()
+        text = stream.getvalue().split('\n')
 
-        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
+        expected = [
+            "3 Input(s) in 'model'",
+            "---------------------",
+            "",
+            "varname  value",
+            "-------  -----",
+            "expl.a   [10.]",
+            "expl.x   11",
+            "impl.x   11",
+        ]
 
-        # make sure they are in the correct order
-        # self.assertTrue(text.find('expl.a') < text.find('expl.x') < text.find('impl.x'))
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
         #
         # list inputs, hierarchical
         #
         stream = StringIO()
         case.list_inputs(values=True, hierarchical=True, out_stream=stream)
-        text = stream.getvalue()
+        text = stream.getvalue().split('\n')
 
-        self.assertEqual(1, text.count("3 Input(s) in 'model'"))
-        self.assertEqual(1, text.count('top'))
-        self.assertEqual(1, text.count('  expl'))
-        self.assertEqual(1, text.count('    a'))
-        self.assertEqual(1, text.count('  impl'))
-        self.assertEqual(2, text.count('    x'))      # both implicit & explicit
+        expected = [
+            "3 Input(s) in 'model'",
+            "---------------------",
+            "",
+            "varname  value",
+            "-------  -----",
+            "top",
+            "  expl",
+            "    a    [10.]",
+            "    x    11   ",
+            "  impl",
+            "    x    11 ",
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
         #
         # list outputs, not hierarchical
         #
         stream = StringIO()
         case.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
-        text = stream.getvalue()
+        text = stream.getvalue().split('\n')
 
-        self.assertEqual(text.count('3 Explicit Output'), 1)
-        self.assertEqual(text.count('1 Implicit Output'), 1)
+        expected = [
+            "3 Explicit Output(s) in 'model'",
+            "-------------------------------",
+            "",
+            "varname  value  resids      ",
+            "-------  -----  ------------",
+            "expl.b   [20.]  [0.]        ",
+            "expl.y   2      Not Recorded",
+            "indep.x  11     Not Recorded",
+        ]
 
-        # make sure they are in the correct order
-        # self.assertTrue(text.find('indep.x') < text.find('expl.b') <
-        #                 text.find('expl.y') < text.find('impl.y'))
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
         #
         # list outputs, hierarchical
         #
         stream = StringIO()
-        case.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
-        text = stream.getvalue()
+        case.list_outputs(values=True, hierarchical=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
 
-        self.assertEqual(text.count('top'), 2)        # both implicit & explicit
-        self.assertEqual(text.count('  indep'), 1)
-        self.assertEqual(text.count('    x'), 1)
-        self.assertEqual(text.count('  expl'), 1)
-        self.assertEqual(text.count('    b'), 1)
-        self.assertEqual(text.count('  impl'), 1)
-        self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
+        expected = [
+            "3 Explicit Output(s) in 'model'",
+            "-------------------------------",
+            "",
+            "varname  value",
+            "-------  -----",
+            "top",
+            "  expl",
+            "    b    [20.]",
+            "    y    2    ",
+            "  indep",
+            "    x    11   ",
+            "",
+            "",
+            "1 Implicit Output(s) in 'model'",
+            "-------------------------------",
+            "",
+            "varname  value",
+            "-------  -----",
+            "top",
+            "  impl",
+            "    y    2    ",
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+    def test_list_discrete_filtered(self):
+        model = om.Group()
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_discrete_output('x', 11)
+
+        sub = model.add_subsystem('sub', om.Group())
+        sub.add_subsystem('expl', ModCompEx(3))
+        sub.add_subsystem('impl', ModCompIm(3))
+
+        model.connect('indep.x', 'sub.expl.x')
+        model.connect('indep.x', 'sub.impl.x')
+
+        sub.add_recorder(self.recorder)
+
+        # exclude one discrete input and one discrete output
+        sub.recording_options['excludes'] = ['impl.x', 'expl.y']
+
+        prob = om.Problem(model)
+
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        #
+        # list inputs
+        #
+        stream = StringIO()
+        case.list_inputs(values=True, hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "2 Input(s) in 'model'",
+            "---------------------",
+            "",
+            "varname      value",
+            "-------      -----",
+            "sub.expl.a   [10.]",
+            "sub.expl.x   11",
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        #
+        # list outputs
+        #
+        stream = StringIO()
+        case.list_outputs(values=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        expected = [
+            "1 Explicit Output(s) in 'model'",
+            "-------------------------------",
+            "",
+            "varname  value",
+            "-------  -----",
+            "top",
+            "  expl",
+            "    b    [20.]",
+            "",
+            "",
+            "1 Implicit Output(s) in 'model'",
+            "-------------------------------",
+            "",
+            "varname  value",
+            "-------  -----",
+            "top",
+            "  impl",
+            "    y    2    ",
+        ]
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
     def test_list_discrete_promoted(self):
-        from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
-
         model = om.Group()
 
         indep = om.IndepVarComp()
@@ -1130,16 +1255,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader(self.filename)
-
         case = cr.get_case(0)
 
         #
         # list inputs
         #
         stream = StringIO()
-
         case.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
-
         text = stream.getvalue().split('\n')
 
         expected = [
@@ -1161,12 +1283,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list outputs
         #
         stream = StringIO()
-
         case.list_outputs(prom_name=True, out_stream=stream)
-
         text = stream.getvalue().split('\n')
 
-        # FIXME: comps are in sorted order, not exec order
         expected = [
             "3 Explicit Output(s) in 'model'",
             "-------------------------------",

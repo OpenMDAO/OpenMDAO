@@ -138,46 +138,46 @@ def check_path(path, includes, excludes, include_all_path=False):
     return False
 
 
-def deserialize(vals, abs2meta):
+def deserialize(json_data, abs2meta):
     """
     Deserialize recorded data from a JSON formatted string.
 
-    If all data values are arrays then a numpy named array will be returned,
+    If all data values are arrays then a numpy structured array will be returned,
     otherwise a dictionary mapping variable names to values will be returned.
 
     Parameters
     ----------
-    vals : string
+    json_data : string
         JSON encoded data
     abs2meta : dict
         Dictionary mapping absolute variable names to variable metadata
 
     Returns
     -------
-    array: numpy named array or dict
+    array or dict
         Variable names and values parsed from the JSON string
     """
-    json_vals = json.loads(vals)
-    if json_vals is None:
+    values = json.loads(json_data)
+    if values is None:
         return None
 
-    named_array = True
+    all_array = True
 
-    for name, value in iteritems(json_vals):
+    for name, value in iteritems(values):
         if isinstance(value, list) and 'shape' in abs2meta[name]:
-            json_vals[name] = np.resize(np.array(value), abs2meta[name]['shape'])
+            values[name] = np.resize(np.array(value), abs2meta[name]['shape'])
         else:
-            named_array = False
+            all_array = False
 
-    if named_array:
-        return dict_to_named_array(json_vals)
+    if all_array:
+        return dict_to_structured_array(values)
     else:
-        return json_vals
+        return values
 
 
-def dict_to_named_array(values):
+def dict_to_structured_array(values):
     """
-    Convert a dict of variable names and values into a numpy named array.
+    Convert a dict of variable names and values into a numpy structured array.
 
     Parameters
     ----------
@@ -186,8 +186,8 @@ def dict_to_named_array(values):
 
     Returns
     -------
-    array: numpy named array
-        named array containing the same names and values as the input values dict.
+    array
+        numpy structured array containing the same names and values as the input values dict.
     """
     if values:
         dtype_tuples = []

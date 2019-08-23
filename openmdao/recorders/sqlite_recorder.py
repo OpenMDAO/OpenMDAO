@@ -18,7 +18,7 @@ from six import iteritems
 
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
-from openmdao.utils.record_util import dict_to_named_array
+from openmdao.utils.record_util import dict_to_structured_array
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.core.driver import Driver
@@ -649,7 +649,7 @@ class SqliteRecorder(CaseRecorder):
         """
         if self.connection:
 
-            data_array = dict_to_named_array(data)
+            data_array = dict_to_structured_array(data)
             data_blob = array_to_blob(data_array)
 
             with self.connection as c:
