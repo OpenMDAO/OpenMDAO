@@ -184,13 +184,21 @@ class AssembledJacobian(Jacobian):
 
                     col_slice = None
                     if src_indices is None:
-                        if all_meta[out_abs_name]['distributed']:
-                            ivar = abs2idx[out_abs_name]
-                            colstart = np.sum(owned_sizes[:iproc, ivar])
-                            col_slice = slice(colstart, colstart + owned_sizes[iproc, ivar])
+                        # if input is connected to a distributed output, then set column slices
+                        # based on the part of the output local to this proc if the input is
+                        # duplicated. Otherwise, have each proc specify the same overlapping
+                        # full col slice.
+                        if False:  # all_meta[out_abs_name]['distributed']:
+                            in_ivar = abs2idx[wrt_abs_name]
+                            # TODO: make this check more robust
+                            if np.sum(in_sizes[:, in_ivar]) > in_sizes[iproc, in_ivar]:
+                                ivar = abs2idx[out_abs_name]
+                                colstart = np.sum(owned_sizes[:iproc, ivar])
+                                col_slice = slice(colstart, colstart + owned_sizes[iproc, ivar])
                     else:
                         # need to add an entry for d(output)/d(source)
-                        # instead of d(output)/d(input)
+                        # instead of d(output)/d(input).  int_mtx is a square matrix whose
+                        # rows and columns map to output/resid vars only.
                         abs_key2 = (res_abs_name, out_abs_name)
 
                         shape = abs_key2shape(abs_key2)
@@ -216,7 +224,7 @@ class AssembledJacobian(Jacobian):
             self._int_mtx._build(total_non_dup_size, total_non_dup_size, system)
 
         else:
-            int_mtx._build(out_size, out_size)
+            int_mtx._build(out_size, out_size, system)
 
         if ext_mtx._submats:
             in_size = np.sum(in_sizes[iproc, :])
@@ -322,8 +330,7 @@ class AssembledJacobian(Jacobian):
             output_names = set(n for n in system._var_abs_names['output']
                                if owned[n] == irank or meta[n]['distributed'])
             input_names = set(n for n in system._var_abs_names['input']
-                              if owned[n] == irank or meta[n]['distributed'] or
-                              (n in global_conns and meta[global_conns[n]]['distributed']))
+                              if owned[n] == irank or meta[n]['distributed'])
 
             rev_conns = defaultdict(list)
             for tgt, src in iteritems(global_conns):

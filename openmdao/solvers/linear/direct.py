@@ -201,6 +201,18 @@ class DirectSolver(LinearSolver):
         # Use an assembled jacobian by default.
         self.options['assemble_jac'] = True
 
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : System
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(DirectSolver, self)._setup_solvers(system, depth)
         self._local2owned_inds = None
         self._owned_size_totals = None
 
@@ -268,6 +280,8 @@ class DirectSolver(LinearSolver):
 
             if system.comm.size > 1 and self._owned_size_totals is None:
                 self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
+                # print('owned_size_totals')
+                # print(self._owned_size_totals)
 
             if matrix is None:
                 self._lu = self._lup = None
@@ -276,6 +290,10 @@ class DirectSolver(LinearSolver):
 
             # Perform dense or sparse lu factorization.
             elif isinstance(matrix, csc_matrix):
+                # from openmdao.utils.general_utils import printoptions
+                # with printoptions(linewidth=9999):
+                #     x = matrix.toarray()
+                #     print(x)
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
                     self._nodup_size = matrix.shape[1]
@@ -428,20 +446,41 @@ class DirectSolver(LinearSolver):
             trans_lu = 1
             trans_splu = 'T'
 
+        # print([n for n in system._var_abs_names['output']])
+        # print("x_vec")
+        # print(x_vec)
+        # print("b_vec")
+        # print(b_vec)
+
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
             if system.comm.size > 1:
-                _, nodup2local_inds, local2owned_inds = system._get_nodup_out_ranges()
+                _, nodup2local_inds, local2owned_inds, noncontig_dist_inds = \
+                    system._get_nodup_out_ranges()
                 # gather full_b
-                full_b = np.empty(self._nodup_size)
+                tmp = np.empty(self._nodup_size)
+                # print("b_vec[local2owned_inds]")
+                # print(b_vec[local2owned_inds])
                 system.comm.Gatherv(b_vec[local2owned_inds],  # src
-                                    (full_b, self._owned_size_totals),  # dest
+                                    (tmp, self._owned_size_totals),  # dest
                                     root=0)
+                # print([n for n in system._var_allprocs_abs_names['output']])
+                # print("gathered b_vec")
+                # print(tmp)
             else:
-                full_b = b_vec
+                full_b = tmp = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 if iproc == 0:
+                    # convert full_b to the same ordering that the matrix expects, where
+                    # dist vars are contiguous.
+                    # TODO: only do this if distributed vars are found to avoid unnecessary
+                    # inefficiency
+                    if system.comm.size > 1:
+                        full_b = tmp[noncontig_dist_inds]
+                        # print("full_b")
+                        # print(full_b)
+
                     if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
                         arr = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
                     else:
@@ -449,11 +488,13 @@ class DirectSolver(LinearSolver):
 
                 if system.comm.size > 1:
                     if iproc > 0:
-                        arr = np.zeros(full_b.size)
+                        arr = np.zeros(tmp.size)
 
                     # this sends more data than necessary, but the alternative is to use a lot
                     # of memory on rank 0 to store the chunk that each proc needs.
                     system.comm.Bcast(arr, root=0)
+                    # print('after LU solve')
+                    # print(arr)
                     x_vec[:] = arr[nodup2local_inds]
                 else:
                     x_vec[:] = arr

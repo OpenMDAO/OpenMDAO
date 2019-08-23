@@ -691,6 +691,7 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         # run first in fwd mode
         p = om.Problem(model=PartialDependGroup())
         p.setup(mode='fwd')
+
         p.run_model()
 
         elapsed_fwd = time.time()

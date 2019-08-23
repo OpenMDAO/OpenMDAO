@@ -65,16 +65,18 @@ class COOMatrix(Matrix):
         if system is None:
             owns = None
             iproc = 0
+            comm_size = 1
             abs2meta = None
         else:
             owns = system._owning_rank
             iproc = system.comm.rank
+            comm_size = system.comm.size
             abs2meta = system._var_allprocs_abs2meta
 
         start = end = 0
         for key, (info, loc, src_indices, shape, factor, col_slice) in iteritems(submats):
-            if owns and not (owns[key[1]] == iproc or abs2meta[key[1]]['distributed']
-                             or col_slice is not None):
+            wrt_dist = abs2meta[key[1]]['distributed'] if abs2meta else False
+            if owns and not (owns[key[1]] == iproc or wrt_dist or abs2meta[key[0]]['distributed']):
                 continue  # only keep stuff that this rank owns
 
             val = info['value']
@@ -84,9 +86,15 @@ class COOMatrix(Matrix):
             full_size = np.prod(shape)
             if dense:
                 if src_indices is None:
-                    delta = full_size
+                    if wrt_dist:
+                        delta = np.prod(info['shape'])
+                    else:
+                        delta = full_size
                 else:
-                    delta = shape[0] * len(src_indices)
+                    if wrt_dist:
+                        delta = info['shape'][0] * len(src_indices)
+                    else:
+                        delta = shape[0] * len(src_indices)
             elif rows is None:  # sparse matrix
                 delta = val.data.size
             else:  # list sparse format
@@ -106,11 +114,22 @@ class COOMatrix(Matrix):
             val = info['value']
             idxs = None
 
+            col_offset = row_offset = 0
+            if comm_size > 1:
+                shape = info['shape']
+                if abs2meta[key[1]]['distributed']:
+                    col_offset = np.sum(
+                        system._owned_sizes[:iproc, system._var_allprocs_abs2idx['linear'][key[1]]])
+                if abs2meta[key[0]]['distributed']:
+                    row_offset = np.sum(
+                        system._owned_sizes[:iproc, system._var_allprocs_abs2idx['linear'][key[0]]])
+
             if dense:
+
                 jac_type = ndarray
 
                 if src_indices is None:
-                    colrange = np.arange(shape[1], dtype=int)
+                    colrange = np.arange(shape[1], dtype=int) + col_offset
                 else:
                     colrange = src_indices
 
@@ -119,7 +138,7 @@ class COOMatrix(Matrix):
                 subcols = cols[start:end]
 
                 for i in range(shape[0]):
-                    subrows[i * ncols: (i + 1) * ncols] = i
+                    subrows[i * ncols: (i + 1) * ncols] = i + row_offset
                     subcols[i * ncols: (i + 1) * ncols] = colrange
 
                 subrows += irow
@@ -136,8 +155,8 @@ class COOMatrix(Matrix):
                     jcols = info['cols']
 
                 if src_indices is None:
-                    rows[start:end] = jrows + irow
-                    cols[start:end] = jcols + icol
+                    rows[start:end] = jrows + (irow + row_offset)
+                    cols[start:end] = jcols + (icol + col_offset)
                 else:
                     irows, icols, idxs = _compute_index_map(jrows, jcols,
                                                             irow, icol,

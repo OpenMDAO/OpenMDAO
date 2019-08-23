@@ -407,5 +407,5 @@ def sizes2offsets(size_array, dtype=int):
         Array of offsets.
     """
     offsets = np.zeros(size_array.size, dtype=dtype)
-    offsets[1:] = np.cumsum(size_array)[:-1]
-    return offsets
+    offsets[1:] = np.cumsum(size_array.flat)[:-1]
+    return offsets.reshape(size_array.shape)

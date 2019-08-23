@@ -27,7 +27,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
 from openmdao.utils.general_utils import filter_var_based_on_tags, convert_user_defined_tags_to_set
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
@@ -1451,6 +1451,8 @@ class System(object):
         """
         self._var_sizes = {}
         self._owned_var_sizes = None
+        self._nodup_out_ranges = None
+        self._nodup2local_out_inds = None
         self._owning_rank = defaultdict(int)
 
     def _setup_global_shapes(self):
@@ -3728,30 +3730,52 @@ class System(object):
 
             ranges = OrderedDict()
             out_views = self._outputs._views
-            inds = []
 
-            # compute offsets into the full non-dup output/resid array
-            offsets = np.zeros(owned_sizes.size, dtype=int)
-            offsets[1:] = np.cumsum(owned_sizes.flat)[:-1]
-            offsets = offsets.reshape(owned_sizes.shape)
+            # compute offsets into the full non-dup output/resid array by summing down columns
+            # of owned_sizes array. This results in the distributed vars being contiguous, and
+            # having the same offsets in every proc so that overlapping indices, etc. will be
+            # properly handled.
+            contig_offsets = sizes2offsets(np.sum(owned_sizes, axis=0))
+
+            # compute offsets into the full non-dup output/resid array where distrib vars are not
+            # contiguous
+            offsets = sizes2offsets(owned_sizes)
 
             # order ranks with our rank first
             ordered_ranks = [iproc] + [r for r in range(self.comm.size) if r != iproc]
 
+            has_distribs = False
+            contig_inds = []
+            non_contig_inds = []
             # compute ranges/indices into the full non-duplicated output/resid arrays
             for i, name in enumerate(self._var_allprocs_abs_names['output']):
+                distrib = abs2meta[name]['distributed']
+                has_distribs |= distrib
+                found = False
                 # check each rank (this rank first) for the first nonzero size
                 for irank in ordered_ranks:
                     size = owned_sizes[irank, i]
+
                     if size > 0:
-                        start = offsets[irank, i]
-                        ranges[name] = (start, start + size)
-                        if name in out_views:
-                            inds.append(np.arange(start, start + size, dtype=int))
-                        break
+                        if not found:
+                            found = True
+                            dsize = np.sum(owned_sizes[:, i]) if distrib else size
+
+                            contig_start = contig_offsets[i]
+                            ranges[name] = (contig_start, contig_start + dsize)
+                            if name in out_views:
+                                if distrib:
+                                    # need offset into the dist var
+                                    dstart = contig_start + np.sum(owned_sizes[:irank, i])
+                                    contig_inds.append(np.arange(dstart, dstart + size, dtype=int))
+                                else:
+                                    contig_inds.append(np.arange(*ranges[name], dtype=int))
+
+                        non_contig_start = offsets[irank, i]
+                        non_contig_inds.append(np.arange(non_contig_start, non_contig_start + size))
 
             self._nodup_out_ranges = ranges
-            self._nodup2local_out_inds = _arraylist2array(inds)
+            self._nodup2local_out_inds = _arraylist2array(contig_inds)
 
             # get indices to pull out only the 'owned' values from the local array
             local2owned_inds = []
@@ -3766,7 +3790,20 @@ class System(object):
 
             self._local2owned_inds = _arraylist2array(local2owned_inds)
 
-        return self._nodup_out_ranges, self._nodup2local_out_inds, self._local2owned_inds
+            # compute inds to map gathered nodup order to nodup ordered by ownership
+            self._noncontig_dis_inds = _arraylist2array(non_contig_inds)
+
+            # print('nodup -> out')
+            # print(self._nodup_out_ranges)
+            # print('nodup -> local')
+            # print(self._nodup2local_out_inds)
+            # print('local -> owned')
+            # print(self._local2owned_inds)
+            # print('contig -> noncontig')
+            # print(self._noncontig_dis_inds)
+
+        return (self._nodup_out_ranges, self._nodup2local_out_inds, self._local2owned_inds,
+                self._noncontig_dis_inds)
 
 
 def _arraylist2array(lst, dtype=int):

@@ -2,12 +2,17 @@
 
 import unittest
 import numpy
+import itertools
 
-from openmdao.api import ParallelGroup, Group, Problem, IndepVarComp, \
-    ExecComp, LinearBlockGS, ExplicitComponent, ImplicitComponent, PETScKrylov, DirectSolver
+import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_rel_error
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -20,7 +25,7 @@ else:
     rank = 0
 
 
-class DistribExecComp(ExecComp):
+class DistribExecComp(om.ExecComp):
     """
     An ExecComp that uses N procs and takes input var slices.  Unlike a normal
     ExecComp, it only supports a single expression per proc.  If you give it
@@ -77,7 +82,7 @@ class DistribExecComp(ExecComp):
         super(DistribExecComp, self).setup()
 
 
-class DistribCoordComp(ExplicitComponent):
+class DistribCoordComp(om.ExplicitComponent):
     def __init__(self, **kwargs):
         super(DistribCoordComp, self).__init__(**kwargs)
 
@@ -112,12 +117,22 @@ class DistribCoordComp(ExplicitComponent):
             outputs['outvec'] = inputs['invec'] * 3.0
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+def _test_func_name(func, num, param):
+    args = []
+    for p in param.args:
+        try:
+            arg = p.__name__
+        except:
+            arg = str(p)
+        args.append(arg)
+    return func.__name__ + '_' + '_'.join(args)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests2(unittest.TestCase):
 
     N_PROCS = 2
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_distrib_shape(self):
         points = numpy.array([
             [0., 0., 0.],
@@ -132,11 +147,11 @@ class MPITests2(unittest.TestCase):
             [0., 0., 2.],
         ])
 
-        prob = Problem()
+        prob = om.Problem()
 
-        prob.model.add_subsystem('indep', IndepVarComp('x', points))
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', points))
         prob.model.add_subsystem('comp', DistribCoordComp())
-        prob.model.add_subsystem('total', ExecComp('y=x',
+        prob.model.add_subsystem('total', om.ExecComp('y=x',
                                                    x=numpy.zeros((9, 3)),
                                                    y=numpy.zeros((9, 3))))
         prob.model.connect('indep.x', 'comp.invec')
@@ -151,66 +166,67 @@ class MPITests2(unittest.TestCase):
 
         assert_rel_error(self, prob['total.y'], final)
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
-    def test_two_simple(self):
+    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver]),
+                          name_func=_test_func_name)
+    def test_two_simple(self, solver):
         size = 3
-        group = Group()
+        group = om.Group()
 
         # import pydevd
         # pydevd.settrace('localhost', port=10000+MPI.COMM_WORLD.rank,
         #                 stdoutToServer=True, stderrToServer=True)
 
-        group.add_subsystem('P', IndepVarComp('x', numpy.arange(size)))
+        group.add_subsystem('P', om.IndepVarComp('x', numpy.arange(size)))
         group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
                                                   x=numpy.zeros(size),
                                                   y=numpy.zeros(size)))
-        group.add_subsystem('C2', ExecComp(['z=3.0*y'],
+        group.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
                                            y=numpy.zeros(size),
                                            z=numpy.zeros(size)))
 
-        prob = Problem()
+        #import wingdbstub
+
+        prob = om.Problem()
         prob.model = group
-        prob.model.linear_solver = DirectSolver()
+        prob.model.linear_solver = solver()
         prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
-        
-        #import wingdbstub
+
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
-        print(J)
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
 
         J = prob.compute_totals(['C2.z'], ['P.x'])
-        print(J)
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
-    def test_fan_out_grouped(self):
+    @parameterized.expand(itertools.product([om.DirectSolver, om.LinearRunOnce]),
+                          name_func=_test_func_name)
+    def test_fan_out_grouped(self, solver):
         size = 3
-        prob = Problem()
-        prob.model = root = Group()
-        root.add_subsystem('P', IndepVarComp('x', numpy.ones(size, dtype=float)))
+        prob = om.Problem()
+        prob.model = root = om.Group()
+        root.add_subsystem('P', om.IndepVarComp('x', numpy.ones(size, dtype=float)))
         root.add_subsystem('C1', DistribExecComp(['y=3.0*x', 'y=2.0*x'], arr_size=size,
                                                  x=numpy.zeros(size, dtype=float),
                                                  y=numpy.zeros(size, dtype=float)))
-        sub = root.add_subsystem('sub', ParallelGroup())
-        sub.add_subsystem('C2', ExecComp('y=1.5*x',
+        sub = root.add_subsystem('sub', om.ParallelGroup())
+        sub.add_subsystem('C2', om.ExecComp('y=1.5*x',
                                          x=numpy.zeros(size),
                                          y=numpy.zeros(size)))
-        sub.add_subsystem('C3', ExecComp(['y=5.0*x'],
+        sub.add_subsystem('C3', om.ExecComp(['y=5.0*x'],
                                          x=numpy.zeros(size, dtype=float),
                                          y=numpy.zeros(size, dtype=float)))
 
-        root.add_subsystem('C2', ExecComp(['y=x'],
+        root.add_subsystem('C2', om.ExecComp(['y=x'],
                                           x=numpy.zeros(size, dtype=float),
                                           y=numpy.zeros(size, dtype=float)))
-        root.add_subsystem('C3', ExecComp(['y=x'],
+        root.add_subsystem('C3', om.ExecComp(['y=x'],
                                           x=numpy.zeros(size, dtype=float),
                                           y=numpy.zeros(size, dtype=float)))
         root.connect('sub.C2.y', 'C2.x')
@@ -219,6 +235,10 @@ class MPITests2(unittest.TestCase):
         root.connect("C1.y", "sub.C2.x")
         root.connect("C1.y", "sub.C3.x")
         root.connect("P.x", "C1.x")
+
+        root.linear_solver = solver()
+
+        #import wingdbstub
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -243,21 +263,20 @@ class MPITests2(unittest.TestCase):
         assert_rel_error(self, J['C2.y', 'P.x'], diag1, 1e-6)
         assert_rel_error(self, J['C3.y', 'P.x'], diag2, 1e-6)
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_fan_in_grouped(self):
         size = 3
 
-        prob = Problem()
-        prob.model = root = Group()
+        prob = om.Problem()
+        prob.model = root = om.Group()
 
-        root.add_subsystem('P1', IndepVarComp('x', numpy.ones(size, dtype=float)))
-        root.add_subsystem('P2', IndepVarComp('x', numpy.ones(size, dtype=float)))
-        sub = root.add_subsystem('sub', ParallelGroup())
+        root.add_subsystem('P1', om.IndepVarComp('x', numpy.ones(size, dtype=float)))
+        root.add_subsystem('P2', om.IndepVarComp('x', numpy.ones(size, dtype=float)))
+        sub = root.add_subsystem('sub', om.ParallelGroup())
 
-        sub.add_subsystem('C1', ExecComp(['y=-2.0*x'],
+        sub.add_subsystem('C1', om.ExecComp(['y=-2.0*x'],
                                          x=numpy.zeros(size, dtype=float),
                                          y=numpy.zeros(size, dtype=float)))
-        sub.add_subsystem('C2', ExecComp(['y=5.0*x'],
+        sub.add_subsystem('C2', om.ExecComp(['y=5.0*x'],
                                          x=numpy.zeros(size, dtype=float),
                                          y=numpy.zeros(size, dtype=float)))
         root.add_subsystem('C3', DistribExecComp(['y=3.0*x1+7.0*x2', 'y=1.5*x1+3.5*x2'],
@@ -265,7 +284,7 @@ class MPITests2(unittest.TestCase):
                                                  x1=numpy.zeros(size, dtype=float),
                                                  x2=numpy.zeros(size, dtype=float),
                                                  y=numpy.zeros(size, dtype=float)))
-        root.add_subsystem('C4', ExecComp(['y=x'],
+        root.add_subsystem('C4', om.ExecComp(['y=x'],
                                           x=numpy.zeros(size, dtype=float),
                                           y=numpy.zeros(size, dtype=float)))
 
@@ -275,8 +294,8 @@ class MPITests2(unittest.TestCase):
         root.connect("P2.x", "sub.C2.x")
         root.connect("C3.y", "C4.x")
 
-        root.linear_solver = LinearBlockGS()
-        sub.linear_solver = LinearBlockGS()
+        root.linear_solver = om.LinearBlockGS()
+        sub.linear_solver = om.LinearBlockGS()
 
         prob.set_solver_print(0)
         prob.setup(mode='fwd')
@@ -301,7 +320,7 @@ class MPITests2(unittest.TestCase):
         raise unittest.SkipTest("distrib vois no supported yet")
 
 
-class DistribStateImplicit(ImplicitComponent):
+class DistribStateImplicit(om.ImplicitComponent):
     """
     This component is unusual in that it has a distributed variable 'states' that
     is not connected to any other variables in the model.  The input 'a' sets the local
@@ -325,7 +344,7 @@ class DistribStateImplicit(ImplicitComponent):
 
         self.local_size = sizes[rank]
 
-        self.linear_solver = PETScKrylov()
+        self.linear_solver = om.PETScKrylov()
 
     def solve_nonlinear(self, i, o):
         o['states'] = i['a']
@@ -388,9 +407,9 @@ class MPITests3(unittest.TestCase):
 
     @unittest.skipUnless(MPI, "MPI is not active.")
     def test_distrib_apply(self):
-        p = Problem()
+        p = om.Problem()
 
-        p.model.add_subsystem('des_vars', IndepVarComp('a', val=10., units='m'), promotes=['*'])
+        p.model.add_subsystem('des_vars', om.IndepVarComp('a', val=10., units='m'), promotes=['*'])
         p.model.add_subsystem('icomp', DistribStateImplicit(), promotes=['*'])
 
         expected = numpy.array([5.])
