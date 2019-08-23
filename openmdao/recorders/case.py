@@ -629,6 +629,7 @@ class Case(object):
         for name, vals in var_data:
             var_dict[name] = vals
 
+        # FIXME: vars should be in execution order, for now they are just in sorted order
         write_var_table('model', sorted(var_dict.keys()), var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
 

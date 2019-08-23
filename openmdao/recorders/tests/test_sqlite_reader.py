@@ -1217,8 +1217,9 @@ class TestSqliteCaseReader(unittest.TestCase):
             "varname  value",
             "-------  -----",
             "top",
-            "  expl",
-            "    b    [20.]",
+            "  sub",
+            "    expl",
+            "      b    [20.]",
             "",
             "",
             "1 Implicit Output(s) in 'model'",
@@ -1227,8 +1228,9 @@ class TestSqliteCaseReader(unittest.TestCase):
             "varname  value",
             "-------  -----",
             "top",
-            "  impl",
-            "    y    2    ",
+            "  sub",
+            "    impl",
+            "      y    2",
         ]
 
         for i, line in enumerate(expected):
