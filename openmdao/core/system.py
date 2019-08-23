@@ -1363,6 +1363,7 @@ class System(object):
                 myinputs.update({n for n in self._inputs._names
                                  if check_path(n, incl, excl)})
 
+            # FIXME: discretes are keyed on rel_name, but incl/excl should use abs for inputs?
             if len(self._var_discrete['input']) > 0:
                 myinputs.update({n for n in self._var_discrete['input']
                                  if check_path(n, incl, excl)})

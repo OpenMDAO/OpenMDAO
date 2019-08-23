@@ -316,9 +316,9 @@ class Case(object):
         Parameters
         ----------
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------
@@ -338,9 +338,9 @@ class Case(object):
         Parameters
         ----------
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------
@@ -360,9 +360,9 @@ class Case(object):
         Parameters
         ----------
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------
@@ -382,9 +382,9 @@ class Case(object):
         Parameters
         ----------
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------
@@ -667,9 +667,9 @@ class Case(object):
         vals : PromAbsDict
             Map of variables to their values.
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------

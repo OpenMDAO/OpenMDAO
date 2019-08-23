@@ -359,8 +359,8 @@ class SqliteCaseReader(BaseCaseReader):
         Returns
         -------
         list
-            One or more of: `problem`, `driver`, `<component hierarchy location>`,
-            `<solver hierarchy location>`
+            One or more of: `problem`, `driver`, `<system hierarchy location>`,
+                            `<solver hierarchy location>`
         """
         sources = []
 
@@ -381,8 +381,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', `<component hierarchy location>`,
-            `<solver hierarchy location>`}
+        source : {`problem`, `driver`, `<system hierarchy location>`,
+                  `<solver hierarchy location>`}
             Identifies the source for which to return information.
 
         Returns

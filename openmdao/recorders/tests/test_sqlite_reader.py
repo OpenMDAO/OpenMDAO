@@ -1171,7 +1171,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         sub.add_recorder(self.recorder)
 
         # exclude one discrete input and one discrete output
-        sub.recording_options['excludes'] = ['impl.x', 'expl.y']
+        sub.recording_options['excludes'] = ['sub.impl.x', 'expl.y']
 
         prob = om.Problem(model)
 
