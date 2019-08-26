@@ -461,7 +461,6 @@ class ExecComp(ExplicitComponent):
                 self.compute(pwrap, uwrap)
 
                 for u in out_names:
-                    # print(self.pathname, (u, param), imag(uwrap[u] * inv_stepsize))
                     partials[(u, param)] = imag(uwrap[u] * inv_stepsize).flat
 
                 # restore old param value
