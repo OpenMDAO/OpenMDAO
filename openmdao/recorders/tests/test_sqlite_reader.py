@@ -612,7 +612,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_list_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
-        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         prob.driver.add_recorder(self.recorder)
         prob.setup()
 
@@ -736,7 +736,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_list_cases_nested_model(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
-        prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
 
         model = prob.model
@@ -778,7 +778,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_list_cases_nested_no_source(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
-        prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
 
         model = prob.model
@@ -823,7 +823,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_get_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
-        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         prob.driver.add_recorder(self.recorder)
         prob.setup()
 
@@ -1990,9 +1990,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         SIZE = 10
         prob = om.Problem()
 
-        driver = prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['disp'] = False
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False)
 
         prob.driver.add_recorder(self.recorder)
         driver.recording_options['includes'] = ['*']
@@ -2457,6 +2455,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_recorder(self.recorder)
 
         prob.setup()
+        prob.set_solver_print(0)
 
         prob['px.x'] = 2.0
         prob['comp.y'] = 0.0
@@ -3110,7 +3109,7 @@ class TestPromAbsDict(unittest.TestCase):
 
     def test_dict_functionality(self):
         prob = SellarProblem(SellarDerivativesGrouped)
-        driver = prob.driver = om.ScipyOptimizeDriver()
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False)
 
         recorder = om.SqliteRecorder("cases.sql")
 

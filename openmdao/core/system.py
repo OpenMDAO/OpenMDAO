@@ -1357,18 +1357,24 @@ class System(object):
         incl = options['includes']
         excl = options['excludes']
 
+        # includes and excludes for inputs are specified using _absolute_ names
+        # vectors are keyed on absolute name, discretes on relative/promoted name
+        abs2prom = self._var_abs2prom['input']
+
         if options['record_inputs']:
             myinputs = set()
             if self._inputs:
                 myinputs.update({n for n in self._inputs._names
                                  if check_path(n, incl, excl)})
 
-            # FIXME: discretes are keyed on rel_name, but incl/excl should use abs for inputs?
             if len(self._var_discrete['input']) > 0:
-                myinputs.update({n for n in self._var_discrete['input']
-                                 if check_path(n, incl, excl)})
+                for n in self._var_discrete['input']:
+                    abs_name = self.pathname + '.' + n if self.pathname else n
+                    if check_path(abs_name, incl, excl):
+                        myinputs.add(n)
 
-        # includes and excludes for outputs are specified using promoted names
+        # includes and excludes for outputs are specified using _promoted_ names
+        # vectors are keyed on absolute name, discretes on relative/promoted name
         abs2prom = self._var_abs2prom['output']
 
         if options['record_outputs']:
@@ -1377,8 +1383,9 @@ class System(object):
                 myoutputs.update({n for n in self._outputs._names
                                   if n in abs2prom and check_path(abs2prom[n], incl, excl)})
 
+            # residuals have the same names as the continous outputs
             if options['record_residuals']:
-                myresiduals = myoutputs.copy()  # outputs and residuals have same names
+                myresiduals = myoutputs.copy()
 
             if len(self._var_discrete['output']) > 0:
                 myoutputs.update({n for n in self._var_discrete['output']
