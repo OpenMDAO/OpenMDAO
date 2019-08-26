@@ -46,7 +46,7 @@ class Matrix(object):
         self._metadata = OrderedDict()
         self._is_internal = is_internal
 
-    def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None, col_slice=None):
+    def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
         """
         Declare a sub-jacobian.
 
@@ -67,10 +67,8 @@ class Matrix(object):
             Shape of the specified submatrix.
         factor : float or None
             Unit conversion factor.
-        col_slice : slice or None
-            Column slice of local part of distributed source.
         """
-        self._submats[key] = (info, (irow, icol), src_indices, shape, factor, col_slice)
+        self._submats[key] = (info, (irow, icol), src_indices, shape, factor)
 
     def _build(self, num_rows, num_cols, system=None):
         """
@@ -100,7 +98,7 @@ class Matrix(object):
         """
         pass
 
-    def _prod(self, vec, mode, ranges):
+    def _prod(self, vec, mode, mask=None):
         """
         Perform a matrix vector product.
 
@@ -110,8 +108,8 @@ class Matrix(object):
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
-        ranges : (int, int, int, int)
-            Min row, max row, min col, max col for the current system.
+        mask : ndarray of type bool, or None
+            Array used to mask out part of the input vector.
 
         Returns
         -------

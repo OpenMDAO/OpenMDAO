@@ -20,9 +20,6 @@ class COOMatrix(Matrix):
 
     Attributes
     ----------
-    _mat_range_cache : dict
-        Dictionary of cached CSC matrices needed for solving on a sub-range of the
-        parent CSC matrix.
     _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
     _first_gather : bool
@@ -41,7 +38,6 @@ class COOMatrix(Matrix):
             If True, this is the int_mtx of an AssembledJacobian.
         """
         super(COOMatrix, self).__init__(comm, is_internal)
-        self._mat_range_cache = {}
         self._coo = None
         self._first_gather = True
 
@@ -74,7 +70,7 @@ class COOMatrix(Matrix):
             abs2meta = system._var_allprocs_abs2meta
 
         start = end = 0
-        for key, (info, loc, src_indices, shape, factor, col_slice) in iteritems(submats):
+        for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
             wrt_dist = abs2meta[key[1]]['distributed'] if abs2meta else False
             if owns and not (owns[key[1]] == iproc or wrt_dist or abs2meta[key[0]]['distributed']):
                 continue  # only keep stuff that this rank owns
@@ -109,7 +105,7 @@ class COOMatrix(Matrix):
         cols = np.empty(end, dtype=int)
 
         for key, (start, end, dense, jrows) in iteritems(pre_metadata):
-            info, loc, src_indices, shape, factor, col_slice = submats[key]
+            info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['value']
             idxs = None
@@ -164,7 +160,7 @@ class COOMatrix(Matrix):
                     rows[start:end] = irows
                     cols[start:end] = icols
 
-            metadata[key] = (start, end, idxs, jac_type, factor, col_slice)
+            metadata[key] = (start, end, idxs, jac_type, factor)
 
         return data, rows, cols
 
@@ -184,13 +180,13 @@ class COOMatrix(Matrix):
         data, rows, cols = self._build_coo(system)
 
         metadata = self._metadata
-        for key, (start, end, idxs, jac_type, factor, col_slice) in iteritems(metadata):
+        for key, (start, end, idxs, jac_type, factor) in iteritems(metadata):
             if idxs is None:
-                metadata[key] = (slice(start, end), jac_type, factor, col_slice)
+                metadata[key] = (slice(start, end), jac_type, factor)
             else:
                 # store reverse indices to avoid copying subjac data during
                 # update_submat.
-                metadata[key] = (np.argsort(idxs) + start, jac_type, factor, col_slice)
+                metadata[key] = (np.argsort(idxs) + start, jac_type, factor)
 
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 
@@ -205,21 +201,21 @@ class COOMatrix(Matrix):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        idxs, jac_type, factor, col_slice = self._metadata[key]
+        idxs, jac_type, factor = self._metadata[key]
         if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
             raise TypeError("Jacobian entry for %s is of different type (%s) than "
                             "the type (%s) used at init time." % (key,
                                                                   type(jac).__name__,
                                                                   jac_type.__name__))
         if isinstance(jac, ndarray):
-            self._matrix.data[idxs] = jac.flat if col_slice is None else jac[:, col_slice].flat
+            self._matrix.data[idxs] = jac.flat
         else:  # sparse
-            self._matrix.data[idxs] = jac.data if col_slice is None else jac[:, col_slice].data
+            self._matrix.data[idxs] = jac.data
 
         if factor is not None:
             self._matrix.data[idxs] *= factor
 
-    def _prod(self, in_vec, mode, ranges, mask=None):
+    def _prod(self, in_vec, mode, mask=None):
         """
         Perform a matrix vector product.
 
@@ -229,8 +225,6 @@ class COOMatrix(Matrix):
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
-        ranges : (int, int, int, int)
-            Min row, max row, min col, max col for the current system.
         mask : ndarray of type bool, or None
             Array used to zero out part of the matrix data.
 
@@ -244,36 +238,8 @@ class COOMatrix(Matrix):
         # the part of the matrix that is relevant to the lower level
         # system.
         mat = self._matrix
-        if ranges is not None:
-            rstart, rend, cstart, cend = ranges
-            if rstart != 0 or cstart != 0 or rend != mat.shape[0] or cend != mat.shape[1]:
-                if ranges in self._mat_range_cache:
-                    mat, idxs = self._mat_range_cache[ranges]
 
-                    # update the data array of our smaller cached matrix with current data from
-                    # self._matrix
-                    mat.data[:] = self._matrix.data[idxs]
-                else:
-                    rstart, rend, cstart, cend = ranges
-                    rmat = mat.tocoo()
-
-                    # find all row and col indices that are within the desired range
-                    ridxs = np.nonzero(np.logical_and(rmat.row >= rstart, rmat.row < rend))[0]
-                    cidxs = np.nonzero(np.logical_and(rmat.col >= cstart, rmat.col < cend))[0]
-
-                    # take the intersection since both rows and cols must be within range
-                    idxs = np.intersect1d(ridxs, cidxs, assume_unique=True)
-
-                    # create a new smaller csc matrix using only the parts of self._matrix that
-                    # are within range
-                    mat = coo_matrix((rmat.data[idxs], (rmat.row[idxs] - rstart,
-                                                        rmat.col[idxs] - cstart)),
-                                     shape=(rend - rstart, cend - cstart))
-                    mat = mat.tocsc()
-                    self._mat_range_cache[ranges] = mat, idxs
-
-        # NOTE: both mask and ranges will never be defined at the same time.  ranges applies only
-        #       to int_mtx and mask applies only to ext_mtx.
+        # NOTE: mask applies only to ext_mtx.
 
         if mode == 'fwd':
             if mask is None:
@@ -313,14 +279,18 @@ class COOMatrix(Matrix):
         """
         if len(d_inputs._views) > len(d_inputs._names):
             input_names = d_inputs._names
-            mask = np.ones(self._matrix.data.size, dtype=np.bool)
+            mask = None
             for key, val in iteritems(self._key_ranges):
                 if key[1] in input_names:
+                    if mask is None:
+                        mask = np.ones(self._matrix.data.size, dtype=np.bool)
                     ind1, ind2, _, _ = val
                     mask[ind1:ind2] = False
 
-            # convert the mask indices (if necessary) base on sparse matrix type (CSC, CSR, etc.)
-            return self._convert_mask(mask)
+            if mask is not None:
+                # convert the mask indices (if necessary) base on sparse matrix type
+                # (CSC, CSR, etc.)
+                return self._convert_mask(mask)
 
     def set_complex_step_mode(self, active):
         """

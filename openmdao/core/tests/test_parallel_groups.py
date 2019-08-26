@@ -114,6 +114,11 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
 
+        # do this a second time to test caching of dist rows/cols
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
+
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
         prob.setup(check=False, mode='rev')
@@ -124,6 +129,11 @@ class TestParallelGroups(unittest.TestCase):
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         # print('J rev')
         # print(J)
+        assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
+
+        # do this a second time to test caching of dist rows/cols
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
 

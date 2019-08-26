@@ -284,6 +284,7 @@ class DirectSolver(LinearSolver):
                 # print(self._owned_size_totals)
 
             if matrix is None:
+                # this happens if we're not rank 0
                 self._lu = self._lup = None
                 sz = np.sum(system._owned_sizes)
                 self._nodup_size = sz

@@ -182,20 +182,7 @@ class AssembledJacobian(Jacobian):
                     shape = (res_size, out_size)
                     src_indices = abs2meta[wrt_abs_name]['src_indices']
 
-                    col_slice = None
-                    if src_indices is None:
-                        # if input is connected to a distributed output, then set column slices
-                        # based on the part of the output local to this proc if the input is
-                        # duplicated. Otherwise, have each proc specify the same overlapping
-                        # full col slice.
-                        if False:  # all_meta[out_abs_name]['distributed']:
-                            in_ivar = abs2idx[wrt_abs_name]
-                            # TODO: make this check more robust
-                            if np.sum(in_sizes[:, in_ivar]) > in_sizes[iproc, in_ivar]:
-                                ivar = abs2idx[out_abs_name]
-                                colstart = np.sum(owned_sizes[:iproc, ivar])
-                                col_slice = slice(colstart, colstart + owned_sizes[iproc, ivar])
-                    else:
+                    if src_indices is not None:
                         # need to add an entry for d(output)/d(source)
                         # instead of d(output)/d(input).  int_mtx is a square matrix whose
                         # rows and columns map to output/resid vars only.
@@ -208,7 +195,7 @@ class AssembledJacobian(Jacobian):
                                                                all_out_meta['global_size'])
 
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
-                                        src_indices, shape, factor, col_slice)
+                                        src_indices, shape, factor)
 
                 elif not is_top:  # input is connected to something outside current system
                     in_offset, in_end = in_ranges[wrt_abs_name]
@@ -433,13 +420,10 @@ class AssembledJacobian(Jacobian):
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
 
-        ranges = self._view_ranges[system.pathname]
-        int_ranges = (ranges[0], ranges[1], ranges[0], ranges[1])
-
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
                 if d_outputs._names and d_residuals._names:
-                    d_residuals._data += int_mtx._prod(d_outputs._data, mode, int_ranges)
+                    d_residuals._data += int_mtx._prod(d_outputs._data, mode)
 
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
                     # Masking
@@ -449,12 +433,12 @@ class AssembledJacobian(Jacobian):
                         mask = ext_mtx._create_mask_cache(d_inputs)
                         self._mask_caches[d_inputs._names] = mask
 
-                    d_residuals._data += ext_mtx._prod(d_inputs._data, mode, None, mask=mask)
+                    d_residuals._data += ext_mtx._prod(d_inputs._data, mode, mask=mask)
 
             else:  # rev
                 dresids = d_residuals._data
                 if d_outputs._names and d_residuals._names:
-                    d_outputs._data += int_mtx._prod(dresids, mode, int_ranges)
+                    d_outputs._data += int_mtx._prod(dresids, mode)
 
                 if ext_mtx is not None and d_inputs._names and d_residuals._names:
                     # Masking
@@ -464,7 +448,7 @@ class AssembledJacobian(Jacobian):
                         mask = ext_mtx._create_mask_cache(d_inputs)
                         self._mask_caches[d_inputs._names] = mask
 
-                    d_inputs._data += ext_mtx._prod(dresids, mode, None, mask=mask)
+                    d_inputs._data += ext_mtx._prod(dresids, mode, mask=mask)
 
     def set_complex_step_mode(self, active):
         """
@@ -487,10 +471,8 @@ class AssembledJacobian(Jacobian):
                     mtx.set_complex_step_mode(active)
 
     def _get_sys_int_mtx(self, system):
-        # FIXME: view_ranges will be wrong for the full non-dup matrix if we have par groups
         if system.comm.size == 1:
-            start, stop = self._view_ranges[system.pathname][:2]
-            return self._int_mtx._matrix[start:stop, start:stop]
+            return self._int_mtx._matrix
 
         # gather contents of the matrix from other procs
         return self._int_mtx._get_assembled_matrix(system)
