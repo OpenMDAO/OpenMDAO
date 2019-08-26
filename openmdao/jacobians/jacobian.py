@@ -183,6 +183,14 @@ class Jacobian(object):
             msg = '{}: Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
+    def __iter__(self):
+        for key in self._subjacs_info.keys():
+            yield key
+
+    def items(self):
+        for key, val in self._subjacs_info.items():
+            yield key, val['value']
+
     @property
     def msginfo(self):
         """

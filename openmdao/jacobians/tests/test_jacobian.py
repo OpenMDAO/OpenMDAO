@@ -1,9 +1,10 @@
 """ Test the Jacobian objects."""
 
 import itertools
+import sys
 import unittest
 
-from six import assertRaisesRegex
+from six import assertRaisesRegex, StringIO
 from six.moves import range
 
 import numpy as np
@@ -15,8 +16,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          LinearBlockGS, DirectSolver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, \
-     SellarDis2withDerivatives
+from openmdao.api import ScipyOptimizeDriver
 
 try:
     from parameterized import parameterized
@@ -148,6 +148,39 @@ class ExplicitSetItemComp(ExplicitComponent):
     def compute_partials(self, inputs, partials):
         partials['out', 'in'] = self._constructor(self._value)
 
+
+class SimpleCompWithPrintPartials(ExplicitComponent):
+
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('f_xy', val=0.0, upper=1.0)
+
+        self.declare_partials(of='*', wrt='*')
+
+        self.count = 0
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        y = inputs['y']
+        outputs['f_xy'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+
+    def compute_partials(self, inputs, partials):
+        x = inputs['x']
+        y = inputs['y']
+
+        partials['f_xy', 'x'] = 2.0*x - 6.0 + y
+        partials['f_xy', 'y'] = 2.0*y + 8.0 + x
+
+        if self.count < 1:  # Only want to print this once for the test
+            for k in partials:
+                print(k)
+
+            for k, v in partials.items():
+                print(k, v)
+
+        self.count += 1
 
 def arr2list(arr):
     """Convert a numpy array to a 'sparse' list."""
@@ -783,6 +816,46 @@ class TestJacobian(unittest.TestCase):
 
         J = prob.compute_totals(of=['G1.C1.z'], wrt=['indeps.x'])
         assert_rel_error(self, J['G1.C1.z', 'indeps.x'], np.eye(10)*5.0, .0001)
+
+    def test_dict_properties(self):
+        # Make sure you can use the partials variable passed to compute_partials as a dict
+        prob = Problem()
+
+        indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
+        indeps.add_output('x', .5)
+        indeps.add_output('y', 10.0)
+        prob.model.add_subsystem('paraboloid', SimpleCompWithPrintPartials(), promotes_inputs=['x', 'y'])
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        prob.model.add_objective('paraboloid.f_xy')
+
+        prob.setup()
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            prob.run_driver()
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue().split('\n')
+
+        # output should include this
+        # ('paraboloid.f_xy', 'paraboloid.f_xy')
+        # ('paraboloid.f_xy', 'paraboloid.x')
+        # ('paraboloid.f_xy', 'paraboloid.y')
+        # ('paraboloid.f_xy', 'paraboloid.f_xy')[-1.]
+        # ('paraboloid.f_xy', 'paraboloid.x')[[5.]]
+        # ('paraboloid.f_xy', 'paraboloid.y')[[28.5]]
+        self.assertTrue(output.count("('paraboloid.f_xy', 'paraboloid.f_xy')") == 1,
+                        "Should be more than one design vars header printed")
+        self.assertTrue(output.count("('paraboloid.f_xy', 'paraboloid.f_xy') [-1.]") == 1,
+                        "Should be more than one design vars header printed")
 
 
 class MySparseComp(ExplicitComponent):
