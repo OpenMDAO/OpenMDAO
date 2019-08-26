@@ -7,7 +7,6 @@ from six.moves import range
 import numpy as np
 
 from openmdao.components.structured_metamodel_util.npss_interp import NPSSGridInterp
-from openmdao.components.structured_metamodel_util.otis_interp import OtisGridInterp
 from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
 from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
 from openmdao.core.analysis_error import AnalysisError
@@ -82,7 +81,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                              desc='Deprecated, use "order".', allow_none=True)
         self.options.declare('order', values=('cubic', 'slinear', 'quintic', 'lagrange2', 'lagrange3', 'akima'), default="cubic",
                              desc='Spline interpolation order.')
-        self.options.declare('interp_method', values=('scipy', 'otis', 'npss'), default='scipy',
+        self.options.declare('interp_method', values=('scipy', 'npss'), default='scipy',
                              desc='Inerpolation method to use.')
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
@@ -140,9 +139,7 @@ class MetaModelStructuredComp(ExplicitComponent):
             Whether to call this method in subsystems.
         """
         interp_method = self.options['interp_method']
-        if interp_method == 'otis':
-            interp = OtisGridInterp
-        elif interp_method == 'npss':
+        if interp_method == 'npss':
             interp = NPSSGridInterp
         else:
             interp = ScipyGridInterp
@@ -157,7 +154,7 @@ class MetaModelStructuredComp(ExplicitComponent):
 
         for name, train_data in iteritems(self.training_outputs):
             self.interps[name] = interp(self.params, train_data,
-                                        order=self.options['order'],
+                                        interp_method=self.options['order'],
                                         bounds_error=not self.options['extrapolate'],
                                         fill_value=None, spline_dim_error=False)
 
@@ -194,7 +191,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                 self._declare_partials(of=name, wrt="%s_train" % name, dct={'dependent': True})
 
         # MetaModelStructuredComp does not support complex step.
-        self.set_check_partial_options('*', method='fd')
+        #self.set_check_partial_options('*', method='fd')
 
     def compute(self, inputs, outputs):
         """

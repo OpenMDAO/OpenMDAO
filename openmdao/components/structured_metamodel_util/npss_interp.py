@@ -5,6 +5,7 @@ from __future__ import division, print_function, absolute_import
 from six.moves import range
 
 import numpy as np
+from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 
 from openmdao.components.structured_metamodel_util.grid_interp_base import GridInterpBase
 from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
@@ -32,16 +33,16 @@ class InterpLinear(object):
             tshape = table.values[tuple(slice_idx)].shape
             nshape = list(tshape[:-nx])
             nshape.append(nx)
-            derivs = np.empty(tuple(nshape))
+            derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
-            dtmp, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
-            slope = (dtmp[..., 1:2] - dtmp[..., 0:1]) / (grid[idx + 1] - grid[idx])
+            dtmp, subderiv, extrap_flag = subtable.evaluate(x[1:], slice_idx=slice_idx)
+            slope = (dtmp[..., 1] - dtmp[..., 0]) / (grid[idx + 1] - grid[idx])
 
-            derivs[..., 0:1] = slope
+            derivs[..., 0] = slope
             dslope_dsub = (subderiv[..., 1, :] - subderiv[..., 0, :]) / (grid[idx + 1] - grid[idx])
             derivs[..., 1:] = subderiv[..., 0, :] + (x[0] - grid[idx]) * dslope_dsub
 
-            return dtmp[..., 0] + (x[0] - grid[idx]) * slope.flatten(), derivs
+            return dtmp[..., 0] + (x[0] - grid[idx]) * slope, derivs, extrap_flag
 
         else:
             values = table.values[tuple(slice_idx)]
@@ -55,7 +56,7 @@ class InterpLinear(object):
                 self.slope = slope
                 self.last_index = last_index
 
-            return values[..., idx] + (x - grid[idx]) * slope, np.expand_dims(slope, axis=-1)
+            return values[..., idx] + (x - grid[idx]) * slope, np.expand_dims(slope, axis=-1), False
 
 
 class InterpLagrange2(object):
@@ -89,7 +90,7 @@ class InterpLagrange2(object):
             tshape = table.values[tuple(slice_idx)].shape
             nshape = list(tshape[:-nx])
             nshape.append(nx)
-            derivs = np.empty(tuple(nshape))
+            derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
             # Checking the lastIndex value here won't help, because our slope is not
             # guaranteed to be the same as last time even if idx == lastIndex, since
@@ -99,7 +100,7 @@ class InterpLagrange2(object):
             c13 = grid[idx] - grid[idx + 2]
             c23 = grid[idx + 1] - grid[idx + 2]
 
-            subval, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
+            subval, subderiv, extrap_flag = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
             q1 = subval[..., 0] / (c12 * c13)
             q2 = subval[..., 1] / (c12 * c23)
@@ -112,12 +113,13 @@ class InterpLagrange2(object):
             derivs[..., 1:] = xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + dq3_dsub * xx1 * xx2
 
         else:
+            extrap_flag = False
             values = table.values[tuple(slice_idx)]
             last_index = self.last_index
 
             nshape = list(values.shape[:-1])
             nshape.append(1)
-            derivs = np.empty(tuple(nshape))
+            derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
             # If the lookup index is the same as last time and it is not '0',
             # then the slope hasn't changed, so don't need to recalculate.
@@ -137,7 +139,7 @@ class InterpLagrange2(object):
                          q2 * (2.0 * x[0] - grid[idx] - grid[idx + 2]) + \
                          q3 * (2.0 * x[0] - grid[idx] - grid[idx + 1])
 
-        return xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2, derivs
+        return xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2, derivs, extrap_flag
 
 
 class InterpLagrange3(object):
@@ -171,13 +173,12 @@ class InterpLagrange3(object):
         xx4 = x[0] - p4
 
         if subtable is not None:
-
             slice_idx.append(slice(idx - 1, idx + 3))
 
             tshape = table.values[tuple(slice_idx)].shape
             nshape = list(tshape[:-nx])
             nshape.append(nx)
-            derivs = np.empty(tuple(nshape))
+            derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
             # Checking the lastIndex value here won't help, because our slope is not
             # guaranteed to be the same as last time even if idx == lastIndex, since
@@ -190,7 +191,7 @@ class InterpLagrange3(object):
             c24 = p2 - p4
             c34 = p3 - p4
 
-            subval, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
+            subval, subderiv, extrap_flag = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
             q1 = subval[..., 0] / (c12 * c13 * c14)
             q2 = subval[..., 1] / (c12 * c23 * c24)
@@ -206,12 +207,13 @@ class InterpLagrange3(object):
                 dq4_dsub * xx1 * xx2 * xx3
 
         else:
+            extrap_flag = False
             values = table.values[tuple(slice_idx)]
             last_index = self.last_index
 
             nshape = list(values.shape[:-1])
             nshape.append(1)
-            derivs = np.empty(tuple(nshape))
+            derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
             # If the lookup index is the same as last time and it is not '0',
             # then the slope hasn't changed, so don't need to recalculate.
@@ -243,12 +245,32 @@ class InterpLagrange3(object):
                          q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) + \
                                p1 * (p2 + p3) + p2 * p3)
 
-        return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, derivs
+        return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, \
+               derivs, extrap_flag
 
 
-def abs_dv(x, x_deriv, deriv_only=True):
+def abs_complex(x):
     """
-    Compute the absolute value of the incoming vector and its derivative.
+    Compute the absolute value of a complex-stepped vector.
+
+    Parameters
+    ----------
+    x : ndarray
+        Array to process.
+
+    Returns
+    -------
+    ndarray
+        Absolute value of the array.
+    """
+    idx_neg = np.where(x < 0)
+    x[idx_neg] = -x[idx_neg]
+    return x
+
+
+def dv_abs_complex(x, x_deriv):
+    """
+    Compute the derivative of the absolute value function.
 
     Parameters
     ----------
@@ -256,8 +278,6 @@ def abs_dv(x, x_deriv, deriv_only=True):
         Array to process.
     x_deriv : ndarray
         Array of derivatives which may have one additional dimension.
-    deriv_only : bool
-        When True, only compute derivatve.
 
     Returns
     -------
@@ -268,20 +288,16 @@ def abs_dv(x, x_deriv, deriv_only=True):
 
     """
     idx_neg = np.where(x < 0)
-    if deriv_only:
-        y = None
-    else:
-        y = x.copy()
-        y[idx_neg] = -x[idx_neg]
+    y = None
 
-    # Special case for final interp point (due to numpy size and brodcasting.)
+    # Special case for final interp point (due to numpy size and broadcasting.)
     if len(x_deriv.shape) == 1:
         if idx_neg[0].size != 0:
-            return y, -x_deriv
+            return -x_deriv
 
     x_deriv[idx_neg] = -x_deriv[idx_neg]
 
-    return y, x_deriv
+    return x_deriv
 
 
 class InterpAkima(object):
@@ -331,9 +347,9 @@ class InterpAkima(object):
             tshape = table.values[tuple(slice_idx)].shape
             nshape = list(tshape[:-nx])
             nshape.append(nx)
-            derivs = np.empty(tuple(nshape))
+            derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
-            subval, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
+            subval, subderiv, extrap_flag = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
             j = 0
             if idx >= 2:
@@ -359,11 +375,12 @@ class InterpAkima(object):
                 j += 1
 
         else:
+            extrap_flag = False
             values = table.values[tuple(slice_idx)]
 
             nshape = list(values.shape[:-1])
             nshape.append(1)
-            derivs = np.empty(tuple(nshape))
+            derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
             if idx >= 2:
                 val1 = values[..., idx - 2]
@@ -422,11 +439,11 @@ class InterpAkima(object):
         m5 = np.atleast_1d(m5)
 
         # Calculate cubic fit coefficients
-        w2 = abs(m4 - m3)
-        w31 = abs(m2 - m1)
+        w2 = abs_complex(m4 - m3)
+        w31 = abs_complex(m2 - m1)
 
         # Special case to avoid divide by zero.
-        jj = np.where(w2 + w31  > 0)
+        jj1 = np.where(w2 + w31  > 0)
         b = 0.5 * (m2 + m3)
 
         # We need to suppress some warnings that occur when we divide by zero.  We replace all
@@ -435,17 +452,17 @@ class InterpAkima(object):
         np.seterr(invalid='ignore', divide='ignore')
 
         bpos = np.atleast_1d((m2 * w2 + m3 * w31) / (w2 + w31))
-        b[jj] = bpos[jj]
+        b[jj1] = bpos[jj1]
 
-        w32 = abs(m5 - m4)
-        w4 = abs(m3 - m2)
+        w32 = abs_complex(m5 - m4)
+        w4 = abs_complex(m3 - m2)
 
         # Special case to avoid divide by zero.
-        jj = np.where(w32 + w4  > 0)
+        jj2 = np.where(w32 + w4  > 0)
         bp1 = 0.5 * (m3 + m4)
 
         bp1pos = np.atleast_1d((m3 * w32 + m4 * w4) / (w32 + w4))
-        bp1[jj] = bp1pos[jj]
+        bp1[jj2] = bp1pos[jj2]
 
         if extrap == 0:
             h = 1.0 / (grid[idx + 1] - grid[idx])
@@ -475,22 +492,22 @@ class InterpAkima(object):
             if idx >= 2:
                 dm1 = (dval2 - dval1) / (grid[idx - 1] - grid[idx - 2])
             else:
-                dm1 = np.zeros(shape)
+                dm1 = np.zeros(shape, dtype=x.dtype)
 
             if idx >= 1:
                 dm2 = (dval3 - dval2) / (grid[idx] - grid[idx - 1])
             else:
-                dm2 = np.zeros(shape)
+                dm2 = np.zeros(shape, dtype=x.dtype)
 
             if idx < ngrid - 2:
                 dm4 = (dval5 - dval4) / (grid[idx + 2] - grid[idx + 1])
             else:
-                dm4 = np.zeros(shape)
+                dm4 = np.zeros(shape, dtype=x.dtype)
 
             if idx < ngrid - 3:
                 dm5 = (dval6 - dval5) / (grid[idx + 3] - grid[idx + 2])
             else:
-                dm5 = np.zeros(shape)
+                dm5 = np.zeros(shape, dtype=x.dtype)
 
             if idx == 0:
                 dm1 = 3 * dm3 - 2 * dm4
@@ -507,20 +524,17 @@ class InterpAkima(object):
                 dm5 = 3 * dm3 - 2 * dm2
 
             # Calculate cubic fit coefficients
-            _, dw2 = abs_dv(m4 - m3, dm4 - dm3)
-            _, dw3 = abs_dv(m2 - m1, dm2 - dm1)
+            dw2 = dv_abs_complex(m4 - m3, dm4 - dm3)
+            dw3 = dv_abs_complex(m2 - m1, dm2 - dm1)
 
             # Special case to avoid divide by zero.
-            if nx > 2:
-                w_extended = np.broadcast_to(np.atleast_1d(w2 + w31), dw3.shape)
-                jj = np.where(w_extended  > 0)
 
             if len(nshape) > 1:
-                w2 = w2[:, np.newaxis]
-                w31 = w31[:, np.newaxis]
-                m2e = m2[:, np.newaxis]
-                m3e = m3[:, np.newaxis]
-                bpos = bpos[:, np.newaxis]
+                w2 = w2[..., np.newaxis]
+                w31 = w31[..., np.newaxis]
+                m2e = m2[..., np.newaxis]
+                m3e = m3[..., np.newaxis]
+                bpos = bpos[..., np.newaxis]
             else:
                 m2e = m2
                 m3e = m3
@@ -530,22 +544,28 @@ class InterpAkima(object):
             dbpos = ((dm2 * w2 + m2e * dw2 + dm3 * w31 + m3e * dw3)  - bpos * (dw2 + dw3)) / \
                     (w2 + w31)
 
-            db[jj] = dbpos[jj]
+            if nx > 2:
 
-            _, dw3 = abs_dv(m5 - m4, dm5 - dm4)
-            _, dw4 = abs_dv(m3 - m2, dm3 - dm2)
+                if len(val3.shape) == 0:
+                    if len(jj1[0]) > 0:
+                        db[:] = dbpos
+                else:
+                    for j in range(nx - 1):
+                        db[jj1, j] = dbpos[jj1, j]
+
+            else:
+                db[jj1] = dbpos[jj1]
+
+            dw3 = dv_abs_complex(m5 - m4, dm5 - dm4)
+            dw4 = dv_abs_complex(m3 - m2, dm3 - dm2)
 
             # Special case to avoid divide by zero.
-            if nx > 2:
-                w_extended = np.broadcast_to(np.atleast_1d(w32 + w4), dw3.shape)
-                jj = np.where(w_extended  > 0)
-
             if len(nshape) > 1:
-                w32 = w32[:, np.newaxis]
-                w4 = w4[:, np.newaxis]
-                m3e = m3[:, np.newaxis]
-                m4e = m4[:, np.newaxis]
-                bp1pos = bp1pos[:, np.newaxis]
+                w32 = w32[..., np.newaxis]
+                w4 = w4[..., np.newaxis]
+                m3e = m3[..., np.newaxis]
+                m4e = m4[..., np.newaxis]
+                bp1pos = bp1pos[..., np.newaxis]
             else:
                 m3e = m3
                 m4e = m4
@@ -555,7 +575,17 @@ class InterpAkima(object):
             dbp1pos = ((dm3 * w32 + m3e * dw3 + dm4 * w4 + m4e * dw4) - bp1pos * (dw3 + dw4) ) / \
                        (w32 + w4)
 
-            dbp1[jj] = dbp1pos[jj]
+            if nx > 2:
+
+                if len(val3.shape) == 0:
+                    if len(jj2[0]) > 0:
+                        dbp1[:] = dbp1pos
+                else:
+                    for j in range(nx - 1):
+                        dbp1[jj2, j] = dbp1pos[jj2, j]
+
+            else:
+                dbp1[jj2] = dbp1pos[jj2]
 
             if extrap == 0:
                 da = dval3
@@ -575,7 +605,7 @@ class InterpAkima(object):
         np.seterr(**old_settings)
 
         # Evaluate dependent value and exit
-        return a + dx * (b + dx * (c + dx * d)), derivs
+        return a + dx * (b + dx * (c + dx * d)), derivs, extrap_flag
 
 
 class InterpCubic(object):
@@ -583,12 +613,12 @@ class InterpCubic(object):
     def __init__(self):
         self.second_derivs = None
 
-    def compute_second_derivatives(self, grid, values):
+    def compute_second_derivatives(self, grid, values, x):
         n = len(grid)
 
         # Natural spline has second deriv=0 at both ends
-        sec_deriv = np.zeros(n)
-        temp = np.zeros(values.shape)
+        sec_deriv = np.zeros(n, dtype=x.dtype)
+        temp = np.zeros(values.shape, dtype=x.dtype)
 
         sig = (grid[1:n - 1] - grid[:n - 2]) / (grid[2:] - grid[:n - 2])
 
@@ -600,7 +630,7 @@ class InterpCubic(object):
             sec_deriv[i] = (sig[i - 1] - 1.0) / prtl
             temp[..., i] = (tmp[..., i - 1] - sig[i - 1] * temp[..., i - 1]) / prtl
 
-        sec_deriv = np.array(np.broadcast_to(sec_deriv, temp.shape))
+        sec_deriv = np.array(np.broadcast_to(sec_deriv, temp.shape), dtype=x.dtype)
 
         for i in range(n - 2, 0, -1):
             sec_deriv[..., i] = sec_deriv[..., i] * sec_deriv[..., i + 1] + temp[..., i]
@@ -619,8 +649,8 @@ class InterpCubic(object):
             n = len(grid)
             nx = len(x)
 
-            values, subderivs = subtable.evaluate(x[1:], slice_idx=slice_idx)
-            sec_deriv = self.compute_second_derivatives(table.grid, values)
+            values, subderivs, extrap_flag = subtable.evaluate(x[1:], slice_idx=slice_idx)
+            sec_deriv = self.compute_second_derivatives(table.grid, values, x)
 
             step = grid[idx + 1] - grid[idx]
             r_step = 1.0 / step
@@ -636,33 +666,34 @@ class InterpCubic(object):
 
             tshape = list(interp_values.shape)
             tshape.append(nx)
-            derivs = np.empty(tuple(tshape))
+            derivs = np.empty(tuple(tshape), dtype=x.dtype)
 
             derivs[..., 0] = r_step * (values[..., idx + 1] - values[..., idx]) + \
                              (((3.0 * b * b - 1) * sec_deriv[..., idx + 1] - \
                                (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact))
 
             if nx == 2:
-                dsec = self.compute_second_derivatives(table.grid, subderivs)
+                dsec = self.compute_second_derivatives(table.grid, subderivs, x)
                 derivs[..., 1] = ((a * a * a - a) * dsec[..., idx] + \
                                    (b * b * b - b) * dsec[..., idx + 1]) * (step * step * fact)
 
                 derivs[..., 1] += a * subderivs[..., idx] + b * subderivs[..., idx + 1]
 
             else:
-                dsec = self.compute_second_derivatives(table.grid, np.swapaxes(subderivs, -1, -2))
+                dsec = self.compute_second_derivatives(table.grid, np.swapaxes(subderivs, -1, -2),
+                                                       x)
                 derivs[..., 1:] = ((a * a * a - a) * dsec[..., idx] + \
                                    (b * b * b - b) * dsec[..., idx + 1]) * (step * step * fact)
 
                 derivs[..., 1:] += a * subderivs[..., idx, :] + b * subderivs[..., idx + 1, :]
 
-            return interp_values, derivs
+            return interp_values, derivs, extrap_flag
 
         else:
             values = table.values
 
             if self.second_derivs is None:
-                self.second_derivs = self.compute_second_derivatives(table.grid, values)
+                self.second_derivs = self.compute_second_derivatives(table.grid, values, x)
             sec_deriv = self.second_derivs
 
             # Perform the interpolation
@@ -680,7 +711,7 @@ class InterpCubic(object):
                     ((3.0 * b * b - 1) * sec_deriv[..., idx + 1] - \
                      (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact)
 
-            return val, deriv
+            return val, deriv, False
 
 
 class NPSSTable(object):
@@ -760,16 +791,16 @@ class NPSSTable(object):
     def evaluate(self, x, slice_idx=None):
 
         if len(x) > 0:
-            idx, _ = self.bracket(x[0])
+            idx, extrap_flag = self.bracket(x[0])
         else:
-            idx, _ = self.bracket(x)
+            idx, extrap_flag = self.bracket(x)
 
         if slice_idx is None:
             slice_idx = []
 
-        result, deriv = self.interp.interpolate(x, idx, slice_idx, self)
+        result, deriv, sub_extrap_flag = self.interp.interpolate(x, idx, slice_idx, self)
 
-        return result, deriv
+        return result, deriv, extrap_flag or sub_extrap_flag
 
 
 class NPSSGridInterp(GridInterpBase):
@@ -796,8 +827,8 @@ class NPSSGridInterp(GridInterpBase):
         Default is `np.nan`.
     grid : tuple
         Collection of points that determine the regular grid.
-    order : string
-        Name of interpolation order.
+    interp_method : string
+        Name of interpolation method.
     values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
     _all_gradients : ndarray
@@ -805,8 +836,7 @@ class NPSSGridInterp(GridInterpBase):
     _g_order : string
         Name of interpolation order used to compute the last gradient.
     _interp_config : dict
-        Configuration object that stores limitations of each interpolation
-        order.
+        Configuration object that stores limitations of each interpolation method.
     _ki : list
         Interpolation order to be used in each dimension.
     _spline_dim_error : bool
@@ -819,7 +849,7 @@ class NPSSGridInterp(GridInterpBase):
         Current evaluation point.
     """
 
-    def __init__(self, points, values, order="slinear", bounds_error=True,
+    def __init__(self, points, values, interp_method="slinear", bounds_error=True,
                  fill_value=np.nan, spline_dim_error=True):
         """
         Initialize instance of interpolation class.
@@ -830,8 +860,8 @@ class NPSSGridInterp(GridInterpBase):
             The points defining the regular grid in n dimensions.
         values : array_like, shape (m1, ..., mn, ...)
             The data on the regular grid in n dimensions.
-        order : str, optional
-            The order of interpolation to perform. Supported are 'slinear',
+        interp_method : str, optional
+            The interpolation method to perform. Supported are 'slinear',
             'cubic',  and 'quintic'. This parameter will become
             the default for the object's interpolate method. Default is "linear".
         bounds_error : bool, optional
@@ -853,22 +883,22 @@ class NPSSGridInterp(GridInterpBase):
             order will be reduced as needed on a per-dimension basis. Default
             is True (raise an exception).
         """
-        super(NPSSGridInterp, self).__init__(points, values, order=order,
+        super(NPSSGridInterp, self).__init__(points, values, interp_method=interp_method,
                                              bounds_error=bounds_error, fill_value=fill_value,
                                              spline_dim_error=spline_dim_error)
 
         # Cache spline coefficients.
         coeffs = []
         for x in self.grid:
-            if order == 'slinear':
+            if interp_method == 'slinear':
                 coef = InterpLinear
-            elif order == 'lagrange2':
+            elif interp_method == 'lagrange2':
                 coef = InterpLagrange2
-            elif order == 'lagrange3':
+            elif interp_method == 'lagrange3':
                 coef = InterpLagrange3
-            elif order == 'cubic':
+            elif interp_method == 'cubic':
                 coef = InterpCubic
-            elif order == 'akima':
+            elif interp_method == 'akima':
                 coef = InterpAkima
 
             coeffs.append(coef)
@@ -876,7 +906,7 @@ class NPSSGridInterp(GridInterpBase):
         self._coeffs = coeffs
         self.table = NPSSTable(self.grid, self.values, coeffs)
 
-    def _interp_orders(self):
+    def _interp_methods(self):
         """
         Method-specific settings for interpolation and for testing.
 
@@ -886,7 +916,7 @@ class NPSSGridInterp(GridInterpBase):
             Valid interpolation name strings.
         dict
             Configuration object that stores limitations of each interpolation
-            order.
+            method.
         """
         interpolator_configs = {
             "slinear": 2,
@@ -896,22 +926,22 @@ class NPSSGridInterp(GridInterpBase):
             "cubic": 3,
         }
 
-        all_orders = list(interpolator_configs.keys())
+        all_methods = list(interpolator_configs.keys())
 
-        return all_orders, interpolator_configs
+        return all_methods, interpolator_configs
 
-    def orders(self):
+    def methods(self):
         """
-        Return a list of valid interpolation order names.
+        Return a list of valid interpolation method names.
 
         Returns
         -------
         list
             Valid interpolation name strings.
         """
-        return ['slinear', 'lagrange2', 'cubic', 'akima']
+        return ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima']
 
-    def interpolate(self, xi, order=None, compute_gradients=True):
+    def interpolate(self, xi, interp_method=None, compute_gradients=True):
         """
         Interpolate at the sample coordinates.
 
@@ -919,24 +949,37 @@ class NPSSGridInterp(GridInterpBase):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-        order : str, optional
-            The order of interpolation to perform. Supported are 'slinear', 'cubic', and
+        interp_method : str, optional
+            The interpolation method to perform. Supported are 'slinear', 'cubic', and
             'quintic'. Default is None, which will use the order defined at the construction
             of the interpolation object instance.
         compute_gradients : bool, optional
-            If a spline interpolation order is chosen, this determines whether gradient
-            calculations should be made and cached. Default is True.
+            When True, gradients should be computed and cached.
 
         Returns
         -------
         array_like
             Value of interpolant at all sample points.
         """
-        order = self.order if order is None else order
-        if order not in self._all_orders:
-            all_m = ', '.join(['"' + m + '"' for m in self._all_orders])
-            raise ValueError('Order"%s" is not defined. Valid order are '
-                             '%s.' % (order, all_m))
+        # cache latest evaluation point for gradient method's use later
+        self._xi = xi
+
+        interp_method = self.interp_method if interp_method is None else interp_method
+        if interp_method not in self._all_methods:
+            all_m = ', '.join(['"' + m + '"' for m in self._all_methods])
+            raise ValueError('Interpolation method "%s" is not defined. Valid methods are '
+                             '%s.' % (interp_method, all_m))
+
+        ndim = len(self.grid)
+        self.ndim = ndim
+        xi = _ndim_coords_from_arrays(xi, ndim=ndim)
+        if xi.shape[-1] != len(self.grid):
+            raise ValueError("The requested sample points xi have dimension "
+                             "%d, but this RegularGridInterp has "
+                             "dimension %d" % (xi.shape[1], ndim))
+
+        self._xi_shape = xi_shape = xi.shape
+        xi = xi.reshape(-1, xi_shape[-1])
 
         if self.bounds_error:
             for i, p in enumerate(xi.T):
@@ -955,13 +998,14 @@ class NPSSGridInterp(GridInterpBase):
                                            i, value, self.grid[i][0], self.grid[i][-1])
 
         # TODO: Vectorize.
-        xi = np.atleast_2d(xi)
+        xi = np.atleast_2d(self._xi)
         n_nodes, nx = xi.shape
         result = np.empty((n_nodes, ), dtype=xi.dtype)
+        extrap_flag = np.empty((n_nodes, ))
         derivs = np.empty((n_nodes, nx), dtype=xi.dtype)
 
         for j in range(n_nodes):
-            val, deriv = self.table.evaluate(xi[j, :])
+            val, deriv, extrap_flag = self.table.evaluate(xi[j, :])
             result[j] = val
             derivs[j, :] = deriv.flatten()
 
@@ -969,12 +1013,14 @@ class NPSSGridInterp(GridInterpBase):
         self.derivs = derivs
 
         # TODO: Support out-of-bounds identification.
-        #if not self.bounds_error and self.fill_value is not None:
-        #   result[out_of_bounds] = self.fill_value
+        if not self.bounds_error and self.fill_value is not None:
+
+            out_of_bounds = np.where(extrap_flag != 0)
+            result[out_of_bounds] = self.fill_value
 
         return result
 
-    def gradient(self, xi, order=None):
+    def gradient(self, xi, interp_method=None):
         """
         Compute the gradients at the specified point.
 
@@ -985,8 +1031,8 @@ class NPSSGridInterp(GridInterpBase):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-        order : str, optional
-            The order of interpolation to perform. Supported are 'slinear',
+        interp_method : str, optional
+            The interpolation method to perform. Supported are 'slinear',
             'cubic', and 'quintic'. Default is None, which will use the order
             defined at the construction of the interpolation object instance.
 

@@ -10,7 +10,7 @@ class GridInterpBase(object):
 
     The data must be defined on a regular grid; the grid spacing however may be uneven. First,
     third and fifth order spline interpolation are supported. After setting up the interpolator
-    object, the interpolation order (*slinear*, *cubic*, and *quintic*) may be chosen at each
+    object, the interpolation method (*slinear*, *cubic*, and *quintic*) may be chosen at each
     evaluation. Additionally, gradients are provided for the spline interpolation methods.
 
     Attributes
@@ -29,17 +29,17 @@ class GridInterpBase(object):
         Default is `np.nan`.
     grid : tuple
         Collection of points that determine the regular grid.
-    order : string
-        Name of interpolation order.
+    interp_method : string
+        Name of interpolation method.
     values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
     _all_gradients : ndarray
         Cache of computed gradients.
-    _g_order : string
-        Name of interpolation order used to compute the last gradient.
+    _g_method : string
+        Name of interpolation method used to compute the last gradient.
     _interp_config : dict
         Configuration object that stores limitations of each interpolation
-        order.
+        method.
     _ki : list
         Interpolation order to be used in each dimension.
     _spline_dim_error : bool
@@ -52,7 +52,7 @@ class GridInterpBase(object):
         Current evaluation point.
     """
 
-    def __init__(self, points, values, order="slinear", bounds_error=True,
+    def __init__(self, points, values, interp_method="slinear", bounds_error=True,
                  fill_value=np.nan, spline_dim_error=True):
         """
         Initialize instance of interpolation class.
@@ -63,10 +63,10 @@ class GridInterpBase(object):
             The points defining the regular grid in n dimensions.
         values : array_like, shape (m1, ..., mn, ...)
             The data on the regular grid in n dimensions.
-        order : str, optional
-            The order of interpolation to perform. Supported are 'slinear',
+        interp_method : str, optional
+            The interpolation method to perform. Supported are 'slinear',
             'cubic',  and 'quintic'. This parameter will become
-            the default for the object's interpolate order. Default is "linear".
+            the default for the object's ``interpolate`` method. Default is "slinear".
         bounds_error : bool, optional
             If True, when interpolated values are requested outside of the
             domain of the input data, a ValueError is raised.
@@ -86,13 +86,13 @@ class GridInterpBase(object):
             order will be reduced as needed on a per-dimension basis. Default
             is True (raise an exception).
         """
-        configs = self._interp_orders()
-        self._all_orders, self._interp_config = configs
-        if order not in self._all_orders:
-            all_m = ', '.join(['"' + m + '"' for m in self._all_orders])
-            raise ValueError('Order "%s" is not defined. Valid order are '
-                             '%s.' % (order, all_m))
-        self.order = order
+        configs = self._interp_methods()
+        self._all_methods, self._interp_config = configs
+        if interp_method not in self._all_methods:
+            all_m = ', '.join(['"' + m + '"' for m in self._all_methods])
+            raise ValueError('Interpolation method "%s" is not defined. Valid methods are '
+                             '%s.' % (interp_method, all_m))
+        self.interp_method = interp_method
         self.bounds_error = bounds_error
 
         if not hasattr(values, 'ndim'):
@@ -108,7 +108,8 @@ class GridInterpBase(object):
                 values = values.astype(float)
 
         if np.iscomplexobj(values[:]):
-            raise ValueError("order '%s' does not support complex values." % order)
+            msg = "Interpolation method '%s' does not support complex values." % interp_method
+            raise ValueError(msg)
 
         self.fill_value = fill_value
         if fill_value is not None:
@@ -119,7 +120,7 @@ class GridInterpBase(object):
                 raise ValueError("fill_value must be either 'None' or "
                                  "of a type compatible with values")
 
-        k = self._interp_config[order]
+        k = self._interp_config[interp_method]
         self._ki = []
         for i, p in enumerate(points):
             n_p = len(p)
@@ -139,10 +140,10 @@ class GridInterpBase(object):
                     self._ki[-1] = n_p - 1
                 else:
                     raise ValueError("There are %d points in dimension %d,"
-                                     " but order %s requires at least %d "
+                                     " but method %s requires at least %d "
                                      "points per "
                                      "dimension."
-                                     "" % (n_p, i, order, k + 1))
+                                     "" % (n_p, i, interp_method, k + 1))
 
         self.grid = tuple([np.asarray(p) for p in points])
         self.values = values
@@ -151,40 +152,7 @@ class GridInterpBase(object):
         self._spline_dim_error = spline_dim_error
         self._g_order = None
 
-    def _interp_orders(self):
-        """
-        Method-specific settings for interpolation and for testing.
-
-        Returns
-        -------
-        list
-            Valid interpolation name strings.
-        dict
-            Configuration object that stores limitations of each interpolation
-            order.
-        """
-        interpolator_configs = {
-            "slinear": 1,
-            "cubic": 3,
-            "quintic": 5,
-        }
-
-        all_orders = list(interpolator_configs.keys())
-
-        return all_orders, interpolator_configs
-
-    def order(self):
-        """
-        Return a list of valid interpolation order names.
-
-        Returns
-        -------
-        list
-            Valid interpolation name strings.
-        """
-        return ['slinear', 'cubic', 'quintic']
-
-    def interpolate(self, xi, order=None, compute_gradients=True):
+    def interpolate(self, xi, interp_method=None, compute_gradients=True):
         """
         Interpolate at the sample coordinates.
 
@@ -192,9 +160,9 @@ class GridInterpBase(object):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-        order : str, optional
-            The order of interpolation to perform. Supported are 'slinear', 'cubic', and
-            'quintic'. Default is None, which will use the order defined at the construction
+        interp_method : str, optional
+            The interpolation method to perform. Supported are 'slinear', 'cubic', and
+            'quintic'. Default is None, which will use the method defined at the construction
             of the interpolation object instance.
         compute_gradients : bool, optional
             If a spline interpolation method is chosen, this determines whether gradient
@@ -207,7 +175,7 @@ class GridInterpBase(object):
         """
         pass
 
-    def gradient(self, xi, order=None):
+    def gradient(self, xi, interp_method=None):
         """
         Return the computed gradients at the specified point.
 
@@ -222,9 +190,9 @@ class GridInterpBase(object):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-        order : str, optional
-            The order of interpolation to perform. Supported are 'slinear',
-            'cubic', and 'quintic'. Default is None, which will use the order
+        interp_method : str, optional
+            The interpolation method to perform. Supported are 'slinear',
+            'cubic', and 'quintic'. Default is None, which will use the method
             defined at the construction of the interpolation object instance.
 
         Returns
