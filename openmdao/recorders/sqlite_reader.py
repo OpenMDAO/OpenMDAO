@@ -381,8 +381,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {`problem`, `driver`, `<system hierarchy location>`,
-                  `<solver hierarchy location>`}
+        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>}
             Identifies the source for which to return information.
 
         Returns
@@ -428,7 +427,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname, case_name}
+        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
+                  case name}
             If not None, only cases originating from the specified source or case are returned.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
