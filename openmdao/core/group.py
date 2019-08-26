@@ -758,7 +758,7 @@ class Group(System):
                     sizes_in = sizes[type_][iproc, :].copy()
                     self.comm.Allgather(sizes_in, sizes[type_])
 
-            # compute owning ranks
+            # compute owning ranks and owned sizes
             abs2meta = self._var_allprocs_abs2meta
             owns = self._owning_rank
             self._owned_sizes = self._var_sizes[vec_names[0]]['output'].copy()

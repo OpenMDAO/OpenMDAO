@@ -61,15 +61,11 @@ class TestParallelGroups(unittest.TestCase):
         wrt=['iv.x']
         prob.model.linear_solver = solver()
 
-        #import wingdbstub
-
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
 
         J = prob.compute_totals(of=['c2.y', "c3.y"], wrt=['iv.x'])
-        # print('J fwd')
-        # print(J)
 
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
@@ -81,8 +77,6 @@ class TestParallelGroups(unittest.TestCase):
         prob.run_model()
 
         J = prob.compute_totals(of=['c2.y', "c3.y"], wrt=['iv.x'])
-        # print('J rev')
-        # print(J)
 
         assert_rel_error(self, J['c2.y', 'iv.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'iv.x'][0][0], 15.0, 1e-6)
@@ -109,8 +103,6 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        # print('J fwd')
-        # print(J)
         assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
 
@@ -127,8 +119,6 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        # print('J rev')
-        # print(J)
         assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
 
@@ -174,8 +164,6 @@ class TestParallelGroups(unittest.TestCase):
         prob.model = Diamond()
         prob.model.linear_solver = solver()
 
-        #import wingdbstub
-
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -189,8 +177,6 @@ class TestParallelGroups(unittest.TestCase):
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
-        # print('J fwd')
-        # print(J)
 
         prob.setup(check=False, mode='rev')
         prob.run_model()
@@ -199,8 +185,6 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c4.y2'], -93.0, 1e-6)
 
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
-        # print('J rev')
-        # print(J)
         assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 

@@ -209,7 +209,6 @@ class AssembledJacobian(Jacobian):
         if check_owns:
             total_non_dup_size = np.sum(system._owned_sizes)
             self._int_mtx._build(total_non_dup_size, total_non_dup_size, system)
-
         else:
             int_mtx._build(out_size, out_size, system)
 
@@ -469,13 +468,6 @@ class AssembledJacobian(Jacobian):
             for mtx in itervalues(self._ext_mtx):
                 if mtx:
                     mtx.set_complex_step_mode(active)
-
-    def _get_sys_int_mtx(self, system):
-        if system.comm.size == 1:
-            return self._int_mtx._matrix
-
-        # gather contents of the matrix from other procs
-        return self._int_mtx._get_assembled_matrix(system)
 
 
 class DenseJacobian(AssembledJacobian):

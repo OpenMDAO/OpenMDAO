@@ -276,12 +276,13 @@ class DirectSolver(LinearSolver):
 
         if self._assembled_jac is not None:
 
-            matrix = self._assembled_jac._get_sys_int_mtx(system)
+            if system.comm.size == 1:
+                matrix = self._assembled_jac._int_mtx._matrix
+            else:
+                matrix = self._assembled_jac._int_mtx._get_assembled_matrix(system)
 
             if system.comm.size > 1 and self._owned_size_totals is None:
                 self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
-                # print('owned_size_totals')
-                # print(self._owned_size_totals)
 
             if matrix is None:
                 # this happens if we're not rank 0
@@ -291,10 +292,6 @@ class DirectSolver(LinearSolver):
 
             # Perform dense or sparse lu factorization.
             elif isinstance(matrix, csc_matrix):
-                # from openmdao.utils.general_utils import printoptions
-                # with printoptions(linewidth=9999):
-                #     x = matrix.toarray()
-                #     print(x)
                 try:
                     self._lu = scipy.sparse.linalg.splu(matrix)
                     self._nodup_size = matrix.shape[1]
@@ -361,7 +358,10 @@ class DirectSolver(LinearSolver):
 
         if self._assembled_jac is not None:
 
-            matrix = self._assembled_jac._get_sys_int_mtx(system)
+            if system.comm.size == 1:
+                matrix = self._assembled_jac._int_mtx._matrix
+            else:
+                matrix = self._assembled_jac._int_mtx._get_assembled_matrix(system)
 
             # Dense and Sparse matrices have their own inverse method.
             if isinstance(matrix, np.ndarray):
@@ -447,12 +447,6 @@ class DirectSolver(LinearSolver):
             trans_lu = 1
             trans_splu = 'T'
 
-        # print([n for n in system._var_abs_names['output']])
-        # print("x_vec")
-        # print(x_vec)
-        # print("b_vec")
-        # print(b_vec)
-
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
             if system.comm.size > 1:
@@ -460,14 +454,9 @@ class DirectSolver(LinearSolver):
                     system._get_nodup_out_ranges()
                 # gather full_b
                 tmp = np.empty(self._nodup_size)
-                # print("b_vec[local2owned_inds]")
-                # print(b_vec[local2owned_inds])
                 system.comm.Gatherv(b_vec[local2owned_inds],  # src
                                     (tmp, self._owned_size_totals),  # dest
                                     root=0)
-                # print([n for n in system._var_allprocs_abs_names['output']])
-                # print("gathered b_vec")
-                # print(tmp)
             else:
                 full_b = tmp = b_vec
 
@@ -479,8 +468,6 @@ class DirectSolver(LinearSolver):
                     # inefficiency
                     if system.comm.size > 1:
                         full_b = tmp[noncontig_dist_inds]
-                        # print("full_b")
-                        # print(full_b)
 
                     if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
                         arr = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
@@ -491,16 +478,15 @@ class DirectSolver(LinearSolver):
                     if iproc > 0:
                         arr = np.zeros(tmp.size)
 
-                    # this sends more data than necessary, but the alternative is to use a lot
-                    # of memory on rank 0 to store the chunk that each proc needs.
+                    # this may send more data than necessary, but the alternative is to use a lot
+                    # of memory on rank 0 to store the chunk that each proc needs and then do a
+                    # Scatterv.
                     system.comm.Bcast(arr, root=0)
-                    # print('after LU solve')
-                    # print(arr)
                     x_vec[:] = arr[nodup2local_inds]
                 else:
                     x_vec[:] = arr
 
-        # matrix-vector-product-generated jacobians are scaled.
+        # matrix-vector-product generated jacobians are scaled.
         else:
             # FIXME: fix to work with MPI
             x_vec[:] = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)

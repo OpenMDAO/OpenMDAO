@@ -3733,7 +3733,7 @@ class System(object):
 
     def _get_nodup_out_ranges(self):
         """
-        Return an ordered dict of global (without duplicates) ranges for each output var.
+        Compute necessary ranges/indices for working with non-dup global outputs array.
 
         Returns
         -------
@@ -3741,6 +3741,14 @@ class System(object):
             Tuples of the form (start, end) keyed on variable name.
         ndarray
             Index array mapping global non-dup outputs/resids to local outputs/resids.
+        ndarray
+            Index array mapping local outputs/resids to owned local outputs/resids.
+        ndarray
+            Index array mapping global stacked (rank order) array to global array where
+            distrib vars are contiguous and all vars appear in global execution order.
+            Execution order is meaningless for systems in ParallelGroups, but for purposes
+            of global ordering, the declared execution order, which is the same across all
+            ranks, is used.
         """
         if self._nodup_out_ranges is None:
             iproc = self.comm.rank
@@ -3813,20 +3821,26 @@ class System(object):
             # compute inds to map gathered nodup order to nodup ordered by ownership
             self._noncontig_dis_inds = _arraylist2array(non_contig_inds)
 
-            # print('nodup -> out')
-            # print(self._nodup_out_ranges)
-            # print('nodup -> local')
-            # print(self._nodup2local_out_inds)
-            # print('local -> owned')
-            # print(self._local2owned_inds)
-            # print('contig -> noncontig')
-            # print(self._noncontig_dis_inds)
-
         return (self._nodup_out_ranges, self._nodup2local_out_inds, self._local2owned_inds,
                 self._noncontig_dis_inds)
 
 
 def _arraylist2array(lst, dtype=int):
+    """
+    Given a list of arrays, return a stacked array of the specified dtype.
+
+    Parameters
+    ----------
+    lst : list
+        List of arrays.
+    dtype : type
+        Specified dtype for the return array.
+
+    Returns
+    -------
+    ndarray
+        The stacked array.
+    """
     if len(lst) > 1:
         return np.hstack(lst)
     elif lst:

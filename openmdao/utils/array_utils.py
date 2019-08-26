@@ -392,7 +392,8 @@ def sizes2offsets(size_array, dtype=int):
     """
     For a given array of sizes, return an array of offsets.
 
-    size_array is assumed to be flat.
+    Offsets will be computed using a flattened version of size_array and then
+    reshaped to match the shape of size_array.
 
     Parameters
     ----------

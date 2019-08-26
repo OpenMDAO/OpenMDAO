@@ -1071,12 +1071,6 @@ class _TotalJacInfo(object):
             # somehow the array within the petsc vector object is getting disassociated
             # from the data array it was created from, so reassign the petsc vec array to
             # the data array.
-            # print("DERIV_VAL")
-            # print(self.output_vec[mode][vecname]._data)
-            # for m in ('fwd', 'rev'):
-            #     print(m, 'VAL')
-            #     print(self.output_vec[m][vecname]._data)
-
             self.soln_petsc[mode][vecname].array = self.output_vec[mode][vecname]._data
             self.jac_petsc[mode].array[:] = 0.
             scatter.scatter(self.soln_petsc[mode][vecname],
@@ -1085,8 +1079,6 @@ class _TotalJacInfo(object):
                 self.J[:, i] = self.jac_petsc[mode].array
             else:
                 self.J[i] = self.jac_petsc[mode].array
-            # print("jac_petsc")
-            # print(self.jac_petsc[mode].array)
 
     def par_deriv_jac_setter(self, inds, mode):
         """

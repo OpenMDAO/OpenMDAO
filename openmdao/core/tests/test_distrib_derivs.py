@@ -238,8 +238,6 @@ class MPITests2(unittest.TestCase):
 
         root.linear_solver = solver()
 
-        #import wingdbstub
-
         prob.setup(check=False, mode='fwd')
         prob.run_model()
 

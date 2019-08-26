@@ -433,7 +433,7 @@ class IndicesTestCase2(unittest.TestCase):
         root.connect('G1.par2.c3.y', 'G1.par2.c5.x')
 
         prob.setup(check=False, mode=mode)
-        prob.run_model()
+        prob.run_driver()
 
         return prob
 
@@ -691,7 +691,6 @@ class ParDerivColorFeatureTestCase(unittest.TestCase):
         # run first in fwd mode
         p = om.Problem(model=PartialDependGroup())
         p.setup(mode='fwd')
-
         p.run_model()
 
         elapsed_fwd = time.time()
