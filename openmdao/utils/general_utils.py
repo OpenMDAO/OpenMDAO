@@ -11,7 +11,10 @@ import unittest
 from fnmatch import fnmatchcase
 from six import string_types, PY2, reraise
 from six.moves import range, cStringIO as StringIO
-from collections import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 import numbers
 import json
 import importlib

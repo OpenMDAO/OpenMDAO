@@ -380,7 +380,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname}
+        source : {'problem', 'driver', `<component hierarchy location>`,
+            `<solver hierarchy location>`}
             Identifies the source for which to return information.
 
         Returns
@@ -614,7 +615,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         return cases
 
-    def get_cases(self, source=None, recurse=True, flat=False):
+    def get_cases(self, source=None, recurse=True, flat=True):
         """
         Iterate over the cases.
 

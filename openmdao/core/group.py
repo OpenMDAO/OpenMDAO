@@ -2,7 +2,11 @@
 from __future__ import division
 
 import os
-from collections import Iterable, Counter, OrderedDict, defaultdict
+from collections import Counter, OrderedDict, defaultdict
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 from itertools import product, chain
 from numbers import Number
 import inspect
@@ -563,15 +567,23 @@ class Group(System):
             Whether to call this method in subsystems.
         """
         super(Group, self)._setup_var_data()
-        allprocs_abs_names = self._var_allprocs_abs_names
-        allprocs_discrete = self._var_allprocs_discrete
+
         abs_names = self._var_abs_names
+        abs_names_discrete = self._var_abs_names_discrete
+
+        allprocs_abs_names = self._var_allprocs_abs_names
+        allprocs_abs_names_discrete = self._var_allprocs_abs_names_discrete
+
         var_discrete = self._var_discrete
-        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+        allprocs_discrete = self._var_allprocs_discrete
+
+        abs2meta = self._var_abs2meta
         abs2prom = self._var_abs2prom
+
         allprocs_abs2meta = self._var_allprocs_abs2meta
         allprocs_abs2prom = self._var_allprocs_abs2prom
-        abs2meta = self._var_abs2meta
+
+        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
         for subsys in self._subsystems_myproc:
             if recurse:
@@ -588,19 +600,25 @@ class Group(System):
             sub_prefix = subsys.name + '.'
 
             for type_ in ['input', 'output']:
-
                 # Assemble abs_names and allprocs_abs_names
-                allprocs_abs_names[type_].extend(subsys._var_allprocs_abs_names[type_])
+                allprocs_abs_names[type_].extend(
+                    subsys._var_allprocs_abs_names[type_])
+                allprocs_abs_names_discrete[type_].extend(
+                    subsys._var_allprocs_abs_names_discrete[type_])
+
+                abs_names[type_].extend(subsys._var_abs_names[type_])
+                abs_names_discrete[type_].extend(subsys._var_abs_names_discrete[type_])
+
                 allprocs_discrete[type_].update({k: v for k, v in
                                                  iteritems(subsys._var_allprocs_discrete[type_])})
-                abs_names[type_].extend(subsys._var_abs_names[type_])
                 var_discrete[type_].update({sub_prefix + k: v for k, v in
                                             iteritems(subsys._var_discrete[type_])})
 
                 # Assemble abs2prom
                 sub_loc_proms = subsys._var_abs2prom[type_]
                 sub_proms = subsys._var_allprocs_abs2prom[type_]
-                for abs_name in subsys._var_allprocs_abs_names[type_]:
+                for abs_name in chain(subsys._var_allprocs_abs_names[type_],
+                                      subsys._var_allprocs_abs_names_discrete[type_]):
                     if abs_name in sub_loc_proms:
                         abs2prom[type_][abs_name] = var_maps[type_][sub_loc_proms[abs_name]]
 
@@ -1042,7 +1060,7 @@ class Group(System):
             try:
                 out_type = self._var_allprocs_discrete['output'][abs_out]['type']
             except KeyError:
-                raise RuntimeError("%s: Can't connect discrete output '%s' to continuous "
+                raise RuntimeError("%s: Can't connect continuous output '%s' to discrete "
                                    "input '%s'." % (self.msginfo, abs_out, abs_in))
             if not issubclass(in_type, out_type):
                 raise RuntimeError("%s: Type '%s' of output '%s' is"
@@ -1091,10 +1109,12 @@ class Group(System):
                     # there's no ambiguity in storage order
                     if not array_connection_compatible(in_shape, out_shape):
                         msg = ("%s: The source and target shapes do not match or are ambiguous"
-                               " for the connection '%s' to '%s'. Expected %s but got %s.")
+                               " for the connection '%s' to '%s'. "
+                               "The source shape is %s but the target shape is %s.")
                         raise ValueError(msg % (self.msginfo, abs_out, abs_in,
+                                                tuple([int(s) for s in out_shape]),
                                                 tuple([int(s) for s in in_shape]),
-                                                tuple([int(s) for s in out_shape])))
+                                                ))
 
                 if src_indices is not None:
                     src_indices = np.atleast_1d(src_indices)

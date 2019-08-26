@@ -478,7 +478,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         ]
 
         last_counter = 0
-        for i, c in enumerate(cr.get_cases()):
+        for i, c in enumerate(cr.get_cases(flat=False)):
             self.assertEqual(c.name, expected_coords[i])
             self.assertTrue(c.counter > last_counter)
             last_counter = c.counter
@@ -2210,9 +2210,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         class ArrayAdder(om.ExplicitComponent):
             """
-            Just a simple component that has array inputs and outputs
+            A simple component that has array inputs and outputs
             """
-
             def __init__(self, size):
                 super(ArrayAdder, self).__init__()
                 self.size = size
@@ -2250,7 +2249,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         system_cases = cr.list_cases()
         case = cr.get_case(system_cases[0])
 
-        # logging inputs
+        # list inputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
         case.list_inputs(values=True,
@@ -2282,7 +2281,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(1, text.count('  mult'))
         self.assertEqual(1, text.count('    x    |10.0|  inch   (100'))
 
-        # logging outputs
+        # list outputs
         # out_stream - not hierarchical - extras - no print_arrays
         stream = StringIO()
         case.list_outputs(values=True,
@@ -2353,7 +2352,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             opts['legacy'] = '1.13'
 
         with printoptions(**opts):
-            # logging outputs
+            # list outputs
             # out_stream - not hierarchical - extras - print_arrays
             stream = StringIO()
             case.list_outputs(values=True,
@@ -2733,6 +2732,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         objs = case.get_objectives()
         cons = case.get_constraints()
         dvs = case.get_design_vars()
+        rsps = case.get_responses()
 
         # keys() will give you the promoted variable names
         self.assertEqual((sorted(objs.keys()), sorted(cons.keys()), sorted(dvs.keys())),
@@ -2745,6 +2745,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         # you can access variable values using either the promoted or the absolute name
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
         self.assertEqual((dvs['x'], dvs['px.x']), (dvs['px.x'], dvs['x']))
+        self.assertEqual((rsps['obj'], rsps['obj_cmp.obj']), (rsps['obj_cmp.obj'], rsps['obj']))
 
         # you can also access the variables directly from the case object
         self.assertEqual((case['obj'], case['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))

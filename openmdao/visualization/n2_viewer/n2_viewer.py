@@ -119,11 +119,15 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     if isinstance(system, ImplicitComponent):
         if overrides_method('solve_linear', system, ImplicitComponent):
             tree_dict['linear_solver'] = "solve_linear"
+        elif system.linear_solver:
+            tree_dict['linear_solver'] = system.linear_solver.SOLVER
         else:
             tree_dict['linear_solver'] = ""
 
         if overrides_method('solve_nonlinear', system, ImplicitComponent):
             tree_dict['nonlinear_solver'] = "solve_nonlinear"
+        elif system.nonlinear_solver:
+            tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
         else:
             tree_dict['nonlinear_solver'] = ""
     else:
@@ -346,7 +350,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         and <head> tags. If False, gives a single, standalone HTML file for viewing.
 
     title : str, optional
-        The title for the diagram. Used in the HTML title and also shown on the page.
+        The title for the diagram. Used in the HTML title.
 
     use_declare_partial_info : bool, optional
         If True, in the N2 matrix, component internal connectivity computed using derivative
@@ -451,14 +455,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
                 'A click on any element in the N^2 diagram will allow those arrows to persist.')
 
     h.add_help(help_txt, footer="OpenMDAO Model Hierarchy and N^2 diagram")
-
-    if use_declare_partial_info:
-        h.insert('{{component_connectivity}}',
-                 'Note: Component internal connectivity computed using derivative declarations')
-    else:
-        h.insert('{{component_connectivity}}',
-                 'Note: Derivative declarations ignored, so dense component '
-                 'connectivity is assumed')
 
     # Write output file
     h.write(outfile)

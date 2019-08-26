@@ -1,41 +1,39 @@
- <div id="all_pt_n2_content_div">
-        {{title}}
-        <div id="ptN2ContentDivId">
-            <!-- The Modal -->
-            {{help}}
-            <div id="toolbarLoc">
-                {{toolbar}}
-            </div>
-            <div style="margin-top:5px;">
+<div id="all_pt_n2_content_div">
+    <div id="ptN2ContentDivId">
+        <!-- The Modal -->
+        {{help}}
+        <div id="toolbarLoc">
+            {{toolbar}}
+            <div style="margin-top:5px; display:inline-block;">
                 <input type="text" id="awesompleteId" size="80" />
                 <button class="myButton" id="searchButtonId" title="Search"><i class="icon-search"></i></button>
                 <label id="searchCountId" style="display:inline-block;width:120px"></label>
             </div>
-            <!--<select id="outputNamingSelect" onchange="OutputNameSelectChange()" style="display:none">-->
-            <div class="component_connectivity">
-                {{component_connectivity}}
-            </div>
-            <div id="currentPathId" class="path_string" style="display:none"></div>
-            <div id="d3_content_div"></div>
-            <div id="connectionId">
-            </div>
+        </div>
+        <!--<select id="outputNamingSelect" onchange="OutputNameSelectChange()" style="display:none">-->
+        <div id="currentPathId" class="path_string" style="display:none"></div>
+        <div id="d3_content_div"></div>
+        <div id="connectionId">
         </div>
     </div>
+</div>
 
-    <nav id="context-menu" class="context-menu">
-        <ul class="context-menu__items">
-            <li class="context-menu__items">
-                <a href='#' class="context-menu__link" id="collapseButton" data-action="Collapse"><i class="fa fa-eye"></i> Collapse/Uncollapse</a>
-            </li>
-            <li class="context-menu__items">
-                <a href='#' class="context-menu__link" id="texButton" data-action="View"><i class="fa fa-eye"></i>Change Name</a>
-            </li>
-        </ul>
-    </nav>
-    <div id="katexTest" class="katex"></div>
-    <div id="katexInputDiv" style="display: none">
-        <input id="katexInput"></input>
-    </div>
+<nav id="context-menu" class="context-menu">
+    <ul class="context-menu__items">
+        <li class="context-menu__items">
+            <a href='#' class="context-menu__link" id="collapseButton" data-action="Collapse"><i class="fa fa-eye"></i>
+                Collapse/Uncollapse</a>
+        </li>
+        <li class="context-menu__items">
+            <a href='#' class="context-menu__link" id="texButton" data-action="View"><i class="fa fa-eye"></i>Change
+                Name</a>
+        </li>
+    </ul>
+</nav>
+<div id="katexTest" class="katex"></div>
+<div id="katexInputDiv" style="display: none">
+    <input id="katexInput"></input>
+</div>
 
 {d3_lib}
 {awesomplete_lib}
