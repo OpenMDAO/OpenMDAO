@@ -81,8 +81,8 @@ class BaseCaseReader(object):
         Returns
         -------
         list
-            One or more of: `problem`, `driver`, `<system hierarchy location>`,
-                            `<solver hierarchy location>`
+            One or more of: 'problem', 'driver', <system hierarchy location>,
+            <solver hierarchy location>}
         """
         pass
 
@@ -92,8 +92,8 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {`problem`, `driver`, `<system hierarchy location>`,
-                  `<solver hierarchy location>`}
+        source : {'problem', 'driver', <system hierarchy location>,
+            <solver hierarchy location>}
             Identifies the source for which to return information.
 
         Returns
@@ -109,8 +109,8 @@ class BaseCaseReader(object):
 
         Parameters
         ----------
-        source : {`problem`, `driver`, `<system hierarchy location>`,
-                  `<solver hierarchy location>`, case name}
+        source : {'problem', 'driver', <system hierarchy location>,
+            <solver hierarchy location>, case name}
             If not None, only cases originating from the specified source or case are returned.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.

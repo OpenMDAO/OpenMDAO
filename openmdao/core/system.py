@@ -1383,7 +1383,7 @@ class System(object):
                 myoutputs.update({n for n in self._outputs._names
                                   if n in abs2prom and check_path(abs2prom[n], incl, excl)})
 
-            # residuals have the same names as the continous outputs
+            # residuals have the same names as the continuous outputs
             if options['record_residuals']:
                 myresiduals = myoutputs.copy()
 
@@ -3556,7 +3556,7 @@ class System(object):
             discrete_outputs = self._discrete_outputs
 
             data = {}
-            if options['record_inputs'] and inputs._names:
+            if options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
                 data['i'] = {}
                 if 'i' in self._filtered_vars_to_record:
                     # use filtered inputs
@@ -3564,37 +3564,40 @@ class System(object):
                         if inp in inputs._names:
                             data['i'][inp] = inputs._views[inp]
                         elif inp in discrete_inputs:
-                            data['i'][inp] = discrete_inputs[inp]
+                            abs_name = self.pathname + '.' + inp if self.pathname else inp
+                            data['i'][abs_name] = discrete_inputs[inp]
                 else:
                     # use all the inputs
                     if len(discrete_inputs) > 0:
                         for inp in inputs:
                             data['i'][inp] = inputs._views[inp]
                         for inp in discrete_inputs:
-                            data['i'][inp] = discrete_inputs[inp]
+                            abs_name = self.pathname + '.' + inp if self.pathname else inp
+                            data['i'][abs_name] = discrete_inputs[inp]
                     else:
                         data['i'] = inputs._names
 
             else:
                 data['i'] = None
 
-            if options['record_outputs'] and outputs._names:
+            if options['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
                 data['o'] = {}
-
                 if 'o' in self._filtered_vars_to_record:
                     # use outputs from filtered list.
                     for out in self._filtered_vars_to_record['o']:
                         if out in outputs._names:
                             data['o'][out] = outputs._views[out]
                         elif out in discrete_outputs:
-                            data['o'][out] = discrete_outputs[out]
+                            abs_name = self.pathname + '.' + out if self.pathname else out
+                            data['o'][abs_name] = discrete_outputs[out]
                 else:
                     # use all the outputs
                     if len(discrete_outputs) > 0:
                         for out in outputs:
                             data['o'][out] = outputs._views[out]
-                        for inp in discrete_outputs:
-                            data['o'][out] = discrete_outputs[out]
+                        for out in discrete_outputs:
+                            abs_name = self.pathname + '.' + out if self.pathname else out
+                            data['o'][abs_name] = discrete_outputs[out]
                     else:
                         data['o'] = outputs._names
             else:
