@@ -184,10 +184,16 @@ class Jacobian(object):
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
     def __iter__(self):
+        """
+        Yield next name pair of sub-Jacobian.
+        """
         for key in self._subjacs_info.keys():
             yield key
 
     def items(self):
+        """
+        Yield name pair and value of sub-Jacobian.
+        """
         for key, val in self._subjacs_info.items():
             yield key, val['value']
 
