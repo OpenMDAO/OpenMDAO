@@ -175,7 +175,7 @@ class SimpleCompWithPrintPartials(ExplicitComponent):
         partials['f_xy', 'x'] = 2.0*x - 6.0 + y
         partials['f_xy', 'y'] = 2.0*y + 8.0 + x
 
-        if self.count < 1:  # Only want to print this once for the test
+        if self.count < 1:  # Only want to save these this once for the test
             for k in partials:
                 self.partials_name_pairs.append(k)
 
@@ -839,15 +839,21 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        expected = [
+        expected_names = [
                      ('paraboloid.f_xy', 'paraboloid.f_xy'),
                      ('paraboloid.f_xy', 'paraboloid.x'),
                      ('paraboloid.f_xy', 'paraboloid.y'),
                    ]
-
-        self.assertEqual(comp.partials_name_pairs, expected)
-        self.assertEqual([ v[0] for v in comp.partials_values], expected)
-
+        expected_values = [
+            [-1.],
+            [[0.]],
+            [[0.]],
+        ]
+        self.assertEqual(comp.partials_name_pairs, expected_names)
+        for item, expected_name, expected_value in zip(comp.partials_values, expected_names,
+                                                       expected_values):
+            self.assertEqual(item[0], expected_name)
+            assert_rel_error(self, item[1], expected_value, 1e-5)
 
 class MySparseComp(ExplicitComponent):
     def setup(self):
