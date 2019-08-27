@@ -160,6 +160,8 @@ class SimpleCompWithPrintPartials(ExplicitComponent):
         self.declare_partials(of='*', wrt='*')
 
         self.count = 0
+        self.partials_name_pairs = []
+        self.partials_values = []
 
     def compute(self, inputs, outputs):
         x = inputs['x']
@@ -175,10 +177,10 @@ class SimpleCompWithPrintPartials(ExplicitComponent):
 
         if self.count < 1:  # Only want to print this once for the test
             for k in partials:
-                print(k)
+                self.partials_name_pairs.append(k)
 
             for k, v in partials.items():
-                print(k, v)
+                self.partials_values.append((k,v))
 
         self.count += 1
 
@@ -824,7 +826,8 @@ class TestJacobian(unittest.TestCase):
         indeps = prob.model.add_subsystem('indeps', IndepVarComp(), promotes=['*'])
         indeps.add_output('x', .5)
         indeps.add_output('y', 10.0)
-        prob.model.add_subsystem('paraboloid', SimpleCompWithPrintPartials(), promotes_inputs=['x', 'y'])
+        comp = SimpleCompWithPrintPartials()
+        prob.model.add_subsystem('paraboloid', comp, promotes_inputs=['x', 'y'])
 
         prob.driver = ScipyOptimizeDriver()
         prob.driver.options['optimizer'] = 'SLSQP'
@@ -834,28 +837,16 @@ class TestJacobian(unittest.TestCase):
         prob.model.add_objective('paraboloid.f_xy')
 
         prob.setup()
+        prob.run_driver()
 
-        stdout = sys.stdout
-        strout = StringIO()
-        sys.stdout = strout
-        try:
-            prob.run_driver()
-        finally:
-            sys.stdout = stdout
+        expected = [
+                     ('paraboloid.f_xy', 'paraboloid.f_xy'),
+                     ('paraboloid.f_xy', 'paraboloid.x'),
+                     ('paraboloid.f_xy', 'paraboloid.y'),
+                   ]
 
-        output = strout.getvalue().split('\n')
-
-        # output should include this
-        # ('paraboloid.f_xy', 'paraboloid.f_xy')
-        # ('paraboloid.f_xy', 'paraboloid.x')
-        # ('paraboloid.f_xy', 'paraboloid.y')
-        # ('paraboloid.f_xy', 'paraboloid.f_xy')[-1.]
-        # ('paraboloid.f_xy', 'paraboloid.x')[[5.]]
-        # ('paraboloid.f_xy', 'paraboloid.y')[[28.5]]
-        self.assertTrue(output.count("('paraboloid.f_xy', 'paraboloid.f_xy')") == 1,
-                        "Should be more than one design vars header printed")
-        self.assertTrue(output.count("('paraboloid.f_xy', 'paraboloid.f_xy') [-1.]") == 1,
-                        "Should be more than one design vars header printed")
+        self.assertEqual(comp.partials_name_pairs, expected)
+        self.assertEqual([ v[0] for v in comp.partials_values], expected)
 
 
 class MySparseComp(ExplicitComponent):
