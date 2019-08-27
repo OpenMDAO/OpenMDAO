@@ -18,6 +18,7 @@ from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.mpi import MPI
+from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import INT_DTYPE
 
 
@@ -323,6 +324,10 @@ class DirectSolver(LinearSolver):
                                    " in %s." % (type(self._assembled_jac._int_mtx), system.msginfo))
 
         else:
+            if system.comm.size > 1:
+                raise RuntimeError("DirectSolvers without an assembled jacobian are not supported "
+                                   "when running under MPI if comm.size > 1.")
+
             mtx = self._build_mtx()
             self._nodup_size = mtx.shape[1]
 
@@ -453,9 +458,11 @@ class DirectSolver(LinearSolver):
                 _, nodup2local_inds, local2owned_inds, noncontig_dist_inds = \
                     system._get_nodup_out_ranges()
                 # gather full_b
-                tmp = np.empty(self._nodup_size)
-                system.comm.Gatherv(b_vec[local2owned_inds],  # src
-                                    (tmp, self._owned_size_totals),  # dest
+                tmp = np.empty(self._nodup_size, dtype=b_vec.dtype)
+                mpi_typ = MPI.C_DOUBLE_COMPLEX if np.iscomplex(b_vec[0]) else MPI.DOUBLE
+                disps = sizes2offsets(self._owned_size_totals, dtype=INT_DTYPE)
+                system.comm.Gatherv((b_vec[local2owned_inds], local2owned_inds.size, mpi_typ),
+                                    (tmp, (self._owned_size_totals, disps), mpi_typ),
                                     root=0)
             else:
                 full_b = tmp = b_vec
@@ -476,17 +483,16 @@ class DirectSolver(LinearSolver):
 
                 if system.comm.size > 1:
                     if iproc > 0:
-                        arr = np.zeros(tmp.size)
+                        arr = np.zeros(tmp.size, dtype=tmp.dtype)
 
                     # this may send more data than necessary, but the alternative is to use a lot
                     # of memory on rank 0 to store the chunk that each proc needs and then do a
                     # Scatterv.
-                    system.comm.Bcast(arr, root=0)
+                    system.comm.Bcast((arr, mpi_typ), root=0)
                     x_vec[:] = arr[nodup2local_inds]
                 else:
                     x_vec[:] = arr
 
         # matrix-vector-product generated jacobians are scaled.
         else:
-            # FIXME: fix to work with MPI
             x_vec[:] = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)

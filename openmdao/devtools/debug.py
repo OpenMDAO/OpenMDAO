@@ -405,3 +405,78 @@ def compare_jacs(Jref, J, rel_trigger=1.0):
     return results
 
 
+def trace_mpi(fname='mpi_trace', flush=True):
+    """
+    Dump traces to the specified filename<.rank> showing openmdao and mpi/petsc calls.
+
+    Parameters
+    ----------
+    fname : str
+        Name of the trace file(s).  <.rank> will be appended to the name on each rank.
+    flush : bool
+        If True, flush print buffer after every print call.
+    """
+    if MPI is None:
+        raise RuntimeError("MPI is not active.  Trace aborted.")
+    if sys.getprofile() is not None:
+        raise RuntimeError("another profile function is already active.")
+
+    my_fname = fname + '.' + str(MPI.COMM_WORLD.rank)
+
+    outfile = open(my_fname, 'w')
+
+    stack = []
+
+    def _mpi_trace_callback(frame, event, arg):
+        pname = None
+        if event == 'call':
+            if 'openmdao' in frame.f_code.co_filename:
+                if 'self' in frame.f_locals:
+                    try:
+                        pname = frame.f_locals['self'].msginfo
+                    except:
+                        pass
+                if pname is not None and not (stack and pname == stack[-1]):
+                    stack.append(pname)
+                    print('   ' * len(stack), pname, file=outfile, flush=flush)
+                print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
+                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                      file=outfile, flush=flush)
+        elif event == 'return':
+            if 'openmdao' in frame.f_code.co_filename:
+                if 'self' in frame.f_locals:
+                    try:
+                        pname = frame.f_locals['self'].msginfo
+                    except:
+                        pass
+                print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
+                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                      file=outfile, flush=flush)
+                if pname is not None and stack and pname == stack[-1]:
+                    stack.pop()
+        elif event == 'c_call':
+            s = str(arg)
+            if 'mpi4py' in s or 'petsc4py' in s:
+                c = arg.__self__.__class__
+                print('   ' * len(stack), '(c) -->', "%s.%s.%s" %
+                      (c.__module__, c.__name__, arg.__name__),
+                      "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                      file=outfile, flush=True)
+        elif event == 'c_return':
+            s = str(arg)
+            if 'mpi4py' in s or 'petsc4py' in s:
+                c = arg.__self__.__class__
+                print('   ' * len(stack), '(c) <--', "%s.%s.%s" %
+                      (c.__module__, c.__name__, arg.__name__),
+                      "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                      file=outfile, flush=True)
+        elif event == 'c_exception':
+            s = str(arg)
+            if 'mpi4py' in s or 'petsc4py' in s:
+                c = arg.__self__.__class__
+                print('   ' * len(stack), '(c_exception)', "%s.%s.%s" %
+                      (c.__module__, c.__name__, arg.__name__),
+                      "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                      file=outfile, flush=True)
+
+    sys.setprofile(_mpi_trace_callback)

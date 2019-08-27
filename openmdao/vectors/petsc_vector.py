@@ -146,26 +146,26 @@ class PETScVector(DefaultVector):
             dup_inds = self._get_dup_inds()
 
             if self._ncol == 1:
-                data_cache = self._data.copy()
+                data_cache = self._data.copy().real
                 self._petsc.array = data_cache
                 self._petsc.array[dup_inds] = 0.0
                 distributed_norm = self._petsc.norm()
 
                 # Reset petsc array
-                self._petsc.array = self._data
+                self._petsc.array = self._data.real
 
             else:
                 # With Vectorized derivative solves, data contains multiple columns.
                 icol = self._icol
                 if icol is None:
                     icol = 0
-                data_cache = self._data.flatten()
+                data_cache = self._data.flatten().real
                 data_cache[dup_inds] = 0.0
                 self._petsc.array = data_cache.reshape(self._data.shape)[:, icol]
                 distributed_norm = self._petsc.norm()
 
                 # Reset petsc array
-                self._petsc.array = self._data[:, icol]
+                self._petsc.array = self._data[:, icol].real
 
             return distributed_norm
 

@@ -71,7 +71,7 @@ class COOMatrix(Matrix):
 
         start = end = 0
         for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
-            wrt_dist = abs2meta[key[1]]['distributed'] if abs2meta else False
+            wrt_dist = abs2meta[key[1]]['distributed'] if abs2meta and owns else False
             if owns and not (owns[key[1]] == iproc or wrt_dist or abs2meta[key[0]]['distributed']):
                 continue  # only keep stuff that this rank owns
 
@@ -111,7 +111,7 @@ class COOMatrix(Matrix):
             idxs = None
 
             col_offset = row_offset = 0
-            if comm_size > 1:
+            if comm_size > 1 and self._is_internal:
                 shape = info['shape']
                 if abs2meta[key[1]]['distributed']:
                     col_offset = np.sum(
