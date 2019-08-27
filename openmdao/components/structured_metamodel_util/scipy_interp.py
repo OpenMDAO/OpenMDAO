@@ -31,16 +31,14 @@ class ScipyGridInterp(GridInterpBase):
     Attributes
     ----------
     bounds_error : bool
-        If True, when interpolated values are requested outside of the
-        domain of the input data, a ValueError is raised.
-        If False, then `fill_value` is used.
+        If True, when interpolated values are requested outside of the domain of the input data,
+        a ValueError is raised. If False, then `fill_value` is used.
         Default is True (raise an exception).
     fill_value : float
-        If provided, the value to use for points outside of the
-        interpolation domain. If None, values outside
-        the domain are extrapolated. Note that gradient values will always be
-        extrapolated rather than set to the fill_value if bounds_error=False
-        for any points outside of the interpolation domain.
+        If provided, the value to use for points outside of the interpolation domain. If None,
+        values outside the domain are extrapolated. Note that gradient values will always be
+        extrapolated rather than set to the fill_value if bounds_error=False for any points
+        outside of the interpolation domain.
         Default is `np.nan`.
     grid : tuple
         Collection of points that determine the regular grid.
@@ -53,8 +51,8 @@ class ScipyGridInterp(GridInterpBase):
     _g_order : string
         Name of interpolation order used to compute the last gradient.
     _interp_config : dict
-        Configuration object that stores limitations of each interpolation
-        order.
+        Configuration object that stores the number of points required for each interpolation
+        method.
     _ki : list
         Interpolation order to be used in each dimension.
     _spline_dim_error : bool
@@ -64,7 +62,7 @@ class ScipyGridInterp(GridInterpBase):
         order will be reduced as needed on a per-dimension basis. Default
         is True (raise an exception).
     _xi : ndarray
-        Current evaluation point.
+        Cache of current evaluation point.
     """
 
     def _interp_methods(self):
@@ -86,19 +84,7 @@ class ScipyGridInterp(GridInterpBase):
         }
 
         all_methods = list(interpolator_configs.keys())
-
         return all_methods, interpolator_configs
-
-    def interp_method(self):
-        """
-        Return a list of valid interpolation method names.
-
-        Returns
-        -------
-        list
-            Valid interpolation name strings.
-        """
-        return ['slinear', 'cubic', 'quintic']
 
     def interpolate(self, xi, interp_method=None, compute_gradients=True):
         """
@@ -107,7 +93,7 @@ class ScipyGridInterp(GridInterpBase):
         Parameters
         ----------
         xi : ndarray of shape (..., ndim)
-            The coordinates to sample the gridded data at
+            The coordinates to sample the gridded data at.
         interp_method : str, optional
             The method of interpolation to perform. Supported are 'slinear', 'cubic', and
             'quintic'. Default is None, which will use the method defined at the construction
@@ -346,8 +332,6 @@ class ScipyGridInterp(GridInterpBase):
         -------
         list of ndarray
             Indices
-        list of ndarray
-            Norm of the distance to the lower edge
         list of bool
             Out of bounds flags.
         """
@@ -390,8 +374,7 @@ class ScipyGridInterp(GridInterpBase):
         Returns
         -------
         gradient : ndarray of shape (..., ndim)
-            gradient vector of the gradients of the interpolated values with
-            respect to each value in xi
+            Vector of gradients of the interpolated values with respect to each value in xi.
         """
         # Determine if the needed gradients have been cached already
         if not interp_method:
@@ -402,8 +385,8 @@ class ScipyGridInterp(GridInterpBase):
                 (interp_method != self._g_order):
             # if not, compute the interpolation to get the gradients
             self.interpolate(xi, interp_method=interp_method)
-        gradients = self._all_gradients
-        gradients = gradients.reshape(np.asarray(xi).shape)
+
+        gradients = self._all_gradients.reshape(np.asarray(xi).shape)
         return gradients
 
     def training_gradients(self, pt):

@@ -8,24 +8,22 @@ class GridInterpBase(object):
     """
     Interpolation on a regular grid in arbitrary dimensions.
 
-    The data must be defined on a regular grid; the grid spacing however may be uneven. First,
-    third and fifth order spline interpolation are supported. After setting up the interpolator
-    object, the interpolation method (*slinear*, *cubic*, and *quintic*) may be chosen at each
-    evaluation. Additionally, gradients are provided for the spline interpolation methods.
+    The data must be defined on a regular grid; the grid spacing however may be uneven. Several
+    interpolation methods are supported. These are defined in the child classes. Gradients are
+    provided for all interpolation methods. Gradients with respect to grid values are also
+    available optionally.
 
     Attributes
     ----------
     bounds_error : bool
-        If True, when interpolated values are requested outside of the
-        domain of the input data, a ValueError is raised.
-        If False, then `fill_value` is used.
+        If True, when interpolated values are requested outside of the domain of the input data,
+        a ValueError is raised. If False, then `fill_value` is used.
         Default is True (raise an exception).
     fill_value : float
-        If provided, the value to use for points outside of the
-        interpolation domain. If None, values outside
-        the domain are extrapolated. Note that gradient values will always be
-        extrapolated rather than set to the fill_value if bounds_error=False
-        for any points outside of the interpolation domain.
+        If provided, the value to use for points outside of the interpolation domain. If None,
+        values outside the domain are extrapolated. Note that gradient values will always be
+        extrapolated rather than set to the fill_value if bounds_error=False for any points
+        outside of the interpolation domain.
         Default is `np.nan`.
     grid : tuple
         Collection of points that determine the regular grid.
@@ -38,7 +36,7 @@ class GridInterpBase(object):
     _g_method : string
         Name of interpolation method used to compute the last gradient.
     _interp_config : dict
-        Configuration object that stores limitations of each interpolation
+        Configuration object that stores the number of points required for each interpolation
         method.
     _ki : list
         Interpolation order to be used in each dimension.
@@ -49,7 +47,7 @@ class GridInterpBase(object):
         order will be reduced as needed on a per-dimension basis. Default
         is True (raise an exception).
     _xi : ndarray
-        Current evaluation point.
+        Cache of current evaluation point.
     """
 
     def __init__(self, points, values, interp_method="slinear", bounds_error=True,
@@ -150,7 +148,7 @@ class GridInterpBase(object):
         self._xi = None
         self._all_gradients = None
         self._spline_dim_error = spline_dim_error
-        self._g_order = None
+        self.training_data_gradients = False
 
     def interpolate(self, xi, interp_method=None, compute_gradients=True):
         """
@@ -198,8 +196,7 @@ class GridInterpBase(object):
         Returns
         -------
         gradient : ndarray of shape (..., ndim)
-            gradient vector of the gradients of the interpolated values with
-            respect to each value in xi
+            Vector of gradients of the interpolated values with respect to each value in xi.
         """
         pass
 

@@ -1,5 +1,7 @@
 """
 Interpolation method based on Tables in NPSS.
+
+This was added to bridge the gap between some of the slower scipy implementations.
 """
 from __future__ import division, print_function, absolute_import
 from six.moves import range
@@ -12,21 +14,46 @@ from openmdao.components.structured_metamodel_util.outofbounds_error import OutO
 
 
 class InterpLinear(object):
+    """
+    Interpolate using a linear polynomial.
+
+    Attributes
+    ----------
+    last_index : int
+        Index of previously computed approximation, for caching slope computation on leaf table.
+    slope : double
+        Cached slope value for leaf table.
+    """
 
     def __init__(self):
-        self.last_index = -1
+        self.last_index = None
         self.slope = 0.0
 
     def interpolate(self, x, idx, slice_idx, table):
+        """
+        Compute the interpolated value over this grid dimension.
+
+        x : ndarray
+            The coordinates to sample the gridded data at. First array element is the point to
+            interpolate here. Remaining elements are interpolated on sub tables.
+        idx : integer
+            Interval index for x.
+        slice_idx : List of <slice>
+            Slice object containing indices of data points requested by parent interpolating
+            tables.
+        table : <InterpTable>
+            Table object that contains the grid and data.
+        """
         grid = table.grid
         subtable = table.subtable
-        slope = self.slope
 
         # Extrapolate high
         if idx == len(grid) - 1:
             idx -= 1
 
         if subtable is not None:
+            # Interpolate between values that come from interpolating the subtables in the
+            # subsequent dimensions.
             nx = len(x)
             slice_idx.append(slice(idx, idx + 2))
 
@@ -47,35 +74,56 @@ class InterpLinear(object):
         else:
             values = table.values[tuple(slice_idx)]
             last_index = self.last_index
+            slope = self.slope
 
-            # If the lookup index is the same as last time and it is not '0',
-            # then the slope hasn't changed, so don't need to recalculate.
-            if idx != last_index or lastIndex==0:
-                lastIndex = idx
+            # If idx is the same as last time, then the slope hasn't changed.
+            if idx != last_index:
+                self.last_index = idx
                 slope = (values[..., idx + 1] - values[..., idx]) / (grid[idx + 1] - grid[idx])
                 self.slope = slope
-                self.last_index = last_index
 
-            return values[..., idx] + (x - grid[idx]) * slope, np.expand_dims(slope, axis=-1), False
+            return values[..., idx] + (x - grid[idx]) * slope, np.expand_dims(slope, axis=-1), \
+                   False
 
 
 class InterpLagrange2(object):
+    """
+    Interpolate using a second order Lagrange polynomial.
+
+    Attributes
+    ----------
+    last_index : int
+        Index of previously computed approximation, for caching slope computation on leaf table.
+    slope : double
+        Cached slope value for leaf table.
+    """
 
     def __init__(self):
-        self.last_index = -1
+        self.last_index = None
         self.slope = None
 
     def interpolate(self, x, idx, slice_idx, table):
+        """
+        Compute the interpolated value over this grid dimension.
+
+        x : ndarray
+            The coordinates to sample the gridded data at. First array element is the point to
+            interpolate here. Remaining elements are interpolated on sub tables.
+        idx : integer
+            Interval index for x.
+        slice_idx : List of <slice>
+            Slice object containing indices of data points requested by parent interpolating
+            tables.
+        table : <InterpTable>
+            Table object that contains the grid and data.
+        """
         grid = table.grid
         subtable = table.subtable
-        nx = len(x)
 
         # Extrapolate high
         ngrid = len(grid)
         if idx > ngrid - 3:
             idx = ngrid - 3
-        elif idx == ngrid - 1:
-            idx -= 1
 
         derivs = np.empty(len(x))
 
@@ -84,7 +132,9 @@ class InterpLagrange2(object):
         xx3 = x[0] - grid[idx + 2]
 
         if subtable is not None:
-
+            # Interpolate between values that come from interpolating the subtables in the
+            # subsequent dimensions.
+            nx = len(x)
             slice_idx.append(slice(idx, idx + 3))
 
             tshape = table.values[tuple(slice_idx)].shape
@@ -92,10 +142,6 @@ class InterpLagrange2(object):
             nshape.append(nx)
             derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
-            # Checking the lastIndex value here won't help, because our slope is not
-            # guaranteed to be the same as last time even if idx == lastIndex, since
-            # the numerator of the slope comes from lower level tables whose index may
-            # have changed.
             c12 = grid[idx] - grid[idx + 1]
             c13 = grid[idx] - grid[idx + 2]
             c23 = grid[idx + 1] - grid[idx + 2]
@@ -121,9 +167,8 @@ class InterpLagrange2(object):
             nshape.append(1)
             derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
-            # If the lookup index is the same as last time and it is not '0',
-            # then the slope hasn't changed, so don't need to recalculate.
-            if idx != last_index or last_index == 0:
+            # If idx is the same as last time, then the slope hasn't changed.
+            if idx != last_index:
                 self.last_index = idx
                 c12 = grid[idx] - grid[idx + 1]
                 c13 = grid[idx] - grid[idx + 2]
@@ -143,15 +188,38 @@ class InterpLagrange2(object):
 
 
 class InterpLagrange3(object):
+    """
+    Interpolate using a third order Lagrange polynomial.
+
+    Attributes
+    ----------
+    last_index : int
+        Index of previously computed approximation, for caching slope computation on leaf table.
+    slope : double
+        Cached slope value for leaf table.
+    """
 
     def __init__(self):
         self.last_index = -1
         self.slope = None
 
     def interpolate(self, x, idx, slice_idx, table):
+        """
+        Compute the interpolated value over this grid dimension.
+
+        x : ndarray
+            The coordinates to sample the gridded data at. First array element is the point to
+            interpolate here. Remaining elements are interpolated on sub tables.
+        idx : integer
+            Interval index for x.
+        slice_idx : List of <slice>
+            Slice object containing indices of data points requested by parent interpolating
+            tables.
+        table : <InterpTable>
+            Table object that contains the grid and data.
+        """
         grid = table.grid
         subtable = table.subtable
-        nx = len(x)
 
         # Extrapolate high
         ngrid = len(grid)
@@ -173,6 +241,9 @@ class InterpLagrange3(object):
         xx4 = x[0] - p4
 
         if subtable is not None:
+            # Interpolate between values that come from interpolating the subtables in the
+            # subsequent dimensions.
+            nx = len(x)
             slice_idx.append(slice(idx - 1, idx + 3))
 
             tshape = table.values[tuple(slice_idx)].shape
@@ -180,10 +251,6 @@ class InterpLagrange3(object):
             nshape.append(nx)
             derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
-            # Checking the lastIndex value here won't help, because our slope is not
-            # guaranteed to be the same as last time even if idx == lastIndex, since
-            # the numerator of the slope comes from lower level tables whose index may
-            # have changed.
             c12 = p1 - p2
             c13 = p1 - p3
             c14 = p1 - p4
@@ -253,15 +320,17 @@ def abs_complex(x):
     """
     Compute the absolute value of a complex-stepped vector.
 
+    Rather than taking a Euclidian norm, simply negate the values that are less than zero.
+
     Parameters
     ----------
     x : ndarray
-        Array to process.
+        Input array.
 
     Returns
     -------
     ndarray
-        Absolute value of the array.
+        Complex-step absolute value of the array.
     """
     idx_neg = np.where(x < 0)
     x[idx_neg] = -x[idx_neg]
@@ -270,27 +339,23 @@ def abs_complex(x):
 
 def dv_abs_complex(x, x_deriv):
     """
-    Compute the derivative of the absolute value function.
+    Apply the complex-step derivative of the absolute value function.
 
     Parameters
     ----------
     x : ndarray
-        Array to process.
+        Input array, used for determining which elements to negate.
     x_deriv : ndarray
-        Array of derivatives which may have one additional dimension.
+        Incominng partial derivative array, may have one additional dimension.
 
     Returns
     -------
     ndarray
-        Absolute value of the array.
-    ndarray
-        Derivative value of the array.
-
+        Absolute value applied to x_deriv.
     """
     idx_neg = np.where(x < 0)
-    y = None
 
-    # Special case for final interp point (due to numpy size and broadcasting.)
+    # Special case when x is (1, ) and x_deriv is (1, n).
     if len(x_deriv.shape) == 1:
         if idx_neg[0].size != 0:
             return -x_deriv
@@ -301,8 +366,25 @@ def dv_abs_complex(x, x_deriv):
 
 
 class InterpAkima(object):
+    """
+    Interpolate using an Akima polynomial.
+    """
 
     def interpolate(self, x, idx, slice_idx, table):
+        """
+        Compute the interpolated value over this grid dimension.
+
+        x : ndarray
+            The coordinates to sample the gridded data at. First array element is the point to
+            interpolate here. Remaining elements are interpolated on sub tables.
+        idx : integer
+            Interval index for x.
+        slice_idx : List of <slice>
+            Slice object containing indices of data points requested by parent interpolating
+            tables.
+        table : <InterpTable>
+            Table object that contains the grid and data.
+        """
         grid = table.grid
         subtable = table.subtable
         nx = len(x)
@@ -341,6 +423,8 @@ class InterpAkima(object):
             high_idx = idx + 2
 
         if subtable is not None:
+            # Interpolate between values that come from interpolating the subtables in the
+            # subsequent dimensions.
 
             slice_idx.append(slice(low_idx, high_idx))
 
@@ -602,6 +686,7 @@ class InterpAkima(object):
 
             derivs[..., 1:] = da + dx * (db + cd_term)
 
+        # Restore numpy warnings to previous setting.
         np.seterr(**old_settings)
 
         # Evaluate dependent value and exit
@@ -609,6 +694,17 @@ class InterpAkima(object):
 
 
 class InterpCubic(object):
+    """
+    Interpolate using a cubic spline.
+
+    Continuity of derivatives between segments is assured, but a linear solution is
+    required to attain this.
+
+    Attributes
+    ----------
+    second_derivs : ndarray
+        Cache of all second derivatives for the leaf table only.
+    """
 
     def __init__(self):
         self.second_derivs = None
@@ -638,6 +734,20 @@ class InterpCubic(object):
         return sec_deriv
 
     def interpolate(self, x, idx, slice_idx, table):
+        """
+        Compute the interpolated value over this grid dimension.
+
+        x : ndarray
+            The coordinates to sample the gridded data at. First array element is the point to
+            interpolate here. Remaining elements are interpolated on sub tables.
+        idx : integer
+            Interval index for x.
+        slice_idx : List of <slice>
+            Slice object containing indices of data points requested by parent interpolating
+            tables.
+        table : <InterpTable>
+            Table object that contains the grid and data.
+        """
         grid = table.grid
         subtable = table.subtable
 
@@ -646,6 +756,8 @@ class InterpCubic(object):
             idx -= 1
 
         if subtable is not None:
+            # Interpolate between values that come from interpolating the subtables in the
+            # subsequent dimensions.
             n = len(grid)
             nx = len(x)
 
@@ -714,17 +826,17 @@ class InterpCubic(object):
             return val, deriv, False
 
 
-class NPSSTable(object):
+class InterpTable(object):
 
-    def __init__(self, grid, values, coeffs):
+    def __init__(self, grid, values, interps):
         self.subtable = None
 
         self.grid = grid[0]
-        self.interp = coeffs[0]()
+        self.interp = interps[0]()
         self.values = values
 
         if len(grid) > 1:
-            self.subtable = NPSSTable(grid[1:], values, coeffs[1:])
+            self.subtable = InterpTable(grid[1:], values, interps[1:])
 
         self.last_index = 0
 
@@ -803,27 +915,26 @@ class NPSSTable(object):
         return result, deriv, extrap_flag or sub_extrap_flag
 
 
-class NPSSGridInterp(GridInterpBase):
+class PythonGridInterp(GridInterpBase):
     """
     Interpolation on a regular grid in arbitrary dimensions.
 
-    This method is based on the interpolation code from OTIS.
+    This class includes methods based on the interpolation code from NPSS implemented solely in
+    Python.
 
     The data must be defined on a regular grid; the grid spacing however may be uneven.
 
     Attributes
     ----------
     bounds_error : bool
-        If True, when interpolated values are requested outside of the
-        domain of the input data, a ValueError is raised.
-        If False, then `fill_value` is used.
+        If True, when interpolated values are requested outside of the domain of the input data,
+        a ValueError is raised. If False, then `fill_value` is used.
         Default is True (raise an exception).
     fill_value : float
-        If provided, the value to use for points outside of the
-        interpolation domain. If None, values outside
-        the domain are extrapolated. Note that gradient values will always be
-        extrapolated rather than set to the fill_value if bounds_error=False
-        for any points outside of the interpolation domain.
+        If provided, the value to use for points outside of the interpolation domain. If None,
+        values outside the domain are extrapolated. Note that gradient values will always be
+        extrapolated rather than set to the fill_value if bounds_error=False for any points
+        outside of the interpolation domain.
         Default is `np.nan`.
     grid : tuple
         Collection of points that determine the regular grid.
@@ -833,10 +944,9 @@ class NPSSGridInterp(GridInterpBase):
         The data on the regular grid in n dimensions.
     _all_gradients : ndarray
         Cache of computed gradients.
-    _g_order : string
-        Name of interpolation order used to compute the last gradient.
     _interp_config : dict
-        Configuration object that stores limitations of each interpolation method.
+        Configuration object that stores the number of points required for each interpolation
+        method.
     _ki : list
         Interpolation order to be used in each dimension.
     _spline_dim_error : bool
@@ -846,7 +956,7 @@ class NPSSGridInterp(GridInterpBase):
         order will be reduced as needed on a per-dimension basis. Default
         is True (raise an exception).
     _xi : ndarray
-        Current evaluation point.
+        Cache of current evaluation point.
     """
 
     def __init__(self, points, values, interp_method="slinear", bounds_error=True,
@@ -883,28 +993,28 @@ class NPSSGridInterp(GridInterpBase):
             order will be reduced as needed on a per-dimension basis. Default
             is True (raise an exception).
         """
-        super(NPSSGridInterp, self).__init__(points, values, interp_method=interp_method,
-                                             bounds_error=bounds_error, fill_value=fill_value,
-                                             spline_dim_error=spline_dim_error)
+        super(PythonGridInterp, self).__init__(points, values, interp_method=interp_method,
+                                               bounds_error=bounds_error, fill_value=fill_value,
+                                               spline_dim_error=spline_dim_error)
 
         # Cache spline coefficients.
-        coeffs = []
+        interps = []
         for x in self.grid:
             if interp_method == 'slinear':
-                coef = InterpLinear
+                interp = InterpLinear
             elif interp_method == 'lagrange2':
-                coef = InterpLagrange2
+                interp = InterpLagrange2
             elif interp_method == 'lagrange3':
-                coef = InterpLagrange3
+                interp = InterpLagrange3
             elif interp_method == 'cubic':
-                coef = InterpCubic
-            elif interp_method == 'akima':
-                coef = InterpAkima
+                interp = InterpCubic
+            else:
+                interp = InterpAkima
 
-            coeffs.append(coef)
+            interps.append(interp)
 
-        self._coeffs = coeffs
-        self.table = NPSSTable(self.grid, self.values, coeffs)
+        self._interps = interps
+        self.table = InterpTable(self.grid, self.values, interps)
 
     def _interp_methods(self):
         """
@@ -929,17 +1039,6 @@ class NPSSGridInterp(GridInterpBase):
         all_methods = list(interpolator_configs.keys())
 
         return all_methods, interpolator_configs
-
-    def methods(self):
-        """
-        Return a list of valid interpolation method names.
-
-        Returns
-        -------
-        list
-            Valid interpolation name strings.
-        """
-        return ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima']
 
     def interpolate(self, xi, interp_method=None, compute_gradients=True):
         """
@@ -973,12 +1072,13 @@ class NPSSGridInterp(GridInterpBase):
         ndim = len(self.grid)
         self.ndim = ndim
         xi = _ndim_coords_from_arrays(xi, ndim=ndim)
-        if xi.shape[-1] != len(self.grid):
+        self._xi_shape = xi_shape = xi.shape
+
+        if xi_shape[-1] != len(self.grid):
             raise ValueError("The requested sample points xi have dimension "
                              "%d, but this RegularGridInterp has "
-                             "dimension %d" % (xi.shape[1], ndim))
+                             "dimension %d" % (xi_shape[1], ndim))
 
-        self._xi_shape = xi_shape = xi.shape
         xi = xi.reshape(-1, xi_shape[-1])
 
         if self.bounds_error:
@@ -1005,16 +1105,17 @@ class NPSSGridInterp(GridInterpBase):
         derivs = np.empty((n_nodes, nx), dtype=xi.dtype)
 
         for j in range(n_nodes):
+            if self.training_data_gradients:
+                # If the table values are inputs, then we need to create a new table each time.
+                self.table = InterpTable(self.grid, self.values, self._interps)
             val, deriv, extrap_flag = self.table.evaluate(xi[j, :])
             result[j] = val
             derivs[j, :] = deriv.flatten()
 
         # Cache derivatives
-        self.derivs = derivs
+        self._all_gradients = derivs
 
-        # TODO: Support out-of-bounds identification.
         if not self.bounds_error and self.fill_value is not None:
-
             out_of_bounds = np.where(extrap_flag != 0)
             result[out_of_bounds] = self.fill_value
 
@@ -1039,7 +1140,40 @@ class NPSSGridInterp(GridInterpBase):
         Returns
         -------
         gradient : ndarray of shape (..., ndim)
-            gradient vector of the gradients of the interpolated values with
-            respect to each value in xi
+            Vector of gradients of the interpolated values with respect to each value in xi.
         """
-        return self.derivs
+        return self._all_gradients
+
+    def training_gradients(self, pt):
+        """
+        Compute the training gradient for the vector of training points.
+
+        Parameters
+        ----------
+        pt : ndarray
+            Training point values.
+
+        Returns
+        -------
+        ndarray
+            Gradient of output with respect to training point values.
+        """
+        grid = self.grid
+
+        for i, axis in enumerate(self.grid):
+            ngrid = axis.size
+            values = np.zeros(ngrid)
+            deriv_i = np.zeros(ngrid)
+
+            for j in range(ngrid):
+                values[j] = 1.0
+                table = InterpTable([grid[i]], values, [self._interps[i]])
+                deriv_i[j], _, _ = table.evaluate(pt[i:i + 1])
+                values[j] = 0.0
+
+            if i == 0:
+                deriv_running = deriv_i.copy()
+            else:
+                deriv_running = np.outer(deriv_running, deriv_i)
+
+        return deriv_running

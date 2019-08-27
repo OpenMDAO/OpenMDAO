@@ -6,12 +6,9 @@ from copy import deepcopy
 import unittest
 
 import numpy as np
-from numpy.testing import (assert_array_almost_equal, assert_almost_equal,
-                           assert_allclose, assert_array_equal, assert_equal)
+from numpy.testing import assert_array_almost_equal, assert_allclose
 
-import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.components.structured_metamodel_util.npss_interp import NPSSGridInterp
+from openmdao.components.structured_metamodel_util.python_interp import PythonGridInterp
 from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
 
 
@@ -19,8 +16,8 @@ def rel_error(actual, computed):
     return np.linalg.norm(actual - computed) / np.linalg.norm(actual)
 
 
-class TestNPSSGridInterpolator(unittest.TestCase):
-    """Tests the functionality of the npss grid interpolator."""
+class TestPythonGridInterpolator(unittest.TestCase):
+    """Tests the functionality of the python grid interpolator."""
 
     def setUp(self):
         self.interp_configs = {
@@ -81,10 +78,10 @@ class TestNPSSGridInterpolator(unittest.TestCase):
                              [0.5, 0.5, .5, .5]])
 
         for method in self.valid_methods:
-            interp = NPSSGridInterp(points, values.tolist(), interp_method=method)
+            interp = PythonGridInterp(points, values.tolist(), interp_method=method)
             v1 = interp.interpolate(sample.tolist(), compute_gradients=False)
 
-            interp = NPSSGridInterp(points, values, interp_method=method)
+            interp = PythonGridInterp(points, values, interp_method=method)
             v2 = interp.interpolate(sample, compute_gradients=False)
 
             assert_allclose(v1, v2)
@@ -97,7 +94,7 @@ class TestNPSSGridInterpolator(unittest.TestCase):
             points = [x, y]
             X, Y = np.meshgrid(*points, indexing='ij')
             values = X + Y
-            self.assertRaises(ValueError, NPSSGridInterp, points, values,
+            self.assertRaises(ValueError, PythonGridInterp, points, values,
                               method)
 
     def test_spline_xi1d(self):
@@ -107,7 +104,7 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         test_pt = np.random.uniform(0, 3, 2)
         actual = func(*test_pt)
         for order in self.valid_methods:
-            interp = NPSSGridInterp(points, values, order)
+            interp = PythonGridInterp(points, values, order)
             computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
             assert r_err < self.tol[order]
@@ -123,9 +120,9 @@ class TestNPSSGridInterpolator(unittest.TestCase):
             k = self.interp_configs[method]
             if method == 'slinear':
                 tol = 2
-            interp = NPSSGridInterp(points, values, method,
-                                        bounds_error=False,
-                                        fill_value=None)
+            interp = PythonGridInterp(points, values, method,
+                                      bounds_error=False,
+                                      fill_value=None)
             computed = interp.interpolate(test_pt)
             computed_grad = interp.gradient(test_pt)
             r_err = rel_error(actual, computed)
@@ -141,10 +138,10 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         test_pt = np.random.uniform(0, 3, 6).reshape(3, 2)
         actual = func(*test_pt.T)
         for method in self.valid_methods:
-            interp = NPSSGridInterp(points, values, method)
+            interp = PythonGridInterp(points, values, method)
             computed = interp.interpolate(test_pt, compute_gradients=False)
             r_err = rel_error(actual, computed)
-            print(method, computed, actual, r_err)
+            #print(method, computed, actual, r_err)
             assert r_err < self.tol[method]
 
     def test_out_of_bounds_fill2(self):
@@ -154,9 +151,9 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         actual = np.asarray([np.nan])
         methods = self.valid_methods
         for method in methods:
-            interp = NPSSGridInterp(points, values, method,
-                                        bounds_error=False,
-                                        fill_value=np.nan)
+            interp = PythonGridInterp(points, values, method,
+                                      bounds_error=False,
+                                      fill_value=np.nan)
             computed = interp.interpolate(test_pt, compute_gradients=False)
             assert_array_almost_equal(computed, actual)
 
@@ -167,10 +164,10 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         values = np.random.rand(5, 7)
 
         # integers can be cast to floats
-        NPSSGridInterp((x, y), values, fill_value=1)
+        PythonGridInterp((x, y), values, fill_value=1)
 
         # complex values cannot
-        self.assertRaises(ValueError, NPSSGridInterp,
+        self.assertRaises(ValueError, PythonGridInterp,
                           (x, y), values, fill_value=1 + 2j)
 
     def test_NaN_exception(self):
@@ -178,7 +175,7 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         x = np.linspace(0, 2, 5)
         y = np.linspace(0, 1, 7)
         values = np.random.rand(5, 7)
-        interp = NPSSGridInterp((x, y), values)
+        interp = PythonGridInterp((x, y), values)
 
         with self.assertRaises(OutOfBoundsError) as cm:
             interp.interpolate([1, np.nan])
@@ -197,13 +194,13 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         points, values = self._get_sample_4d_large()
 
         with self.assertRaises(ValueError) as cm:
-            interp = NPSSGridInterp(points, values.tolist(), interp_method='junk')
+            interp = PythonGridInterp(points, values.tolist(), interp_method='junk')
 
         msg = ('Interpolation method "junk" is not defined. Valid methods are')
         self.assertTrue(str(cm.exception).startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
-            interp = NPSSGridInterp(points, values.tolist()[1])
+            interp = PythonGridInterp(points, values.tolist()[1])
 
         msg = ('There are 4 point arrays, but values has 3 dimensions')
         self.assertEqual(str(cm.exception), msg)
@@ -211,33 +208,33 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         badpoints = deepcopy(points)
         badpoints[0][0] = 55.0
         with self.assertRaises(ValueError) as cm:
-            interp = NPSSGridInterp(badpoints, values.tolist())
+            interp = PythonGridInterp(badpoints, values.tolist())
 
         msg = ('The points in dimension 0 must be strictly ascending')
         self.assertEqual(str(cm.exception), msg)
 
         badpoints[0] = np.vstack((np.arange(6), np.arange(6)))
         with self.assertRaises(ValueError) as cm:
-            interp = NPSSGridInterp(badpoints, values.tolist())
+            interp = PythonGridInterp(badpoints, values.tolist())
 
         msg = ('The points in dimension 0 must be 1-dimensional')
         self.assertEqual(str(cm.exception), msg)
 
         badpoints[0] = (np.arange(4))
         with self.assertRaises(ValueError) as cm:
-            interp = NPSSGridInterp(badpoints, values.tolist())
+            interp = PythonGridInterp(badpoints, values.tolist())
 
         msg = ('There are 4 points and 6 values in dimension 0')
         self.assertEqual(str(cm.exception), msg)
 
         badvalues = np.array(values, dtype=np.complex)
         with self.assertRaises(ValueError) as cm:
-            interp = NPSSGridInterp(badpoints, badvalues.tolist())
+            interp = PythonGridInterp(badpoints, badvalues.tolist())
 
         msg = ("Interpolation method 'slinear' does not support complex values.")
         self.assertEqual(str(cm.exception), msg)
 
-        interp = NPSSGridInterp(points, values.tolist())
+        interp = PythonGridInterp(points, values.tolist())
         x = [0.5, 0, 0.5, 0.9]
 
         with self.assertRaises(ValueError) as cm:
@@ -246,7 +243,8 @@ class TestNPSSGridInterpolator(unittest.TestCase):
         msg = ('Interpolation method "junk" is not defined. Valid methods are')
         self.assertTrue(str(cm.exception).startswith(msg))
 
-        self.assertEqual(set(interp.methods()), set(["cubic", "slinear", 'lagrange2', 'lagrange3', 'akima']))
+        methods = set(interp._interp_methods()[0])
+        self.assertEqual(methods, set(["cubic", "slinear", 'lagrange2', 'lagrange3', 'akima']))
 
 
 if __name__ == "__main__":

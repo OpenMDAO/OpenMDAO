@@ -723,7 +723,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
             prob.setup()
 
 
-class TestMetaModelNPSS(unittest.TestCase):
+class TestMetaModelStructuredPython(unittest.TestCase):
     """
     Tests the regular grid map component. specifically the analytic derivatives
     vs. finite difference estimates.
@@ -860,7 +860,7 @@ class TestMetaModelNPSS(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, vec_size=3,
+        comp = om.MetaModelStructuredComp(order='cubic', extrapolate=True, vec_size=3,
                                           interp_method='npss')
 
         for param in params:
@@ -1058,6 +1058,42 @@ class TestMetaModelNPSS(unittest.TestCase):
         partials = prob.check_partials(method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
         assert_check_partials(partials, atol=1e10, rtol=2e-5)
+
+    def test_training_gradient(self):
+        model = om.Group()
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        outs = mapdata.output_data
+
+        ivc.add_output('x', np.array([-0.3, 0.7, 1.2]))
+        ivc.add_output('y', np.array([0.14, 0.313, 1.41]))
+        ivc.add_output('z', np.array([-2.11, -1.2, 2.01]))
+
+        ivc.add_output('f_train', outs[0]['values'])
+        ivc.add_output('g_train', outs[1]['values'])
+
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          order='lagrange3', interp_method='npss',
+                                          vec_size=3)
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('ivc', ivc, promotes=["*"])
+        model.add_subsystem('comp',
+                            comp,
+                            promotes=["*"])
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+
+        self.run_and_check_derivs(prob)
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")

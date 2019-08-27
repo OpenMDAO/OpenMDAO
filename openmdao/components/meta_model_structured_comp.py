@@ -6,30 +6,31 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.components.structured_metamodel_util.npss_interp import NPSSGridInterp
 from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
+from openmdao.components.structured_metamodel_util.python_interp import PythonGridInterp
 from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 
 
+ALL_METHODS = ('cubic', 'slinear', 'quintic', 'lagrange2', 'lagrange3', 'akima')
+
+
 class MetaModelStructuredComp(ExplicitComponent):
     """
     Interpolation Component generated from data on a regular grid.
 
-    Produces smooth fits through provided training data using polynomial
-    splines of order 1 (linear), 3 (cubic), or 5 (quintic). Analytic
-    derivatives are automatically computed.
+    Produces smooth fits through provided training data using polynomial splines of various
+    orders. Analytic derivatives are automatically computed.
 
-    For multi-dimensional data, fits are computed
-    on a separable per-axis basis. If a particular dimension does not have
-    enough training data points to support a selected spline order (e.g. 3
-    sample points, but an order 5 quintic spline is specified) the order of the
+    For multi-dimensional data, fits are computed on a separable per-axis basis. If a particular
+    dimension does not have enough training data points to support a selected spline method (e.g. 3
+    sample points, but an fifth order quintic spline is specified) the order of the
     fitted spline with be automatically reduced for that dimension alone.
 
-    Extrapolation is supported, but disabled by default. It can be enabled
-    via initialization attribute (see below).
+    Extrapolation is supported, but disabled by default. It can be enabled via initialization
+    attribute (see below).
 
     Attributes
     ----------
@@ -77,9 +78,9 @@ class MetaModelStructuredComp(ExplicitComponent):
                                   'training data should be computed.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
-        self.options.declare('method', values=('cubic', 'slinear', 'quintic', 'lagrange2', 'lagrange3', 'akima'), default=None,
+        self.options.declare('method', values=ALL_METHODS, default=None,
                              desc='Deprecated, use "order".', allow_none=True)
-        self.options.declare('order', values=('cubic', 'slinear', 'quintic', 'lagrange2', 'lagrange3', 'akima'), default="cubic",
+        self.options.declare('order', values=ALL_METHODS, default="cubic",
                              desc='Spline interpolation order.')
         self.options.declare('interp_method', values=('scipy', 'npss'), default='scipy',
                              desc='Inerpolation method to use.')
@@ -140,7 +141,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         interp_method = self.options['interp_method']
         if interp_method == 'npss':
-            interp = NPSSGridInterp
+            interp = PythonGridInterp
         else:
             interp = ScipyGridInterp
 
@@ -205,13 +206,14 @@ class MetaModelStructuredComp(ExplicitComponent):
             unscaled, dimensional output variables read via outputs[key]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        for out_name in self.interps:
+        for out_name, interp in iteritems(self.interps):
             if self.options['training_data_gradients']:
                 # Training point values may have changed every time we compute.
-                self.interps[out_name].values = inputs["%s_train" % out_name]
+                interp.values = inputs["%s_train" % out_name]
+                interp.training_data_gradients = True
 
             try:
-                val = self.interps[out_name].interpolate(pt)
+                val = interp.interpolate(pt)
 
             except OutOfBoundsError as err:
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))

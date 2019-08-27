@@ -6,10 +6,8 @@ from copy import deepcopy
 import unittest
 
 import numpy as np
-from numpy.testing import (assert_array_almost_equal, assert_almost_equal,
-                           assert_allclose, assert_array_equal, assert_equal)
+from numpy.testing import assert_array_almost_equal, assert_allclose
 
-import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 scipy_gte_019 = True
@@ -408,7 +406,8 @@ class TestScipyGridInterpolator(unittest.TestCase):
         msg = ('Interpolation method "junk" is not defined. Valid methods are')
         self.assertTrue(str(cm.exception).startswith(msg))
 
-        self.assertEqual(set(interp._all_methods), set(["quintic", "cubic", "slinear"]))
+        methods = set(interp._interp_methods()[0])
+        self.assertEqual(methods, set(["quintic", "cubic", "slinear"]))
 
 
 if __name__ == "__main__":
