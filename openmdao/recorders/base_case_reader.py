@@ -42,7 +42,7 @@ class BaseCaseReader(object):
         Parameters
         ----------
         source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
-                  case name}
+            case name}
             Identifies which cases to return.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy
@@ -110,7 +110,7 @@ class BaseCaseReader(object):
         Parameters
         ----------
         source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
-                  case name}
+            case name}
             If not None, only cases originating from the specified source or case are returned.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.
