@@ -21,13 +21,13 @@ class TestGeneralUtils(unittest.TestCase):
     test_str = ws+'abc'+ws+'def'+ws
 
     def test_remove_whitespace(self):
-        self.assertTrue(remove_whitespace(self.test_str), 'abcdef')
+        self.assertEqual(remove_whitespace(self.test_str), 'abcdef')
 
-        self.assertTrue(remove_whitespace(self.test_str, right=True), ws+'abc'+ws+'def')
+        self.assertEqual(remove_whitespace(self.test_str, right=True), ws+'abc'+ws+'def')
 
-        self.assertTrue(remove_whitespace(self.test_str, left=True), 'abc'+ws+'def'+ws)
+        self.assertEqual(remove_whitespace(self.test_str, left=True), 'abc'+ws+'def'+ws)
 
-        self.assertTrue(remove_whitespace(self.test_str, right=True, left=True), 'abc'+ws+'def')
+        self.assertEqual(remove_whitespace(self.test_str, right=True, left=True), 'abc'+ws+'def')
 
 
 if __name__ == "__main__":
