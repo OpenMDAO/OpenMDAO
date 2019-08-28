@@ -839,21 +839,20 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        expected_names = [
-                     ('paraboloid.f_xy', 'paraboloid.f_xy'),
-                     ('paraboloid.f_xy', 'paraboloid.x'),
-                     ('paraboloid.f_xy', 'paraboloid.y'),
-                   ]
-        expected_values = [
-            [-1.],
-            [[0.]],
-            [[0.]],
+        expected = [
+            (('paraboloid.f_xy', 'paraboloid.f_xy'),[-1.]),
+            (('paraboloid.f_xy', 'paraboloid.x'),[[0.]]),
+            (('paraboloid.f_xy', 'paraboloid.y'),[[0.]]),
         ]
-        self.assertEqual(comp.partials_name_pairs, expected_names)
-        for item, expected_name, expected_value in zip(comp.partials_values, expected_names,
-                                                       expected_values):
-            self.assertEqual(item[0], expected_name)
-            assert_rel_error(self, item[1], expected_value, 1e-5)
+        self.assertEqual(sorted(comp.partials_name_pairs), sorted(e[0] for e in sorted(expected)))
+
+        self.assertEqual(sorted(comp.partials_name_pairs),
+                         sorted(e[0] for e in sorted(expected)))
+        for act, exp in zip(
+                [e[1] for e in sorted(comp.partials_values)],
+                [e[1] for e in sorted(expected)],
+                ):
+            assert_rel_error(self,act,exp, 1e-5)
 
 class MySparseComp(ExplicitComponent):
     def setup(self):
