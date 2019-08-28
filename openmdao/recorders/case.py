@@ -11,7 +11,7 @@ from collections import OrderedDict
 import numpy as np
 
 from openmdao.recorders.sqlite_recorder import blob_to_array
-from openmdao.utils.record_util import json_to_np_array
+from openmdao.utils.record_util import deserialize
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import get_conversion
@@ -129,7 +129,7 @@ class Case(object):
 
         if 'inputs' in data.keys():
             if data_format >= 3:
-                inputs = json_to_np_array(data['inputs'], abs2meta)
+                inputs = deserialize(data['inputs'], abs2meta)
             elif data_format in (1, 2):
                 inputs = blob_to_array(data['inputs'])
                 if type(inputs) is np.ndarray and not inputs.shape:
@@ -137,11 +137,11 @@ class Case(object):
             else:
                 inputs = data['inputs']
             if inputs is not None:
-                self.inputs = PromAbsDict(inputs[0], prom2abs, abs2prom, output=False)
+                self.inputs = PromAbsDict(inputs, prom2abs, abs2prom, output=False)
 
         if 'outputs' in data.keys():
             if data_format >= 3:
-                outputs = json_to_np_array(data['outputs'], abs2meta)
+                outputs = deserialize(data['outputs'], abs2meta)
             elif self._format_version in (1, 2):
                 outputs = blob_to_array(data['outputs'])
                 if type(outputs) is np.ndarray and not outputs.shape:
@@ -149,11 +149,11 @@ class Case(object):
             else:
                 outputs = data['outputs']
             if outputs is not None:
-                self.outputs = PromAbsDict(outputs[0], prom2abs, abs2prom)
+                self.outputs = PromAbsDict(outputs, prom2abs, abs2prom)
 
         if 'residuals' in data.keys():
             if data_format >= 3:
-                residuals = json_to_np_array(data['residuals'], abs2meta)
+                residuals = deserialize(data['residuals'], abs2meta)
             elif data_format in (1, 2):
                 residuals = blob_to_array(data['residuals'])
                 if type(residuals) is np.ndarray and not residuals.shape:
@@ -161,7 +161,7 @@ class Case(object):
             else:
                 residuals = data['residuals']
             if residuals is not None:
-                self.residuals = PromAbsDict(residuals[0], prom2abs, abs2prom)
+                self.residuals = PromAbsDict(residuals, prom2abs, abs2prom)
 
         if 'jacobian' in data.keys():
             if data_format >= 2:
@@ -171,7 +171,7 @@ class Case(object):
             else:
                 jacobian = data['jacobian']
             if jacobian is not None:
-                self.jacobian = PromAbsDict(jacobian[0], prom2abs, abs2prom, output=True)
+                self.jacobian = PromAbsDict(jacobian, prom2abs, abs2prom, output=True)
 
         # save var name & meta dict references for use by self._get_variables_of_type()
         self._prom2abs = prom2abs
@@ -316,9 +316,9 @@ class Case(object):
         Parameters
         ----------
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------
@@ -338,9 +338,9 @@ class Case(object):
         Parameters
         ----------
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------
@@ -360,9 +360,9 @@ class Case(object):
         Parameters
         ----------
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------
@@ -382,9 +382,9 @@ class Case(object):
         Parameters
         ----------
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------
@@ -629,7 +629,8 @@ class Case(object):
         for name, vals in var_data:
             var_dict[name] = vals
 
-        write_var_table('model', var_dict.keys(), var_type, var_dict,
+        # FIXME: vars should be in execution order, for now they are just in sorted order
+        write_var_table('model', sorted(var_dict.keys()), var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
 
     def _get_variables_of_type(self, var_type):
@@ -666,9 +667,9 @@ class Case(object):
         vals : PromAbsDict
             Map of variables to their values.
         scaled : bool
-            The unique id of the system/solver/driver/problem that did the recording.
+            If True, then return scaled values.
         use_indices : bool
-            The full unique identifier for this iteration.
+            If True, apply indices.
 
         Returns
         -------
@@ -762,7 +763,7 @@ class PromAbsDict(dict):
             self._keys = self._values.keys()
         else:
             # numpy structured array, which will always use absolute names
-            self._values = values
+            self._values = values[0]
             self._keys = values.dtype.names
             for key in self._keys:
                 if key in abs2prom:
@@ -773,11 +774,11 @@ class PromAbsDict(dict):
                         # value to AMBIGOUS and require access via absolute name.
                         super(PromAbsDict, self).__setitem__(prom_key, _AMBIGOUS_PROM_NAME)
                     else:
-                        super(PromAbsDict, self).__setitem__(prom_key, values[key])
+                        super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
                 elif ',' in key:
                     # derivative keys will be a string in the form of 'of,wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
-                    super(PromAbsDict, self).__setitem__(prom_key, values[key])
+                    super(PromAbsDict, self).__setitem__(prom_key, self._values[key])
 
     def __str__(self):
         """
