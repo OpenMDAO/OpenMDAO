@@ -11,7 +11,7 @@ from collections import OrderedDict
 import numpy as np
 
 from openmdao.recorders.sqlite_recorder import blob_to_array
-from openmdao.utils.record_util import deserialize
+from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.units import get_conversion
@@ -629,8 +629,16 @@ class Case(object):
         for name, vals in var_data:
             var_dict[name] = vals
 
+        # determine pathname of the system
+        if self.source in ('root', 'driver', 'problem', 'root.nonlinear_solver'):
+            pathname = ''
+        elif '|' in self.source:
+            pathname = get_source_system(self.source)
+        else:
+            pathname = self.source.replace('root.', '')
+
         # FIXME: vars should be in execution order, for now they are just in sorted order
-        write_var_table('model', sorted(var_dict.keys()), var_type, var_dict,
+        write_var_table(pathname, sorted(var_dict.keys()), var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
 
     def _get_variables_of_type(self, var_type):

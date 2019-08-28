@@ -3,7 +3,6 @@ Definition of the SqliteCaseReader.
 """
 from __future__ import print_function, absolute_import
 
-import re
 import sqlite3
 from collections import OrderedDict
 
@@ -16,7 +15,7 @@ from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case, PromAbsDict
 
 from openmdao.utils.general_utils import simple_warning
-from openmdao.utils.record_util import check_valid_sqlite3_db
+from openmdao.utils.record_util import check_valid_sqlite3_db, get_source_system
 
 from openmdao.recorders.sqlite_recorder import format_version
 
@@ -26,40 +25,6 @@ if PY2:
 elif PY3:
     import pickle
     from json import loads as json_loads
-
-
-# regular expression used to determine if a node in an iteration coordinate represents a system
-_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear)$')
-
-# Regular expression used for splitting iteration coordinates, removes separator and iter counts
-_coord_split_re = re.compile('\\|\\d+\\|*')
-
-
-def _get_source_system(iteration_coordinate):
-    """
-    Get pathname of system that is the source of the iteration.
-
-    Parameters
-    ----------
-    iteration_coordinate : str
-        The full unique identifier for this iteration.
-
-    Returns
-    -------
-    str
-        The pathname of the system that is the source of the iteration.
-    """
-    path = []
-    parts = _coord_split_re.split(iteration_coordinate)
-    for part in parts:
-        if (_coord_system_re.search(part) is not None):
-            if ':' in part:
-                # get rid of 'rank#:'
-                part = part.split(':')[1]
-            path.append(part.split('.')[0])
-
-    # return pathname of the system
-    return '.'.join(path)
 
 
 class SqliteCaseReader(BaseCaseReader):
@@ -886,7 +851,7 @@ class CaseTable(object):
                     # return all cases under the source system
                     source_sys = source.replace('.nonlinear_solver', '')
                     return list([self.get_case(key) for key in self._keys
-                                 if _get_source_system(key).startswith(source_sys)])
+                                 if get_source_system(key).startswith(source_sys)])
                 else:
                     cases = OrderedDict()
                     for key in self._keys:
@@ -1050,7 +1015,7 @@ class CaseTable(object):
         str
             The source of the iteration.
         """
-        return _get_source_system(iteration_coordinate)
+        return get_source_system(iteration_coordinate)
 
     def _get_row_source(self, row_id):
         """
@@ -1345,7 +1310,7 @@ class SolverCases(CaseTable):
         str
             The pathname of the solver that is the source of the iteration.
         """
-        source_system = _get_source_system(iteration_coordinate)
+        source_system = get_source_system(iteration_coordinate)
 
         system_solve = source_system.split('.')[-1] + '._solve_nonlinear'
         system_coord_len = iteration_coordinate.index(system_solve) + len(system_solve)

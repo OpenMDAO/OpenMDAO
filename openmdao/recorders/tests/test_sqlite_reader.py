@@ -1190,7 +1190,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         text = stream.getvalue().split('\n')
 
         expected = [
-            "2 Input(s) in 'model'",
+            "2 Input(s) in 'sub'",
             "---------------------",
             "",
             "varname      value",
@@ -1211,7 +1211,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         text = stream.getvalue().split('\n')
 
         expected = [
-            "1 Explicit Output(s) in 'model'",
+            "1 Explicit Output(s) in 'sub'",
             "-------------------------------",
             "",
             "varname  value",
@@ -1222,7 +1222,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             "      b    [20.]",
             "",
             "",
-            "1 Implicit Output(s) in 'model'",
+            "1 Implicit Output(s) in 'sub'",
             "-------------------------------",
             "",
             "varname  value",
