@@ -810,7 +810,6 @@ class ExplCompTestCase(unittest.TestCase):
         outputs = prob.model.list_outputs(values=False, out_stream=None, tags="tag3")
         self.assertEqual(sorted(outputs), [])
 
-
     def test_compute_inputs_read_only(self):
         class BadComp(TestExplCompSimple):
             def compute(self, inputs, outputs):

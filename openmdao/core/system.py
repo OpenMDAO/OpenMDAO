@@ -131,6 +131,10 @@ class System(object):
         List of absolute names of this system's variables on all procs.
     _var_abs_names : {'input': [str, ...], 'output': [str, ...]}
         List of absolute names of this system's variables existing on current proc.
+    _var_allprocs_abs_names_discrete : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of this system's discrete variables on all procs.
+    _var_abs_names_discrete : {'input': [str, ...], 'output': [str, ...]}
+        List of absolute names of this system's discrete variables existing on current proc.
     _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to list of all absolute names.
         For outputs, the list will have length one since promoted output names are unique.
@@ -358,6 +362,8 @@ class System(object):
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
+        self._var_allprocs_abs_names_discrete = {'input': [], 'output': []}
+        self._var_abs_names_discrete = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
@@ -1346,24 +1352,46 @@ class System(object):
 
     def _setup_recording(self, recurse=True):
         myinputs = myoutputs = myresiduals = set()
-        incl = self.recording_options['includes']
-        excl = self.recording_options['excludes']
 
-        if self.recording_options['record_inputs']:
+        options = self.recording_options
+        incl = options['includes']
+        excl = options['excludes']
+
+        # includes and excludes for inputs are specified using _absolute_ names
+        # vectors are keyed on absolute name, discretes on relative/promoted name
+        abs2prom = self._var_abs2prom['input']
+
+        if options['record_inputs']:
+            myinputs = set()
             if self._inputs:
-                myinputs = {n for n in self._inputs._names
-                            if check_path(n, incl, excl)}
+                myinputs.update({n for n in self._inputs._names
+                                 if check_path(n, incl, excl)})
 
-        # includes and excludes for outputs are specified using promoted names
+            if len(self._var_discrete['input']) > 0:
+                for n in self._var_discrete['input']:
+                    abs_name = self.pathname + '.' + n if self.pathname else n
+                    if check_path(abs_name, incl, excl):
+                        myinputs.add(n)
+
+        # includes and excludes for outputs are specified using _promoted_ names
+        # vectors are keyed on absolute name, discretes on relative/promoted name
         abs2prom = self._var_abs2prom['output']
 
-        if self.recording_options['record_outputs']:
+        if options['record_outputs']:
+            myoutputs = set()
             if self._outputs:
-                myoutputs = {n for n in self._outputs._names
-                             if n in abs2prom and check_path(abs2prom[n], incl, excl)}
-            if self.recording_options['record_residuals']:
-                myresiduals = myoutputs  # outputs and residuals have same names
-        elif self.recording_options['record_residuals']:
+                myoutputs.update({n for n in self._outputs._names
+                                  if n in abs2prom and check_path(abs2prom[n], incl, excl)})
+
+            # residuals have the same names as the continuous outputs
+            if options['record_residuals']:
+                myresiduals = myoutputs.copy()
+
+            if len(self._var_discrete['output']) > 0:
+                myoutputs.update({n for n in self._var_discrete['output']
+                                  if check_path(n, incl, excl)})
+
+        elif options['record_residuals']:
             if self._residuals:
                 myresiduals = {n for n in self._residuals._names
                                if n in abs2prom and check_path(abs2prom[n], incl, excl)}
@@ -3506,6 +3534,8 @@ class System(object):
         Record an iteration of the current System.
         """
         if self._rec_mgr._recorders:
+            options = self.recording_options
+
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
@@ -3522,35 +3552,58 @@ class System(object):
             else:
                 inputs, outputs, residuals = self.get_linear_vectors()
 
+            discrete_inputs = self._discrete_inputs
+            discrete_outputs = self._discrete_outputs
+
             data = {}
-            if self.recording_options['record_inputs'] and inputs._names:
+            if options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
                 data['i'] = {}
                 if 'i' in self._filtered_vars_to_record:
                     # use filtered inputs
                     for inp in self._filtered_vars_to_record['i']:
                         if inp in inputs._names:
                             data['i'][inp] = inputs._views[inp]
+                        elif inp in discrete_inputs:
+                            abs_name = self.pathname + '.' + inp if self.pathname else inp
+                            data['i'][abs_name] = discrete_inputs[inp]
                 else:
                     # use all the inputs
-                    data['i'] = inputs._names
+                    if len(discrete_inputs) > 0:
+                        for inp in inputs:
+                            data['i'][inp] = inputs._views[inp]
+                        for inp in discrete_inputs:
+                            abs_name = self.pathname + '.' + inp if self.pathname else inp
+                            data['i'][abs_name] = discrete_inputs[inp]
+                    else:
+                        data['i'] = inputs._names
+
             else:
                 data['i'] = None
 
-            if self.recording_options['record_outputs'] and outputs._names:
+            if options['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
                 data['o'] = {}
-
                 if 'o' in self._filtered_vars_to_record:
                     # use outputs from filtered list.
                     for out in self._filtered_vars_to_record['o']:
                         if out in outputs._names:
                             data['o'][out] = outputs._views[out]
+                        elif out in discrete_outputs:
+                            abs_name = self.pathname + '.' + out if self.pathname else out
+                            data['o'][abs_name] = discrete_outputs[out]
                 else:
                     # use all the outputs
-                    data['o'] = outputs._names
+                    if len(discrete_outputs) > 0:
+                        for out in outputs:
+                            data['o'][out] = outputs._views[out]
+                        for out in discrete_outputs:
+                            abs_name = self.pathname + '.' + out if self.pathname else out
+                            data['o'][abs_name] = discrete_outputs[out]
+                    else:
+                        data['o'] = outputs._names
             else:
                 data['o'] = None
 
-            if self.recording_options['record_residuals'] and residuals._names:
+            if options['record_residuals'] and residuals._names:
                 data['r'] = {}
 
                 if 'r' in self._filtered_vars_to_record:

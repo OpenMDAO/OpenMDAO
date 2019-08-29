@@ -221,6 +221,46 @@ class TestEQConstraintComp(unittest.TestCase):
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
+    def test_set_shape(self):
+        prob = om.Problem()
+        model = prob.model
+
+        n = 100
+
+        # find intersection of two non-parallel lines, vectorized
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(n)))
+        model.add_subsystem('f', om.ExecComp('y=3*x-3', x=np.ones(n), y=np.ones(n)))
+        model.add_subsystem('g', om.ExecComp('y=2.3*x+4', x=np.ones(n), y=np.ones(n)))
+        model.add_subsystem('equal', om.EQConstraintComp('y', shape=(n,), add_constraint=True))
+        model.add_subsystem('obj_cmp', om.ExecComp('obj=sum(y)', y=np.zeros(n)))
+
+        model.connect('indep.x', 'f.x')
+        model.connect('indep.x', 'g.x')
+        model.connect('f.y', 'equal.lhs:y')
+        model.connect('g.y', 'equal.rhs:y')
+        model.connect('f.y', 'obj_cmp.y')
+
+        model.add_design_var('indep.x', lower=np.zeros(n), upper=20.*np.ones(n))
+        model.add_objective('obj_cmp.obj')
+
+        prob.setup(mode='fwd')
+
+        prob.driver = om.ScipyOptimizeDriver(disp=False)
+
+        prob.run_driver()
+
+        assert_almost_equal(prob['equal.y'], np.zeros(n))
+        assert_almost_equal(prob['indep.x'], np.ones(n)*10.)
+        assert_almost_equal(prob['f.y'], np.ones(n)*27.)
+        assert_almost_equal(prob['g.y'], np.ones(n)*27.)
+
+        cpd = prob.check_partials(out_stream=None)
+
+        for (of, wrt) in cpd['equal']:
+            assert_almost_equal(cpd['equal'][of, wrt]['abs error'], 0.0, decimal=5)
+
+        assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
+
     def test_vectorized_no_normalization(self):
         prob = om.Problem()
         model = prob.model

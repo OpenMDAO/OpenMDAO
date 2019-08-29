@@ -119,11 +119,15 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     if isinstance(system, ImplicitComponent):
         if overrides_method('solve_linear', system, ImplicitComponent):
             tree_dict['linear_solver'] = "solve_linear"
+        elif system.linear_solver:
+            tree_dict['linear_solver'] = system.linear_solver.SOLVER
         else:
             tree_dict['linear_solver'] = ""
 
         if overrides_method('solve_nonlinear', system, ImplicitComponent):
             tree_dict['nonlinear_solver'] = "solve_nonlinear"
+        elif system.nonlinear_solver:
+            tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
         else:
             tree_dict['nonlinear_solver'] = ""
     else:

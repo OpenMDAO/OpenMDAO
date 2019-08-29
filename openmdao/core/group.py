@@ -567,15 +567,23 @@ class Group(System):
             Whether to call this method in subsystems.
         """
         super(Group, self)._setup_var_data()
-        allprocs_abs_names = self._var_allprocs_abs_names
-        allprocs_discrete = self._var_allprocs_discrete
+
         abs_names = self._var_abs_names
+        abs_names_discrete = self._var_abs_names_discrete
+
+        allprocs_abs_names = self._var_allprocs_abs_names
+        allprocs_abs_names_discrete = self._var_allprocs_abs_names_discrete
+
         var_discrete = self._var_discrete
-        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+        allprocs_discrete = self._var_allprocs_discrete
+
+        abs2meta = self._var_abs2meta
         abs2prom = self._var_abs2prom
+
         allprocs_abs2meta = self._var_allprocs_abs2meta
         allprocs_abs2prom = self._var_allprocs_abs2prom
-        abs2meta = self._var_abs2meta
+
+        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
         for subsys in self._subsystems_myproc:
             if recurse:
@@ -592,17 +600,23 @@ class Group(System):
             sub_prefix = subsys.name + '.'
 
             for type_ in ['input', 'output']:
-
                 # Assemble abs_names and allprocs_abs_names
-                allprocs_abs_names[type_].extend(subsys._var_allprocs_abs_names[type_])
+                allprocs_abs_names[type_].extend(
+                    subsys._var_allprocs_abs_names[type_])
+                allprocs_abs_names_discrete[type_].extend(
+                    subsys._var_allprocs_abs_names_discrete[type_])
+
+                abs_names[type_].extend(subsys._var_abs_names[type_])
+                abs_names_discrete[type_].extend(subsys._var_abs_names_discrete[type_])
+
                 allprocs_discrete[type_].update({k: v for k, v in
                                                  iteritems(subsys._var_allprocs_discrete[type_])})
-                abs_names[type_].extend(subsys._var_abs_names[type_])
                 var_discrete[type_].update({sub_prefix + k: v for k, v in
                                             iteritems(subsys._var_discrete[type_])})
 
                 # Assemble abs2prom
-                for abs_name in subsys._var_abs_names[type_]:
+                for abs_name in chain(subsys._var_abs_names[type_],
+                                      subsys._var_abs_names_discrete[type_]):
                     sub_prom_name = subsys._var_abs2prom[type_][abs_name]
                     abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
 
@@ -1031,7 +1045,7 @@ class Group(System):
             try:
                 out_type = self._var_allprocs_discrete['output'][abs_out]['type']
             except KeyError:
-                raise RuntimeError("%s: Can't connect discrete output '%s' to continuous "
+                raise RuntimeError("%s: Can't connect continuous output '%s' to discrete "
                                    "input '%s'." % (self.msginfo, abs_out, abs_in))
             if not issubclass(in_type, out_type):
                 raise RuntimeError("%s: Type '%s' of output '%s' is"
