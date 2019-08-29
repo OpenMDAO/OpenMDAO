@@ -1027,6 +1027,57 @@ class TestSqliteCaseReader(unittest.TestCase):
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['value'], expected['value'])
 
+    def test_list_input_and_outputs_with_tags(self):
+        from openmdao.core.tests.test_expl_comp import RectangleCompWithTags
+        prob = om.Problem(RectangleCompWithTags())
+
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        print(cr)
+
+        cases = cr.get_cases()
+        case = cases[0]
+
+        # Inputs no tags
+        inputs = case.list_inputs(out_stream=None)
+        self.assertEqual(sorted([inp[0] for inp in inputs]), ['length', 'width'])
+
+        # Inputs with tag that matches
+        inputs = case.list_inputs(out_stream=None, tags="tag2")
+        self.assertEqual([inp[0] for inp in inputs], ['width',])
+
+        # Inputs with tag that does not match
+        inputs = case.list_inputs(out_stream=None, tags="tag3")
+        self.assertEqual([inp[0] for inp in inputs], [])
+
+        # Inputs with multiple tags
+        inputs = case.list_inputs(out_stream=None, tags=["tag2", "tag3"])
+        self.assertEqual([inp[0] for inp in inputs], ['width',])
+
+        # Outputs no tags
+        outputs = case.list_outputs(out_stream=None)
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+
+        # Outputs with tag that does match
+        outputs = case.list_outputs(out_stream=None, tags="tag1")
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+
+        # Outputs with tag that do not match any vars
+        outputs = case.list_outputs(out_stream=None, tags="tag3")
+        self.assertEqual(sorted([outp[0] for outp in outputs]), [])
+
+        # Outputs with multiple tags
+        outputs = case.list_outputs(out_stream=None, tags=["tag1", "tag3"])
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+
+
     def test_getitem(self):
         prob = SellarProblem()
         prob.setup()
@@ -2786,6 +2837,57 @@ class TestFeatureSqliteReader(unittest.TestCase):
         case_outputs = case.list_outputs(prom_name=True)
 
         assert_rel_error(self, case_outputs[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
+
+    def test_feature_list_inputs_and_outputs_with_tags(self):
+        import openmdao.api as om
+
+        class RectangleCompWithTags(om.ExplicitComponent):
+            """
+            A simple Explicit Component that also has input and output with tags.
+            """
+
+            def setup(self):
+                self.add_input('length', val=1., tags=["tag1", "tag2"])
+                self.add_input('width', val=1., tags=["tag2"])
+                self.add_output('area', val=1., tags="tag1")
+
+                self.declare_partials('*', '*')
+
+            def compute(self, inputs, outputs):
+                outputs['area'] = inputs['length'] * inputs['width']
+
+        model = om.Group()
+        prob = om.Problem(model)
+        model.add_recorder(om.SqliteRecorder('cases.sql'))
+
+        indep = om.IndepVarComp()
+        indep.add_output('length', val=100.)
+        indep.add_output('width', val=60.)
+
+        model.add_subsystem('rect', RectangleCompWithTags(), promotes = ['length', 'width', 'area'])
+        model.add_subsystem('indep', indep, promotes = ['length', 'width'])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+
+        cases = cr.get_cases()
+        case = cases[0]
+
+        # Inputs with tag that matches
+        inputs = case.list_inputs(out_stream=None, tags="tag1")
+        self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.length',]))
+
+        # Inputs with multiple tags
+        inputs = case.list_inputs(out_stream=None, tags=["tag2", "tag3"])
+        self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.width', 'rect.length']))
+
+        # Outputs with tag that does match
+        outputs = case.list_outputs(out_stream=None, tags="tag1")
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
 
     def test_feature_get_val(self):
         import openmdao.api as om

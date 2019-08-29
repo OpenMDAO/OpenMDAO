@@ -14,6 +14,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import json_to_np_array
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import filter_var_based_on_tags, convert_user_defined_tags_to_set
 from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
@@ -404,6 +405,7 @@ class Case(object):
                     shape=False,
                     hierarchical=True,
                     print_arrays=False,
+                    tags=None,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
@@ -429,6 +431,10 @@ class Case(object):
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed. Only inputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -442,6 +448,8 @@ class Case(object):
         inp_vars = {}
         inputs = []
 
+        tags = convert_user_defined_tags_to_set(tags)
+
         if self.inputs is not None:
             for abs_name in self.inputs.absolute_names():
                 if abs_name not in inp_vars:
@@ -449,6 +457,9 @@ class Case(object):
 
         if inp_vars is not None and len(inp_vars) > 0:
             for var_name in inp_vars:
+                # Filter based on tags
+                if filter_var_based_on_tags(tags, meta[var_name]):
+                    continue
                 var_meta = {}
                 if values:
                     var_meta['value'] = inp_vars[var_name]['value']
@@ -484,6 +495,7 @@ class Case(object):
                      scaling=False,
                      hierarchical=True,
                      print_arrays=False,
+                     tags=None,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -523,6 +535,10 @@ class Case(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed. Only inputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -537,6 +553,8 @@ class Case(object):
         impl_outputs = []
         out_vars = {}
 
+        tags = convert_user_defined_tags_to_set(tags)
+
         for abs_name in self.outputs.absolute_names():
             out_vars[abs_name] = {'value': self.outputs[abs_name]}
             if self.residuals and abs_name in self.residuals.absolute_names():
@@ -545,7 +563,12 @@ class Case(object):
                 out_vars[abs_name]['residuals'] = 'Not Recorded'
 
         if len(out_vars) > 0:
+
             for name in out_vars:
+                # Filter based on tags
+                if filter_var_based_on_tags(tags, meta[name]):
+                    continue
+
                 if residuals_tol and \
                    out_vars[name]['residuals'] is not 'Not Recorded' and \
                    np.linalg.norm(out_vars[name]['residuals']) < residuals_tol:

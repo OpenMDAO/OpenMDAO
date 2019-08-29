@@ -14,7 +14,7 @@ from six.moves import range
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case, PromAbsDict
 
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import simple_warning, convert_user_defined_tags_to_set
 from openmdao.utils.record_util import check_valid_sqlite3_db, convert_to_np_array
 
 from openmdao.recorders.sqlite_recorder import format_version
@@ -155,6 +155,10 @@ class SqliteCaseReader(BaseCaseReader):
             self._global_iterations = self._get_global_iterations(cur)
 
         con.close()
+
+        for name, meta in iteritems(self._abs2meta):
+            if 'tags' in meta:
+                meta['tags'] = convert_user_defined_tags_to_set(meta['tags'])
 
         # create maps to facilitate accessing variable metadata using absolute or promoted name
         self._output2meta = PromAbsDict(self._abs2meta, self._prom2abs, self._abs2prom, 1)

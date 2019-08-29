@@ -40,7 +40,7 @@ class RectangleCompWithTags(om.ExplicitComponent):
     """
 
     def setup(self):
-        self.add_input('length', val=1., tags=["tag1", "tag2"])
+        self.add_input('length', val=1., tags=["tag1"])
         self.add_input('width', val=1., tags=["tag2"])
         self.add_output('area', val=1., tags=["tag1"])
 
