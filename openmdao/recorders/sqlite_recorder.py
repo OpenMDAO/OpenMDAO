@@ -18,7 +18,7 @@ from six import iteritems
 
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
-from openmdao.utils.record_util import values_to_array
+from openmdao.utils.record_util import dict_to_structured_array
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.core.driver import Driver
@@ -299,8 +299,12 @@ class SqliteRecorder(CaseRecorder):
                 objectives = driver._objs
                 responses = driver._responses
 
-            inputs = system._var_allprocs_abs_names['input']
-            outputs = system._var_allprocs_abs_names['output']
+            inputs = system._var_allprocs_abs_names['input'] + \
+                system._var_allprocs_abs_names_discrete['input']
+
+            outputs = system._var_allprocs_abs_names['output'] + \
+                system._var_allprocs_abs_names_discrete['output']
+
             full_var_set = [(outputs, 'output'),
                             (desvars, 'desvar'), (responses, 'response'),
                             (objectives, 'objective'), (constraints, 'constraint')]
@@ -319,20 +323,29 @@ class SqliteRecorder(CaseRecorder):
             for v, abs_names in iteritems(system._var_allprocs_prom2abs_list['output']):
                 self._prom2abs['output'][v] = abs_names
 
+            # absolute pathname to metadata mappings for continuous & discrete variables
+            # discrete mapping is sub-keyed on 'output' & 'input'
+            real_meta = system._var_allprocs_abs2meta
+            disc_meta = system._var_allprocs_discrete
+
             for var_set, var_type in full_var_set:
                 for name in var_set:
                     if name not in self._abs2meta:
-                        self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
+                        try:
+                            self._abs2meta[name] = real_meta[name].copy()
+                        except KeyError:
+                            self._abs2meta[name] = disc_meta['output'][name].copy()
                         self._abs2meta[name]['type'] = []
-                        if name in states:
-                            self._abs2meta[name]['explicit'] = False
+                        self._abs2meta[name]['explicit'] = name not in states
 
                     if var_type not in self._abs2meta[name]['type']:
                         self._abs2meta[name]['type'].append(var_type)
-                    self._abs2meta[name]['explicit'] = True
 
             for name in inputs:
-                self._abs2meta[name] = system._var_allprocs_abs2meta[name].copy()
+                try:
+                    self._abs2meta[name] = real_meta[name].copy()
+                except KeyError:
+                    self._abs2meta[name] = disc_meta['input'][name].copy()
                 self._abs2meta[name]['type'] = ['input']
                 self._abs2meta[name]['explicit'] = True
 
@@ -636,7 +649,7 @@ class SqliteRecorder(CaseRecorder):
         """
         if self.connection:
 
-            data_array = values_to_array(data)
+            data_array = dict_to_structured_array(data)
             data_blob = array_to_blob(data_array)
 
             with self.connection as c:

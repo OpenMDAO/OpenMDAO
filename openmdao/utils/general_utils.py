@@ -715,6 +715,37 @@ def json_loads_byteified(json_str):
         return json.loads(json_str)
 
 
+def remove_whitespace(s, right=False, left=False):
+    """
+    Remove white-space characters from the given string.
+
+    If neither right nor left is specified (the default),
+    then all white-space is removed.
+
+    Parameters
+    ----------
+    s : str
+        The string to be modified.
+    right : bool
+        If True, remove white-space from the end of the string.
+    left : bool
+        If True, remove white-space from the beginning of the string.
+
+    Returns
+    -------
+    str
+        The string with white-space removed.
+    """
+    if not left and not right:
+        return re.sub(r"\s+", "", s, flags=re.UNICODE)
+    elif right and left:
+        return re.sub("^\s+|\s+$", "", s, flags=re.UNICODE)
+    elif right:
+        return re.sub(r"\s+$", "", s, flags=re.UNICODE)
+    else:  # left
+        return re.sub(r"^\s+", "", s, flags=re.UNICODE)
+
+
 _badtab = r'`~@#$%^&*()[]{}-+=|\/?<>,.:;'
 if PY2:
     import string
