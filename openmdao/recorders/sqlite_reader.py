@@ -15,6 +15,7 @@ import numpy as np
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case, PromAbsDict
 
+from openmdao.utils.general_utils import simple_warning, convert_user_defined_tags_to_set
 from openmdao.utils.record_util import check_valid_sqlite3_db
 
 from openmdao.recorders.sqlite_recorder import format_version
