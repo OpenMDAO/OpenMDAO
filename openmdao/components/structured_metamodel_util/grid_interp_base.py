@@ -3,6 +3,8 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 
+from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
+
 
 class GridInterpBase(object):
     """
@@ -17,41 +19,27 @@ class GridInterpBase(object):
     ----------
     bounds_error : bool
         If True, when interpolated values are requested outside of the domain of the input data,
-        a ValueError is raised. If False, then `fill_value` is used.
+        a ValueError is raised. If False, then the methods are allowed to extrapolate.
         Default is True (raise an exception).
-    fill_value : float
-        If provided, the value to use for points outside of the interpolation domain. If None,
-        values outside the domain are extrapolated. Note that gradient values will always be
-        extrapolated rather than set to the fill_value if bounds_error=False for any points
-        outside of the interpolation domain.
-        Default is `np.nan`.
     grid : tuple
         Collection of points that determine the regular grid.
     interp_method : string
         Name of interpolation method.
+    training_data_gradients : bool
+        Flag that tells interpolation objects wether to compute gradients with respect to the
+        grid values.
     values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
     _all_gradients : ndarray
         Cache of computed gradients.
-    _g_method : string
-        Name of interpolation method used to compute the last gradient.
     _interp_config : dict
         Configuration object that stores the number of points required for each interpolation
         method.
-    _ki : list
-        Interpolation order to be used in each dimension.
-    _spline_dim_error : bool
-        If spline_dim_error=True and an order `k` spline interpolation method
-        is used, then if any dimension has fewer points than `k` + 1, an error
-        will be raised. If spline_dim_error=False, then the spline interpolant
-        order will be reduced as needed on a per-dimension basis. Default
-        is True (raise an exception).
     _xi : ndarray
         Cache of current evaluation point.
     """
 
-    def __init__(self, points, values, interp_method="slinear", bounds_error=True,
-                 fill_value=np.nan, spline_dim_error=True):
+    def __init__(self, points, values, interp_method="slinear", bounds_error=True):
         """
         Initialize instance of interpolation class.
 
@@ -62,27 +50,11 @@ class GridInterpBase(object):
         values : array_like, shape (m1, ..., mn, ...)
             The data on the regular grid in n dimensions.
         interp_method : str, optional
-            The interpolation method to perform. Supported are 'slinear',
-            'cubic',  and 'quintic'. This parameter will become
-            the default for the object's ``interpolate`` method. Default is "slinear".
+            Name of interpolation method.
         bounds_error : bool, optional
-            If True, when interpolated values are requested outside of the
-            domain of the input data, a ValueError is raised.
-            If False, then `fill_value` is used.
+            If True, when interpolated values are requested outside of the domain of the input
+            data, a ValueError is raised. If False, then the methods are allowed to extrapolate.
             Default is True (raise an exception).
-        fill_value : number, optional
-            If provided, the value to use for points outside of the
-            interpolation domain. If None, values outside
-            the domain are extrapolated. Note that gradient values will always be
-            extrapolated rather than set to the fill_value if bounds_error=False
-            for any points outside of the interpolation domain.
-            Default is `np.nan`.
-        spline_dim_error : bool, optional
-            If spline_dim_error=True and an order `k` spline interpolation method
-            is used, then if any dimension has fewer points than `k` + 1, an error
-            will be raised. If spline_dim_error=False, then the spline interpolant
-            order will be reduced as needed on a per-dimension basis. Default
-            is True (raise an exception).
         """
         configs = self._interp_methods()
         self._all_methods, self._interp_config = configs
@@ -109,17 +81,6 @@ class GridInterpBase(object):
             msg = "Interpolation method '%s' does not support complex values." % interp_method
             raise ValueError(msg)
 
-        self.fill_value = fill_value
-        if fill_value is not None:
-            fill_value_dtype = np.asarray(fill_value).dtype
-            if (hasattr(values, 'dtype') and not
-                    np.can_cast(fill_value_dtype, values.dtype,
-                                casting='same_kind')):
-                raise ValueError("fill_value must be either 'None' or "
-                                 "of a type compatible with values")
-
-        k = self._interp_config[interp_method]
-        self._ki = []
         for i, p in enumerate(points):
             n_p = len(p)
             if not np.all(np.diff(p) > 0.):
@@ -132,25 +93,13 @@ class GridInterpBase(object):
                 raise ValueError("There are %d points and %d values in "
                                  "dimension %d" % (len(p), values.shape[i], i))
 
-            self._ki.append(k)
-            if n_p <= k:
-                if not spline_dim_error:
-                    self._ki[-1] = n_p - 1
-                else:
-                    raise ValueError("There are %d points in dimension %d,"
-                                     " but method %s requires at least %d "
-                                     "points per "
-                                     "dimension."
-                                     "" % (n_p, i, interp_method, k + 1))
-
         self.grid = tuple([np.asarray(p) for p in points])
         self.values = values
         self._xi = None
         self._all_gradients = None
-        self._spline_dim_error = spline_dim_error
         self.training_data_gradients = False
 
-    def interpolate(self, xi, interp_method=None, compute_gradients=True):
+    def interpolate(self, xi):
         """
         Interpolate at the sample coordinates.
 
@@ -158,24 +107,35 @@ class GridInterpBase(object):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-        interp_method : str, optional
-            The interpolation method to perform. Supported are 'slinear', 'cubic', and
-            'quintic'. Default is None, which will use the method defined at the construction
-            of the interpolation object instance.
-        compute_gradients : bool, optional
-            If a spline interpolation method is chosen, this determines whether gradient
-            calculations should be made and cached. Default is True.
 
         Returns
         -------
-        array_like
+        ndarray
             Value of interpolant at all sample points.
         """
-        pass
+        # cache latest evaluation point for gradient method's use later
+        self._xi = xi
 
-    def gradient(self, xi, interp_method=None):
+        if self.bounds_error:
+            for i, p in enumerate(xi.T):
+                if np.isnan(p).any():
+                    raise OutOfBoundsError("One of the requested xi contains a NaN",
+                                           i, np.NaN, self.grid[i][0], self.grid[i][-1])
+
+                if not np.logical_and(np.all(self.grid[i][0] <= p),
+                                      np.all(p <= self.grid[i][-1])):
+                    p1 = np.where(self.grid[i][0] > p)[0]
+                    p2 = np.where(p > self.grid[i][-1])[0]
+                    # First violating entry is enough to direct the user.
+                    violated_idx = set(p1).union(p2).pop()
+                    value = p[violated_idx]
+                    raise OutOfBoundsError("One of the requested xi is out of bounds",
+                                           i, value, self.grid[i][0], self.grid[i][-1])
+        return None
+
+    def gradient(self, xi):
         """
-        Return the computed gradients at the specified point.
+        Compute the gradients at the specified point.
 
         The gradients are computed as the interpolation itself is performed,
         but are cached and returned separately by this method.
@@ -188,17 +148,17 @@ class GridInterpBase(object):
         ----------
         xi : ndarray of shape (..., ndim)
             The coordinates to sample the gridded data at
-        interp_method : str, optional
-            The interpolation method to perform. Supported are 'slinear',
-            'cubic', and 'quintic'. Default is None, which will use the method
-            defined at the construction of the interpolation object instance.
 
         Returns
         -------
         gradient : ndarray of shape (..., ndim)
             Vector of gradients of the interpolated values with respect to each value in xi.
         """
-        pass
+        if (self._xi is None) or (not np.array_equal(xi, self._xi)):
+            # If inputs have changed since last computation, then re-interpolate.
+            self.interpolate(xi)
+
+        return self._all_gradients.reshape(np.asarray(xi).shape)
 
     def training_gradients(self, pt):
         """

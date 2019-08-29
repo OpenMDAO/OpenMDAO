@@ -1,4 +1,4 @@
-"""Define the RegularGridInterpComp class."""
+"""Define the MetaModelStructured class."""
 from __future__ import division, print_function, absolute_import
 
 from six import raise_from, iteritems, itervalues
@@ -11,10 +11,11 @@ from openmdao.components.structured_metamodel_util.python_interp import PythonGr
 from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.general_utils import warn_deprecation
 
 
-ALL_METHODS = ('cubic', 'slinear', 'quintic', 'lagrange2', 'lagrange3', 'akima')
+ALL_METHODS = ('cubic', 'slinear', 'quintic', 'lagrange2', 'lagrange3', 'akima',
+               'scipy_cubic', 'scipy_slinear', 'scipy_quintic')
 
 
 class MetaModelStructuredComp(ExplicitComponent):
@@ -44,8 +45,6 @@ class MetaModelStructuredComp(ExplicitComponent):
         Cached shape of the gradient of the outputs wrt the training inputs.
     training_outputs : dict
         Dictionary of training data each output.
-    _ki : dict
-        Dictionary of interpolation orders for each output.
     """
 
     def __init__(self, **kwargs):
@@ -63,7 +62,6 @@ class MetaModelStructuredComp(ExplicitComponent):
         self.params = []
         self.training_outputs = {}
         self.interps = {}
-        self._ki = {}
         self.sh = ()
 
     def initialize(self):
@@ -78,12 +76,8 @@ class MetaModelStructuredComp(ExplicitComponent):
                                   'training data should be computed.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
-        self.options.declare('method', values=ALL_METHODS, default=None,
-                             desc='Deprecated, use "order".', allow_none=True)
-        self.options.declare('order', values=ALL_METHODS, default="cubic",
-                             desc='Spline interpolation order.')
-        self.options.declare('interp_method', values=('scipy', 'npss'), default='scipy',
-                             desc='Inerpolation method to use.')
+        self.options.declare('method', values=ALL_METHODS, default='scipy_cubic',
+                             desc='Spline interpolation method to use for all outputs.')
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
         """
@@ -139,27 +133,17 @@ class MetaModelStructuredComp(ExplicitComponent):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        interp_method = self.options['interp_method']
-        if interp_method == 'npss':
-            interp = PythonGridInterp
-        else:
+        interp_method = self.options['method']
+        if interp_method.startswith('scipy'):
             interp = ScipyGridInterp
-
-        # Raise a deprecation warning for changed option.
-        if 'method' in self.options and self.options['method'] is not None:
-            self.options['order'] = self.options['method']
-            warn_deprecation("The 'method' option provides backwards compatibility "
-                             "with earlier version of OpenMDAO; use options['order'] "
-                             "instead.")
-            self.options['order'] = self.options['method']
+            interp_method = interp_method[6:]
+        else:
+            interp = PythonGridInterp
 
         for name, train_data in iteritems(self.training_outputs):
             self.interps[name] = interp(self.params, train_data,
-                                        interp_method=self.options['order'],
-                                        bounds_error=not self.options['extrapolate'],
-                                        fill_value=None, spline_dim_error=False)
-
-            self._ki = self.interps[name]._ki
+                                        interp_method=interp_method,
+                                        bounds_error=not self.options['extrapolate'])
 
         if self.options['training_data_gradients']:
             self.sh = tuple([self.options['vec_size']] + [i.size for i in self.params])
@@ -191,8 +175,9 @@ class MetaModelStructuredComp(ExplicitComponent):
             if self.options['training_data_gradients']:
                 self._declare_partials(of=name, wrt="%s_train" % name, dct={'dependent': True})
 
-        # MetaModelStructuredComp does not support complex step.
-        #self.set_check_partial_options('*', method='fd')
+        # The scipy methods do not support complex step.
+        if self.options['method'].startswith('scipy'):
+            self.set_check_partial_options('*', method='fd')
 
     def compute(self, inputs, outputs):
         """

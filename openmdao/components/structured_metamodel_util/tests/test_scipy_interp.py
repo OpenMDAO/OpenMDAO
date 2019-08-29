@@ -6,7 +6,8 @@ from copy import deepcopy
 import unittest
 
 import numpy as np
-from numpy.testing import assert_array_almost_equal, assert_allclose
+from numpy.testing import assert_array_almost_equal, assert_allclose, \
+                          assert_almost_equal, assert_array_equal
 
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -77,21 +78,6 @@ class TestScipyGridInterpolator(unittest.TestCase):
         values = f(*np.meshgrid(*points, indexing='ij'))
         return points, values, f, df
 
-    def test_list_input(self):
-        points, values = self._get_sample_4d_large()
-
-        sample = np.asarray([[0.1, 0.1, 1., .9], [0.2, 0.1, .45, .8],
-                             [0.5, 0.5, .5, .5]])
-
-        for method in self.valid_methods:
-            interp = ScipyGridInterp(points, values.tolist(), interp_method=method)
-            v1 = interp.interpolate(sample.tolist(), compute_gradients=False)
-
-            interp = ScipyGridInterp(points, values, interp_method=method)
-            v2 = interp.interpolate(sample, compute_gradients=False)
-
-            assert_allclose(v1, v2)
-
     def test_auto_reduce_spline_order(self):
         # if a spline method is used and spline_dim_error=False and a dimension
         # does not have enough points, the spline order for that dimension
@@ -106,41 +92,32 @@ class TestScipyGridInterpolator(unittest.TestCase):
         points = [x, y, z]
         values = np.random.randn(2, 10, 20)
 
-        # verify that this raises error with dimension checking
-        self.assertRaises(ValueError, ScipyGridInterp,
-                          points, values, 'cubic')
-
         interp = ScipyGridInterp(
-            points, values, interp_method='cubic', spline_dim_error=False)
+            points, values, interp_method='cubic')
 
         # first dimension (x) should be reduced to k=1 (linear)
-        assert_equal(interp._ki[0], 1)
+        self.assertEqual(interp._ki[0], 1)
 
         # should operate as normal
-        x = [0.5, 0, 1001]
+        x = np.array([0.5, 0, 1001])
         result = interp.interpolate(x)
         assert_almost_equal(result, -0.046325695741704434, decimal=5)
 
-        interp = ScipyGridInterp(
-            points, values, interp_method='slinear', spline_dim_error=False)
-
+        interp = ScipyGridInterp(points, values, interp_method='slinear')
         value1 = interp.interpolate(x)
+
         # cycle through different methods that require order reduction
         # in the first dimension
-        value2 = interp.interpolate(x, interp_method='quintic')
-        interp.gradient(x, interp_method='quintic')
-        value3 = interp.interpolate(x, interp_method='cubic')
-        interp.gradient(x, interp_method='cubic')
-        # use default method again
-        value4 = interp.interpolate(x)
+        interp = ScipyGridInterp(points, values, interp_method='quintic')
+        value2 = interp.interpolate(x)
+        interp.gradient(x)
+        interp = ScipyGridInterp(points, values, interp_method='cubic')
+        value3 = interp.interpolate(x)
+        interp.gradient(x)
 
         # values from different methods should be different
-        self.assertRaises(AssertionError, assert_equal, value1, value2)
-        self.assertRaises(AssertionError, assert_equal, value2, value3)
-
-        # first value should match last with no side effects from the
-        # order reduction or gradient caluclations
-        assert_equal(value1, value4)
+        self.assertTrue(value1[0] != value2[0])
+        self.assertTrue(value2[0] != value3[0])
 
     def test_complex_exception_spline(self):
         points, values = self._get_sample_4d_large()
@@ -151,88 +128,6 @@ class TestScipyGridInterpolator(unittest.TestCase):
         for method in self.valid_methods:
             self.assertRaises(ValueError, ScipyGridInterp, points, values,
                               method)
-
-    def test_minimum_required_gridsize(self):
-        for method in self.valid_methods:
-            k = self.interp_configs[method]
-            x = np.linspace(0, 1, k)
-            y = np.linspace(0, 1, k)
-            points = [x, y]
-            X, Y = np.meshgrid(*points, indexing='ij')
-            values = X + Y
-            self.assertRaises(ValueError, ScipyGridInterp, points, values,
-                              method)
-
-    def test_method_switching(self):
-        # should be able to switch interpolation methods on each __call__
-        # and gradient call, without overriding defaults permenantly.
-        # exceptions and gradient caching should work as expected.
-
-        np.random.seed(314)
-        x = np.linspace(-100, 2, 10)
-        y = np.linspace(-10, 4, 6)
-        z = np.linspace(1000, 2000, 50)
-
-        points = [x, y, z]
-        values = np.random.randn(10, 6, 50)
-
-        x = [0.5, 0, 1001]
-
-        # create as cubic
-        interp = ScipyGridInterp(
-            points, values, interp_method='cubic')
-
-        # value and gradient work as expected
-        result1 = interp.interpolate(x)
-        gradient1 = interp.gradient(x)
-        result_actual_1 = 0.2630309995970872
-        result_gradient_1 = np.array([0.22505535, -0.46465198, 0.02523666])
-
-        assert_almost_equal(result1, result_actual_1)
-        assert_almost_equal(gradient1, result_gradient_1)
-
-        # changing the method should work as expected
-        result2 = interp.interpolate(x, interp_method='slinear')
-        gradient2 = interp.gradient(x, interp_method='slinear')
-        result_actual_2 = 0.27801704674026684
-        result_gradient_2 = np.array([0.12167214, -0.44221416, -0.00323078])
-
-        assert_almost_equal(result2, result_actual_2)
-        assert_almost_equal(gradient2, result_gradient_2)
-
-        # should be able to switch back and get the original results without
-        # explicitly setting the method
-        result3 = interp.interpolate(x)
-        gradient3 = interp.gradient(x)
-        assert_almost_equal(result3, result_actual_1)
-        assert_almost_equal(gradient3, result_gradient_1)
-
-        # new interpolator and evaluation point
-        interp = ScipyGridInterp(points, values, interp_method='slinear')
-
-        # values will be cast to float for splines/gradient methods
-        # otherwise, will get null vector gradient [0,0,0] at all pts
-        x = [-50, 0, 1501]
-        result6 = interp.interpolate(x)
-        result_actual_6 = 0.3591176338294626
-        assert_almost_equal(result6, result_actual_6)
-
-        # should be able to switch and get value and gradient
-        result7 = interp.interpolate(x, interp_method='quintic')
-        gradient7 = interp.gradient(x, interp_method='quintic')
-        result_actual_7 = 0.6157594079479937
-        result_gradient_7 = np.array([-0.35731922, 0.23131539, -0.14088582])
-        assert_almost_equal(result7, result_actual_7)
-        assert_almost_equal(gradient7, result_gradient_7)
-
-        # switch again; gradient should be different
-        gradient8 = interp.gradient(x, interp_method='slinear')
-        result_gradient_8 = np.array([-0.11299396, 0.24352342, -0.07446338])
-        assert_almost_equal(gradient8, result_gradient_8)
-
-        # should be able to switch back to original without setting it
-        result9 = interp.interpolate(x)
-        assert_almost_equal(result9, result6)
 
     def test_spline_deriv_xi1d(self):
         # tests gradient values
@@ -259,7 +154,6 @@ class TestScipyGridInterpolator(unittest.TestCase):
             interp = ScipyGridInterp(points, values, method)
             x = np.array([0.9, 0.1])
             interp._xi = x
-            interp._g_order = method
             dy = np.array([0.997901, 0.08915])
             interp._all_gradients = dy
             assert_almost_equal(interp.gradient(x), dy)
@@ -272,7 +166,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
         actual = func(*test_pt)
         for method in self.valid_methods:
             interp = ScipyGridInterp(points, values, method)
-            computed = interp.interpolate(test_pt, compute_gradients=False)
+            computed = interp.interpolate(test_pt)
             r_err = rel_error(actual, computed)
             assert r_err < self.tol[method]
 
@@ -285,8 +179,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
         for method in self.valid_methods:
             k = self.interp_configs[method]
             interp = ScipyGridInterp(points, values, method,
-                                        bounds_error=False,
-                                        fill_value=None)
+                                        bounds_error=False)
             computed = interp.interpolate(test_pt)
             computed_grad = interp.gradient(test_pt)
             r_err = rel_error(actual, computed)
@@ -303,35 +196,9 @@ class TestScipyGridInterpolator(unittest.TestCase):
         actual = func(*test_pt.T)
         for method in self.valid_methods:
             interp = ScipyGridInterp(points, values, method)
-            computed = interp.interpolate(test_pt, compute_gradients=True)
+            computed = interp.interpolate(test_pt)
             r_err = rel_error(actual, computed)
             assert r_err < self.tol[method]
-
-    def test_out_of_bounds_fill2(self):
-        points, values, func, df = self. _get_sample_2d()
-        np.random.seed(1)
-        test_pt = np.random.uniform(3, 3.1, 2)
-        actual = np.asarray([np.nan])
-        methods = self.valid_methods
-        for method in methods:
-            interp = ScipyGridInterp(points, values, method,
-                                        bounds_error=False,
-                                        fill_value=np.nan)
-            computed = interp.interpolate(test_pt, compute_gradients=False)
-            assert_array_almost_equal(computed, actual)
-
-    def test_invalid_fill_value(self):
-        np.random.seed(1234)
-        x = np.linspace(0, 2, 5)
-        y = np.linspace(0, 1, 7)
-        values = np.random.rand(5, 7)
-
-        # integers can be cast to floats
-        ScipyGridInterp((x, y), values, fill_value=1)
-
-        # complex values cannot
-        self.assertRaises(ValueError, ScipyGridInterp,
-                          (x, y), values, fill_value=1 + 2j)
 
     def test_NaN_exception(self):
         np.random.seed(1234)
@@ -341,7 +208,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
         interp = ScipyGridInterp((x, y), values)
 
         with self.assertRaises(OutOfBoundsError) as cm:
-            interp.interpolate([1, np.nan])
+            interp.interpolate(np.array([1, np.nan]))
 
         err = cm.exception
 
@@ -399,12 +266,6 @@ class TestScipyGridInterpolator(unittest.TestCase):
 
         interp = ScipyGridInterp(points, values.tolist())
         x = [0.5, 0, 0.5, 0.9]
-
-        with self.assertRaises(ValueError) as cm:
-            computed = interp.interpolate(x, interp_method='junk')
-
-        msg = ('Interpolation method "junk" is not defined. Valid methods are')
-        self.assertTrue(str(cm.exception).startswith(msg))
 
         methods = set(interp._interp_methods()[0])
         self.assertEqual(methods, set(["quintic", "cubic", "slinear"]))

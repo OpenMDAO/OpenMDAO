@@ -71,21 +71,6 @@ class TestPythonGridInterpolator(unittest.TestCase):
         values = f(*np.meshgrid(*points, indexing='ij'))
         return points, values, f, df
 
-    def test_list_input(self):
-        points, values = self._get_sample_4d_large()
-
-        sample = np.asarray([[0.1, 0.1, 1., .9], [0.2, 0.1, .45, .8],
-                             [0.5, 0.5, .5, .5]])
-
-        for method in self.valid_methods:
-            interp = PythonGridInterp(points, values.tolist(), interp_method=method)
-            v1 = interp.interpolate(sample.tolist(), compute_gradients=False)
-
-            interp = PythonGridInterp(points, values, interp_method=method)
-            v2 = interp.interpolate(sample, compute_gradients=False)
-
-            assert_allclose(v1, v2)
-
     def test_minimum_required_gridsize(self):
         for method in self.valid_methods:
             k = self.interp_configs[method]
@@ -94,8 +79,7 @@ class TestPythonGridInterpolator(unittest.TestCase):
             points = [x, y]
             X, Y = np.meshgrid(*points, indexing='ij')
             values = X + Y
-            self.assertRaises(ValueError, PythonGridInterp, points, values,
-                              method)
+            self.assertRaises(ValueError, PythonGridInterp, points, values, method)
 
     def test_spline_xi1d(self):
         # test interpolated values
@@ -105,7 +89,7 @@ class TestPythonGridInterpolator(unittest.TestCase):
         actual = func(*test_pt)
         for order in self.valid_methods:
             interp = PythonGridInterp(points, values, order)
-            computed = interp.interpolate(test_pt, compute_gradients=False)
+            computed = interp.interpolate(test_pt)
             r_err = rel_error(actual, computed)
             assert r_err < self.tol[order]
 
@@ -121,8 +105,7 @@ class TestPythonGridInterpolator(unittest.TestCase):
             if method == 'slinear':
                 tol = 2
             interp = PythonGridInterp(points, values, method,
-                                      bounds_error=False,
-                                      fill_value=None)
+                                      bounds_error=False)
             computed = interp.interpolate(test_pt)
             computed_grad = interp.gradient(test_pt)
             r_err = rel_error(actual, computed)
@@ -139,36 +122,10 @@ class TestPythonGridInterpolator(unittest.TestCase):
         actual = func(*test_pt.T)
         for method in self.valid_methods:
             interp = PythonGridInterp(points, values, method)
-            computed = interp.interpolate(test_pt, compute_gradients=False)
+            computed = interp.interpolate(test_pt)
             r_err = rel_error(actual, computed)
             #print(method, computed, actual, r_err)
             assert r_err < self.tol[method]
-
-    def test_out_of_bounds_fill2(self):
-        points, values, func, df = self. _get_sample_2d()
-        np.random.seed(1)
-        test_pt = np.random.uniform(3, 3.1, 2)
-        actual = np.asarray([np.nan])
-        methods = self.valid_methods
-        for method in methods:
-            interp = PythonGridInterp(points, values, method,
-                                      bounds_error=False,
-                                      fill_value=np.nan)
-            computed = interp.interpolate(test_pt, compute_gradients=False)
-            assert_array_almost_equal(computed, actual)
-
-    def test_invalid_fill_value(self):
-        np.random.seed(1234)
-        x = np.linspace(0, 2, 5)
-        y = np.linspace(0, 1, 7)
-        values = np.random.rand(5, 7)
-
-        # integers can be cast to floats
-        PythonGridInterp((x, y), values, fill_value=1)
-
-        # complex values cannot
-        self.assertRaises(ValueError, PythonGridInterp,
-                          (x, y), values, fill_value=1 + 2j)
 
     def test_NaN_exception(self):
         np.random.seed(1234)
@@ -178,7 +135,7 @@ class TestPythonGridInterpolator(unittest.TestCase):
         interp = PythonGridInterp((x, y), values)
 
         with self.assertRaises(OutOfBoundsError) as cm:
-            interp.interpolate([1, np.nan])
+            interp.interpolate(np.array([1, np.nan]))
 
         err = cm.exception
 
@@ -236,12 +193,6 @@ class TestPythonGridInterpolator(unittest.TestCase):
 
         interp = PythonGridInterp(points, values.tolist())
         x = [0.5, 0, 0.5, 0.9]
-
-        with self.assertRaises(ValueError) as cm:
-            computed = interp.interpolate(x, interp_method='junk')
-
-        msg = ('Interpolation method "junk" is not defined. Valid methods are')
-        self.assertTrue(str(cm.exception).startswith(msg))
 
         methods = set(interp._interp_methods()[0])
         self.assertEqual(methods, set(["cubic", "slinear", 'lagrange2', 'lagrange3', 'akima']))

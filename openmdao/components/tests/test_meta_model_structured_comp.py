@@ -407,7 +407,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, interp_method='scipy')
+        comp = om.MetaModelStructuredComp(method='scipy_slinear', extrapolate=True)
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -451,7 +451,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True)
+        comp = om.MetaModelStructuredComp(method='scipy_slinear', extrapolate=True)
 
         for out in outs:
             comp.add_output(out['name'], out['default'], out['values'])
@@ -488,19 +488,6 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         self.prob['z'] = 2.5
         self.run_and_check_derivs(self.prob)
 
-    def test_raise_interp_error(self):
-        # muck with the grid to trigger an error in the interp call
-        self.prob.model.comp.interps['f'].grid = []
-
-        # verify that the error is raised by the meta model comp with
-        # information to help locate the error
-        with self.assertRaises(Exception) as context:
-            self.run_and_check_derivs(self.prob)
-        self.assertEqual(str(context.exception),
-                         "MetaModelStructuredComp (comp): Error interpolating output 'f':\n"
-                         "The requested sample points xi have dimension 3, "
-                         "but this RegularGridInterp has dimension 0")
-
     def test_raise_out_of_bounds_error(self):
         model = om.Group()
         ivc = om.IndepVarComp()
@@ -518,7 +505,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
         # Need to make sure extrapolate is False for bounds to be checked
-        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=False)
+        comp = om.MetaModelStructuredComp(method='scipy_slinear', extrapolate=False)
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -559,7 +546,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         ivc.add_output('g_train', outs[1]['values'])
 
         comp = om.MetaModelStructuredComp(training_data_gradients=True,
-                                          order='cubic',
+                                          method='scipy_cubic',
                                           vec_size=3)
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -602,7 +589,7 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         ivc.add_output('g_train', outs[1]['values'])
 
         comp = om.MetaModelStructuredComp(training_data_gradients=True,
-                                          order='cubic',
+                                          method='scipy_cubic',
                                           vec_size=3)
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -683,45 +670,6 @@ class TestMetaModelStructuredScipy(unittest.TestCase):
         msg = ("MMComp (MM): Error interpolating output 'y' because input 'MM.x' was out of bounds ('0.0', '1.0') with value '1.1'")
         self.assertEqual(str(cm.exception), msg)
 
-    def test_deprecated_option(self):
-        prob = om.Problem()
-        model = prob.model
-        ivc = om.IndepVarComp()
-
-        mapdata = SampleMap()
-
-        params = mapdata.param_data
-        outs = mapdata.output_data
-
-        ivc.add_output('x', np.array([-0.3, 0.7, 1.2]))
-        ivc.add_output('y', np.array([0.14, 0.313, 1.41]))
-        ivc.add_output('z', np.array([-2.11, -1.2, 2.01]))
-
-        ivc.add_output('f_train', outs[0]['values'])
-        ivc.add_output('g_train', outs[1]['values'])
-
-        comp = om.MetaModelStructuredComp(training_data_gradients=True,
-                                          method='cubic',
-                                          vec_size=3)
-
-        for param in params:
-            comp.add_input(param['name'], param['default'], param['values'])
-
-        for out in outs:
-            comp.add_output(out['name'], out['default'], out['values'])
-
-        model.add_subsystem('ivc', ivc, promotes=["*"])
-        model.add_subsystem('comp',
-                            comp,
-                            promotes=["*"])
-
-        msg = "The 'method' option provides backwards compatibility " + \
-        "with earlier version of OpenMDAO; use options['order'] " + \
-        "instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.setup()
-
 
 class TestMetaModelStructuredPython(unittest.TestCase):
     """
@@ -746,7 +694,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='slinear', extrapolate=True, interp_method='npss')
+        comp = om.MetaModelStructuredComp(method='slinear', extrapolate=True)
 
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
@@ -803,7 +751,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='slinear', interp_method='npss', extrapolate=True)
+        comp = om.MetaModelStructuredComp(method='slinear', extrapolate=True)
 
         for out in outs:
             comp.add_output(out['name'], out['default'], out['values'])
@@ -860,8 +808,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='cubic', extrapolate=True, vec_size=3,
-                                          interp_method='npss')
+        comp = om.MetaModelStructuredComp(method='cubic', extrapolate=True, vec_size=3)
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -903,8 +850,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='lagrange2', extrapolate=True, vec_size=3,
-                                          interp_method='npss')
+        comp = om.MetaModelStructuredComp(method='lagrange2', extrapolate=True, vec_size=3)
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -947,8 +893,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='lagrange3', extrapolate=True, vec_size=3,
-                                          interp_method='npss')
+        comp = om.MetaModelStructuredComp(method='lagrange3', extrapolate=True, vec_size=3)
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -991,8 +936,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='akima', extrapolate=True, vec_size=3,
-                                          interp_method='npss')
+        comp = om.MetaModelStructuredComp(method='akima', extrapolate=True, vec_size=3)
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -1035,8 +979,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(order='cubic', extrapolate=True, vec_size=3,
-                                          interp_method='npss')
+        comp = om.MetaModelStructuredComp(method='cubic', extrapolate=True, vec_size=3)
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),
@@ -1076,8 +1019,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         ivc.add_output('g_train', outs[1]['values'])
 
         comp = om.MetaModelStructuredComp(training_data_gradients=True,
-                                          order='lagrange3', interp_method='npss',
-                                          vec_size=3)
+                                          method='lagrange3', vec_size=3)
         for param in params:
             comp.add_input(param['name'], param['default'], param['values'])
 
@@ -1105,7 +1047,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         import openmdao.api as om
 
         # Create regular grid interpolator instance
-        xor_interp = om.MetaModelStructuredComp(order='slinear')
+        xor_interp = om.MetaModelStructuredComp(method='scipy_slinear')
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
@@ -1155,7 +1097,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         print(f.shape)
 
         # Create regular grid interpolator instance
-        interp = om.MetaModelStructuredComp(order='cubic')
+        interp = om.MetaModelStructuredComp(method='scipy_cubic')
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
         interp.add_input('p3', 3.14, training_data=p3)
@@ -1198,7 +1140,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         f = np.sqrt(P1) + P2 * P3
 
         # Create regular grid interpolator instance
-        interp = om.MetaModelStructuredComp(order='cubic', vec_size=2)
+        interp = om.MetaModelStructuredComp(method='scipy_cubic', vec_size=2)
         interp.add_input('p1', 0.5, training_data=p1)
         interp.add_input('p2', 0.0, training_data=p2)
         interp.add_input('p3', 3.14, training_data=p3)
@@ -1241,7 +1183,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         print(f.shape)
 
         # Create regular grid interpolator instance
-        interp = om.MetaModelStructuredComp(order='cubic', training_data_gradients=True)
+        interp = om.MetaModelStructuredComp(method='scipy_cubic', training_data_gradients=True)
         interp.add_input('p1', 0.5, p1)
         interp.add_input('p2', 0.0, p2)
         interp.add_input('p3', 3.14, p3)
@@ -1278,7 +1220,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         msg = "'MetaModelStructured' has been deprecated. Use 'MetaModelStructuredComp' instead."
 
         with assert_warning(DeprecationWarning, msg):
-            xor_interp = om.MetaModelStructured(order='slinear')
+            xor_interp = om.MetaModelStructured(method='scipy_slinear')
 
         # set up inputs and outputs
         xor_interp.add_input('x', 0.0, training_data=np.array([0.0, 1.0]), units=None)
