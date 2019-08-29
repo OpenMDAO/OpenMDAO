@@ -425,25 +425,39 @@ def trace_mpi(fname='mpi_trace', flush=True):
 
     outfile = open(my_fname, 'w')
 
+    skip = {
+        '_mpi_print',
+    }
+
     stack = []
+    refcounts = []
 
     def _mpi_trace_callback(frame, event, arg):
         pname = None
+        #print('-', frame.f_code.co_name, file=outfile, flush=True)
         if event == 'call':
             if 'openmdao' in frame.f_code.co_filename:
+                if frame.f_code.co_name in skip:
+                    return
                 if 'self' in frame.f_locals:
                     try:
                         pname = frame.f_locals['self'].msginfo
                     except:
                         pass
-                if pname is not None and not (stack and pname == stack[-1]):
-                    stack.append(pname)
-                    print('   ' * len(stack), pname, file=outfile, flush=flush)
+                if pname is not None:
+                    if not stack or pname != stack[-1]:
+                        stack.append(pname)
+                        refcounts.append(1)
+                        print('   ' * len(stack), pname, file=outfile, flush=flush)
+                    else:
+                        refcounts[-1] += 1
                 print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
                       file=outfile, flush=flush)
         elif event == 'return':
             if 'openmdao' in frame.f_code.co_filename:
+                if frame.f_code.co_name in skip:
+                    return
                 if 'self' in frame.f_locals:
                     try:
                         pname = frame.f_locals['self'].msginfo
@@ -453,7 +467,13 @@ def trace_mpi(fname='mpi_trace', flush=True):
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
                       file=outfile, flush=flush)
                 if pname is not None and stack and pname == stack[-1]:
-                    stack.pop()
+                    refcounts[-1] -= 1
+                    if refcounts[-1] < 1:
+                        stack.pop()
+                        refcounts.pop()
+                        if stack:
+                            print('   ' * len(stack), stack[-1], file=outfile, flush=flush)
+
         elif event == 'c_call':
             s = str(arg)
             if 'mpi4py' in s or 'petsc4py' in s:

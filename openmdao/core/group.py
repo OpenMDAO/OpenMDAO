@@ -1628,10 +1628,11 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for ind, sub in enumerate(self._subsystems_myproc):
-                if sub._has_guess:
-                    isub = self._subsystems_myproc_inds[ind]
-                    self._transfer('nonlinear', 'fwd', isub)
+            for isub, (sub, loc)in enumerate(self._all_subsystem_iter()):
+                # TODO: could gather 'has_guess' information during setup and be able to
+                # skip transfer for subs that don't have guesses...
+                self._transfer('nonlinear', 'fwd', isub)
+                if loc and sub._has_guess:
                     sub._guess_nonlinear()
 
         # call our own guess_nonlinear method, after the recursion is done to

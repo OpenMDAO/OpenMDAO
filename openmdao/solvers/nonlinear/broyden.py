@@ -13,6 +13,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.mpi import MPI
 
 CITATION = """@ARTICLE{
               Broyden1965ACo,
@@ -146,6 +147,10 @@ class BroydenSolver(NonlinearSolver):
         depth : int
             Depth of the current system (already incremented).
         """
+        if system.comm.size > 1:
+            raise RuntimeError("BroydenSolver currently does not work when running under MPI "
+                               "with comm.size >1.")
+
         super(BroydenSolver, self)._setup_solvers(system, depth)
         self._recompute_jacobian = True
         self._computed_jacobians = 0

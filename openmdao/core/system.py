@@ -2368,6 +2368,20 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
+    def _all_subsystem_iter(self):
+        """
+        Yield a generator of subsystems along with their local status.
+
+        Yields
+        ------
+        System
+            Current subsystem.
+        bool
+            True if current subsystem is local.
+        """
+        for isub, subsys in enumerate(self._subsystems_allprocs):
+            yield subsys, subsys.name in self._loc_subsys_map
+
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
