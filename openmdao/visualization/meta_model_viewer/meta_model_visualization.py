@@ -175,8 +175,9 @@ class UnstructuredMetaModelVisualization(object):
 
         # Grouping all of the sliders and dropdowns into one column
         sliders = [i for i in self.slider_dict.values()]
+        sliders.extend([self.x_input, self.y_input, self.output_select, self.scatter_distance])
         self.sliders_and_selects = row(
-            column(*sliders, self.x_input, self.y_input, self.output_select, self.scatter_distance))
+            column(*sliders))
 
         # Layout creation
         self.layout = row(self.contour_data(), self.right_plot(), self.sliders_and_selects)
