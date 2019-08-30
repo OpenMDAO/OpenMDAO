@@ -142,6 +142,7 @@ setup(
         'pyparsing',
         'scipy',
         'six',
+        'bokeh'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""
