@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 import openmdao.api as om
-from openmdao.visualization.MetaModelVisualization.meta_model_visualization import UnstructuredMetaModelVisualization
+from openmdao.visualization.meta_model_viewer.meta_model_visualization import UnstructuredMetaModelVisualization
 
 
 class UnstructuredMetaModelCompTests(unittest.TestCase):
