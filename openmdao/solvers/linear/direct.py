@@ -281,9 +281,8 @@ class DirectSolver(LinearSolver):
                 matrix = self._assembled_jac._int_mtx._matrix
             else:
                 matrix = self._assembled_jac._int_mtx._get_assembled_matrix(system)
-
-            if system.comm.size > 1 and self._owned_size_totals is None:
-                self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
+                if self._owned_size_totals is None:
+                    self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
 
             if matrix is None:
                 # this happens if we're not rank 0
@@ -436,6 +435,7 @@ class DirectSolver(LinearSolver):
 
         system = self._system
         iproc = system.comm.rank
+        nproc = system.comm.size
 
         d_residuals = system._vectors['residual']['linear']
         d_outputs = system._vectors['output']['linear']
@@ -454,7 +454,7 @@ class DirectSolver(LinearSolver):
 
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
-            if system.comm.size > 1:
+            if nproc > 1:
                 _, nodup2local_inds, local2owned_inds, noncontig_dist_inds = \
                     system._get_nodup_out_ranges()
                 # gather full_b
@@ -471,9 +471,7 @@ class DirectSolver(LinearSolver):
                 if iproc == 0:
                     # convert full_b to the same ordering that the matrix expects, where
                     # dist vars are contiguous.
-                    # TODO: only do this if distributed vars are found to avoid unnecessary
-                    # inefficiency
-                    if system.comm.size > 1:
+                    if nproc > 1:
                         full_b = tmp[noncontig_dist_inds]
 
                     if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
@@ -481,7 +479,7 @@ class DirectSolver(LinearSolver):
                     else:
                         arr = self._lu.solve(full_b, trans_splu)
 
-                if system.comm.size > 1:
+                if nproc > 1:
                     if iproc > 0:
                         arr = np.zeros(tmp.size, dtype=tmp.dtype)
 

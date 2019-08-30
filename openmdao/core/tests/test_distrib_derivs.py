@@ -203,9 +203,10 @@ class MPITests2(unittest.TestCase):
         J = prob.compute_totals(['C2.z'], ['P.x'])
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
-    @parameterized.expand(itertools.product([om.DirectSolver, om.LinearRunOnce]),
+    @parameterized.expand(itertools.product([om.DirectSolver, om.LinearRunOnce],
+                          [om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
-    def test_fan_out_grouped(self, solver):
+    def test_fan_out_grouped(self, solver, nlsolver):
         size = 3
         prob = om.Problem()
         prob.model = root = om.Group()
@@ -235,6 +236,7 @@ class MPITests2(unittest.TestCase):
         root.connect("P.x", "C1.x")
 
         root.linear_solver = solver()
+        root.nonlinear_solver = nlsolver()
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -259,7 +261,10 @@ class MPITests2(unittest.TestCase):
         assert_rel_error(self, J['C2.y', 'P.x'], diag1, 1e-6)
         assert_rel_error(self, J['C3.y', 'P.x'], diag2, 1e-6)
 
-    def test_fan_in_grouped(self):
+    @parameterized.expand(itertools.product([om.DirectSolver, om.LinearRunOnce],
+                          [om.NonlinearRunOnce, om.NonlinearBlockGS]),
+                          name_func=_test_func_name)
+    def test_fan_in_grouped(self, solver, nlsolver):
         size = 3
 
         prob = om.Problem()
@@ -290,8 +295,9 @@ class MPITests2(unittest.TestCase):
         root.connect("P2.x", "sub.C2.x")
         root.connect("C3.y", "C4.x")
 
-        root.linear_solver = om.LinearBlockGS()
-        sub.linear_solver = om.LinearBlockGS()
+        root.linear_solver = solver()
+        root.nonlinear_solver = nlsolver()
+        sub.linear_solver = solver()
 
         prob.set_solver_print(0)
         prob.setup(mode='fwd')
@@ -396,12 +402,11 @@ class DistribStateImplicit(om.ImplicitComponent):
                     d_i['a'] -= numpy.sum(d_r['states'])
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests3(unittest.TestCase):
 
     N_PROCS = 3
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_distrib_apply(self):
         p = om.Problem()
 

@@ -323,8 +323,6 @@ class MPITests(unittest.TestCase):
 
         model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])))
 
-        #import wingdbstub
-
         sub1 = model.add_subsystem('sub1', om.Group())
         sub2 = sub1.add_subsystem('sub2', om.Group())
         g1 = sub2.add_subsystem('g1', SubSellar())
