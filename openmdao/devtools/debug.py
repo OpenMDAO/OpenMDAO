@@ -428,11 +428,26 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
     outfile = open(my_fname, 'w')
 
     stack = []
-    refcounts = []
+
+    _c_map = {
+        'c_call': '(c) -->',
+        'c_return': '(c) <--',
+        'c_exception': '(c_exception)',
+    }
+
+
+    def _print_c_func(frame, arg, typestr):
+        s = str(arg)
+        if 'mpi4py' in s or 'petsc4py' in s:
+            c = arg.__self__.__class__
+            print('   ' * len(stack), typestr, "%s.%s.%s" %
+                    (c.__module__, c.__name__, arg.__name__),
+                    "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                    file=outfile, flush=True)
+
 
     def _mpi_trace_callback(frame, event, arg):
         pname = None
-        #print('-', frame.f_code.co_name, file=outfile, flush=True)
         if event == 'call':
             if 'openmdao' in frame.f_code.co_filename:
                 if frame.f_code.co_name in skip:
@@ -443,12 +458,11 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                     except:
                         pass
                 if pname is not None:
-                    if not stack or pname != stack[-1]:
-                        stack.append(pname)
-                        refcounts.append(1)
+                    if not stack or pname != stack[-1][0]:
+                        stack.append([pname, 1])
                         print('   ' * len(stack), pname, file=outfile, flush=flush)
                     else:
-                        refcounts[-1] += 1
+                        stack[-1][1] += 1
                 print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
                       file=outfile, flush=flush)
@@ -464,37 +478,13 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                 print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
                       file=outfile, flush=flush)
-                if pname is not None and stack and pname == stack[-1]:
-                    refcounts[-1] -= 1
-                    if refcounts[-1] < 1:
+                if pname is not None and stack and pname == stack[-1][0]:
+                    stack[-1][1] -= 1
+                    if stack[-1][1] < 1:
                         stack.pop()
-                        refcounts.pop()
                         if stack:
-                            print('   ' * len(stack), stack[-1], file=outfile, flush=flush)
-
-        elif event == 'c_call':
-            s = str(arg)
-            if 'mpi4py' in s or 'petsc4py' in s:
-                c = arg.__self__.__class__
-                print('   ' * len(stack), '(c) -->', "%s.%s.%s" %
-                      (c.__module__, c.__name__, arg.__name__),
-                      "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
-                      file=outfile, flush=True)
-        elif event == 'c_return':
-            s = str(arg)
-            if 'mpi4py' in s or 'petsc4py' in s:
-                c = arg.__self__.__class__
-                print('   ' * len(stack), '(c) <--', "%s.%s.%s" %
-                      (c.__module__, c.__name__, arg.__name__),
-                      "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
-                      file=outfile, flush=True)
-        elif event == 'c_exception':
-            s = str(arg)
-            if 'mpi4py' in s or 'petsc4py' in s:
-                c = arg.__self__.__class__
-                print('   ' * len(stack), '(c_exception)', "%s.%s.%s" %
-                      (c.__module__, c.__name__, arg.__name__),
-                      "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
-                      file=outfile, flush=True)
+                            print('   ' * len(stack), stack[-1][0], file=outfile, flush=flush)
+        else:
+            _print_c_func(frame, arg, _c_map[event])
 
     sys.setprofile(_mpi_trace_callback)
