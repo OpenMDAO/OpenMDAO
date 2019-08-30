@@ -32,7 +32,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.general_utils import filter_var_based_on_tags, convert_user_defined_tags_to_set
+from openmdao.utils.general_utils import make_set
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -3031,12 +3031,10 @@ class System(object):
         meta = self._var_abs2meta
         inputs = []
 
-        tags = convert_user_defined_tags_to_set(tags)
-
         for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
 
             # Filter based on tags
-            if filter_var_based_on_tags(tags, meta[var_name]):
+            if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                 continue
 
             var_meta = {}
@@ -3055,7 +3053,7 @@ class System(object):
             for var_name, val in iteritems(self._discrete_inputs):
 
                 # Filter based on tags
-                if filter_var_based_on_tags(tags, self._discrete_inputs._dict[var_name]):
+                if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                     continue
 
                 var_meta = {}
@@ -3154,8 +3152,6 @@ class System(object):
         meta = self._var_abs2meta  # This only includes metadata for this process.
         states = self._list_states()
 
-        tags = convert_user_defined_tags_to_set(tags)
-
         # Go though the hierarchy. Printing Systems
         # If the System owns an output directly, show its output
         expl_outputs = []
@@ -3163,7 +3159,7 @@ class System(object):
         for var_name, val in iteritems(self._outputs._views):
 
             # Filter based on tags
-            if filter_var_based_on_tags(tags, meta[var_name]):
+            if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                 continue
 
             if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
@@ -3195,8 +3191,9 @@ class System(object):
 
         if self._discrete_outputs and not residuals_tol:
             for var_name, val in iteritems(self._discrete_outputs):
+
                 # Filter based on tags
-                if filter_var_based_on_tags(tags, self._discrete_outputs._dict[var_name]):
+                if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                     continue
 
                 var_meta = {}

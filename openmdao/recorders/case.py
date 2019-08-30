@@ -14,7 +14,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.general_utils import filter_var_based_on_tags, convert_user_defined_tags_to_set
+from openmdao.utils.general_utils import make_set
 from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
@@ -448,8 +448,6 @@ class Case(object):
         inp_vars = {}
         inputs = []
 
-        tags = convert_user_defined_tags_to_set(tags)
-
         if self.inputs is not None:
             for abs_name in self.inputs.absolute_names():
                 if abs_name not in inp_vars:
@@ -458,8 +456,9 @@ class Case(object):
         if inp_vars is not None and len(inp_vars) > 0:
             for var_name in inp_vars:
                 # Filter based on tags
-                if filter_var_based_on_tags(tags, meta[var_name]):
+                if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                     continue
+
                 var_meta = {}
                 if values:
                     var_meta['value'] = inp_vars[var_name]['value']
@@ -553,8 +552,6 @@ class Case(object):
         impl_outputs = []
         out_vars = {}
 
-        tags = convert_user_defined_tags_to_set(tags)
-
         for abs_name in self.outputs.absolute_names():
             out_vars[abs_name] = {'value': self.outputs[abs_name]}
             if self.residuals and abs_name in self.residuals.absolute_names():
@@ -566,13 +563,14 @@ class Case(object):
 
             for name in out_vars:
                 # Filter based on tags
-                if filter_var_based_on_tags(tags, meta[name]):
+                if tags and not (make_set(tags) & make_set(meta[abs_name]['tags'])):
                     continue
 
                 if residuals_tol and \
                    out_vars[name]['residuals'] is not 'Not Recorded' and \
                    np.linalg.norm(out_vars[name]['residuals']) < residuals_tol:
                     continue
+
                 outs = {}
                 if values:
                     outs['value'] = out_vars[name]['value']

@@ -800,52 +800,27 @@ def make_serializable(o):
         return o
 
 
-def filter_var_based_on_tags(filtering_tags, var_metadata):
+def make_set(string_data):
     """
-    Given the tags to filter on, and the metadata of the var, determine if it should be filtered.
+    Construct a set containing the specified character strings.
 
     Parameters
     ----------
-    filtering_tags : str or list of strs
-        User defined tags that can be used to filter what gets listed. Only inputs with the
-        given tags will be listed.
-    var_metadata : dict
-        Dict of metadata about the var.
-
-    Returns
-    -------
-    bool
-        True if the var should be filtered and therefore not listed.
-    """
-    if filtering_tags:
-        var_tags = var_metadata['tags']
-        if not var_tags:
-            return True
-        if not (set(filtering_tags) & var_tags):
-            return True
-
-    return False
-
-
-def convert_user_defined_tags_to_set(tags):
-    """
-    Convert user defined tag which could be None, str, or list to a set.
-
-    Parameters
-    ----------
-    tags : None, str, or list of strs
-        User defined tags that can be used to filter what gets listed.
+    string_data : None, str, or list of strs
+        Character string(s) to be included in the set.
 
     Returns
     -------
     set
-        True if the var should be filtered and therefore not listed.
+        A set of character strings.
     """
-    if not tags:
+    if not string_data:
         return set()
-    elif isinstance(tags, str):
-        return {tags}
-    elif isinstance(tags, set):
-        return tags
-    else:  # must be str
-        return set(tags)
+    elif isinstance(string_data, str):
+        return {string_data}
+    elif isinstance(string_data, set):
+        return string_data
+    elif isinstance(string_data, list):
+        return set(string_data)
+    else:
+        raise RuntimeError("Invalid data passed to 'make_set': {}".format(str(string_data)))

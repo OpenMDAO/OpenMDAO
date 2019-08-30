@@ -23,7 +23,7 @@ from openmdao.utils.units import valid_units
 from openmdao.utils.name_maps import rel_key2abs_key, abs_key2rel_key, rel_name2abs_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    warn_deprecation, find_matches, simple_warning, convert_user_defined_tags_to_set
+    warn_deprecation, find_matches, simple_warning, make_set
 import openmdao.utils.coloring as coloring_mod
 
 
@@ -525,7 +525,7 @@ class Component(System):
         metadata['desc'] = desc
         metadata['distributed'] = self.options['distributed']
 
-        metadata['tags'] = convert_user_defined_tags_to_set(tags)
+        metadata['tags'] = tags
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -574,8 +574,6 @@ class Component(System):
             raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('%s: The tags argument should be a str or list' % self.msginfo)
-
-        tags = convert_user_defined_tags_to_set(tags)
 
         metadata = {
             'value': val,
@@ -747,7 +745,7 @@ class Component(System):
 
         metadata['distributed'] = self.options['distributed']
 
-        metadata['tags'] = convert_user_defined_tags_to_set(tags)
+        metadata['tags'] = tags
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -795,8 +793,6 @@ class Component(System):
             raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('%s: The tags argument should be a str, set, or list' % self.msginfo)
-
-        tags = convert_user_defined_tags_to_set(tags)
 
         metadata = {
             'value': val,

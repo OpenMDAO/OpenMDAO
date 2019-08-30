@@ -3173,6 +3173,18 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         # Outputs with tag that does match
         outputs = case.list_outputs(out_stream=None, tags="tag1")
+        from pprint import pprint
+        print(case.name)
+        pprint(case.outputs)
+        for o in case.outputs.absolute_names():
+            print('----')
+            print(o)
+            print('----')
+            pprint(case._abs2meta[o])
+        print('------------------------')
+        pprint(outputs)
+        for outp in outputs:
+            pprint(outp)
         self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
 
     def test_feature_get_val(self):
