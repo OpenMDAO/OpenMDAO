@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 import openmdao.api as om
-from main import UnstructuredMetaModelVisualization
+from openmdao.visualization.MetaModelVisualization.meta_model_visualization import UnstructuredMetaModelVisualization
 
 
 class UnstructuredMetaModelCompTests(unittest.TestCase):
@@ -13,8 +13,8 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         interp = om.MetaModelUnStructuredComp()
 
         # Training Data
-        x_train = np.linspace(0,10,20)
-        y_train = np.linspace(0,20,20)
+        x_train = np.linspace(0, 10, 20)
+        y_train = np.linspace(0, 20, 20)
 
         # Inputs
         interp.add_input('simple_x', 0., training_data=x_train)
@@ -42,8 +42,8 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         interp = om.MetaModelUnStructuredComp()
 
         # Training Data
-        x_train = np.linspace(0,10,20)
-        y_train = np.linspace(0,20,20)
+        x_train = np.linspace(0, 10, 20)
+        y_train = np.linspace(0, 20, 20)
 
         # Inputs
         interp.add_input('simple_x', 0., training_data=x_train)
