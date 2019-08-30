@@ -166,7 +166,7 @@ class MPITests2(unittest.TestCase):
 
         assert_rel_error(self, prob['total.y'], final)
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver]),
+    @parameterized.expand(itertools.product([om.LinearBlockGS, om.DirectSolver]),
                           name_func=_test_func_name)
     def test_two_simple(self, solver):
         size = 3
@@ -183,8 +183,6 @@ class MPITests2(unittest.TestCase):
         group.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
                                            y=numpy.zeros(size),
                                            z=numpy.zeros(size)))
-
-        #import wingdbstub
 
         prob = om.Problem()
         prob.model = group

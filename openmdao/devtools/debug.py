@@ -405,7 +405,7 @@ def compare_jacs(Jref, J, rel_trigger=1.0):
     return results
 
 
-def trace_mpi(fname='mpi_trace', flush=True):
+def trace_mpi(fname='mpi_trace', skip=(), flush=True):
     """
     Dump traces to the specified filename<.rank> showing openmdao and mpi/petsc calls.
 
@@ -413,6 +413,8 @@ def trace_mpi(fname='mpi_trace', flush=True):
     ----------
     fname : str
         Name of the trace file(s).  <.rank> will be appended to the name on each rank.
+    skip : set-like
+        Collection of function names to skip.
     flush : bool
         If True, flush print buffer after every print call.
     """
@@ -424,10 +426,6 @@ def trace_mpi(fname='mpi_trace', flush=True):
     my_fname = fname + '.' + str(MPI.COMM_WORLD.rank)
 
     outfile = open(my_fname, 'w')
-
-    skip = {
-        '_mpi_print',
-    }
 
     stack = []
     refcounts = []
