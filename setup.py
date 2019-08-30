@@ -97,7 +97,7 @@ setup(
         'openmdao.visualization.connection_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.xdsm_viewer',
-        'openmdao.visualization.meta_model_viewer'
+        'openmdao.visualization.meta_model_viewer',
         'openmdao.surrogate_models',
         'openmdao.surrogate_models.nn_interpolators'
     ],
