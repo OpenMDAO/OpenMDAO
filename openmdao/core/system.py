@@ -647,6 +647,9 @@ class System(object):
             else:
                 self._scale_factors = {}
 
+            if self._vector_class is None:
+                self._vector_class = self._local_vector_class
+
             vector_class = self._vector_class
 
             for vec_name in vec_names:
@@ -1671,6 +1674,9 @@ class System(object):
             raise RuntimeError("{}: In order to activate complex step during reconfiguration, "
                                "you need to set 'force_alloc_complex' to True during setup. e.g. "
                                "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
+
+        if self._vector_class is None:
+            self._vector_class = self._local_vector_class
 
         vector_class = self._vector_class
 

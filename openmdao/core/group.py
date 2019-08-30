@@ -719,6 +719,8 @@ class Group(System):
 
         vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
+        n_distrib_vars = 0
+
         # Compute _var_sizes
         for vec_name in vec_names:
             sizes[vec_name] = {}
@@ -729,6 +731,9 @@ class Group(System):
                                                        INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
+                    if isinstance(subsys, Component) and subsys.options['distributed']:
+                        n_distrib_vars += 1
+
                     if vec_name not in subsys._rel_vec_names:
                         continue
                     proc_slice = slice(*subsystems_proc_range[ind])
@@ -758,6 +763,15 @@ class Group(System):
                     sizes_in = sizes[type_][iproc, :].copy()
                     self.comm.Allgather(sizes_in, sizes[type_])
 
+            has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
+            if (has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
+                    not np.all(self._var_sizes[vec_names[0]]['input'])):
+                if self._distributed_vector_class is not None:
+                    self._vector_class = self._distributed_vector_class
+                else:
+                    raise RuntimeError("{}: Distributed vectors are required but no distributed "
+                                       "vector type has been set.".format(self.msginfo))
+
             # compute owning ranks and owned sizes
             abs2meta = self._var_allprocs_abs2meta
             owns = self._owning_rank
@@ -780,6 +794,7 @@ class Group(System):
                                 owns[n] = i
         else:
             self._owned_sizes = self._var_sizes[vec_names[0]]['output']
+            self._vector_class = self._local_vector_class
 
         if self._use_derivatives:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
@@ -979,7 +994,7 @@ class Group(System):
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
 
-        self._vector_class = None
+        nproc = self.comm.size
 
         # Check input/output units here, and set _has_input_scaling
         # to True for this Group if units are defined and different, or if
@@ -1000,7 +1015,7 @@ class Group(System):
                     else:
                         abs_in2out[abs_in] = abs_out
 
-                    if MPI and self._vector_class is None:
+                    if nproc > 1 and self._vector_class is None:
                         # check for any cross-process data transfer.  If found, use
                         # self._distributed_vector_class as our vector class.
                         in_path = abs_in.rsplit('.', 1)[0]
@@ -1045,14 +1060,6 @@ class Group(System):
                                 needs_input_scaling = np.any(res_ref != 1.0)
 
                 self._has_input_scaling = needs_input_scaling
-
-        if self._vector_class is None:
-            if self.comm.size > 1:
-                # we need a uniform norm() value for all ranks so we stay in sync
-                self._vector_class = self._distributed_vector_class
-            else:
-                # our vectors are just local vectors.
-                self._vector_class = self._local_vector_class
 
         # check compatability for any discrete connections
         for abs_in, abs_out in iteritems(self._conn_discrete_in2out):
