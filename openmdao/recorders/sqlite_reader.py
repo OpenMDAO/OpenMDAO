@@ -8,14 +8,15 @@ import sqlite3
 from collections import OrderedDict
 
 from six import PY2, PY3, iteritems, string_types
-
 from six.moves import range
+
+import numpy as np
 
 from openmdao.recorders.base_case_reader import BaseCaseReader
 from openmdao.recorders.case import Case, PromAbsDict
 
-from openmdao.utils.general_utils import simple_warning
-from openmdao.utils.record_util import check_valid_sqlite3_db, convert_to_np_array
+from openmdao.utils.general_utils import simple_warning, convert_user_defined_tags_to_set
+from openmdao.utils.record_util import check_valid_sqlite3_db
 
 from openmdao.recorders.sqlite_recorder import format_version
 
@@ -156,6 +157,10 @@ class SqliteCaseReader(BaseCaseReader):
 
         con.close()
 
+        for name, meta in iteritems(self._abs2meta):
+            if 'tags' in meta:
+                meta['tags'] = convert_user_defined_tags_to_set(meta['tags'])
+
         # create maps to facilitate accessing variable metadata using absolute or promoted name
         self._output2meta = PromAbsDict(self._abs2meta, self._prom2abs, self._abs2prom, 1)
         self._input2meta = PromAbsDict(self._abs2meta, self._prom2abs, self._abs2prom, 0)
@@ -218,10 +223,10 @@ class SqliteCaseReader(BaseCaseReader):
 
             # need to convert bounds to numpy arrays
             for name, meta in iteritems(self._abs2meta):
-                if 'lower' in meta:
-                    meta['lower'] = convert_to_np_array(meta['lower'], name, meta['shape'])
-                if 'upper' in meta:
-                    meta['upper'] = convert_to_np_array(meta['upper'], name, meta['shape'])
+                if 'lower' in meta and meta['lower'] is not None:
+                    meta['lower'] = np.resize(np.array(meta['lower']), meta['shape'])
+                if 'upper' in meta and meta['upper'] is not None:
+                    meta['upper'] = np.resize(np.array(meta['upper']), meta['shape'])
 
         elif version in (1, 2):
             abs2prom = row['abs2prom']
@@ -358,8 +363,8 @@ class SqliteCaseReader(BaseCaseReader):
         Returns
         -------
         list
-            One or more of: `problem`, `driver`, `<component hierarchy location>`,
-            `<solver hierarchy location>`
+            One or more of: `problem`, `driver`, `<system hierarchy location>`,
+                            `<solver hierarchy location>`
         """
         sources = []
 
@@ -380,8 +385,7 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', `<component hierarchy location>`,
-            `<solver hierarchy location>`}
+        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>}
             Identifies the source for which to return information.
 
         Returns
@@ -427,7 +431,8 @@ class SqliteCaseReader(BaseCaseReader):
 
         Parameters
         ----------
-        source : {'problem', 'driver', component pathname, solver pathname, case_name}
+        source : {'problem', 'driver', <system hierarchy location>, <solver hierarchy location>,
+            case name}
             If not None, only cases originating from the specified source or case are returned.
         recurse : bool, optional
             If True, will enable iterating over all successors in case hierarchy.

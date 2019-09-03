@@ -51,6 +51,12 @@ The following example shows how to use these methods.
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs
     :layout: interleave
 
+You can also make use of the variable tagging feature when getting values from cases. This example shows how to do
+that.
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs_with_tags
+    :layout: interleave
 
 Getting Variable Data from Case By Specifying Variable Name and Units Desired
 -----------------------------------------------------------------------------

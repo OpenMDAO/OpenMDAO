@@ -23,8 +23,8 @@ list of the names of objects that are the sources of recorded data in the file.
 .. automethod:: openmdao.recorders.base_case_reader.BaseCaseReader.list_sources
     :noindex:
 
-The complementary :code:`list_source_vars` method will provide a dictionary of the input and output variables recorded
-by each of those sources.
+The complementary :code:`list_source_vars` method will provide a list of the input and output variables recorded
+for a given source.
 
 .. automethod:: openmdao.recorders.base_case_reader.BaseCaseReader.list_source_vars
     :noindex:
