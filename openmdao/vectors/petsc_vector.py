@@ -118,18 +118,55 @@ class PETScVector(DefaultVector):
     def _get_dup_inds(self):
         if self._dup_inds is None:
             system = self._system
-            # Here, we find the indices that are not locally owned so that we can
-            # temporarilly zero them out for the norm calculation.
-            dup_inds = []
-            abs2meta = system._var_allprocs_abs2meta
-            for name, idx_slice in iteritems(self.get_slice_dict()):
-                owning_rank = system._owning_rank[name]
-                if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
-                    dup_inds.extend(range(idx_slice.start, idx_slice.stop))
+            if system.comm.size > 1:
+                # Here, we find the indices that are not locally owned so that we can
+                # temporarilly zero them out for the norm calculation.
+                dup_inds = []
+                abs2meta = system._var_allprocs_abs2meta
+                for name, idx_slice in iteritems(self.get_slice_dict()):
+                    owning_rank = system._owning_rank[name]
+                    if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
+                        dup_inds.extend(range(idx_slice.start, idx_slice.stop))
 
-            self._dup_inds = np.array(dup_inds, dtype=int)
+                self._dup_inds = np.array(dup_inds, dtype=int)
+            else:
+                self._dup_inds = np.array([], dtype=int)
 
         return self._dup_inds
+
+    def _get_nodup(self):
+        dup_inds = self._get_dup_inds()
+        has_dups = dup_inds.size > 0
+
+        if self._ncol == 1:
+            if has_dups:
+                data_cache = self._data.copy()
+                data_cache[dup_inds] = 0.0
+            else:
+                data_cache = self._data
+        else:
+            # With Vectorized derivative solves, data contains multiple columns.
+            icol = self._icol
+            if icol is None:
+                icol = 0
+            if has_dups:
+                data_cache = self._data.flatten()
+                data_cache[dup_inds] = 0.0
+                data_cache = data_cache.reshape(self._data.shape)[:, icol]
+            else:
+                data_cache = self._data[:, icol]
+
+        return data_cache
+
+    def _restore(self):
+        if self._ncol == 1:
+            self._petsc.array = self._data
+        else:
+            # With Vectorized derivative solves, data contains multiple columns.
+            icol = self._icol
+            if icol is None:
+                icol = 0
+            self._petsc.array = self._data[:, icol]
 
     def get_norm(self):
         """
@@ -140,40 +177,44 @@ class PETScVector(DefaultVector):
         float
             norm of this vector.
         """
-        system = self._system
-        comm = system.comm
-        if comm.size > 1:
-            dup_inds = self._get_dup_inds()
+        nodup = self._get_nodup()
+        self._petsc.array = nodup.real
+        distributed_norm = self._petsc.norm()
+        self._restore()
+        return distributed_norm
 
-            if self._ncol == 1:
-                data_cache = self._data.copy().real
-                self._petsc.array = data_cache
-                self._petsc.array[dup_inds] = 0.0
-                distributed_norm = self._petsc.norm()
+        # dup_inds = self._get_dup_inds()
+        # has_dups = dup_inds.size > 0
 
-                # Reset petsc array
-                self._petsc.array = self._data.real
+        # if self._ncol == 1:
+        #     if has_dups:
+        #         data_cache = self._data.copy().real
+        #         self._petsc.array = data_cache
+        #         self._petsc.array[dup_inds] = 0.0
+        #     else:
+        #         self._petsc.array = self._data.real
+        #     distributed_norm = self._petsc.norm()
 
-            else:
-                # With Vectorized derivative solves, data contains multiple columns.
-                icol = self._icol
-                if icol is None:
-                    icol = 0
-                data_cache = self._data.flatten().real
-                data_cache[dup_inds] = 0.0
-                self._petsc.array = data_cache.reshape(self._data.shape)[:, icol]
-                distributed_norm = self._petsc.norm()
+        #     # Reset petsc array
+        #     self._petsc.array = self._data
 
-                # Reset petsc array
-                self._petsc.array = self._data[:, icol].real
+        # else:
+        #     # With Vectorized derivative solves, data contains multiple columns.
+        #     icol = self._icol
+        #     if icol is None:
+        #         icol = 0
+        #     if has_dups:
+        #         data_cache = self._data.flatten().real
+        #         data_cache[dup_inds] = 0.0
+        #         self._petsc.array = data_cache.reshape(self._data.shape)[:, icol]
+        #     else:
+        #         self._petsc.array = self._data[:, icol].real
+        #     distributed_norm = self._petsc.norm()
 
-            return distributed_norm
+        #     # Reset petsc array
+        #     self._petsc.array = self._data[:, icol]
 
-        else:
-            # If we are below a parallel group, all variables only appear on the rank that
-            # owns them.
-            self._petsc.array = self._data
-            return self._petsc.norm()
+        # return distributed_norm
 
     def dot(self, vec):
         """
@@ -189,8 +230,5 @@ class PETScVector(DefaultVector):
         float
             The computed dot product value.
         """
-        if self._system.comm.size > 1:
-            dup_inds = self._get_dup_inds()
-        else:
-            dup_inds = _full_slice
-        return self._system.comm.allreduce(np.dot(self._data[dup_inds], vec._data[dup_inds]))
+        nodup = self._get_nodup()
+        return self._system.comm.allreduce(np.dot(nodup, vec._data))
