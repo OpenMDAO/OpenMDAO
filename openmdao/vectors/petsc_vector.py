@@ -35,8 +35,11 @@ class PETScVector(DefaultVector):
 
     Attributes
     ----------
-    _dup_inds : list(int)
-        Keeps track of indices that aren't locally owned; used by norm calculation.
+    _dup_inds : ndarray of int
+        Array of indices of variables that aren't locally owned, meaning that they duplicate
+        variables that are 'owned' by a different process. Used by certain distributed
+        calculations, e.g., get_norm(), where including duplicate values would result in
+        the wrong answer.
     """
 
     TRANSFER = PETScTransfer
@@ -116,6 +119,14 @@ class PETScVector(DefaultVector):
                                                                    comm=self._system.comm)
 
     def _get_dup_inds(self):
+        """
+        Compute the indices into the data vector corresponding to duplicated variables.
+
+        Returns
+        -------
+        ndarray of int
+            Index array corresponding to duplicated variables.
+        """
         if self._dup_inds is None:
             system = self._system
             if system.comm.size > 1:
@@ -135,6 +146,16 @@ class PETScVector(DefaultVector):
         return self._dup_inds
 
     def _get_nodup(self):
+        """
+        Retrieve a version of the data vector with any duplicate variables zeroed out.
+
+        Returns
+        -------
+        ndarray
+            Array the same size as our data array with duplicate variables zeroed out.
+            If all variables are owned by this process, then the data array itself is
+            returned without copying.
+        """
         dup_inds = self._get_dup_inds()
         has_dups = dup_inds.size > 0
 
@@ -158,7 +179,13 @@ class PETScVector(DefaultVector):
 
         return data_cache
 
-    def _restore(self):
+    def _restore_dups(self):
+        """
+        Restore our petsc array so that it corresponds once again to our local data array.
+
+        This is done to restore the petsc array after we previously zeroed out all duplicated
+        values.
+        """
         if self._ncol == 1:
             self._petsc.array = self._data
         else:
@@ -180,41 +207,8 @@ class PETScVector(DefaultVector):
         nodup = self._get_nodup()
         self._petsc.array = nodup.real
         distributed_norm = self._petsc.norm()
-        self._restore()
+        self._restore_dups()
         return distributed_norm
-
-        # dup_inds = self._get_dup_inds()
-        # has_dups = dup_inds.size > 0
-
-        # if self._ncol == 1:
-        #     if has_dups:
-        #         data_cache = self._data.copy().real
-        #         self._petsc.array = data_cache
-        #         self._petsc.array[dup_inds] = 0.0
-        #     else:
-        #         self._petsc.array = self._data.real
-        #     distributed_norm = self._petsc.norm()
-
-        #     # Reset petsc array
-        #     self._petsc.array = self._data
-
-        # else:
-        #     # With Vectorized derivative solves, data contains multiple columns.
-        #     icol = self._icol
-        #     if icol is None:
-        #         icol = 0
-        #     if has_dups:
-        #         data_cache = self._data.flatten().real
-        #         data_cache[dup_inds] = 0.0
-        #         self._petsc.array = data_cache.reshape(self._data.shape)[:, icol]
-        #     else:
-        #         self._petsc.array = self._data[:, icol].real
-        #     distributed_norm = self._petsc.norm()
-
-        #     # Reset petsc array
-        #     self._petsc.array = self._data[:, icol]
-
-        # return distributed_norm
 
     def dot(self, vec):
         """
@@ -231,4 +225,5 @@ class PETScVector(DefaultVector):
             The computed dot product value.
         """
         nodup = self._get_nodup()
+        # we don't need to _resore_dups here since we don't modify _petsc.array.
         return self._system.comm.allreduce(np.dot(nodup, vec._data))

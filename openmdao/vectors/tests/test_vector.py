@@ -155,6 +155,11 @@ class TestPETScVector2Proc(unittest.TestCase):
 
         assert_rel_error(self, norm_val, 0.22595230821097395, 1e-10)
 
+        # test petsc dot while we're at it
+        vec.set_const(3.)
+        vec2 = prob.model._vectors['residual']['linear']
+        vec2.set_const(4.)
+        assert_rel_error(self, vec.dot(vec2), 12.*6, 1e-10)
 
 @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class TestPETScVector3Proc(unittest.TestCase):
@@ -181,6 +186,12 @@ class TestPETScVector3Proc(unittest.TestCase):
         norm_val = vec.get_norm()
 
         assert_rel_error(self, norm_val, 0.22595230821097395, 1e-10)
+
+        # test petsc dot while we're at it
+        vec.set_const(3.)
+        vec2 = prob.model._vectors['residual']['linear']
+        vec2.set_const(4.)
+        assert_rel_error(self, vec.dot(vec2), 12.*6, 1e-10)
 
     def test_distributed_norm_parallel_group(self):
         prob = om.Problem()
@@ -216,8 +227,7 @@ class TestPETScVector3Proc(unittest.TestCase):
         norm_val = vec.get_norm()
         assert_rel_error(self, norm_val, 8.888194417315589, 1e-10)
 
-        print("owned size:", prob.model._owned_sizes)
-        # test petsc norm while we're at it
+        # test petsc dot while we're at it
         vec.set_const(3.)
         vec2 = prob.model._vectors['residual']['linear']
         vec2.set_const(4.)

@@ -457,7 +457,7 @@ class DirectSolver(LinearSolver):
             if nproc > 1:
                 _, nodup2local_inds, local2owned_inds, noncontig_dist_inds = \
                     system._get_nodup_out_ranges()
-                # gather full_b
+                # gather the 'owned' parts of b_vec from each process
                 tmp = np.empty(self._nodup_size, dtype=b_vec.dtype)
                 mpi_typ = MPI.C_DOUBLE_COMPLEX if np.iscomplex(b_vec[0]) else MPI.DOUBLE
                 disps = sizes2offsets(self._owned_size_totals, dtype=INT_DTYPE)
@@ -470,7 +470,7 @@ class DirectSolver(LinearSolver):
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 if iproc == 0:
                     # convert full_b to the same ordering that the matrix expects, where
-                    # dist vars are contiguous.
+                    # dist vars are contiguous and other vars appear in 'execution' order.
                     if nproc > 1:
                         full_b = tmp[noncontig_dist_inds]
 
