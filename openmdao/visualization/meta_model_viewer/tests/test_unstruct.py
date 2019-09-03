@@ -2,13 +2,13 @@ import unittest
 
 import numpy as np
 import openmdao.api as om
-from openmdao.visualization.meta_model_viewer.meta_model_visualization import UnstructuredMetaModelVisualization
+from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 
 
 class UnstructuredMetaModelCompTests(unittest.TestCase):
 
     def test_missing_training_data_in_parameter(self):
-        
+
         # Model
         interp = om.MetaModelUnStructuredComp()
 
@@ -31,13 +31,13 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = UnstructuredMetaModelVisualization(prob, interp)
+            viz = MetaModelVisualization(prob, interp)
 
         msg = "No training data present for one or more parameters"
         self.assertTrue(msg in str(context.exception))
 
     def test_single_input_parameter(self):
-        
+
         # Model
         interp = om.MetaModelUnStructuredComp()
 
@@ -59,7 +59,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = UnstructuredMetaModelVisualization(prob, interp)
+            viz = MetaModelVisualization(prob, interp)
 
         msg = 'Must have more than one input value'
         self.assertTrue(msg in str(context.exception))
