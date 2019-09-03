@@ -4,21 +4,47 @@
 MetaModelStructuredComp
 ***********************
 
-`MetaModelStructuredComp` is a smooth interpolation Component for data that exists on a regular, structured, grid.
-This differs from :ref:`MetaModelUnStructured <feature_MetaModelUnStructuredComp>` which accepts unstructured data as collections of points.
+`MetaModelStructuredComp` is a smooth interpolation Component for data that exists on a regular,
+structured, grid. This differs from :ref:`MetaModelUnStructured <feature_MetaModelUnStructuredComp>`
+which accepts unstructured data as collections of points.
 
 `MetaModelStructuredComp` produces smooth fits through provided training data using polynomial
-splines of order 1 (linear), 3 (cubic), or 5 (quintic). Analytic
-derivatives are automatically computed.
+splines of various orders. The interpolation methods include three that wrap methods in
+scipy.interpolate, as well as five methods that are written in pure python. For all methods,
+derivatives are automatically computed.  The followiing table summarizes the methods and gives
+the number of points required for each.
 
-Note that `MetaModelStructuredComp` only accepts scaler inputs and outputs. If you have a multivariable function, each
-input variable needs its own named OpenMDAO input.
++---------------+--------+------------------------------------------------------------+
+| Method        | Order  | Description                                                |
++===============+========+============================================================+
+| slinear       | 2      | Basic linear interpolation                                 |
++---------------+--------+------------------------------------------------------------+
+| lagrange2     | 3      | Second order Lagrange polynomial                           |
++---------------+--------+------------------------------------------------------------+
+| lagrange3     | 4      | Third order Lagrange polynomial                            |
++---------------+--------+------------------------------------------------------------+
+| akima         | 4      | Interpolation using Akima splines                          |
++---------------+--------+------------------------------------------------------------+
+| cubic         | 3      | Cubic Splines, continuity of derivatives between splines   |
++---------------+--------+------------------------------------------------------------+
+| scipy_slinear | 2      | Scipy linear interpolation                                 |
++---------------+--------+------------------------------------------------------------+
+| scipy_cubic   | 3      | Scipy cubic interpolation                                  |
++---------------+--------+------------------------------------------------------------+
+| scipy_quintic | 5      | Scipy quintic interpolation. Most accurate, but slower    |
++---------------+--------+------------------------------------------------------------+
 
-For multi-dimensional data, fits are computed
-on a separable per-axis basis. If a particular dimension does not have
-enough training data points to support a selected spline order (e.g. 3
-sample points, but an order 5 quintic spline is specified), the order of the
-fitted spline will be automatically reduced for that dimension alone.
+
+Note that `MetaModelStructuredComp` only accepts scaler inputs and outputs. If you have a
+multivariable function, each input variable needs its own named OpenMDAO input.
+
+For multi-dimensional data, fits are computed on a separable per-axis basis. A single interpolation
+method is used for all dimensions, so the minimum table dimension must be high enough to use
+the chosen interpolate. However, if you choose one of the scipy methods, then automatic order
+reduction is supported. In this case, if a particular dimension does not haveenough training data
+points to support a selected spline order (e.g. 3 sample points, but an order 5 'scipy_quintic'
+spline is specified), the order of the fitted spline will be automatically reduced to one of the
+lower order scipy methods ('scipy_cubic' or 'scipy_slinear')for that dimension alone.
 
 Extrapolation is supported, but disabled by default. It can be enabled
 via the :code:`extrapolate` option (see below).

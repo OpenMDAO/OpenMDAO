@@ -828,7 +828,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         prob.run_model()
 
         partials = prob.check_partials(method='cs', out_stream=None)
-        assert_check_partials(partials)
+        assert_check_partials(partials, rtol=1e-10)
 
     def test_vectorized_lagrange2(self):
         prob = om.Problem()
@@ -871,7 +871,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         partials = prob.check_partials(method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
-        assert_check_partials(partials, atol=1e10, rtol=1e-5)
+        assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
     def test_vectorized_lagrange3(self):
         prob = om.Problem()
@@ -914,7 +914,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         partials = prob.check_partials(method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
-        assert_check_partials(partials, atol=1e10, rtol=2e-5)
+        assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
     def test_vectorized_akima(self):
         prob = om.Problem()
@@ -957,7 +957,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         partials = prob.check_partials(method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
-        assert_check_partials(partials, atol=1e10, rtol=2e-5)
+        assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
     def test_vectorized_cubic(self):
         prob = om.Problem()
@@ -1000,7 +1000,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         partials = prob.check_partials(method='cs', out_stream=None)
         # Derivs are large, so ignore atol.
-        assert_check_partials(partials, atol=1e10, rtol=2e-5)
+        assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
     def test_training_gradient(self):
         model = om.Group()

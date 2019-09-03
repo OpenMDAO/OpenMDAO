@@ -14,7 +14,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
 
 
-ALL_METHODS = ('cubic', 'slinear', 'quintic', 'lagrange2', 'lagrange3', 'akima',
+ALL_METHODS = ('cubic', 'slinear', 'lagrange2', 'lagrange3', 'akima',
                'scipy_cubic', 'scipy_slinear', 'scipy_quintic')
 
 
