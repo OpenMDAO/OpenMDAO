@@ -12,6 +12,7 @@ from bokeh.models.widgets import TextInput, Select
 # Misc Imports
 from scipy.spatial import cKDTree
 import numpy as np
+import openmdao.api as om
 
 
 def stack_outputs(outputs_dict):
@@ -42,9 +43,11 @@ class MetaModelVisualization(object):
     Attributes
     ----------
     prob : om.Problem
-        Name of Problem object reference
-    surrogate_comp : MetaModel
+        Name of variable corresponding to Problem Component
+    surrogate_ref : MetaModel
         Name of Meta Model Component object reference
+    model_ref : MetaModel
+        Name of empty Meta Model Component object reference
     resolution : int
         Number used to calculate width and height of contour plot
     slider_source : ColumnDataSource
@@ -101,39 +104,37 @@ class MetaModelVisualization(object):
         A 2D array containing contour plot data
     """
 
-    def __init__(self, prob, surrogate_comp, resolution=50):
+    def __init__(self, surrogate_ref, resolution=50):
         """
         Initialize parameters.
 
         Parameters
         ----------
-        prob : Problem
-            Openmdao problem instance
-        surrogate_comp : MetaModelComponent
+        surrogate_ref : MetaModelComponent
             Reference to meta model component
         resolution : int
             Value used to calculate the size of contour plot meshgrid
         """
-        self.prob = prob
-        self.surrogate_comp = surrogate_comp
+        self.prob = om.Problem()
+        self.surrogate_ref = surrogate_ref
         self.resolution = resolution
         # Create list of inputs
-        self.input_list = [i[0] for i in self.surrogate_comp._surrogate_input_names]
+        self.input_list = [i[0] for i in self.surrogate_ref._surrogate_input_names]
 
         if len(self.input_list) < 2:
             raise ValueError('Must have more than one input value')
 
-        self.output_list = [i[0] for i in self.surrogate_comp._surrogate_output_names]
+        self.output_list = [i[0] for i in self.surrogate_ref._surrogate_output_names]
 
+        self.model_ref = om.MetaModelUnStructuredComp(default_surrogate=om.ResponseSurface())
         # Pair input list names with their respective data
         self.input_data = {}
-        for title in self.input_list:
-            try:
-                self.input_data[title] = {
-                    i for i in self.surrogate_comp.options[str('train:' + title)]}
-            except TypeError:
-                msg = "No training data present for one or more parameters"
-                raise TypeError(msg)
+
+        self._empty_prob_comp()
+
+        self.prob = om.Problem()
+        self.prob.model.add_subsystem('interp', self.model_ref)
+        self.prob.setup()
 
         # Setup dropdown menus for x/y inputs and the output value
         self.x_input = Select(title="X Input:", value=[x for x in self.input_list][0],
@@ -198,6 +199,31 @@ class MetaModelVisualization(object):
         curdoc().add_root(self.layout2)
         curdoc().title = 'Meta Model Visualization'
 
+    def _empty_prob_comp(self):
+        """
+        Take data from surrogate ref and pass it into new surrogate model with empty Problem model.
+
+        Parameters
+        ----------
+        None
+
+        """
+        for name in self.input_list:
+            try:
+                self.input_data[name] = {
+                    i for i in self.surrogate_ref.options[str('train:' + name)]}
+                self.model_ref.add_input(
+                    name, 0.,
+                    training_data=[i for i in self.surrogate_ref.options[str('train:' + name)]])
+            except TypeError:
+                msg = "No training data present for one or more parameters"
+                raise TypeError(msg)
+
+        for name in self.output_list:
+            self.model_ref.add_output(
+                name, 0.,
+                training_data=[i for i in self.surrogate_ref.options[str('train:' + name)]])
+
     def _slider_attrs(self):
         """
         Assign slider objects and callback functions.
@@ -246,10 +272,10 @@ class MetaModelVisualization(object):
         # Pair data points with their respective prob name. Loop to make predictions
         for idx, tup in enumerate(inputs):
             for name, val in zip(data.keys(), tup):
-                self.prob[str.format(self.surrogate_comp.name + '.' + name)] = val
+                self.prob[str.format(self.model_ref.name + '.' + name)] = val
             self.prob.run_model()
             for i in self.output_list:
-                outputs[i].append(float(self.prob[str.format(self.surrogate_comp.name + '.' + i)]))
+                outputs[i].append(float(self.prob[str.format(self.model_ref.name + '.' + i)]))
 
         return stack_outputs(outputs)
 
@@ -521,8 +547,8 @@ class MetaModelVisualization(object):
         # [x1, x2, x3, x4]
         # Input Data
         # Output Data
-        x_training = self.surrogate_comp._training_input
-        y_training = np.squeeze(stack_outputs(self.surrogate_comp._training_output), axis=1)
+        x_training = self.model_ref._training_input
+        y_training = np.squeeze(stack_outputs(self.model_ref._training_output), axis=1)
         output_variable = self.output_list.index(self.output_select.value)
         data = np.zeros((0, 8))
 

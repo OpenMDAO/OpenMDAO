@@ -31,7 +31,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = MetaModelVisualization(prob, interp)
+            viz = MetaModelVisualization(interp)
 
         msg = "No training data present for one or more parameters"
         self.assertTrue(msg in str(context.exception))
@@ -59,62 +59,10 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
 
         with self.assertRaises(Exception) as context:
-            viz = MetaModelVisualization(prob, interp)
+            viz = MetaModelVisualization(interp)
 
         msg = 'Must have more than one input value'
         self.assertTrue(msg in str(context.exception))
-
-    # def test_single_point_training(self):
-
-    #     # Model
-    #     interp = om.MetaModelUnStructuredComp()
-
-    #     # Training Data
-    #     x_train = np.linspace(0, 10, 1)
-    #     y_train = np.linspace(0, 20, 1)
-
-    #     # Inputs
-    #     interp.add_input('simple_x', 0., training_data=x_train)
-
-    #     #Outputs
-    #     interp.add_output('cos_x', 0., training_data=.5*np.cos(y_train))
-
-    #     # Surrogate Model
-    #     interp.options['default_surrogate'] = om.ResponseSurface()
-
-    #     prob = om.Problem()
-    #     prob.model.add_subsystem('interp', interp)
-    #     prob.setup()
-
-    #     viz = MetaModelVisualization(prob, interp)._training_points()
-
-    # def test_single_training_point(self):
-
-    #     # Model
-    #     interp = om.MetaModelUnStructuredComp()
-
-    #     # Training Data
-    #     x_train = np.linspace(0, -10, 20)
-    #     y_train = np.linspace(0, 20, 20)
-
-    #     # Inputs
-    #     interp.add_input('simple_x', 0., training_data=x_train)
-
-    #     #Outputs
-    #     interp.add_output('cos_x', 0., training_data=.5*np.cos(y_train))
-
-    #     # Surrogate Model
-    #     interp.options['default_surrogate'] = om.ResponseSurface()
-
-    #     prob = om.Problem()
-    #     prob.model.add_subsystem('interp', interp)
-    #     prob.setup()
-
-    #     viz = MetaModelVisualization(prob, interp)
-
-
-    #     self.assertTrue(msg in str(context.exception))
-
 
 
 if __name__ == '__main__':
