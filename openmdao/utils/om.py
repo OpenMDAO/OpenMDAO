@@ -229,6 +229,7 @@ def _view_connections_cmd(options):
         exit()
     return _viewconns
 
+
 def _meta_model_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao meta_model' command.
@@ -239,6 +240,7 @@ def _meta_model_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
+
 
 def _meta_model_cmd(options):
     """
@@ -260,6 +262,7 @@ def _meta_model_cmd(options):
     bash_command = str.format("bokeh serve --show " + file_name)
     process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
+
 
 def _config_summary_setup_parser(parser):
     """
