@@ -695,22 +695,40 @@ class InterpCubic(object):
     def __init__(self):
         self.second_derivs = None
 
-    def compute_second_derivatives(self, grid, values, x):
+    def compute_coeffs(self, grid, values, x):
+        """
+        Compute cubic spline coefficients that give continuity of second derivatives.
+
+        This requires solution of a tri-diagonal system, which is done with a forward and
+        a reverse pass.
+
+        Parameters
+        ----------
+        grid : tuple(ndarray)
+            Tuple containing x grid locations for this dimension.
+        values : ndarray
+            Array containing the values to be interpolated.
+        x : ndarray
+            The coordinates to sample the gridded data at. Only needed to query the dtype for
+            complex step.
+        """
         n = len(grid)
 
         # Natural spline has second deriv=0 at both ends
         sec_deriv = np.zeros(n, dtype=x.dtype)
         temp = np.zeros(values.shape, dtype=x.dtype)
 
-        sig = (grid[1:n - 1] - grid[:n - 2]) / (grid[2:] - grid[:n - 2])
+        # Subdiagonal stripe.
+        mu = (grid[1:n - 1] - grid[:n - 2]) / (grid[2:] - grid[:n - 2])
 
+        # Right hand sides.
         vdiff = (values[..., 1:] - values[..., :n - 1]) / (grid[1:] - grid[:n - 1])
         tmp = 6.0 * (vdiff[..., 1:] - vdiff[..., :n - 2]) / (grid[2:] - grid[:n - 2])
 
         for i in range(1, n - 1):
-            prtl = sig[i - 1] * sec_deriv[..., i - 1] + 2.0
-            sec_deriv[i] = (sig[i - 1] - 1.0) / prtl
-            temp[..., i] = (tmp[..., i - 1] - sig[i - 1] * temp[..., i - 1]) / prtl
+            prtl = mu[i - 1] * sec_deriv[..., i - 1] + 2.0
+            sec_deriv[i] = (mu[i - 1] - 1.0) / prtl
+            temp[..., i] = (tmp[..., i - 1] - mu[i - 1] * temp[..., i - 1]) / prtl
 
         sec_deriv = np.array(np.broadcast_to(sec_deriv, temp.shape), dtype=x.dtype)
 
@@ -758,7 +776,7 @@ class InterpCubic(object):
             nx = len(x)
 
             values, subderivs = subtable.evaluate(x[1:], slice_idx=slice_idx)
-            sec_deriv = self.compute_second_derivatives(table.grid, values, x)
+            sec_deriv = self.compute_coeffs(table.grid, values, x)
 
             step = grid[idx + 1] - grid[idx]
             r_step = 1.0 / step
@@ -781,14 +799,14 @@ class InterpCubic(object):
                                (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact))
 
             if nx == 2:
-                dsec = self.compute_second_derivatives(table.grid, subderivs, x)
+                dsec = self.compute_coeffs(table.grid, subderivs, x)
                 derivs[..., 1] = ((a * a * a - a) * dsec[..., idx] + \
                                    (b * b * b - b) * dsec[..., idx + 1]) * (step * step * fact)
 
                 derivs[..., 1] += a * subderivs[..., idx] + b * subderivs[..., idx + 1]
 
             else:
-                dsec = self.compute_second_derivatives(table.grid, np.swapaxes(subderivs, -1, -2),
+                dsec = self.compute_coeffs(table.grid, np.swapaxes(subderivs, -1, -2),
                                                        x)
                 derivs[..., 1:] = ((a * a * a - a) * dsec[..., idx] + \
                                    (b * b * b - b) * dsec[..., idx + 1]) * (step * step * fact)
@@ -801,7 +819,7 @@ class InterpCubic(object):
             values = table.values
 
             if self.second_derivs is None:
-                self.second_derivs = self.compute_second_derivatives(table.grid, values, x)
+                self.second_derivs = self.compute_coeffs(table.grid, values, x)
             sec_deriv = self.second_derivs
 
             # Perform the interpolation
