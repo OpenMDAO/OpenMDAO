@@ -353,7 +353,8 @@ class Vector(object):
         root_vector : <Vector> or None
             the root's vector instance or None, if we are at the root.
         """
-        pass
+        raise NotImplementedError('_initialize_data not defined for vector type %s' %
+                                  type(self).__name__)
 
     def _initialize_views(self):
         """
@@ -366,7 +367,8 @@ class Vector(object):
         - _views
         - _views_flat
         """
-        pass
+        raise NotImplementedError('_initialize_views not defined for vector type %s' %
+                                  type(self).__name__)
 
     def _clone_data(self):
         """
@@ -374,7 +376,8 @@ class Vector(object):
 
         Must be implemented by the subclass.
         """
-        pass
+        raise NotImplementedError('_clone_data not defined for vector type %s' %
+                                  type(self).__name__)
 
     def __iadd__(self, vec):
         """
@@ -387,7 +390,8 @@ class Vector(object):
         vec : <Vector>
             vector to add to self.
         """
-        pass
+        raise NotImplementedError('__iadd__ not defined for vector type %s' %
+                                  type(self).__name__)
 
     def __isub__(self, vec):
         """
@@ -400,7 +404,8 @@ class Vector(object):
         vec : <Vector>
             vector to subtract from self.
         """
-        pass
+        raise NotImplementedError('__isub__ not defined for vector type %s' %
+                                  type(self).__name__)
 
     def __imul__(self, val):
         """
@@ -413,7 +418,8 @@ class Vector(object):
         val : int or float
             scalar to multiply self.
         """
-        pass
+        raise NotImplementedError('__imul__ not defined for vector type %s' %
+                                  type(self).__name__)
 
     def add_scal_vec(self, val, vec):
         """
@@ -428,7 +434,8 @@ class Vector(object):
         vec : <Vector>
             this vector times val is added to self.
         """
-        pass
+        raise NotImplementedError('add_scale_vec not defined for vector type %s' %
+                                  type(self).__name__)
 
     def scale(self, scale_to):
         """
@@ -460,7 +467,8 @@ class Vector(object):
         vec : <Vector>
             the vector whose values self is set to.
         """
-        pass
+        raise NotImplementedError('set_vec not defined for vector type %s' %
+                                  type(self).__name__)
 
     def set_const(self, val):
         """
@@ -473,7 +481,8 @@ class Vector(object):
         val : int or float
             scalar to set self to.
         """
-        pass
+        raise NotImplementedError('set_const not defined for vector type %s' %
+                                  type(self).__name__)
 
     def dot(self, vec):
         """
@@ -486,7 +495,8 @@ class Vector(object):
         vec : <Vector>
             The incoming vector being dotted with self.
         """
-        pass
+        raise NotImplementedError('dot not defined for vector type %s' %
+                                  type(self).__name__)
 
     def get_norm(self):
         """
@@ -499,7 +509,9 @@ class Vector(object):
         float
             norm of this vector.
         """
-        pass
+        raise NotImplementedError('get_norm not defined for vector type %s' %
+                                  type(self).__name__)
+        return None  # silence lint warning about missing return value.
 
     def _enforce_bounds_vector(self, du, alpha, lower_bounds, upper_bounds):
         """
@@ -518,7 +530,8 @@ class Vector(object):
         upper_bounds : <Vector>
             Upper bounds vector.
         """
-        pass
+        raise NotImplementedError('_enforce_bounds_vector not defined for vector type %s' %
+                                  type(self).__name__)
 
     def _enforce_bounds_scalar(self, du, alpha, lower_bounds, upper_bounds):
         """
@@ -537,7 +550,8 @@ class Vector(object):
         upper_bounds : <Vector>
             Upper bounds vector.
         """
-        pass
+        raise NotImplementedError('_enforce_bounds_scalar not defined for vector type %s' %
+                                  type(self).__name__)
 
     def _enforce_bounds_wall(self, du, alpha, lower_bounds, upper_bounds):
         """
@@ -556,7 +570,8 @@ class Vector(object):
         upper_bounds : <Vector>
             Upper bounds vector.
         """
-        pass
+        raise NotImplementedError('_enforce_bounds_wall not defined for vector type %s' %
+                                  type(self).__name__)
 
     def set_complex_step_mode(self, active, keep_real=False):
         """

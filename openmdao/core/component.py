@@ -367,6 +367,9 @@ class Component(System):
         if self._use_derivatives:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
+        # for a component, all vars are 'owned'
+        self._owned_sizes = self._var_sizes['nonlinear']['output']
+
         self._setup_global_shapes()
 
     def _setup_partials(self, recurse=True):

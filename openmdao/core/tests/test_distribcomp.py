@@ -398,7 +398,7 @@ class MPITests(unittest.TestCase):
         p.run_model()
 
         if MPI:
-            if self.comm.rank == 0:
+            if p.comm.rank == 0:
                 self.assertTrue(all(C2._outputs['outvec'] ==
                                     np.array(list(take_nth(0, 2, range(size))), 'f')*4))
             else:

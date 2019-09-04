@@ -4,7 +4,7 @@ from __future__ import division, print_function
 from collections import Counter, defaultdict
 import numpy as np
 from numpy import ndarray
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, csc_matrix
 
 from six import iteritems
 from six.moves import range
@@ -20,14 +20,13 @@ class COOMatrix(Matrix):
 
     Attributes
     ----------
-    _mat_range_cache : dict
-        Dictionary of cached CSC matrices needed for solving on a sub-range of the
-        parent CSC matrix.
     _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
+    _first_gather : bool
+        If True, this is the first time the matrix has been gathered (MPI only).
     """
 
-    def __init__(self, comm):
+    def __init__(self, comm, is_internal):
         """
         Initialize all attributes.
 
@@ -35,33 +34,47 @@ class COOMatrix(Matrix):
         ----------
         comm : MPI.Comm or <FakeComm>
             communicator of the top-level system that owns the <Jacobian>.
+        is_internal : bool
+            If True, this is the int_mtx of an AssembledJacobian.
         """
-        super(COOMatrix, self).__init__(comm)
-        self._mat_range_cache = {}
+        super(COOMatrix, self).__init__(comm, is_internal)
         self._coo = None
+        self._first_gather = True
 
-    def _build_sparse(self, num_rows, num_cols):
+    def _build_coo(self, system):
         """
-        Allocate the data, rows, and cols for the sparse matrix.
+        Allocate the data, rows, and cols for the COO matrix.
 
         Parameters
         ----------
-        num_rows : int
-            number of rows in the matrix.
-        num_cols : int
-            number of cols in the matrix.
+        system : <System>
+            Parent system of this matrix.
 
         Returns
         -------
         (ndarray, ndarray, ndarray)
-            data, rows, cols that can be used to construct a sparse matrix.
+            data, rows, cols that can be used to construct a COO matrix.
         """
         submats = self._submats
         metadata = self._metadata
         pre_metadata = self._key_ranges = OrderedDict()
+        if system is None:
+            owns = None
+            iproc = 0
+            comm_size = 1
+            abs2meta = None
+        else:
+            owns = system._owning_rank
+            iproc = system.comm.rank
+            comm_size = system.comm.size
+            abs2meta = system._var_allprocs_abs2meta
 
         start = end = 0
         for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
+            wrt_dist = abs2meta[key[1]]['distributed'] if abs2meta and owns else False
+            if owns and not (owns[key[1]] == iproc or wrt_dist or abs2meta[key[0]]['distributed']):
+                continue  # only keep stuff that this rank owns
+
             val = info['value']
             rows = info['rows']
             dense = (rows is None and (val is None or isinstance(val, ndarray)))
@@ -69,9 +82,15 @@ class COOMatrix(Matrix):
             full_size = np.prod(shape)
             if dense:
                 if src_indices is None:
-                    delta = full_size
+                    if wrt_dist:
+                        delta = np.prod(info['shape'])
+                    else:
+                        delta = full_size
                 else:
-                    delta = shape[0] * len(src_indices)
+                    if wrt_dist:
+                        delta = info['shape'][0] * len(src_indices)
+                    else:
+                        delta = shape[0] * len(src_indices)
             elif rows is None:  # sparse matrix
                 delta = val.data.size
             else:  # list sparse format
@@ -91,11 +110,22 @@ class COOMatrix(Matrix):
             val = info['value']
             idxs = None
 
+            col_offset = row_offset = 0
+            if comm_size > 1 and self._is_internal:
+                shape = info['shape']
+                if abs2meta[key[1]]['distributed']:
+                    col_offset = np.sum(
+                        system._owned_sizes[:iproc, system._var_allprocs_abs2idx['linear'][key[1]]])
+                if abs2meta[key[0]]['distributed']:
+                    row_offset = np.sum(
+                        system._owned_sizes[:iproc, system._var_allprocs_abs2idx['linear'][key[0]]])
+
             if dense:
+
                 jac_type = ndarray
 
                 if src_indices is None:
-                    colrange = np.arange(shape[1], dtype=int)
+                    colrange = np.arange(shape[1], dtype=int) + col_offset
                 else:
                     colrange = src_indices
 
@@ -104,7 +134,7 @@ class COOMatrix(Matrix):
                 subcols = cols[start:end]
 
                 for i in range(shape[0]):
-                    subrows[i * ncols: (i + 1) * ncols] = i
+                    subrows[i * ncols: (i + 1) * ncols] = i + row_offset
                     subcols[i * ncols: (i + 1) * ncols] = colrange
 
                 subrows += irow
@@ -121,8 +151,8 @@ class COOMatrix(Matrix):
                     jcols = info['cols']
 
                 if src_indices is None:
-                    rows[start:end] = jrows + irow
-                    cols[start:end] = jcols + icol
+                    rows[start:end] = jrows + (irow + row_offset)
+                    cols[start:end] = jcols + (icol + col_offset)
                 else:
                     irows, icols, idxs = _compute_index_map(jrows, jcols,
                                                             irow, icol,
@@ -134,7 +164,7 @@ class COOMatrix(Matrix):
 
         return data, rows, cols
 
-    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
+    def _build(self, num_rows, num_cols, system=None):
         """
         Allocate the matrix.
 
@@ -144,12 +174,10 @@ class COOMatrix(Matrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        in_ranges : dict
-            Maps input var name to column range.
-        out_ranges : dict
-            Maps output var name to row range.
+        system : <System>
+            owning system.
         """
-        data, rows, cols = self._build_sparse(num_rows, num_cols)
+        data, rows, cols = self._build_coo(system)
 
         metadata = self._metadata
         for key, (start, end, idxs, jac_type, factor) in iteritems(metadata):
@@ -187,7 +215,7 @@ class COOMatrix(Matrix):
         if factor is not None:
             self._matrix.data[idxs] *= factor
 
-    def _prod(self, in_vec, mode, ranges, mask=None):
+    def _prod(self, in_vec, mode, mask=None):
         """
         Perform a matrix vector product.
 
@@ -197,8 +225,6 @@ class COOMatrix(Matrix):
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
-        ranges : (int, int, int, int)
-            Min row, max row, min col, max col for the current system.
         mask : ndarray of type bool, or None
             Array used to zero out part of the matrix data.
 
@@ -212,36 +238,8 @@ class COOMatrix(Matrix):
         # the part of the matrix that is relevant to the lower level
         # system.
         mat = self._matrix
-        if ranges is not None:
-            rstart, rend, cstart, cend = ranges
-            if rstart != 0 or cstart != 0 or rend != mat.shape[0] or cend != mat.shape[1]:
-                if ranges in self._mat_range_cache:
-                    mat, idxs = self._mat_range_cache[ranges]
 
-                    # update the data array of our smaller cached matrix with current data from
-                    # self._matrix
-                    mat.data[:] = self._matrix.data[idxs]
-                else:
-                    rstart, rend, cstart, cend = ranges
-                    rmat = mat.tocoo()
-
-                    # find all row and col indices that are within the desired range
-                    ridxs = np.nonzero(np.logical_and(rmat.row >= rstart, rmat.row < rend))[0]
-                    cidxs = np.nonzero(np.logical_and(rmat.col >= cstart, rmat.col < cend))[0]
-
-                    # take the intersection since both rows and cols must be within range
-                    idxs = np.intersect1d(ridxs, cidxs, assume_unique=True)
-
-                    # create a new smaller csc matrix using only the parts of self._matrix that
-                    # are within range
-                    mat = coo_matrix((rmat.data[idxs], (rmat.row[idxs] - rstart,
-                                                        rmat.col[idxs] - cstart)),
-                                     shape=(rend - rstart, cend - cstart))
-                    mat = mat.tocsc()
-                    self._mat_range_cache[ranges] = mat, idxs
-
-        # NOTE: both mask and ranges will never be defined at the same time.  ranges applies only
-        #       to int_mtx and mask applies only to ext_mtx.
+        # NOTE: mask applies only to ext_mtx.
 
         if mode == 'fwd':
             if mask is None:
@@ -281,14 +279,18 @@ class COOMatrix(Matrix):
         """
         if len(d_inputs._views) > len(d_inputs._names):
             input_names = d_inputs._names
-            mask = np.ones(self._matrix.data.size, dtype=np.bool)
+            mask = None
             for key, val in iteritems(self._key_ranges):
                 if key[1] in input_names:
+                    if mask is None:
+                        mask = np.ones(self._matrix.data.size, dtype=np.bool)
                     ind1, ind2, _, _ = val
                     mask[ind1:ind2] = False
 
-            # convert the mask indices (if necessary) base on sparse matrix type (CSC, CSR, etc.)
-            return self._convert_mask(mask)
+            if mask is not None:
+                # convert the mask indices (if necessary) base on sparse matrix type
+                # (CSC, CSR, etc.)
+                return self._convert_mask(mask)
 
     def set_complex_step_mode(self, active):
         """
@@ -324,3 +326,36 @@ class COOMatrix(Matrix):
             The converted mask array.
         """
         return mask
+
+    def _get_assembled_matrix(self, system):
+        assert self._is_internal
+        if self._first_gather:
+            self._first_gather = False
+
+            # only need to gather the row/col indices the first time. After that we only need
+            # the data.
+            all_mtx = system.comm.gather(self._coo, root=0)
+
+            if system.comm.rank == 0:
+                data = []
+                rows = []
+                cols = []
+                for i, mtx in enumerate(all_mtx):
+                    data.append(mtx.data)
+                    rows.append(mtx.row)
+                    cols.append(mtx.col)
+
+                data = np.hstack(data)
+                self._gathered_rows = rows = np.hstack(rows)
+                self._gathered_cols = cols = np.hstack(cols)
+
+                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)
+        else:
+            all_data = system.comm.gather(self._coo.data, root=0)
+
+            if system.comm.rank == 0:
+                data = np.hstack(all_data)
+                rows = self._gathered_rows
+                cols = self._gathered_cols
+
+                return csc_matrix((data, (rows, cols)), shape=self._matrix.shape)

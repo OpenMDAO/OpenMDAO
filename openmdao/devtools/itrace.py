@@ -82,7 +82,7 @@ def _get_printer(stream, rank=-1):
     # rank < 0 means output on all ranks
     if not MPI or rank < 0 or MPI.COMM_WORLD.rank == rank:
         def prt(*args, **kwargs):
-            print(*args, file=stream, **kwargs)
+            print(*args, file=stream, flush=True, **kwargs)
     else:
         def prt(*args, **kwargs):
             pass
@@ -139,8 +139,6 @@ def _trace_call(frame, arg, stack, context):
         stats['list'] += 1
         leaks.append(stats)
 
-    stream.flush()
-
 
 def _trace_return(frame, arg, stack, context):
     """
@@ -194,8 +192,6 @@ def _trace_return(frame, arg, stack, context):
         last_objs = leaks.pop()
         for name, _, delta_objs in objgraph.growth(peak_stats=last_objs):
             _printer("%s   %s %+d" % (indent, name, delta_objs))
-
-    stream.flush()
 
 
 def _setup(options):

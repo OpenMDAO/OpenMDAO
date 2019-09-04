@@ -53,7 +53,7 @@ class IndepVarComp(ExplicitComponent):
         else:
             if not isinstance(kwargs['tags'], (str, set, list)):
                 raise TypeError('The tags argument should be a str, set, or list')
-            kwargs['tags'] = make_set(kwargs['tags']).add('indep_var')
+            kwargs['tags'] = make_set(kwargs['tags']) | {'indep_var'}
 
         # A single variable is declared during instantiation
         if isinstance(name, string_types):
@@ -161,7 +161,7 @@ class IndepVarComp(ExplicitComponent):
         else:
             if not isinstance(tags, (str, set, list)):
                 raise TypeError('The tags argument should be a str, set, or list')
-            tags = make_set(tags).add('indep_var')
+            tags = make_set(kwargs['tags']) | {'indep_var'}
 
 
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
