@@ -17,6 +17,9 @@ optional_dependencies = {
         'redbaron',
         'sphinx>=1.8.5',
     ],
+    'visualization': [
+        'bokeh'
+    ],
     'test': [
         'coverage',
         'parameterized',
@@ -141,8 +144,7 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'six',
-        'bokeh'
+        'six'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""

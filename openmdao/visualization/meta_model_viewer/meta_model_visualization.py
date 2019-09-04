@@ -42,9 +42,9 @@ class MetaModelVisualization(object):
     Attributes
     ----------
     prob : om.Problem
-        Name of variable corresponding to Problem Component
+        Name of Problem object reference
     surrogate_comp : MetaModel
-        Name of variable corresponding to Meta Model Component
+        Name of Meta Model Component object reference
     resolution : int
         Number used to calculate width and height of contour plot
     slider_source : ColumnDataSource
@@ -108,9 +108,9 @@ class MetaModelVisualization(object):
         Parameters
         ----------
         prob : Problem
-            Openmdao problem component
+            Openmdao problem instance
         surrogate_comp : MetaModelComponent
-            Name of meta model component
+            Reference to meta model component
         resolution : int
             Value used to calculate the size of contour plot meshgrid
         """
@@ -156,22 +156,11 @@ class MetaModelVisualization(object):
             self.input_data_dict[title] = slider_data
             # Calculates the distance between slider ticks
             slider_step = slider_data[1] - slider_data[0]
-            self.slider_dict[title] = Slider(start=min(values), end=max(values), value=min(values),
-                                             step=slider_step, title=str(title))
+            slider_object = Slider(start=min(values), end=max(values), value=min(values),
+                                   step=slider_step, title=str(title))
+            self.slider_dict[title] = slider_object
 
-        # Match the slider dictionary key value pairs with an on
-        # change event handler to call an update function later
-        for name, slider_object in self.slider_dict.items():
-            if name == self.x_input.value:
-                self.x_input_slider = slider_object
-                self.x_input_slider.on_change('value', self._scatter_plots_update)
-            elif name == self.y_input.value:
-                self.y_input_slider = slider_object
-                self.y_input_slider.on_change('value', self._scatter_plots_update)
-            else:
-                setattr(self, name, slider_object)
-                obj = getattr(self, name)
-                obj.on_change('value', self._update)
+        self._slider_attrs()
 
         # Length of inputs and outputs
         self.num_of_inputs = len(self.input_list)
@@ -208,6 +197,29 @@ class MetaModelVisualization(object):
         curdoc().add_root(self.layout)
         curdoc().add_root(self.layout2)
         curdoc().title = 'Meta Model Visualization'
+
+    def _slider_attrs(self):
+        """
+        Assign slider objects and callback functions.
+
+        Parameters
+        ----------
+        None
+
+        """
+        for name, slider_object in self.slider_dict.items():
+            # Checks if there is a callback previously assigned and then clears it
+            if len(slider_object._callbacks) == 1:
+                slider_object._callbacks.clear()
+            if name == self.x_input.value:
+                self.x_input_slider = slider_object
+                self.x_input_slider.on_change('value', self._scatter_plots_update)
+            elif name == self.y_input.value:
+                self.y_input_slider = slider_object
+                self.y_input_slider.on_change('value', self._scatter_plots_update)
+            else:
+
+                slider_object.on_change('value', self._update)
 
     def _make_predictions(self, data):
         """
@@ -257,6 +269,7 @@ class MetaModelVisualization(object):
         x_data = np.zeros((resolution, resolution, self.num_of_inputs))
         y_data = np.zeros((resolution, resolution, self.num_of_outputs))
 
+        self._slider_attrs()
         # Query the slider dictionary, append the name and current value to the ordered dictionary
         self.slider_value_and_name = OrderedDict()
         for title, slider_params in self.slider_dict.items():
@@ -297,9 +310,6 @@ class MetaModelVisualization(object):
             pred_dict.update({title: x_data[:, :, idx]})
         pred_dict_ordered = OrderedDict((k, pred_dict[k]) for k in self.input_list)
 
-        # pred_dict.update(self.slider_value_and_name.items())
-        # pred_dict_ordered = OrderedDict((k, pred_dict[k]) for k in self.input_list)
-
         # Pass the dict to make predictions and then reshape the output to (n, n, number of outputs)
         y_data[:, :, :] = self._make_predictions(pred_dict_ordered).reshape(
             (resolution, resolution, self.num_of_outputs))
@@ -315,20 +325,20 @@ class MetaModelVisualization(object):
                              location=(0, 0))
 
         # Contour Plot
-        self.contour_plot = figure(
+        self.contour_plot = contour_plot = figure(
             tooltips=[(self.x_input.value, "$x"), (self.y_input.value, "$y"),
                       (self.output_select.value, "@image")], tools="pan")
-        self.contour_plot.plot_width = 600
-        self.contour_plot.plot_height = 500
-        self.contour_plot.xaxis.axis_label = self.x_input.value
-        self.contour_plot.yaxis.axis_label = self.y_input.value
-        self.contour_plot.min_border_left = 0
-        self.contour_plot.add_layout(color_bar, 'right')
-        self.contour_plot.x_range = Range1d(min(xlins), max(xlins))
-        self.contour_plot.y_range = Range1d(min(ylins), max(ylins))
+        contour_plot.plot_width = 600
+        contour_plot.plot_height = 500
+        contour_plot.xaxis.axis_label = self.x_input.value
+        contour_plot.yaxis.axis_label = self.y_input.value
+        contour_plot.min_border_left = 0
+        contour_plot.add_layout(color_bar, 'right')
+        contour_plot.x_range = Range1d(min(xlins), max(xlins))
+        contour_plot.y_range = Range1d(min(ylins), max(ylins))
 
-        self.contour_plot.image(image=[self.source.data['z']], x=min(xlins), y=min(ylins),
-                                dh=dh, dw=dw, palette="Viridis11")
+        contour_plot.image(image=[self.source.data['z']], x=min(xlins), y=min(ylins),
+                           dh=dh, dw=dw, palette="Viridis11")
 
         # Adding training data points overlay to contour plot
         data = self._training_points()
@@ -351,17 +361,14 @@ class MetaModelVisualization(object):
         Bokeh figure
         """
         # Sets data for x/y inputs
-        for title in self.input_data_dict:
-            if title == self.x_input.value:
-                x_value = self.x_input_slider.value
-                # Rounds the x_data to match the input_data_dict value
-                mach_index = np.where(
-                    np.around(self.input_data_dict[title], 5) == np.around(x_value, 5))[0]
-            elif title == self.y_input.value:
-                y_data = self.input_data_dict[title]
+        y_data = self.input_data_dict[self.y_input.value]
+        x_value = self.x_input_slider.value
+        # Rounds the x_data to match the input_data_dict value
+        subplot_value_index = np.where(
+            np.around(self.input_data_dict[self.x_input.value], 5) == np.around(x_value, 5))[0]
 
         # Make slice in Z data at the point calculated before and add it to the data source
-        z_data = self.Z[:, mach_index].flatten()
+        z_data = self.Z[:, subplot_value_index].flatten()
         self.source.add(z_data, 'left_slice')
 
         x = self.source.data['left_slice']
@@ -413,14 +420,10 @@ class MetaModelVisualization(object):
         -------
         Bokeh figure
         """
-        for title in self.input_data_dict:
-            if title == self.x_input.value:
-                self.x_data = self.input_data_dict[title]
-
-            elif title == self.y_input.value:
-                self.y_value = self.y_input_slider.value
-                alt_index = np.where(np.around(
-                    self.input_data_dict[title], 5) == np.around(self.y_value, 5))[0]
+        x_data = self.input_data_dict[self.x_input.value]
+        y_value = self.y_input_slider.value
+        alt_index = np.where(
+            np.around(self.input_data_dict[self.y_input.value], 5) == np.around(y_value, 5))[0]
 
         z_data = self.Z[alt_index].flatten()
         self.source.add(z_data, 'bot_slice')
@@ -429,7 +432,7 @@ class MetaModelVisualization(object):
         y = self.source.data['bot_slice']
 
         bot_plot_fig = figure(
-            plot_width=550, plot_height=200, x_range=(min(self.x_data), max(self.x_data)),
+            plot_width=550, plot_height=200, x_range=(min(x_data), max(x_data)),
             y_range=(min(y), max(y)),
             title="{} vs {}".format(self.x_input.value, self.output_select.value), tools="")
         bot_plot_fig.xaxis.axis_label = self.x_input.value
@@ -439,7 +442,7 @@ class MetaModelVisualization(object):
         data = self._training_points()
         horiz_color = np.zeros((len(data), 1))
         for i, info in enumerate(data):
-            alpha = np.abs(info[1] - self.y_value) / self.limit_range[self.y_index]
+            alpha = np.abs(info[1] - y_value) / self.limit_range[self.y_index]
             if alpha < self.dist_range:
                 horiz_color[i, -1] = (1 - alpha / self.dist_range) * info[-1]
 
@@ -449,8 +452,8 @@ class MetaModelVisualization(object):
                              fill_alpha=alphas)
 
         self.bot_plot_source.data = dict(
-            bot_slice_x=self.x_data,
-            bot_slice_y=np.repeat(self.y_value, self.resolution))
+            bot_slice_x=x_data,
+            bot_slice_y=np.repeat(y_value, self.resolution))
         self.contour_plot.line(
             'bot_slice_x', 'bot_slice_y', source=self.bot_plot_source, color='black', line_width=2)
 
@@ -487,12 +490,14 @@ class MetaModelVisualization(object):
         if not self._input_dropdown_checks(new, self.y_input.value):
             raise ValueError("Inputs should not equal each other")
         else:
+            self.x_input.value = new
             self._update_all_plots()
 
     def _y_input_update(self, attr, old, new):
         if not self._input_dropdown_checks(self.x_input.value, new):
             raise ValueError("Inputs should not equal each other")
         else:
+            self.y_input.value = new
             self._update_all_plots()
 
     def _output_value_update(self, attr, old, new):
