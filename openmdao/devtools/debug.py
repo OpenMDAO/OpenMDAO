@@ -405,3 +405,86 @@ def compare_jacs(Jref, J, rel_trigger=1.0):
     return results
 
 
+def trace_mpi(fname='mpi_trace', skip=(), flush=True):
+    """
+    Dump traces to the specified filename<.rank> showing openmdao and mpi/petsc calls.
+
+    Parameters
+    ----------
+    fname : str
+        Name of the trace file(s).  <.rank> will be appended to the name on each rank.
+    skip : set-like
+        Collection of function names to skip.
+    flush : bool
+        If True, flush print buffer after every print call.
+    """
+    if MPI is None:
+        raise RuntimeError("MPI is not active.  Trace aborted.")
+    if sys.getprofile() is not None:
+        raise RuntimeError("another profile function is already active.")
+
+    my_fname = fname + '.' + str(MPI.COMM_WORLD.rank)
+
+    outfile = open(my_fname, 'w')
+
+    stack = []
+
+    _c_map = {
+        'c_call': '(c) -->',
+        'c_return': '(c) <--',
+        'c_exception': '(c_exception)',
+    }
+
+
+    def _print_c_func(frame, arg, typestr):
+        s = str(arg)
+        if 'mpi4py' in s or 'petsc4py' in s:
+            c = arg.__self__.__class__
+            print('   ' * len(stack), typestr, "%s.%s.%s" %
+                    (c.__module__, c.__name__, arg.__name__),
+                    "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                    file=outfile, flush=True)
+
+
+    def _mpi_trace_callback(frame, event, arg):
+        pname = None
+        if event == 'call':
+            if 'openmdao' in frame.f_code.co_filename:
+                if frame.f_code.co_name in skip:
+                    return
+                if 'self' in frame.f_locals:
+                    try:
+                        pname = frame.f_locals['self'].msginfo
+                    except:
+                        pass
+                if pname is not None:
+                    if not stack or pname != stack[-1][0]:
+                        stack.append([pname, 1])
+                        print('   ' * len(stack), pname, file=outfile, flush=flush)
+                    else:
+                        stack[-1][1] += 1
+                print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
+                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                      file=outfile, flush=flush)
+        elif event == 'return':
+            if 'openmdao' in frame.f_code.co_filename:
+                if frame.f_code.co_name in skip:
+                    return
+                if 'self' in frame.f_locals:
+                    try:
+                        pname = frame.f_locals['self'].msginfo
+                    except:
+                        pass
+                print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
+                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                      file=outfile, flush=flush)
+                if pname is not None and stack and pname == stack[-1][0]:
+                    stack[-1][1] -= 1
+                    if stack[-1][1] < 1:
+                        stack.pop()
+                        if stack:
+                            print('   ' * len(stack), stack[-1][0], file=outfile, flush=flush)
+        else:
+            _print_c_func(frame, arg, _c_map[event])
+
+    sys.setprofile(_mpi_trace_callback)
