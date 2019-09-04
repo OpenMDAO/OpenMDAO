@@ -17,8 +17,9 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.utils.mpi import MPI
+from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import sizes2offsets
+from openmdao.utils.general_utils import do_nothing_context
 from openmdao.vectors.vector import INT_DTYPE
 
 
@@ -41,16 +42,13 @@ def loc2error_msg(system, loc_txt, loc):
         New error string.
     """
     start = end = 0
-    varname = "Unknown"
-    varsizes = system._var_sizes['nonlinear']['output']
-    var_inds = system._var_allprocs_abs2idx['nonlinear']
-    for name in system._var_abs_names['output']:
-        if name in system._var_abs2meta:
-            end += varsizes[system._owning_rank[name]][var_inds[name]]
-            if loc < end:
-                varname = system._var_abs2prom['output'][name]
-                break
-            start = end
+    varsizes = np.sum(system._owned_sizes, axis=0)
+    for i, name in enumerate(system._var_allprocs_abs_names['output']):
+        end += varsizes[i]
+        if loc < end:
+            varname = system._var_allprocs_abs2prom['output'][name]
+            break
+        start = end
 
     if varname == name:
         names = "'{}' index {}.".format(varname, loc - start)
@@ -89,13 +87,13 @@ def format_singular_error(err, system, mtx):
     # Lapack:DGETRF outputs INFO, which uses fortran numbering.
     loc -= 1
 
-    col_norm = np.linalg.norm(mtx[:, loc - 1])
-    row_norm = np.linalg.norm(mtx[loc - 1, :])
+    col_norm = np.linalg.norm(mtx[:, loc])
+    row_norm = np.linalg.norm(mtx[loc, :])
 
-    if row_norm <= col_norm:
-        loc_txt = "row"
+    if (col_norm == 0. or row_norm == 0.) and col_norm != row_norm:
+        loc_txt = "row" if row_norm <= col_norm else "column"
     else:
-        loc_txt = "column"
+        loc_txt = "row/col"
 
     return loc2error_msg(system, loc_txt, loc)
 
@@ -117,12 +115,13 @@ def format_singular_csc_error(system, matrix):
         New error string.
     """
     dense = matrix.toarray()
-    zero_rows = np.where(~dense.any(axis=1))[0]
-    zero_cols = np.where(~dense.any(axis=0))[0]
     if np.any(np.isnan(dense)):
         # There is a nan in the matrix.
         return(format_nan_error(system, dense))
-    elif zero_cols.size <= zero_rows.size:
+
+    zero_rows = np.where(~dense.any(axis=1))[0]
+    zero_cols = np.where(~dense.any(axis=0))[0]
+    if zero_cols.size <= zero_rows.size:
 
         if zero_rows.size == 0:
             # Underdetermined: duplicate columns or rows.
@@ -155,24 +154,23 @@ def format_nan_error(system, matrix):
     str
         New error string.
     """
-    rows = set(np.where(np.isnan(matrix))[0])
-
     # Because of how we built the matrix, a NaN in a comp cause the whole row to be NaN, so we
     # need to associate each index with a variable.
-    varname = []
-    all_vars = system._var_allprocs_abs_names['output']
-    varsizes = system._var_sizes['nonlinear']['output']
-    for row in rows:
-        n = 0
-        for j, name in enumerate(all_vars):
-            n += varsizes[system._owning_rank[name]][j]
-            if row < n:
-                relname = system._var_abs2prom['output'][name]
-                varname.append("'%s'" % relname)
-                break
+    varsizes = np.sum(system._owned_sizes, axis=0)
+
+    nanrows = np.zeros(matrix.shape[0], dtype=np.bool)
+    nanrows[np.where(np.isnan(matrix))[0]] = True
+
+    varnames = []
+    start = end = 0
+    for i, name in enumerate(system._var_allprocs_abs_names['output']):
+        end += varsizes[i]
+        if np.any(nanrows[start:end]):
+            varnames.append("'%s'" % system._var_allprocs_abs2prom['output'][name])
+        start = end
 
     msg = "NaN entries found in {} for rows associated with states/residuals [{}]."
-    return msg.format(system.msginfo, ', '.join(varname))
+    return msg.format(system.msginfo, ', '.join(varnames))
 
 
 class DirectSolver(LinearSolver):
@@ -274,54 +272,56 @@ class DirectSolver(LinearSolver):
         Perform factorization.
         """
         system = self._system
+        nproc = system.comm.size
 
         if self._assembled_jac is not None:
 
-            if system.comm.size == 1:
-                matrix = self._assembled_jac._int_mtx._matrix
-            else:
-                matrix = self._assembled_jac._int_mtx._get_assembled_matrix(system)
-                if self._owned_size_totals is None:
-                    self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
+            with multi_proc_exception_check(system.comm) if nproc > 1 else do_nothing_context():
+                if nproc == 1:
+                    matrix = self._assembled_jac._int_mtx._matrix
+                else:
+                    matrix = self._assembled_jac._int_mtx._get_assembled_matrix(system)
+                    if self._owned_size_totals is None:
+                        self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
 
-            if matrix is None:
-                # this happens if we're not rank 0
-                self._lu = self._lup = None
-                sz = np.sum(system._owned_sizes)
-                self._nodup_size = sz
+                if matrix is None:
+                    # this happens if we're not rank 0
+                    self._lu = self._lup = None
+                    sz = np.sum(system._owned_sizes)
+                    self._nodup_size = sz
 
-            # Perform dense or sparse lu factorization.
-            elif isinstance(matrix, csc_matrix):
-                try:
-                    self._lu = scipy.sparse.linalg.splu(matrix)
-                    self._nodup_size = matrix.shape[1]
-                except RuntimeError as err:
-                    if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singular_csc_error(system, matrix))
-                    else:
-                        reraise(*sys.exc_info())
-
-            elif isinstance(matrix, np.ndarray):  # dense
-                # During LU decomposition, detect singularities and warn user.
-                with warnings.catch_warnings():
-                    if self.options['err_on_singular']:
-                        warnings.simplefilter('error', RuntimeWarning)
+                # Perform dense or sparse lu factorization.
+                elif isinstance(matrix, csc_matrix):
                     try:
-                        self._lup = scipy.linalg.lu_factor(matrix)
+                        self._lu = scipy.sparse.linalg.splu(matrix)
                         self._nodup_size = matrix.shape[1]
-                    except RuntimeWarning as err:
-                        raise RuntimeError(format_singular_error(err, system, matrix))
+                    except RuntimeError as err:
+                        if 'exactly singular' in str(err):
+                            raise RuntimeError(format_singular_csc_error(system, matrix))
+                        else:
+                            reraise(*sys.exc_info())
 
-                    # NaN in matrix.
-                    except ValueError as err:
-                        raise RuntimeError(format_nan_error(system, matrix))
+                elif isinstance(matrix, np.ndarray):  # dense
+                    # During LU decomposition, detect singularities and warn user.
+                    with warnings.catch_warnings():
+                        if self.options['err_on_singular']:
+                            warnings.simplefilter('error', RuntimeWarning)
+                        try:
+                            self._lup = scipy.linalg.lu_factor(matrix)
+                            self._nodup_size = matrix.shape[1]
+                        except RuntimeWarning as err:
+                            raise RuntimeError(format_singular_error(err, system, matrix))
 
-            # Note: calling scipy.sparse.linalg.splu on a COO actually transposes
-            # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
-            else:
-                raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(self._assembled_jac._int_mtx), system.msginfo))
+                        # NaN in matrix.
+                        except ValueError as err:
+                            raise RuntimeError(format_nan_error(system, matrix))
 
+                # Note: calling scipy.sparse.linalg.splu on a COO actually transposes
+                # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
+                else:
+                    raise RuntimeError("Direct solver not implemented for matrix type %s"
+                                       " in %s." % (type(self._assembled_jac._int_mtx),
+                                                    system.msginfo))
         else:
             if system.comm.size > 1:
                 raise RuntimeError("DirectSolvers without an assembled jacobian are not supported "
