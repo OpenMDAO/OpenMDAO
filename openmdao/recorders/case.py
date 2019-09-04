@@ -455,6 +455,7 @@ class Case(object):
 
         if inp_vars is not None and len(inp_vars) > 0:
             for var_name in inp_vars:
+
                 # Filter based on tags
                 if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                     continue
@@ -560,10 +561,10 @@ class Case(object):
                 out_vars[abs_name]['residuals'] = 'Not Recorded'
 
         if len(out_vars) > 0:
-
             for name in out_vars:
+
                 # Filter based on tags
-                if tags and not (make_set(tags) & make_set(meta[abs_name]['tags'])):
+                if tags and not (make_set(tags) & make_set(meta[name]['tags'])):
                     continue
 
                 if residuals_tol and \

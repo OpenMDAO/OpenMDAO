@@ -1042,7 +1042,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        print(cr)
 
         cases = cr.get_cases()
         case = cases[0]
@@ -3150,8 +3149,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         indep.add_output('length', val=100.)
         indep.add_output('width', val=60.)
 
-        model.add_subsystem('rect', RectangleCompWithTags(), promotes = ['length', 'width', 'area'])
-        model.add_subsystem('indep', indep, promotes = ['length', 'width'])
+        model.add_subsystem('rect', RectangleCompWithTags(), promotes=['length', 'width', 'area'])
+        model.add_subsystem('indep', indep, promotes=['length', 'width'])
 
         prob.setup(check=False)
         prob.run_model()
@@ -3172,19 +3171,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.width', 'rect.length']))
 
         # Outputs with tag that does match
-        outputs = case.list_outputs(out_stream=None, tags="tag1")
-        from pprint import pprint
-        print(case.name)
-        pprint(case.outputs)
-        for o in case.outputs.absolute_names():
-            print('----')
-            print(o)
-            print('----')
-            pprint(case._abs2meta[o])
-        print('------------------------')
-        pprint(outputs)
-        for outp in outputs:
-            pprint(outp)
+        outputs = case.list_outputs(tags="tag1")
         self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
 
     def test_feature_get_val(self):

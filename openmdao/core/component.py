@@ -528,7 +528,7 @@ class Component(System):
         metadata['desc'] = desc
         metadata['distributed'] = self.options['distributed']
 
-        metadata['tags'] = tags
+        metadata['tags'] = make_set(tags)
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -582,7 +582,7 @@ class Component(System):
             'value': val,
             'type': type(val),
             'desc': desc,
-            'tags': tags,
+            'tags': make_set(tags),
         }
 
         if self._static_mode:
@@ -748,7 +748,7 @@ class Component(System):
 
         metadata['distributed'] = self.options['distributed']
 
-        metadata['tags'] = tags
+        metadata['tags'] = make_set(tags)
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -801,7 +801,7 @@ class Component(System):
             'value': val,
             'type': type(val),
             'desc': desc,
-            'tags': tags
+            'tags': make_set(tags)
         }
 
         if self._static_mode:

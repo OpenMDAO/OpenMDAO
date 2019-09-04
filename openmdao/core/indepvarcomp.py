@@ -161,8 +161,7 @@ class IndepVarComp(ExplicitComponent):
         else:
             if not isinstance(tags, (str, set, list)):
                 raise TypeError('The tags argument should be a str, set, or list')
-            tags = make_set(kwargs['tags']) | {'indep_var'}
-
+            tags = make_set(tags) | {'indep_var'}
 
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,

@@ -3066,7 +3066,7 @@ class System(object):
         for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
 
             # Filter based on tags
-            if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+            if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
             var_meta = {}
@@ -3087,7 +3087,7 @@ class System(object):
             for var_name, val in iteritems(self._discrete_inputs):
 
                 # Filter based on tags
-                if tags and not (make_set(tags) & make_set(disc_meta[var_name]['tags'])):
+                if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
                 var_meta = {}
@@ -3193,7 +3193,7 @@ class System(object):
         for var_name, val in iteritems(self._outputs._views):
 
             # Filter based on tags
-            if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+            if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
             if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
@@ -3229,7 +3229,7 @@ class System(object):
             for var_name, val in iteritems(self._discrete_outputs):
 
                 # Filter based on tags
-                if tags and not (make_set(tags) & make_set(disc_meta[var_name]['tags'])):
+                if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
                 var_meta = {}
