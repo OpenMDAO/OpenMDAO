@@ -12,6 +12,7 @@ from six import iteritems
 from openmdao.core.problem import Problem
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
+from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
@@ -228,6 +229,37 @@ def _view_connections_cmd(options):
         exit()
     return _viewconns
 
+def _meta_model_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao meta_model' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+
+def _meta_model_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao meta_model'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    import subprocess
+
+    file_name = options.file[0]
+    bash_command = str.format("bokeh serve --show " + file_name)
+    process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
+    output, error = process.communicate()
 
 def _config_summary_setup_parser(parser):
     """
@@ -520,7 +552,8 @@ _non_post_setup_map = {
                       'Colored jacobian viewer.'),
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd, 'XDSM viewer.'),
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
-                 'Generate a simple scaffold for a component.')
+                 'Generate a simple scaffold for a component.'),
+    'meta_model': (_meta_model_parser, _meta_model_cmd, "Meta Model Viewer.")
 }
 
 
