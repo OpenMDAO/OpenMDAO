@@ -808,7 +808,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         model.add_subsystem('des_vars', ivc, promotes=["*"])
 
-        comp = om.MetaModelStructuredComp(method='cubic', extrapolate=True, vec_size=3)
+        comp = om.MetaModelStructuredComp(method='slinear', extrapolate=True, vec_size=3)
 
         for param in params:
             comp.add_input(param['name'], np.array([param['default'], param['default'], param['default']]),

@@ -410,3 +410,52 @@ def sizes2offsets(size_array, dtype=int):
     offsets = np.zeros(size_array.size, dtype=dtype)
     offsets[1:] = np.cumsum(size_array.flat)[:-1]
     return offsets.reshape(size_array.shape)
+
+
+def abs_complex(x):
+    """
+    Compute the absolute value of a complex-stepped vector.
+
+    Rather than taking a Euclidian norm, simply negate the values that are less than zero.
+
+    Parameters
+    ----------
+    x : ndarray
+        Input array.
+
+    Returns
+    -------
+    ndarray
+        Complex-step absolute value of the array.
+    """
+    idx_neg = np.where(x < 0)
+    x[idx_neg] = -x[idx_neg]
+    return x
+
+
+def dv_abs_complex(x, x_deriv):
+    """
+    Apply the complex-step derivative of the absolute value function.
+
+    Parameters
+    ----------
+    x : ndarray
+        Input array, used for determining which elements to negate.
+    x_deriv : ndarray
+        Incominng partial derivative array, may have one additional dimension.
+
+    Returns
+    -------
+    ndarray
+        Absolute value applied to x_deriv.
+    """
+    idx_neg = np.where(x < 0)
+
+    # Special case when x is (1, ) and x_deriv is (1, n).
+    if len(x_deriv.shape) == 1:
+        if idx_neg[0].size != 0:
+            return -x_deriv
+
+    x_deriv[idx_neg] = -x_deriv[idx_neg]
+
+    return x_deriv

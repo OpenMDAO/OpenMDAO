@@ -41,13 +41,13 @@ multivariable function, each input variable needs its own named OpenMDAO input.
 For multi-dimensional data, fits are computed on a separable per-axis basis. A single interpolation
 method is used for all dimensions, so the minimum table dimension must be high enough to use
 the chosen interpolate. However, if you choose one of the scipy methods, then automatic order
-reduction is supported. In this case, if a particular dimension does not haveenough training data
+reduction is supported. In this case, if a particular dimension does not have enough training data
 points to support a selected spline order (e.g. 3 sample points, but an order 5 'scipy_quintic'
-spline is specified), the order of the fitted spline will be automatically reduced to one of the
-lower order scipy methods ('scipy_cubic' or 'scipy_slinear')for that dimension alone.
+spline is specified), then the order of the fitted spline will be automatically reduced to one of the
+lower order scipy methods ('scipy_cubic' or 'scipy_slinear') for that dimension alone.
 
-Extrapolation is supported, but disabled by default. It can be enabled
-via the :code:`extrapolate` option (see below).
+Extrapolation is supported, but disabled by default. It can be enabled via the :code:`extrapolate`
+option (see below).
 
 MetaModelStructuredComp Options
 -------------------------------
