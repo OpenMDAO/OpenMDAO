@@ -15,13 +15,6 @@ from openmdao.utils.array_utils import abs_complex, dv_abs_complex
 class InterpLinear(object):
     """
     Interpolate using a linear polynomial.
-
-    Attributes
-    ----------
-    last_index : int
-        Index of previously computed approximation, for caching slope computation on leaf table.
-    slope : double
-        Cached slope value for leaf table.
     """
 
     def interpolate(self, x, idx, slice_idx, table):
@@ -88,13 +81,6 @@ class InterpLinear(object):
 class InterpLagrange2(object):
     """
     Interpolate using a second order Lagrange polynomial.
-
-    Attributes
-    ----------
-    last_index : int
-        Index of previously computed approximation, for caching slope computation on leaf table.
-    slope : double
-        Cached slope value for leaf table.
     """
 
     def interpolate(self, x, idx, slice_idx, table):
@@ -187,13 +173,6 @@ class InterpLagrange2(object):
 class InterpLagrange3(object):
     """
     Interpolate using a third order Lagrange polynomial.
-
-    Attributes
-    ----------
-    last_index : int
-        Index of previously computed approximation, for caching slope computation on leaf table.
-    slope : double
-        Cached slope value for leaf table.
     """
 
     def interpolate(self, x, idx, slice_idx, table):
@@ -789,6 +768,8 @@ class InterpCubic(object):
         else:
             values = table.values
 
+            # The coefficients can be cached because it is computed for every grid segment in
+            # the model.
             if self.second_derivs is None:
                 self.second_derivs = self.compute_coeffs(table.grid, values, x)
             sec_deriv = self.second_derivs

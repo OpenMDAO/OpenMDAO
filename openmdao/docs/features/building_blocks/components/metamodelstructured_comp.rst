@@ -14,25 +14,25 @@ scipy.interpolate, as well as five methods that are written in pure python. For 
 derivatives are automatically computed.  The followiing table summarizes the methods and gives
 the number of points required for each.
 
-+---------------+--------+------------------------------------------------------------+
-| Method        | Order  | Description                                                |
-+===============+========+============================================================+
-| slinear       | 2      | Basic linear interpolation                                 |
-+---------------+--------+------------------------------------------------------------+
-| lagrange2     | 3      | Second order Lagrange polynomial                           |
-+---------------+--------+------------------------------------------------------------+
-| lagrange3     | 4      | Third order Lagrange polynomial                            |
-+---------------+--------+------------------------------------------------------------+
-| akima         | 4      | Interpolation using Akima splines                          |
-+---------------+--------+------------------------------------------------------------+
-| cubic         | 3      | Cubic Splines, continuity of derivatives between splines   |
-+---------------+--------+------------------------------------------------------------+
-| scipy_slinear | 2      | Scipy linear interpolation                                 |
-+---------------+--------+------------------------------------------------------------+
-| scipy_cubic   | 3      | Scipy cubic interpolation                                  |
-+---------------+--------+------------------------------------------------------------+
-| scipy_quintic | 5      | Scipy quintic interpolation. Most accurate, but slower    |
-+---------------+--------+------------------------------------------------------------+
++---------------+--------+------------------------------------------------------------------+
+| Method        | Order  | Description                                                      |
++===============+========+==================================================================+
+| slinear       | 1      | Basic linear interpolation                                       |
++---------------+--------+------------------------------------------------------------------+
+| lagrange2     | 2      | Second order Lagrange polynomial                                 |
++---------------+--------+------------------------------------------------------------------+
+| lagrange3     | 3      | Third order Lagrange polynomial                                  |
++---------------+--------+------------------------------------------------------------------+
+| akima         | 3      | Interpolation using Akima splines                                |
++---------------+--------+------------------------------------------------------------------+
+| cubic         | 3      | Cubic spline, with continuity of derivatives between segments    |
++---------------+--------+------------------------------------------------------------------+
+| scipy_slinear | 1      | Scipy linear interpolation. Same as slinear, though slower       |
++---------------+--------+------------------------------------------------------------------+
+| scipy_cubic   | 3      | Scipy cubic interpolation. More accurate than cubic, but slower  |
++---------------+--------+------------------------------------------------------------------+
+| scipy_quintic | 5      | Scipy quintic interpolation. Most accurate, but slowest          |
++---------------+--------+------------------------------------------------------------------+
 
 
 Note that `MetaModelStructuredComp` only accepts scaler inputs and outputs. If you have a
@@ -64,7 +64,7 @@ A simple quick-start example is fitting the exclusive-or ("XOR") operator betwee
 two inputs, `x` and `y`:
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_xor
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_xor
     :layout: code, output
 
 
@@ -78,14 +78,14 @@ with shape (5, 12, 20).
 This is illustrated by the example:
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_shape
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_shape
     :layout: code, output
 
 You can also predict multiple independent output points by setting the `vec_size` argument to be equal to the number of
 points you want to predict. Here, we set it to 2 and predict 2 points with `MetaModelStructuredComp`:
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_vectorized
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_vectorized
     :layout: code, output
 
 
@@ -104,7 +104,7 @@ to `True`. This automatically creates an input named `f_train` when the output
 match the finite difference estimate in the `check_partials` output.
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_training_derivatives
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_training_derivatives
     :layout: code, output
 
 .. tags:: MetaModelStructuredComp, Component
