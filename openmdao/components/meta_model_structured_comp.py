@@ -31,18 +31,18 @@ class MetaModelStructuredComp(ExplicitComponent):
     fitted spline with be automatically reduced for that dimension alone.
 
     Extrapolation is supported, but disabled by default. It can be enabled via initialization
-    attribute (see below).
+    attribute.
 
     Attributes
     ----------
+    grad_shape : tuple
+        Cached shape of the gradient of the outputs wrt the training inputs.
     interps : dict
         Dictionary of interpolations for each output.
     params : list
         List containing training data for each input.
     pnames : list
         Cached list of input names.
-    sh : tuple
-        Cached shape of the gradient of the outputs wrt the training inputs.
     training_outputs : dict
         Dictionary of training data each output.
     """
@@ -62,7 +62,7 @@ class MetaModelStructuredComp(ExplicitComponent):
         self.params = []
         self.training_outputs = {}
         self.interps = {}
-        self.sh = ()
+        self.grad_shape = ()
 
     def initialize(self):
         """
@@ -146,7 +146,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                                         bounds_error=not self.options['extrapolate'])
 
         if self.options['training_data_gradients']:
-            self.sh = tuple([self.options['vec_size']] + [i.size for i in self.params])
+            self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
 
         super(MetaModelStructuredComp, self)._setup_var_data(recurse=recurse)
 
@@ -231,11 +231,11 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         if self.options['training_data_gradients']:
-            dy_ddata = np.zeros(self.sh)
+            dy_ddata = np.zeros(self.grad_shape)
             interp = next(itervalues(self.interps))
             for j in range(self.options['vec_size']):
                 val = interp.training_gradients(pt[j, :])
-                dy_ddata[j] = val.reshape(self.sh[1:])
+                dy_ddata[j] = val.reshape(self.grad_shape[1:])
 
         for out_name in self.interps:
             dval = self.interps[out_name].gradient(pt).T

@@ -99,6 +99,19 @@ class GridInterpBase(object):
         self._all_gradients = None
         self.training_data_gradients = False
 
+    def _interp_methods(self):
+        """
+        Method-specific settings for interpolation and for testing.
+
+        Returns
+        -------
+        list
+            Valid interpolation name strings.
+        dict
+            Configuration object that stores the number of points required for each method.
+        """
+        return None
+
     def interpolate(self, xi):
         """
         Interpolate at the sample coordinates.

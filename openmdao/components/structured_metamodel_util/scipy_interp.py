@@ -73,7 +73,7 @@ class ScipyGridInterp(GridInterpBase):
         self._ki = []
         # Order is the number of required points minus one.
         k = self._interp_config[interp_method] - 1
-        for i, p in enumerate(points):
+        for p in points:
             n_p = len(p)
             self._ki.append(k)
             if n_p <= k:
@@ -115,16 +115,13 @@ class ScipyGridInterp(GridInterpBase):
         """
         super(ScipyGridInterp, self).interpolate(xi)
 
-        result = self._evaluate_splines(self.values[:].T,
-                                        xi,
-                                        _make_interp_spline,
-                                        self._ki)
+        result = self._evaluate_splines(self.values[:].T, xi, self._ki)
 
         return result
 
-    def _evaluate_splines(self, data_values, xi, interpolator, ki, compute_gradients=True):
+    def _evaluate_splines(self, data_values, xi, ki, compute_gradients=True):
         """
-        Perform interpolation using the given interpolator.
+        Perform interpolation using the scipy interpolator.
 
         Parameters
         ----------
@@ -132,8 +129,6 @@ class ScipyGridInterp(GridInterpBase):
             The data on the regular grid in n dimensions.
         xi : ndarray
             The coordinates to sample the gridded data at
-        interpolator : <scipy.interpolate.BSpline>
-            A BSpline object that is used for interpolation.
         ki : list
             List of spline interpolation orders.
         compute_gradients : bool, optional
@@ -168,8 +163,7 @@ class ScipyGridInterp(GridInterpBase):
         # last variable of xi. This provides one dimension of the entire
         # gradient output array.
         i = n - 1
-        first_values, first_derivs = self._do_spline_fit(interpolator,
-                                                         self.grid[i],
+        first_values, first_derivs = self._do_spline_fit(self.grid[i],
                                                          data_values,
                                                          xi[:, i],
                                                          ki[i],
@@ -192,8 +186,7 @@ class ScipyGridInterp(GridInterpBase):
                     # Interpolate and collect gradients for each 1D in this
                     # last dimensions. This collapses each 1D sequence into a
                     # scalar.
-                    values, local_derivs = self._do_spline_fit(interpolator,
-                                                               self.grid[i],
+                    values, local_derivs = self._do_spline_fit(self.grid[i],
                                                                values,
                                                                x[i],
                                                                ki[i],
@@ -206,15 +199,13 @@ class ScipyGridInterp(GridInterpBase):
                 if compute_gradients:
                     gradient[i] = self._evaluate_splines(local_derivs,
                                                          x[: i],
-                                                         interpolator,
                                                          ki,
                                                          compute_gradients=False)
 
             # All values have been folded down to a single dimensional array
             # compute the final interpolated results, and gradient w.r.t. the
             # first dimension
-            output_value, gradient[0] = self._do_spline_fit(interpolator,
-                                                            self.grid[0],
+            output_value, gradient[0] = self._do_spline_fit(self.grid[0],
                                                             values,
                                                             x[0],
                                                             ki[0],
@@ -231,14 +222,12 @@ class ScipyGridInterp(GridInterpBase):
 
         return result
 
-    def _do_spline_fit(self, interpolator, x, y, pt, k, compute_gradients):
+    def _do_spline_fit(self, x, y, pt, k, compute_gradients):
         """
         Do a single interpolant call, and compute the gradient if needed.
 
         Parameters
         ----------
-        interpolator : <scipy.interpolate.BSpline>
-            A BSpline object that is used for interpolation.
         x : array_like, shape (n,)
             Abscissas.
         y : array_like, shape (n, ...)
@@ -258,7 +247,7 @@ class ScipyGridInterp(GridInterpBase):
         None or array_like, optional
             Value of gradient of interpolant at point of interest.
         """
-        local_interp = interpolator(x, y, k=k, axis=0)
+        local_interp = _make_interp_spline(x, y, k=k, axis=0)
         values = local_interp(pt)
         local_derivs = None
         if compute_gradients:

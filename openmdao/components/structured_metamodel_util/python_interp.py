@@ -252,8 +252,8 @@ class InterpLagrange3(object):
             dq3_dsub = subderiv[..., 2, :] / (c13 * c23 * c34)
             dq4_dsub = subderiv[..., 3, :] / (c14 * c24 * c34)
 
-            derivs[..., 1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + dq3_dsub * xx1 * xx2) - \
-                dq4_dsub * xx1 * xx2 * xx3
+            derivs[..., 1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + \
+                                     dq3_dsub * xx1 * xx2) - dq4_dsub * xx1 * xx2 * xx3
 
         else:
             values = table.values[tuple(slice_idx)]
@@ -458,7 +458,7 @@ class InterpAkima(object):
         w31 = abs_complex(m2 - m1)
 
         # Special case to avoid divide by zero.
-        jj1 = np.where(w2 + w31  > 0)
+        jj1 = np.where(w2 + w31 > 0)
         b = 0.5 * (m2 + m3)
 
         # We need to suppress some warnings that occur when we divide by zero.  We replace all
@@ -473,7 +473,7 @@ class InterpAkima(object):
         w4 = abs_complex(m3 - m2)
 
         # Special case to avoid divide by zero.
-        jj2 = np.where(w32 + w4  > 0)
+        jj2 = np.where(w32 + w4 > 0)
         bp1 = 0.5 * (m3 + m4)
 
         bp1pos = np.atleast_1d((m3 * w32 + m4 * w4) / (w32 + w4))
@@ -587,7 +587,7 @@ class InterpAkima(object):
 
             dbp1 = 0.5 * (dm3 + dm4)
 
-            dbp1pos = ((dm3 * w32 + m3e * dw3 + dm4 * w4 + m4e * dw4) - bp1pos * (dw3 + dw4) ) / \
+            dbp1pos = ((dm3 * w32 + m3e * dw3 + dm4 * w4 + m4e * dw4) - bp1pos * (dw3 + dw4)) / \
                        (w32 + w4)
 
             if nx > 2:
@@ -722,7 +722,6 @@ class InterpCubic(object):
         if subtable is not None:
             # Interpolate between values that come from interpolating the subtables in the
             # subsequent dimensions.
-            n = len(grid)
             nx = len(x)
 
             values, subderivs = subtable.evaluate(x[1:], slice_idx=slice_idx)
@@ -756,8 +755,7 @@ class InterpCubic(object):
                 derivs[..., 1] += a * subderivs[..., idx] + b * subderivs[..., idx + 1]
 
             else:
-                dsec = self.compute_coeffs(table.grid, np.swapaxes(subderivs, -1, -2),
-                                                       x)
+                dsec = self.compute_coeffs(table.grid, np.swapaxes(subderivs, -1, -2), x)
                 derivs[..., 1:] = ((a * a * a - a) * dsec[..., idx] + \
                                    (b * b * b - b) * dsec[..., idx + 1]) * (step * step * fact)
 
@@ -765,31 +763,30 @@ class InterpCubic(object):
 
             return interp_values, derivs
 
-        else:
-            values = table.values
+        values = table.values
 
-            # The coefficients can be cached because it is computed for every grid segment in
-            # the model.
-            if self.second_derivs is None:
-                self.second_derivs = self.compute_coeffs(table.grid, values, x)
-            sec_deriv = self.second_derivs
+        # The coefficients can be cached because it is computed for every grid segment in
+        # the model.
+        if self.second_derivs is None:
+            self.second_derivs = self.compute_coeffs(table.grid, values, x)
+        sec_deriv = self.second_derivs
 
-            # Perform the interpolation
-            step = grid[idx + 1] - grid[idx]
-            r_step = 1.0 / step
-            a = (grid[idx + 1] - x) * r_step
-            b = (x - grid[idx]) * r_step
-            fact = 1.0 / 6.0
+        # Perform the interpolation
+        step = grid[idx + 1] - grid[idx]
+        r_step = 1.0 / step
+        a = (grid[idx + 1] - x) * r_step
+        b = (x - grid[idx]) * r_step
+        fact = 1.0 / 6.0
 
-            val = a * values[..., idx] + b * values[..., idx + 1] + \
-                   ((a * a * a - a) * sec_deriv[..., idx] + \
-                    (b * b * b - b) * sec_deriv[..., idx + 1]) * (step * step * fact)
+        val = a * values[..., idx] + b * values[..., idx + 1] + \
+               ((a * a * a - a) * sec_deriv[..., idx] + \
+                (b * b * b - b) * sec_deriv[..., idx + 1]) * (step * step * fact)
 
-            deriv = r_step * (values[..., idx + 1] - values[..., idx]) + \
-                    ((3.0 * b * b - 1) * sec_deriv[..., idx + 1] - \
-                     (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact)
+        deriv = r_step * (values[..., idx + 1] - values[..., idx]) + \
+                ((3.0 * b * b - 1) * sec_deriv[..., idx + 1] - \
+                 (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact)
 
-            return val, deriv
+        return val, deriv
 
 
 class InterpTable(object):
@@ -928,10 +925,7 @@ class InterpTable(object):
             independents
         """
 
-        if len(x) > 0:
-            idx, _ = self.bracket(x[0])
-        else:
-            idx, _ = self.bracket(x)
+        idx, _ = self.bracket(x[0])
 
         self.last_index = idx
         if slice_idx is None:
@@ -1065,7 +1059,7 @@ class PythonGridInterp(GridInterpBase):
         result = np.empty((n_nodes, ), dtype=xi.dtype)
         derivs = np.empty((n_nodes, nx), dtype=xi.dtype)
 
-        # TODO: Vectorize over n_nodes.
+        # TODO: it might be possible to vectorize over n_nodes.
         for j in range(n_nodes):
             if self.training_data_gradients:
                 # If the table values are inputs, then we need to create a new table each time.
