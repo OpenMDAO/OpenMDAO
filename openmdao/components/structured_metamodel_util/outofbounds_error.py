@@ -1,4 +1,4 @@
-"""Exception rasied by grid interpolators when the go out of bounds."""
+"""Exception rasied by grid interpolators when they go out of bounds."""
 from __future__ import division, print_function, absolute_import
 
 

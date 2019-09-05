@@ -351,10 +351,6 @@ g = np.array([
 ])
 
 
-#def rel_error(actual, computed):
-#    return np.linalg.norm(actual - computed) / np.linalg.norm(actual)
-
-
 class SampleMap(object):
     param_data = []
     np.random.seed(0)
