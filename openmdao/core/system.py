@@ -31,7 +31,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
 from openmdao.utils.general_utils import filter_var_based_on_tags, convert_user_defined_tags_to_set
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
@@ -164,6 +164,12 @@ class System(object):
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
+    _owned_var_sizes : ndarray
+        Array of local sizes for 'owned' or distributed vars only.
+    _nodup_out_ranges : dict
+        Range of each output/resid in the global non-duplicated array.
+    _nodup2local_out_inds : ndarray
+        Indices that map values from the global non-duplicated array into the local output/resids.
     _var_offsets : {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
         Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
@@ -375,7 +381,10 @@ class System(object):
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
+        self._owned_var_sizes = None
         self._var_offsets = None
+        self._nodup_out_ranges = None
+        self._nodup2local_out_inds = None
 
         self._full_comm = None
 
@@ -637,6 +646,9 @@ class System(object):
                 self._scale_factors = self._compute_root_scale_factors()
             else:
                 self._scale_factors = {}
+
+            if self._vector_class is None:
+                self._vector_class = self._local_vector_class
 
             vector_class = self._vector_class
 
@@ -1473,6 +1485,9 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_sizes = {}
+        self._owned_var_sizes = None
+        self._nodup_out_ranges = None
+        self._nodup2local_out_inds = None
         self._owning_rank = defaultdict(int)
 
     def _setup_global_shapes(self):
@@ -1681,6 +1696,9 @@ class System(object):
             raise RuntimeError("{}: In order to activate complex step during reconfiguration, "
                                "you need to set 'force_alloc_complex' to True during setup. e.g. "
                                "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
+
+        if self._vector_class is None:
+            self._vector_class = self._local_vector_class
 
         vector_class = self._vector_class
 
@@ -2377,6 +2395,20 @@ class System(object):
             if recurse:
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
+
+    def _all_subsystem_iter(self):
+        """
+        Yield a generator of subsystems along with their local status.
+
+        Yields
+        ------
+        System
+            Current subsystem.
+        bool
+            True if current subsystem is local.
+        """
+        for isub, subsys in enumerate(self._subsystems_allprocs):
+            yield subsys, subsys.name in self._loc_subsys_map
 
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
@@ -3765,6 +3797,123 @@ class System(object):
             else:
                 new_list.append((abs2prom_in[abs_name], offset, end, idxs))
         return new_list
+
+    def _get_nodup_out_ranges(self):
+        """
+        Compute necessary ranges/indices for working with non-dup global outputs array.
+
+        Returns
+        -------
+        OrderedDict
+            Tuples of the form (start, end) keyed on variable name.
+        ndarray
+            Index array mapping global non-dup outputs/resids to local outputs/resids.
+        ndarray
+            Index array mapping local outputs/resids to owned local outputs/resids.
+        ndarray
+            Index array mapping global stacked (rank order) array to global array where
+            distrib vars are contiguous and all vars appear in global execution order.
+            Execution order is meaningless for systems in ParallelGroups, but for purposes
+            of global ordering, the declared execution order, which is the same across all
+            ranks, is used.
+        """
+        if self._nodup_out_ranges is None:
+            iproc = self.comm.rank
+            abs2meta = self._var_allprocs_abs2meta
+            sizes = self._var_sizes['linear']['output']
+            owned_sizes = self._owned_sizes
+
+            ranges = OrderedDict()
+            out_views = self._outputs._views
+
+            # compute offsets into the full non-dup output/resid array by summing down columns
+            # of owned_sizes array. This results in the distributed vars being contiguous, and
+            # having the same offsets in every proc so that overlapping indices, etc. will be
+            # properly handled.
+            contig_offsets = sizes2offsets(np.sum(owned_sizes, axis=0))
+
+            # compute offsets into the full non-dup output/resid array where distrib vars are not
+            # contiguous
+            offsets = sizes2offsets(owned_sizes)
+
+            # order ranks with our rank first
+            ordered_ranks = [iproc] + [r for r in range(self.comm.size) if r != iproc]
+
+            has_distribs = False
+            contig_inds = []
+            non_contig_inds = []
+            # compute ranges/indices into the full non-duplicated output/resid arrays
+            for i, name in enumerate(self._var_allprocs_abs_names['output']):
+                distrib = abs2meta[name]['distributed']
+                has_distribs |= distrib
+                found = False
+                # check each rank (this rank first) for the first nonzero size
+                for irank in ordered_ranks:
+                    size = owned_sizes[irank, i]
+
+                    if size > 0:
+                        if not found:
+                            found = True
+                            dsize = np.sum(owned_sizes[:, i]) if distrib else size
+
+                            contig_start = contig_offsets[i]
+                            ranges[name] = (contig_start, contig_start + dsize)
+                            if name in out_views:
+                                if distrib:
+                                    # need offset into the dist var
+                                    dstart = contig_start + np.sum(owned_sizes[:irank, i])
+                                    contig_inds.append(np.arange(dstart, dstart + size, dtype=int))
+                                else:
+                                    contig_inds.append(np.arange(*ranges[name], dtype=int))
+
+                        non_contig_start = offsets[irank, i]
+                        non_contig_inds.append(np.arange(non_contig_start, non_contig_start + size))
+
+            self._nodup_out_ranges = ranges
+            self._nodup2local_out_inds = _arraylist2array(contig_inds)
+
+            # get indices to pull out only the 'owned' values from the local array
+            local2owned_inds = []
+            start = end = 0
+            for owned_sz, sz in zip(owned_sizes[iproc], sizes[iproc]):
+                if sz == 0:
+                    continue
+                end += sz
+                if owned_sz > 0:
+                    local2owned_inds.append(np.arange(start, end, dtype=int))
+                start = end
+
+            self._local2owned_inds = _arraylist2array(local2owned_inds)
+
+            # compute inds to map gathered nodup order to nodup ordered by ownership
+            self._noncontig_dis_inds = _arraylist2array(non_contig_inds)
+
+        return (self._nodup_out_ranges, self._nodup2local_out_inds, self._local2owned_inds,
+                self._noncontig_dis_inds)
+
+
+def _arraylist2array(lst, dtype=int):
+    """
+    Given a list of arrays, return a stacked array of the specified dtype.
+
+    Parameters
+    ----------
+    lst : list
+        List of arrays.
+    dtype : type
+        Specified dtype for the return array.
+
+    Returns
+    -------
+    ndarray
+        The stacked array.
+    """
+    if len(lst) > 1:
+        return np.hstack(lst)
+    elif lst:
+        return lst[0]
+
+    return np.zeros(0, dtype=dtype)
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

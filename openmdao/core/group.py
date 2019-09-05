@@ -22,7 +22,7 @@ import networkx as nx
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.core.system import System, INT_DTYPE, get_relevant_vars
+from openmdao.core.system import System, INT_DTYPE
 from openmdao.core.component import Component, _DictValues, _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
 from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
@@ -615,12 +615,14 @@ class Group(System):
                                             iteritems(subsys._var_discrete[type_])})
 
                 # Assemble abs2prom
-                for abs_name in chain(subsys._var_abs_names[type_],
-                                      subsys._var_abs_names_discrete[type_]):
-                    sub_prom_name = subsys._var_abs2prom[type_][abs_name]
-                    abs2prom[type_][abs_name] = var_maps[type_][sub_prom_name]
+                sub_loc_proms = subsys._var_abs2prom[type_]
+                sub_proms = subsys._var_allprocs_abs2prom[type_]
+                for abs_name in chain(subsys._var_allprocs_abs_names[type_],
+                                      subsys._var_allprocs_abs_names_discrete[type_]):
+                    if abs_name in sub_loc_proms:
+                        abs2prom[type_][abs_name] = var_maps[type_][sub_loc_proms[abs_name]]
 
-                allprocs_abs2prom[type_] = abs2prom[type_]
+                    allprocs_abs2prom[type_][abs_name] = var_maps[type_][sub_proms[abs_name]]
 
                 # Assemble allprocs_prom2abs_list
                 for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
@@ -640,8 +642,9 @@ class Group(System):
             mysub = self._subsystems_myproc[0] if self._subsystems_myproc else False
             if (mysub and mysub.comm.rank == 0 and (mysub._full_comm is None or
                                                     mysub._full_comm.rank == 0)):
-                raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list, abs2prom,
-                       allprocs_abs2meta, self._has_output_scaling, self._has_resid_scaling)
+                raw = (allprocs_abs_names, allprocs_discrete, allprocs_prom2abs_list,
+                       allprocs_abs2prom, allprocs_abs2meta, self._has_output_scaling,
+                       self._has_resid_scaling)
             else:
                 raw = (
                     {'input': [], 'output': []},
@@ -659,20 +662,22 @@ class Group(System):
                 allprocs_abs2prom[type_] = {}
                 allprocs_prom2abs_list[type_] = OrderedDict()
 
-            for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, myproc_abs2prom,
+            for (myproc_abs_names, myproc_discrete, myproc_prom2abs_list, all_abs2prom,
                  myproc_abs2meta, oscale, rscale) in gathered:
                 self._has_output_scaling |= oscale
                 self._has_resid_scaling |= rscale
 
                 # Assemble in parallel allprocs_abs2meta
-                allprocs_abs2meta.update(myproc_abs2meta)
+                for n in myproc_abs2meta:
+                    if n not in allprocs_abs2meta:
+                        allprocs_abs2meta[n] = myproc_abs2meta[n]
 
                 for type_ in ['input', 'output']:
 
                     # Assemble in parallel allprocs_abs_names
                     allprocs_abs_names[type_].extend(myproc_abs_names[type_])
                     allprocs_discrete[type_].update(myproc_discrete[type_])
-                    allprocs_abs2prom[type_].update(myproc_abs2prom[type_])
+                    allprocs_abs2prom[type_].update(all_abs2prom[type_])
 
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
@@ -714,6 +719,8 @@ class Group(System):
 
         vec_names = self._lin_rel_vec_name_list if self._use_derivatives else self._vec_names
 
+        n_distrib_vars = 0
+
         # Compute _var_sizes
         for vec_name in vec_names:
             sizes[vec_name] = {}
@@ -724,6 +731,9 @@ class Group(System):
                                                        INT_DTYPE)
 
                 for ind, subsys in enumerate(self._subsystems_myproc):
+                    if isinstance(subsys, Component) and subsys.options['distributed']:
+                        n_distrib_vars += 1
+
                     if vec_name not in subsys._rel_vec_names:
                         continue
                     proc_slice = slice(*subsystems_proc_range[ind])
@@ -753,14 +763,27 @@ class Group(System):
                     sizes_in = sizes[type_][iproc, :].copy()
                     self.comm.Allgather(sizes_in, sizes[type_])
 
-            # compute owning ranks
+            has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
+            if (has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
+                    not np.all(self._var_sizes[vec_names[0]]['input'])):
+                if self._distributed_vector_class is not None:
+                    self._vector_class = self._distributed_vector_class
+                else:
+                    raise RuntimeError("{}: Distributed vectors are required but no distributed "
+                                       "vector type has been set.".format(self.msginfo))
+
+            # compute owning ranks and owned sizes
+            abs2meta = self._var_allprocs_abs2meta
             owns = self._owning_rank
+            self._owned_sizes = self._var_sizes[vec_names[0]]['output'].copy()
             for type_ in ('input', 'output'):
                 sizes = self._var_sizes[vec_names[0]][type_]
                 for i, name in enumerate(self._var_allprocs_abs_names[type_]):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
+                            if type_ is 'output' and not abs2meta[name]['distributed']:
+                                self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
                 if self._var_allprocs_discrete[type_]:
@@ -769,6 +792,9 @@ class Group(System):
                         for n in names:
                             if n not in owns:
                                 owns[n] = i
+        else:
+            self._owned_sizes = self._var_sizes[vec_names[0]]['output']
+            self._vector_class = self._local_vector_class
 
         if self._use_derivatives:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
@@ -968,7 +994,7 @@ class Group(System):
 
         allprocs_abs2meta = self._var_allprocs_abs2meta
 
-        self._vector_class = None
+        nproc = self.comm.size
 
         # Check input/output units here, and set _has_input_scaling
         # to True for this Group if units are defined and different, or if
@@ -989,7 +1015,7 @@ class Group(System):
                     else:
                         abs_in2out[abs_in] = abs_out
 
-                    if MPI and self._vector_class is None:
+                    if nproc > 1 and self._vector_class is None:
                         # check for any cross-process data transfer.  If found, use
                         # self._distributed_vector_class as our vector class.
                         in_path = abs_in.rsplit('.', 1)[0]
@@ -1034,10 +1060,6 @@ class Group(System):
                                 needs_input_scaling = np.any(res_ref != 1.0)
 
                 self._has_input_scaling = needs_input_scaling
-
-        if self._vector_class is None:
-            # our vectors are just local vectors.
-            self._vector_class = self._local_vector_class
 
         # check compatability for any discrete connections
         for abs_in, abs_out in iteritems(self._conn_discrete_in2out):
@@ -1613,10 +1635,11 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for ind, sub in enumerate(self._subsystems_myproc):
-                if sub._has_guess:
-                    isub = self._subsystems_myproc_inds[ind]
-                    self._transfer('nonlinear', 'fwd', isub)
+            for isub, (sub, loc)in enumerate(self._all_subsystem_iter()):
+                # TODO: could gather 'has_guess' information during setup and be able to
+                # skip transfer for subs that don't have guesses...
+                self._transfer('nonlinear', 'fwd', isub)
+                if loc and sub._has_guess:
                     sub._guess_nonlinear()
 
         # call our own guess_nonlinear method, after the recursion is done to

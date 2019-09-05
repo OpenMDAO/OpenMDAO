@@ -1,6 +1,7 @@
 """Test the Broyden nonlinear solver. """
 from __future__ import print_function
 
+import os
 from six import iteritems
 import unittest
 
@@ -12,6 +13,11 @@ from openmdao.test_suite.components.sellar import SellarStateConnection, SellarD
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+from openmdao.utils.mpi import MPI
 
 class VectorEquation(om.ImplicitComponent):
     """Equation with 5 states in a single vector. Should converge to x=[0,0,0,0,0]"""
@@ -800,6 +806,62 @@ class TestBryodenFeature(unittest.TestCase):
 
         # sanity check: should sum to .1 Amps
         assert_rel_error(self,  p['circuit.R1.I'] + p['circuit.D1.I'], .1, 1e-6)
+
+
+# FIXME: this test is commented out because BroydenSolver currently doesn't work with comm.size > 1.
+#
+# @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+# class BroydenMPITestCase(unittest.TestCase):
+#     N_PROCS = 2
+
+#     def test_cs_around_broyden_mpi(self):
+#         # Basic sellar test.
+
+#         prob = om.Problem()
+#         model = prob.model
+#         sub = model.add_subsystem('sub', om.ParallelGroup(), promotes=['*'])
+
+#         model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+#         model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+#         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+#         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+#         model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+#                                                 z=np.array([0.0, 0.0]), x=0.0),
+#                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+#         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'),
+#                             promotes=['con1', 'y1'])
+#         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'),
+#                             promotes=['con2', 'y2'])
+
+#         sub.nonlinear_solver = om.BroydenSolver()
+#         sub.linear_solver = om.DirectSolver()
+#         model.linear_solver = om.DirectSolver()
+
+#         if int(os.environ.get('TRACE_MPI', 0)):
+#             from openmdao.devtools.debug import trace_mpi
+#             trace_mpi()
+
+#         if int(os.environ.get('USE_WING', 0)):
+#             import wingdbstub
+
+#         prob.model.add_design_var('x', lower=-100, upper=100)
+#         prob.model.add_design_var('z', lower=-100, upper=100)
+#         prob.model.add_objective('obj')
+#         prob.model.add_constraint('con1', upper=0.0)
+#         prob.model.add_constraint('con2', upper=0.0)
+
+#         prob.setup(check=False, force_alloc_complex=True)
+#         prob.set_solver_print(level=2)
+
+#         prob.run_model()
+
+#         totals = prob.check_totals(method='cs', out_stream=None)
+
+#         for key, val in iteritems(totals):
+#             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
 
 
 if __name__ == "__main__":

@@ -88,7 +88,15 @@ class Jacobian(object):
             local size of the input variable.
         """
         abs2meta = self._system._var_allprocs_abs2meta
-        return (abs2meta[abs_key[0]]['size'], abs2meta[abs_key[1]]['size'])
+        of, wrt = abs_key
+        if self._system.comm.size > 1:
+            if wrt in self._system._outputs._views:
+                sz = abs2meta[wrt]['global_size']
+            else:
+                sz = abs2meta[wrt]['size']
+            return (abs2meta[of]['global_size'], sz)
+
+        return (abs2meta[of]['size'], abs2meta[wrt]['size'])
 
     def __contains__(self, key):
         """
@@ -281,33 +289,6 @@ class Jacobian(object):
             r = rand(*subjac.shape)
             r += 1.0
         return r
-
-    def _get_ranges(self, system, vtype):
-        """
-        Return an ordered dict of ranges for each var of a particular type (input or output).
-
-        Parameters
-        ----------
-        system : System
-            System owning this jacobian.
-        vtype : str
-            Type of variable, must be one of ('input', 'output').
-
-        Returns
-        -------
-        OrderedDict
-            Tuples of the form (start, end) keyed on variable name.
-        """
-        iproc = system.comm.rank
-        abs2idx = system._var_allprocs_abs2idx['linear']
-        sizes = system._var_sizes['linear'][vtype]
-        start = end = 0
-        ranges = OrderedDict()
-        for name in system._var_allprocs_abs_names[vtype]:
-            end += sizes[iproc, abs2idx[name]]
-            ranges[name] = (start, end)
-            start = end
-        return ranges
 
     def _save_sparsity(self, system):
         """

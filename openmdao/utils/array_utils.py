@@ -386,3 +386,27 @@ def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
     cols = np.vstack(src_indices[i] for i in product(*entries))
     dimidxs = [convert_neg(cols[:, i], shape_out[i]) for i in range(cols.shape[1])]
     return np.ravel_multi_index(dimidxs, shape_out)
+
+
+def sizes2offsets(size_array, dtype=int):
+    """
+    For a given array of sizes, return an array of offsets.
+
+    Offsets will be computed using a flattened version of size_array and then
+    reshaped to match the shape of size_array.
+
+    Parameters
+    ----------
+    size_array : ndarray
+        Array of sizes.
+    dtype : type
+        numpy dtype of size_array.
+
+    Returns
+    -------
+    ndarray
+        Array of offsets.
+    """
+    offsets = np.zeros(size_array.size, dtype=dtype)
+    offsets[1:] = np.cumsum(size_array.flat)[:-1]
+    return offsets.reshape(size_array.shape)

@@ -2,17 +2,23 @@
 from __future__ import print_function
 
 import time
+import itertools
 import numpy as np
 import unittest
 TestCase = unittest.TestCase
 
 from six import iterkeys
 
-from openmdao.api import Group, ParallelGroup, Problem, IndepVarComp, ExplicitComponent, ExecComp, DirectSolver
+import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.test_suite.components.matmultcomp import MatMultComp
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -20,7 +26,7 @@ except ImportError:
     PETScVector = None
 
 
-class ScalableComp(ExplicitComponent):
+class ScalableComp(om.ExplicitComponent):
 
     def __init__(self, size, mult=2.0, add=1.0):
         super(ScalableComp, self).__init__()
@@ -47,8 +53,8 @@ class ScalableComp(ExplicitComponent):
 
 
 def setup_1comp_model(par_fds, size, mult, add, method):
-    prob = Problem(model=Group(num_par_fd=par_fds))
-    prob.model.add_subsystem('P1', IndepVarComp('x', np.ones(size)))
+    prob = om.Problem(model=om.Group(num_par_fd=par_fds))
+    prob.model.add_subsystem('P1', om.IndepVarComp('x', np.ones(size)))
     prob.model.add_subsystem('C1', ScalableComp(size, mult, add))
 
     prob.model.connect('P1.x', 'C1.x')
@@ -68,23 +74,23 @@ def setup_diamond_model(par_fds, size, method, par_fd_at):
     assert par_fd_at in ('model', 'par')
 
     if par_fd_at == 'model':
-        prob = Problem(model=Group(num_par_fd=par_fds))
+        prob = om.Problem(model=om.Group(num_par_fd=par_fds))
         prob.model.approx_totals(method=method)
     else:
-        prob = Problem()
+        prob = om.Problem()
     root = prob.model
 
-    root.add_subsystem('P1', IndepVarComp('x', np.ones(size)))
+    root.add_subsystem('P1', om.IndepVarComp('x', np.ones(size)))
 
     if par_fd_at == 'par':
-        par = root.add_subsystem("par", Group(num_par_fd=par_fds))
+        par = root.add_subsystem("par", om.Group(num_par_fd=par_fds))
         par.approx_totals(method=method)
     else:
-        par = root.add_subsystem("par", Group())
+        par = root.add_subsystem("par", om.Group())
 
-    par.add_subsystem('C1', ExecComp('y=2.0*x+1.0', x=np.zeros(size), y=np.zeros(size)))
-    par.add_subsystem('C2', ExecComp('y=3.0*x+5.0', x=np.zeros(size), y=np.zeros(size)))
-    root.add_subsystem('C3', ExecComp('y=-3.0*x1+4.0*x2+1.0', x1=np.zeros(size), x2=np.zeros(size), y=np.zeros(size)))
+    par.add_subsystem('C1', om.ExecComp('y=2.0*x+1.0', x=np.zeros(size), y=np.zeros(size)))
+    par.add_subsystem('C2', om.ExecComp('y=3.0*x+5.0', x=np.zeros(size), y=np.zeros(size)))
+    root.add_subsystem('C3', om.ExecComp('y=-3.0*x1+4.0*x2+1.0', x1=np.zeros(size), x2=np.zeros(size), y=np.zeros(size)))
 
     root.connect("P1.x", "par.C1.x")
     root.connect("P1.x", "par.C2.x")
@@ -248,11 +254,24 @@ class ParallelDiamondFDTestCase(TestCase):
         assert_rel_error(self, J['C3.y']['P1.x'], np.eye(size)*6.0, 1e-6)
 
 
+def _test_func_name(func, num, param):
+    args = []
+    for p in param.args:
+        try:
+            arg = p.__name__
+        except:
+            arg = str(p)
+        args.append(arg)
+    return func.__name__ + '_' + '_'.join(args)
+
+
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class MatMultTestCase(unittest.TestCase):
     N_PROCS = 4
 
-    def run_model(self, size, num_par_fd, method):
+    @parameterized.expand(itertools.product([20, 21, 22], [2, 3, 4], ['fd', 'cs'], [om.LinearRunOnce, om.DirectSolver]),
+                          name_func=_test_func_name)
+    def test_par_fd(self, size, num_par_fd, method, solver):
         if MPI:
             if MPI.COMM_WORLD.rank == 0:
                 mat = np.random.random(5 * size).reshape((5, size)) - 0.5
@@ -262,10 +281,12 @@ class MatMultTestCase(unittest.TestCase):
         else:
             mat = np.random.random(5 * size).reshape((5, size)) - 0.5
 
-        p = Problem()
+        p = om.Problem()
 
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
+        model.linear_solver = solver()
+
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
         comp = model.add_subsystem('comp', MatMultComp(mat, approx_method=method, num_par_fd=num_par_fd))
 
         model.connect('indep.x', 'comp.x')
@@ -292,36 +313,6 @@ class MatMultTestCase(unittest.TestCase):
         norm = np.linalg.norm(data['comp']['y', 'x']['J_fd'] - comp.mat)
         self.assertLess(norm, 1.e-7)
 
-    def test_20_by_4_fd(self):
-        self.run_model(20, 4, 'fd')
-
-    def test_21_by_4_fd(self):
-        self.run_model(21, 4, 'fd')
-
-    def test_21_by_2_fd(self):
-        self.run_model(21, 2, 'fd')
-
-    def test_21_by_3_fd(self):
-        self.run_model(21, 3, 'fd')
-
-    def test_22_by_3_fd(self):
-        self.run_model(22, 3, 'fd')
-
-    def test_20_by_4_cs(self):
-        self.run_model(20, 4, 'cs')
-
-    def test_21_by_4_cs(self):
-        self.run_model(21, 4, 'cs')
-
-    def test_21_by_2_cs(self):
-        self.run_model(21, 2, 'cs')
-
-    def test_21_by_3_cs(self):
-        self.run_model(21, 3, 'cs')
-
-    def test_22_by_3_cs(self):
-        self.run_model(22, 3, 'cs')
-
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
 class MatMultParallelTestCase(unittest.TestCase):
@@ -340,14 +331,14 @@ class MatMultParallelTestCase(unittest.TestCase):
         mat2 = mat1 * 5.0
 
         if total:
-            grp = Group(num_par_fd=num_par_fd1)
+            grp = om.Group(num_par_fd=num_par_fd1)
         else:
-            grp = Group()
-        p = Problem(model=grp)
+            grp = om.Group()
+        p = om.Problem(model=grp)
 
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat1.shape[1])))
-        par = model.add_subsystem('par', ParallelGroup())
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat1.shape[1])))
+        par = model.add_subsystem('par', om.ParallelGroup())
 
         if total:
             C1 = par.add_subsystem('C1', MatMultComp(mat1, approx_method='exact'))
@@ -444,9 +435,9 @@ class MatMultParallelTestCase(unittest.TestCase):
 
 def _setup_problem(mat, total_method='exact', partial_method='exact', total_num_par_fd=1,
                    partial_num_par_fd=1, approx_totals=False):
-    p = Problem(model=Group(num_par_fd=total_num_par_fd))
+    p = om.Problem(model=om.Group(num_par_fd=total_num_par_fd))
     model = p.model
-    model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
+    model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
     model.add_subsystem('comp', MatMultComp(mat, approx_method=partial_method,
                         num_par_fd=partial_num_par_fd))
 
@@ -505,10 +496,10 @@ class ParFDFeatureTestCase(unittest.TestCase):
     def test_fd_totals(self):
         mat = np.arange(30, dtype=float).reshape(5, 6)
 
-        p = Problem(model=Group(num_par_fd=3))
+        p = om.Problem(model=om.Group(num_par_fd=3))
         model = p.model
         model.approx_totals(method='fd')
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
         comp = model.add_subsystem('comp', MatMultComp(mat))
 
         model.connect('indep.x', 'comp.x')
@@ -534,9 +525,9 @@ class ParFDFeatureTestCase(unittest.TestCase):
     def test_fd_partials(self):
         mat = np.arange(30, dtype=float).reshape(5, 6)
 
-        p = Problem()
+        p = om.Problem()
         model = p.model
-        model.add_subsystem('indep', IndepVarComp('x', val=np.ones(mat.shape[1])))
+        model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
         comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd', num_par_fd=3))
 
         model.connect('indep.x', 'comp.x')

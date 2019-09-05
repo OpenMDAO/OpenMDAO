@@ -333,7 +333,7 @@ class MPITests(unittest.TestCase):
         model.connect('g2.y2', 'sub1.sub2.g1.x')
 
         model.nonlinear_solver = om.NewtonSolver()
-        model.linear_solver = om.ScipyKrylov()
+        model.linear_solver = om.LinearBlockGS()
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 0
 
@@ -341,7 +341,7 @@ class MPITests(unittest.TestCase):
         g1.linear_solver = om.LinearBlockGS()
 
         g2.nonlinear_solver = om.NewtonSolver()
-        g2.linear_solver = om.ScipyKrylov()
+        g2.linear_solver = om.PETScKrylov()
         g2.linear_solver.precon = om.LinearBlockGS()
         g2.linear_solver.precon.options['maxiter'] = 2
 
