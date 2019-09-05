@@ -164,8 +164,8 @@ class InterpLagrange2(object):
             q3 = values[..., idx + 2] / (c13 * c23)
 
         derivs[..., 0] = q1 * (2.0 * x[0] - grid[idx + 1] - grid[idx + 2]) - \
-                         q2 * (2.0 * x[0] - grid[idx] - grid[idx + 2]) + \
-                         q3 * (2.0 * x[0] - grid[idx] - grid[idx + 1])
+            q2 * (2.0 * x[0] - grid[idx] - grid[idx + 2]) + \
+            q3 * (2.0 * x[0] - grid[idx] - grid[idx + 1])
 
         return xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2, derivs
 
@@ -252,7 +252,7 @@ class InterpLagrange3(object):
             dq3_dsub = subderiv[..., 2, :] / (c13 * c23 * c34)
             dq4_dsub = subderiv[..., 3, :] / (c14 * c24 * c34)
 
-            derivs[..., 1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) + \
+            derivs[..., 1:] = xx4 * (xx3 * (dq1_dsub * xx2 - dq2_dsub * xx1) +
                                      dq3_dsub * xx1 * xx2) - dq4_dsub * xx1 * xx2 * xx3
 
         else:
@@ -274,17 +274,16 @@ class InterpLagrange3(object):
             q3 = values[..., idx + 1] / (c13 * c23 * c34)
             q4 = values[..., idx + 2] / (c14 * c24 * c34)
 
-        derivs[..., 0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) + \
-                               p4 * (p2 + p3) + p2 * p3) - \
-                         q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) + \
-                               p4 * (p1 + p3) + p1 * p3) + \
-                         q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) + \
-                               p4 * (p2 + p1) + p2 * p1) - \
-                         q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) + \
-                               p1 * (p2 + p3) + p2 * p3)
+        derivs[..., 0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) +
+                            p4 * (p2 + p3) + p2 * p3) - \
+            q2 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p1)) +
+                  p4 * (p1 + p3) + p1 * p3) + \
+            q3 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p2 + p1)) +
+                  p4 * (p2 + p1) + p2 * p1) - \
+            q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) +
+                  p1 * (p2 + p3) + p2 * p3)
 
-        return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, \
-               derivs
+        return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, derivs
 
 
 class InterpAkima(object):
@@ -556,8 +555,8 @@ class InterpAkima(object):
 
             db = 0.5 * (dm2 + dm3)
 
-            dbpos = ((dm2 * w2 + m2e * dw2 + dm3 * w31 + m3e * dw3)  - bpos * (dw2 + dw3)) / \
-                    (w2 + w31)
+            dbpos = ((dm2 * w2 + m2e * dw2 + dm3 * w31 + m3e * dw3) - bpos * (dw2 + dw3)) / \
+                (w2 + w31)
 
             if nx > 2:
 
@@ -588,7 +587,7 @@ class InterpAkima(object):
             dbp1 = 0.5 * (dm3 + dm4)
 
             dbp1pos = ((dm3 * w32 + m3e * dw3 + dm4 * w4 + m4e * dw4) - bp1pos * (dw3 + dw4)) / \
-                       (w32 + w4)
+                (w32 + w4)
 
             if nx > 2:
 
@@ -638,6 +637,9 @@ class InterpCubic(object):
     """
 
     def __init__(self):
+        """
+        Initialize.
+        """
         self.second_derivs = None
 
     def compute_coeffs(self, grid, values, x):
@@ -734,7 +736,7 @@ class InterpCubic(object):
             fact = 1.0 / 6.0
 
             interp_values = a * values[..., idx] + b * values[..., idx + 1] + \
-                ((a * a * a - a) * sec_deriv[..., idx] + \
+                ((a * a * a - a) * sec_deriv[..., idx] +
                  (b * b * b - b) * sec_deriv[..., idx + 1]) * (step * step * fact)
 
             # Derivatives
@@ -744,19 +746,19 @@ class InterpCubic(object):
             derivs = np.empty(tuple(tshape), dtype=x.dtype)
 
             derivs[..., 0] = r_step * (values[..., idx + 1] - values[..., idx]) + \
-                             (((3.0 * b * b - 1) * sec_deriv[..., idx + 1] - \
-                               (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact))
+                (((3.0 * b * b - 1) * sec_deriv[..., idx + 1] -
+                  (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact))
 
             if nx == 2:
                 dsec = self.compute_coeffs(table.grid, subderivs, x)
-                derivs[..., 1] = ((a * a * a - a) * dsec[..., idx] + \
-                                   (b * b * b - b) * dsec[..., idx + 1]) * (step * step * fact)
+                derivs[..., 1] = ((a * a * a - a) * dsec[..., idx] +
+                                  (b * b * b - b) * dsec[..., idx + 1]) * (step * step * fact)
 
                 derivs[..., 1] += a * subderivs[..., idx] + b * subderivs[..., idx + 1]
 
             else:
                 dsec = self.compute_coeffs(table.grid, np.swapaxes(subderivs, -1, -2), x)
-                derivs[..., 1:] = ((a * a * a - a) * dsec[..., idx] + \
+                derivs[..., 1:] = ((a * a * a - a) * dsec[..., idx] +
                                    (b * b * b - b) * dsec[..., idx + 1]) * (step * step * fact)
 
                 derivs[..., 1:] += a * subderivs[..., idx, :] + b * subderivs[..., idx + 1, :]
@@ -779,12 +781,12 @@ class InterpCubic(object):
         fact = 1.0 / 6.0
 
         val = a * values[..., idx] + b * values[..., idx + 1] + \
-               ((a * a * a - a) * sec_deriv[..., idx] + \
-                (b * b * b - b) * sec_deriv[..., idx + 1]) * (step * step * fact)
+            ((a * a * a - a) * sec_deriv[..., idx] +
+             (b * b * b - b) * sec_deriv[..., idx + 1]) * (step * step * fact)
 
         deriv = r_step * (values[..., idx + 1] - values[..., idx]) + \
-                ((3.0 * b * b - 1) * sec_deriv[..., idx + 1] - \
-                 (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact)
+            ((3.0 * b * b - 1) * sec_deriv[..., idx + 1] -
+             (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact)
 
         return val, deriv
 
@@ -924,7 +926,6 @@ class InterpTable(object):
             Derivative of interpolated values with respect to this independent and child
             independents
         """
-
         idx, _ = self.bracket(x[0])
 
         self.last_index = idx
