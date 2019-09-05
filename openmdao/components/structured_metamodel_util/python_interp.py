@@ -711,6 +711,11 @@ class InterpCubic(object):
         x : ndarray
             The coordinates to sample the gridded data at. Only needed to query the dtype for
             complex step.
+
+        Returns
+        -------
+        ndarray
+            Coefficients for cubic spline.
         """
         n = len(grid)
 
@@ -1047,7 +1052,7 @@ class PythonGridInterp(GridInterpBase):
         k = self._interp_config[interp_method]
         for i, p in enumerate(points):
             n_p = len(p)
-            if n_p <= k:
+            if n_p < k:
                 raise ValueError("There are %d points in dimension %d,"
                                  " but method %s requires at least %d "
                                  "points per "
@@ -1078,15 +1083,14 @@ class PythonGridInterp(GridInterpBase):
         list
             Valid interpolation name strings.
         dict
-            Configuration object that stores limitations of each interpolation
-            method.
+            Configuration object that stores the number of points required for each method.
         """
         interpolator_configs = {
             "slinear": 2,
             "lagrange2": 3,
             "lagrange3": 4,
             "akima": 4,
-            "cubic": 3,
+            "cubic": 4,
         }
 
         all_methods = list(interpolator_configs.keys())
@@ -1100,7 +1104,7 @@ class PythonGridInterp(GridInterpBase):
         Parameters
         ----------
         xi : ndarray of shape (..., ndim)
-            The coordinates to sample the gridded data at
+            The coordinates to sample the gridded data.
 
         Returns
         -------

@@ -73,7 +73,7 @@ class TestPythonGridInterpolator(unittest.TestCase):
 
     def test_minimum_required_gridsize(self):
         for method in self.valid_methods:
-            k = self.interp_configs[method]
+            k = self.interp_configs[method] - 1
             x = np.linspace(0, 1, k)
             y = np.linspace(0, 1, k)
             points = [x, y]

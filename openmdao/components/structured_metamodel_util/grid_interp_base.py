@@ -106,7 +106,7 @@ class GridInterpBase(object):
         Parameters
         ----------
         xi : ndarray of shape (..., ndim)
-            The coordinates to sample the gridded data at
+            The coordinates to sample the gridded data.
 
         Returns
         -------

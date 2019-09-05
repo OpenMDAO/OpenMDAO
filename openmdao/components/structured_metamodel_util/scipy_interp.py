@@ -71,7 +71,8 @@ class ScipyGridInterp(GridInterpBase):
 
         # ScipyGridInterp supports automatic order reduction.
         self._ki = []
-        k = self._interp_config[interp_method]
+        # Order is the number of required points minus one.
+        k = self._interp_config[interp_method] - 1
         for i, p in enumerate(points):
             n_p = len(p)
             self._ki.append(k)
@@ -87,13 +88,12 @@ class ScipyGridInterp(GridInterpBase):
         list
             Valid interpolation name strings.
         dict
-            Configuration object that stores limitations of each interpolation
-            method.
+            Configuration object that stores the number of points required for each method.
         """
         interpolator_configs = {
-            "slinear": 1,
-            "cubic": 3,
-            "quintic": 5,
+            "slinear": 2,
+            "cubic": 4,
+            "quintic": 6,
         }
 
         all_methods = list(interpolator_configs.keys())
@@ -106,7 +106,7 @@ class ScipyGridInterp(GridInterpBase):
         Parameters
         ----------
         xi : ndarray of shape (..., ndim)
-            The coordinates to sample the gridded data at.
+            The coordinates to sample the gridded data.
 
         Returns
         -------
