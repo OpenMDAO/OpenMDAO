@@ -244,7 +244,6 @@ class MetaModelVisualization(object):
                 self.y_input_slider = slider_object
                 self.y_input_slider.on_change('value', self._scatter_plots_update)
             else:
-
                 slider_object.on_change('value', self._update)
 
     def _make_predictions(self, data):
@@ -352,19 +351,21 @@ class MetaModelVisualization(object):
 
         # Contour Plot
         self.contour_plot = contour_plot = figure(
+            match_aspect=False,
             tooltips=[(self.x_input.value, "$x"), (self.y_input.value, "$y"),
                       (self.output_select.value, "@image")], tools="pan")
+        contour_plot.x_range.range_padding = 0
+        contour_plot.y_range.range_padding = 0
         contour_plot.plot_width = 600
         contour_plot.plot_height = 500
         contour_plot.xaxis.axis_label = self.x_input.value
         contour_plot.yaxis.axis_label = self.y_input.value
         contour_plot.min_border_left = 0
         contour_plot.add_layout(color_bar, 'right')
-        contour_plot.x_range = Range1d(min(xlins), max(xlins))
-        contour_plot.y_range = Range1d(min(ylins), max(ylins))
 
         contour_plot.image(image=[self.source.data['z']], x=min(xlins), y=min(ylins),
-                           dh=dh, dw=dw, palette="Viridis11")
+                           dh=(max(ylins) - min(ylins)), dw=(max(xlins) - min(xlins)),
+                           palette="Viridis11")
 
         # Adding training data points overlay to contour plot
         data = self._training_points()
