@@ -24,10 +24,6 @@ class InterpLinear(object):
         Cached slope value for leaf table.
     """
 
-    def __init__(self):
-        self.last_index = None
-        self.slope = 0.0
-
     def interpolate(self, x, idx, slice_idx, table):
         """
         Compute the interpolated value over this grid dimension.
@@ -60,6 +56,8 @@ class InterpLinear(object):
         if idx == len(grid) - 1:
             idx -= 1
 
+        h = 1.0 / (grid[idx + 1] - grid[idx])
+
         if subtable is not None:
             # Interpolate between values that come from interpolating the subtables in the
             # subsequent dimensions.
@@ -72,24 +70,17 @@ class InterpLinear(object):
             derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
             dtmp, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
-            slope = (dtmp[..., 1] - dtmp[..., 0]) / (grid[idx + 1] - grid[idx])
+            slope = (dtmp[..., 1] - dtmp[..., 0]) * h
 
             derivs[..., 0] = slope
-            dslope_dsub = (subderiv[..., 1, :] - subderiv[..., 0, :]) / (grid[idx + 1] - grid[idx])
+            dslope_dsub = (subderiv[..., 1, :] - subderiv[..., 0, :]) * h
             derivs[..., 1:] = subderiv[..., 0, :] + (x[0] - grid[idx]) * dslope_dsub
 
             return dtmp[..., 0] + (x[0] - grid[idx]) * slope, derivs
 
         else:
             values = table.values[tuple(slice_idx)]
-            last_index = self.last_index
-            slope = self.slope
-
-            # If idx is the same as last time, then the slope hasn't changed.
-            if idx != last_index:
-                self.last_index = idx
-                slope = (values[..., idx + 1] - values[..., idx]) / (grid[idx + 1] - grid[idx])
-                self.slope = slope
+            slope = (values[..., idx + 1] - values[..., idx]) * h
 
             return values[..., idx] + (x - grid[idx]) * slope, np.expand_dims(slope, axis=-1)
 
@@ -105,10 +96,6 @@ class InterpLagrange2(object):
     slope : double
         Cached slope value for leaf table.
     """
-
-    def __init__(self):
-        self.last_index = None
-        self.slope = None
 
     def interpolate(self, x, idx, slice_idx, table):
         """
@@ -178,24 +165,17 @@ class InterpLagrange2(object):
 
         else:
             values = table.values[tuple(slice_idx)]
-            last_index = self.last_index
 
             nshape = list(values.shape[:-1])
             nshape.append(1)
             derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
-            # If idx is the same as last time, then the slope hasn't changed.
-            if idx != last_index:
-                self.last_index = idx
-                c12 = grid[idx] - grid[idx + 1]
-                c13 = grid[idx] - grid[idx + 2]
-                c23 = grid[idx + 1] - grid[idx + 2]
-                q1 = values[..., idx] / (c12 * c13)
-                q2 = values[..., idx + 1] / (c12 * c23)
-                q3 = values[..., idx + 2] / (c13 * c23)
-                self.slope = (q1, q2, q3)
-
-            q1, q2, q3 = self.slope
+            c12 = grid[idx] - grid[idx + 1]
+            c13 = grid[idx] - grid[idx + 2]
+            c23 = grid[idx + 1] - grid[idx + 2]
+            q1 = values[..., idx] / (c12 * c13)
+            q2 = values[..., idx + 1] / (c12 * c23)
+            q3 = values[..., idx + 2] / (c13 * c23)
 
         derivs[..., 0] = q1 * (2.0 * x[0] - grid[idx + 1] - grid[idx + 2]) - \
                          q2 * (2.0 * x[0] - grid[idx] - grid[idx + 2]) + \
@@ -215,10 +195,6 @@ class InterpLagrange3(object):
     slope : double
         Cached slope value for leaf table.
     """
-
-    def __init__(self):
-        self.last_index = -1
-        self.slope = None
 
     def interpolate(self, x, idx, slice_idx, table):
         """
@@ -302,32 +278,22 @@ class InterpLagrange3(object):
 
         else:
             values = table.values[tuple(slice_idx)]
-            last_index = self.last_index
 
             nshape = list(values.shape[:-1])
             nshape.append(1)
             derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
-            # If the lookup index is the same as last time and it is not '0',
-            # then the slope hasn't changed, so don't need to recalculate.
-            if idx != last_index or last_index == 0:
-                self.last_index = idx
+            c12 = p1 - p2
+            c13 = p1 - p3
+            c14 = p1 - p4
+            c23 = p2 - p3
+            c24 = p2 - p4
+            c34 = p3 - p4
 
-                c12 = p1 - p2
-                c13 = p1 - p3
-                c14 = p1 - p4
-                c23 = p2 - p3
-                c24 = p2 - p4
-                c34 = p3 - p4
-
-                q1 = values[..., idx - 1] / (c12 * c13 * c14)
-                q2 = values[..., idx] / (c12 * c23 * c24)
-                q3 = values[..., idx + 1] / (c13 * c23 * c34)
-                q4 = values[..., idx + 2] / (c14 * c24 * c34)
-
-                self.slope = (q1, q2, q3, q4)
-
-            q1, q2, q3, q4 = self.slope
+            q1 = values[..., idx - 1] / (c12 * c13 * c14)
+            q2 = values[..., idx] / (c12 * c23 * c24)
+            q3 = values[..., idx + 1] / (c13 * c23 * c34)
+            q4 = values[..., idx + 2] / (c14 * c24 * c34)
 
         derivs[..., 0] = q1 * (x[0] * (3.0 * x[0] - 2.0 * (p4 + p3 + p2)) + \
                                p4 * (p2 + p3) + p2 * p3) - \

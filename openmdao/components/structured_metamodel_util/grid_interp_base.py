@@ -122,8 +122,9 @@ class GridInterpBase(object):
                     raise OutOfBoundsError("One of the requested xi contains a NaN",
                                            i, np.NaN, self.grid[i][0], self.grid[i][-1])
 
-                if not np.logical_and(np.all(self.grid[i][0] <= p),
-                                      np.all(p <= self.grid[i][-1])):
+                eps = 1e-14 * self.grid[i][-1]
+                if not np.logical_and(np.all(self.grid[i][0] <= p + eps),
+                                      np.all(p - eps <= self.grid[i][-1])):
                     p1 = np.where(self.grid[i][0] > p)[0]
                     p2 = np.where(p > self.grid[i][-1])[0]
                     # First violating entry is enough to direct the user.

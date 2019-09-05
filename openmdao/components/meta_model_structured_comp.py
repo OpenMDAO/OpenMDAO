@@ -213,6 +213,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                                                                                    out_name,
                                                                                    str(err)))
             outputs[out_name] = val
+        print('SMM', inputs._data, outputs._data)
 
     def compute_partials(self, inputs, partials):
         """
