@@ -1097,55 +1097,61 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
+        model.list_outputs(hierarchical=False)
+
         cr = om.CaseReader(self.filename)
         case = cr.get_case(0)
 
-        #
-        # list inputs, not hierarchical
-        #
-        stream = StringIO()
-        case.list_inputs(values=True, hierarchical=False, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        # #
+        # # list inputs, not hierarchical
+        # #
+        # stream = StringIO()
+        # case.list_inputs(values=True, hierarchical=False, out_stream=stream)
+        # text = stream.getvalue().split('\n')
 
-        expected = [
-            "3 Input(s) in 'model'",
-            "---------------------",
-            "",
-            "varname  value",
-            "-------  -----",
-            "expl.a   [10.]",
-            "expl.x   11",
-            "impl.x   11",
-        ]
+        # print('\n'.join(text))
 
-        for i, line in enumerate(expected):
-            if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+        # expected = [
+        #     "3 Input(s) in 'model'",
+        #     "---------------------",
+        #     "",
+        #     "varname  value",
+        #     "-------  -----",
+        #     "expl.a   [10.]",
+        #     "expl.x   11",
+        #     "impl.x   11",
+        # ]
 
-        #
-        # list inputs, hierarchical
-        #
-        stream = StringIO()
-        case.list_inputs(values=True, hierarchical=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        # for i, line in enumerate(expected):
+        #     if line and not line.startswith('-'):
+        #         self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
-        expected = [
-            "3 Input(s) in 'model'",
-            "---------------------",
-            "",
-            "varname  value",
-            "-------  -----",
-            "top",
-            "  expl",
-            "    a    [10.]",
-            "    x    11   ",
-            "  impl",
-            "    x    11 ",
-        ]
+        # #
+        # # list inputs, hierarchical
+        # #
+        # stream = StringIO()
+        # case.list_inputs(values=True, hierarchical=True, out_stream=stream)
+        # text = stream.getvalue().split('\n')
 
-        for i, line in enumerate(expected):
-            if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+        # print('\n'.join(text))
+
+        # expected = [
+        #     "3 Input(s) in 'model'",
+        #     "---------------------",
+        #     "",
+        #     "varname  value",
+        #     "-------  -----",
+        #     "top",
+        #     "  expl",
+        #     "    a    [10.]",
+        #     "    x    11   ",
+        #     "  impl",
+        #     "    x    11 ",
+        # ]
+
+        # for i, line in enumerate(expected):
+        #     if line and not line.startswith('-'):
+        #         self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
         #
         # list outputs, not hierarchical
@@ -1153,6 +1159,8 @@ class TestSqliteCaseReader(unittest.TestCase):
         stream = StringIO()
         case.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
         text = stream.getvalue().split('\n')
+
+        print('\n'.join(text))
 
         expected = [
             "3 Explicit Output(s) in 'model'",

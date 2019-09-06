@@ -659,8 +659,8 @@ class Case(object):
         else:
             pathname = self.source.replace('root.', '')
 
-        # FIXME: vars should be in execution order, for now they are just in sorted order
-        write_var_table(pathname, sorted(var_dict.keys()), var_type, var_dict,
+        # vars should be in execution order
+        write_var_table(pathname, var_dict.keys(), var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
 
     def _get_variables_of_type(self, var_type):

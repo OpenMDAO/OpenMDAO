@@ -3346,10 +3346,31 @@ class System(object):
                                     np.append(var_dict[name]['resids'],
                                               proc_vars[name]['resids'])
 
-        # get list of var names in execution order, based on the order subsystems were setup
+        var_list = self._get_vars_execution_order(inputs=var_type is 'input', variables=var_dict)
+        print('var_list:', var_list)
+
+        write_var_table(self.pathname, var_list, var_type, var_dict,
+                        hierarchical, print_arrays, out_stream)
+
+    def _get_vars_execution_order(self, inputs=False, variables=None):
+        """
+        Get list of variable names in execution order, based on the order subsystems were setup.
+
+        Parameters
+        ----------
+        input : bool, optional
+            Get names of inputs instead of outputs. Default is Falsee.
+        variables : Collection (list or dict)
+            Variables to include. If None then all varables will be included. Default is None.
+
+        Returns
+        -------
+        list
+            list of variable names in execution order
+        """
         var_list = []
 
-        in_or_out = 'input' if var_type is 'input' else 'output'
+        in_or_out = 'input' if inputs else 'output'
         real_vars = self._var_allprocs_abs_names[in_or_out]
         disc_vars = self._var_allprocs_discrete[in_or_out]
 
@@ -3360,23 +3381,22 @@ class System(object):
                 path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name
                 path += '.'
                 for var_name in real_vars:
-                    if var_name in var_dict and var_name.startswith(path):
+                    if not variables or (var_name in variables and var_name.startswith(path)):
                         var_list.append(var_name)
                 for var_name in disc_vars:
-                    if var_name in var_dict and var_name.startswith(path):
+                    if not variables or (var_name in variables and var_name.startswith(path)):
                         var_list.append(var_name)
         else:
             # For components with no children, self._subsystems_allprocs is empty.
             for var_name in real_vars:
-                if var_name in var_dict:
+                if not variables or var_name in variables:
                     var_list.append(var_name)
 
             for var_name in disc_vars:
-                if var_name in var_dict:
+                if not variables or var_name in variables:
                     var_list.append(var_name)
 
-        write_var_table(self.pathname, var_list, var_type, var_dict,
-                        hierarchical, print_arrays, out_stream)
+        return var_list
 
     def run_solve_nonlinear(self):
         """
