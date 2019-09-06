@@ -3,6 +3,7 @@ from __future__ import division
 
 import numpy as np
 from six.moves import range
+from scipy.sparse import csc_matrix
 
 from openmdao.jacobians.jacobian import Jacobian
 
@@ -64,8 +65,27 @@ class DictionaryJacobian(Jacobian):
                         key = (res_name, name)
                         if key in subjacs:
                             keys.append(key)
+                            rows = subjacs[key]['rows']
+                            if rows is not None:
+                                cols = subjacs[key]['cols']
+                                # create a CSC matrix to use for the subjac in apply
+                                csc = csc_matrix((np.arange(rows.size, dtype=int), (rows, cols)),
+                                                 shape=subjacs[key]['shape'])
+                                inds = csc.data
+                                if np.all(np.arange(rows.size, dtype=int) == inds):
+                                    # no mapping needed
+                                    inds = slice(None)
+                                else:
+                                    # reverse inds to avoid an array copy during apply
+                                    inds = np.argsort(inds)
+                                # keep track of how data array was modified in conversion
+                                # from COO to CSC
+                                subjacs[key]['csc_val_map'] = inds
+                                subjacs[key]['csc'] = csc_matrix((subjacs[key]['value'],
+                                                                 (rows, cols)),
+                                                                 shape=subjacs[key]['shape'])
+
             self._iter_keys[entry] = keys
-            return keys
 
         return self._iter_keys[entry]
 
@@ -99,6 +119,7 @@ class DictionaryJacobian(Jacobian):
         np_add_at = np.add.at
         ncol = d_residuals._ncol
         subjacs_info = self._subjacs_info
+        is_explicit = isinstance(system, ExplicitComponent)
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system, d_residuals._name):
@@ -111,47 +132,51 @@ class DictionaryJacobian(Jacobian):
                 if res_name in d_res_names:
                     rows = subjac_info['rows']
                     if rows is not None:  # sparse list format
-                        cols = subjac_info['cols']
                         if other_name in d_out_names:
                             # skip the matvec mult completely for identity subjacs
-                            if res_name is other_name and isinstance(system, ExplicitComponent):
+                            if res_name is other_name and is_explicit:
                                 if fwd:
                                     rflat[res_name] -= oflat[other_name]
                                 else:
                                     oflat[other_name] -= rflat[res_name]
-                            elif fwd:
-                                if ncol > 1:
-                                    for i in range(ncol):
-                                        np_add_at(rflat[res_name][:, i], rows,
-                                                  oflat[other_name][:, i][cols] * subjac)
-                                else:
-                                    np_add_at(rflat[res_name], rows,
-                                              oflat[other_name][cols] * subjac)
-                            else:  # rev
-                                if ncol > 1:
-                                    for i in range(ncol):
-                                        np_add_at(oflat[other_name][:, i], cols,
-                                                  rflat[res_name][:, i][rows] * subjac)
-                                else:
-                                    np_add_at(oflat[other_name], cols,
-                                              rflat[res_name][rows] * subjac)
+                            else:
+                                cols = subjac_info['cols']
+                                csc = subjac_info['csc']
+                                inds = subjac_info['csc_val_map']
+                                csc.data[inds] = subjac
+                                if fwd:
+                                    if ncol > 1:
+                                        for i in range(ncol):
+                                            np_add_at(rflat[res_name][:, i], rows,
+                                                      oflat[other_name][:, i][cols] * subjac)
+                                    else:
+                                        rflat[res_name] += csc.dot(oflat[other_name])
+                                else:  # rev
+                                    if ncol > 1:
+                                        for i in range(ncol):
+                                            np_add_at(oflat[other_name][:, i], cols,
+                                                      rflat[res_name][:, i][rows] * subjac)
+                                    else:
+                                        oflat[other_name] += csc.transpose().dot(rflat[res_name])
                         elif other_name in d_inp_names:
+                            cols = subjac_info['cols']
+                            csc = subjac_info['csc']
+                            inds = subjac_info['csc_val_map']
+                            csc.data[inds] = subjac
                             if fwd:
                                 if ncol > 1:
                                     for i in range(ncol):
                                         np_add_at(rflat[res_name][:, i], rows,
                                                   iflat[other_name][:, i][cols] * subjac)
                                 else:
-                                    np_add_at(rflat[res_name], rows,
-                                              iflat[other_name][cols] * subjac)
+                                    rflat[res_name] += csc.dot(iflat[other_name])
                             else:  # rev
                                 if ncol > 1:
                                     for i in range(ncol):
                                         np_add_at(iflat[other_name][:, i], cols,
                                                   rflat[res_name][:, i][rows] * subjac)
                                 else:
-                                    np_add_at(iflat[other_name], cols,
-                                              rflat[res_name][rows] * subjac)
+                                    iflat[other_name] += csc.transpose().dot(rflat[res_name])
                     else:  # ndarray or sparse
                         if other_name in d_out_names:
                             if fwd:
