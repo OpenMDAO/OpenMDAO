@@ -130,61 +130,48 @@ class DictionaryJacobian(Jacobian):
                     subjac = subjac_info['value']
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
+
+                    # skip the matvec mult completely for identity subjacs
+                    if is_explicit and res_name is other_name and other_name in d_out_names:
+                        if fwd:
+                            rflat[res_name] -= oflat[other_name]
+                        else:
+                            oflat[other_name] -= rflat[res_name]
+                        continue
+
+                    if other_name in d_out_names:
+                        if fwd:
+                            left_vec = rflat[res_name]
+                            right_vec = oflat[other_name]
+                        else:
+                            left_vec = oflat[other_name]
+                            right_vec = rflat[res_name]
+                    elif other_name in d_inp_names:
+                        if fwd:
+                            left_vec = rflat[res_name]
+                            right_vec = iflat[other_name]
+                        else:
+                            left_vec = iflat[other_name]
+                            right_vec = rflat[res_name]
+                    else:
+                        continue
+
                     rows = subjac_info['rows']
-                    if rows is not None:  # sparse list format
-                        if other_name in d_out_names:
-                            # skip the matvec mult completely for identity subjacs
-                            if res_name is other_name and is_explicit:
-                                if fwd:
-                                    rflat[res_name] -= oflat[other_name]
-                                else:
-                                    oflat[other_name] -= rflat[res_name]
-                            else:
-                                cols = subjac_info['cols']
-                                csc = subjac_info['csc']
-                                inds = subjac_info['csc_val_map']
-                                csc.data[inds] = subjac
-                                if fwd:
-                                    if ncol > 1:
-                                        for i in range(ncol):
-                                            np_add_at(rflat[res_name][:, i], rows,
-                                                      oflat[other_name][:, i][cols] * subjac)
-                                    else:
-                                        rflat[res_name] += csc.dot(oflat[other_name])
-                                else:  # rev
-                                    if ncol > 1:
-                                        for i in range(ncol):
-                                            np_add_at(oflat[other_name][:, i], cols,
-                                                      rflat[res_name][:, i][rows] * subjac)
-                                    else:
-                                        oflat[other_name] += csc.transpose().dot(rflat[res_name])
-                        elif other_name in d_inp_names:
-                            cols = subjac_info['cols']
-                            csc = subjac_info['csc']
-                            inds = subjac_info['csc_val_map']
-                            csc.data[inds] = subjac
-                            if fwd:
-                                if ncol > 1:
-                                    for i in range(ncol):
-                                        np_add_at(rflat[res_name][:, i], rows,
-                                                  iflat[other_name][:, i][cols] * subjac)
-                                else:
-                                    rflat[res_name] += csc.dot(iflat[other_name])
-                            else:  # rev
-                                if ncol > 1:
-                                    for i in range(ncol):
-                                        np_add_at(iflat[other_name][:, i], cols,
-                                                  rflat[res_name][:, i][rows] * subjac)
-                                else:
-                                    iflat[other_name] += csc.transpose().dot(rflat[res_name])
-                    else:  # ndarray or sparse
-                        if other_name in d_out_names:
-                            if fwd:
-                                rflat[res_name] += subjac.dot(oflat[other_name])
-                            else:  # rev
-                                oflat[other_name] += subjac.T.dot(rflat[res_name])
-                        elif other_name in d_inp_names:
-                            if fwd:
-                                rflat[res_name] += subjac.dot(iflat[other_name])
-                            else:  # rev
-                                iflat[other_name] += subjac.T.dot(rflat[res_name])
+                    if rows is not None:
+                        if ncol > 1:
+                            linds, rinds = rows, subjac_info['cols']
+                            if not fwd:
+                                linds, rinds = rinds, linds
+                            for i in range(ncol):
+                                np_add_at(left_vec[:, i], linds,
+                                          right_vec[:, i][rinds] * subjac)
+                            continue
+
+                        csc = subjac_info['csc']
+                        csc.data[subjac_info['csc_val_map']] = subjac
+                        subjac = csc
+
+                    if not fwd:
+                        subjac = subjac.transpose()
+
+                    left_vec += subjac.dot(right_vec)
