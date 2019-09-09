@@ -22,6 +22,8 @@ class DictionaryJacobian(Jacobian):
 
     """
 
+    _csc_dict = {}  # cache for CSC subjacs (multiple DictionaryJacobians can share a subjac)
+
     def __init__(self, system, **kwargs):
         """
         Initialize all attributes.
@@ -57,6 +59,7 @@ class DictionaryJacobian(Jacobian):
         entry = (system.pathname, vec_name)
 
         if entry not in self._iter_keys:
+            ncol = system._vectors['residual'][vec_name]._ncol
             subjacs = self._subjacs_info
             keys = []
             for res_name in system._var_relevant_names[vec_name]['output']:
@@ -66,24 +69,37 @@ class DictionaryJacobian(Jacobian):
                         if key in subjacs:
                             keys.append(key)
                             rows = subjacs[key]['rows']
-                            if rows is not None:
+                            if rows is not None and ncol == 1:
                                 cols = subjacs[key]['cols']
-                                # create a CSC matrix to use for the subjac in apply
-                                csc = csc_matrix((np.arange(rows.size, dtype=int), (rows, cols)),
-                                                 shape=subjacs[key]['shape'])
-                                inds = csc.data
-                                if np.all(np.arange(rows.size, dtype=int) == inds):
-                                    # no mapping needed
-                                    inds = _full_slice
-                                else:
-                                    # reverse inds to avoid an array copy during apply
-                                    inds = np.argsort(inds)
+
+                                csc = inds = None
+                                if key in DictionaryJacobian._csc_dict:
+                                    r, c, mat, idx = DictionaryJacobian._csc_dict[key]
+                                    if np.all(r == rows) and np.all(c == cols):
+                                        csc == mat
+                                        inds = idx
+
+                                if csc is None:
+                                    # create a CSC matrix to use for the subjac in apply
+                                    tmpcsc = csc_matrix((np.arange(rows.size, dtype=int),
+                                                        (rows, cols)),
+                                                        shape=subjacs[key]['shape'])
+                                    inds = tmpcsc.data
+                                    if np.all(np.arange(rows.size, dtype=int) == inds):
+                                        # no mapping needed
+                                        inds = _full_slice
+                                    else:
+                                        # reverse inds to avoid an array copy during apply
+                                        inds = np.argsort(inds)
+                                    csc = csc_matrix((subjacs[key]['value'], (rows, cols)),
+                                                     shape=subjacs[key]['shape'])
+
+                                    DictionaryJacobian._csc_dict[key] = (rows, cols, csc, inds)
+
                                 # keep track of how data array was modified in conversion
                                 # from COO to CSC
                                 subjacs[key]['csc_val_map'] = inds
-                                subjacs[key]['csc'] = csc_matrix((subjacs[key]['value'],
-                                                                 (rows, cols)),
-                                                                 shape=subjacs[key]['shape'])
+                                subjacs[key]['csc'] = csc
 
             self._iter_keys[entry] = keys
 
@@ -113,6 +129,10 @@ class DictionaryJacobian(Jacobian):
         d_res_names = d_residuals._names
         d_out_names = d_outputs._names
         d_inp_names = d_inputs._names
+
+        if not d_out_names and not d_inp_names:
+            return
+
         rflat = d_residuals._views_flat
         oflat = d_outputs._views_flat
         iflat = d_inputs._views_flat
@@ -131,15 +151,15 @@ class DictionaryJacobian(Jacobian):
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
 
-                    # skip the matvec mult completely for identity subjacs
-                    if is_explicit and res_name is other_name and other_name in d_out_names:
-                        if fwd:
-                            rflat[res_name] -= oflat[other_name]
-                        else:
-                            oflat[other_name] -= rflat[res_name]
-                        continue
-
                     if other_name in d_out_names:
+                        # skip the matvec mult completely for identity subjacs
+                        if is_explicit and res_name is other_name:
+                            if fwd:
+                                rflat[res_name] -= oflat[other_name]
+                            else:
+                                oflat[other_name] -= rflat[res_name]
+                            continue
+
                         if fwd:
                             left_vec = rflat[res_name]
                             right_vec = oflat[other_name]
