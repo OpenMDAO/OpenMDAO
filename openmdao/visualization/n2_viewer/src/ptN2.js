@@ -56,16 +56,17 @@ function PtN2Diagram(parentDiv, modelData) {
         .attr("orient", "auto")
         .append("path")
         .attr("d", "M0,-5L10,0L0,5")
-        .attr("class", "arrowHead");
+        .attr("class", "arrowHead")
+        .attr("z-index", "255");
 
     setN2Group();
     var pTreeGroup = svg.append("g").attr("id", "tree"); // id given just so it is easier to see in Chrome dev tools when debugging
     var pSolverTreeGroup = svg.append("g").attr("id", "solver_tree");
 
-    function InitSubSystemChildren(d){
+    function InitSubSystemChildren(d) {
         for (var i = 0; i < d.children.length; ++i) {
             var child = d.children[i];
-            if (child.type === "subsystem"){
+            if (child.type === "subsystem") {
                 if (!d.hasOwnProperty("subsystem_children")) {
                     d.subsystem_children = [];
                 }
@@ -241,10 +242,10 @@ function PtN2Diagram(parentDiv, modelData) {
         collapseDepthElement.appendChild(option);
     }
 
-    Update(computeNewTreeLayout=false);
+    Update(computeNewTreeLayout = false);
     SetupLegend(d3, d3ContentDiv);
 
-    function Update(computeNewTreeLayout=true) {
+    function Update(computeNewTreeLayout = true) {
         parentDiv.querySelector("#currentPathId").innerHTML = "PATH: root" + ((zoomedElement.parent) ? "." : "") + zoomedElement.absPathName;
 
         parentDiv.querySelector("#backButtonId").disabled = (backButtonHistory.length == 0) ? "disabled" : false;
@@ -297,9 +298,9 @@ function PtN2Diagram(parentDiv, modelData) {
 
             //Update svg dimensions before ComputeLayout() changes widthPTreePx
             svgDiv.style("width", (widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + widthPSolverTreePx + 2 * SVG_MARGIN + PTREE_N2_GAP_PX) + "px")
-                  .style("height", (HEIGHT_PX + 2 * SVG_MARGIN) + "px");
+                .style("height", (HEIGHT_PX + 2 * SVG_MARGIN) + "px");
             svg.attr("width", widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + widthPSolverTreePx + 2 * SVG_MARGIN + PTREE_N2_GAP_PX)
-               .attr("height", HEIGHT_PX + 2 * SVG_MARGIN);
+                .attr("height", HEIGHT_PX + 2 * SVG_MARGIN);
 
             n2Group.attr("transform", "translate(" + (widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
             pTreeGroup.attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
@@ -340,11 +341,11 @@ function PtN2Diagram(parentDiv, modelData) {
                 if (abs2prom != undefined) {
                     if (d.type == "param" || d.type == "unconnected_param") {
                         return tooltip.text(abs2prom.input[d.absPathName])
-                                      .style("visibility", "visible");
+                            .style("visibility", "visible");
                     }
                     if (d.type == "unknown") {
                         return tooltip.text(abs2prom.output[d.absPathName])
-                                      .style("visibility", "visible");
+                            .style("visibility", "visible");
                     }
                 }
             })
@@ -353,10 +354,10 @@ function PtN2Diagram(parentDiv, modelData) {
                     return tooltip.style("visibility", "hidden");
                 }
             })
-            .on("mousemove", function(){
+            .on("mousemove", function () {
                 if (abs2prom != undefined) {
-                    return tooltip.style("top", (d3.event.pageY-30)+"px")
-                                  .style("left",(d3.event.pageX+5)+"px");
+                    return tooltip.style("top", (d3.event.pageY - 30) + "px")
+                        .style("left", (d3.event.pageX + 5) + "px");
                 }
             });
 
@@ -434,20 +435,20 @@ function PtN2Diagram(parentDiv, modelData) {
             .style("opacity", 0);
 
 
-       var selSolver = pSolverTreeGroup.selectAll(".solver_group")
+        var selSolver = pSolverTreeGroup.selectAll(".solver_group")
             .data(d3SolverNodesArray, function (d) {
                 return d.id;
             });
 
-        function getSolverClass(showLinearSolverNames, linear_solver_name, nonlinear_solver_name){
-            if (showLinearSolverNames){
-                if (linearSolverNames.indexOf(linear_solver_name) >= 0){
+        function getSolverClass(showLinearSolverNames, linear_solver_name, nonlinear_solver_name) {
+            if (showLinearSolverNames) {
+                if (linearSolverNames.indexOf(linear_solver_name) >= 0) {
                     solver_class = linearSolverClasses[linear_solver_name]
                 } else {
                     solver_class = linearSolverClasses["other"]; // user must have defined their own solver that we do not know about
                 }
             } else {
-                if (nonLinearSolverNames.indexOf(nonlinear_solver_name) >= 0){
+                if (nonLinearSolverNames.indexOf(nonlinear_solver_name) >= 0) {
                     solver_class = nonLinearSolverClasses[nonlinear_solver_name]
                 } else {
                     solver_class = nonLinearSolverClasses["other"]; // user must have defined their own solver that we do not know about
@@ -458,8 +459,8 @@ function PtN2Diagram(parentDiv, modelData) {
 
         var nodeSolverEnter = selSolver.enter().append("svg:g")
             .attr("class", function (d) {
-                solver_class = getSolverClass(showLinearSolverNames, d.linear_solver, d.nonlinear_solver) ;
-                return solver_class + " " + "solver_group " + GetClass(d) ;
+                solver_class = getSolverClass(showLinearSolverNames, d.linear_solver, d.nonlinear_solver);
+                return solver_class + " " + "solver_group " + GetClass(d);
             })
             .attr("transform", function (d) {
                 x = 1.0 - d.xSolver0 - d.widthSolver0; // The magic for reversing the blocks on the right side
@@ -472,11 +473,11 @@ function PtN2Diagram(parentDiv, modelData) {
                 if (abs2prom != undefined) {
                     if (d.type == "param" || d.type == "unconnected_param") {
                         return tooltip.text(abs2prom.input[d.absPathName])
-                                      .style("visibility", "visible");
+                            .style("visibility", "visible");
                     }
                     if (d.type == "unknown") {
                         return tooltip.text(abs2prom.output[d.absPathName])
-                                      .style("visibility", "visible");
+                            .style("visibility", "visible");
                     }
                 }
             })
@@ -485,10 +486,10 @@ function PtN2Diagram(parentDiv, modelData) {
                     return tooltip.style("visibility", "hidden");
                 }
             })
-            .on("mousemove", function(){
+            .on("mousemove", function () {
                 if (abs2prom != undefined) {
-                    return tooltip.style("top", (d3.event.pageY-30)+"px")
-                                  .style("left",(d3.event.pageX+5)+"px");
+                    return tooltip.style("top", (d3.event.pageY - 30) + "px")
+                        .style("left", (d3.event.pageX + 5) + "px");
                 }
             });
 
@@ -514,8 +515,8 @@ function PtN2Diagram(parentDiv, modelData) {
 
         var nodeSolverUpdate = nodeSolverEnter.merge(selSolver).transition(sharedTransition)
             .attr("class", function (d) {
-                solver_class = getSolverClass(showLinearSolverNames, d.linear_solver, d.nonlinear_solver) ;
-                return solver_class + " " + "solver_group " + GetClass(d) ;
+                solver_class = getSolverClass(showLinearSolverNames, d.linear_solver, d.nonlinear_solver);
+                return solver_class + " " + "solver_group " + GetClass(d);
             })
             .attr("transform", function (d) {
                 x = 1.0 - d.xSolver - d.widthSolver; // The magic for reversing the blocks on the right side
@@ -758,15 +759,15 @@ function PtN2Diagram(parentDiv, modelData) {
         }
 
         function GetTextWidth(s) {
-            var width ;
+            var width;
 
-            if ( text_width_cache[ s ] != null )
-                return text_width_cache[ s ];
+            if (text_width_cache[s] != null)
+                return text_width_cache[s];
 
             textWidthText.text(s);
             width = textWidthTextNode.getBoundingClientRect().width;
 
-            text_width_cache[ s ] = width;
+            text_width_cache[s] = width;
             return width;
         }
 
@@ -947,7 +948,7 @@ function PtN2Diagram(parentDiv, modelData) {
         function ComputeSolverNormalizedPositions(d, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
             isChildOfZoomed = (isChildOfZoomed) ? true : (d === zoomedElement);
             if (earliestMinimizedParent == null && isChildOfZoomed) {
-                if (d.type === "subsystem" || d.type === "root" ) d3SolverNodesArray.push(d);
+                if (d.type === "subsystem" || d.type === "root") d3SolverNodesArray.push(d);
                 if (!d.children || d.isMinimized) { //at a "leaf" node
                     if ((d.type !== "param" && d.type !== "unconnected_param") && !d.varIsHidden) d3SolverRightTextNodesArrayZoomed.push(d);
                     earliestMinimizedParent = d;
@@ -1268,7 +1269,7 @@ function PtN2Diagram(parentDiv, modelData) {
                 for (var j = 0; j < cycleArrows.length; ++j) {
                     if (cycleArrows[j].length != 2) {
                         alert("error: cycleArrowsSplitArray length not 2, got " + cycleArrows[j].length +
-                              ": " + cycleArrows[j]);
+                            ": " + cycleArrows[j]);
                         return;
                     }
 
@@ -1343,10 +1344,10 @@ function PtN2Diagram(parentDiv, modelData) {
         symbols_vectorGroup = [];
         symbols_groupVector = [];
         symbols_groupGroup = [];
-        symbols_vectorVector_declared_partials = [] ;
-        symbols_scalarScalar_declared_partials = [] ;
-        symbols_vectorScalar_declared_partials = [] ;
-        symbols_scalarVector_declared_partials = [] ;
+        symbols_vectorVector_declared_partials = [];
+        symbols_scalarScalar_declared_partials = [];
+        symbols_vectorScalar_declared_partials = [];
+        symbols_scalarVector_declared_partials = [];
 
         for (var key in matrix) {
             var d = matrix[key];
@@ -1383,7 +1384,7 @@ function PtN2Diagram(parentDiv, modelData) {
                         if (tgtObj.dtype === "ndarray" || (tgtObj.type === "param" || tgtObj.type === "unconnected_param")) {//vectorVector
                             symbols_vectorVector.push(d);
                             var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                            if (modelData.declare_partials_list.includes(partials_string)){
+                            if (modelData.declare_partials_list.includes(partials_string)) {
                                 symbols_vectorVector_declared_partials.push(d);
                             }
 
@@ -1391,10 +1392,10 @@ function PtN2Diagram(parentDiv, modelData) {
                         else {//vectorScalar
                             symbols_vectorScalar.push(d);
                             var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                            if (modelData.declare_partials_list.includes(partials_string)){
+                            if (modelData.declare_partials_list.includes(partials_string)) {
                                 symbols_vectorScalar_declared_partials.push(d);
                             }
-                       }
+                        }
 
                     }
                     else if (tgtObj.type === "subsystem") { //vectorGroup
@@ -1413,7 +1414,7 @@ function PtN2Diagram(parentDiv, modelData) {
                         else {//scalarScalar
                             symbols_scalarScalar.push(d);
                             var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                            if (modelData.declare_partials_list.includes(partials_string)){
+                            if (modelData.declare_partials_list.includes(partials_string)) {
                                 symbols_scalarScalar_declared_partials.push(d);
                             }
                         }
@@ -1525,14 +1526,12 @@ function PtN2Diagram(parentDiv, modelData) {
         var tgt = d3RightTextNodesArrayZoomed[d.c];
         var boxEnd = d3RightTextNodesArrayZoomedBoxInfo[d.c];
         if (d.r > d.c) { //bottom left
-            DrawPathTwoLines(
-                n2Dx * d.r, //x1
-                n2Dy * d.r + n2Dy * .5, //y1
-                n2Dx * d.c + n2Dx * .5, //left x2
-                n2Dy * d.r + n2Dy * .5, //left y2
-                n2Dx * d.c + n2Dx * .5, //up x3
-                n2Dy * d.c + n2Dy - 1e-2, //up y3
-                RED_ARROW_COLOR, lineWidth, true);
+            new N2Arrow({
+                start: { col: d.r, row: d.r },
+                end: { col: d.c, row: d.c },
+                color: RED_ARROW_COLOR,
+                width: lineWidth
+            });
 
             var targetsWithCycleArrows = [];
             GetObjectsWithCycleArrows(tgt, targetsWithCycleArrows);
@@ -1582,15 +1581,14 @@ function PtN2Diagram(parentDiv, modelData) {
             }
         }
         else if (d.r < d.c) { //top right
-            DrawPathTwoLines(
-                n2Dx * d.r + n2Dx, //x1
-                n2Dy * d.r + n2Dy * .5, //y1
-                n2Dx * d.c + n2Dx * .5, //right x2
-                n2Dy * d.r + n2Dy * .5, //right y2
-                n2Dx * d.c + n2Dx * .5, //down x3
-                n2Dy * d.c + 1e-2, //down y3
-                RED_ARROW_COLOR, lineWidth, true);
+            var arr1 = new N2Arrow({
+                start: { col: d.r, row: d.r },
+                end: { col: d.c, row: d.c },
+                color: RED_ARROW_COLOR,
+                width: lineWidth
+            });
         }
+
         var leftTextWidthR = d3RightTextNodesArrayZoomed[d.r].nameWidthPx,
             leftTextWidthC = d3RightTextNodesArrayZoomed[d.c].nameWidthPx;
         DrawRect(-leftTextWidthR - PTREE_N2_GAP_PX, n2Dy * d.r, leftTextWidthR, n2Dy, RED_ARROW_COLOR); //highlight var name
@@ -1599,6 +1597,7 @@ function PtN2Diagram(parentDiv, modelData) {
 
     function MouseoverOnDiagN2(d) {
         //d=hovered element
+        // console.log('MouseoverOnDiagN2:'); console.log(d);
         var hoveredIndexRC = d.c; //d.x == d.y == row == col
         var leftTextWidthHovered = d3RightTextNodesArrayZoomed[hoveredIndexRC].nameWidthPx;
 
@@ -1611,51 +1610,26 @@ function PtN2Diagram(parentDiv, modelData) {
             var leftTextWidthDependency = d3RightTextNodesArrayZoomed[i].nameWidthPx;
             var box = d3RightTextNodesArrayZoomedBoxInfo[i];
             if (matrix[hoveredIndexRC + "_" + i] !== undefined) { //if (matrix[hoveredIndexRC][i].z > 0) { //i is column here
-                if (i < hoveredIndexRC) { //column less than hovered
-                    DrawPathTwoLines(
-                        n2Dx * hoveredIndexRC, //x1
-                        n2Dy * (hoveredIndexRC + .5), //y1
-                        (i + .5) * n2Dx, //left x2
-                        n2Dy * (hoveredIndexRC + .5), //left y2
-                        (i + .5) * n2Dx, //up x3
-                        (i + 1) * n2Dy, //up y3
-                        GREEN_ARROW_COLOR, lineWidth, true);
-                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, GREEN_ARROW_COLOR); //highlight var name
-
-                } else if (i > hoveredIndexRC) { //column greater than hovered
-                    DrawPathTwoLines(
-                        n2Dx * hoveredIndexRC + n2Dx, //x1
-                        n2Dy * (hoveredIndexRC + .5), //y1
-                        (i + .5) * n2Dx, //right x2
-                        n2Dy * (hoveredIndexRC + .5), //right y2
-                        (i + .5) * n2Dx, //down x3
-                        n2Dy * i, //down y3
-                        GREEN_ARROW_COLOR, lineWidth, true); //vertical down
-                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, GREEN_ARROW_COLOR); //highlight var name
+                if (i != hoveredIndexRC) {
+                    new N2Arrow({
+                        end: { col: i, row: i },
+                        start: { col: hoveredIndexRC, row: hoveredIndexRC },
+                        color: GREEN_ARROW_COLOR,
+                        width: lineWidth
+                    });
+                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, DEBUG_ARROW_GREEN); //highlight var name
                 }
             }
 
             if (matrix[i + "_" + hoveredIndexRC] !== undefined) { //if (matrix[i][hoveredIndexRC].z > 0) { //i is row here
-                if (i < hoveredIndexRC) { //row less than hovered
-                    DrawPathTwoLines(
-                        n2Dx * i + n2Dx, //x1
-                        n2Dy * i + n2Dy * .5, //y1
-                        n2Dx * hoveredIndexRC + n2Dx * .5, //right x2
-                        n2Dy * i + n2Dy * .5, //right y2
-                        n2Dx * hoveredIndexRC + n2Dx * .5, //down x3
-                        n2Dy * hoveredIndexRC, //down y3
-                        RED_ARROW_COLOR, lineWidth, true); //vertical down
-                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, RED_ARROW_COLOR); //highlight var name
-                } else if (i > hoveredIndexRC) { //row greater than hovered
-                    DrawPathTwoLines(
-                        n2Dx * i, //x1
-                        n2Dy * i + n2Dy * .5, //y1
-                        n2Dx * hoveredIndexRC + n2Dx * .5, //left x2
-                        n2Dy * i + n2Dy * .5, //left y2
-                        n2Dx * hoveredIndexRC + n2Dx * .5, //up x3
-                        n2Dy * hoveredIndexRC + n2Dy, //up y3
-                        RED_ARROW_COLOR, lineWidth, true);
-                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, RED_ARROW_COLOR); //highlight var name
+                if (i != hoveredIndexRC) {
+                    new N2Arrow({
+                        start: { col: i, row: i },
+                        end: { col: hoveredIndexRC, row: hoveredIndexRC },
+                        color: RED_ARROW_COLOR,
+                        width: lineWidth
+                    });
+                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, DEBUG_ARROW_RED); //highlight var name
                 }
             }
         }
@@ -1838,7 +1812,7 @@ function PtN2Diagram(parentDiv, modelData) {
             div.querySelector("#idVerticalResize" + i + "px").onclick = f;
         }
         for (var i = 2000; i <= 4000; i += 1000) {
-            var f = function(idx) {
+            var f = function (idx) {
                 return function () { VerticalResize(idx); };
             }(i);
             div.querySelector("#idVerticalResize" + i + "px").onclick = f;

@@ -120,29 +120,12 @@ function DrawArrows(startIndex, endIndex) {
     for (var i = 0; i < startIndices.length; ++i) {
         var startI = startIndices[i];
         var boxEndDelta = boxEnd.stopI - boxEnd.startI;
-
-        if (startIndex < endIndex) { //right down arrow
-            var x1 = (startI + 1) * n2Dx; //x1
-            var x2 = (endIndex + boxEndDelta * .5) * n2Dx + n2Dx * .5; //right x2
-            var x3 = x2; //down x3
-
-            var y1 = startI * n2Dy + n2Dy * .5; //y1
-            var y2 = y1; //right y2
-            var y3 = endIndex * n2Dy; //down y3
-
-            DrawPathTwoLines(x1, y1, x2, y2, x3, y3, GREEN_ARROW_COLOR, lineWidth, true);
-        }
-        else if (startIndex > endIndex) { //left up arrow
-            var x1 = startI * n2Dx; //x1
-            var x2 = (endIndex + boxEndDelta * .5) * n2Dx + n2Dx * .5; //left x2
-            var x3 = x2; //up x3
-
-            var y1 = startI * n2Dy + n2Dy * .5; //y1
-            var y2 = y1; //left y2
-            var y3 = (endIndex + boxEndDelta + 1) * n2Dy; //y1
-
-            DrawPathTwoLines(x1, y1, x2, y2, x3, y3, RED_ARROW_COLOR, lineWidth, true);
-        }
+        new N2Arrow({
+            start: { col: startI, row: startI },
+            end: { col: endIndex, row: endIndex },
+            color: (startIndex < endIndex) ? GREEN_ARROW_COLOR : RED_ARROW_COLOR,
+            width: lineWidth
+        });
     }
 }
 
@@ -168,30 +151,12 @@ function DrawArrowsParamView(startIndex, endIndex) {
     for (var i = 0; i < startIndices.length; ++i) {
         var startI = startIndices[i];
         var endI = endIndices[i];
-
-        if (startIndex < endIndex) { //right down arrow
-            var x1 = (startI + 1) * n2Dx; //x1
-            var x2 = (endI + .5) * n2Dx; //right x2
-            var x3 = x2; //down x3
-
-            var y1 = (startI + .5) * n2Dy; //y1
-            var y2 = y1; //right y2
-            var y3 = endI * n2Dy; //down y3
-
-            DrawPathTwoLines(x1, y1, x2, y2, x3, y3, GREEN_ARROW_COLOR, lineWidth, true);
-        }
-        else if (startIndex > endIndex) { //left up arrow
-            //alert("yes");
-            var x1 = startI * n2Dx; //x1
-            var x2 = (endI + .5) * n2Dx; //left x2
-            var x3 = x2; //up x3
-
-            var y1 = (startI + .5) * n2Dy; //y1
-            var y2 = y1; //left y2
-            var y3 = (endI + 1) * n2Dy; //y1
-
-            DrawPathTwoLines(x1, y1, x2, y2, x3, y3, RED_ARROW_COLOR, lineWidth, true);
-        }
+        new N2Arrow({
+            start: { col: startI, row: startI },
+            end: { col: endI, row: endI },
+            color: (startIndex < endIndex) ? GREEN_ARROW_COLOR : RED_ARROW_COLOR,
+            width: lineWidth
+        });
     }
 }
 
@@ -209,8 +174,7 @@ function DrawMatrix() {
         return (rt.implicit) ? UNKNOWN_IMPLICIT_COLOR : UNKNOWN_EXPLICIT_COLOR;
     }
 
-    if ( modelData.options.use_declare_partial_info)
-    {
+    if (modelData.options.use_declare_partial_info) {
         symbols_scalarScalar_data = symbols_scalarScalar_declared_partials;
         symbols_vectorVector_data = symbols_vectorVector_declared_partials;
         symbols_vectorScalar_data = symbols_vectorScalar_declared_partials;
@@ -225,7 +189,7 @@ function DrawMatrix() {
         "cell_vectorVector", "cell_scalarGroup", "cell_groupScalar", "cell_vectorGroup", "cell_groupVector", "cell_groupGroup"
     ];
     var datas = [symbols_scalar, symbols_vector, symbols_group, symbols_scalarScalar_data, symbols_scalarVector_data, symbols_vectorScalar_data,
-                 symbols_vectorVector_data, symbols_scalarGroup, symbols_groupScalar, symbols_vectorGroup, symbols_groupVector, symbols_groupGroup
+        symbols_vectorVector_data, symbols_scalarGroup, symbols_groupScalar, symbols_vectorGroup, symbols_groupVector, symbols_groupGroup
     ];
     var drawFunctions = [DrawScalar, DrawVector, DrawGroup, DrawScalar, DrawVector, DrawVector,
         DrawVector, DrawGroup, DrawGroup, DrawGroup, DrawGroup, DrawGroup
