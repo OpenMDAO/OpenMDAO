@@ -168,6 +168,7 @@ class DictionaryJacobian(Jacobian):
 
                     rows = subjac_info['rows']
                     if rows is not None:
+                        # keep np.add.at for the 'matrix-matrix' case
                         if ncol > 1:
                             linds, rinds = rows, subjac_info['cols']
                             if not fwd:
