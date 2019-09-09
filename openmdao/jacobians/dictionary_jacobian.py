@@ -22,8 +22,6 @@ class DictionaryJacobian(Jacobian):
 
     """
 
-    _csc_dict = {}  # cache for CSC subjacs (multiple DictionaryJacobians can share a subjac)
-
     def __init__(self, system, **kwargs):
         """
         Initialize all attributes.
@@ -68,22 +66,16 @@ class DictionaryJacobian(Jacobian):
                         key = (res_name, name)
                         if key in subjacs:
                             keys.append(key)
-                            rows = subjacs[key]['rows']
+                            sjac = subjacs[key]
+                            rows = sjac['rows']
                             if rows is not None and ncol == 1:
-                                cols = subjacs[key]['cols']
+                                if 'csc' not in sjac:
+                                    cols = sjac['cols']
 
-                                csc = inds = None
-                                if key in DictionaryJacobian._csc_dict:
-                                    r, c, mat, idx = DictionaryJacobian._csc_dict[key]
-                                    if np.all(r == rows) and np.all(c == cols):
-                                        csc == mat
-                                        inds = idx
-
-                                if csc is None:
                                     # create a CSC matrix to use for the subjac in apply
                                     tmpcsc = csc_matrix((np.arange(rows.size, dtype=int),
                                                         (rows, cols)),
-                                                        shape=subjacs[key]['shape'])
+                                                        shape=sjac['shape'])
                                     inds = tmpcsc.data
                                     if np.all(np.arange(rows.size, dtype=int) == inds):
                                         # no mapping needed
@@ -91,15 +83,13 @@ class DictionaryJacobian(Jacobian):
                                     else:
                                         # reverse inds to avoid an array copy during apply
                                         inds = np.argsort(inds)
-                                    csc = csc_matrix((subjacs[key]['value'], (rows, cols)),
-                                                     shape=subjacs[key]['shape'])
+                                    csc = csc_matrix((sjac['value'], (rows, cols)),
+                                                     shape=sjac['shape'])
 
-                                    DictionaryJacobian._csc_dict[key] = (rows, cols, csc, inds)
-
-                                # keep track of how data array was modified in conversion
-                                # from COO to CSC
-                                subjacs[key]['csc_val_map'] = inds
-                                subjacs[key]['csc'] = csc
+                                    # keep track of how data array was modified in conversion
+                                    # from COO to CSC
+                                    sjac['csc_val_map'] = inds
+                                    sjac['csc'] = csc
 
             self._iter_keys[entry] = keys
 
