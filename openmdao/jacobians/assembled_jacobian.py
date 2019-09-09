@@ -422,9 +422,11 @@ class AssembledJacobian(Jacobian):
         """
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
+        if ext_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
+            return
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-            do_mask = ext_mtx is not None and d_inputs._names and d_residuals._names
+            do_mask = ext_mtx is not None and d_inputs._names
             if do_mask:
                 # Masking
                 try:
@@ -434,14 +436,14 @@ class AssembledJacobian(Jacobian):
                     self._mask_caches[(d_inputs._names, mode)] = mask
 
             if mode == 'fwd':
-                if d_outputs._names and d_residuals._names:
+                if d_outputs._names:
                     d_residuals._data += int_mtx._prod(d_outputs._data, mode)
                 if do_mask:
                     d_residuals._data += ext_mtx._prod(d_inputs._data, mode, mask=mask)
 
             else:  # rev
                 dresids = d_residuals._data
-                if d_outputs._names and d_residuals._names:
+                if d_outputs._names:
                     d_outputs._data += int_mtx._prod(dresids, mode)
                 if do_mask:
                     d_inputs._data += ext_mtx._prod(dresids, mode, mask=mask)

@@ -74,7 +74,7 @@ class DictionaryJacobian(Jacobian):
                                 inds = csc.data
                                 if np.all(np.arange(rows.size, dtype=int) == inds):
                                     # no mapping needed
-                                    inds = slice(None)
+                                    inds = _full_slice
                                 else:
                                     # reverse inds to avoid an array copy during apply
                                     inds = np.argsort(inds)
