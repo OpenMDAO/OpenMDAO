@@ -424,33 +424,26 @@ class AssembledJacobian(Jacobian):
         ext_mtx = self._ext_mtx[system.pathname]
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+            do_mask = ext_mtx is not None and d_inputs._names and d_residuals._names
+            if do_mask:
+                # Masking
+                try:
+                    mask = self._mask_caches[(d_inputs._names, mode)]
+                except KeyError:
+                    mask = ext_mtx._create_mask_cache(d_inputs)
+                    self._mask_caches[(d_inputs._names, mode)] = mask
+
             if mode == 'fwd':
                 if d_outputs._names and d_residuals._names:
                     d_residuals._data += int_mtx._prod(d_outputs._data, mode)
-
-                if ext_mtx is not None and d_inputs._names and d_residuals._names:
-                    # Masking
-                    try:
-                        mask = self._mask_caches[d_inputs._names]
-                    except KeyError:
-                        mask = ext_mtx._create_mask_cache(d_inputs)
-                        self._mask_caches[d_inputs._names] = mask
-
+                if do_mask:
                     d_residuals._data += ext_mtx._prod(d_inputs._data, mode, mask=mask)
 
             else:  # rev
                 dresids = d_residuals._data
                 if d_outputs._names and d_residuals._names:
                     d_outputs._data += int_mtx._prod(dresids, mode)
-
-                if ext_mtx is not None and d_inputs._names and d_residuals._names:
-                    # Masking
-                    try:
-                        mask = self._mask_caches[d_inputs._names]
-                    except KeyError:
-                        mask = ext_mtx._create_mask_cache(d_inputs)
-                        self._mask_caches[d_inputs._names] = mask
-
+                if do_mask:
                     d_inputs._data += ext_mtx._prod(dresids, mode, mask=mask)
 
     def set_complex_step_mode(self, active):
