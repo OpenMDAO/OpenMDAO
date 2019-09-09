@@ -11,7 +11,7 @@ which accepts unstructured data as collections of points.
 `MetaModelStructuredComp` produces smooth fits through provided training data using polynomial
 splines of various orders. The interpolation methods include three that wrap methods in
 scipy.interpolate, as well as five methods that are written in pure python. For all methods,
-derivatives are automatically computed.  The followiing table summarizes the methods and gives
+derivatives are automatically computed.  The following table summarizes the methods and gives
 the number of points required for each.
 
 +---------------+--------+------------------------------------------------------------------+

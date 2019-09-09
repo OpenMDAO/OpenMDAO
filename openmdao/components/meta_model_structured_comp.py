@@ -31,7 +31,7 @@ class MetaModelStructuredComp(ExplicitComponent):
     fitted spline with be automatically reduced for that dimension alone.
 
     Extrapolation is supported, but disabled by default. It can be enabled via initialization
-    attribute.
+    option.
 
     Attributes
     ----------
