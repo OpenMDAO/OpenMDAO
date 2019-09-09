@@ -35,7 +35,7 @@ the number of points required for each.
 +---------------+--------+------------------------------------------------------------------+
 
 
-Note that `MetaModelStructuredComp` only accepts scaler inputs and outputs. If you have a
+Note that `MetaModelStructuredComp` only accepts scalar inputs and outputs. If you have a
 multivariable function, each input variable needs its own named OpenMDAO input.
 
 For multi-dimensional data, fits are computed on a separable per-axis basis. A single interpolation
