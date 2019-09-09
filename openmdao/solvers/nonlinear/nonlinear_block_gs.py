@@ -152,9 +152,9 @@ class NonlinearBlockGS(NonlinearSolver):
                 if temp_norm == 0.:
                     temp_norm = 1e-12  # prevent division by 0 in the next line
 
-                # If MPI, piggyback on the output and residual vector sto perform a distributed
+                # If MPI, piggyback on the output and residual vectors to perform a distributed
                 # dot product.
-                if  system.comm.size > 1:
+                if system.comm.size > 1:
                     backup_o = outputs._data.copy()
                     outputs._data[:] = delta_outputs_n
                     tddo = residuals.dot(outputs)
