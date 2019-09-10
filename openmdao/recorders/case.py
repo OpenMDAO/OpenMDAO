@@ -453,23 +453,22 @@ class Case(object):
                 if abs_name not in inp_vars:
                     inp_vars[abs_name] = {'value': self.inputs[abs_name]}
 
-        if inp_vars is not None and len(inp_vars) > 0:
-            for var_name in inp_vars:
+        for var_name in inp_vars:
 
-                # Filter based on tags
-                if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
-                    continue
+            # Filter based on tags
+            if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+                continue
 
-                var_meta = {}
-                if values:
-                    var_meta['value'] = inp_vars[var_name]['value']
-                if prom_name:
-                    var_meta['prom_name'] = self._abs2prom['input'][var_name]
-                if units:
-                    var_meta['units'] = meta[var_name]['units']
-                if shape:
-                    var_meta['shape'] = inp_vars[var_name]['value'].shape
-                inputs.append((var_name, var_meta))
+            var_meta = {}
+            if values:
+                var_meta['value'] = inp_vars[var_name]['value']
+            if prom_name:
+                var_meta['prom_name'] = self._abs2prom['input'][var_name]
+            if units:
+                var_meta['units'] = meta[var_name]['units']
+            if shape:
+                var_meta['shape'] = inp_vars[var_name]['value'].shape
+            inputs.append((var_name, var_meta))
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -660,7 +659,16 @@ class Case(object):
             pathname = self.source.replace('root.', '')
 
         # vars should be in execution order
-        write_var_table(pathname, var_dict.keys(), var_type, var_dict,
+        if 'order' in self._voi_meta:
+            var_order = self._voi_meta['order']
+            print(var_dict.keys())
+            print('var_order:', var_order)
+            print([var_name in var_dict for var_name in var_order])
+            var_list = [var_name for var_name in var_order if var_name in var_dict]
+        else:
+            var_list = var_dict.keys()
+
+        write_var_table(pathname, var_list, var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
 
     def _get_variables_of_type(self, var_type):

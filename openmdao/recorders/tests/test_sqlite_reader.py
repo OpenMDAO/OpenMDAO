@@ -1102,76 +1102,53 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
         case = cr.get_case(0)
 
-        # #
-        # # list inputs, not hierarchical
-        # #
-        # stream = StringIO()
-        # case.list_inputs(values=True, hierarchical=False, out_stream=stream)
-        # text = stream.getvalue().split('\n')
-
-        # print('\n'.join(text))
-
-        # expected = [
-        #     "3 Input(s) in 'model'",
-        #     "---------------------",
-        #     "",
-        #     "varname  value",
-        #     "-------  -----",
-        #     "expl.a   [10.]",
-        #     "expl.x   11",
-        #     "impl.x   11",
-        # ]
-
-        # for i, line in enumerate(expected):
-        #     if line and not line.startswith('-'):
-        #         self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
-
-        # #
-        # # list inputs, hierarchical
-        # #
-        # stream = StringIO()
-        # case.list_inputs(values=True, hierarchical=True, out_stream=stream)
-        # text = stream.getvalue().split('\n')
-
-        # print('\n'.join(text))
-
-        # expected = [
-        #     "3 Input(s) in 'model'",
-        #     "---------------------",
-        #     "",
-        #     "varname  value",
-        #     "-------  -----",
-        #     "top",
-        #     "  expl",
-        #     "    a    [10.]",
-        #     "    x    11   ",
-        #     "  impl",
-        #     "    x    11 ",
-        # ]
-
-        # for i, line in enumerate(expected):
-        #     if line and not line.startswith('-'):
-        #         self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
-
         #
-        # list outputs, not hierarchical
+        # list inputs, not hierarchical
         #
         stream = StringIO()
-        case.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
+        model.list_inputs(hierarchical=False, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, out_stream=stream)
         text = stream.getvalue().split('\n')
 
-        print('\n'.join(text))
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
+        #
+        # list inputs, hierarchical
+        #
+        stream = StringIO()
+        model.list_inputs(hierarchical=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        #
+        # list outputs, not hierarchical, with residuals
+        #
         expected = [
             "3 Explicit Output(s) in 'model'",
             "-------------------------------",
             "",
             "varname  value  resids      ",
             "-------  -----  ------------",
+            "indep.x  11     Not Recorded",
             "expl.b   [20.]  [0.]        ",
             "expl.y   2      Not Recorded",
-            "indep.x  11     Not Recorded",
         ]
+
+        stream = StringIO()
+        case.list_outputs(residuals=True, hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -1181,32 +1158,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list outputs, hierarchical
         #
         stream = StringIO()
-        case.list_outputs(values=True, hierarchical=True, out_stream=stream)
+        model.list_outputs(hierarchical=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_outputs(hierarchical=True, out_stream=stream)
         text = stream.getvalue().split('\n')
 
-        expected = [
-            "3 Explicit Output(s) in 'model'",
-            "-------------------------------",
-            "",
-            "varname  value",
-            "-------  -----",
-            "top",
-            "  expl",
-            "    b    [20.]",
-            "    y    2    ",
-            "  indep",
-            "    x    11   ",
-            "",
-            "",
-            "1 Implicit Output(s) in 'model'",
-            "-------------------------------",
-            "",
-            "varname  value",
-            "-------  -----",
-            "top",
-            "  impl",
-            "    y    2    ",
-        ]
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -1242,19 +1200,23 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         # list inputs
         #
-        stream = StringIO()
-        case.list_inputs(values=True, hierarchical=False, out_stream=stream)
-        text = stream.getvalue().split('\n')
-
         expected = [
             "2 Input(s) in 'sub'",
-            "---------------------",
+            "-------------------",
             "",
-            "varname      value",
-            "-------      -----",
-            "sub.expl.a   [10.]",
-            "sub.expl.x   11",
+            "varname     value",
+            "----------  -----",
+            "sub.expl.a  [10.]",
+            "sub.expl.x  11   ",
+            # sub.impl.x is not recorded (excluded)
         ]
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        from pprint import pprint
+        pprint(text)
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -1263,32 +1225,33 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         # list outputs
         #
-        stream = StringIO()
-        case.list_outputs(values=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
-
         expected = [
             "1 Explicit Output(s) in 'sub'",
-            "-------------------------------",
+            "-----------------------------",
             "",
-            "varname  value",
-            "-------  -----",
+            "varname   value",
+            "--------  -----",
             "top",
             "  sub",
             "    expl",
-            "      b    [20.]",
+            "      b   [20.]",
+            #      y is not recorded (excluded)
             "",
             "",
             "1 Implicit Output(s) in 'sub'",
-            "-------------------------------",
+            "-----------------------------",
             "",
-            "varname  value",
-            "-------  -----",
+            "varname   value",
+            "-------   -----",
             "top",
             "  sub",
             "    impl",
-            "      y    2",
+            "      y   2    ",
         ]
+
+        stream = StringIO()
+        case.list_outputs(out_stream=stream)
+        text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -1320,19 +1283,18 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list inputs
         #
         stream = StringIO()
+        model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
         case.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
         text = stream.getvalue().split('\n')
 
-        expected = [
-            "3 Input(s) in 'model'",
-            "---------------------",
-            "",
-            "varname  value  prom_name",
-            "-------  -----  ---------",
-            "expl.a   [10.]  expl.a",
-            "expl.x   11     x",
-            "impl.x   11     x",
-        ]
+        from pprint import pprint
+        print('Expected:')
+        pprint(expected)
+        print('text:')
+        pprint(text)
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -1342,32 +1304,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list outputs
         #
         stream = StringIO()
+        model.list_outputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
         case.list_outputs(prom_name=True, out_stream=stream)
         text = stream.getvalue().split('\n')
-
-        expected = [
-            "3 Explicit Output(s) in 'model'",
-            "-------------------------------",
-            "",
-            "varname  value  prom_name",
-            "-------  -----  ---------",
-            "top",
-            "  expl",
-            "    b    [20.]  expl.b",
-            "    y    2      expl.y",
-            "  indep",
-            "    x    11     x",
-            "",
-            "",
-            "1 Implicit Output(s) in 'model'",
-            "-------------------------------",
-            "",
-            "varname  value  prom_name",
-            "-------  -----  ---------",
-            "top",
-            "  impl",
-            "    y    2      impl.y",
-        ]
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):

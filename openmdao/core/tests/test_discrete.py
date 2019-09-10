@@ -314,6 +314,14 @@ class DiscreteTestCase(unittest.TestCase):
         #
         stream = StringIO()
 
+        disc_meta = model._discrete_inputs._dict
+
+        from pprint import pprint
+        pprint(model._discrete_inputs._dict)
+        pprint(disc_meta)
+
+        # model.list_inputs(hierarchical=False, prom_name=True)
+
         model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')

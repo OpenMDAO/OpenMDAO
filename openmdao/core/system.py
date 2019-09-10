@@ -3085,7 +3085,9 @@ class System(object):
             disc_meta = self._discrete_inputs._dict
 
             for var_name, val in iteritems(self._discrete_inputs):
+                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
 
+                print('dicrete input:', var_name, abs_name)
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
@@ -3094,14 +3096,14 @@ class System(object):
                 if values:
                     var_meta['value'] = val
                 if prom_name:
-                    var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                    var_meta['prom_name'] = var_name
                 # remaining items do not apply for discrete vars
                 if units:
                     var_meta['units'] = ''
                 if shape:
                     var_meta['shape'] = ''
 
-                inputs.append((var_name, var_meta))
+                inputs.append((abs_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3227,6 +3229,7 @@ class System(object):
             disc_meta = self._discrete_outputs._dict
 
             for var_name, val in iteritems(self._discrete_outputs):
+                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
 
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
@@ -3236,7 +3239,7 @@ class System(object):
                 if values:
                     var_meta['value'] = val
                 if prom_name:
-                    var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
+                    var_meta['prom_name'] = var_name
                 # remaining items do not apply for discrete vars
                 if residuals:
                     var_meta['resids'] = ''
@@ -3253,9 +3256,9 @@ class System(object):
                     var_meta['res_ref'] = ''
 
                 if var_name in states:
-                    impl_outputs.append((var_name, var_meta))
+                    impl_outputs.append((abs_name, var_meta))
                 else:
-                    expl_outputs.append((var_name, var_meta))
+                    expl_outputs.append((abs_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3346,22 +3349,26 @@ class System(object):
                                     np.append(var_dict[name]['resids'],
                                               proc_vars[name]['resids'])
 
-        var_list = self._get_vars_execution_order(inputs=var_type is 'input', variables=var_dict)
-        print('var_list:', var_list)
+        inputs = var_type is 'input'
+        outputs = not inputs
+        var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
 
         write_var_table(self.pathname, var_list, var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
 
-    def _get_vars_execution_order(self, inputs=False, variables=None):
+    def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None):
         """
         Get list of variable names in execution order, based on the order subsystems were setup.
 
         Parameters
         ----------
-        input : bool, optional
-            Get names of inputs instead of outputs. Default is Falsee.
+        outputs : bool, optional
+            Get names of output variables. Default is False.
+        inputs : bool, optional
+            Get names of input variables. Default is False.
         variables : Collection (list or dict)
-            Variables to include. If None then all varables will be included. Default is None.
+            Absolute path names of the variables to include.
+            If None then all varables will be included. Default is None.
 
         Returns
         -------
@@ -3370,9 +3377,14 @@ class System(object):
         """
         var_list = []
 
-        in_or_out = 'input' if inputs else 'output'
-        real_vars = self._var_allprocs_abs_names[in_or_out]
-        disc_vars = self._var_allprocs_discrete[in_or_out]
+        real_vars = self._var_allprocs_abs_names
+        disc_vars = self._var_allprocs_discrete
+
+        in_or_out = []
+        if inputs:
+            in_or_out.append('input')
+        if outputs:
+            in_or_out.append('output')
 
         if self._subsystems_allprocs:
             for subsys in self._subsystems_allprocs:
@@ -3380,21 +3392,22 @@ class System(object):
                 # but subsys.name will be properly defined.
                 path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name
                 path += '.'
-                for var_name in real_vars:
-                    if not variables or (var_name in variables and var_name.startswith(path)):
-                        var_list.append(var_name)
-                for var_name in disc_vars:
-                    if not variables or (var_name in variables and var_name.startswith(path)):
-                        var_list.append(var_name)
+                for var_type in in_or_out:
+                    for var_name in real_vars[var_type]:
+                        if (not variables or var_name in variables) and var_name.startswith(path):
+                            var_list.append(var_name)
+                    for var_name in disc_vars[var_type]:
+                        if (not variables or var_name in variables) and var_name.startswith(path):
+                            var_list.append(var_name)
         else:
             # For components with no children, self._subsystems_allprocs is empty.
-            for var_name in real_vars:
-                if not variables or var_name in variables:
-                    var_list.append(var_name)
-
-            for var_name in disc_vars:
-                if not variables or var_name in variables:
-                    var_list.append(var_name)
+            for var_type in in_or_out:
+                for var_name in real_vars[var_type]:
+                    if not variables or var_name in variables:
+                        var_list.append(var_name)
+                for var_name in disc_vars[var_type]:
+                    if not variables or var_name in variables:
+                        var_list.append(var_name)
 
         return var_list
 
