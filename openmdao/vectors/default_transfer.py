@@ -32,7 +32,6 @@ class DefaultTransfer(Transfer):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        group._transfers = {}
         iproc = group.comm.rank
         rev = group._mode == 'rev' or group._mode == 'auto'
 
@@ -56,7 +55,7 @@ class DefaultTransfer(Transfer):
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta
 
-        transfers = group._transfers
+        group._transfers = transfers = {}
         vectors = group._vectors
         offsets = _global2local_offsets(group._get_var_offsets())
 
@@ -151,13 +150,19 @@ class DefaultTransfer(Transfer):
             if rev:
                 transfers[vec_name]['rev', None] = xfer_all
             for isub in range(nsub_allprocs):
-                transfers[vec_name]['fwd', isub] = DefaultTransfer(
-                    vectors['input'][vec_name], vectors['output'][vec_name],
-                    fwd_xfer_in[isub], fwd_xfer_out[isub], group.comm)
-                if rev:
-                    transfers[vec_name]['rev', isub] = DefaultTransfer(
+                if fwd_xfer_in[isub].size > 0:
+                    transfers[vec_name]['fwd', isub] = DefaultTransfer(
                         vectors['input'][vec_name], vectors['output'][vec_name],
-                        rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
+                        fwd_xfer_in[isub], fwd_xfer_out[isub], group.comm)
+                else:
+                    transfers[vec_name]['fwd', isub] = None
+                if rev:
+                    if rev_xfer_out[isub].size > 0:
+                        transfers[vec_name]['rev', isub] = DefaultTransfer(
+                            vectors['input'][vec_name], vectors['output'][vec_name],
+                            rev_xfer_in[isub], rev_xfer_out[isub], group.comm)
+                    else:
+                        transfers[vec_name]['rev', isub] = None
 
         if group._use_derivatives:
             transfers['nonlinear'] = transfers['linear']
@@ -203,4 +208,8 @@ class DefaultTransfer(Transfer):
             in_vec._data[self._in_inds] = out_vec._data[self._out_inds]
 
         else:  # rev
-            np.add.at(out_vec._data, self._out_inds, in_vec._data[self._in_inds])
+            if out_vec._ncol == 1:
+                out_vec._data[:] += np.bincount(self._out_inds, in_vec._data[self._in_inds],
+                                                minlength=out_vec._data.size)
+            else:  # matrix-matrix
+                np.add.at(out_vec._data, self._out_inds, in_vec._data[self._in_inds])
