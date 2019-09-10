@@ -15,7 +15,6 @@ import os
 import time
 from numbers import Integral
 import itertools
-from pprint import pprint
 
 from six import iteritems, itervalues, string_types
 
@@ -3064,7 +3063,6 @@ class System(object):
         inputs = []
 
         for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
-
             # Filter based on tags
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
@@ -3085,9 +3083,6 @@ class System(object):
             disc_meta = self._discrete_inputs._dict
 
             for var_name, val in iteritems(self._discrete_inputs):
-                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
-
-                print('dicrete input:', var_name, abs_name)
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
@@ -3096,12 +3091,14 @@ class System(object):
                 if values:
                     var_meta['value'] = val
                 if prom_name:
-                    var_meta['prom_name'] = var_name
+                    var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
                 # remaining items do not apply for discrete vars
                 if units:
                     var_meta['units'] = ''
                 if shape:
                     var_meta['shape'] = ''
+
+                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
 
                 inputs.append((abs_name, var_meta))
 
@@ -3193,7 +3190,6 @@ class System(object):
         expl_outputs = []
         impl_outputs = []
         for var_name, val in iteritems(self._outputs._views):
-
             # Filter based on tags
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
@@ -3229,8 +3225,6 @@ class System(object):
             disc_meta = self._discrete_outputs._dict
 
             for var_name, val in iteritems(self._discrete_outputs):
-                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
-
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
@@ -3239,7 +3233,7 @@ class System(object):
                 if values:
                     var_meta['value'] = val
                 if prom_name:
-                    var_meta['prom_name'] = var_name
+                    var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
                 # remaining items do not apply for discrete vars
                 if residuals:
                     var_meta['resids'] = ''
@@ -3254,6 +3248,8 @@ class System(object):
                     var_meta['ref'] = ''
                     var_meta['ref0'] = ''
                     var_meta['res_ref'] = ''
+
+                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
 
                 if var_name in states:
                     impl_outputs.append((abs_name, var_meta))

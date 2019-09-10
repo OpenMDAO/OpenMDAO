@@ -61,13 +61,13 @@ class Case(object):
         Dictionary mapping absolute names of all variables to promoted names.
     _abs2meta : dict
         Dictionary mapping absolute names of all variables to variable metadata.
-    _voi_meta : dict
-        Dictionary mapping absolute names of variables of interest to variable metadata.
+    _var_info : dict
+        Dictionary with information about variables (scaling, indices, execution order).
     _format_version : int
         A version number specifying the format of array data, if not numpy arrays.
     """
 
-    def __init__(self, source, data, prom2abs, abs2prom, abs2meta, voi_meta, data_format=None):
+    def __init__(self, source, data, prom2abs, abs2prom, abs2meta, var_info, data_format=None):
         """
         Initialize.
 
@@ -83,8 +83,8 @@ class Case(object):
             Dictionary mapping absolute names of all variables to promoted names.
         abs2meta : dict
             Dictionary mapping absolute names of all variables to variable metadata.
-        voi_meta : dict
-            Dictionary mapping absolute names of variables of interest to variable metadata.
+        var_info : dict
+            Dictionary with information about variables (scaling, indices, execution order).
         data_format : int
             A version number specifying the format of array data, if not numpy arrays.
         """
@@ -180,7 +180,7 @@ class Case(object):
         self._abs2meta = abs2meta
 
         # save VOI dict reference for use by self._scale()
-        self._voi_meta = voi_meta
+        self._var_info = var_info
 
     @property
     def iteration_coordinate(self):
@@ -328,7 +328,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('desvar')
         if scaled:
-            return self._apply_voi_meta(vals, scaled, use_indices)
+            return self._apply_var_settings(vals, scaled, use_indices)
         else:
             return vals
 
@@ -350,7 +350,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('objective')
         if scaled:
-            return self._apply_voi_meta(vals, scaled, use_indices)
+            return self._apply_var_settings(vals, scaled, use_indices)
         else:
             return vals
 
@@ -372,7 +372,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('constraint')
         if scaled:
-            return self._apply_voi_meta(vals, scaled, use_indices)
+            return self._apply_var_settings(vals, scaled, use_indices)
         else:
             return vals
 
@@ -394,7 +394,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('response')
         if scaled:
-            return self._apply_voi_meta(vals, scaled, use_indices)
+            return self._apply_var_settings(vals, scaled, use_indices)
         else:
             return vals
 
@@ -454,7 +454,6 @@ class Case(object):
                     inp_vars[abs_name] = {'value': self.inputs[abs_name]}
 
         for var_name in inp_vars:
-
             # Filter based on tags
             if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                 continue
@@ -561,7 +560,6 @@ class Case(object):
 
         if len(out_vars) > 0:
             for name in out_vars:
-
                 # Filter based on tags
                 if tags and not (make_set(tags) & make_set(meta[name]['tags'])):
                     continue
@@ -659,11 +657,8 @@ class Case(object):
             pathname = self.source.replace('root.', '')
 
         # vars should be in execution order
-        if 'order' in self._voi_meta:
-            var_order = self._voi_meta['order']
-            print(var_dict.keys())
-            print('var_order:', var_order)
-            print([var_name in var_dict for var_name in var_order])
+        if 'order' in self._var_info:
+            var_order = self._var_info['order']
             var_list = [var_name for var_name in var_order if var_name in var_dict]
         else:
             var_list = var_dict.keys()
@@ -696,9 +691,9 @@ class Case(object):
 
         return PromAbsDict(ret_vars, self._prom2abs, self._abs2prom)
 
-    def _apply_voi_meta(self, vals, scaled=True, use_indices=True):
+    def _apply_var_settings(self, vals, scaled=True, use_indices=True):
         """
-        Scale the values array and apply indices from _voi_meta per the arguments.
+        Scale the values array and apply indices from _var_info per the arguments.
 
         Parameters
         ----------
@@ -715,8 +710,8 @@ class Case(object):
             Map of variables to their scaled values.
         """
         for name in vals.absolute_names():
-            if name in self._voi_meta:
-                meta = self._voi_meta[name]
+            if name in self._var_info:
+                meta = self._var_info[name]
                 if scaled:
                     # physical to scaled
                     if meta['adder'] is not None:

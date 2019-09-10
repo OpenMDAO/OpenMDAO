@@ -128,19 +128,19 @@ class SqliteCaseReader(BaseCaseReader):
 
         # create helper objects for accessing cases from the three iteration tables and
         # the problem cases table
-        voi_meta = self.problem_metadata['variables']
+        var_info = self.problem_metadata['variables']
         self._driver_cases = DriverCases(filename, self._format_version, self._global_iterations,
-                                         self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
+                                         self._prom2abs, self._abs2prom, self._abs2meta, var_info)
         self._system_cases = SystemCases(filename, self._format_version, self._global_iterations,
-                                         self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
+                                         self._prom2abs, self._abs2prom, self._abs2meta, var_info)
         self._solver_cases = SolverCases(filename, self._format_version, self._global_iterations,
-                                         self._prom2abs, self._abs2prom, self._abs2meta, voi_meta)
+                                         self._prom2abs, self._abs2prom, self._abs2meta, var_info)
         if self._format_version >= 2:
             self._problem_cases = ProblemCases(filename,
                                                self._format_version,
                                                self._global_iterations,
                                                self._prom2abs, self._abs2prom, self._abs2meta,
-                                               voi_meta)
+                                               var_info)
 
         # if requested, load all the iteration data into memory
         if pre_load:
@@ -702,8 +702,8 @@ class CaseTable(object):
         Dictionary mapping absolute variable names to variable metadata.
     _prom2abs : {'input': dict, 'output': dict}
         Dictionary mapping promoted names to absolute names.
-    _voi_meta : dict
-        Dictionary mapping absolute variable names to variable settings.
+    _var_info : dict
+        Dictionary with information about variables (scaling, indices, execution order).
     _sources : list
         List of sources of cases in the table.
     _keys : list
@@ -714,7 +714,7 @@ class CaseTable(object):
         List of iteration cases and the table and row in which they are found.
     """
 
-    def __init__(self, fname, ver, table, index, giter, prom2abs, abs2prom, abs2meta, voi_meta):
+    def __init__(self, fname, ver, table, index, giter, prom2abs, abs2prom, abs2meta, var_info):
         """
         Initialize.
 
@@ -736,8 +736,8 @@ class CaseTable(object):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        voi_meta : dict
-            Dictionary mapping absolute variable names to variable settings.
+        var_info : dict
+            Dictionary with information about variables (scaling, indices, execution order).
         """
         self._filename = fname
         self._format_version = ver
@@ -747,7 +747,7 @@ class CaseTable(object):
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
         self._abs2meta = abs2meta
-        self._voi_meta = voi_meta
+        self._var_info = var_info
 
         # cached keys/cases
         self._sources = None
@@ -911,7 +911,7 @@ class CaseTable(object):
                 source = self._get_source(row[self._index_name])
 
             case = Case(source, row,
-                        self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
+                        self._prom2abs, self._abs2prom, self._abs2meta, self._var_info,
                         self._format_version)
 
             # cache it if requested
@@ -960,7 +960,7 @@ class CaseTable(object):
                 case_id = row[self._index_name]
                 source = self._get_source(case_id)
                 case = Case(source, row,
-                            self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
+                            self._prom2abs, self._abs2prom, self._abs2meta, self._var_info,
                             self._format_version)
                 if cache:
                     self._cases[case_id] = case
@@ -1066,7 +1066,7 @@ class DriverCases(CaseTable):
     Cases specific to the entries that might be recorded in a Driver iteration.
     """
 
-    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, voi_meta):
+    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, var_info):
         """
         Initialize.
 
@@ -1084,13 +1084,13 @@ class DriverCases(CaseTable):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        voi_meta : dict
-            Dictionary mapping absolute variable names to variable settings.
+        var_info : dict
+            Dictionary with information about variables (scaling, indices, execution order).
         """
         super(DriverCases, self).__init__(filename, format_version,
                                           'driver_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, voi_meta)
-        self._voi_meta = voi_meta
+                                          prom2abs, abs2prom, abs2meta, var_info)
+        self._var_info = var_info
 
     def cases(self, cache=False):
         """
@@ -1122,7 +1122,7 @@ class DriverCases(CaseTable):
                         row['jacobian'] = derivs_row['derivatives']
 
                 case = Case('driver', row,
-                            self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
+                            self._prom2abs, self._abs2prom, self._abs2meta, self._var_info,
                             self._format_version)
 
                 if cache:
@@ -1183,7 +1183,7 @@ class DriverCases(CaseTable):
         # if found, create Case object (and cache it if requested) else return None
         if row:
             case = Case('driver', row,
-                        self._prom2abs, self._abs2prom, self._abs2meta, self._voi_meta,
+                        self._prom2abs, self._abs2prom, self._abs2meta, self._var_info,
                         self._format_version)
             if cache:
                 self._cases[case_id] = case
@@ -1240,7 +1240,7 @@ class SystemCases(CaseTable):
     Cases specific to the entries that might be recorded in a System iteration.
     """
 
-    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, voi_meta):
+    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, var_info):
         """
         Initialize.
 
@@ -1258,12 +1258,12 @@ class SystemCases(CaseTable):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        voi_meta : dict
-            Dictionary mapping absolute variable names to variable settings.
+        var_info : dict
+            Dictionary with information about variables (scaling, indices, execution order).
         """
         super(SystemCases, self).__init__(filename, format_version,
                                           'system_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, voi_meta)
+                                          prom2abs, abs2prom, abs2meta, var_info)
 
 
 class SolverCases(CaseTable):
@@ -1271,7 +1271,7 @@ class SolverCases(CaseTable):
     Cases specific to the entries that might be recorded in a Solver iteration.
     """
 
-    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, voi_meta):
+    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, var_info):
         """
         Initialize.
 
@@ -1289,12 +1289,12 @@ class SolverCases(CaseTable):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        voi_meta : dict
-            Dictionary mapping absolute variable names to variable settings.
+        var_info : dict
+            Dictionary with information about variables (scaling, indices, execution order).
         """
         super(SolverCases, self).__init__(filename, format_version,
                                           'solver_iterations', 'iteration_coordinate', giter,
-                                          prom2abs, abs2prom, abs2meta, voi_meta)
+                                          prom2abs, abs2prom, abs2meta, var_info)
 
     def _get_source(self, iteration_coordinate):
         """
@@ -1330,7 +1330,7 @@ class ProblemCases(CaseTable):
     Cases specific to the entries that might be recorded in a Driver iteration.
     """
 
-    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, voi_meta):
+    def __init__(self, filename, format_version, giter, prom2abs, abs2prom, abs2meta, var_info):
         """
         Initialize.
 
@@ -1348,12 +1348,12 @@ class ProblemCases(CaseTable):
             Dictionary mapping absolute variable names to variable metadata.
         prom2abs : {'input': dict, 'output': dict}
             Dictionary mapping promoted names to absolute names.
-        voi_meta : dict
-            Dictionary mapping absolute variable names to variable settings.
+        var_info : dict
+            Dictionary with information about variables (scaling, indices, execution order).
         """
         super(ProblemCases, self).__init__(filename, format_version,
                                            'problem_cases', 'case_name', giter,
-                                           prom2abs, abs2prom, abs2meta, voi_meta)
+                                           prom2abs, abs2prom, abs2meta, var_info)
 
     def list_sources(self):
         """

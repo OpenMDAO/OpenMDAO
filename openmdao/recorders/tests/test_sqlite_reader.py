@@ -1042,7 +1042,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-
         cases = cr.get_cases()
         case = cases[0]
 
@@ -1097,8 +1096,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.run_model()
         prob.cleanup()
 
-        model.list_outputs(hierarchical=False)
-
         cr = om.CaseReader(self.filename)
         case = cr.get_case(0)
 
@@ -1115,7 +1112,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
         #
         # list inputs, hierarchical
@@ -1130,7 +1127,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
         #
         # list outputs, not hierarchical, with residuals
@@ -1168,7 +1165,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
     def test_list_discrete_filtered(self):
         model = om.Group()
@@ -1214,9 +1211,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         stream = StringIO()
         case.list_inputs(hierarchical=False, out_stream=stream)
         text = stream.getvalue().split('\n')
-
-        from pprint import pprint
-        pprint(text)
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -1290,15 +1284,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         case.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
         text = stream.getvalue().split('\n')
 
-        from pprint import pprint
-        print('Expected:')
-        pprint(expected)
-        print('text:')
-        pprint(text)
-
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
         #
         # list outputs
@@ -1313,7 +1301,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
     def test_getitem(self):
         prob = SellarProblem()
