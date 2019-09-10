@@ -69,6 +69,7 @@ setup(
         'openmdao.approximation_schemes',
         'openmdao.code_review',
         'openmdao.components',
+        'openmdao.components.structured_metamodel_util',
         'openmdao.core',
         'openmdao.devtools',
         'openmdao.devtools.iprofile_app',

@@ -175,21 +175,20 @@ class Group(System):
             pass
 
         if excl_sub is None:
-            # All myproc outputs
-            scope_out = frozenset(self._var_abs_names['output'])
+            # All outputs
+            scope_out = frozenset(self._var_allprocs_abs_names['output'])
 
-            # All myproc inputs connected to an output in this system
+            # All inputs connected to an output in this system
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(
-                self._var_abs_names['input'])
+                self._var_allprocs_abs_names['input'])
 
         else:
-            # All myproc outputs not in excl_sub
-            scope_out = frozenset(self._var_abs_names['output']).difference(
-                excl_sub._var_abs_names['output'])
+            # Empty for the excl_sub
+            scope_out = frozenset()
 
-            # All myproc inputs connected to an output in this system but not in excl_sub
+            # All inputs connected to an output in this system but not in excl_sub
             scope_in = set()
-            for abs_in in self._var_abs_names['input']:
+            for abs_in in self._var_allprocs_abs_names['input']:
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
