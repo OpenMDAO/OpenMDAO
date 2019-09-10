@@ -363,7 +363,7 @@ class SqliteRecorder(CaseRecorder):
             var_settings.update(objectives)
             var_settings.update(constraints)
             var_settings = self._cleanup_var_settings(var_settings)
-            var_settings['order'] = var_order
+            var_settings['execution_order'] = var_order
             var_settings_json = json.dumps(var_settings)
 
             with self.connection as c:

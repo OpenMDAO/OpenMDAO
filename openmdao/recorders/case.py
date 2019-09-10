@@ -657,11 +657,12 @@ class Case(object):
             pathname = self.source.replace('root.', '')
 
         # vars should be in execution order
-        if 'order' in self._var_info:
-            var_order = self._var_info['order']
+        if 'execution_order' in self._var_info:
+            var_order = self._var_info['execution_order']
             var_list = [var_name for var_name in var_order if var_name in var_dict]
         else:
-            var_list = var_dict.keys()
+            # don't have execution order, just sort for determinism
+            var_list = sorted(var_dict.keys())
 
         write_var_table(pathname, var_list, var_type, var_dict,
                         hierarchical, print_arrays, out_stream)

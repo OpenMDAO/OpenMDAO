@@ -3363,8 +3363,8 @@ class System(object):
         inputs : bool, optional
             Get names of input variables. Default is False.
         variables : Collection (list or dict)
-            Absolute path names of the variables to include.
-            If None then all varables will be included. Default is None.
+            Absolute path names of the subset of variables to include.
+            If None then all variables will be included. Default is None.
 
         Returns
         -------
