@@ -5,7 +5,6 @@ Based on implementation in Scipy via OpenMDAO 0.8x with improvements based on NP
 """
 from __future__ import print_function
 import sys
-import warnings
 from six.moves import range
 
 import numpy as np
@@ -336,7 +335,7 @@ class BroydenSolver(NonlinearSolver):
         Returns
         -------
         float
-            norm.
+            Norm of the residuals.
         """
         # Need to cache the initial residuals, which is done in this function.
         fxm = self.get_residuals()
@@ -344,10 +343,25 @@ class BroydenSolver(NonlinearSolver):
             # Use full model residual for driving the main loop convergence.
             fxm = self._system._residuals._data
 
-        z = self.compute_norm(fxm)
-        return z
+        return self.compute_norm(fxm)
 
     def compute_norm(self, vec):
+        """
+        Compute norm of the vector.
+
+        Under MPI, compute the norm on rank 0, and broadcast it to all other ranks.
+
+        Parameters
+        ----------
+        vec : ndarray
+            Array of real or complex values. For MPI on rank 0, should be full dimension of the
+            openmdao vector with duplicate indices removed.
+
+        Returns
+        -------
+        float
+            Norm of vec, computed on rank 0 and broadcast to all other ranks.
+        """
         system = self._system
 
         if system.comm.size > 1:
@@ -355,10 +369,7 @@ class BroydenSolver(NonlinearSolver):
             mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
             system.comm.Bcast((vec, mpi_typ), root=0)
 
-        if system.under_complex_step:
-            return (np.sum(vec.real**2) + np.sum(vec.imag**2))**0.5
-        else:
-            return np.sum(vec**2) ** 0.5
+        return np.linalg.norm(vec)
 
     def _single_iteration(self):
         """
@@ -440,8 +451,8 @@ class BroydenSolver(NonlinearSolver):
                 dfxm = self.delta_fxm
                 fact = np.linalg.norm(dfxm)
 
-                # Sometimes you can get stuck, particularly when enforcing bounds in a linesearch. Make
-                # sure we don't update in this case because of divide by zero.
+                # Sometimes you can get stuck, particularly when enforcing bounds in a linesearch.
+                # Make sure we don't update in this case because of divide by zero.
                 if fact > self.options['atol']:
                     Gm += np.outer((self.delta_xm - Gm.dot(dfxm)), dfxm * (1.0 / fact**2))
 
@@ -523,7 +534,7 @@ class BroydenSolver(NonlinearSolver):
 
             if system.comm.size > 1:
 
-                _, nodup2local_inds, _, _ =  system._get_nodup_out_ranges()
+                _, nodup2local_inds, _, _ = system._get_nodup_out_ranges()
                 mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
 
                 if system.comm.rank > 0:
@@ -663,6 +674,7 @@ class BroydenSolver(NonlinearSolver):
 
         # Enable local fd
         system._owns_approx_jac = approx_status
+        print(inv_jac)
 
         return inv_jac
 

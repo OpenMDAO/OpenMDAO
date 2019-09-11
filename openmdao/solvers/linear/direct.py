@@ -287,8 +287,7 @@ class DirectSolver(LinearSolver):
                 if matrix is None:
                     # this happens if we're not rank 0
                     self._lu = self._lup = None
-                    sz = np.sum(system._owned_sizes)
-                    self._nodup_size = sz
+                    self._nodup_size = np.sum(system._owned_sizes)
 
                 # Perform dense or sparse lu factorization.
                 elif isinstance(matrix, csc_matrix):
