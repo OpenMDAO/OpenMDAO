@@ -12,6 +12,8 @@ from six import iteritems
 from openmdao.core.problem import Problem
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
@@ -240,6 +242,8 @@ def _meta_model_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-s', '--surrogate_model_ref', action='store', dest='sur_ref',
+                        help='Variable name of the surrogate model reference.')
 
 
 def _meta_model_cmd(options):
@@ -256,12 +260,49 @@ def _meta_model_cmd(options):
     function
         The post-setup hook function.
     """
-    import subprocess
-
     file_name = options.file[0]
-    bash_command = str.format("bokeh serve --show " + file_name)
-    process = subprocess.Popen(bash_command.split(), stdout=subprocess.PIPE)
-    output, error = process.communicate()
+    sur_name = options.sur_ref
+
+    dir_name = os.path.dirname(os.path.abspath(__file__))
+    script_path = os.path.join(dir_name, '_meta_model_shell.py')
+    if options.sur_ref is not None:
+        bash_command = ("bokeh serve --show {0} --args  _hidden_func {1} -s {2}").format(
+            script_path, file_name, sur_name)
+    else:
+        bash_command = ("bokeh serve --show {0} --args _hidden_func {1}").format(
+            script_path, file_name)
+    os.system(bash_command)
+
+
+def _hidden_func_parser(parser):
+
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-s', '--surrogate_model_ref', action='store', dest='sur_ref',
+                        help='Variable name of the surrogate model reference.')
+
+
+def _hidden_func_cmd(options):
+
+    def _viz(prob):
+
+        Problem._post_setup_func = None
+
+        metamodels = list(prob.model.system_iter(
+            include_self=True, typ=(MetaModelStructuredComp, MetaModelUnStructuredComp)))
+        metamodel_names = [metamodels[i].name for i in range(0, len(metamodels))]
+
+        if options.sur_ref not in metamodels:
+            raise NameError(
+                ("{0} is not in list of given file. Try one of the following {1}").
+                format(options.sur_ref, metamodel_names))
+        if len(metamodels) == 1:
+            MetaModelVisualization(metamodels[0])
+        else:
+            for index in range(0, len(metamodels)):
+                if metamodels[index].name == options.sur_ref:
+                    MetaModelVisualization(metamodels[index])
+
+    return _viz
 
 
 def _config_summary_setup_parser(parser):
@@ -532,6 +573,9 @@ _post_setup_map = {
              'Print citations referenced by problem'),
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
+    '_hidden_func': (_hidden_func_parser, _hidden_func_cmd,
+                     'This is a hidden function for meta_model')
+
 }
 
 
