@@ -342,11 +342,9 @@ class BroydenSolver(NonlinearSolver):
         fxm = self.get_residuals()
         if not self._full_inverse:
             # Use full model residual for driving the main loop convergence.
-            fxm = self.system._residuals._data
+            fxm = self._system._residuals._data
 
         z = self.compute_norm(fxm)
-        print('iter norm', z)
-        sys.stdout.flush()
         return z
 
     def compute_norm(self, vec):
@@ -354,7 +352,8 @@ class BroydenSolver(NonlinearSolver):
 
         if system.comm.size > 1:
             # Norms computed for all vars on rank 0, then broadcast out.
-            system.comm.Bcast((vec, MPI.DOUBLE), root=0)
+            mpi_typ = MPI.C_DOUBLE_COMPLEX if np.any(np.iscomplex(vec)) else MPI.DOUBLE
+            system.comm.Bcast((vec, mpi_typ), root=0)
 
         if system.under_complex_step:
             return (np.sum(vec.real**2) + np.sum(vec.imag**2))**0.5
@@ -400,6 +399,8 @@ class BroydenSolver(NonlinearSolver):
         # States may have been further converged hierarchically.
         xm = self.get_states()
         delta_xm = xm - self.xm
+        print('delta_fxm', delta_fxm)
+        print('delta_xm', delta_xm)
 
         # Determine whether to update Jacobian.
         self._recompute_jacobian = False
@@ -591,6 +592,7 @@ class BroydenSolver(NonlinearSolver):
                 i, j = self._idx[name]
                 fxm[i:j] = residuals[name]
 
+        print('fxm', fxm)
         return fxm
 
     def set_linear_vector(self, dx):
