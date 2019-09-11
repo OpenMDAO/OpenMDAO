@@ -352,7 +352,7 @@ class BroydenSolver(NonlinearSolver):
 
         if system.comm.size > 1:
             # Norms computed for all vars on rank 0, then broadcast out.
-            mpi_typ = MPI.C_DOUBLE_COMPLEX if np.any(np.iscomplex(vec)) else MPI.DOUBLE
+            mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
             system.comm.Bcast((vec, mpi_typ), root=0)
 
         if system.under_complex_step:
@@ -399,8 +399,6 @@ class BroydenSolver(NonlinearSolver):
         # States may have been further converged hierarchically.
         xm = self.get_states()
         delta_xm = xm - self.xm
-        print('delta_fxm', delta_fxm)
-        print('delta_xm', delta_xm)
 
         # Determine whether to update Jacobian.
         self._recompute_jacobian = False
@@ -481,17 +479,16 @@ class BroydenSolver(NonlinearSolver):
             if system.comm.size > 1:
 
                 out_vec = outputs._data
-                self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
-                self._nodup_size = np.sum(system._owned_sizes)
+                owned_size_totals = np.sum(system._owned_sizes, axis=1)
+                nodup_size = np.sum(system._owned_sizes)
 
-                _, nodup2local_inds, local2owned_inds, noncontig_dist_inds = \
-                    system._get_nodup_out_ranges()
+                _, _, local2owned_inds, noncontig_dist_inds = system._get_nodup_out_ranges()
                 # gather the 'owned' parts of out_vec from each process
-                xm = np.empty(self._nodup_size, dtype=out_vec.dtype)
-                mpi_typ = MPI.C_DOUBLE_COMPLEX if np.iscomplex(out_vec[0]) else MPI.DOUBLE
-                disps = sizes2offsets(self._owned_size_totals, dtype=INT_DTYPE)
+                xm = np.empty(nodup_size, dtype=out_vec.dtype)
+                mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
+                disps = sizes2offsets(owned_size_totals, dtype=INT_DTYPE)
                 system.comm.Gatherv((out_vec[local2owned_inds], local2owned_inds.size, mpi_typ),
-                                    (xm, (self._owned_size_totals, disps), mpi_typ),
+                                    (xm, (owned_size_totals, disps), mpi_typ),
                                     root=0)
 
                 # Convert full_b to the same ordering that the matrix expects, where
@@ -527,7 +524,7 @@ class BroydenSolver(NonlinearSolver):
             if system.comm.size > 1:
 
                 _, nodup2local_inds, _, _ =  system._get_nodup_out_ranges()
-                mpi_typ = MPI.C_DOUBLE_COMPLEX if np.iscomplex(np.any(new_val)) else MPI.DOUBLE
+                mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
 
                 if system.comm.rank > 0:
                     new_val = np.zeros(new_val.shape, dtype=new_val.dtype)
@@ -564,17 +561,16 @@ class BroydenSolver(NonlinearSolver):
             if system.comm.size > 1:
 
                 res_vec = residuals._data
-                self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
-                self._nodup_size = np.sum(system._owned_sizes)
+                owned_size_totals = np.sum(system._owned_sizes, axis=1)
+                nodup_size = np.sum(system._owned_sizes)
 
-                _, nodup2local_inds, local2owned_inds, noncontig_dist_inds = \
-                    system._get_nodup_out_ranges()
+                _, _, local2owned_inds, noncontig_dist_inds = system._get_nodup_out_ranges()
                 # gather the 'owned' parts of res_vec from each process
-                fxm = np.empty(self._nodup_size, dtype=res_vec.dtype)
-                mpi_typ = MPI.C_DOUBLE_COMPLEX if np.iscomplex(res_vec[0]) else MPI.DOUBLE
-                disps = sizes2offsets(self._owned_size_totals, dtype=INT_DTYPE)
+                fxm = np.empty(nodup_size, dtype=res_vec.dtype)
+                mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
+                disps = sizes2offsets(owned_size_totals, dtype=INT_DTYPE)
                 system.comm.Gatherv((res_vec[local2owned_inds], local2owned_inds.size, mpi_typ),
-                                    (fxm, (self._owned_size_totals, disps), mpi_typ),
+                                    (fxm, (owned_size_totals, disps), mpi_typ),
                                     root=0)
 
                 # Convert full_b to the same ordering that the matrix expects, where
@@ -592,7 +588,6 @@ class BroydenSolver(NonlinearSolver):
                 i, j = self._idx[name]
                 fxm[i:j] = residuals[name]
 
-        print('fxm', fxm)
         return fxm
 
     def set_linear_vector(self, dx):
