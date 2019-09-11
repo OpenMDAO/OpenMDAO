@@ -960,7 +960,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check the system case for 'd1' (there should be only one output, 'd1.y1')
         system_cases = cr.list_cases('root.d1')
-        case = cr.get_case(system_cases[1])
+        case = cr.get_case(system_cases[-1])
 
         outputs = case.list_outputs(explicit=True, implicit=True, values=True,
                                     residuals=True, residuals_tol=None,
@@ -975,7 +975,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 'ref': 1.0,
                 'resids': [1.318e-10],
                 'shape': (1,),
-                'values': [25.5454859]
+                'values': [25.5883024]
             }
         }
 
@@ -990,11 +990,23 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(vals['resids'], expected['resids'])
         np.testing.assert_almost_equal(vals['value'], expected['values'])
 
-        # check implicit outputs
-        # there should not be any
+        # check implicit outputs, there should not be any
         impl_outputs_case = case.list_outputs(explicit=False, implicit=True,
                                               out_stream=None)
         self.assertEqual(len(impl_outputs_case), 0)
+
+        # check that output from the Case method matches output from the System method
+        # the system for the case should be properly identified as 'd1'
+        stream = StringIO()
+        d1.list_outputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_outputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
 
     def test_list_inputs(self):
         prob = SellarProblem()
@@ -1016,18 +1028,70 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_inputs_case = {
             'd1.z': {'value': [5., 2.]},
             'd1.x': {'value': [1.]},
-            'd1.y2': {'value': [12.27257053]}
+            'd1.y2': {'value': [12.0584882]}
         }
 
         system_cases = cr.list_cases('root.d1')
 
-        case = cr.get_case(system_cases[1])
+        case = cr.get_case(system_cases[-1])
 
         inputs = case.list_inputs(values=True, out_stream=None)
 
         for name, meta in inputs:
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['value'], expected['value'])
+
+        # check that output from the Case method matches output from the System method
+        # the system for the case should be properly identified as 'd1'
+        stream = StringIO()
+        d1.list_inputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
+
+    def test_list_inputs_outputs_solver_case(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+        prob.setup()
+
+        mda = prob.model.mda
+        mda.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
+        mda.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.set_solver_print(-1)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(-1)
+
+        # check that output from the Case methods match output from the System methods
+        # the system for the solver case should be properly identified as 'mda'
+        stream = StringIO()
+        mda.list_inputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
+
+        stream = StringIO()
+        mda.list_outputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_outputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
 
     def test_list_input_and_outputs_with_tags(self):
         from openmdao.core.tests.test_expl_comp import RectangleCompWithTags
@@ -1161,7 +1225,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         stream = StringIO()
         case.list_outputs(hierarchical=True, out_stream=stream)
         text = stream.getvalue().split('\n')
-
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -2333,6 +2396,13 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
 
+        # check that inputs & outputs are in execution order (i.e. in the order they were setup)
+        self.assertEqual([name for name, val in case.list_inputs(out_stream=None)],
+                         ['mda.d1.z', 'mda.d1.x', 'mda.d1.y2', 'mda.d2.z', 'mda.d2.y1'])
+
+        self.assertEqual([name for name, val in case.list_outputs(out_stream=None)],
+                         ['mda.d1.y1', 'mda.d2.y2'])
+
         for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
 
@@ -3235,7 +3305,7 @@ class TestPromAbsDict(unittest.TestCase):
 
 
 def _assert_model_matches_case(case, system):
-    '''
+    """
     Check to see if the values in the case match those in the model.
 
     Parameters
@@ -3244,7 +3314,7 @@ def _assert_model_matches_case(case, system):
         Case to be used for the comparison.
     system : System object
         System to be used for the comparison.
-    '''
+    """
     case_inputs = case.inputs
     model_inputs = system._inputs
     for name, model_input in iteritems(model_inputs._views):
@@ -3372,6 +3442,12 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
+
+        # check that inputs & outputs are in sorted order, since exec/setup order is not available
+        self.assertEqual([name for name, val in case.list_inputs(out_stream=None)],
+                         ['mda.d1.x', 'mda.d1.y2', 'mda.d1.z', 'mda.d2.y1', 'mda.d2.z'])
+        self.assertEqual([name for name, val in case.list_outputs(out_stream=None)],
+                         ['mda.d1.y1', 'mda.d2.y2'])
 
         np.testing.assert_almost_equal(case.abs_err, 0, decimal=6)
         np.testing.assert_almost_equal(case.rel_err, 0, decimal=6)
