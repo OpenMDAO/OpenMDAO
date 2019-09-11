@@ -286,15 +286,24 @@ def _hidden_func_cmd(options):
     def _viz(prob):
 
         Problem._post_setup_func = None
-
+        # Check if list contains objects that aren't metamodels (use isinstance)
         metamodels = list(prob.model.system_iter(
             include_self=True, typ=(MetaModelStructuredComp, MetaModelUnStructuredComp)))
+        if not metamodels:
+            raise AttributeError(
+                'No metamodels found. Check for missing subsystem or incorrect reference name.')
         metamodel_names = [metamodels[i].name for i in range(0, len(metamodels))]
 
-        if options.sur_ref not in metamodels:
+        if options.sur_ref is None and len(metamodels) > 1:
             raise NameError(
-                ("{0} is not in list of given file. Try one of the following {1}").
+                ("No surrogate reference given. Try one of the following {1}").
+                format(metamodel_names))
+
+        if options.sur_ref is not None and options.sur_ref not in metamodels:
+            raise NameError(
+                ("{0} not in list of surrogate models in given file. Try one of the following {1}").
                 format(options.sur_ref, metamodel_names))
+
         if len(metamodels) == 1:
             MetaModelVisualization(metamodels[0])
         else:

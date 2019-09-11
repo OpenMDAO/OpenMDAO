@@ -281,23 +281,19 @@ class MetaModelVisualization(object):
     def _cont_data_calcs(self):
         resolution = self.resolution
         x_data = np.zeros((resolution, resolution, self.num_of_inputs))
-        y_data = np.zeros((resolution, resolution, self.num_of_outputs))
 
         self._slider_attrs()
 
         self.input_point_list = [i.value for i in self.slider_dict.values()]
         x_data[:, :, :] = np.array(self.input_point_list)
-        # always [in1, in2, in3, in4]
 
         for idx, (title, values) in enumerate(self.slider_source.data.items()):
             if title == self.x_input.value:
                 self.xlins_mesh = values
                 x_index_position = idx
-                # print("X Input: ", xlins)
             if title == self.y_input.value:
                 self.ylins_mesh = values
                 y_index_position = idx
-                # print("Y Input: ", ylins)
 
         X, Y = np.meshgrid(self.xlins_mesh, self.ylins_mesh)
         x_data[:, :, x_index_position] = X
@@ -308,7 +304,6 @@ class MetaModelVisualization(object):
             pred_dict.update({title: x_data[:, :, idx]})
 
         return pred_dict
-
 
     def _contour_data(self):
         """
