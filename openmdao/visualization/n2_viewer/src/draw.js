@@ -36,36 +36,6 @@ var lastLeftClickedElement = document.getElementById("ptN2ContentDivId"),
 var enterIndex = 0,
     exitIndex = 0;
 
-function DrawPathTwoLines(x1, y1, x2, y2, x3, y3, color, width, useArrow) {
-    var path = n2ArrowsGroup.insert("path")
-        .attr("class", "n2_hover_elements")
-        .attr("d", "M" + x1 + " " + y1 + " L" + x2 + " " + y2 + " L" + x3 + " " + y3)
-        .attr("fill", "none")
-        .style("stroke-width", width)
-        .style("stroke", color);
-
-    n2DotsGroup.append("circle")
-        .attr("class", "n2_hover_elements")
-        .attr("cx", x2)
-        .attr("cy", y2)
-        .attr("r", width * 1.0)
-        .style("stroke-width", 0)
-        .style("fill-opacity", 1)
-        .style("fill", "black");
-    n2DotsGroup.append("circle")
-        .attr("class", "n2_hover_elements")
-        .attr("cx", x2)
-        .attr("cy", y2)
-        .attr("r", width * 1.0)
-        .style("stroke-width", 0)
-        .style("fill-opacity", .75)
-        .style("fill", color);
-
-    if (useArrow) {
-        path.attr("marker-end", "url(#arrow)");
-    }
-}
-
 function setD3ContentDiv() {
     d3ContentDiv = document.getElementById("ptN2ContentDivId").querySelector("#d3_content_div");
     svgDiv = d3.select(d3ContentDiv).append("div")

@@ -56,8 +56,7 @@ function PtN2Diagram(parentDiv, modelData) {
         .attr("orient", "auto")
         .append("path")
         .attr("d", "M0,-5L10,0L0,5")
-        .attr("class", "arrowHead")
-        .attr("z-index", "255");
+        .attr("class", "arrowHead");
 
     setN2Group();
     var pTreeGroup = svg.append("g").attr("id", "tree"); // id given just so it is easier to see in Chrome dev tools when debugging
@@ -1581,7 +1580,7 @@ function PtN2Diagram(parentDiv, modelData) {
             }
         }
         else if (d.r < d.c) { //top right
-            var arr1 = new N2Arrow({
+            new N2Arrow({
                 start: { col: d.r, row: d.r },
                 end: { col: d.c, row: d.c },
                 color: RED_ARROW_COLOR,
