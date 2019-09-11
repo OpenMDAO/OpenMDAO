@@ -445,19 +445,11 @@ class Case(object):
             list of input names and other optional information about those inputs
         """
         meta = self._abs2meta
-        inp_vars = OrderedDict()
+        inp_vars = {}
         inputs = []
 
         if self.inputs is not None:
-            # get variable names in execution order.
-            # if we don't have execution order, just sort for determinism
-            if 'execution_order' in self._var_info:
-                var_order = self._var_info['execution_order']
-                var_names = [name for name in var_order if name in self.inputs.absolute_names()]
-            else:
-                var_names = sorted(self.inputs.absolute_names())
-
-            for abs_name in var_names:
+            for abs_name in self.inputs.absolute_names():
                 if abs_name not in inp_vars:
                     inp_vars[abs_name] = {'value': self.inputs[abs_name]}
 
@@ -559,14 +551,7 @@ class Case(object):
         impl_outputs = []
         out_vars = {}
 
-        # get vars in execution order if we have it, otherwise use sorted order
-        if 'execution_order' in self._var_info:
-            var_order = self._var_info['execution_order']
-            var_names = [name for name in var_order if name in self.outputs.absolute_names()]
-        else:
-            var_names = sorted(self.outputs.absolute_names())
-
-        for abs_name in var_names:
+        for abs_name in self.outputs.absolute_names():
             out_vars[abs_name] = {'value': self.outputs[abs_name]}
             if self.residuals and abs_name in self.residuals.absolute_names():
                 out_vars[abs_name]['residuals'] = self.residuals[abs_name]
@@ -673,7 +658,15 @@ class Case(object):
             if pathname.endswith('.nonlinear_solver'):
                 pathname = pathname[:-17]  # len('.nonlinear_solver') == 17
 
-        write_var_table(pathname, var_dict.keys(), var_type, var_dict,
+        # vars should be in execution order
+        if 'execution_order' in self._var_info:
+            var_order = self._var_info['execution_order']
+            var_list = [var_name for var_name in var_order if var_name in var_dict]
+        else:
+            # don't have execution order, just sort for determinism
+            var_list = sorted(var_dict.keys())
+
+        write_var_table(pathname, var_list, var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
 
     def _get_variables_of_type(self, var_type):

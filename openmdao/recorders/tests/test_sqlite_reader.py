@@ -2396,12 +2396,18 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
 
-        # check that inputs & outputs are in execution order (i.e. in the order they were setup)
-        self.assertEqual([name for name, val in case.list_inputs(out_stream=None)],
-                         ['mda.d1.z', 'mda.d1.x', 'mda.d1.y2', 'mda.d2.z', 'mda.d2.y1'])
+        # check that output from the Case method matches output from the System method
+        # the system for the case should be properly identified as 'd1'
+        stream = StringIO()
+        prob.model.mda.list_inputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
 
-        self.assertEqual([name for name, val in case.list_outputs(out_stream=None)],
-                         ['mda.d1.y1', 'mda.d2.y2'])
+        stream = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
 
         for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
@@ -3444,10 +3450,50 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
 
         # check that inputs & outputs are in sorted order, since exec/setup order is not available
-        self.assertEqual([name for name, val in case.list_inputs(out_stream=None)],
-                         ['mda.d1.x', 'mda.d1.y2', 'mda.d1.z', 'mda.d2.y1', 'mda.d2.z'])
-        self.assertEqual([name for name, val in case.list_outputs(out_stream=None)],
-                         ['mda.d1.y1', 'mda.d2.y2'])
+        expected = [
+            "5 Input(s) in 'mda'",
+            "-------------------",
+            "",
+            "varname    value               ",
+            "---------  --------------------",
+            "mda.d1.x   [3.43977636e-15]    ",
+            "mda.d1.y2  [3.75527777]        ",
+            "mda.d1.z   |1.9776388835080063|",
+            "mda.d2.y1  [3.16]              ",
+            "mda.d2.z   |1.9776388835080063|",
+         ]
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+        for i, line in enumerate(expected):
+            if i == 0:
+                self.assertEqual(text[i], line)
+            elif line and not line.startswith('-'):
+                self.assertTrue(text[i].startswith(line.split()[0]))
+
+        expected = [
+            "2 Explicit Output(s) in 'mda'",
+            "-----------------------------",
+            "",
+            "varname    value       ",
+            "---------  ------------",
+            "mda.d1.y1  [3.16]      ",
+            "mda.d2.y2  [3.75527777]",
+            "",
+            "",
+            "0 Implicit Output(s) in 'mda'",
+            "-----------------------------",
+         ]
+
+        stream = StringIO()
+        case.list_outputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+        for i, line in enumerate(expected):
+            if i == 0:
+                self.assertEqual(text[i], line)
+            elif line and not line.startswith('-'):
+                self.assertTrue(text[i].startswith(line.split()[0]))
 
         np.testing.assert_almost_equal(case.abs_err, 0, decimal=6)
         np.testing.assert_almost_equal(case.rel_err, 0, decimal=6)
