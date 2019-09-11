@@ -558,39 +558,38 @@ class Case(object):
             else:
                 out_vars[abs_name]['residuals'] = 'Not Recorded'
 
-        if len(out_vars) > 0:
-            for name in out_vars:
-                # Filter based on tags
-                if tags and not (make_set(tags) & make_set(meta[name]['tags'])):
-                    continue
+        for name in out_vars:
+            # Filter based on tags
+            if tags and not (make_set(tags) & make_set(meta[name]['tags'])):
+                continue
 
-                if residuals_tol and \
-                   out_vars[name]['residuals'] is not 'Not Recorded' and \
-                   np.linalg.norm(out_vars[name]['residuals']) < residuals_tol:
-                    continue
+            if residuals_tol and \
+               out_vars[name]['residuals'] is not 'Not Recorded' and \
+               np.linalg.norm(out_vars[name]['residuals']) < residuals_tol:
+                continue
 
-                outs = {}
-                if values:
-                    outs['value'] = out_vars[name]['value']
-                if prom_name:
-                    outs['prom_name'] = self._abs2prom['output'][name]
-                if residuals:
-                    outs['resids'] = out_vars[name]['residuals']
-                if units:
-                    outs['units'] = meta[name]['units']
-                if shape:
-                    outs['shape'] = out_vars[name]['value'].shape
-                if bounds:
-                    outs['lower'] = meta[name]['lower']
-                    outs['upper'] = meta[name]['upper']
-                if scaling:
-                    outs['ref'] = meta[name]['ref']
-                    outs['ref0'] = meta[name]['ref0']
-                    outs['res_ref'] = meta[name]['res_ref']
-                if meta[name]['explicit']:
-                    expl_outputs.append((name, outs))
-                else:
-                    impl_outputs.append((name, outs))
+            outs = {}
+            if values:
+                outs['value'] = out_vars[name]['value']
+            if prom_name:
+                outs['prom_name'] = self._abs2prom['output'][name]
+            if residuals:
+                outs['resids'] = out_vars[name]['residuals']
+            if units:
+                outs['units'] = meta[name]['units']
+            if shape:
+                outs['shape'] = out_vars[name]['value'].shape
+            if bounds:
+                outs['lower'] = meta[name]['lower']
+                outs['upper'] = meta[name]['upper']
+            if scaling:
+                outs['ref'] = meta[name]['ref']
+                outs['ref0'] = meta[name]['ref0']
+                outs['res_ref'] = meta[name]['res_ref']
+            if meta[name]['explicit']:
+                expl_outputs.append((name, outs))
+            else:
+                impl_outputs.append((name, outs))
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
