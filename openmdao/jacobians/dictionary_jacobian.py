@@ -66,30 +66,6 @@ class DictionaryJacobian(Jacobian):
                         key = (res_name, name)
                         if key in subjacs:
                             keys.append(key)
-                            sjac = subjacs[key]
-                            rows = sjac['rows']
-                            if rows is not None and ncol == 1:
-                                if 'csc' not in sjac:
-                                    cols = sjac['cols']
-
-                                    # create a CSC matrix to use for the subjac in apply
-                                    tmpcsc = csc_matrix((np.arange(rows.size, dtype=int),
-                                                        (rows, cols)),
-                                                        shape=sjac['shape'])
-                                    inds = tmpcsc.data
-                                    if np.all(np.arange(rows.size, dtype=int) == inds):
-                                        # no mapping needed
-                                        inds = _full_slice
-                                    else:
-                                        # reverse inds to avoid an array copy during apply
-                                        inds = np.argsort(inds)
-                                    csc = csc_matrix((sjac['value'], (rows, cols)),
-                                                     shape=sjac['shape'])
-
-                                    # keep track of how data array was modified in conversion
-                                    # from COO to CSC
-                                    sjac['csc_val_map'] = inds
-                                    sjac['csc'] = csc
 
             self._iter_keys[entry] = keys
 
@@ -126,7 +102,6 @@ class DictionaryJacobian(Jacobian):
         rflat = d_residuals._views_flat
         oflat = d_outputs._views_flat
         iflat = d_inputs._views_flat
-        np_add_at = np.add.at
         ncol = d_residuals._ncol
         subjacs_info = self._subjacs_info
         is_explicit = isinstance(system, ExplicitComponent)
@@ -167,22 +142,37 @@ class DictionaryJacobian(Jacobian):
                         continue
 
                     rows = subjac_info['rows']
-                    if rows is not None:
-                        # keep np.add.at for the 'matrix-matrix' case
-                        if ncol > 1:
-                            linds, rinds = rows, subjac_info['cols']
-                            if not fwd:
-                                linds, rinds = rinds, linds
-                            for i in range(ncol):
-                                np_add_at(left_vec[:, i], linds,
-                                          right_vec[:, i][rinds] * subjac)
-                            continue
+                    if rows is not None:  # our homegrown COO format
+                        linds, rinds = rows, subjac_info['cols']
+                        if not fwd:
+                            linds, rinds = rinds, linds
+                        if self._under_complex_step:
+                            # bincount only works with float, so split into parts
+                            if ncol > 1:
+                                for i in range(ncol):
+                                    prod = right_vec[:, i][rinds] * subjac
+                                    left_vec[:, i].real += np.bincount(linds, prod.real,
+                                                                       minlength=left_vec.shape[0])
+                                    left_vec[:, i].imag += np.bincount(linds, prod.imag,
+                                                                       minlength=left_vec.shape[0])
+                            else:
+                                prod = right_vec[rinds] * subjac
+                                left_vec[:].real += np.bincount(linds, prod.real,
+                                                                minlength=left_vec.size)
+                                left_vec[:].imag += np.bincount(linds, prod.imag,
+                                                                minlength=left_vec.size)
+                        else:
+                            if ncol > 1:
+                                for i in range(ncol):
+                                    left_vec[:, i] += np.bincount(linds,
+                                                                  right_vec[:, i][rinds] * subjac,
+                                                                  minlength=left_vec.shape[0])
+                            else:
+                                left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
+                                                           minlength=left_vec.size)
 
-                        csc = subjac_info['csc']
-                        csc.data[subjac_info['csc_val_map']] = subjac
-                        subjac = csc
+                    else:
+                        if not fwd:
+                            subjac = subjac.transpose()
 
-                    if not fwd:
-                        subjac = subjac.transpose()
-
-                    left_vec += subjac.dot(right_vec)
+                        left_vec += subjac.dot(right_vec)
