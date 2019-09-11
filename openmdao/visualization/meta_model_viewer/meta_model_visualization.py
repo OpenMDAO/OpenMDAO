@@ -278,6 +278,38 @@ class MetaModelVisualization(object):
 
         return stack_outputs(outputs)
 
+    def _cont_data_calcs(self):
+        resolution = self.resolution
+        x_data = np.zeros((resolution, resolution, self.num_of_inputs))
+        y_data = np.zeros((resolution, resolution, self.num_of_outputs))
+
+        self._slider_attrs()
+
+        self.input_point_list = [i.value for i in self.slider_dict.values()]
+        x_data[:, :, :] = np.array(self.input_point_list)
+        # always [in1, in2, in3, in4]
+
+        for idx, (title, values) in enumerate(self.slider_source.data.items()):
+            if title == self.x_input.value:
+                self.xlins_mesh = values
+                x_index_position = idx
+                # print("X Input: ", xlins)
+            if title == self.y_input.value:
+                self.ylins_mesh = values
+                y_index_position = idx
+                # print("Y Input: ", ylins)
+
+        X, Y = np.meshgrid(self.xlins_mesh, self.ylins_mesh)
+        x_data[:, :, x_index_position] = X
+        x_data[:, :, y_index_position] = Y
+
+        pred_dict = {}
+        for idx, title in enumerate(self.slider_source.data):
+            pred_dict.update({title: x_data[:, :, idx]})
+
+        return pred_dict
+
+
     def _contour_data(self):
         """
         Create a contour plot.
@@ -290,53 +322,12 @@ class MetaModelVisualization(object):
         -------
         Bokeh Image Plot
         """
+        # self.cont_data_calcs()
         resolution = self.resolution
-        x_data = np.zeros((resolution, resolution, self.num_of_inputs))
         y_data = np.zeros((resolution, resolution, self.num_of_outputs))
 
-        self._slider_attrs()
-        # Query the slider dictionary, append the name and current value to the ordered dictionary
-        self.slider_value_and_name = OrderedDict()
-        for title, slider_params in self.slider_dict.items():
-            self.slider_value_and_name[title] = slider_params.value
-
-        # Cast the current values of the slider_value_and_name dictionary values to a list
-        self.input_point_list = list(self.slider_value_and_name.values())
-        x_data[:, :, :] = np.array(self.input_point_list)
-
-        # Search the input_data_dict to match the names with the x/y dropdown menus. Then set x/y
-        # linspaces to the values for the meshgrid which follows
-        for title, values in self.input_data_dict.items():
-            if title == self.x_input.value:
-                xlins = values
-                dw = max(values)
-            if title == self.y_input.value:
-                ylins = values
-                dh = max(values)
-
-        # Create a mesh grid and then append that data to 'x_data' in the respective columns
-        X, Y = np.meshgrid(xlins, ylins)
-        x_data[:, :, self.x_index] = X
-        x_data[:, :, self.y_index] = Y
-
-        # This block places the x and y inputs first and then appends any
-        # other values to the list the first two points
-        pred_dict = {}
-        self.input_list = [self.x_input.value, self.y_input.value]
-        for title in self.slider_value_and_name:
-            if title == self.x_input.value or title == self.y_input.value:
-                pass
-            else:
-                self.input_list.append(title)
-
-        # Append the key (input_list) and the values copied from x_data to pred_dict
-        # where it is then ordered in pred_dict_ordered.
-        for idx, title in enumerate(self.slider_value_and_name):
-            pred_dict.update({title: x_data[:, :, idx]})
-        pred_dict_ordered = OrderedDict((k, pred_dict[k]) for k in self.input_list)
-
         # Pass the dict to make predictions and then reshape the output to (n, n, number of outputs)
-        y_data[:, :, :] = self._make_predictions(pred_dict_ordered).reshape(
+        y_data[:, :, :] = self._make_predictions(self._cont_data_calcs()).reshape(
             (resolution, resolution, self.num_of_outputs))
         Z = y_data[:, :, self.output_variable]
         Z = Z.reshape(resolution, resolution)
@@ -362,6 +353,8 @@ class MetaModelVisualization(object):
         contour_plot.yaxis.axis_label = self.y_input.value
         contour_plot.min_border_left = 0
         contour_plot.add_layout(color_bar, 'right')
+        xlins = self.xlins_mesh
+        ylins = self.ylins_mesh
 
         contour_plot.image(image=[self.source.data['z']], x=min(xlins), y=min(ylins),
                            dh=(max(ylins) - min(ylins)), dw=(max(xlins) - min(xlins)),
