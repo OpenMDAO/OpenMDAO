@@ -8,11 +8,13 @@ from bokeh.plotting import figure
 from bokeh.models import Slider, ColumnDataSource
 from bokeh.models import ColorBar, BasicTicker, LinearColorMapper, Range1d
 from bokeh.models.widgets import TextInput, Select
+from bokeh.models.ranges import DataRange1d
 
 # Misc Imports
 from scipy.spatial import cKDTree
 import numpy as np
 import openmdao.api as om
+import warnings
 
 
 def stack_outputs(outputs_dict):
@@ -54,8 +56,12 @@ class MetaModelVisualization(object):
         Data source containing dictionary of sliders
     bot_plot_source : ColumnDataSource
         Data source containing data for the bottom subplot
+    bot_plot_scatter_source : ColumnDataSource
+        Data source containing scatter point data for the bottom subplot
     right_plot_source : ColumnDataSource
         Data source containing data for the right subplot
+    right_plot_scatter_source : ColumnDataSource
+        Data source containing scatter point data for the right subplot
     source : ColumnDataSource
         Data source containing data for the contour plot
     input_list : list
@@ -174,12 +180,18 @@ class MetaModelVisualization(object):
 
         # Most data sources are filled with initial values
         self.slider_source = ColumnDataSource(data=self.input_data_dict)
-        self.bot_plot_source = ColumnDataSource(data=dict(
-            bot_slice_x=np.repeat(0, self.resolution), bot_slice_y=np.repeat(0, self.resolution)))
-        self.right_plot_source = ColumnDataSource(data=dict(
-            left_slice_x=np.repeat(0, self.resolution), left_slice_y=np.repeat(0, self.resolution)))
         self.source = ColumnDataSource(data=dict(
+            z=np.random.rand(self.resolution, self.resolution)))
+
+        self.bot_plot_source = ColumnDataSource(data=dict(
             x=np.repeat(0, self.resolution), y=np.repeat(0, self.resolution)))
+        self.bot_plot_scatter_source = ColumnDataSource(data=dict(
+            bot_slice_x=np.repeat(0, self.resolution), bot_slice_y=np.repeat(0, self.resolution)))
+
+        self.right_plot_source = ColumnDataSource(data=dict(
+            x=np.repeat(0, self.resolution), y=np.repeat(0, self.resolution)))
+        self.right_plot_scatter_source = ColumnDataSource(data=dict(
+            left_slice_x=np.repeat(0, self.resolution), left_slice_y=np.repeat(0, self.resolution)))
 
         # Text input to change the distance of reach when searching for nearest data points
         self.scatter_distance = TextInput(value="0.1", title="Scatter Distance")
@@ -317,21 +329,20 @@ class MetaModelVisualization(object):
         -------
         Bokeh Image Plot
         """
-        # self.cont_data_calcs()
         resolution = self.resolution
         y_data = np.zeros((resolution, resolution, self.num_of_outputs))
 
         # Pass the dict to make predictions and then reshape the output to (n, n, number of outputs)
         y_data[:, :, :] = self._make_predictions(self._cont_data_calcs()).reshape(
             (resolution, resolution, self.num_of_outputs))
-        Z = y_data[:, :, self.output_variable]
-        Z = Z.reshape(resolution, resolution)
-        self.Z = Z
+        self.Z = y_data[:, :, self.output_variable]
+        self.Z = self.Z.reshape(resolution, resolution)
 
-        self.source.add(Z, 'z')
+        self.source.data = dict(z=[self.Z])
 
         # Color bar formatting
-        color_mapper = LinearColorMapper(palette="Viridis11", low=np.amin(Z), high=np.amax(Z))
+        color_mapper = LinearColorMapper(
+            palette="Viridis11", low=np.amin(self.Z), high=np.amax(self.Z))
         color_bar = ColorBar(color_mapper=color_mapper, ticker=BasicTicker(), label_standoff=12,
                              location=(0, 0))
 
@@ -351,7 +362,7 @@ class MetaModelVisualization(object):
         xlins = self.xlins_mesh
         ylins = self.ylins_mesh
 
-        contour_plot.image(image=[self.source.data['z']], x=min(xlins), y=min(ylins),
+        contour_plot.image(image='z', source=self.source, x=min(xlins), y=min(ylins),
                            dh=(max(ylins) - min(ylins)), dw=(max(xlins) - min(xlins)),
                            palette="Viridis11")
 
@@ -384,20 +395,20 @@ class MetaModelVisualization(object):
 
         # Make slice in Z data at the point calculated before and add it to the data source
         z_data = self.Z[:, subplot_value_index].flatten()
-        self.source.add(z_data, 'left_slice')
 
-        x = self.source.data['left_slice']
+        x = z_data
         y = self.slider_source.data[self.y_input.value]
 
+        self.right_plot_source.data = dict(x=x, y=y)
+
         # Create and format figure
-        right_plot_fig = figure(plot_width=200, plot_height=500, x_range=(min(x), max(x)),
-                                y_range=(min(y_data), max(y_data)),
-                                title="{} vs {}".format(self.y_input.value,
-                                                        self.output_select.value),
-                                tools="")
+        self.right_plot_fig = right_plot_fig = figure(
+            plot_width=200, plot_height=500, x_range=(min(x), max(x)),
+            y_range=(min(y_data), max(y_data)),
+            title="{} vs {}".format(self.y_input.value, self.output_select.value), tools="")
         right_plot_fig.xaxis.axis_label = self.output_select.value
         right_plot_fig.yaxis.axis_label = self.y_input.value
-        right_plot_fig.line(x, y)
+        right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
 
         # Determine distance and alpha opacity of training points
         data = self._training_points()
@@ -413,15 +424,16 @@ class MetaModelVisualization(object):
                                fill_alpha=alphas)
 
         # Set the right_plot data source to new values
-        self.right_plot_source.data = dict(
+        self.right_plot_scatter_source.data = dict(
             left_slice_x=np.repeat(x_value, self.resolution), left_slice_y=y_data,
             x1=np.array([x + self.dist_range for x in np.repeat(x_value, self.resolution)]),
             x2=np.array([x - self.dist_range for x in np.repeat(x_value, self.resolution)]))
 
-        self.contour_plot.line('left_slice_x', 'left_slice_y', source=self.right_plot_source,
-                               color='black', line_width=2)
+        self.contour_plot.line(
+            'left_slice_x', 'left_slice_y', source=self.right_plot_scatter_source,
+            color='black', line_width=2)
 
-        return right_plot_fig
+        return self.right_plot_fig
 
     def _bot_plot(self):
         """
@@ -441,18 +453,18 @@ class MetaModelVisualization(object):
             np.around(self.input_data_dict[self.y_input.value], 5) == np.around(y_value, 5))[0]
 
         z_data = self.Z[alt_index].flatten()
-        self.source.add(z_data, 'bot_slice')
 
         x = self.slider_source.data[self.x_input.value]
-        y = self.source.data['bot_slice']
+        y = z_data
+        self.bot_plot_source.data = dict(x=x, y=y)
 
-        bot_plot_fig = figure(
+        self.bot_plot_fig = bot_plot_fig = figure(
             plot_width=550, plot_height=200, x_range=(min(x_data), max(x_data)),
             y_range=(min(y), max(y)),
             title="{} vs {}".format(self.x_input.value, self.output_select.value), tools="")
         bot_plot_fig.xaxis.axis_label = self.x_input.value
         bot_plot_fig.yaxis.axis_label = self.output_select.value
-        bot_plot_fig.line(x, y)
+        bot_plot_fig.line(x='x', y='y', source=self.bot_plot_source)
 
         data = self._training_points()
         horiz_color = np.zeros((len(data), 1))
@@ -466,11 +478,12 @@ class MetaModelVisualization(object):
         bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
                              fill_alpha=alphas)
 
-        self.bot_plot_source.data = dict(
+        self.bot_plot_scatter_source.data = dict(
             bot_slice_x=x_data,
             bot_slice_y=np.repeat(y_value, self.resolution))
         self.contour_plot.line(
-            'bot_slice_x', 'bot_slice_y', source=self.bot_plot_source, color='black', line_width=2)
+            'bot_slice_x', 'bot_slice_y', source=self.bot_plot_scatter_source, color='black',
+            line_width=2)
 
         return bot_plot_fig
 
@@ -506,14 +519,18 @@ class MetaModelVisualization(object):
             raise ValueError("Inputs should not equal each other")
         else:
             self.x_input.value = new
-            self._update_all_plots()
+            self.layout.children[0] = self._contour_data()
+            self.layout.children[1] = self._right_plot()
+            self.layout2.children[0] = self._bot_plot()
 
     def _y_input_update(self, attr, old, new):
         if not self._input_dropdown_checks(self.x_input.value, new):
             raise ValueError("Inputs should not equal each other")
         else:
             self.y_input.value = new
-            self._update_all_plots()
+            self.layout.children[0] = self._contour_data()
+            self.layout.children[1] = self._right_plot()
+            self.layout2.children[0] = self._bot_plot()
 
     def _output_value_update(self, attr, old, new):
         self.output_variable = self.output_list.index(new)

@@ -5,7 +5,6 @@ from openmdao.visualization.meta_model_viewer.meta_model_visualization import Me
 
 # Model
 interp = om.MetaModelUnStructuredComp()
-trig = om.Group()
 
 # Training Data
 x_train1 = np.linspace(0, 10, 20)
@@ -27,6 +26,6 @@ interp.add_output('output_1', 0., training_data=.5 * np.cos(y_train))
 interp.options['default_surrogate'] = om.ResponseSurface()
 
 prob = om.Problem()
-prob.model.add_subsystem('trig', trig)
+prob.model.add_subsystem('interp', interp)
 prob.setup()
 prob.final_setup()
