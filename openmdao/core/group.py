@@ -175,21 +175,20 @@ class Group(System):
             pass
 
         if excl_sub is None:
-            # All myproc outputs
-            scope_out = frozenset(self._var_abs_names['output'])
+            # All outputs
+            scope_out = frozenset(self._var_allprocs_abs_names['output'])
 
-            # All myproc inputs connected to an output in this system
+            # All inputs connected to an output in this system
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(
-                self._var_abs_names['input'])
+                self._var_allprocs_abs_names['input'])
 
         else:
-            # All myproc outputs not in excl_sub
-            scope_out = frozenset(self._var_abs_names['output']).difference(
-                excl_sub._var_abs_names['output'])
+            # Empty for the excl_sub
+            scope_out = frozenset()
 
-            # All myproc inputs connected to an output in this system but not in excl_sub
+            # All inputs connected to an output in this system but not in excl_sub
             scope_in = set()
-            for abs_in in self._var_abs_names['input']:
+            for abs_in in self._var_allprocs_abs_names['input']:
                 if abs_in in self._conn_global_abs_in2out:
                     abs_out = self._conn_global_abs_in2out[abs_in]
 
@@ -1206,31 +1205,27 @@ class Group(System):
         """
         vec_inputs = self._vectors['input'][vec_name]
 
+        xfer = self._transfers[vec_name][mode, isub]
+
         if mode == 'fwd':
-            if self._has_input_scaling:
-                vec_inputs.scale('norm')
-                self._transfers[vec_name][mode, isub]._transfer(vec_inputs,
-                                                                self._vectors['output'][vec_name],
-                                                                mode)
-                vec_inputs.scale('phys')
-            else:
-                self._transfers[vec_name][mode, isub]._transfer(vec_inputs,
-                                                                self._vectors['output'][vec_name],
-                                                                mode)
+            if xfer is not None:
+                if self._has_input_scaling:
+                    vec_inputs.scale('norm')
+                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+                    vec_inputs.scale('phys')
+                else:
+                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(isub)
 
         else:  # rev
-            if self._has_input_scaling:
-                vec_inputs.scale('phys')
-                self._transfers[vec_name][mode, isub]._transfer(vec_inputs,
-                                                                self._vectors['output'][vec_name],
-                                                                mode)
-                vec_inputs.scale('norm')
-            else:
-                self._transfers[vec_name][mode, isub]._transfer(vec_inputs,
-                                                                self._vectors['output'][vec_name],
-                                                                mode)
+            if xfer is not None:
+                if self._has_input_scaling:
+                    vec_inputs.scale('phys')
+                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+                    vec_inputs.scale('norm')
+                else:
+                    xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
     def _discrete_transfer(self, isub):
         """

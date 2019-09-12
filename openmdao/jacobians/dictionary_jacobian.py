@@ -3,6 +3,7 @@ from __future__ import division
 
 import numpy as np
 from six.moves import range
+from scipy.sparse import csc_matrix
 
 from openmdao.jacobians.jacobian import Jacobian
 
@@ -56,6 +57,7 @@ class DictionaryJacobian(Jacobian):
         entry = (system.pathname, vec_name)
 
         if entry not in self._iter_keys:
+            ncol = system._vectors['residual'][vec_name]._ncol
             subjacs = self._subjacs_info
             keys = []
             for res_name in system._var_relevant_names[vec_name]['output']:
@@ -64,8 +66,8 @@ class DictionaryJacobian(Jacobian):
                         key = (res_name, name)
                         if key in subjacs:
                             keys.append(key)
+
             self._iter_keys[entry] = keys
-            return keys
 
         return self._iter_keys[entry]
 
@@ -93,12 +95,16 @@ class DictionaryJacobian(Jacobian):
         d_res_names = d_residuals._names
         d_out_names = d_outputs._names
         d_inp_names = d_inputs._names
+
+        if not d_out_names and not d_inp_names:
+            return
+
         rflat = d_residuals._views_flat
         oflat = d_outputs._views_flat
         iflat = d_inputs._views_flat
-        np_add_at = np.add.at
         ncol = d_residuals._ncol
         subjacs_info = self._subjacs_info
+        is_explicit = isinstance(system, ExplicitComponent)
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system, d_residuals._name):
@@ -109,57 +115,64 @@ class DictionaryJacobian(Jacobian):
                     subjac = subjac_info['value']
                 res_name, other_name = abs_key
                 if res_name in d_res_names:
+
+                    if other_name in d_out_names:
+                        # skip the matvec mult completely for identity subjacs
+                        if is_explicit and res_name is other_name:
+                            if fwd:
+                                rflat[res_name] -= oflat[other_name]
+                            else:
+                                oflat[other_name] -= rflat[res_name]
+                            continue
+
+                        if fwd:
+                            left_vec = rflat[res_name]
+                            right_vec = oflat[other_name]
+                        else:
+                            left_vec = oflat[other_name]
+                            right_vec = rflat[res_name]
+                    elif other_name in d_inp_names:
+                        if fwd:
+                            left_vec = rflat[res_name]
+                            right_vec = iflat[other_name]
+                        else:
+                            left_vec = iflat[other_name]
+                            right_vec = rflat[res_name]
+                    else:
+                        continue
+
                     rows = subjac_info['rows']
-                    if rows is not None:  # sparse list format
-                        cols = subjac_info['cols']
-                        if other_name in d_out_names:
-                            # skip the matvec mult completely for identity subjacs
-                            if res_name is other_name and isinstance(system, ExplicitComponent):
-                                if fwd:
-                                    rflat[res_name] -= oflat[other_name]
-                                else:
-                                    oflat[other_name] -= rflat[res_name]
-                            elif fwd:
-                                if ncol > 1:
-                                    for i in range(ncol):
-                                        np_add_at(rflat[res_name][:, i], rows,
-                                                  oflat[other_name][:, i][cols] * subjac)
-                                else:
-                                    np_add_at(rflat[res_name], rows,
-                                              oflat[other_name][cols] * subjac)
-                            else:  # rev
-                                if ncol > 1:
-                                    for i in range(ncol):
-                                        np_add_at(oflat[other_name][:, i], cols,
-                                                  rflat[res_name][:, i][rows] * subjac)
-                                else:
-                                    np_add_at(oflat[other_name], cols,
-                                              rflat[res_name][rows] * subjac)
-                        elif other_name in d_inp_names:
-                            if fwd:
-                                if ncol > 1:
-                                    for i in range(ncol):
-                                        np_add_at(rflat[res_name][:, i], rows,
-                                                  iflat[other_name][:, i][cols] * subjac)
-                                else:
-                                    np_add_at(rflat[res_name], rows,
-                                              iflat[other_name][cols] * subjac)
-                            else:  # rev
-                                if ncol > 1:
-                                    for i in range(ncol):
-                                        np_add_at(iflat[other_name][:, i], cols,
-                                                  rflat[res_name][:, i][rows] * subjac)
-                                else:
-                                    np_add_at(iflat[other_name], cols,
-                                              rflat[res_name][rows] * subjac)
-                    else:  # ndarray or sparse
-                        if other_name in d_out_names:
-                            if fwd:
-                                rflat[res_name] += subjac.dot(oflat[other_name])
-                            else:  # rev
-                                oflat[other_name] += subjac.T.dot(rflat[res_name])
-                        elif other_name in d_inp_names:
-                            if fwd:
-                                rflat[res_name] += subjac.dot(iflat[other_name])
-                            else:  # rev
-                                iflat[other_name] += subjac.T.dot(rflat[res_name])
+                    if rows is not None:  # our homegrown COO format
+                        linds, rinds = rows, subjac_info['cols']
+                        if not fwd:
+                            linds, rinds = rinds, linds
+                        if self._under_complex_step:
+                            # bincount only works with float, so split into parts
+                            if ncol > 1:
+                                for i in range(ncol):
+                                    prod = right_vec[:, i][rinds] * subjac
+                                    left_vec[:, i].real += np.bincount(linds, prod.real,
+                                                                       minlength=left_vec.shape[0])
+                                    left_vec[:, i].imag += np.bincount(linds, prod.imag,
+                                                                       minlength=left_vec.shape[0])
+                            else:
+                                prod = right_vec[rinds] * subjac
+                                left_vec[:].real += np.bincount(linds, prod.real,
+                                                                minlength=left_vec.size)
+                                left_vec[:].imag += np.bincount(linds, prod.imag,
+                                                                minlength=left_vec.size)
+                        else:
+                            if ncol > 1:
+                                for i in range(ncol):
+                                    left_vec[:, i] += np.bincount(linds,
+                                                                  right_vec[:, i][rinds] * subjac,
+                                                                  minlength=left_vec.shape[0])
+                            else:
+                                left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
+                                                           minlength=left_vec.size)
+
+                    else:
+                        if not fwd:
+                            subjac = subjac.transpose()
+
+                        left_vec += subjac.dot(right_vec)

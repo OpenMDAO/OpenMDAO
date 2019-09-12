@@ -512,8 +512,8 @@ class Coloring(object):
         good_tol = meta.get('good_tol')
         if good_tol is not None:
             print("\nSparsity computed using tolerance: %g" % meta['good_tol'])
-            print("Most common number of zero entries (%d of %d) repeated %d times out of %d "
-                  "tolerances tested.\n" % (meta['zero_entries'], meta['J_size'],
+            print("Most common number of nonzero entries (%d of %d) repeated %d times out of %d "
+                  "tolerances tested.\n" % (meta['J_size'] - meta['zero_entries'], meta['J_size'],
                                             meta['nz_matches'], meta['n_tested']))
 
         sparsity_time = meta.get('sparsity_time')
