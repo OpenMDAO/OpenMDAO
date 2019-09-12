@@ -194,8 +194,16 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
             cprint("%s " % type(s).__name__, color=Fore.GREEN + Style.BRIGHT)
             cprint("%s" % s.name)
         else:
-            cprint("%s " % type(s).__name__, color=Fore.CYAN + Style.BRIGHT)
+            if isinstance(s, ImplicitComponent):
+                colr = Back.CYAN + Fore.BLACK + Style.BRIGHT
+            else:
+                colr = Fore.CYAN + Style.BRIGHT
+            cprint("%s " % type(s).__name__, color=colr)
             cprint("%s" % s.name)
+
+        # FIXME: these sizes could be wrong under MPI
+        cprint(" (%d / %d)" % (s._inputs._data.size, s._outputs._data.size),
+               color=Fore.RED + Style.BRIGHT)
 
         if show_solvers:
             lnsolver = type(s.linear_solver).__name__
@@ -209,15 +217,33 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
                 cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
 
         if show_jacs:
+            jacs = []
+            lnjac = nljac = None
             if s._assembled_jac is not None:
-                cprint(" LN_jac: ")
-                cprint(type(s._assembled_jac).__name__, color=Fore.MAGENTA + Style.BRIGHT)
+                lnjac = s._assembled_jac
+                jacs.append(lnjac)
             if s.nonlinear_solver is not None:
                 jacsolvers = list(s.nonlinear_solver._assembled_jac_solver_iter())
                 if jacsolvers:
-                    cprint(" NL_jac: ")
-                    cprint(type(jacsolvers[0]._assembled_jac).__name__,
-                           color=Fore.MAGENTA + Style.BRIGHT)
+                    nljac = jacsolvers[0]._assembled_jac
+                    if nljac is not lnjac:
+                        jacs.append(nljac)
+
+            if len(jacs) == 2:
+                jnames = [' LN Jac: ', ' NL Jac: ']
+            elif lnjac is not None:
+                if lnjac is nljac:
+                    jnames = [' Jac: ']
+                else:
+                    jnames = [' LN Jac: ']
+            elif nljac is not None:
+                jnames = [' NL Jac: ']
+            else:
+                jnames = []
+
+            for jname, jac in zip(jnames, jacs):
+                cprint(jname)
+                cprint(type(jac).__name__, color=Fore.MAGENTA + Style.BRIGHT)
 
         if show_approx and s._approx_schemes:
             approx_keys = set()
