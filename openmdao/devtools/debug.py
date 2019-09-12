@@ -4,12 +4,13 @@ from __future__ import print_function
 
 import sys
 import os
-from itertools import product
+from itertools import product, chain
 
 import numpy as np
 import cProfile
 from contextlib import contextmanager
 from six import iteritems, iterkeys, itervalues
+from collections import Counter
 
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
@@ -266,8 +267,10 @@ def config_summary(problem, stream=sys.stdout):
 
     grpnames = [s.pathname for s in locgroups]
     sysnames = [s.pathname for s in locsystems]
-    ln_solvers = set(type(s.linear_solver).__name__ for s in locgroups)
-    nl_solvers = set(type(s.nonlinear_solver).__name__ for s in locgroups)
+    ln_solvers = [(s.pathname, type(s.linear_solver).__name__) for s in locsystems
+                              if s.linear_solver is not None]
+    nl_solvers = [(s.pathname, type(s.nonlinear_solver).__name__) for s in locsystems
+                         if s.nonlinear_solver is not None]
 
     max_depth = max([len(name.split('.')) for name in sysnames])
     setup_done = problem._setup_status == 2
@@ -280,17 +283,27 @@ def config_summary(problem, stream=sys.stdout):
         proc_names = problem.comm.gather((sysnames, grpnames, ln_solvers, nl_solvers), root=0)
         grpnames = set()
         sysnames = set()
-        ln_solvers = set()
-        nl_solvers = set()
+        ln_solvers = Counter()
+        nl_solvers = Counter()
+        ln_seen = set()
+        nl_seen = set()
         if proc_names is not None:
             for rank in range(problem.comm.size):
                 systems, grps, lnsols, nlsols = proc_names[rank]
                 sysnames.update(systems)
                 grpnames.update(grps)
-                ln_solvers.update(lnsols)
+                lnlst = [(path, slv) for path, slv in lnsols if path not in ln_seen]
+                ln_seen.update([path for path, _ in lnsols])
+                ln_solvers.update([slv for _, slv in lnlst])
+
+                nllst = [(path, slv) for path, slv in nlsols if path not in nl_seen]
+                nl_seen.update([path for path, _ in nlsols])
+                nl_solvers.update([slv for _, slv in nllst])
                 nl_solvers.update(nlsols)
     else:
         global_max_depth = max_depth
+        ln_solvers = Counter([slv for _, slv in ln_solvers])
+        nl_solvers = Counter([slv for _, slv in nl_solvers])
 
     # this gives us a printer that only prints on rank 0
     printer = _get_printer(problem.comm, stream)
@@ -306,21 +319,42 @@ def config_summary(problem, stream=sys.stdout):
         printer("Design variables:        %5d   Total size: %8d" %
                 (len(desvars), sum(d['size'] for d in desvars.values())))
 
-        # TODO: give separate info for equality, inequality constraints
-        con_nonlin = {}
-        con_linear = {}
+        con_nonlin_eq = {}
+        con_nonlin_ineq = {}
+        con_linear_eq = {}
+        con_linear_ineq = {}
         for con, vals in iteritems(model.get_constraints()):
-            if not vals['linear']:
-                con_nonlin[con]= vals
+            if vals['linear']:
+                if vals['equals'] is not None:
+                    con_linear_eq[con] = vals
+                else:
+                    con_linear_ineq[con] = vals
             else:
-                con_linear[con] = vals
-        printer("Constraints (nonlinear): %5d   Total size: %8d" %
+                if vals['equals'] is not None:
+                    con_nonlin_eq[con]= vals
+                else:
+                    con_nonlin_ineq[con]= vals
+
+        con_nonlin = con_nonlin_eq.copy()
+        con_nonlin.update(con_nonlin_ineq)
+        con_linear = con_linear_eq.copy()
+        con_linear.update(con_linear_ineq)
+
+        printer("\nNonlinear Constraints:   %5d   Total size: %8d" %
                 (len(con_nonlin), sum(d['size'] for d in con_nonlin.values())))
-        printer("Constraints (linear):    %5d   Total size: %8d" %
+        printer("    equality:            %5d               %8d" %
+                (len(con_nonlin_eq), sum(d['size'] for d in con_nonlin_eq.values())))
+        printer("    inequality:          %5d               %8d" %
+                (len(con_nonlin_ineq), sum(d['size'] for d in con_nonlin_ineq.values())))
+        printer("\nLinear Constraints:      %5d   Total size: %8d" %
                 (len(con_linear), sum(d['size'] for d in con_linear.values())))
+        printer("    equality:            %5d               %8d" %
+                (len(con_linear_eq), sum(d['size'] for d in con_linear_eq.values())))
+        printer("    inequality:          %5d               %8d" %
+                (len(con_linear_ineq), sum(d['size'] for d in con_linear_ineq.values())))
 
         objs = model.get_objectives()
-        printer("Objectives:              %5d   Total size: %8d" %
+        printer("\nObjectives:              %5d   Total size: %8d" %
                 (len(objs), sum(d['size'] for d in objs.values())))
 
     printer()
@@ -349,8 +383,8 @@ def config_summary(problem, stream=sys.stdout):
 
     printer()
     printer("Driver type: %s" % problem.driver.__class__.__name__)
-    printer("Linear Solvers: %s" % sorted(ln_solvers))
-    printer("Nonlinear Solvers: %s" % sorted(nl_solvers))
+    printer("Linear Solvers: %s" % ln_solvers.most_common())
+    printer("Nonlinear Solvers: %s" % nl_solvers.most_common())
 
 
 @contextmanager
