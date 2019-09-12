@@ -155,7 +155,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
     filter : function(System)
         A function taking a System arg and returning None or an iter of (name, value) tuples.
         If None is returned, that system will not be displayed.  Otherwise, the system will
-        be displayed along with any name, value pairs returned from the filter, if any.
+        be displayed along with any name, value pairs returned from the filter.
     max_depth : int
         Maximum depth for display.
     rank : int
