@@ -242,8 +242,8 @@ def _meta_model_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-s', '--surrogate_model_ref', action='store', dest='sur_ref',
-                        help='Variable name of the surrogate model reference.')
+    parser.add_argument('-m', '--pathname', action='store', dest='pathname',
+                        help='pathname of the metamodel component.')
 
 
 def _meta_model_cmd(options):
@@ -261,55 +261,71 @@ def _meta_model_cmd(options):
         The post-setup hook function.
     """
     file_name = options.file[0]
-    sur_name = options.sur_ref
+    pathname = options.pathname
 
     dir_name = os.path.dirname(os.path.abspath(__file__))
     script_path = os.path.join(dir_name, '_meta_model_shell.py')
-    if options.sur_ref is not None:
-        bash_command = ("bokeh serve --show {0} --args  _hidden_func {1} -s {2}").format(
-            script_path, file_name, sur_name)
+
+    if pathname is not None:
+        bash_command = ("bokeh serve --show {0} --args  _hidden_func {1} -m {2}").format(
+            script_path, file_name, pathname)
     else:
         bash_command = ("bokeh serve --show {0} --args _hidden_func {1}").format(
             script_path, file_name)
+
+    print('bash command:', bash_command)
     os.system(bash_command)
 
 
 def _hidden_func_parser(parser):
 
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-s', '--surrogate_model_ref', action='store', dest='sur_ref',
-                        help='Variable name of the surrogate model reference.')
+    parser.add_argument('-m', '--pathname', action='store', dest='pathname',
+                        help='pathname of the metamodel component.')
 
 
 def _hidden_func_cmd(options):
 
     def _viz(prob):
+        mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp)
 
-        Problem._post_setup_func = None
-        # Check if list contains objects that aren't metamodels (use isinstance)
-        metamodels = list(prob.model.system_iter(
-            include_self=True, typ=(MetaModelStructuredComp, MetaModelUnStructuredComp)))
-        if not metamodels:
-            raise AttributeError(
-                'No metamodels found. Check for missing subsystem or incorrect reference name.')
-        metamodel_names = [metamodels[i].name for i in range(0, len(metamodels))]
-
-        if options.sur_ref is None and len(metamodels) > 1:
-            raise NameError(
-                ("No surrogate reference given. Try one of the following {1}").
-                format(metamodel_names))
-
-        if options.sur_ref is not None and options.sur_ref not in metamodels:
-            raise NameError(
-                ("{0} not in list of surrogate models in given file. Try one of the following {1}").
-                format(options.sur_ref, metamodel_names))
-
-        if len(metamodels) == 1:
-            MetaModelVisualization(metamodels[0])
+        pathname = options.pathname
+        if pathname:
+            comp = prob.model._get_subsystem(pathname)
+            if isinstance(comp, mm_types):
+                print('viewing', pathname, comp.msginfo)
+                MetaModelVisualization(comp)
+            return
         else:
-            for index in range(0, len(metamodels)):
-                if metamodels[index].name == options.sur_ref:
-                    MetaModelVisualization(metamodels[index])
+            print('{} not found.'.format(pathname))
+
+            comp = None
+
+        metamodels = {mm.pathname: mm for
+                      mm in prob.model.system_iter(include_self=True, typ=mm_types)}
+
+        mm_names = list(metamodels.keys())
+        mm_count = len(mm_names)
+
+        if mm_count == 0:
+            raise AttributeError('No MetaModel components found in model.')
+
+        elif mm_count == 1 and not pathname:
+            comp = metamodels[mm_names[0]]
+            print('viewing the only MM:', comp.msginfo)
+            MetaModelVisualization(comp)
+            return
+
+        else:
+            try_str = "Try one of the following {}.".format(mm_names)
+
+            if not pathname:
+                raise NameError("Metamodel not specified. {}.".format(try_str))
+            elif not comp:
+                raise NameError('{} not found. {}'.format(pathname, try_str))
+            else:
+                # there was a comp but it was not a MetaModel type
+                raise AttributeError('{} is not a MetaModel.  {}'.format(pathname, try_str))
 
     return _viz
 
