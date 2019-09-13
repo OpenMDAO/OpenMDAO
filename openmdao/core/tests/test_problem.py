@@ -3,7 +3,7 @@
 import sys
 import unittest
 
-from six import assertRaisesRegex, StringIO, assertRegex, iteritems
+from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
 
@@ -469,6 +469,39 @@ class TestProblem(unittest.TestCase):
         derivs = p.compute_totals()
 
         assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+
+    def test_compute_jacvec_product(self):
+
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.setup(mode='fwd')
+        prob.run_model()
+
+        of = ['obj', 'con1']
+        wrt = ['x', 'z']
+        J = prob.compute_totals(of, wrt, return_format='array')
+        
+        seed = []
+        rvec = prob.model._vectors['output']['linear']
+        lvec = prob.model._vectors['residual']['linear']
+        rvec._data[:] = 0.
+        lvec._data[:] = 0.
+        for name in wrt:
+            seed.append(np.random.random(rvec[name].size))
+
+        testvec = np.hstack(seed)
+        
+        resdict = prob.compute_jacvec_product(of, wrt, 'fwd', seed)
+        result = []
+        for name in of:
+            result.append(resdict[name].flat)
+        result = np.hstack(result)
+        
+        checkvec = J.dot(testvec)
+        
+        np.testing.assert_allclose(checkvec, result)
 
     def test_feature_set_indeps(self):
         import openmdao.api as om

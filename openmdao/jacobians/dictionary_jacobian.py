@@ -91,7 +91,6 @@ class DictionaryJacobian(Jacobian):
         # avoid circular import
         from openmdao.core.explicitcomponent import ExplicitComponent
 
-        fwd = mode == 'fwd'
         d_res_names = d_residuals._names
         d_out_names = d_outputs._names
         d_inp_names = d_inputs._names
@@ -99,6 +98,7 @@ class DictionaryJacobian(Jacobian):
         if not d_out_names and not d_inp_names:
             return
 
+        fwd = mode == 'fwd'
         rflat = d_residuals._views_flat
         oflat = d_outputs._views_flat
         iflat = d_inputs._views_flat
