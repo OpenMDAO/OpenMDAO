@@ -294,7 +294,7 @@ def _meta_model_cmd(options):
             if not pathname:
                 print("Metamodel not specified. {}".format(try_str))
             elif not comp:
-                print("Metamodel '{}'' not found. {}".format(pathname, try_str))
+                print("Metamodel '{}' not found. {}".format(pathname, try_str))
             else:
                 print("'{}' is not a Metamodel. {}".format(pathname, try_str))
 
