@@ -9,6 +9,7 @@ from bokeh.models import Slider, ColumnDataSource
 from bokeh.models import ColorBar, BasicTicker, LinearColorMapper, Range1d
 from bokeh.models.widgets import TextInput, Select
 from bokeh.models.ranges import DataRange1d
+from bokeh.server.server import Server
 
 # Misc Imports
 from scipy.spatial import cKDTree
@@ -110,7 +111,7 @@ class MetaModelVisualization(object):
         A 2D array containing contour plot data
     """
 
-    def __init__(self, surrogate_ref, resolution=50):
+    def __init__(self, surrogate_ref, resolution=50, doc=None):
         """
         Initialize parameters.
 
@@ -120,6 +121,8 @@ class MetaModelVisualization(object):
             Reference to meta model component
         resolution : int
             Value used to calculate the size of contour plot meshgrid
+        doc : Document
+            The bokeh document to build.
         """
         self.prob = om.Problem()
         self.surrogate_ref = surrogate_ref
@@ -207,9 +210,13 @@ class MetaModelVisualization(object):
         # Layout creation
         self.layout = row(self._contour_data(), self._right_plot(), self.sliders_and_selects)
         self.layout2 = row(self._bot_plot())
-        curdoc().add_root(self.layout)
-        curdoc().add_root(self.layout2)
-        curdoc().title = 'Meta Model Visualization'
+
+        if doc is None:
+            doc = curdoc()
+
+        doc.add_root(self.layout)
+        doc.add_root(self.layout2)
+        doc.title = 'Meta Model Visualization'
 
     def _empty_prob_comp(self):
         """
@@ -589,3 +596,24 @@ class MetaModelVisualization(object):
             data[dist_index] = info
 
         return data
+
+
+def view_metamodel(meta_model_comp):
+    """
+    Visualize a metamodel.
+
+    Parameters
+    ----------
+    meta_model_comp : MetaModelStructuredComp or MetaModelUnStructuredComp
+        The metamodel component.
+    """
+    from bokeh.application.application import Application
+    from bokeh.application.handlers import FunctionHandler
+
+    def make_doc(doc):
+        doc = MetaModelVisualization(meta_model_comp, doc=doc)
+
+    # print('Opening Bokeh application on http://localhost:5006/')
+    server = Server({'/': Application(FunctionHandler(make_doc))})
+    server.io_loop.add_callback(server.show, "/")
+    server.io_loop.start()

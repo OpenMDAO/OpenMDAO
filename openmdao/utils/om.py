@@ -14,7 +14,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
-from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
+from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
@@ -260,45 +260,19 @@ def _meta_model_cmd(options):
     function
         The post-setup hook function.
     """
-    file_name = options.file[0]
-    pathname = options.pathname
+    def _view_metamodel(prob):
+        Problem._post_setup_func = None
 
-    dir_name = os.path.dirname(os.path.abspath(__file__))
-    script_path = os.path.join(dir_name, '_meta_model_shell.py')
-
-    if pathname is not None:
-        bash_command = ("bokeh serve --show {0} --args  _hidden_func {1} -m {2}").format(
-            script_path, file_name, pathname)
-    else:
-        bash_command = ("bokeh serve --show {0} --args _hidden_func {1}").format(
-            script_path, file_name)
-
-    print('bash command:', bash_command)
-    os.system(bash_command)
-
-
-def _hidden_func_parser(parser):
-
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-m', '--pathname', action='store', dest='pathname',
-                        help='pathname of the metamodel component.')
-
-
-def _hidden_func_cmd(options):
-
-    def _viz(prob):
         mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp)
 
         pathname = options.pathname
+
         if pathname:
             comp = prob.model._get_subsystem(pathname)
-            if isinstance(comp, mm_types):
-                print('viewing', pathname, comp.msginfo)
-                MetaModelVisualization(comp)
-            return
+            if comp and isinstance(comp, mm_types):
+                view_metamodel(comp)
+                return
         else:
-            print('{} not found.'.format(pathname))
-
             comp = None
 
         metamodels = {mm.pathname: mm for
@@ -308,26 +282,23 @@ def _hidden_func_cmd(options):
         mm_count = len(mm_names)
 
         if mm_count == 0:
-            raise AttributeError('No MetaModel components found in model.')
+            print("No Metamodel components found in model.")
 
         elif mm_count == 1 and not pathname:
             comp = metamodels[mm_names[0]]
-            print('viewing the only MM:', comp.msginfo)
-            MetaModelVisualization(comp)
-            return
+            view_metamodel(comp)
 
         else:
             try_str = "Try one of the following {}.".format(mm_names)
 
             if not pathname:
-                raise NameError("Metamodel not specified. {}.".format(try_str))
+                print("Metamodel not specified. {}".format(try_str))
             elif not comp:
-                raise NameError('{} not found. {}'.format(pathname, try_str))
+                print("Metamodel '{}'' not found. {}".format(pathname, try_str))
             else:
-                # there was a comp but it was not a MetaModel type
-                raise AttributeError('{} is not a MetaModel.  {}'.format(pathname, try_str))
+                print("'{}' is not a Metamodel. {}".format(pathname, try_str))
 
-    return _viz
+    return _view_metamodel
 
 
 def _config_summary_setup_parser(parser):
@@ -598,9 +569,7 @@ _post_setup_map = {
              'Print citations referenced by problem'),
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
-    '_hidden_func': (_hidden_func_parser, _hidden_func_cmd,
-                     'This is a hidden function for meta_model')
-
+    'meta_model': (_meta_model_parser, _meta_model_cmd, "Meta Model Viewer.")
 }
 
 
@@ -625,7 +594,6 @@ _non_post_setup_map = {
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd, 'XDSM viewer.'),
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
-    'meta_model': (_meta_model_parser, _meta_model_cmd, "Meta Model Viewer.")
 }
 
 
