@@ -611,7 +611,7 @@ def view_metamodel(meta_model_comp):
     from bokeh.application.handlers import FunctionHandler
 
     def make_doc(doc):
-        doc = MetaModelVisualization(meta_model_comp, doc=doc)
+        MetaModelVisualization(meta_model_comp, doc=doc)
 
     # print('Opening Bokeh application on http://localhost:5006/')
     server = Server({'/': Application(FunctionHandler(make_doc))})
