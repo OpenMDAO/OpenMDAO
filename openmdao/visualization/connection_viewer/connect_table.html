@@ -152,7 +152,8 @@ h3 {
 var data = <connection_data>;
 
 var src2tgts = data.src2tgts;
-var proms = data.proms;
+var proms_in = data.proms["input"];
+var proms_out = data.proms["output"];
 var units = data.units;
 var vals = data.vals;
 var src_systems = data.src_systems;
@@ -216,7 +217,7 @@ function fill_vars() {
         .selectAll("tr")
         .remove();
 
-    var i, j, source, proms, promt, tgt, tgts, in_scope;
+    var i, j, source, tgt, tgts, in_scope;
 
     var rows = [];
     var cols = [];
@@ -237,6 +238,7 @@ function fill_vars() {
                     "UUnits": units[noconn_srcs[i]],
                     "Value": vals[noconn_srcs[i]],
                     "PUnits": "",
+                    "ParamsProm": "",
                     "Params": tgt_prefix,
                     "in_scope": true,
                     "needs_viewer": vals[noconn_srcs[i]].length > 20,
@@ -268,6 +270,7 @@ function fill_vars() {
                             "UUnits": units[source],
                             "Value": vals[tgt],
                             "PUnits": units[tgt],
+                            "ParamsProm": proms_in[tgt],
                             "Params": tgt,
                             "in_scope": in_scope,
                             "needs_viewer": vals[tgt].length > 20,
@@ -278,7 +281,7 @@ function fill_vars() {
         }
     }
 
-    var ccols = ['Unknowns', 'UUnits', 'Value', 'PUnits', 'Params']
+    var ccols = ['Unknowns', 'UUnits', 'Value', 'PUnits', 'ParamsProm', 'Params']
     tabulate(rows, ccols);
 }
 
@@ -381,7 +384,7 @@ function tgt_system_changed() {
     <div id="scroller">
         <table id="conn_table">
          <thead>
-          <tr><th>Source</th><th>Units</th><th>Value</th><th>Units</th><th>Target</th></tr>
+          <tr><th>Source</th><th>Units</th><th>Value</th><th>Units</th><th>Target (promoted)</th><th>Target</th></tr>
          </thead>
          <tbody>
          </tbody>

@@ -123,7 +123,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     data = {
         'src2tgts': sorted(iteritems(src2tgts)),
-        'proms': None,
+        'proms': system._var_abs2prom,
         'units': units,
         'vals': vals,
         'src_systems': src_systems,

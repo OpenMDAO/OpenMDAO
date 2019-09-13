@@ -662,6 +662,9 @@ class Problem(object):
         self.model._clear_iprint()
         return self.driver.run()
 
+    def compute_jacvec_product(self, of, wrt, mode, seed):
+        pass
+
     def run_once(self):
         """
         Backward compatible call for run_model.
