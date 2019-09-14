@@ -23,8 +23,18 @@ var table = new Tabulator("#connection-table", {
                           height: 500, // set height of table (in CSS or here), this enables the Virtual DOM and improves render speed dramatically (can be any valid css height value)
                           data:tabledata, //assign data to table
                           layout:"fitColumns", //"fitDataFill",
+                          footerElement:"<button id='prom-toggle-button' onclick='toggle(this)'>Use Absolute Names</button>",
                           columns:[ //Define Table Columns
-	 	                          {title: "Output (abs)", field:"src", align:"left", headerFilter:true, visible:false, minWidth:300},
+                                   {title: "Output (abs)", field:"src", align:"left", headerFilter:true, visible:false, minWidth:300,
+                                   tooltip:function(cell){
+                                        var promname = cell.getData().sprom;
+                                        if (promname != cell.getData().src) {
+                                            return promname;
+                                        }
+                                        else {
+                                            return false;
+                                        }
+                                    }},
 	 	                          {title: "Output", field:"sprom", align:"left", headerFilter:true, minWidth:300,
                                     tooltip:function(cell){
                                         var fullname = cell.getData().src;
@@ -63,12 +73,35 @@ var table = new Tabulator("#connection-table", {
                                         else {
                                             return false;
                                         }
-                                    }
-                                },
-	 	                          {title: "Input (abs)", field:"tgt", align:"left", headerFilter:true, visible:false, minWidth:300},
+                                    }},
+	 	                          {title: "Input (abs)", field:"tgt", align:"left", headerFilter:true, visible:false, minWidth:300,
+                                    tooltip:function(cell){
+                                        var promname = cell.getData().sprom;
+                                        if (promname != cell.getData().src) {
+                                            return promname;
+                                        }
+                                        else {
+                                            return false;
+                                        }
+                                    }},
                           ],
 });
 
+// var button = document.querySelector("#prom-toggle-button");
+// button.addEventListener("click", () => {
+function toggle(tbutton) {
+    table.toggleColumn("src");
+    table.toggleColumn("sprom");
+    table.toggleColumn("tgt");
+    table.toggleColumn("tprom");
+    if (tbutton.innerHTML.startsWith("Use Absolute")) {
+        tbutton.innerHTML = "Use Promoted Names";
+    }
+    else {
+        tbutton.innerHTML = "Use Absolute Names";
+    }
+}
+// });
 </script>
 </body>
 </html>
