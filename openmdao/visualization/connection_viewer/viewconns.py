@@ -18,6 +18,16 @@ from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
 
 
+def _val2str(val):
+    if isinstance(val, np.ndarray):
+        if val.size > 5:
+            return 'array %s' % str(val.shape)
+        else:
+            return np.array2string(val)
+
+    return str(val)
+
+
 def view_connections(root, outfile='connections.html', show_browser=True,
                      src_filter='', tgt_filter='', precision=6):
     """
@@ -63,8 +73,13 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     }
 
     src2tgts = defaultdict(list)
-    units = {n: data.get('units', '')
-             for n, data in iteritems(system._var_allprocs_abs2meta)}
+    units = {}
+    for n, data in iteritems(system._var_allprocs_abs2meta):
+        u = data.get('units', '')
+        if u is None:
+            u = ''
+        units[n] = u
+
     vals = {}
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
@@ -86,17 +101,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             else:  # unconnected param
                 val = _get_input(system, t, None)
 
-            if isinstance(val, np.ndarray):
-                val = np.array2string(val)
-            else:
-                val = str(val)
-
             vals[t] = val
-
-        noconn_srcs = sorted((n for n in system._var_abs_names['output']
-                              if n not in src2tgts), reverse=True)
-        for s in noconn_srcs:
-            vals[s] = str(system._outputs[s])
 
     vals['NO CONNECTION'] = ''
 
@@ -112,23 +117,48 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         for i in range(len(parts)):
             tgt_systems.add('.'.join(parts[:i]))
 
-    # reverse sort so that "NO CONNECTION" shows up at the bottom
-    src2tgts['NO CONNECTION'] = sorted([t for t in system._var_abs_names['input']
-                                       if t not in connections], reverse=True)
-
     src_systems = [{'name': n} for n in sorted(src_systems)]
     src_systems.insert(1, {'name': "NO CONNECTION"})
     tgt_systems = [{'name': n} for n in sorted(tgt_systems)]
     tgt_systems.insert(1, {'name': "NO CONNECTION"})
 
+    tprom = system._var_allprocs_abs2prom['input']
+    sprom = system._var_allprocs_abs2prom['output']
+
+    table = []
+    idx = 1
+    for tgt, src in iteritems(connections):
+        usrc = units[src]
+        utgt = units[tgt]
+        if usrc != utgt:
+            if usrc:
+                usrc = '!' + units[src]
+            if utgt:
+                utgt = '!' + units[tgt]
+
+        row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': usrc,
+               'val': _val2str(vals[tgt]), 'tunits': utgt,
+               'tprom': tprom[tgt], 'tgt': tgt}
+        table.append(row)
+        idx += 1
+
+    for t in system._var_abs_names['input']:
+        if t not in connections:
+            row = {'id': idx, 'src': 'NO CONNECTION', 'sprom': 'NO CONNECTION', 'sunits': '', 'val': _val2str(vals[t]),
+                   'tunits': units[t], 'tprom': tprom[t], 'tgt': t}
+            table.append(row)
+            idx += 1
+
+    for src in system._var_abs_names['output']:
+        if src not in src2tgts:
+            row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': units[src],
+                   'val': _val2str(system._outputs[src]),
+                   'tunits': '', 'tprom': 'NO CONNECTION', 'tgt': 'NO CONNECTION'}
+            table.append(row)
+            idx += 1
+
     data = {
-        'src2tgts': sorted(iteritems(src2tgts)),
-        'proms': system._var_abs2prom,
-        'units': units,
-        'vals': vals,
-        'src_systems': src_systems,
-        'tgt_systems': tgt_systems,
-        'noconn_srcs': noconn_srcs,
+        'table': table,
         'src_filter': src_filter,
         'tgt_filter': tgt_filter,
     }
@@ -136,14 +166,24 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     viewer = 'connect_table.html'
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
+    libs_dir = os.path.join(code_dir, 'libs')
+    style_dir = os.path.join(code_dir, 'style')
 
     with open(os.path.join(code_dir, viewer), "r") as f:
         template = f.read()
 
-    graphjson = json.dumps(data)
+    with open(os.path.join(libs_dir, 'tabulator.min.js'), "r") as f:
+        tabulator_src = f.read()
+
+    with open(os.path.join(style_dir, 'tabulator.min.css'), "r") as f:
+        tabulator_style = f.read()
+
+    jsontxt = json.dumps(data)
 
     with open(outfile, 'w') as f:
-        s = template.replace("<connection_data>", graphjson)
+        s = template.replace("<connection_data>", jsontxt)
+        s = s.replace("<tabulator_src>", tabulator_src)
+        s = s.replace("<tabulator_style>", tabulator_style)
         f.write(s)
 
     if show_browser:
