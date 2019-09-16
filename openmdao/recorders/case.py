@@ -445,35 +445,30 @@ class Case(object):
             list of input names and other optional information about those inputs
         """
         meta = self._abs2meta
-        inp_vars = {}
         inputs = []
 
         if self.inputs is not None:
-            for abs_name in self.inputs.absolute_names():
-                if abs_name not in inp_vars:
-                    inp_vars[abs_name] = {'value': self.inputs[abs_name]}
+            for var_name in self.inputs.absolute_names():
+                # Filter based on tags
+                if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+                    continue
 
-        for var_name in inp_vars:
-            # Filter based on tags
-            if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
-                continue
-
-            var_meta = {}
-            if values:
-                var_meta['value'] = inp_vars[var_name]['value']
-            if prom_name:
-                var_meta['prom_name'] = self._abs2prom['input'][var_name]
-            if units:
-                var_meta['units'] = meta[var_name]['units']
-            if shape:
-                var_meta['shape'] = inp_vars[var_name]['value'].shape
-            inputs.append((var_name, var_meta))
+                var_meta = {}
+                if values:
+                    var_meta['value'] = self.inputs[var_name]
+                if prom_name:
+                    var_meta['prom_name'] = self._abs2prom['input'][var_name]
+                if units:
+                    var_meta['units'] = meta[var_name]['units']
+                if shape:
+                    var_meta['shape'] = self.inputs[var_name].shape
+                inputs.append((var_name, var_meta))
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
-            if len(inp_vars) is 0:
+            if self.inputs is None or len(self.inputs) is 0:
                 out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
                                  'settings have record_inputs set to True\n')
 
@@ -549,53 +544,48 @@ class Case(object):
         meta = self._abs2meta
         expl_outputs = []
         impl_outputs = []
-        out_vars = {}
 
-        for abs_name in self.outputs.absolute_names():
-            out_vars[abs_name] = {'value': self.outputs[abs_name]}
-            if self.residuals and abs_name in self.residuals.absolute_names():
-                out_vars[abs_name]['residuals'] = self.residuals[abs_name]
-            else:
-                out_vars[abs_name]['residuals'] = 'Not Recorded'
-
-        for name in out_vars:
+        for var_name in self.outputs.absolute_names():
             # Filter based on tags
-            if tags and not (make_set(tags) & make_set(meta[name]['tags'])):
+            if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                 continue
 
-            if residuals_tol and \
-               out_vars[name]['residuals'] is not 'Not Recorded' and \
-               np.linalg.norm(out_vars[name]['residuals']) < residuals_tol:
-                continue
-
-            outs = {}
-            if values:
-                outs['value'] = out_vars[name]['value']
-            if prom_name:
-                outs['prom_name'] = self._abs2prom['output'][name]
-            if residuals:
-                outs['resids'] = out_vars[name]['residuals']
-            if units:
-                outs['units'] = meta[name]['units']
-            if shape:
-                outs['shape'] = out_vars[name]['value'].shape
-            if bounds:
-                outs['lower'] = meta[name]['lower']
-                outs['upper'] = meta[name]['upper']
-            if scaling:
-                outs['ref'] = meta[name]['ref']
-                outs['ref0'] = meta[name]['ref0']
-                outs['res_ref'] = meta[name]['res_ref']
-            if meta[name]['explicit']:
-                expl_outputs.append((name, outs))
+            # check if residuals were recorded, skip if within specifed tolerance
+            if self.residuals and var_name in self.residuals.absolute_names():
+                resids = self.residuals[var_name]
+                if residuals_tol and np.linalg.norm(resids) < residuals_tol:
+                    continue
             else:
-                impl_outputs.append((name, outs))
+                resids = 'Not Recorded'
+
+            var_meta = {}
+            if values:
+                var_meta['value'] = self.outputs[var_name]
+            if prom_name:
+                var_meta['prom_name'] = self._abs2prom['output'][var_name]
+            if residuals:
+                var_meta['resids'] = resids
+            if units:
+                var_meta['units'] = meta[var_name]['units']
+            if shape:
+                var_meta['shape'] = self.outputs[var_name].shape
+            if bounds:
+                var_meta['lower'] = meta[var_name]['lower']
+                var_meta['upper'] = meta[var_name]['upper']
+            if scaling:
+                var_meta['ref'] = meta[var_name]['ref']
+                var_meta['ref0'] = meta[var_name]['ref0']
+                var_meta['res_ref'] = meta[var_name]['res_ref']
+            if meta[var_name]['explicit']:
+                expl_outputs.append((var_name, var_meta))
+            else:
+                impl_outputs.append((var_name, var_meta))
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
-            if len(out_vars) is 0:
+            if self.outputs is None or len(self.outputs) is 0:
                 out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
                                  'settings have record_outputs set to True\n')
 

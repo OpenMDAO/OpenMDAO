@@ -800,27 +800,32 @@ def make_serializable(o):
         return o
 
 
-def make_set(string_data):
+def make_set(str_data, name=None):
     """
     Construct a set containing the specified character strings.
 
     Parameters
     ----------
-    string_data : None, str, or list of strs
+    str_data : None, str, or list of strs
         Character string(s) to be included in the set.
+
+    name : str, optional
+        A name to be used in error messages.
 
     Returns
     -------
     set
         A set of character strings.
     """
-    if not string_data:
+    if not str_data:
         return set()
-    elif isinstance(string_data, str):
-        return {string_data}
-    elif isinstance(string_data, set):
-        return string_data
-    elif isinstance(string_data, list):
-        return set(string_data)
+    elif isinstance(str_data, str):
+        return {str_data}
+    elif isinstance(str_data, set):
+        return str_data
+    elif isinstance(str_data, list):
+        return set(str_data)
+    elif name:
+        raise TypeError("The {} argument should be str, set, or list: {}".format(name, str_data))
     else:
-        raise RuntimeError("Invalid data passed to 'make_set': {}".format(str(string_data)))
+        raise TypeError("The argument should be str, set, or list: {}".format(str_data))
