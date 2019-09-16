@@ -39,7 +39,7 @@ var table =
                     height: 500,
                     data:tabledata, //assign data to table
                     layout:"fitColumns", //"fitDataFill",
-                    footerElement:"<button onclick='toggle(this)'>Use Absolute Names</button>",
+                    footerElement:"<span><button onclick='src_toggle(this)'>Use Absolute Output Names</button><button onclick='tgt_toggle(this)'>Use Absolute Input Names</button></span>",
                     columns:[ //Define Table Columns
                             {title: "Output", field:"src", align:"left", headerFilter:true,
                              visible:false, minWidth:300,
@@ -102,16 +102,25 @@ var table =
 });
 
 
-function toggle(tbutton) {
+function src_toggle(tbutton) {
     table.toggleColumn("src");
     table.toggleColumn("sprom");
+    if (tbutton.innerHTML.startsWith("Use Absolute")) {
+        tbutton.innerHTML = "Use Promoted Output Names";
+    }
+    else {
+        tbutton.innerHTML = "Use Absolute Output Names";
+    }
+}
+
+function tgt_toggle(tbutton) {
     table.toggleColumn("tgt");
     table.toggleColumn("tprom");
     if (tbutton.innerHTML.startsWith("Use Absolute")) {
-        tbutton.innerHTML = "Use Promoted Names";
+        tbutton.innerHTML = "Use Promoted Input Names";
     }
     else {
-        tbutton.innerHTML = "Use Absolute Names";
+        tbutton.innerHTML = "Use Absolute Input Names";
     }
 }
 
