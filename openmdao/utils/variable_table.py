@@ -144,8 +144,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
             # What parts of the hierarchy for this varname need to be written that
             #   were not already written above this
-            remaining_sys_path_parts = varname_sys_names[len(
-                existing_sys_names):]
+            remaining_sys_path_parts = varname_sys_names[len(existing_sys_names):]
 
             # Write the Systems in the var name path
             indent = len(existing_sys_names) * indent_inc
