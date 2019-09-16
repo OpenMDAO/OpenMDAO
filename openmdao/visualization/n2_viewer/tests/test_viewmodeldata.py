@@ -151,6 +151,34 @@ class TestViewModelData(unittest.TestCase):
             self.expected_declare_partials
         )
 
+    def test_model_viewer_has_correct_data_from_sqlite(self):
+        """
+        Verify that the correct data exists when a model structure is recorded
+        and then pulled out of a sqlite db file and compared to the expected
+        structure.  Uses the SellarStateConnection model.
+        """
+        p = Problem(model=SellarStateConnection())
+
+        r = SqliteRecorder(self.sqlite_db_filename)
+        p.driver.add_recorder(r)
+
+        p.setup()
+        p.final_setup()
+        r.shutdown()
+
+        model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
+
+        # check expected model tree
+        self.check_model_viewer_data(
+            model_viewer_data,
+            self.expected_tree,
+            self.expected_pathnames,
+            self.expected_conns,
+            self.expected_abs2prom,
+            self.expected_declare_partials
+        )
+
+
     def test_model_viewer_has_correct_data_from_optimization_problem(self):
         """
         Verify that the correct model structure data exists when stored as compared
@@ -239,33 +267,6 @@ class TestViewModelData(unittest.TestCase):
             expected_conns_betz,
             expected_abs2prom_betz,
             expected_declare_partials_betz
-        )
-
-    def test_model_viewer_has_correct_data_from_sqlite(self):
-        """
-        Verify that the correct data exists when a model structure is recorded
-        and then pulled out of a sqlite db file and compared to the expected
-        structure.  Uses the SellarStateConnection model.
-        """
-        p = Problem(model=SellarStateConnection())
-
-        r = SqliteRecorder(self.sqlite_db_filename)
-        p.driver.add_recorder(r)
-
-        p.setup()
-        p.final_setup()
-        r.shutdown()
-
-        model_viewer_data = _get_viewer_data(self.sqlite_db_filename)
-
-        # check expected model tree
-        self.check_model_viewer_data(
-            model_viewer_data,
-            self.expected_tree,
-            self.expected_pathnames,
-            self.expected_conns,
-            self.expected_abs2prom,
-            self.expected_declare_partials
         )
 
     def test_n2_from_problem(self):
