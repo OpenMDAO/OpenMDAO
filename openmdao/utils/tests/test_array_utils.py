@@ -1,9 +1,11 @@
 from __future__ import print_function, division, absolute_import
-
-
 import unittest
 
-from openmdao.utils.array_utils import array_connection_compatible
+import numpy as np
+
+from openmdao.utils.array_utils import array_connection_compatible, abs_complex, dv_abs_complex
+from openmdao.utils.assert_utils import assert_rel_error
+
 
 class TestArrayConnectionCompatible(unittest.TestCase):
 
@@ -41,3 +43,29 @@ class TestArrayConnectionCompatible(unittest.TestCase):
         shape1 = (3, 3)
         shape2 = (3, 1, 3)
         self.assertFalse(array_connection_compatible(shape1, shape2))
+
+
+class TestArrayUtils(unittest.TestCase):
+
+    def test_abs_complex(self):
+
+        x = np.array([3.0 + 0.5j, -4.0 - 1.5j, -5.0 + 2.5j, -6.0 - 3.5j])
+        y = abs_complex(x)
+
+        self.assertEqual(y[0], 3.0 + 0.5j)
+        self.assertEqual(y[1], 4.0 + 1.5j)
+        self.assertEqual(y[2], 5.0 - 2.5j)
+        self.assertEqual(y[3], 6.0 + 3.5j)
+
+        x = np.array([3.0 + 0.5j, -4.0 - 1.5j, -5.0 + 2.5j, -6.0 - 3.5j])
+        dx = 1.0 + 2j * np.ones((4, 3), dtype=np.complex)
+
+        dy = dv_abs_complex(x, dx)
+
+        row = np.array([1.0 + 2j, 1.0 + 2j, 1.0 + 2j])
+        dy_check = np.vstack((row, -row, -row, -row))
+        assert_rel_error(self, dy, dy_check, 1e-10)
+
+
+if __name__ == "__main__":
+    unittest.main()

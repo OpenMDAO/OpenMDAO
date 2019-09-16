@@ -4,24 +4,50 @@
 MetaModelStructuredComp
 ***********************
 
-`MetaModelStructuredComp` is a smooth interpolation Component for data that exists on a regular, structured, grid.
-This differs from :ref:`MetaModelUnStructured <feature_MetaModelUnStructuredComp>` which accepts unstructured data as collections of points.
+`MetaModelStructuredComp` is a smooth interpolation Component for data that exists on a regular,
+structured, grid. This differs from :ref:`MetaModelUnStructured <feature_MetaModelUnStructuredComp>`
+which accepts unstructured data as collections of points.
 
 `MetaModelStructuredComp` produces smooth fits through provided training data using polynomial
-splines of order 1 (linear), 3 (cubic), or 5 (quintic). Analytic
-derivatives are automatically computed.
+splines of various orders. The interpolation methods include three that wrap methods in
+scipy.interpolate, as well as five methods that are written in pure python. For all methods,
+derivatives are automatically computed.  The following table summarizes the methods and gives
+the number of points required for each.
 
-Note that `MetaModelStructuredComp` only accepts scaler inputs and outputs. If you have a multivariable function, each
-input variable needs its own named OpenMDAO input.
++---------------+--------+------------------------------------------------------------------+
+| Method        | Order  | Description                                                      |
++===============+========+==================================================================+
+| slinear       | 1      | Basic linear interpolation                                       |
++---------------+--------+------------------------------------------------------------------+
+| lagrange2     | 2      | Second order Lagrange polynomial                                 |
++---------------+--------+------------------------------------------------------------------+
+| lagrange3     | 3      | Third order Lagrange polynomial                                  |
++---------------+--------+------------------------------------------------------------------+
+| akima         | 3      | Interpolation using Akima splines                                |
++---------------+--------+------------------------------------------------------------------+
+| cubic         | 3      | Cubic spline, with continuity of derivatives between segments    |
++---------------+--------+------------------------------------------------------------------+
+| scipy_slinear | 1      | Scipy linear interpolation. Same as slinear, though slower       |
++---------------+--------+------------------------------------------------------------------+
+| scipy_cubic   | 3      | Scipy cubic interpolation. More accurate than cubic, but slower  |
++---------------+--------+------------------------------------------------------------------+
+| scipy_quintic | 5      | Scipy quintic interpolation. Most accurate, but slowest          |
++---------------+--------+------------------------------------------------------------------+
 
-For multi-dimensional data, fits are computed
-on a separable per-axis basis. If a particular dimension does not have
-enough training data points to support a selected spline order (e.g. 3
-sample points, but an order 5 quintic spline is specified), the order of the
-fitted spline will be automatically reduced for that dimension alone.
 
-Extrapolation is supported, but disabled by default. It can be enabled
-via the :code:`extrapolate` option (see below).
+Note that `MetaModelStructuredComp` only accepts scalar inputs and outputs. If you have a
+multivariable function, each input variable needs its own named OpenMDAO input.
+
+For multi-dimensional data, fits are computed on a separable per-axis basis. A single interpolation
+method is used for all dimensions, so the minimum table dimension must be high enough to use
+the chosen interpolate. However, if you choose one of the scipy methods, then automatic order
+reduction is supported. In this case, if a particular dimension does not have enough training data
+points to support a selected spline order (e.g. 3 sample points, but an order 5 'scipy_quintic'
+spline is specified), then the order of the fitted spline will be automatically reduced to one of the
+lower order scipy methods ('scipy_cubic' or 'scipy_slinear') for that dimension alone.
+
+Extrapolation is supported, but disabled by default. It can be enabled via the :code:`extrapolate`
+option (see below).
 
 MetaModelStructuredComp Options
 -------------------------------
@@ -38,7 +64,7 @@ A simple quick-start example is fitting the exclusive-or ("XOR") operator betwee
 two inputs, `x` and `y`:
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_xor
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_xor
     :layout: code, output
 
 
@@ -52,14 +78,14 @@ with shape (5, 12, 20).
 This is illustrated by the example:
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_shape
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_shape
     :layout: code, output
 
 You can also predict multiple independent output points by setting the `vec_size` argument to be equal to the number of
 points you want to predict. Here, we set it to 2 and predict 2 points with `MetaModelStructuredComp`:
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_vectorized
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_vectorized
     :layout: code, output
 
 
@@ -78,7 +104,7 @@ to `True`. This automatically creates an input named `f_train` when the output
 match the finite difference estimate in the `check_partials` output.
 
 .. embed-code::
-    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompMapFeature.test_training_derivatives
+    openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_training_derivatives
     :layout: code, output
 
 .. tags:: MetaModelStructuredComp, Component

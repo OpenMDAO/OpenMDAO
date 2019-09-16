@@ -5,11 +5,18 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, \
     SellarDis1, SellarDis2
+from openmdao.utils.assert_utils import assert_rel_error
+
+from openmdao.utils.mpi import MPI
+try:
+    from openmdao.api import PETScVector
+except:
+    PETScVector = None
+
 
 class TestNLBGaussSeidel(unittest.TestCase):
 
@@ -399,6 +406,58 @@ class TestNLBGaussSeidel(unittest.TestCase):
         p.run_model()
 
         self.assertEqual(nlbgs._iter_count, 9, 'res_ref should make this take more iters.')
+
+
+@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+class ProcTestCase1(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_aitken(self):
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        p1 = model.add_subsystem('p1', om.ParallelGroup(), promotes=['*'])
+        p1.add_subsystem('d1a', SellarDis1withDerivatives(), promotes=['x', 'z'])
+        p1.add_subsystem('d1b', SellarDis1withDerivatives(), promotes=['x', 'z'])
+
+        p2 = model.add_subsystem('p2', om.ParallelGroup(), promotes=['*'])
+        p2.add_subsystem('d2a', SellarDis2withDerivatives(), promotes=['z'])
+        p2.add_subsystem('d2b', SellarDis2withDerivatives(), promotes=['z'])
+
+        model.connect('d1a.y1', 'd2a.y1')
+        model.connect('d1b.y1', 'd2b.y1')
+        model.connect('d2a.y2', 'd1a.y2')
+        model.connect('d2b.y2', 'd1b.y2')
+
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.setup()
+        prob.set_solver_print(level=2)
+        model.nonlinear_solver.options['use_aitken'] = True
+
+        # Set one branch of Sellar close to the solution.
+        prob.set_val('d2b.y2', 12.05848815)
+        prob.set_val('d1b.y1', 25.58830237)
+
+        prob.run_model()
+
+        print(prob.get_val('d1a.y1', get_remote=True))
+        print(prob.get_val('d2a.y1', get_remote=True))
+        print(prob.get_val('d1b.y2', get_remote=True))
+        print(prob.get_val('d2b.y2', get_remote=True))
+
+        assert_rel_error(self, prob.get_val('d1a.y1', get_remote=True), 25.58830273, .00001)
+        assert_rel_error(self, prob.get_val('d1b.y1', get_remote=True), 25.58830273, .00001)
+        assert_rel_error(self, prob.get_val('d2a.y2', get_remote=True), 12.05848819, .00001)
+        assert_rel_error(self, prob.get_val('d2b.y2', get_remote=True), 12.05848819, .00001)
+
+        # Test that Aitken accelerated the convergence, normally takes 7.
+        self.assertTrue(model.nonlinear_solver._iter_count == 5)
+
 
 if __name__ == "__main__":
     unittest.main()
