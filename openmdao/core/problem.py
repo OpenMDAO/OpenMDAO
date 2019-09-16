@@ -666,29 +666,31 @@ class Problem(object):
     def compute_jacvec_product(self, of, wrt, mode, seed):
         if mode == 'fwd':
             assert(len(wrt) == len(seed)), "seed and 'wrt' list must have the same length"
-            rnames, lnames = wrt, of
-            rkind, lkind = 'output', 'residual'
+            lnames, rnames = of, wrt
+            lkind, rkind = 'output', 'residual'
         else:  # rev
             assert(len(of) == len(seed)), "seed and 'of' list must have the same length"
             lnames, rnames = wrt, of
-            lkind, rkind = 'output', 'residual'
-    
+            lkind, rkind = 'residual', 'output'
+
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
-    
+
         try:
             seed[rnames[0]]
         except (IndexError, TypeError):
             vals = seed
         else:
             vals = [seed[n] for n in rnames]
-    
-        # set seed values into doutputs (fwd) or dresids (rev)
+
+        # set seed values into dresids (fwd) or doutputs (rev)
         for i, name in enumerate(rnames):
             rvec[name] = vals[i]
-    
+
+        rvec._data *= -1.
+
         self.model.run_solve_linear(['linear'], mode)
-    
+
         return {n: lvec[n] for n in lnames}
 
     def run_once(self):
