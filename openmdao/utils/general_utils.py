@@ -800,52 +800,32 @@ def make_serializable(o):
         return o
 
 
-def filter_var_based_on_tags(filtering_tags, var_metadata):
+def make_set(str_data, name=None):
     """
-    Given the tags to filter on, and the metadata of the var, determine if it should be filtered.
+    Construct a set containing the specified character strings.
 
     Parameters
     ----------
-    filtering_tags : str or list of strs
-        User defined tags that can be used to filter what gets listed. Only inputs with the
-        given tags will be listed.
-    var_metadata : dict
-        Dict of metadata about the var.
+    str_data : None, str, or list of strs
+        Character string(s) to be included in the set.
 
-    Returns
-    -------
-    bool
-        True if the var should be filtered and therefore not listed.
-    """
-    if filtering_tags:
-        var_tags = var_metadata['tags']
-        if not var_tags:
-            return True
-        if not (set(filtering_tags) & var_tags):
-            return True
-
-    return False
-
-
-def convert_user_defined_tags_to_set(tags):
-    """
-    Convert user defined tag which could be None, str, or list to a set.
-
-    Parameters
-    ----------
-    tags : None, str, or list of strs
-        User defined tags that can be used to filter what gets listed.
+    name : str, optional
+        A name to be used in error messages.
 
     Returns
     -------
     set
-        True if the var should be filtered and therefore not listed.
+        A set of character strings.
     """
-    if not tags:
+    if not str_data:
         return set()
-    elif isinstance(tags, str):
-        return {tags}
-    elif isinstance(tags, set):
-        return tags
-    else:  # must be str
-        return set(tags)
+    elif isinstance(str_data, str):
+        return {str_data}
+    elif isinstance(str_data, set):
+        return str_data
+    elif isinstance(str_data, list):
+        return set(str_data)
+    elif name:
+        raise TypeError("The {} argument should be str, set, or list: {}".format(name, str_data))
+    else:
+        raise TypeError("The argument should be str, set, or list: {}".format(str_data))

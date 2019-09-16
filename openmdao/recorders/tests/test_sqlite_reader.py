@@ -960,7 +960,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check the system case for 'd1' (there should be only one output, 'd1.y1')
         system_cases = cr.list_cases('root.d1')
-        case = cr.get_case(system_cases[1])
+        case = cr.get_case(system_cases[-1])
 
         outputs = case.list_outputs(explicit=True, implicit=True, values=True,
                                     residuals=True, residuals_tol=None,
@@ -975,7 +975,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 'ref': 1.0,
                 'resids': [1.318e-10],
                 'shape': (1,),
-                'values': [25.5454859]
+                'values': [25.5883024]
             }
         }
 
@@ -990,11 +990,23 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(vals['resids'], expected['resids'])
         np.testing.assert_almost_equal(vals['value'], expected['values'])
 
-        # check implicit outputs
-        # there should not be any
+        # check implicit outputs, there should not be any
         impl_outputs_case = case.list_outputs(explicit=False, implicit=True,
                                               out_stream=None)
         self.assertEqual(len(impl_outputs_case), 0)
+
+        # check that output from the Case method matches output from the System method
+        # the system for the case should be properly identified as 'd1'
+        stream = StringIO()
+        d1.list_outputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_outputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
 
     def test_list_inputs(self):
         prob = SellarProblem()
@@ -1016,18 +1028,70 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_inputs_case = {
             'd1.z': {'value': [5., 2.]},
             'd1.x': {'value': [1.]},
-            'd1.y2': {'value': [12.27257053]}
+            'd1.y2': {'value': [12.0584882]}
         }
 
         system_cases = cr.list_cases('root.d1')
 
-        case = cr.get_case(system_cases[1])
+        case = cr.get_case(system_cases[-1])
 
         inputs = case.list_inputs(values=True, out_stream=None)
 
         for name, meta in inputs:
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['value'], expected['value'])
+
+        # check that output from the Case method matches output from the System method
+        # the system for the case should be properly identified as 'd1'
+        stream = StringIO()
+        d1.list_inputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
+
+    def test_list_inputs_outputs_solver_case(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+        prob.setup()
+
+        mda = prob.model.mda
+        mda.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
+        mda.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.set_solver_print(-1)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(-1)
+
+        # check that output from the Case methods match output from the System methods
+        # the system for the solver case should be properly identified as 'mda'
+        stream = StringIO()
+        mda.list_inputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
+
+        stream = StringIO()
+        mda.list_outputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_outputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
 
     def test_list_input_and_outputs_with_tags(self):
         from openmdao.core.tests.test_expl_comp import RectangleCompWithTags
@@ -1042,8 +1106,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.cleanup()
 
         cr = om.CaseReader("cases.sql")
-        print(cr)
-
         cases = cr.get_cases()
         case = cases[0]
 
@@ -1105,66 +1167,49 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list inputs, not hierarchical
         #
         stream = StringIO()
-        case.list_inputs(values=True, hierarchical=False, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        model.list_inputs(hierarchical=False, out_stream=stream)
+        expected = stream.getvalue().split('\n')
 
-        expected = [
-            "3 Input(s) in 'model'",
-            "---------------------",
-            "",
-            "varname  value",
-            "-------  -----",
-            "expl.a   [10.]",
-            "expl.x   11",
-            "impl.x   11",
-        ]
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
         #
         # list inputs, hierarchical
         #
         stream = StringIO()
-        case.list_inputs(values=True, hierarchical=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        model.list_inputs(hierarchical=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
 
-        expected = [
-            "3 Input(s) in 'model'",
-            "---------------------",
-            "",
-            "varname  value",
-            "-------  -----",
-            "top",
-            "  expl",
-            "    a    [10.]",
-            "    x    11   ",
-            "  impl",
-            "    x    11 ",
-        ]
+        stream = StringIO()
+        case.list_inputs(hierarchical=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
         #
-        # list outputs, not hierarchical
+        # list outputs, not hierarchical, with residuals
         #
-        stream = StringIO()
-        case.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
-        text = stream.getvalue().split('\n')
-
         expected = [
             "3 Explicit Output(s) in 'model'",
             "-------------------------------",
             "",
             "varname  value  resids      ",
             "-------  -----  ------------",
+            "indep.x  11     Not Recorded",
             "expl.b   [20.]  [0.]        ",
             "expl.y   2      Not Recorded",
-            "indep.x  11     Not Recorded",
         ]
+
+        stream = StringIO()
+        case.list_outputs(residuals=True, hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -1174,36 +1219,16 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list outputs, hierarchical
         #
         stream = StringIO()
-        case.list_outputs(values=True, hierarchical=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
+        model.list_outputs(hierarchical=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
 
-        expected = [
-            "3 Explicit Output(s) in 'model'",
-            "-------------------------------",
-            "",
-            "varname  value",
-            "-------  -----",
-            "top",
-            "  expl",
-            "    b    [20.]",
-            "    y    2    ",
-            "  indep",
-            "    x    11   ",
-            "",
-            "",
-            "1 Implicit Output(s) in 'model'",
-            "-------------------------------",
-            "",
-            "varname  value",
-            "-------  -----",
-            "top",
-            "  impl",
-            "    y    2    ",
-        ]
+        stream = StringIO()
+        case.list_outputs(hierarchical=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
     def test_list_discrete_filtered(self):
         model = om.Group()
@@ -1235,19 +1260,20 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         # list inputs
         #
-        stream = StringIO()
-        case.list_inputs(values=True, hierarchical=False, out_stream=stream)
-        text = stream.getvalue().split('\n')
-
         expected = [
-            "2 Input(s) in 'model'",
-            "---------------------",
+            "2 Input(s) in 'sub'",
+            "-------------------",
             "",
-            "varname      value",
-            "-------      -----",
-            "sub.expl.a   [10.]",
-            "sub.expl.x   11",
+            "varname     value",
+            "----------  -----",
+            "sub.expl.a  [10.]",
+            "sub.expl.x  11   ",
+            # sub.impl.x is not recorded (excluded)
         ]
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -1256,32 +1282,33 @@ class TestSqliteCaseReader(unittest.TestCase):
         #
         # list outputs
         #
-        stream = StringIO()
-        case.list_outputs(values=True, out_stream=stream)
-        text = stream.getvalue().split('\n')
-
         expected = [
-            "1 Explicit Output(s) in 'model'",
-            "-------------------------------",
+            "1 Explicit Output(s) in 'sub'",
+            "-----------------------------",
             "",
-            "varname  value",
-            "-------  -----",
+            "varname   value",
+            "--------  -----",
             "top",
             "  sub",
             "    expl",
-            "      b    [20.]",
+            "      b   [20.]",
+            #      y is not recorded (excluded)
             "",
             "",
-            "1 Implicit Output(s) in 'model'",
-            "-------------------------------",
+            "1 Implicit Output(s) in 'sub'",
+            "-----------------------------",
             "",
-            "varname  value",
-            "-------  -----",
+            "varname   value",
+            "-------   -----",
             "top",
             "  sub",
             "    impl",
-            "      y    2",
+            "      y   2    ",
         ]
+
+        stream = StringIO()
+        case.list_outputs(out_stream=stream)
+        text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
@@ -1313,58 +1340,31 @@ class TestSqliteCaseReader(unittest.TestCase):
         # list inputs
         #
         stream = StringIO()
+        model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
         case.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
         text = stream.getvalue().split('\n')
 
-        expected = [
-            "3 Input(s) in 'model'",
-            "---------------------",
-            "",
-            "varname  value  prom_name",
-            "-------  -----  ---------",
-            "expl.a   [10.]  expl.a",
-            "expl.x   11     x",
-            "impl.x   11     x",
-        ]
-
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
         #
         # list outputs
         #
         stream = StringIO()
+        model.list_outputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
         case.list_outputs(prom_name=True, out_stream=stream)
         text = stream.getvalue().split('\n')
 
-        expected = [
-            "3 Explicit Output(s) in 'model'",
-            "-------------------------------",
-            "",
-            "varname  value  prom_name",
-            "-------  -----  ---------",
-            "top",
-            "  expl",
-            "    b    [20.]  expl.b",
-            "    y    2      expl.y",
-            "  indep",
-            "    x    11     x",
-            "",
-            "",
-            "1 Implicit Output(s) in 'model'",
-            "-------------------------------",
-            "",
-            "varname  value  prom_name",
-            "-------  -----  ---------",
-            "top",
-            "  impl",
-            "    y    2      impl.y",
-        ]
-
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                self.assertEqual(text[i], line)
 
     def test_getitem(self):
         prob = SellarProblem()
@@ -2396,6 +2396,19 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
 
+        # check that output from the Case method matches output from the System method
+        # the system for the case should be properly identified as 'd1'
+        stream = StringIO()
+        prob.model.mda.list_inputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
+
         for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
 
@@ -3150,8 +3163,8 @@ class TestFeatureSqliteReader(unittest.TestCase):
         indep.add_output('length', val=100.)
         indep.add_output('width', val=60.)
 
-        model.add_subsystem('rect', RectangleCompWithTags(), promotes = ['length', 'width', 'area'])
-        model.add_subsystem('indep', indep, promotes = ['length', 'width'])
+        model.add_subsystem('rect', RectangleCompWithTags(), promotes=['length', 'width', 'area'])
+        model.add_subsystem('indep', indep, promotes=['length', 'width'])
 
         prob.setup(check=False)
         prob.run_model()
@@ -3172,7 +3185,7 @@ class TestFeatureSqliteReader(unittest.TestCase):
         self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.width', 'rect.length']))
 
         # Outputs with tag that does match
-        outputs = case.list_outputs(out_stream=None, tags="tag1")
+        outputs = case.list_outputs(tags="tag1")
         self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
 
     def test_feature_get_val(self):
@@ -3298,7 +3311,7 @@ class TestPromAbsDict(unittest.TestCase):
 
 
 def _assert_model_matches_case(case, system):
-    '''
+    """
     Check to see if the values in the case match those in the model.
 
     Parameters
@@ -3307,7 +3320,7 @@ def _assert_model_matches_case(case, system):
         Case to be used for the comparison.
     system : System object
         System to be used for the comparison.
-    '''
+    """
     case_inputs = case.inputs
     model_inputs = system._inputs
     for name, model_input in iteritems(model_inputs._views):
@@ -3435,6 +3448,52 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
+
+        # check that inputs & outputs are in sorted order, since exec/setup order is not available
+        expected = [
+            "5 Input(s) in 'mda'",
+            "-------------------",
+            "",
+            "varname    value               ",
+            "---------  --------------------",
+            "mda.d1.x   [3.43977636e-15]    ",
+            "mda.d1.y2  [3.75527777]        ",
+            "mda.d1.z   |1.9776388835080063|",
+            "mda.d2.y1  [3.16]              ",
+            "mda.d2.z   |1.9776388835080063|",
+         ]
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+        for i, line in enumerate(expected):
+            if i == 0:
+                self.assertEqual(text[i], line)
+            elif line and not line.startswith('-'):
+                self.assertTrue(text[i].startswith(line.split()[0]))
+
+        expected = [
+            "2 Explicit Output(s) in 'mda'",
+            "-----------------------------",
+            "",
+            "varname    value       ",
+            "---------  ------------",
+            "mda.d1.y1  [3.16]      ",
+            "mda.d2.y2  [3.75527777]",
+            "",
+            "",
+            "0 Implicit Output(s) in 'mda'",
+            "-----------------------------",
+         ]
+
+        stream = StringIO()
+        case.list_outputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+        for i, line in enumerate(expected):
+            if i == 0:
+                self.assertEqual(text[i], line)
+            elif line and not line.startswith('-'):
+                self.assertTrue(text[i].startswith(line.split()[0]))
 
         np.testing.assert_almost_equal(case.abs_err, 0, decimal=6)
         np.testing.assert_almost_equal(case.rel_err, 0, decimal=6)

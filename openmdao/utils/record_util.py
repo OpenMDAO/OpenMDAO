@@ -5,6 +5,7 @@ from fnmatch import fnmatchcase
 from six.moves import map, zip
 from six import iteritems
 import os
+import re
 import json
 import numpy as np
 
@@ -67,6 +68,40 @@ def format_iteration_coordinate(coord, prefix=None):
         prefix = "rank%d" % (coord[0])
 
     return ':'.join([prefix, separator.join(iteration_coordinate)])
+
+
+# regular expression used to determine if a node in an iteration coordinate represents a system
+_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear)$')
+
+# Regular expression used for splitting iteration coordinates, removes separator and iter counts
+_coord_split_re = re.compile('\\|\\d+\\|*')
+
+
+def get_source_system(iteration_coordinate):
+    """
+    Get pathname of system that is the source of the iteration.
+
+    Parameters
+    ----------
+    iteration_coordinate : str
+        The full unique identifier for this iteration.
+
+    Returns
+    -------
+    str
+        The pathname of the system that is the source of the iteration.
+    """
+    path = []
+    parts = _coord_split_re.split(iteration_coordinate)
+    for part in parts:
+        if (_coord_system_re.search(part) is not None):
+            if ':' in part:
+                # get rid of 'rank#:'
+                part = part.split(':')[1]
+            path.append(part.split('.')[0])
+
+    # return pathname of the system
+    return '.'.join(path)
 
 
 def check_valid_sqlite3_db(filename):

@@ -96,6 +96,13 @@ class TestIndepVarComp(unittest.TestCase):
         assert_rel_error(self, prob['indep_var_1'], 1.0)
         assert_rel_error(self, prob['indep_var_2'], 2.0)
 
+    def test_invalid_tags(self):
+        with self.assertRaises(TypeError) as cm:
+            comp = om.IndepVarComp('indep_var', tags=99)
+
+        self.assertEqual(str(cm.exception),
+            "The tags argument should be str, set, or list: 99")
+
     def test_simple_with_tags(self):
         """Define one independent variable and set its value. Try filtering with tag"""
         from openmdao.api import Problem, IndepVarComp
