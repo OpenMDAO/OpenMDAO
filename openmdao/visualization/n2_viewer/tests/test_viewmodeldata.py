@@ -119,13 +119,13 @@ class TestViewModelData(unittest.TestCase):
                              key=lambda x: (x['tgt'], x['src']))
         expected_conns = sorted(expected_conns,
                              key=lambda x: (x['tgt'], x['src']))
+        self.assertEqual(len(connections), len(expected_conns))
         for conn in connections:
             if 'cycle_arrows' in conn and conn['cycle_arrows']:
                 cycle_arrows = []
                 for src, tgt in conn['cycle_arrows']:
                     cycle_arrows.append(' '.join([pathnames[src], pathnames[tgt]]))
                 conn['cycle_arrows'] = sorted(cycle_arrows)
-            self.assertEqual(len(connections), len(expected_conns))
         for c, ex in zip(connections, expected_conns):
             self.assertEqual(c['src'], ex['src'])
             self.assertEqual(c['tgt'], ex['tgt'])
