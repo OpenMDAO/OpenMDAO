@@ -84,6 +84,10 @@ class TestViewModelData(unittest.TestCase):
         ["px.x > px.x", "pz.z > pz.z", "sub.state_eq_group.state_eq.y2_command > sub.state_eq_group.state_eq.y2_command", "sub.state_eq_group.state_eq.y2_command > sub.state_eq_group.state_eq.y2_actual", "sub.d1.y1 > sub.d1.y1", "sub.d1.y1 > sub.d1.z", "sub.d1.y1 > sub.d1.x", "sub.d1.y1 > sub.d1.y2", "sub.d2.y2 > sub.d2.y2", "sub.d2.y2 > sub.d2.z", "sub.d2.y2 > sub.d2.y1", "obj_cmp.obj > obj_cmp.obj", "obj_cmp.obj > obj_cmp.x", "obj_cmp.obj > obj_cmp.y1", "obj_cmp.obj > obj_cmp.y2", "obj_cmp.obj > obj_cmp.z", "con_cmp1.con1 > con_cmp1.con1", "con_cmp1.con1 > con_cmp1.y1", "con_cmp2.con2 > con_cmp2.con2", "con_cmp2.con2 > con_cmp2.y2"]
         """)
 
+        self.expected_driver_name = 'Driver'
+        self.expected_design_vars_names = []
+        self.expected_responses_names = []
+
     def tearDown(self):
         if not DEBUG:
             try:
@@ -98,8 +102,12 @@ class TestViewModelData(unittest.TestCase):
                                 expected_pathnames,
                                 expected_conns,
                                 expected_abs2prom,
-                                expected_declare_partials
+                                expected_declare_partials,
+                                expected_driver_name,
+                                expected_design_vars_names,
+                                expected_responses_names
                                 ):
+
         self.assertDictEqual(model_viewer_data['tree'], expected_tree)
 
         # check expected system pathnames
@@ -130,6 +138,11 @@ class TestViewModelData(unittest.TestCase):
         self.assertListEqual(sorted(model_viewer_data['declare_partials_list']),
                              sorted(expected_declare_partials))
 
+        self.assertEqual(model_viewer_data['driver']['name'], expected_driver_name)
+
+        self.assertListEqual( sorted(dv for dv in model_viewer_data['design_vars']), sorted(expected_design_vars_names))
+        self.assertListEqual( sorted(resp for resp in model_viewer_data['responses']), sorted(expected_responses_names))
+
     def test_model_viewer_has_correct_data_from_problem(self):
         """
         Verify that the correct model structure data exists when stored as compared
@@ -148,7 +161,10 @@ class TestViewModelData(unittest.TestCase):
             self.expected_pathnames,
             self.expected_conns,
             self.expected_abs2prom,
-            self.expected_declare_partials
+            self.expected_declare_partials,
+            self.expected_driver_name,
+            self.expected_design_vars_names,
+            self.expected_responses_names
         )
 
     def test_model_viewer_has_correct_data_from_sqlite(self):
@@ -175,7 +191,10 @@ class TestViewModelData(unittest.TestCase):
             self.expected_pathnames,
             self.expected_conns,
             self.expected_abs2prom,
-            self.expected_declare_partials
+            self.expected_declare_partials,
+            self.expected_driver_name,
+            self.expected_design_vars_names,
+            self.expected_responses_names
         )
 
 
@@ -259,6 +278,10 @@ class TestViewModelData(unittest.TestCase):
                 ["indeps.a > indeps.a", "indeps.Area > indeps.Area", "indeps.rho > indeps.rho", "indeps.Vu > indeps.Vu", "a_disk.Vr > a_disk.a", "a_disk.Vr > a_disk.Vu", "a_disk.Vd > a_disk.a", "a_disk.Ct > a_disk.a", "a_disk.thrust > a_disk.a", "a_disk.thrust > a_disk.Area", "a_disk.thrust > a_disk.rho", "a_disk.thrust > a_disk.Vu", "a_disk.Cp > a_disk.a", "a_disk.power > a_disk.a", "a_disk.power > a_disk.Area", "a_disk.power > a_disk.rho", "a_disk.power > a_disk.Vu", "a_disk.Vr > a_disk.Vr", "a_disk.Vd > a_disk.Vd", "a_disk.Ct > a_disk.Ct", "a_disk.thrust > a_disk.thrust", "a_disk.Cp > a_disk.Cp", "a_disk.power > a_disk.power"]
         """)
 
+        expected_driver_name = 'ScipyOptimizeDriver'
+        expected_design_vars_names = ['indeps.a',  'indeps.Area']
+        expected_responses_names = ['a_disk.Cp',]
+
         # check expected model tree
         self.check_model_viewer_data(
             model_viewer_data,
@@ -266,7 +289,10 @@ class TestViewModelData(unittest.TestCase):
             expected_pathnames_betz,
             expected_conns_betz,
             expected_abs2prom_betz,
-            expected_declare_partials_betz
+            expected_declare_partials_betz,
+            expected_driver_name,
+            expected_design_vars_names,
+            expected_responses_names,
         )
 
     def test_n2_from_problem(self):
