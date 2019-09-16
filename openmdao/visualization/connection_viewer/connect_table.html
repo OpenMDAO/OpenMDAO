@@ -7,6 +7,16 @@
     <tabulator_src>
 </script>
 <style>
+    .unitnomatch {
+        color: red;
+        font-weight: bold;
+    }
+
+    .promoted {
+        color: blue;
+        font-style: italic;
+    }
+
     <tabulator_style>
 </style>
 <title>Connectione Viewer</title>
@@ -34,64 +44,59 @@ var table =
                             {title: "Output", field:"src", align:"left", headerFilter:true,
                              visible:false, minWidth:300,
                             tooltip:function(cell){
+                                return cell.getData().sprom;
+                            }},
+                            {title: "Output", field:"sprom", align:"left", headerFilter:true, minWidth:300,
+                             formatter:function(cell, formmaterParams, onRendered) {
                                 var promname = cell.getData().sprom;
-                                if (promname != cell.getData().src) {
+                                if (promname == cell.getData().src) {
                                     return promname;
                                 }
                                 else {
-                                    return false;
+                                    return "<span class='promoted'>" + promname + "</span>";
                                 }
-                            }},
-                            {title: "Output", field:"sprom", align:"left", headerFilter:true, minWidth:300,
+                            },
                             tooltip:function(cell){
-                                var fullname = cell.getData().src;
-                                if (fullname != cell.getData().sprom) {
-                                    return fullname;
-                                }
-                                else {
-                                    return false;
-                                }
+                                return cell.getData().src;
                             }},
-                            {title: "Units", field:"sunits", align:"center",
-                                headerFilter:true, formatter:function(cell, formatterParams){
-                                    var value = cell.getValue();
-                                    if(value.startsWith("!")){
-                                        return "<span style='color:red; font-weight:bold;'>" + value.substring(1) + "</span>";
-                                    }else{
-                                        return value;
-                                    }
-                            }},
+                            {title: "Units", field:"sunits", align:"center", headerFilter:true,
+                             formatter:function(cell, formatterParams){
+                                var value = cell.getValue();
+                                if(value.startsWith("!")){
+                                    return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
+                                }else{
+                                    return value;
+                                }
+                             }},
                             {title: "Value", field:"val", align:"center", headerFilter:true},
                             {title: "Units", field:"tunits", align:"center", headerFilter:true,
                                 formatter:function(cell, formatterParams){
                                     var value = cell.getValue();
                                     if(value.startsWith("!")){
-                                        return "<span style='color:red; font-weight:bold;'>" + value.substring(1) + "</span>";
+                                        return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
                                     }else{
                                         return value;
                                     }
-                                }},
-                            {title: "Input", field:"tprom", align:"left", headerFilter:true,
-                             minWidth:300,
-                            tooltip:function(cell){
-                                var fullname = cell.getData().tgt;
-                                if (fullname != cell.getData().tprom) {
-                                    return  fullname;
                                 }
-                                else {
-                                    return false;
-                                }
-                            }},
+                            },
                             {title: "Input", field:"tgt", align:"left", headerFilter:true,
                              visible:false, minWidth:300,
-                            tooltip:function(cell){
-                                var promname = cell.getData().sprom;
-                                if (promname != cell.getData().src) {
+                             tooltip:function(cell){
+                                return cell.getData().tprom;
+                             }},
+                            {title: "Input", field:"tprom", align:"left", headerFilter:true,
+                             minWidth:300,
+                             formatter:function(cell, formmaterParams, onRendered) {
+                                var promname = cell.getData().tprom;
+                                if (promname == cell.getData().tgt) {
                                     return promname;
                                 }
                                 else {
-                                    return false;
+                                    return "<span class='promoted'>" + promname + "</span>";
                                 }
+                             },
+                             tooltip:function(cell){
+                                return cell.getData().tgt;
                             }},
                     ],
 });

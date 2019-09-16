@@ -94,7 +94,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
                 # if there's a unit conversion, express the value in the
                 # units of the target
-                if units[t] and val != "<on remote_proc>":
+                if units[t] and s in system._outputs:
                     val = convert_units(val, units[s], units[t])
 
                 src2tgts[s].append(t)
