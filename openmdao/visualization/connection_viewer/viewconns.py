@@ -55,6 +55,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     precision : int, optional
         Sets the precision for displaying array values.
+
+    title : str, optional
+        Sets the title of the web page.
     """
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
