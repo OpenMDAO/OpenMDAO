@@ -146,11 +146,11 @@ class ApproximationScheme(object):
         keys = set()
         for key, apprx in iteritems(self._exec_dict):
             if key[0] in wrt_matches:
+                if data is None:
+                    # data is the same for all colored approxs so we only need the first
+                    data = self._get_approx_data(system, key)
                 options = apprx[0][1]
                 if 'coloring' in options:
-                    if data is None:
-                        # data is the same for all colored approxs so we only need the first
-                        data = self._get_approx_data(system, key)
                     keys.update(a[0] for a in apprx)
 
         if is_total and system.pathname == '':  # top level approx totals
