@@ -16,6 +16,9 @@ import numpy as np
 import openmdao.api as om
 import warnings
 
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+
 
 def stack_outputs(outputs_dict):
     """
@@ -110,7 +113,7 @@ class MetaModelVisualization(object):
         A 2D array containing contour plot data
     """
 
-    def __init__(self, surrogate_ref, resolution=50):
+    def __init__(self, surrogate_ref, resolution=2):
         """
         Initialize parameters.
 
@@ -125,14 +128,35 @@ class MetaModelVisualization(object):
         self.surrogate_ref = surrogate_ref
         self.resolution = resolution
         # Create list of inputs
-        self.input_list = [i[0] for i in self.surrogate_ref._surrogate_input_names]
+        if isinstance(self.surrogate_ref, MetaModelUnStructuredComp):
+            self.is_unstructured_meta_model = True
 
-        if len(self.input_list) < 2:
-            raise ValueError('Must have more than one input value')
+            self.input_list = [i[0] for i in self.surrogate_ref._surrogate_input_names]
 
-        self.output_list = [i[0] for i in self.surrogate_ref._surrogate_output_names]
+            if len(self.input_list) < 2:
+                raise ValueError('Must have more than one input value')
 
-        self.model_ref = om.MetaModelUnStructuredComp(default_surrogate=om.ResponseSurface())
+            self.output_list = [i[0] for i in self.surrogate_ref._surrogate_output_names]
+
+            self.model_ref = om.MetaModelUnStructuredComp(
+                default_surrogate=self.surrogate_ref.options['default_surrogate'])
+
+        elif isinstance(self.surrogate_ref, MetaModelStructuredComp):
+            self.is_unstructured_meta_model = False
+            self.input_list = [i for i in self.surrogate_ref._static_var_rel_names['input']]
+
+            if len(self.input_list) < 2:
+                raise ValueError('Must have more than one input value')
+
+            self.output_list = [i for i in self.surrogate_ref._static_var_rel_names['output']]
+
+            self.model_ref = om.MetaModelStructuredComp(
+                distributed=self.surrogate_ref.options['distributed'],
+                extrapolate=self.surrogate_ref.options['extrapolate'],
+                method=self.surrogate_ref.options['method'],
+                training_data_gradients=self.surrogate_ref.options['training_data_gradients'],
+                vec_size=self.surrogate_ref.options['vec_size'])
+
         # Pair input list names with their respective data
         self.input_data = {}
 
@@ -220,21 +244,38 @@ class MetaModelVisualization(object):
         None
 
         """
-        for name in self.input_list:
-            try:
-                self.input_data[name] = {
-                    i for i in self.surrogate_ref.options[str('train:' + name)]}
-                self.model_ref.add_input(
+        if self.is_unstructured_meta_model == False:
+            for idx, name in enumerate(self.input_list):
+                try:
+                    self.input_data[name] = self.surrogate_ref.params[idx]
+                    self.model_ref.add_input(
+                        name, 0.,
+                        training_data=self.surrogate_ref.params[idx])
+                except TypeError:
+                    msg = "No training data present for one or more parameters"
+                    raise TypeError(msg)
+
+            for idx, name in enumerate(self.output_list):
+                self.model_ref.add_output(
+                    name, 0.,
+                    training_data=self.surrogate_ref.training_outputs[name])
+
+        else:
+            for name in self.input_list:
+                try:
+                    self.input_data[name] = {
+                        i for i in self.surrogate_ref.options[str('train:' + name)]}
+                    self.model_ref.add_input(
+                        name, 0.,
+                        training_data=[i for i in self.surrogate_ref.options[str('train:' + name)]])
+                except TypeError:
+                    msg = "No training data present for one or more parameters"
+                    raise TypeError(msg)
+
+            for name in self.output_list:
+                self.model_ref.add_output(
                     name, 0.,
                     training_data=[i for i in self.surrogate_ref.options[str('train:' + name)]])
-            except TypeError:
-                msg = "No training data present for one or more parameters"
-                raise TypeError(msg)
-
-        for name in self.output_list:
-            self.model_ref.add_output(
-                name, 0.,
-                training_data=[i for i in self.surrogate_ref.options[str('train:' + name)]])
 
     def _slider_attrs(self):
         """
@@ -280,13 +321,22 @@ class MetaModelVisualization(object):
         for idx, values in enumerate(data.values()):
             inputs[:, idx] = values.flatten()
 
-        # Pair data points with their respective prob name. Loop to make predictions
-        for idx, tup in enumerate(inputs):
-            for name, val in zip(data.keys(), tup):
-                self.prob[str.format(self.model_ref.name + '.' + name)] = val
-            self.prob.run_model()
-            for i in self.output_list:
-                outputs[i].append(float(self.prob[str.format(self.model_ref.name + '.' + i)]))
+        if self.is_unstructured_meta_model == False:
+            for idx, tup in enumerate(inputs):
+                for name, val in zip(data.keys(), tup):
+                    self.prob[str.format(self.model_ref.name + '.' + name)] = val
+                self.prob.run_model()
+                for i in self.output_list:
+                    outputs[i].append(
+                        np.array(self.prob[str.format(self.model_ref.name + '.' + i)]))
+        else:
+            # Pair data points with their respective prob name. Loop to make predictions
+            for idx, tup in enumerate(inputs):
+                for name, val in zip(data.keys(), tup):
+                    self.prob[str.format(self.model_ref.name + '.' + name)] = val
+                self.prob.run_model()
+                for i in self.output_list:
+                    outputs[i].append(float(self.prob[str.format(self.model_ref.name + '.' + i)]))
 
         return stack_outputs(outputs)
 
@@ -553,8 +603,14 @@ class MetaModelVisualization(object):
         # [x1, x2, x3, x4]
         # Input Data
         # Output Data
-        x_training = self.model_ref._training_input
-        y_training = np.squeeze(stack_outputs(self.model_ref._training_output), axis=1)
+        if self.is_unstructured_meta_model == False:
+            x_training = np.squeeze(stack_outputs(self.input_data_dict))
+            y_training = stack_outputs(self.surrogate_ref.training_outputs).reshape(2, 2)
+
+        else:
+            x_training = self.model_ref._training_input
+            y_training = np.squeeze(stack_outputs(self.model_ref._training_output), axis=1)
+
         output_variable = self.output_list.index(self.output_select.value)
         data = np.zeros((0, 8))
 

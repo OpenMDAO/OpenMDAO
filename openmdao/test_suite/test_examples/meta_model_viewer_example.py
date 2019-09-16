@@ -21,6 +21,7 @@ interp.add_input('input_4', 0., training_data=x_train4)
 
 # Outputs
 interp.add_output('output_1', 0., training_data=.5 * np.cos(y_train))
+interp.add_output('output_2', 0., training_data=.5 * np.sin(y_train))
 
 # Surrogate Model
 interp.options['default_surrogate'] = om.ResponseSurface()
@@ -29,3 +30,5 @@ prob = om.Problem()
 prob.model.add_subsystem('interp', interp)
 prob.setup()
 prob.final_setup()
+
+viz = MetaModelVisualization(interp)
