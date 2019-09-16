@@ -9,86 +9,94 @@
 <style>
     <tabulator_style>
 </style>
+<title>Connectione Viewer</title>
 </head>
 <body>
-    <h2></h2>
+    <h2 id="conn_title"></h2>
     <div id="connection-table"></div>
 <script type="text/javascript">
 
 var data = <connection_data>;
 var tabledata = data.table;
 
+document.title = data.title;
+document.getElementById("conn_title").innerHTML = data.title
 
-var table = new Tabulator("#connection-table", {
-                          height: 500, // set height of table (in CSS or here), this enables the Virtual DOM and improves render speed dramatically (can be any valid css height value)
-                          data:tabledata, //assign data to table
-                          layout:"fitColumns", //"fitDataFill",
-                          footerElement:"<button id='prom-toggle-button' onclick='toggle(this)'>Use Absolute Names</button>",
-                          columns:[ //Define Table Columns
-                                   {title: "Output (abs)", field:"src", align:"left", headerFilter:true, visible:false, minWidth:300,
-                                   tooltip:function(cell){
-                                        var promname = cell.getData().sprom;
-                                        if (promname != cell.getData().src) {
-                                            return promname;
-                                        }
-                                        else {
-                                            return false;
-                                        }
-                                    }},
-	 	                          {title: "Output", field:"sprom", align:"left", headerFilter:true, minWidth:300,
-                                    tooltip:function(cell){
-                                        var fullname = cell.getData().src;
-                                        if (fullname != cell.getData().sprom) {
-                                            return fullname;
-                                        }
-                                        else {
-                                            return false;
-                                        }
-                                   }},
-                                   {title: "Units", field:"sunits", align:"center",
-                                       headerFilter:true, formatter:function(cell, formatterParams){
-                                           var value = cell.getValue();
-                                           if(value.startsWith("!")){
-                                              return "<span style='color:red; font-weight:bold;'>" + value.substring(1) + "</span>";
-                                           }else{
-                                              return value;
-                                           }
-                                  }},
-	 	                          {title: "Value", field:"val", align:"center", headerFilter:true},
-                                   {title: "Units", field:"tunits", align:"center", headerFilter:true,
-                                        formatter:function(cell, formatterParams){
-                                           var value = cell.getValue();
-                                           if(value.startsWith("!")){
-                                              return "<span style='color:red; font-weight:bold;'>" + value.substring(1) + "</span>";
-                                           }else{
-                                              return value;
-                                           }
-                                        }},
-                                   {title: "Input", field:"tprom", align:"left", headerFilter:true, minWidth:300,
-                                    tooltip:function(cell){
-                                        var fullname = cell.getData().tgt;
-                                        if (fullname != cell.getData().tprom) {
-                                           return  fullname;
-                                        }
-                                        else {
-                                            return false;
-                                        }
-                                    }},
-	 	                          {title: "Input (abs)", field:"tgt", align:"left", headerFilter:true, visible:false, minWidth:300,
-                                    tooltip:function(cell){
-                                        var promname = cell.getData().sprom;
-                                        if (promname != cell.getData().src) {
-                                            return promname;
-                                        }
-                                        else {
-                                            return false;
-                                        }
-                                    }},
-                          ],
+var table =
+      new Tabulator("#connection-table", {
+                    // set height of table (in CSS or here), this enables the Virtual DOM and
+                    // improves render speed dramatically (can be any valid css height value)
+                    height: 500,
+                    data:tabledata, //assign data to table
+                    layout:"fitColumns", //"fitDataFill",
+                    footerElement:"<button onclick='toggle(this)'>Use Absolute Names</button>",
+                    columns:[ //Define Table Columns
+                            {title: "Output", field:"src", align:"left", headerFilter:true,
+                             visible:false, minWidth:300,
+                            tooltip:function(cell){
+                                var promname = cell.getData().sprom;
+                                if (promname != cell.getData().src) {
+                                    return promname;
+                                }
+                                else {
+                                    return false;
+                                }
+                            }},
+                            {title: "Output", field:"sprom", align:"left", headerFilter:true, minWidth:300,
+                            tooltip:function(cell){
+                                var fullname = cell.getData().src;
+                                if (fullname != cell.getData().sprom) {
+                                    return fullname;
+                                }
+                                else {
+                                    return false;
+                                }
+                            }},
+                            {title: "Units", field:"sunits", align:"center",
+                                headerFilter:true, formatter:function(cell, formatterParams){
+                                    var value = cell.getValue();
+                                    if(value.startsWith("!")){
+                                        return "<span style='color:red; font-weight:bold;'>" + value.substring(1) + "</span>";
+                                    }else{
+                                        return value;
+                                    }
+                            }},
+                            {title: "Value", field:"val", align:"center", headerFilter:true},
+                            {title: "Units", field:"tunits", align:"center", headerFilter:true,
+                                formatter:function(cell, formatterParams){
+                                    var value = cell.getValue();
+                                    if(value.startsWith("!")){
+                                        return "<span style='color:red; font-weight:bold;'>" + value.substring(1) + "</span>";
+                                    }else{
+                                        return value;
+                                    }
+                                }},
+                            {title: "Input", field:"tprom", align:"left", headerFilter:true,
+                             minWidth:300,
+                            tooltip:function(cell){
+                                var fullname = cell.getData().tgt;
+                                if (fullname != cell.getData().tprom) {
+                                    return  fullname;
+                                }
+                                else {
+                                    return false;
+                                }
+                            }},
+                            {title: "Input", field:"tgt", align:"left", headerFilter:true,
+                             visible:false, minWidth:300,
+                            tooltip:function(cell){
+                                var promname = cell.getData().sprom;
+                                if (promname != cell.getData().src) {
+                                    return promname;
+                                }
+                                else {
+                                    return false;
+                                }
+                            }},
+                    ],
 });
 
-// var button = document.querySelector("#prom-toggle-button");
-// button.addEventListener("click", () => {
+
 function toggle(tbutton) {
     table.toggleColumn("src");
     table.toggleColumn("sprom");
@@ -101,7 +109,7 @@ function toggle(tbutton) {
         tbutton.innerHTML = "Use Absolute Names";
     }
 }
-// });
+
 </script>
 </body>
 </html>

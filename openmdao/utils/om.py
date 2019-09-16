@@ -205,6 +205,8 @@ def _view_connections_setup_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-o', default='connections.html', action='store', dest='outfile',
                         help='html output file.')
+    parser.add_argument('-t', '--title', action='store', dest='title',
+                        help='title of web page.')
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
                         help="don't display in a browser.")
 
@@ -224,7 +226,12 @@ def _view_connections_cmd(options):
         The post-setup hook function.
     """
     def _viewconns(prob):
-        view_connections(prob, outfile=options.outfile, show_browser=not options.no_browser)
+        if options.title:
+            title = options.title
+        else:
+            title = "Connections for %s" % os.path.basename(options.file[0])
+        view_connections(prob, outfile=options.outfile, show_browser=not options.no_browser,
+                         title=title)
         exit()
     return _viewconns
 

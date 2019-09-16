@@ -29,7 +29,7 @@ def _val2str(val):
 
 
 def view_connections(root, outfile='connections.html', show_browser=True,
-                     src_filter='', tgt_filter='', precision=6):
+                     src_filter='', tgt_filter='', precision=6, title=None):
     """
     Generate a self-contained html file containing a detailed connection viewer.
 
@@ -99,7 +99,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
                 src2tgts[s].append(t)
             else:  # unconnected param
-                val = _get_input(system, t, None)
+                val = _get_input(system, t)
 
             vals[t] = val
 
@@ -126,11 +126,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     sprom = system._var_allprocs_abs2prom['output']
 
     table = []
-    idx = 1
+    idx = 1  # unique ID for use by Tabulator
     for tgt, src in iteritems(connections):
         usrc = units[src]
         utgt = units[tgt]
         if usrc != utgt:
+            # prepend these with '!' so they'll be colored red
             if usrc:
                 usrc = '!' + units[src]
             if utgt:
@@ -144,8 +145,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     for t in system._var_abs_names['input']:
         if t not in connections:
-            row = {'id': idx, 'src': 'NO CONNECTION', 'sprom': 'NO CONNECTION', 'sunits': '', 'val': _val2str(vals[t]),
-                   'tunits': units[t], 'tprom': tprom[t], 'tgt': t}
+            row = {'id': idx, 'src': 'NO CONNECTION', 'sprom': 'NO CONNECTION', 'sunits': '',
+                   'val': _val2str(vals[t]), 'tunits': units[t], 'tprom': tprom[t], 'tgt': t}
             table.append(row)
             idx += 1
 
@@ -157,7 +158,11 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             table.append(row)
             idx += 1
 
+    if title is None:
+        title = ''
+
     data = {
+        'title': title,
         'table': table,
         'src_filter': src_filter,
         'tgt_filter': tgt_filter,
@@ -190,15 +195,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         webview(outfile)
 
 
-def _get_input(system, name, idxs=None):
+def _get_input(system, name):
     """
     Return the named value if it's local to the process, else "<on remote proc>".
     """
     if name in system._inputs:
-        val = system._inputs[name]
-        if idxs is not None and isinstance(val, np.ndarray):
-            val = val.flatten()[idxs]
-        return val
+        return system._inputs[name]
     return "<on remote proc>"
 
 
