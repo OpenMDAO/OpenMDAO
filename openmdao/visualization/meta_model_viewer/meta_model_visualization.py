@@ -113,7 +113,7 @@ class MetaModelVisualization(object):
         A 2D array containing contour plot data
     """
 
-    def __init__(self, surrogate_ref, resolution=2):
+    def __init__(self, surrogate_ref, resolution=25):
         """
         Initialize parameters.
 
@@ -155,8 +155,7 @@ class MetaModelVisualization(object):
                 extrapolate=self.surrogate_ref.options['extrapolate'],
                 method=self.surrogate_ref.options['method'],
                 training_data_gradients=self.surrogate_ref.options['training_data_gradients'],
-                vec_size=self.surrogate_ref.options['vec_size'])
-
+                vec_size=1)
         # Pair input list names with their respective data
         self.input_data = {}
 
@@ -400,7 +399,7 @@ class MetaModelVisualization(object):
         self.contour_plot = contour_plot = figure(
             match_aspect=False,
             tooltips=[(self.x_input.value, "$x"), (self.y_input.value, "$y"),
-                      (self.output_select.value, "@image")], tools="pan")
+                      (self.output_select.value, "@z")], tools="pan")
         contour_plot.x_range.range_padding = 0
         contour_plot.y_range.range_padding = 0
         contour_plot.plot_width = 600
@@ -453,11 +452,12 @@ class MetaModelVisualization(object):
 
         # Create and format figure
         self.right_plot_fig = right_plot_fig = figure(
-            plot_width=200, plot_height=500, x_range=(min(x), max(x)),
+            plot_width=250, plot_height=500, x_range=(min(x), max(x)),
             y_range=(min(y_data), max(y_data)),
             title="{} vs {}".format(self.y_input.value, self.output_select.value), tools="")
         right_plot_fig.xaxis.axis_label = self.output_select.value
         right_plot_fig.yaxis.axis_label = self.y_input.value
+        right_plot_fig.xaxis.major_label_orientation = math.pi/9
         right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
 
         # Determine distance and alpha opacity of training points
@@ -475,9 +475,7 @@ class MetaModelVisualization(object):
 
         # Set the right_plot data source to new values
         self.right_plot_scatter_source.data = dict(
-            left_slice_x=np.repeat(x_value, self.resolution), left_slice_y=y_data,
-            x1=np.array([x + self.dist_range for x in np.repeat(x_value, self.resolution)]),
-            x2=np.array([x - self.dist_range for x in np.repeat(x_value, self.resolution)]))
+            left_slice_x=np.repeat(x_value, self.resolution), left_slice_y=y_data)
 
         self.contour_plot.line(
             'left_slice_x', 'left_slice_y', source=self.right_plot_scatter_source,
@@ -604,8 +602,15 @@ class MetaModelVisualization(object):
         # Input Data
         # Output Data
         if self.is_unstructured_meta_model == False:
-            x_training = np.squeeze(stack_outputs(self.input_data_dict))
-            y_training = stack_outputs(self.surrogate_ref.training_outputs).reshape(2, 2)
+            if self.surrogate_ref.options['method'] == 'cubic':
+                x_training = np.squeeze(stack_outputs(self.input_data_dict))
+                y_training = self.surrogate_ref.training_outputs[self.output_select.value].flatten()
+
+            else:
+                # slinear
+                x_training = np.squeeze(stack_outputs(self.input_data_dict))
+                y_training = stack_outputs(
+                    self.surrogate_ref.training_outputs).reshape(self.resolution, self.resolution)
 
         else:
             x_training = self.model_ref._training_input
@@ -640,7 +645,10 @@ class MetaModelVisualization(object):
             info = np.ones((5))
             info[0:2] = infos[i, :]
             info[2] = dists[dist_index] / dist_limit
-            info[3] = y_training[i, output_variable]
+            if self.surrogate_ref.options['method'] == 'cubic':
+                info[3] = y_training[i]
+            else:
+                info[3] = y_training[i, output_variable]
             info[4] = (1. - info[2] / self.dist_range) ** 0.5
             data[dist_index] = info
 

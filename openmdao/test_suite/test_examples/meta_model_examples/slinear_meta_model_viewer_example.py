@@ -27,9 +27,9 @@ actual = 0.8990064
 
 print(computed)
 
-# viz = MetaModelVisualization(xor_interp)
 
 # we can verify all gradients by checking against finite-difference
 prob.check_partials(compact_print=True)
+
 
 
