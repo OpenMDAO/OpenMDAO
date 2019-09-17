@@ -55,6 +55,8 @@ class MetaModelVisualization(object):
         Name of empty Meta Model Component object reference
     resolution : int
         Number used to calculate width and height of contour plot
+    is_unstructured_meta_model : Bool
+        Boolean used to signal whether the meta model is structured or unstructured
     slider_source : ColumnDataSource
         Data source containing dictionary of sliders
     bot_plot_source : ColumnDataSource
@@ -113,7 +115,7 @@ class MetaModelVisualization(object):
         A 2D array containing contour plot data
     """
 
-    def __init__(self, surrogate_ref, resolution=25):
+    def __init__(self, surrogate_ref, resolution=50):
         """
         Initialize parameters.
 
@@ -126,11 +128,12 @@ class MetaModelVisualization(object):
         """
         self.prob = om.Problem()
         self.surrogate_ref = surrogate_ref
-        self.resolution = resolution
+
         # Create list of inputs
         if isinstance(self.surrogate_ref, MetaModelUnStructuredComp):
             self.is_unstructured_meta_model = True
 
+            self.resolution = resolution
             self.input_list = [i[0] for i in self.surrogate_ref._surrogate_input_names]
 
             if len(self.input_list) < 2:
@@ -143,6 +146,7 @@ class MetaModelVisualization(object):
 
         elif isinstance(self.surrogate_ref, MetaModelStructuredComp):
             self.is_unstructured_meta_model = False
+
             self.input_list = [i for i in self.surrogate_ref._static_var_rel_names['input']]
 
             if len(self.input_list) < 2:
@@ -156,6 +160,8 @@ class MetaModelVisualization(object):
                 method=self.surrogate_ref.options['method'],
                 training_data_gradients=self.surrogate_ref.options['training_data_gradients'],
                 vec_size=1)
+
+            self.resolution = self.surrogate_ref.params.__len__()
         # Pair input list names with their respective data
         self.input_data = {}
 
@@ -243,7 +249,7 @@ class MetaModelVisualization(object):
         None
 
         """
-        if self.is_unstructured_meta_model == False:
+        if not self.is_unstructured_meta_model:
             for idx, name in enumerate(self.input_list):
                 try:
                     self.input_data[name] = self.surrogate_ref.params[idx]
@@ -320,7 +326,7 @@ class MetaModelVisualization(object):
         for idx, values in enumerate(data.values()):
             inputs[:, idx] = values.flatten()
 
-        if self.is_unstructured_meta_model == False:
+        if not self.is_unstructured_meta_model:
             for idx, tup in enumerate(inputs):
                 for name, val in zip(data.keys(), tup):
                     self.prob[str.format(self.model_ref.name + '.' + name)] = val
@@ -457,7 +463,7 @@ class MetaModelVisualization(object):
             title="{} vs {}".format(self.y_input.value, self.output_select.value), tools="")
         right_plot_fig.xaxis.axis_label = self.output_select.value
         right_plot_fig.yaxis.axis_label = self.y_input.value
-        right_plot_fig.xaxis.major_label_orientation = math.pi/9
+        right_plot_fig.xaxis.major_label_orientation = math.pi / 9
         right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
 
         # Determine distance and alpha opacity of training points
@@ -601,12 +607,12 @@ class MetaModelVisualization(object):
         # [x1, x2, x3, x4]
         # Input Data
         # Output Data
-        if self.is_unstructured_meta_model == False:
-            if self.surrogate_ref.options['method'] == 'cubic':
+        if not self.is_unstructured_meta_model:
+            if self.surrogate_ref.options['method'] in ['cubic', 'scipy_cubic']:
                 x_training = np.squeeze(stack_outputs(self.input_data_dict))
                 y_training = self.surrogate_ref.training_outputs[self.output_select.value].flatten()
 
-            else:
+            elif self.surrogate_ref.options['method'] in ['slinear', 'scipy_slinear']:
                 # slinear
                 x_training = np.squeeze(stack_outputs(self.input_data_dict))
                 y_training = stack_outputs(
@@ -645,8 +651,11 @@ class MetaModelVisualization(object):
             info = np.ones((5))
             info[0:2] = infos[i, :]
             info[2] = dists[dist_index] / dist_limit
-            if self.surrogate_ref.options['method'] == 'cubic':
-                info[3] = y_training[i]
+            if not self.is_unstructured_meta_model:
+                if self.surrogate_ref.options['method'] in ['cubic', 'scipy_cubic']:
+                    info[3] = y_training[i]
+                elif self.surrogate_ref.options['method'] in ['slinear', 'scipy_slinear']:
+                    info[3] = y_training[i, output_variable]
             else:
                 info[3] = y_training[i, output_variable]
             info[4] = (1. - info[2] / self.dist_range) ** 0.5
