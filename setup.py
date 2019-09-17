@@ -112,6 +112,8 @@ setup(
         ],
         'openmdao.visualization.connection_viewer': [
             '*.html',
+            'libs/*.js',
+            'style/*.css'
         ],
         'openmdao.visualization.xdsm_viewer': [
             'XDSMjs/*',
