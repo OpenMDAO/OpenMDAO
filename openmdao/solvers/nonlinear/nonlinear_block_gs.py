@@ -140,10 +140,30 @@ class NonlinearBlockGS(NonlinearSolver):
 
                 temp = delta_outputs_n.copy()
                 temp -= delta_outputs_n_1
-                temp_norm = np.linalg.norm(temp)
+
+                # If MPI, piggyback on the residual vector to perform a distributed norm.
+                if system.comm.size > 1:
+                    backup_r = residuals._data.copy()
+                    residuals._data[:] = temp
+                    temp_norm = residuals.get_norm()
+                else:
+                    temp_norm = np.linalg.norm(temp)
+
                 if temp_norm == 0.:
                     temp_norm = 1e-12  # prevent division by 0 in the next line
-                theta_n = theta_n_1 * (1 - temp.dot(delta_outputs_n) / temp_norm ** 2)
+
+                # If MPI, piggyback on the output and residual vectors to perform a distributed
+                # dot product.
+                if system.comm.size > 1:
+                    backup_o = outputs._data.copy()
+                    outputs._data[:] = delta_outputs_n
+                    tddo = residuals.dot(outputs)
+                    residuals._data[:] = backup_r
+                    outputs._data[:] = backup_o
+                else:
+                    tddo = temp.dot(delta_outputs_n)
+
+                theta_n = theta_n_1 * (1 - tddo / temp_norm ** 2)
 
                 # limit relaxation factor to the specified range
                 theta_n = max(aitken_min_factor, min(aitken_max_factor, theta_n))
@@ -200,10 +220,11 @@ class NonlinearBlockGS(NonlinearSolver):
                 outputs_n = outputs._data.copy()
 
             self._solver_info.append_subsolver()
-            for isub, subsys in enumerate(system._subsystems_myproc):
+            for isub, (subsys, local)in enumerate(system._all_subsystem_iter()):
                 system._transfer('nonlinear', 'fwd', isub)
-                subsys._solve_nonlinear()
-                system._check_child_reconf()
+                if local:
+                    subsys._solve_nonlinear()
+                    system._check_child_reconf()
 
             self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals]):

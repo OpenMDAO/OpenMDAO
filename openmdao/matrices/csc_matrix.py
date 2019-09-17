@@ -11,7 +11,7 @@ class CSCMatrix(COOMatrix):
     Sparse matrix in Compressed Col Storage format.
     """
 
-    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
+    def _build(self, num_rows, num_cols, system=None):
         """
         Allocate the matrix.
 
@@ -21,12 +21,10 @@ class CSCMatrix(COOMatrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        in_ranges : dict
-            Maps input var name to column range.
-        out_ranges : dict
-            Maps output var name to row range.
+        system : <System>
+            owning system.
         """
-        super(CSCMatrix, self)._build(num_rows, num_cols, in_ranges, out_ranges)
+        super(CSCMatrix, self)._build(num_rows, num_cols, system)
         self._coo = self._matrix
 
     def _pre_update(self):

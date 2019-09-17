@@ -4,12 +4,13 @@ from __future__ import print_function
 
 import sys
 import os
-from itertools import product
+from itertools import product, chain
 
 import numpy as np
 import cProfile
 from contextlib import contextmanager
 from six import iteritems, iterkeys, itervalues
+from collections import Counter
 
 from six.moves import zip_longest
 from openmdao.core.problem import Problem
@@ -154,7 +155,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
     filter : function(System)
         A function taking a System arg and returning None or an iter of (name, value) tuples.
         If None is returned, that system will not be displayed.  Otherwise, the system will
-        be displayed along with any name, value pairs returned from the filter, if any.
+        be displayed along with any name, value pairs returned from the filter.
     max_depth : int
         Maximum depth for display.
     rank : int
@@ -193,8 +194,16 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
             cprint("%s " % type(s).__name__, color=Fore.GREEN + Style.BRIGHT)
             cprint("%s" % s.name)
         else:
-            cprint("%s " % type(s).__name__, color=Fore.CYAN + Style.BRIGHT)
+            if isinstance(s, ImplicitComponent):
+                colr = Back.CYAN + Fore.BLACK + Style.BRIGHT
+            else:
+                colr = Fore.CYAN + Style.BRIGHT
+            cprint("%s " % type(s).__name__, color=colr)
             cprint("%s" % s.name)
+
+        # FIXME: these sizes could be wrong under MPI
+        cprint(" (%d / %d)" % (s._inputs._data.size, s._outputs._data.size),
+               color=Fore.RED + Style.BRIGHT)
 
         if show_solvers:
             lnsolver = type(s.linear_solver).__name__
@@ -208,15 +217,33 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
                 cprint(nlsolver, color=Fore.MAGENTA + Style.BRIGHT)
 
         if show_jacs:
+            jacs = []
+            lnjac = nljac = None
             if s._assembled_jac is not None:
-                cprint(" LN_jac: ")
-                cprint(type(s._assembled_jac).__name__, color=Fore.MAGENTA + Style.BRIGHT)
+                lnjac = s._assembled_jac
+                jacs.append(lnjac)
             if s.nonlinear_solver is not None:
                 jacsolvers = list(s.nonlinear_solver._assembled_jac_solver_iter())
                 if jacsolvers:
-                    cprint(" NL_jac: ")
-                    cprint(type(jacsolvers[0]._assembled_jac).__name__,
-                           color=Fore.MAGENTA + Style.BRIGHT)
+                    nljac = jacsolvers[0]._assembled_jac
+                    if nljac is not lnjac:
+                        jacs.append(nljac)
+
+            if len(jacs) == 2:
+                jnames = [' LN Jac: ', ' NL Jac: ']
+            elif lnjac is not None:
+                if lnjac is nljac:
+                    jnames = [' Jac: ']
+                else:
+                    jnames = [' LN Jac: ']
+            elif nljac is not None:
+                jnames = [' NL Jac: ']
+            else:
+                jnames = []
+
+            for jname, jac in zip(jnames, jacs):
+                cprint(jname)
+                cprint(type(jac).__name__, color=Fore.MAGENTA + Style.BRIGHT)
 
         if show_approx and s._approx_schemes:
             approx_keys = set()
@@ -266,8 +293,10 @@ def config_summary(problem, stream=sys.stdout):
 
     grpnames = [s.pathname for s in locgroups]
     sysnames = [s.pathname for s in locsystems]
-    ln_solvers = set(type(s.linear_solver).__name__ for s in locgroups)
-    nl_solvers = set(type(s.nonlinear_solver).__name__ for s in locgroups)
+    ln_solvers = [(s.pathname, type(s.linear_solver).__name__) for s in locsystems
+                              if s.linear_solver is not None]
+    nl_solvers = [(s.pathname, type(s.nonlinear_solver).__name__) for s in locsystems
+                         if s.nonlinear_solver is not None]
 
     max_depth = max([len(name.split('.')) for name in sysnames])
     setup_done = problem._setup_status == 2
@@ -280,17 +309,27 @@ def config_summary(problem, stream=sys.stdout):
         proc_names = problem.comm.gather((sysnames, grpnames, ln_solvers, nl_solvers), root=0)
         grpnames = set()
         sysnames = set()
-        ln_solvers = set()
-        nl_solvers = set()
+        ln_solvers = Counter()
+        nl_solvers = Counter()
+        ln_seen = set()
+        nl_seen = set()
         if proc_names is not None:
             for rank in range(problem.comm.size):
                 systems, grps, lnsols, nlsols = proc_names[rank]
                 sysnames.update(systems)
                 grpnames.update(grps)
-                ln_solvers.update(lnsols)
+                lnlst = [(path, slv) for path, slv in lnsols if path not in ln_seen]
+                ln_seen.update([path for path, _ in lnsols])
+                ln_solvers.update([slv for _, slv in lnlst])
+
+                nllst = [(path, slv) for path, slv in nlsols if path not in nl_seen]
+                nl_seen.update([path for path, _ in nlsols])
+                nl_solvers.update([slv for _, slv in nllst])
                 nl_solvers.update(nlsols)
     else:
         global_max_depth = max_depth
+        ln_solvers = Counter([slv for _, slv in ln_solvers])
+        nl_solvers = Counter([slv for _, slv in nl_solvers])
 
     # this gives us a printer that only prints on rank 0
     printer = _get_printer(problem.comm, stream)
@@ -306,21 +345,42 @@ def config_summary(problem, stream=sys.stdout):
         printer("Design variables:        %5d   Total size: %8d" %
                 (len(desvars), sum(d['size'] for d in desvars.values())))
 
-        # TODO: give separate info for equality, inequality constraints
-        con_nonlin = {}
-        con_linear = {}
+        con_nonlin_eq = {}
+        con_nonlin_ineq = {}
+        con_linear_eq = {}
+        con_linear_ineq = {}
         for con, vals in iteritems(model.get_constraints()):
-            if not vals['linear']:
-                con_nonlin[con]= vals
+            if vals['linear']:
+                if vals['equals'] is not None:
+                    con_linear_eq[con] = vals
+                else:
+                    con_linear_ineq[con] = vals
             else:
-                con_linear[con] = vals
-        printer("Constraints (nonlinear): %5d   Total size: %8d" %
+                if vals['equals'] is not None:
+                    con_nonlin_eq[con]= vals
+                else:
+                    con_nonlin_ineq[con]= vals
+
+        con_nonlin = con_nonlin_eq.copy()
+        con_nonlin.update(con_nonlin_ineq)
+        con_linear = con_linear_eq.copy()
+        con_linear.update(con_linear_ineq)
+
+        printer("\nNonlinear Constraints:   %5d   Total size: %8d" %
                 (len(con_nonlin), sum(d['size'] for d in con_nonlin.values())))
-        printer("Constraints (linear):    %5d   Total size: %8d" %
+        printer("    equality:            %5d               %8d" %
+                (len(con_nonlin_eq), sum(d['size'] for d in con_nonlin_eq.values())))
+        printer("    inequality:          %5d               %8d" %
+                (len(con_nonlin_ineq), sum(d['size'] for d in con_nonlin_ineq.values())))
+        printer("\nLinear Constraints:      %5d   Total size: %8d" %
                 (len(con_linear), sum(d['size'] for d in con_linear.values())))
+        printer("    equality:            %5d               %8d" %
+                (len(con_linear_eq), sum(d['size'] for d in con_linear_eq.values())))
+        printer("    inequality:          %5d               %8d" %
+                (len(con_linear_ineq), sum(d['size'] for d in con_linear_ineq.values())))
 
         objs = model.get_objectives()
-        printer("Objectives:              %5d   Total size: %8d" %
+        printer("\nObjectives:              %5d   Total size: %8d" %
                 (len(objs), sum(d['size'] for d in objs.values())))
 
     printer()
@@ -349,8 +409,8 @@ def config_summary(problem, stream=sys.stdout):
 
     printer()
     printer("Driver type: %s" % problem.driver.__class__.__name__)
-    printer("Linear Solvers: %s" % sorted(ln_solvers))
-    printer("Nonlinear Solvers: %s" % sorted(nl_solvers))
+    printer("Linear Solvers: %s" % ln_solvers.most_common())
+    printer("Nonlinear Solvers: %s" % nl_solvers.most_common())
 
 
 @contextmanager
@@ -405,3 +465,86 @@ def compare_jacs(Jref, J, rel_trigger=1.0):
     return results
 
 
+def trace_mpi(fname='mpi_trace', skip=(), flush=True):
+    """
+    Dump traces to the specified filename<.rank> showing openmdao and mpi/petsc calls.
+
+    Parameters
+    ----------
+    fname : str
+        Name of the trace file(s).  <.rank> will be appended to the name on each rank.
+    skip : set-like
+        Collection of function names to skip.
+    flush : bool
+        If True, flush print buffer after every print call.
+    """
+    if MPI is None:
+        raise RuntimeError("MPI is not active.  Trace aborted.")
+    if sys.getprofile() is not None:
+        raise RuntimeError("another profile function is already active.")
+
+    my_fname = fname + '.' + str(MPI.COMM_WORLD.rank)
+
+    outfile = open(my_fname, 'w')
+
+    stack = []
+
+    _c_map = {
+        'c_call': '(c) -->',
+        'c_return': '(c) <--',
+        'c_exception': '(c_exception)',
+    }
+
+
+    def _print_c_func(frame, arg, typestr):
+        s = str(arg)
+        if 'mpi4py' in s or 'petsc4py' in s:
+            c = arg.__self__.__class__
+            print('   ' * len(stack), typestr, "%s.%s.%s" %
+                    (c.__module__, c.__name__, arg.__name__),
+                    "%s:%d" % (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                    file=outfile, flush=True)
+
+
+    def _mpi_trace_callback(frame, event, arg):
+        pname = None
+        if event == 'call':
+            if 'openmdao' in frame.f_code.co_filename:
+                if frame.f_code.co_name in skip:
+                    return
+                if 'self' in frame.f_locals:
+                    try:
+                        pname = frame.f_locals['self'].msginfo
+                    except:
+                        pass
+                if pname is not None:
+                    if not stack or pname != stack[-1][0]:
+                        stack.append([pname, 1])
+                        print('   ' * len(stack), pname, file=outfile, flush=flush)
+                    else:
+                        stack[-1][1] += 1
+                print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
+                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                      file=outfile, flush=flush)
+        elif event == 'return':
+            if 'openmdao' in frame.f_code.co_filename:
+                if frame.f_code.co_name in skip:
+                    return
+                if 'self' in frame.f_locals:
+                    try:
+                        pname = frame.f_locals['self'].msginfo
+                    except:
+                        pass
+                print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
+                      (frame.f_code.co_filename, frame.f_code.co_firstlineno),
+                      file=outfile, flush=flush)
+                if pname is not None and stack and pname == stack[-1][0]:
+                    stack[-1][1] -= 1
+                    if stack[-1][1] < 1:
+                        stack.pop()
+                        if stack:
+                            print('   ' * len(stack), stack[-1][0], file=outfile, flush=flush)
+        else:
+            _print_c_func(frame, arg, _c_map[event])
+
+    sys.setprofile(_mpi_trace_callback)

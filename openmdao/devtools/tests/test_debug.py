@@ -26,8 +26,15 @@ class TestDebug(unittest.TestCase):
             "Max tree depth:       1",
             "",
             "Design variables:            3   Total size:       21",
-            "Constraints (nonlinear):     4   Total size:       21",
-            "Constraints (linear):        1   Total size:        1",
+            "",
+            "Nonlinear Constraints:       4   Total size:       21",
+            "    equality:                2                     11",
+            "    inequality:              2                     10",
+            "",
+            "Linear Constraints:          1   Total size:        1",
+            "    equality:                1                      1",
+            "    inequality:              0                      0",
+            "",
             "Objectives:                  1   Total size:        1",
             "",
             "Input variables:            11   Total size:       82",
@@ -36,8 +43,8 @@ class TestDebug(unittest.TestCase):
             "Total connections: 10   Total transfer data size: 72",
             "",
             "Driver type: Driver",
-            "Linear Solvers: ['LinearRunOnce']",
-            "Nonlinear Solvers: ['NonlinearRunOnce']"
+            "Linear Solvers: [('LinearRunOnce', 1)]",
+            "Nonlinear Solvers: [('NonlinearRunOnce', 1)]"
         ]
 
         for i in range(len(expected)):

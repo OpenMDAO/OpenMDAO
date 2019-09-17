@@ -305,6 +305,8 @@ class SqliteRecorder(CaseRecorder):
             outputs = system._var_allprocs_abs_names['output'] + \
                 system._var_allprocs_abs_names_discrete['output']
 
+            var_order = system._get_vars_exec_order(inputs=True, outputs=True)
+
             full_var_set = [(outputs, 'output'),
                             (desvars, 'desvar'), (responses, 'response'),
                             (objectives, 'objective'), (constraints, 'constraint')]
@@ -361,6 +363,7 @@ class SqliteRecorder(CaseRecorder):
             var_settings.update(objectives)
             var_settings.update(constraints)
             var_settings = self._cleanup_var_settings(var_settings)
+            var_settings['execution_order'] = var_order
             var_settings_json = json.dumps(var_settings)
 
             with self.connection as c:

@@ -11,9 +11,10 @@ from collections import OrderedDict
 import numpy as np
 
 from openmdao.recorders.sqlite_recorder import blob_to_array
-from openmdao.utils.record_util import deserialize
+from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import make_set
 from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
@@ -60,13 +61,13 @@ class Case(object):
         Dictionary mapping absolute names of all variables to promoted names.
     _abs2meta : dict
         Dictionary mapping absolute names of all variables to variable metadata.
-    _voi_meta : dict
-        Dictionary mapping absolute names of variables of interest to variable metadata.
+    _var_info : dict
+        Dictionary with information about variables (scaling, indices, execution order).
     _format_version : int
         A version number specifying the format of array data, if not numpy arrays.
     """
 
-    def __init__(self, source, data, prom2abs, abs2prom, abs2meta, voi_meta, data_format=None):
+    def __init__(self, source, data, prom2abs, abs2prom, abs2meta, var_info, data_format=None):
         """
         Initialize.
 
@@ -82,8 +83,8 @@ class Case(object):
             Dictionary mapping absolute names of all variables to promoted names.
         abs2meta : dict
             Dictionary mapping absolute names of all variables to variable metadata.
-        voi_meta : dict
-            Dictionary mapping absolute names of variables of interest to variable metadata.
+        var_info : dict
+            Dictionary with information about variables (scaling, indices, execution order).
         data_format : int
             A version number specifying the format of array data, if not numpy arrays.
         """
@@ -179,7 +180,7 @@ class Case(object):
         self._abs2meta = abs2meta
 
         # save VOI dict reference for use by self._scale()
-        self._voi_meta = voi_meta
+        self._var_info = var_info
 
     @property
     def iteration_coordinate(self):
@@ -327,7 +328,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('desvar')
         if scaled:
-            return self._apply_voi_meta(vals, scaled, use_indices)
+            return self._apply_var_settings(vals, scaled, use_indices)
         else:
             return vals
 
@@ -349,7 +350,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('objective')
         if scaled:
-            return self._apply_voi_meta(vals, scaled, use_indices)
+            return self._apply_var_settings(vals, scaled, use_indices)
         else:
             return vals
 
@@ -371,7 +372,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('constraint')
         if scaled:
-            return self._apply_voi_meta(vals, scaled, use_indices)
+            return self._apply_var_settings(vals, scaled, use_indices)
         else:
             return vals
 
@@ -393,7 +394,7 @@ class Case(object):
         """
         vals = self._get_variables_of_type('response')
         if scaled:
-            return self._apply_voi_meta(vals, scaled, use_indices)
+            return self._apply_var_settings(vals, scaled, use_indices)
         else:
             return vals
 
@@ -404,6 +405,7 @@ class Case(object):
                     shape=False,
                     hierarchical=True,
                     print_arrays=False,
+                    tags=None,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
@@ -429,6 +431,10 @@ class Case(object):
             When True, also display full values of the ndarray below the row. Format is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed. Only inputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -439,32 +445,30 @@ class Case(object):
             list of input names and other optional information about those inputs
         """
         meta = self._abs2meta
-        inp_vars = {}
         inputs = []
 
         if self.inputs is not None:
-            for abs_name in self.inputs.absolute_names():
-                if abs_name not in inp_vars:
-                    inp_vars[abs_name] = {'value': self.inputs[abs_name]}
+            for var_name in self.inputs.absolute_names():
+                # Filter based on tags
+                if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+                    continue
 
-        if inp_vars is not None and len(inp_vars) > 0:
-            for var_name in inp_vars:
                 var_meta = {}
                 if values:
-                    var_meta['value'] = inp_vars[var_name]['value']
+                    var_meta['value'] = self.inputs[var_name]
                 if prom_name:
                     var_meta['prom_name'] = self._abs2prom['input'][var_name]
                 if units:
                     var_meta['units'] = meta[var_name]['units']
                 if shape:
-                    var_meta['shape'] = inp_vars[var_name]['value'].shape
+                    var_meta['shape'] = self.inputs[var_name].shape
                 inputs.append((var_name, var_meta))
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
-            if len(inp_vars) is 0:
+            if self.inputs is None or len(self.inputs) is 0:
                 out_stream.write('WARNING: Inputs not recorded. Make sure your recording ' +
                                  'settings have record_inputs set to True\n')
 
@@ -484,6 +488,7 @@ class Case(object):
                      scaling=False,
                      hierarchical=True,
                      print_arrays=False,
+                     tags=None,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -523,6 +528,10 @@ class Case(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        tags : str or list of strs
+            User defined tags that can be used to filter what gets listed. Only inputs with the
+            given tags will be listed.
+            Default is None, which means there will be no filtering based on tags.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -535,49 +544,48 @@ class Case(object):
         meta = self._abs2meta
         expl_outputs = []
         impl_outputs = []
-        out_vars = {}
 
-        for abs_name in self.outputs.absolute_names():
-            out_vars[abs_name] = {'value': self.outputs[abs_name]}
-            if self.residuals and abs_name in self.residuals.absolute_names():
-                out_vars[abs_name]['residuals'] = self.residuals[abs_name]
-            else:
-                out_vars[abs_name]['residuals'] = 'Not Recorded'
+        for var_name in self.outputs.absolute_names():
+            # Filter based on tags
+            if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+                continue
 
-        if len(out_vars) > 0:
-            for name in out_vars:
-                if residuals_tol and \
-                   out_vars[name]['residuals'] is not 'Not Recorded' and \
-                   np.linalg.norm(out_vars[name]['residuals']) < residuals_tol:
+            # check if residuals were recorded, skip if within specifed tolerance
+            if self.residuals and var_name in self.residuals.absolute_names():
+                resids = self.residuals[var_name]
+                if residuals_tol and np.linalg.norm(resids) < residuals_tol:
                     continue
-                outs = {}
-                if values:
-                    outs['value'] = out_vars[name]['value']
-                if prom_name:
-                    outs['prom_name'] = self._abs2prom['output'][name]
-                if residuals:
-                    outs['resids'] = out_vars[name]['residuals']
-                if units:
-                    outs['units'] = meta[name]['units']
-                if shape:
-                    outs['shape'] = out_vars[name]['value'].shape
-                if bounds:
-                    outs['lower'] = meta[name]['lower']
-                    outs['upper'] = meta[name]['upper']
-                if scaling:
-                    outs['ref'] = meta[name]['ref']
-                    outs['ref0'] = meta[name]['ref0']
-                    outs['res_ref'] = meta[name]['res_ref']
-                if meta[name]['explicit']:
-                    expl_outputs.append((name, outs))
-                else:
-                    impl_outputs.append((name, outs))
+            else:
+                resids = 'Not Recorded'
+
+            var_meta = {}
+            if values:
+                var_meta['value'] = self.outputs[var_name]
+            if prom_name:
+                var_meta['prom_name'] = self._abs2prom['output'][var_name]
+            if residuals:
+                var_meta['resids'] = resids
+            if units:
+                var_meta['units'] = meta[var_name]['units']
+            if shape:
+                var_meta['shape'] = self.outputs[var_name].shape
+            if bounds:
+                var_meta['lower'] = meta[var_name]['lower']
+                var_meta['upper'] = meta[var_name]['upper']
+            if scaling:
+                var_meta['ref'] = meta[var_name]['ref']
+                var_meta['ref0'] = meta[var_name]['ref0']
+                var_meta['res_ref'] = meta[var_name]['res_ref']
+            if meta[var_name]['explicit']:
+                expl_outputs.append((var_name, var_meta))
+            else:
+                impl_outputs.append((var_name, var_meta))
 
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
-            if len(out_vars) is 0:
+            if self.outputs is None or len(self.outputs) is 0:
                 out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
                                  'settings have record_outputs set to True\n')
 
@@ -629,8 +637,25 @@ class Case(object):
         for name, vals in var_data:
             var_dict[name] = vals
 
-        # FIXME: vars should be in execution order, for now they are just in sorted order
-        write_var_table('model', sorted(var_dict.keys()), var_type, var_dict,
+        # determine pathname of the system
+        if self.source in ('root', 'driver', 'problem', 'root.nonlinear_solver'):
+            pathname = ''
+        elif '|' in self.source:
+            pathname = get_source_system(self.source)
+        else:
+            pathname = self.source.replace('root.', '')
+            if pathname.endswith('.nonlinear_solver'):
+                pathname = pathname[:-17]  # len('.nonlinear_solver') == 17
+
+        # vars should be in execution order
+        if 'execution_order' in self._var_info:
+            var_order = self._var_info['execution_order']
+            var_list = [var_name for var_name in var_order if var_name in var_dict]
+        else:
+            # don't have execution order, just sort for determinism
+            var_list = sorted(var_dict.keys())
+
+        write_var_table(pathname, var_list, var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
 
     def _get_variables_of_type(self, var_type):
@@ -658,9 +683,9 @@ class Case(object):
 
         return PromAbsDict(ret_vars, self._prom2abs, self._abs2prom)
 
-    def _apply_voi_meta(self, vals, scaled=True, use_indices=True):
+    def _apply_var_settings(self, vals, scaled=True, use_indices=True):
         """
-        Scale the values array and apply indices from _voi_meta per the arguments.
+        Scale the values array and apply indices from _var_info per the arguments.
 
         Parameters
         ----------
@@ -677,8 +702,8 @@ class Case(object):
             Map of variables to their scaled values.
         """
         for name in vals.absolute_names():
-            if name in self._voi_meta:
-                meta = self._voi_meta[name]
+            if name in self._var_info:
+                meta = self._var_info[name]
                 if scaled:
                     # physical to scaled
                     if meta['adder'] is not None:

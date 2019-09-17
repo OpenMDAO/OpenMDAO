@@ -16,3 +16,4 @@ doc_plot_*
 coloring.json
 connections.html
 rank*.dat
+.coverage
