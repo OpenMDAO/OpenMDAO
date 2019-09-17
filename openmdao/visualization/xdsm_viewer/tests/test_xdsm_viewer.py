@@ -13,6 +13,7 @@ from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.scripts.circuit import Circuit
 from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.shell_proc import check_call
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from pyxdsm.XDSM import XDSM
@@ -30,22 +31,13 @@ PYXDSM_OUT = 'pdf' if DEBUG else 'tex'
 SHOW = False
 
 
+if DEBUG:
+    use_tempdirs = lambda cls: cls
+
+
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
+@use_tempdirs
 class TestPyXDSMViewer(unittest.TestCase):
-
-    def setUp(self):
-        if not DEBUG:
-            self.startdir = os.getcwd()
-            self.tempdir = tempfile.mkdtemp(prefix='TestPyXDSMViewer-')
-            os.chdir(self.tempdir)
-
-    def tearDown(self):
-        if not DEBUG:
-            os.chdir(self.startdir)
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
 
     def test_pyxdsm_output_sides(self):
         """Makes XDSM for the Sellar problem"""
@@ -507,21 +499,8 @@ class TestPyXDSMViewer(unittest.TestCase):
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
 
+@use_tempdirs
 class TestXDSMjsViewer(unittest.TestCase):
-
-    def setUp(self):
-        if not DEBUG:
-            self.startdir = os.getcwd()
-            self.tempdir = tempfile.mkdtemp(prefix='TestXDSMjsViewer-')
-            os.chdir(self.tempdir)
-
-    def tearDown(self):
-        if not DEBUG:
-            os.chdir(self.startdir)
-            try:
-                shutil.rmtree(self.tempdir)
-            except OSError:
-                pass
 
     def test_xdsmjs(self):
         """
@@ -1018,7 +997,9 @@ class TestXDSMjsViewer(unittest.TestCase):
 
 
 @unittest.skipUnless(XDSM, "The pyXDSM package is required.")
+@use_tempdirs
 class TestCustomXDSMViewer(unittest.TestCase):
+
     def test_custom_writer(self):
         from openmdao.visualization.xdsm_viewer.xdsm_writer import XDSMjsWriter
 
