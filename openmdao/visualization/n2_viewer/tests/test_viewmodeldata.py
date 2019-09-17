@@ -201,7 +201,7 @@ class TestViewModelData(unittest.TestCase):
     def test_model_viewer_has_correct_data_from_optimization_problem(self):
         """
         Verify that the correct model structure data exists when stored as compared
-        to the expected structure, using the SellarStateConnection model.
+        to the expected structure, using the ActuatorDisc model.
         """
 
         # build the model
