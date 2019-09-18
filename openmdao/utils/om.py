@@ -14,7 +14,7 @@ from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
-from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
+from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
@@ -249,8 +249,8 @@ def _meta_model_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-s', '--surrogate_model_ref', action='store', dest='sur_ref',
-                        help='Variable name of the surrogate model reference.')
+    parser.add_argument('-m', '--pathname', action='store', dest='pathname',
+                        help='pathname of the metamodel component.')
 
 
 def _meta_model_cmd(options):
@@ -267,58 +267,45 @@ def _meta_model_cmd(options):
     function
         The post-setup hook function.
     """
-    file_name = options.file[0]
-    sur_name = options.sur_ref
-
-    dir_name = os.path.dirname(os.path.abspath(__file__))
-    script_path = os.path.join(dir_name, '_meta_model_shell.py')
-    if options.sur_ref is not None:
-        bash_command = ("bokeh serve --show {0} --args  _hidden_func {1} -s {2}").format(
-            script_path, file_name, sur_name)
-    else:
-        bash_command = ("bokeh serve --show {0} --args _hidden_func {1}").format(
-            script_path, file_name)
-    os.system(bash_command)
-
-
-def _hidden_func_parser(parser):
-
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-s', '--surrogate_model_ref', action='store', dest='sur_ref',
-                        help='Variable name of the surrogate model reference.')
-
-
-def _hidden_func_cmd(options):
-
-    def _viz(prob):
-
+    def _view_metamodel(prob):
         Problem._post_setup_func = None
-        # Check if list contains objects that aren't metamodels (use isinstance)
-        metamodels = list(prob.model.system_iter(
-            include_self=True, typ=(MetaModelStructuredComp, MetaModelUnStructuredComp)))
-        if not metamodels:
-            raise AttributeError(
-                'No metamodels found. Check for missing subsystem or incorrect reference name.')
-        metamodel_names = [metamodels[i].name for i in range(0, len(metamodels))]
 
-        if options.sur_ref is None and len(metamodels) > 1:
-            raise NameError(
-                ("No surrogate reference given. Try one of the following {1}").
-                format(metamodel_names))
+        mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp)
 
-        if options.sur_ref is not None and options.sur_ref not in metamodels:
-            raise NameError(
-                ("{0} not in list of surrogate models in given file. Try one of the following {1}").
-                format(options.sur_ref, metamodel_names))
+        pathname = options.pathname
 
-        if len(metamodels) == 1:
-            MetaModelVisualization(metamodels[0])
+        if pathname:
+            comp = prob.model._get_subsystem(pathname)
+            if comp and isinstance(comp, mm_types):
+                view_metamodel(comp)
+                return
         else:
-            for index in range(0, len(metamodels)):
-                if metamodels[index].name == options.sur_ref:
-                    MetaModelVisualization(metamodels[index])
+            comp = None
 
-    return _viz
+        metamodels = {mm.pathname: mm for
+                      mm in prob.model.system_iter(include_self=True, typ=mm_types)}
+
+        mm_names = list(metamodels.keys())
+        mm_count = len(mm_names)
+
+        if mm_count == 0:
+            print("No Metamodel components found in model.")
+
+        elif mm_count == 1 and not pathname:
+            comp = metamodels[mm_names[0]]
+            view_metamodel(comp)
+
+        else:
+            try_str = "Try one of the following {}.".format(mm_names)
+
+            if not pathname:
+                print("Metamodel not specified. {}".format(try_str))
+            elif not comp:
+                print("Metamodel '{}' not found. {}".format(pathname, try_str))
+            else:
+                print("'{}' is not a Metamodel. {}".format(pathname, try_str))
+
+    return _view_metamodel
 
 
 def _config_summary_setup_parser(parser):
@@ -589,9 +576,7 @@ _post_setup_map = {
              'Print citations referenced by problem'),
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
-    '_hidden_func': (_hidden_func_parser, _hidden_func_cmd,
-                     'This is a hidden function for meta_model')
-
+    'meta_model': (_meta_model_parser, _meta_model_cmd, "Meta Model Viewer.")
 }
 
 
@@ -616,7 +601,6 @@ _non_post_setup_map = {
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd, 'XDSM viewer.'),
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
-    'meta_model': (_meta_model_parser, _meta_model_cmd, "Meta Model Viewer.")
 }
 
 
