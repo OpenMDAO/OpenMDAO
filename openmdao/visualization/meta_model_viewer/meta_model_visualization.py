@@ -426,7 +426,6 @@ class MetaModelVisualization(object):
         contour_plot.add_layout(color_bar, 'right')
         contour_plot.x_range = Range1d(min(xlins), max(xlins))
         contour_plot.y_range = Range1d(min(ylins), max(ylins))
-        print(min(xlins), min(ylins))
         contour_plot.image(image='z', source=self.source, x=min(xlins), y=min(ylins),
                            dh=(max(ylins) - min(ylins)), dw=(max(xlins) - min(xlins)),
                            palette="Viridis11")
@@ -619,13 +618,16 @@ class MetaModelVisualization(object):
         # Output Data
         if not self.is_unstructured_meta_model:
             stacked_data = stack_outputs(self.surrogate_ref.training_outputs)
+            training_data = {}
+            for name, values in zip(self.model_ref.pnames, self.model_ref.params):
+                training_data.update({name:values})
 
             if stacked_data.ndim > 2:
-                x_training = np.squeeze(stack_outputs(self.input_data_dict))
+                x_training = np.squeeze(stack_outputs(training_data))
                 y_training = self.surrogate_ref.training_outputs[self.output_select.value].flatten()
 
             else:
-                x_training = np.squeeze(stack_outputs(self.input_data_dict))
+                x_training = np.squeeze(stack_outputs(training_data))
                 y_training = stack_outputs(
                     self.surrogate_ref.training_outputs).reshape(self.resolution, self.resolution)
 
@@ -691,6 +693,6 @@ def view_metamodel(meta_model_comp):
         MetaModelVisualization(meta_model_comp, doc=doc)
 
     # print('Opening Bokeh application on http://localhost:5006/')
-    server = Server({'/': Application(FunctionHandler(make_doc))})
+    server = Server({'/': Application(FunctionHandler(make_doc))}, port=5007)
     server.io_loop.add_callback(server.show, "/")
     server.io_loop.start()
