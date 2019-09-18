@@ -665,28 +665,32 @@ class Problem(object):
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
         if mode == 'fwd':
-            assert(len(wrt) == len(seed)), "seed and 'wrt' list must have the same length"
+            if len(wrt) != len(seed):
+                raise RuntimeError("seed and 'wrt' list must be the same length in fwd mode.")
             lnames, rnames = of, wrt
             lkind, rkind = 'output', 'residual'
         else:  # rev
-            assert(len(of) == len(seed)), "seed and 'of' list must have the same length"
+            if len(of) != len(seed):
+                raise RuntimeError("seed and 'of' list must be the same length in rev mode.")
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
 
+        # set seed values into dresids (fwd) or doutputs (rev)
         try:
             seed[rnames[0]]
         except (IndexError, TypeError):
-            vals = seed
+            for i, name in enumerate(rnames):
+                rvec[name] = seed[i]
         else:
             vals = [seed[n] for n in rnames]
+        for name in rnames:
+            rvec[name] = seed[name]
 
-        # set seed values into dresids (fwd) or doutputs (rev)
-        for i, name in enumerate(rnames):
-            rvec[name] = vals[i]
-
+        # We apply a -1 here because the derivative of the output is minus the derivative of
+        # the residual in openmdao.
         rvec._data *= -1.
 
         self.model.run_solve_linear(['linear'], mode)

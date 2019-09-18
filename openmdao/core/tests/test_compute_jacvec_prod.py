@@ -19,15 +19,19 @@ def get_comp(size):
 
 
 class SubProbComp(om.ExplicitComponent):
-    def __init__(self, input_size, num_nodes):
+    def __init__(self, input_size, num_nodes, mode, **kwargs):
+        super(SubProbComp, self).__init__(**kwargs)
         self.prob = None
         self.size = input_size
         self.num_nodes = num_nodes
+        self.mode = mode
 
     def _setup_subprob(self):
-        self.prob = om.Problem(self.comm)
+        self.prob = p = om.Problem(comm=self.comm)
         model = self.prob.model
         model.add_subsystem('comp', get_comp(self.size))
+        p.setup()
+        p.final_setup()
 
     def setup(self):
         self._setup_subprob()
@@ -39,18 +43,46 @@ class SubProbComp(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         p = self.prob
         x = inputs['x']
-        p['x'] = x
+        p['comp.x'] = x
         for xi in range(x.size):
             inp = inputs['inp']
             for i in range(self.num_nodes):
-                p['inp'] = inp
+                p['comp.inp'] = inp
                 p.run_model()
-                inp = p['out']
+                inp = p['comp.out']
 
-        outputs['out'] = p['out']
+        outputs['out'] = p['comp.out']
+
+    def compute_partials_fwd(self, inputs, partials):
+        p = self.prob
+        x = inputs['x']
+        p['comp.x'] = x
+        subjacs = {}
+        subjacs['out', 'x'] = np.zeros((1, x.size))
+        subjacs['out', 'inp'] = np.zeros((1, 1))
+        seed = {'x': np.zeros(x.size), 'inp': np.zeros(1)}
+        for rhs_i in range(rhs.size):
+            inp = inputs['inp']
+            seed['x'][:] = 0.0
+            seed['inp'][:] = 0.0
+            for i in range(self.num_nodes):
+                p['comp.inp'] = inp
+                p.run_model()
+                inp = p['comp.out']
+                jvp = p.compute_jacvec_product(of=['out'], wrt=['x','inp'], 'fwd', seed)
+
+            subjacs['out', 'x'][rhs_i]
+
+        outputs['out'] = p['comp.out']
+
+    def compute_partials_rev(self, inputs, partials):
+        pass
 
     def compute_partials(self, inputs, partials):
-        pass
+        if self.mode == 'fwd':
+            self._compute_partials_fwd(inputs, partials)
+        else:
+            self._compute_partials_rev(inputs, partials)
 
 
 
@@ -61,27 +93,43 @@ class TestPComputeJacvecProd(unittest.TestCase):
         p = om.Problem()
         model = p.model
         indep = model.add_subsystem('indep', om.IndepVarComp('x', val=np.zeros(size)))
-        indep.add_output('out', val=0.0)
+        indep.add_output('inp', val=0.0)
 
         C1 = model.add_subsystem('C1', get_comp(size))
         C2 = model.add_subsystem('C2', get_comp(size))
         C3 = model.add_subsystem('C3', get_comp(size))
 
         model.connect('indep.x', ['C1.x', 'C2.x', 'C3.x'])
+        model.connect('indep.inp', 'C1.inp')
         model.connect('C1.out', 'C2.inp')
         model.connect('C2.out', 'C3.inp')
 
         return p
 
     def test_fwd(self):
-        p = self._build_om_model(3)
+        p = self._build_om_model(5)
         p.setup(mode='fwd')
-        p['indep.x'] = np.random.random(3)
-        p['indep.out'] = np.random.random(1)[0]
+        p['indep.x'] = np.random.random(5)
+        p['indep.inp'] = np.random.random(1)[0]
+        p.final_setup()
+
+        p2 = om.Problem()
+        comp = p2.model.add_subsystem('comp', SubProbComp(input_size=5, num_nodes=3))
+        p2.setup(mode='fwd')
+
+        p2['comp.x'] = p['indep.x']
+        p2['comp.inp'] = p['indep.inp']
+
         p.run_model()
 
-        J = p.compute_totals(of=['C3.out'], wrt=['indep.x', 'indep.out'], return_format='array')
+        J = p.compute_totals(of=['C3.out'], wrt=['indep.x', 'indep.inp'], return_format='array')
         print(J)
+
+
+        p2.run_model()
+
+        self.assertEqual(p['C3.out'], p2['comp.out'])
+
 
     def test_rev(self):
         pass
