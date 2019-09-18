@@ -296,14 +296,14 @@ def _meta_model_cmd(options):
             view_metamodel(comp)
 
         else:
-            try_str = "Try one of the following {}.".format(mm_names)
+            try_str = "Try one of the following: {}.".format(mm_names)
 
             if not pathname:
-                print("Metamodel not specified. {}".format(try_str))
+                raise AttributeError("Metamodel not specified.\n {}".format(try_str))
             elif not comp:
-                print("Metamodel '{}' not found. {}".format(pathname, try_str))
+                raise AttributeError("Metamodel '{}' not found.\n {}".format(pathname, try_str))
             else:
-                print("'{}' is not a Metamodel. {}".format(pathname, try_str))
+                raise AttributeError("'{}' is not a Metamodel.\n {}".format(pathname, try_str))
 
     return _view_metamodel
 

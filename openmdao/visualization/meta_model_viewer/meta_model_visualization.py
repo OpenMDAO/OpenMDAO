@@ -402,6 +402,9 @@ class MetaModelVisualization(object):
 
         self.source.data = dict(z=[self.Z])
 
+        xlins = self.xlins_mesh
+        ylins = self.ylins_mesh
+
         # Color bar formatting
         color_mapper = LinearColorMapper(
             palette="Viridis11", low=np.amin(self.Z), high=np.amax(self.Z))
@@ -412,7 +415,7 @@ class MetaModelVisualization(object):
         self.contour_plot = contour_plot = figure(
             match_aspect=False,
             tooltips=[(self.x_input.value, "$x"), (self.y_input.value, "$y"),
-                      (self.output_select.value, "@z")], tools="pan")
+                      (self.output_select.value, "@z")], tools='')
         contour_plot.x_range.range_padding = 0
         contour_plot.y_range.range_padding = 0
         contour_plot.plot_width = 600
@@ -421,9 +424,9 @@ class MetaModelVisualization(object):
         contour_plot.yaxis.axis_label = self.y_input.value
         contour_plot.min_border_left = 0
         contour_plot.add_layout(color_bar, 'right')
-        xlins = self.xlins_mesh
-        ylins = self.ylins_mesh
-
+        contour_plot.x_range = Range1d(min(xlins), max(xlins))
+        contour_plot.y_range = Range1d(min(ylins), max(ylins))
+        print(min(xlins), min(ylins))
         contour_plot.image(image='z', source=self.source, x=min(xlins), y=min(ylins),
                            dh=(max(ylins) - min(ylins)), dw=(max(xlins) - min(xlins)),
                            palette="Viridis11")
@@ -615,12 +618,13 @@ class MetaModelVisualization(object):
         # Input Data
         # Output Data
         if not self.is_unstructured_meta_model:
-            if self.surrogate_ref.options['method'] in ['cubic', 'scipy_cubic']:
+            stacked_data = stack_outputs(self.surrogate_ref.training_outputs)
+
+            if stacked_data.ndim > 2:
                 x_training = np.squeeze(stack_outputs(self.input_data_dict))
                 y_training = self.surrogate_ref.training_outputs[self.output_select.value].flatten()
 
-            elif self.surrogate_ref.options['method'] in ['slinear', 'scipy_slinear']:
-                # slinear
+            else:
                 x_training = np.squeeze(stack_outputs(self.input_data_dict))
                 y_training = stack_outputs(
                     self.surrogate_ref.training_outputs).reshape(self.resolution, self.resolution)
@@ -659,9 +663,9 @@ class MetaModelVisualization(object):
             info[0:2] = infos[i, :]
             info[2] = dists[dist_index] / dist_limit
             if not self.is_unstructured_meta_model:
-                if self.surrogate_ref.options['method'] in ['cubic', 'scipy_cubic']:
+                if stacked_data.ndim > 2:
                     info[3] = y_training[i]
-                elif self.surrogate_ref.options['method'] in ['slinear', 'scipy_slinear']:
+                else:
                     info[3] = y_training[i, output_variable]
             else:
                 info[3] = y_training[i, output_variable]

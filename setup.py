@@ -18,7 +18,7 @@ optional_dependencies = {
         'sphinx>=1.8.5',
     ],
     'visualization': [
-        'bokeh'
+        'bokeh>=1.3.4'
     ],
     'test': [
         'coverage',
