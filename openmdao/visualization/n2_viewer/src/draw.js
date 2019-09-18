@@ -13,18 +13,6 @@ var drawableN2ComponentBoxes;
 var matrix;
 
 var gridLines;
-var symbols_scalar,
-    symbols_vector,
-    symbols_group,
-    symbols_scalarScalar,
-    symbols_scalarVector,
-    symbols_vectorScalar,
-    symbols_vectorVector,
-    symbols_scalarGroup,
-    symbols_groupScalar,
-    symbols_vectorGroup,
-    symbols_groupVector,
-    symbols_groupGroup;
 
 var sharedTransition;
 var FindRootOfChangeFunction = null;
@@ -68,37 +56,6 @@ function DrawRect(x, y, width, height, fill) {
         .attr("fill-opacity", "1");
 }
 
-function DrawArrows(startIndex, endIndex) {
-    var lineWidth = Math.min(5, n2Dx * .5, n2Dy * .5);
-    arrowMarker.attr("markerWidth", lineWidth * .4)
-        .attr("markerHeight", lineWidth * .4);
-
-    var boxStart = d3RightTextNodesArrayZoomedBoxInfo[startIndex];
-    var boxEnd = d3RightTextNodesArrayZoomedBoxInfo[endIndex];
-
-    //draw multiple horizontal lines but no more than one vertical line for box to box connections
-    var startIndices = [];
-    for (var startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
-        for (var endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
-            if (matrix[startsI + "_" + endsI] !== undefined) { //if(matrix[startsI][endsI].z > 0){
-                startIndices.push(startsI);
-                break;
-            }
-        }
-    }
-
-    for (var i = 0; i < startIndices.length; ++i) {
-        var startI = startIndices[i];
-        var boxEndDelta = boxEnd.stopI - boxEnd.startI;
-        new N2Arrow({
-            start: { col: startI, row: startI },
-            end: { col: endIndex, row: endIndex },
-            color: (startIndex < endIndex) ? GREEN_ARROW_COLOR : RED_ARROW_COLOR,
-            width: lineWidth
-        });
-    }
-}
-
 function DrawArrowsParamView(startIndex, endIndex) {
     var lineWidth = Math.min(5, n2Dx * .5, n2Dy * .5);
     arrowMarker.attr("markerWidth", lineWidth * .4)
@@ -111,7 +68,7 @@ function DrawArrowsParamView(startIndex, endIndex) {
     var startIndices = [], endIndices = [];
     for (var startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
         for (var endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
-            if (matrix[startsI + "_" + endsI] !== undefined) { //if(matrix[startsI][endsI].z > 0){
+            if (matrix.node(startsI, endsI) !== undefined) {
                 startIndices.push(startsI);
                 endIndices.push(endsI);
             }
@@ -137,7 +94,8 @@ function DrawMatrix() {
         v = n2Dy * .5; //(0,0) = center of cell... (u,v) = bottom right of cell... (-u,-v) = top left of cell
 
     function GetOnDiagonalCellColor(d) {
-        var rt = d3RightTextNodesArrayZoomed[d.c];
+        var rt = d3RightTextNodesArrayZoomed[d.col];
+        if ( rt === undefined ) {console.log(d);}
         if (rt.isMinimized) return COLLAPSED_COLOR;
         if (rt.type === "param") return PARAM_COLOR;
         if (rt.type === "unconnected_param") return UNCONNECTED_PARAM_COLOR
@@ -145,21 +103,32 @@ function DrawMatrix() {
     }
 
     if (modelData.options.use_declare_partial_info) {
-        symbols_scalarScalar_data = symbols_scalarScalar_declared_partials;
-        symbols_vectorVector_data = symbols_vectorVector_declared_partials;
-        symbols_vectorScalar_data = symbols_vectorScalar_declared_partials;
-        symbols_scalarVector_data = symbols_scalarVector_declared_partials;
+        symbols_scalarScalar_data = matrix.symbols.declaredPartials.scalarScalar;
+        symbols_vectorVector_data = matrix.symbols.declaredPartials.vectorVector;
+        symbols_vectorScalar_data = matrix.symbols.declaredPartials.vectorScalar;
+        symbols_scalarVector_data = matrix.symbols.declaredPartials.scalarVector;
     } else {
-        symbols_scalarScalar_data = symbols_scalarScalar;
-        symbols_vectorVector_data = symbols_vectorVector;
-        symbols_vectorScalar_data = symbols_vectorScalar;
-        symbols_scalarVector_data = symbols_scalarVector;
+        symbols_scalarScalar_data = matrix.symbols.scalarScalar;
+        symbols_vectorVector_data = matrix.symbols.vectorVector;
+        symbols_vectorScalar_data = matrix.symbols.vectorScalar;
+        symbols_scalarVector_data = matrix.symbols.scalarVector;
     }
     var classes = ["cell_scalar", "cell_vector", "cell_group", "cell_scalarScalar", "cell_scalarVector", "cell_vectorScalar",
         "cell_vectorVector", "cell_scalarGroup", "cell_groupScalar", "cell_vectorGroup", "cell_groupVector", "cell_groupGroup"
     ];
-    var datas = [symbols_scalar, symbols_vector, symbols_group, symbols_scalarScalar_data, symbols_scalarVector_data, symbols_vectorScalar_data,
-        symbols_vectorVector_data, symbols_scalarGroup, symbols_groupScalar, symbols_vectorGroup, symbols_groupVector, symbols_groupGroup
+    var datas = [
+        matrix.symbols.scalar,
+        matrix.symbols.vector,
+        matrix.symbols.group,
+        symbols_scalarScalar_data,
+        symbols_scalarVector_data,
+        symbols_vectorScalar_data,
+        symbols_vectorVector_data,
+        matrix.symbols.scalarGroup,
+        matrix.symbols.groupScalar,
+        matrix.symbols.vectorGroup,
+        matrix.symbols.groupVector,
+        matrix.symbols.groupGroup
     ];
     var drawFunctions = [DrawScalar, DrawVector, DrawGroup, DrawScalar, DrawVector, DrawVector,
         DrawVector, DrawGroup, DrawGroup, DrawGroup, DrawGroup, DrawGroup
@@ -172,7 +141,7 @@ function DrawMatrix() {
         var gEnter = sel.enter().append("g")
             .attr("class", classes[i])
             .attr("transform", function (d) {
-                if (lastClickWasLeft) return "translate(" + (n2Dx0 * (d.c - enterIndex) + u0) + "," + (n2Dy0 * (d.r - enterIndex) + v0) + ")";
+                if (lastClickWasLeft) return "translate(" + (n2Dx0 * (d.col - enterIndex) + u0) + "," + (n2Dy0 * (d.row - enterIndex) + v0) + ")";
                 var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                 if (roc) {
                     var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
@@ -188,14 +157,14 @@ function DrawMatrix() {
 
         var gUpdate = gEnter.merge(sel).transition(sharedTransition)
             .attr("transform", function (d) {
-                return "translate(" + (n2Dx * (d.c) + u) + "," + (n2Dy * (d.r) + v) + ")";
+                return "translate(" + (n2Dx * (d.col) + u) + "," + (n2Dy * (d.row) + v) + ")";
             });
         drawFunctions[i](gUpdate, u, v, (i < 3) ? GetOnDiagonalCellColor : CONNECTION_COLOR, true);
 
 
         var nodeExit = sel.exit().transition(sharedTransition)
             .attr("transform", function (d) {
-                if (lastClickWasLeft) return "translate(" + (n2Dx * (d.c - exitIndex) + u) + "," + (n2Dy * (d.r - exitIndex) + v) + ")";
+                if (lastClickWasLeft) return "translate(" + (n2Dx * (ol - exitIndex) + u) + "," + (n2Dy * (d.row - exitIndex) + v) + ")";
                 var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                 if (roc) {
                     var index = roc.rootIndex - zoomedElement.rootIndex;

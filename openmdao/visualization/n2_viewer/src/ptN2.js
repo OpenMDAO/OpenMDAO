@@ -1,6 +1,8 @@
 function PtN2Diagram(parentDiv, modelData) {
+    // console.log(modelData);
     var root = modelData.tree;
     var conns = modelData.connections_list;
+    // console.log(conns);
     var abs2prom = modelData.hasOwnProperty("abs2prom") ? modelData.abs2prom : undefined;
 
     var FONT_SIZE_PX = 11;
@@ -123,8 +125,8 @@ function PtN2Diagram(parentDiv, modelData) {
         var text = "Connections:";
         for (var key in newConnsDict) {
             var d = newConnsDict[key];
-            var param = d3RightTextNodesArrayZoomed[d.c],
-                unknown = d3RightTextNodesArrayZoomed[d.r];
+            var param = d3RightTextNodesArrayZoomed[d.col],
+                unknown = d3RightTextNodesArrayZoomed[d.row];
             var paramName = (zoomedElement.promotions && zoomedElement.promotions[param.absPathName] !== undefined) ?
                 "<b>" + zoomedElement.promotions[param.absPathName] + "</b>" :
                 ((zoomedElement === root) ? param.absPathName : param.absPathName.slice(zoomedElement.absPathName.length + 1));
@@ -145,7 +147,7 @@ function PtN2Diagram(parentDiv, modelData) {
             var c = Math.floor(coords[0] * d3RightTextNodesArrayZoomed.length / WIDTH_N2_PX);
             var r = Math.floor(coords[1] * d3RightTextNodesArrayZoomed.length / HEIGHT_PX);
             if (r == c || r < 0 || c < 0 || r >= d3RightTextNodesArrayZoomed.length || c >= d3RightTextNodesArrayZoomed.length) return;
-            if (matrix[r + "_" + c] !== undefined) return;
+            if (matrix.node(r,c) !== undefined) return;
 
             var param = d3RightTextNodesArrayZoomed[c],
                 unknown = d3RightTextNodesArrayZoomed[r];
@@ -181,7 +183,7 @@ function PtN2Diagram(parentDiv, modelData) {
             var c = Math.floor(coords[0] * d3RightTextNodesArrayZoomed.length / WIDTH_N2_PX);
             var r = Math.floor(coords[1] * d3RightTextNodesArrayZoomed.length / HEIGHT_PX);
             if (r == c || r < 0 || c < 0 || r >= d3RightTextNodesArrayZoomed.length || c >= d3RightTextNodesArrayZoomed.length) return;
-            if (matrix[r + "_" + c] !== undefined) return;
+            if (matrix.node(r,c) !== undefined) return;
             if (n2BackgroundRectR0 == r && n2BackgroundRectC0 == c) return;
             //n2Group.selectAll(".n2_hover_elements_" + n2BackgroundRectR0 + "_" + n2BackgroundRectC0).remove();
             n2Group.selectAll(".n2_hover_elements").remove();
@@ -224,7 +226,8 @@ function PtN2Diagram(parentDiv, modelData) {
     InitSubSystemChildren(root);
     ComputeLayout();
     ComputeConnections();
-    ComputeMatrixN2();
+    matrix = new N2Matrix(d3RightTextNodesArrayZoomed);
+    // ComputeMatrixN2(true);
 
     var collapseDepthElement = parentDiv.querySelector("#idCollapseDepthDiv");
     for (var i = 2; i <= maxDepth; ++i) {
@@ -255,7 +258,8 @@ function PtN2Diagram(parentDiv, modelData) {
         // Compute the new tree layout.
         if (computeNewTreeLayout) {
             ComputeLayout(); //updates d3NodesArray
-            ComputeMatrixN2();
+            // ComputeMatrixN2();
+            matrix = new N2Matrix(d3RightTextNodesArrayZoomed);
         }
 
         for (var i = 2; i <= maxDepth; ++i) {
@@ -1300,167 +1304,6 @@ function PtN2Diagram(parentDiv, modelData) {
         }
     }
 
-    function ComputeMatrixN2() {
-        matrix = {};
-        if (d3RightTextNodesArrayZoomed.length < LEVEL_OF_DETAIL_THRESHOLD) {
-            for (var si = 0; si < d3RightTextNodesArrayZoomed.length; ++si) {
-                var srcObj = d3RightTextNodesArrayZoomed[si];
-                matrix[si + "_" + si] = { "r": si, "c": si, "obj": srcObj, "id": srcObj.id + "_" + srcObj.id };
-                var targets = srcObj.targetsParamView;
-                for (let tgtObj of targets) {
-                    var ti = d3RightTextNodesArrayZoomed.indexOf(tgtObj);
-                    if (ti != -1) {
-                        matrix[si + "_" + ti] = { "r": si, "c": ti, "obj": srcObj, "id": srcObj.id + "_" + tgtObj.id }; //matrix[si][ti].z = 1;
-                    }
-                }
-                if (srcObj.type === "param" || srcObj.type === "unconnected_param") {
-                    for (var j = si + 1; j < d3RightTextNodesArrayZoomed.length; ++j) {
-                        var tgtObj = d3RightTextNodesArrayZoomed[j];
-                        if (srcObj.parentComponent !== tgtObj.parentComponent) break;
-                        if (tgtObj.type === "unknown") {
-                            var ti = j;
-                            matrix[si + "_" + ti] = { "r": si, "c": ti, "obj": srcObj, "id": srcObj.id + "_" + tgtObj.id };
-                        }
-                    }
-                }
-            }
-        }
-        n2Dx0 = n2Dx;
-        n2Dy0 = n2Dy;
-
-        n2Dx = WIDTH_N2_PX / d3RightTextNodesArrayZoomed.length;
-        n2Dy = HEIGHT_PX / d3RightTextNodesArrayZoomed.length;
-
-        symbols_scalar = [];
-        symbols_vector = [];
-        symbols_group = [];
-        symbols_scalarScalar = [];
-        symbols_scalarVector = [];
-        symbols_vectorScalar = [];
-        symbols_vectorVector = [];
-        symbols_scalarGroup = [];
-        symbols_groupScalar = [];
-        symbols_vectorGroup = [];
-        symbols_groupVector = [];
-        symbols_groupGroup = [];
-        symbols_vectorVector_declared_partials = [];
-        symbols_scalarScalar_declared_partials = [];
-        symbols_vectorScalar_declared_partials = [];
-        symbols_scalarVector_declared_partials = [];
-
-        for (var key in matrix) {
-            var d = matrix[key];
-            var tgtObj = d3RightTextNodesArrayZoomed[d.c], srcObj = d3RightTextNodesArrayZoomed[d.r];
-            //alert(tgtObj.name + " " + srcObj.name);
-            if (d.c == d.r) { //on diagonal
-                if (srcObj.type === "subsystem") { //group
-                    symbols_group.push(d);
-                } else if (srcObj.type === "unknown" || (srcObj.type === "param" || srcObj.type === "unconnected_param")) {
-                    if (srcObj.dtype === "ndarray") { //vector
-                        symbols_vector.push(d);
-                    } else { //scalar
-                        symbols_scalar.push(d);
-                    }
-                }
-
-            }
-            else if (srcObj.type === "subsystem") {
-                if (tgtObj.type === "subsystem") { //groupGroup
-                    symbols_groupGroup.push(d);
-                }
-                else if (tgtObj.type === "unknown" || (tgtObj.type === "param" || tgtObj.type === "unconnected_param")) {
-                    if (tgtObj.dtype === "ndarray") {//groupVector
-                        symbols_groupVector.push(d);
-                    }
-                    else {//groupScalar
-                        symbols_groupScalar.push(d);
-                    }
-                }
-            }
-            else if (srcObj.type === "unknown" || (srcObj.type === "param" || srcObj.type === "unconnected_param")) {
-                if (srcObj.dtype === "ndarray") {
-                    if (tgtObj.type === "unknown" || (tgtObj.type === "param" || tgtObj.type === "unconnected_param")) {
-                        if (tgtObj.dtype === "ndarray" || (tgtObj.type === "param" || tgtObj.type === "unconnected_param")) {//vectorVector
-                            symbols_vectorVector.push(d);
-                            var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                            if (modelData.declare_partials_list.includes(partials_string)) {
-                                symbols_vectorVector_declared_partials.push(d);
-                            }
-
-                        }
-                        else {//vectorScalar
-                            symbols_vectorScalar.push(d);
-                            var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                            if (modelData.declare_partials_list.includes(partials_string)) {
-                                symbols_vectorScalar_declared_partials.push(d);
-                            }
-                        }
-
-                    }
-                    else if (tgtObj.type === "subsystem") { //vectorGroup
-                        symbols_vectorGroup.push(d);
-                    }
-                }
-                else { //if (srcObj.dtype !== "ndarray"){
-                    if (tgtObj.type === "unknown" || (tgtObj.type === "param" || tgtObj.type === "unconnected_param")) {
-                        if (tgtObj.dtype === "ndarray") {//scalarVector
-                            symbols_scalarVector.push(d);
-                            var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                            if (modelData.declare_partials_list.includes(partials_string)) {
-                                symbols_scalarVector_declared_partials.push(d);
-                            }
-                        }
-                        else {//scalarScalar
-                            symbols_scalarScalar.push(d);
-                            var partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                            if (modelData.declare_partials_list.includes(partials_string)) {
-                                symbols_scalarScalar_declared_partials.push(d);
-                            }
-                        }
-                    }
-                    else if (tgtObj.type === "subsystem") { //scalarGroup
-                        symbols_scalarGroup.push(d);
-                    }
-                }
-            }
-        }
-
-        var currentBox = { "startI": 0, "stopI": 0 };
-        d3RightTextNodesArrayZoomedBoxInfo = [currentBox];
-        for (var ri = 1; ri < d3RightTextNodesArrayZoomed.length; ++ri) {
-            //boxes
-            var el = d3RightTextNodesArrayZoomed[ri];
-            var startINode = d3RightTextNodesArrayZoomed[currentBox.startI];
-            if (startINode.parentComponent && el.parentComponent && startINode.parentComponent === el.parentComponent) {
-                ++currentBox.stopI;
-            }
-            else {
-                currentBox = { "startI": ri, "stopI": ri };
-            }
-            d3RightTextNodesArrayZoomedBoxInfo.push(currentBox);
-        }
-
-        drawableN2ComponentBoxes = [];
-        for (var i = 0; i < d3RightTextNodesArrayZoomedBoxInfo.length; ++i) { //draw grid lines last so that they will always be visible
-            var box = d3RightTextNodesArrayZoomedBoxInfo[i];
-            if (box.startI == box.stopI) continue;
-            var el = d3RightTextNodesArrayZoomed[box.startI];
-            if (!el.parentComponent) alert("parent component not found in box"); //continue;
-            box.obj = el.parentComponent;
-            i = box.stopI;
-            drawableN2ComponentBoxes.push(box);
-        }
-
-        //do this so you save old index for the exit()
-        gridLines = [];
-        if (d3RightTextNodesArrayZoomed.length < LEVEL_OF_DETAIL_THRESHOLD) {
-            for (var i = 0; i < d3RightTextNodesArrayZoomed.length; ++i) {
-                var obj = d3RightTextNodesArrayZoomed[i];
-                var gl = { "i": i, "obj": obj };
-                gridLines.push(gl);
-            }
-        }
-    }
     function FindRootOfChangeForRightClick(d) {
         return lastRightClickedElement;
     }
@@ -1477,6 +1320,8 @@ function PtN2Diagram(parentDiv, modelData) {
     }
 
     function MouseoverOffDiagN2(d) {
+        // console.log('MouseoverOffDiagN2:'); console.log(d);
+
         function GetObjectsInChildrenWithCycleArrows(d, arr) {
             if (d.cycleArrows) {
                 arr.push(d);
@@ -1521,17 +1366,18 @@ function PtN2Diagram(parentDiv, modelData) {
         var lineWidth = Math.min(5, n2Dx * .5, n2Dy * .5);
         arrowMarker.attr("markerWidth", lineWidth * .4)
             .attr("markerHeight", lineWidth * .4);
-        var src = d3RightTextNodesArrayZoomed[d.r];
-        var tgt = d3RightTextNodesArrayZoomed[d.c];
-        var boxEnd = d3RightTextNodesArrayZoomedBoxInfo[d.c];
-        if (d.r > d.c) { //bottom left
-            new N2Arrow({
-                start: { col: d.r, row: d.r },
-                end: { col: d.c, row: d.c },
-                color: RED_ARROW_COLOR,
-                width: lineWidth
-            });
+        var src = d3RightTextNodesArrayZoomed[d.row];
+        var tgt = d3RightTextNodesArrayZoomed[d.col];
+        var boxEnd = d3RightTextNodesArrayZoomedBoxInfo[d.col];
 
+        new N2Arrow({
+            start: { col: d.row, row: d.row },
+            end: { col: d.col, row: d.col },
+            color: RED_ARROW_COLOR,
+            width: lineWidth
+        });
+
+        if (d.row > d.col) {
             var targetsWithCycleArrows = [];
             GetObjectsWithCycleArrows(tgt, targetsWithCycleArrows);
             for (var ti = 0; ti < targetsWithCycleArrows.length; ++ti) {
@@ -1579,25 +1425,17 @@ function PtN2Diagram(parentDiv, modelData) {
                 }
             }
         }
-        else if (d.r < d.c) { //top right
-            new N2Arrow({
-                start: { col: d.r, row: d.r },
-                end: { col: d.c, row: d.c },
-                color: RED_ARROW_COLOR,
-                width: lineWidth
-            });
-        }
 
-        var leftTextWidthR = d3RightTextNodesArrayZoomed[d.r].nameWidthPx,
-            leftTextWidthC = d3RightTextNodesArrayZoomed[d.c].nameWidthPx;
-        DrawRect(-leftTextWidthR - PTREE_N2_GAP_PX, n2Dy * d.r, leftTextWidthR, n2Dy, RED_ARROW_COLOR); //highlight var name
-        DrawRect(-leftTextWidthC - PTREE_N2_GAP_PX, n2Dy * d.c, leftTextWidthC, n2Dy, GREEN_ARROW_COLOR); //highlight var name
+        var leftTextWidthR = d3RightTextNodesArrayZoomed[d.row].nameWidthPx,
+            leftTextWidthC = d3RightTextNodesArrayZoomed[d.col].nameWidthPx;
+        DrawRect(-leftTextWidthR - PTREE_N2_GAP_PX, n2Dy * d.row, leftTextWidthR, n2Dy, RED_ARROW_COLOR); //highlight var name
+        DrawRect(-leftTextWidthC - PTREE_N2_GAP_PX, n2Dy * d.col, leftTextWidthC, n2Dy, GREEN_ARROW_COLOR); //highlight var name
     }
 
     function MouseoverOnDiagN2(d) {
         //d=hovered element
         // console.log('MouseoverOnDiagN2:'); console.log(d);
-        var hoveredIndexRC = d.c; //d.x == d.y == row == col
+        var hoveredIndexRC = d.col; //d.x == d.y == row == col
         var leftTextWidthHovered = d3RightTextNodesArrayZoomed[hoveredIndexRC].nameWidthPx;
 
         // Loop over all elements in the matrix looking for other cells in the same column as
@@ -1608,7 +1446,7 @@ function PtN2Diagram(parentDiv, modelData) {
         for (var i = 0; i < d3RightTextNodesArrayZoomed.length; ++i) {
             var leftTextWidthDependency = d3RightTextNodesArrayZoomed[i].nameWidthPx;
             var box = d3RightTextNodesArrayZoomedBoxInfo[i];
-            if (matrix[hoveredIndexRC + "_" + i] !== undefined) { //if (matrix[hoveredIndexRC][i].z > 0) { //i is column here
+            if (matrix.node(hoveredIndexRC,i) !== undefined) { //i is column here
                 if (i != hoveredIndexRC) {
                     new N2Arrow({
                         end: { col: i, row: i },
@@ -1616,11 +1454,11 @@ function PtN2Diagram(parentDiv, modelData) {
                         color: GREEN_ARROW_COLOR,
                         width: lineWidth
                     });
-                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, DEBUG_ARROW_GREEN); //highlight var name
+                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, GREEN_ARROW_COLOR); //highlight var name
                 }
             }
 
-            if (matrix[i + "_" + hoveredIndexRC] !== undefined) { //if (matrix[i][hoveredIndexRC].z > 0) { //i is row here
+            if (matrix.node(i,hoveredIndexRC) !== undefined) { //i is row here
                 if (i != hoveredIndexRC) {
                     new N2Arrow({
                         start: { col: i, row: i },
@@ -1628,7 +1466,7 @@ function PtN2Diagram(parentDiv, modelData) {
                         color: RED_ARROW_COLOR,
                         width: lineWidth
                     });
-                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, DEBUG_ARROW_RED); //highlight var name
+                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, RED_ARROW_COLOR); //highlight var name
                 }
             }
         }
@@ -1639,7 +1477,7 @@ function PtN2Diagram(parentDiv, modelData) {
     }
 
     function MouseClickN2(d) {
-        var newClassName = "n2_hover_elements_" + d.r + "_" + d.c;
+        var newClassName = "n2_hover_elements_" + d.row + "_" + d.col;
         var selection = n2Group.selectAll("." + newClassName);
         if (selection.size() > 0) {
             selection.remove();
