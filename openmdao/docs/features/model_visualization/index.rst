@@ -15,3 +15,4 @@ a model.
     view_connections.rst
     n2_basics.rst
     n2_details.rst
+    meta_model_basics.rst
