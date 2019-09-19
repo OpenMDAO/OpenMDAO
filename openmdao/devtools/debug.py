@@ -409,7 +409,7 @@ def config_summary(problem, stream=sys.stdout):
             linstr.append('{} x {}'.format(slvname, num))
         else:
             linstr.append(slvname)
-    printer("Linear Solvers: {}".format(', '.join(linstr)))
+    printer("Linear Solvers: [{}]".format(', '.join(linstr)))
 
 
     nlstr = []
@@ -418,7 +418,7 @@ def config_summary(problem, stream=sys.stdout):
             nlstr.append('{} x {}'.format(slvname, num))
         else:
             nlstr.append(slvname)
-    printer("Nonlinear Solvers: {}".format(', '.join(nlstr)))
+    printer("Nonlinear Solvers: [{}]".format(', '.join(nlstr)))
 
 
 @contextmanager
