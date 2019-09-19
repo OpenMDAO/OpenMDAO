@@ -44,12 +44,11 @@ class SubProbComp(om.ExplicitComponent):
         p = self.prob
         x = inputs['x']
         p['comp.x'] = x
-        for xi in range(x.size):
-            inp = inputs['inp']
-            for i in range(self.num_nodes):
-                p['comp.inp'] = inp
-                p.run_model()
-                inp = p['comp.out']
+        inp = inputs['inp']
+        for i in range(self.num_nodes):
+            p['comp.inp'] = inp
+            p.run_model()
+            inp = p['comp.out']
 
         outputs['out'] = p['comp.out']
 
@@ -57,23 +56,22 @@ class SubProbComp(om.ExplicitComponent):
         p = self.prob
         x = inputs['x']
         p['comp.x'] = x
-        subjacs = {}
-        subjacs['out', 'x'] = np.zeros((1, x.size))
-        subjacs['out', 'inp'] = np.zeros((1, 1))
-        seed = {'x': np.zeros(x.size), 'inp': np.zeros(1)}
+        p['comp.inp'] = inputs['inp']
+        rhs = np.zeros(x.size + 1)
+        seed = {'x': rhs[:x.size], 'inp': rhs[x.size:]}
+        p.run_model()
         for rhs_i in range(rhs.size):
-            inp = inputs['inp']
-            seed['x'][:] = 0.0
-            seed['inp'][:] = 0.0
+            rhs[:] = 0.0
+            rhs[rhs_i] = 1.0
             for i in range(self.num_nodes):
-                p['comp.inp'] = inp
-                p.run_model()
                 inp = p['comp.out']
                 jvp = p.compute_jacvec_product(of=['out'], wrt=['x','inp'], 'fwd', seed)
+                seed['inp'] = jvp['out']
 
-            subjacs['out', 'x'][rhs_i]
-
-        outputs['out'] = p['comp.out']
+            if rhs_i < x.size:
+                partials['out', 'x'][0, rhs_i] = jvp['out']
+            else:
+                partials['out', 'inp'][0, 0] = jvp['out']
 
     def compute_partials_rev(self, inputs, partials):
         pass
