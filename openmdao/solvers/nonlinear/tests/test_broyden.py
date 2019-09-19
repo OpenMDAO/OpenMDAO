@@ -852,9 +852,7 @@ class TestBryodenFeature(unittest.TestCase):
 class BroydenMPITestCase(unittest.TestCase):
     N_PROCS = 2
 
-    def test_cs_around_broyden_mpi(self):
-        # Basic sellar test.
-
+    def test_cs_around_broyden(self):
         prob = om.Problem()
         model = prob.model
         sub = model.add_subsystem('sub', om.ParallelGroup(), promotes=['*'])
@@ -866,7 +864,7 @@ class BroydenMPITestCase(unittest.TestCase):
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
 
         model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
-                                                z=np.array([0.0, 0.0]), x=0.0),
+                                                   z=np.array([0.0, 0.0]), x=0.0),
                             promotes=['obj', 'x', 'z', 'y1', 'y2'])
 
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'),
@@ -878,12 +876,48 @@ class BroydenMPITestCase(unittest.TestCase):
         sub.linear_solver = om.DirectSolver()
         model.linear_solver = om.DirectSolver()
 
-        if int(os.environ.get('TRACE_MPI', 0)):
-            from openmdao.devtools.debug import trace_mpi
-            trace_mpi()
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
 
-        if int(os.environ.get('USE_WING', 0)):
-            import wingdbstub
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.set_solver_print(level=2)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob.get_val('y1', get_remote=True), 25.58830237, .00001)
+
+        totals = prob.check_totals(method='cs', out_stream=None)
+
+        for key, val in iteritems(totals):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+
+    def test_cs_around_broyden_compute_jac_false(self):
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.ParallelGroup(), promotes=['*'])
+
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'),
+                            promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'),
+                            promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = om.BroydenSolver()
+        sub.nonlinear_solver.options['compute_jacobian'] = False
+        sub.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
 
         prob.model.add_design_var('x', lower=-100, upper=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
@@ -895,6 +929,50 @@ class BroydenMPITestCase(unittest.TestCase):
         prob.set_solver_print(level=2)
 
         prob.run_model()
+
+        assert_rel_error(self, prob.get_val('y1', get_remote=True), 25.58830237, .00001)
+
+        totals = prob.check_totals(method='cs', out_stream=None)
+
+        for key, val in iteritems(totals):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+
+    def test_cs_around_broyden_states(self):
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.ParallelGroup(), promotes=['*'])
+
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'),
+                            promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'),
+                            promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = om.BroydenSolver(state_vars=['y1', 'y2'])
+        sub.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.set_solver_print(level=2)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob.get_val('y1', get_remote=True), 25.58830237, .00001)
 
         totals = prob.check_totals(method='cs', out_stream=None)
 

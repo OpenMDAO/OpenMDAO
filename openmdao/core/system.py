@@ -164,7 +164,7 @@ class System(object):
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
-    _owned_var_sizes : ndarray
+    _owned_sizes : ndarray
         Array of local sizes for 'owned' or distributed vars only.
     _nodup_out_ranges : dict
         Range of each output/resid in the global non-duplicated array.
@@ -308,6 +308,18 @@ class System(object):
         used if this System does no partial or semi-total coloring.
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
+    _nodup_out_ranges : OrderedDict
+        Tuples of the form (start, end) keyed on variable name.
+    _nodup2local_out_inds : ndarray
+        Index array mapping global non-dup outputs/resids to local outputs/resids.
+    _local2owned_inds : ndarray
+        Index array mapping local outputs/resids to owned local outputs/resids.
+    _noncontig_dis_inds : ndarray
+        Index array mapping global stacked (rank order) array to global array where
+        distrib vars are contiguous and all vars appear in global execution order.
+        Execution order is meaningless for systems in ParallelGroups, but for purposes
+        of global ordering, the declared execution order, which is the same across all
+        ranks, is used.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -381,7 +393,7 @@ class System(object):
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
-        self._owned_var_sizes = None
+        self._owned_sizes = None
         self._var_offsets = None
         self._nodup_out_ranges = None
         self._nodup2local_out_inds = None
@@ -1485,7 +1497,7 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_sizes = {}
-        self._owned_var_sizes = None
+        self._owned_sizes = None
         self._nodup_out_ranges = None
         self._nodup2local_out_inds = None
         self._owning_rank = defaultdict(int)
@@ -3798,9 +3810,14 @@ class System(object):
                 new_list.append((abs2prom_in[abs_name], offset, end, idxs))
         return new_list
 
-    def _get_nodup_out_ranges(self):
+    def _get_nodup_out_ranges(self, var_list=None):
         """
         Compute necessary ranges/indices for working with non-dup global outputs array.
+
+        Parameters
+        ----------
+        var_list : list
+            Optional list of variables if we want to transfer a subset of the vector.
 
         Returns
         -------
@@ -3817,11 +3834,26 @@ class System(object):
             of global ordering, the declared execution order, which is the same across all
             ranks, is used.
         """
+        if var_list:
+            key = tuple(var_list)
+        else:
+            key = 'all'
+
         if self._nodup_out_ranges is None:
+            self._nodup_out_ranges = {}
+            self._nodup2local_out_inds = {}
+            self._local2owned_inds = {}
+            self._noncontig_dis_inds = {}
+
+        if key not in self._nodup_out_ranges:
             iproc = self.comm.rank
             abs2meta = self._var_allprocs_abs2meta
             sizes = self._var_sizes['linear']['output']
             owned_sizes = self._owned_sizes
+
+            if var_list:
+                prom2abs = self._var_allprocs_prom2abs_list['output']
+                var_list = [prom2abs[name][0] for name in var_list]
 
             ranges = OrderedDict()
             out_views = self._outputs._views
@@ -3839,13 +3871,17 @@ class System(object):
             # order ranks with our rank first
             ordered_ranks = [iproc] + [r for r in range(self.comm.size) if r != iproc]
 
-            has_distribs = False
             contig_inds = []
             non_contig_inds = []
             # compute ranges/indices into the full non-duplicated output/resid arrays
             for i, name in enumerate(self._var_allprocs_abs_names['output']):
+
+                # Skip if we are only interested in a subset of the vars.
+                if var_list:
+                    if name not in var_list:
+                        continue
+
                 distrib = abs2meta[name]['distributed']
-                has_distribs |= distrib
                 found = False
                 # check each rank (this rank first) for the first nonzero size
                 for irank in ordered_ranks:
@@ -3869,8 +3905,8 @@ class System(object):
                         non_contig_start = offsets[irank, i]
                         non_contig_inds.append(np.arange(non_contig_start, non_contig_start + size))
 
-            self._nodup_out_ranges = ranges
-            self._nodup2local_out_inds = _arraylist2array(contig_inds)
+            self._nodup_out_ranges[key] = ranges
+            self._nodup2local_out_inds[key] = _arraylist2array(contig_inds)
 
             # get indices to pull out only the 'owned' values from the local array
             local2owned_inds = []
@@ -3883,13 +3919,13 @@ class System(object):
                     local2owned_inds.append(np.arange(start, end, dtype=int))
                 start = end
 
-            self._local2owned_inds = _arraylist2array(local2owned_inds)
+            self._local2owned_inds[key] = _arraylist2array(local2owned_inds)
 
             # compute inds to map gathered nodup order to nodup ordered by ownership
-            self._noncontig_dis_inds = _arraylist2array(non_contig_inds)
+            self._noncontig_dis_inds[key] = _arraylist2array(non_contig_inds)
 
-        return (self._nodup_out_ranges, self._nodup2local_out_inds, self._local2owned_inds,
-                self._noncontig_dis_inds)
+        return (self._nodup_out_ranges[key], self._nodup2local_out_inds[key],
+                self._local2owned_inds[key], self._noncontig_dis_inds[key])
 
 
 def _arraylist2array(lst, dtype=int):

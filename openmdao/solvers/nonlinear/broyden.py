@@ -61,6 +61,8 @@ class BroydenSolver(NonlinearSolver):
         When True, Broyden considers the whole vector rather than a list of states.
     _recompute_jacobian : bool
         Flag that becomes True when Broyden detects it needs to recompute the inverse Jacobian.
+    _sendcounts : ndarray or None
+        Cached local indices of non duplicated vars under mpi.
     """
 
     SOLVER = 'BROYDEN'
@@ -84,7 +86,7 @@ class BroydenSolver(NonlinearSolver):
 
         self.cite = CITATION
 
-        self.n = 0
+        self.size = 0
         self._idx = {}
         self._recompute_jacobian = True
         self.Gm = None
@@ -97,6 +99,8 @@ class BroydenSolver(NonlinearSolver):
 
         # This gets set to True if the user doesn't declare any states.
         self._full_inverse = False
+
+        self._sendcounts = None
 
     def _declare_options(self):
         """
@@ -174,33 +178,40 @@ class BroydenSolver(NonlinearSolver):
             raise ValueError(msg.format(self.msginfo, ', '.join(bad_names)))
 
         # Size linear system
-        outputs = system._outputs
         if len(states) > 0:
             # User has specified states, so we must size them.
             n = 0
-            if system.comm.size > 0:
-                allproc_list = system._var_allprocs_abs_names['output']
-                varsizes = np.sum(system._owned_sizes, axis=0)
+            sizes = system._var_allprocs_abs2meta
+            prom2abs = system._var_allprocs_prom2abs_list['output']
 
-            for name in states:
-                if system.comm.size > 0 and name not in outputs:
-                    abs_name = system._var_allprocs_prom2abs_list['output'][name][0]
-                    for i, varname in enumerate(allproc_list):
-                        if varname == abs_name:
-                            size = varsizes[i]
-                            break
-                else:
-                    size = len(outputs[name])
-                sys.stdout.flush()
+            local_sizes = []
+            i_state = {}
+            for i, name in enumerate(states):
+                size = sizes[prom2abs[name][0]]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size
+                local_sizes.append(size)
+
+                if system.comm.size > 0:
+                    i_state[name] = j
+
+            if system.comm.size > 0:
+                abs2idx = system._var_allprocs_abs2idx['nonlinear']
+                local_idx = [abs2idx[prom2abs[name][0]] for name in states]
+                disps = np.array(local_idx)
+                self._sendcounts = (local_sizes, disps)
 
         else:
             # Full system size.
             self._full_inverse = True
-            n = len(outputs._data)
+            n = np.sum(system._owned_sizes)
 
-        self.n = n
+            if system.comm.size > 0:
+                owned_size_totals = np.sum(system._owned_sizes, axis=1)
+                disps = sizes2offsets(owned_size_totals, dtype=INT_DTYPE)
+                self._sendcounts = (owned_size_totals, disps)
+
+        self.size = n
         self.Gm = np.empty((n, n))
         self.xm = np.empty((n, ))
         self.fxm = np.empty((n, ))
@@ -481,7 +492,7 @@ class BroydenSolver(NonlinearSolver):
         # Set inverse Jacobian to identity scaled by alpha.
         # This is the default starting point used by scipy and the general broyden algorithm.
         else:
-            Gm = np.diag(np.full(self.n, -self.options['alpha'], dtype=Gm.dtype))
+            Gm = np.diag(np.full(self.size, -self.options['alpha'], dtype=Gm.dtype))
 
         return Gm
 
@@ -498,49 +509,82 @@ class BroydenSolver(NonlinearSolver):
         """
         system = self._system
         outputs = self._system._outputs
+        states = self.options['state_vars']
+
         if system.comm.size > 1:
+            states = None if not states else states
+
+            out_vec = outputs._data
             mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
 
-        if self._full_inverse:
-            if system.comm.size > 1:
+            _, _, local2owned_inds, noncontig_dist_inds = \
+                system._get_nodup_out_ranges(var_list=states)
 
-                out_vec = outputs._data
-                owned_size_totals = np.sum(system._owned_sizes, axis=1)
-                nodup_size = np.sum(system._owned_sizes)
+            # gather the 'owned' parts of out_vec from each process
+            xm = np.empty(self.size, dtype=out_vec.dtype)
+            system.comm.Gatherv((out_vec[local2owned_inds], local2owned_inds.size, mpi_typ),
+                                (xm, self._sendcounts, mpi_typ),
+                                root=0)
 
-                _, _, local2owned_inds, noncontig_dist_inds = system._get_nodup_out_ranges()
-                # gather the 'owned' parts of out_vec from each process
-                xm = np.empty(nodup_size, dtype=out_vec.dtype)
-                disps = sizes2offsets(owned_size_totals, dtype=INT_DTYPE)
-                system.comm.Gatherv((out_vec[local2owned_inds], local2owned_inds.size, mpi_typ),
-                                    (xm, (owned_size_totals, disps), mpi_typ),
-                                    root=0)
+            # Convert full_b to the same ordering that the matrix expects, where
+            # dist vars are contiguous and other vars appear in 'execution' order.
+            xm = xm[noncontig_dist_inds]
 
-                # Convert full_b to the same ordering that the matrix expects, where
-                # dist vars are contiguous and other vars appear in 'execution' order.
-                xm = xm[noncontig_dist_inds]
-
-            else:
-                xm = outputs._data.copy()
+        elif self._full_inverse:
+            xm = outputs._data.copy()
 
         else:
-            states = self.options['state_vars']
             xm = self.xm.copy()
             for name in states:
                 i, j = self._idx[name]
-                if system.comm.size > 1:
-                    abs_name = system._var_allprocs_prom2abs_list['output'][name][0]
-                    owning_rank = system._owning_rank[abs_name]
-                    if system.comm.rank == owning_rank:
-                        val = outputs[name]
-                    else:
-                        val = None
-                    system.comm.Bcast((val, mpi_typ), root=owning_rank)
-                    xm[i:j] = val
-                else:
-                    xm[i:j] = outputs[name]
+                xm[i:j] = outputs[name]
 
         return xm
+
+    def get_residuals(self):
+        """
+        Return a vector containing the residuals of the states specified in options.
+
+        Returns
+        -------
+        ndarray
+            Array containing values of residuals.
+        """
+        system = self._system
+        residuals = system._residuals
+        states = self.options['state_vars']
+
+        if system.comm.size > 1:
+            states = None if not states else states
+
+            mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
+            res_vec = residuals._data
+
+            _, _, local2owned_inds, noncontig_dist_inds = \
+                system._get_nodup_out_ranges(var_list=states)
+
+            # gather the 'owned' parts of res_vec from each process
+            fxm = np.empty(self.size, dtype=res_vec.dtype)
+            system.comm.Gatherv((res_vec[local2owned_inds], local2owned_inds.size, mpi_typ),
+                                (fxm, self._sendcounts, mpi_typ),
+                                root=0)
+
+            # Convert full_b to the same ordering that the matrix expects, where
+            # dist vars are contiguous and other vars appear in 'execution' order.
+            fxm = fxm[noncontig_dist_inds]
+
+            self.fxm = fxm
+
+        elif self._full_inverse:
+            fxm = self.fxm = residuals._data.copy()
+
+        else:
+            fxm = self.fxm
+            for name in states:
+                i, j = self._idx[name]
+                fxm[i:j] = residuals[name]
+
+        return fxm
 
     def set_states(self, new_val):
         """
@@ -553,39 +597,39 @@ class BroydenSolver(NonlinearSolver):
         """
         system = self._system
         outputs = system._outputs
+        states = self.options['state_vars']
 
-        if self._full_inverse:
+        if system.comm.size > 1:
+            states = None if not states else states
 
-            if system.comm.size > 1:
+            _, nodup2local_inds, _, _ = system._get_nodup_out_ranges(var_list=states)
 
-                _, nodup2local_inds, _, _ = system._get_nodup_out_ranges()
-                mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
+            mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
 
-                if system.comm.rank > 0:
-                    new_val = np.zeros(new_val.shape, dtype=new_val.dtype)
+            if system.comm.rank > 0:
+                new_val = np.zeros(new_val.shape, dtype=new_val.dtype)
 
-                # This may send more data than necessary, but the alternative is to use a lot
-                # of memory on rank 0 to store the chunk that each proc needs and then do a
-                # Scatterv.
-                system.comm.Bcast((new_val, mpi_typ), root=0)
+            # This may send more data than necessary, but the alternative is to use a lot
+            # of memory on rank 0 to store the chunk that each proc needs and then do a
+            # Scatterv.
+            system.comm.Bcast((new_val, mpi_typ), root=0)
 
-                outputs._data[:] = new_val[..., nodup2local_inds]
+            outputs._data[:] = new_val[..., nodup2local_inds]
 
-            else:
-                outputs._data[:] = new_val
+        elif self._full_inverse:
+            outputs._data[:] = new_val
 
         else:
             states = self.options['state_vars']
             for name in states:
                 i, j = self._idx[name]
-                if system.comm.size == 0 or name in outputs:
-                    print('new_val', new_val)
-                    sys.stdout.flush()
-                    outputs[name] = new_val[i:j]
+                outputs[name] = new_val[i:j]
 
-    def get_residuals(self):
+    def get_linear_vector(self):
         """
-        Return a vector containing the values of the residuals specified in options.
+        Return the linear vector outputs for the states specified in options.
+
+        This is only used under mpi when we aren't taking a full inverse.
 
         Returns
         -------
@@ -593,51 +637,24 @@ class BroydenSolver(NonlinearSolver):
             Array containing values of residuals.
         """
         system = self._system
-        residuals = system._residuals
-        if system.comm.size > 1:
-            mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
+        vec = system._vectors['output']['linear']._data
+        states = self.options['state_vars']
+        states = None if not states else states
 
-        if self._full_inverse:
-            if system.comm.size > 1:
+        mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
 
-                res_vec = residuals._data
-                owned_size_totals = np.sum(system._owned_sizes, axis=1)
-                nodup_size = np.sum(system._owned_sizes)
+        _, _, local2owned_inds, noncontig_dist_inds = \
+            system._get_nodup_out_ranges(var_list=states)
 
-                _, _, local2owned_inds, noncontig_dist_inds = system._get_nodup_out_ranges()
-                # gather the 'owned' parts of res_vec from each process
-                fxm = np.empty(nodup_size, dtype=res_vec.dtype)
-                disps = sizes2offsets(owned_size_totals, dtype=INT_DTYPE)
-                system.comm.Gatherv((res_vec[local2owned_inds], local2owned_inds.size, mpi_typ),
-                                    (fxm, (owned_size_totals, disps), mpi_typ),
-                                    root=0)
+        # gather the 'owned' parts of vec from each process
+        dx = np.empty(self.size, dtype=vec.dtype)
+        system.comm.Gatherv((vec[local2owned_inds], local2owned_inds.size, mpi_typ),
+                            (dx, self._sendcounts, mpi_typ),
+                            root=0)
 
-                # Convert full_b to the same ordering that the matrix expects, where
-                # dist vars are contiguous and other vars appear in 'execution' order.
-                fxm = fxm[noncontig_dist_inds]
-
-                self.fxm = fxm
-            else:
-                fxm = self.fxm = residuals._data.copy()
-
-        else:
-            states = self.options['state_vars']
-            fxm = self.fxm
-            for name in states:
-                i, j = self._idx[name]
-                if system.comm.size > 1:
-                    abs_name = system._var_allprocs_prom2abs_list['output'][name][0]
-                    owning_rank = system._owning_rank[abs_name]
-                    if system.comm.rank == owning_rank:
-                        val = residuals[name]
-                    else:
-                        val = None
-                    system.comm.Bcast((val, mpi_typ), root=owning_rank)
-                    fxm[i:j] = val
-                else:
-                    fxm[i:j] = residuals[name]
-
-        return fxm
+        # Convert full_b to the same ordering that the matrix expects, where
+        # dist vars are contiguous and other vars appear in 'execution' order.
+        return dx[noncontig_dist_inds]
 
     def set_linear_vector(self, dx):
         """
@@ -675,8 +692,6 @@ class BroydenSolver(NonlinearSolver):
         states = self.options['state_vars']
         d_res = system._vectors['residual']['linear']
         d_out = system._vectors['output']['linear']
-        if system.comm.size > 1:
-            mpi_typ = MPI.C_DOUBLE_COMPLEX if system.under_complex_step else MPI.DOUBLE
 
         inv_jac = self.Gm
         d_res.set_const(0.0)
@@ -696,57 +711,32 @@ class BroydenSolver(NonlinearSolver):
 
         for wrt_name in states:
             i_wrt, j_wrt = self._idx[wrt_name]
-            if system.comm.size > 1:
-                abs_name = system._var_allprocs_prom2abs_list['output'][wrt_name][0]
-                wrt_owning_rank = system._owning_rank[abs_name]
-                if system.comm.rank == wrt_owning_rank:
-                    val = d_res[wrt_name]
-                else:
-                    val = None
-                print(system.comm.rank, wrt_owning_rank, 'b1', val)
-                system.comm.Bcast((val, mpi_typ), root=wrt_owning_rank)
-                print(system.comm.rank, wrt_owning_rank, 'b1 after', val)
-                d_wrt = val
-            else:
+            if wrt_name in d_res:
                 d_wrt = d_res[wrt_name]
 
             for j in range(j_wrt - i_wrt):
 
                 # Increment each variable.
-                if system.comm.size == 0 or system.comm.rank == wrt_owning_rank:
+                if wrt_name in d_res:
                     d_wrt[j] = 1.0
 
                 # Solve for total derivatives.
                 ln_solver.solve(['linear'], 'fwd')
 
                 # Extract results.
-                for of_name in states:
-                    i_of, j_of = self._idx[of_name]
-                    if system.comm.size > 1:
-                        abs_name = system._var_allprocs_prom2abs_list['output'][of_name][0]
-                        of_owning_rank = system._owning_rank[abs_name]
-                        print(system.comm.rank, of_owning_rank, of_name)
-                        if system.comm.rank == of_owning_rank:
-                            val = d_out[of_name].copy()
-                        else:
-                            val = np.zeros((j_of - i_of))
-                        print(system.comm.rank, 'val pre', val)
-                        system.comm.Bcast((val, mpi_typ), root=of_owning_rank)
-                        print(system.comm.rank, 'val post', val)
-                        sys.stdout.flush()
+                if system.comm.size > 1:
+                    inv_jac[:, i_wrt + j] = self.get_linear_vector()
 
-                        inv_jac[i_of:j_of, i_wrt + j] = val
-                        exit()
-
-                    else:
+                else:
+                    for of_name in states:
+                        i_of, j_of = self._idx[of_name]
                         inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
 
-                if system.comm.size == 0 or system.comm.rank == wrt_owning_rank:
+                if wrt_name in d_res:
                     d_wrt[j] = 0.0
 
         # Enable local fd
         system._owns_approx_jac = approx_status
-        print('inv_jac', inv_jac)
         sys.stdout.flush()
 
         return inv_jac
