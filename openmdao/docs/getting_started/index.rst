@@ -10,13 +10,8 @@ From your python environment (we recommend `Anaconda <https://www.anaconda.com/d
 
 .. code::
 
-    >> pip install openmdao[all]
+    >> pip install openmdao
 
-
-.. note::
-
-    The [all] suffix to the install command ensures that you get all the optional dependencies
-    (e.g. for testing and visualization).  You can omit this for a bare bones installation.
 
 
 .. _paraboloid_min:
