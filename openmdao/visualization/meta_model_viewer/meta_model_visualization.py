@@ -16,6 +16,7 @@ from scipy.spatial import cKDTree
 import numpy as np
 import openmdao.api as om
 import warnings
+from itertools import product
 
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
@@ -56,7 +57,7 @@ class MetaModelVisualization(object):
         Name of empty Meta Model Component object reference
     resolution : int
         Number used to calculate width and height of contour plot
-    is_unstructured_meta_model : Bool
+    is_structured_meta_model : Bool
         Boolean used to signal whether the meta model is structured or unstructured
     slider_source : ColumnDataSource
         Data source containing dictionary of sliders
@@ -131,12 +132,13 @@ class MetaModelVisualization(object):
         """
         self.prob = om.Problem()
         self.surrogate_ref = surrogate_ref
+        self.resolution = resolution
 
         # Create list of inputs
         if isinstance(self.surrogate_ref, MetaModelUnStructuredComp):
-            self.is_unstructured_meta_model = True
+            self.is_structured_meta_model = False
 
-            self.resolution = resolution
+            # self.resolution = resolution
             self.input_list = [i[0] for i in self.surrogate_ref._surrogate_input_names]
 
             if len(self.input_list) < 2:
@@ -148,7 +150,7 @@ class MetaModelVisualization(object):
                 default_surrogate=self.surrogate_ref.options['default_surrogate'])
 
         elif isinstance(self.surrogate_ref, MetaModelStructuredComp):
-            self.is_unstructured_meta_model = False
+            self.is_structured_meta_model = True
 
             self.input_list = [i for i in self.surrogate_ref._static_var_rel_names['input']]
 
@@ -164,7 +166,7 @@ class MetaModelVisualization(object):
                 training_data_gradients=self.surrogate_ref.options['training_data_gradients'],
                 vec_size=1)
 
-            self.resolution = self.surrogate_ref.params.__len__()
+            # self.resolution = self.surrogate_ref.params.__len__()
         # Pair input list names with their respective data
         self.input_data = {}
 
@@ -256,7 +258,7 @@ class MetaModelVisualization(object):
         None
 
         """
-        if not self.is_unstructured_meta_model:
+        if self.is_structured_meta_model:
             for idx, name in enumerate(self.input_list):
                 try:
                     self.input_data[name] = self.surrogate_ref.params[idx]
@@ -333,7 +335,7 @@ class MetaModelVisualization(object):
         for idx, values in enumerate(data.values()):
             inputs[:, idx] = values.flatten()
 
-        if not self.is_unstructured_meta_model:
+        if self.is_structured_meta_model:
             for idx, tup in enumerate(inputs):
                 for name, val in zip(data.keys(), tup):
                     self.prob[str.format(self.model_ref.name + '.' + name)] = val
@@ -431,7 +433,11 @@ class MetaModelVisualization(object):
                            palette="Viridis11")
 
         # Adding training data points overlay to contour plot
-        data = self._training_points()
+        if self.is_structured_meta_model:
+            data = self._structured_training_points()
+        else:
+            data = self._unstructured_training_points()
+
         if len(data):
             data = np.array(data)
             self.contour_plot.circle(x=data[:, 0], y=data[:, 1], size=5, color='white', alpha=0.50)
@@ -458,7 +464,7 @@ class MetaModelVisualization(object):
             np.around(self.input_data_dict[self.x_input.value], 5) == np.around(x_value, 5))[0]
 
         # Make slice in Z data at the point calculated before and add it to the data source
-        z_data = self.Z[:, subplot_value_index].flatten()
+        z_data = self.Z[subplot_value_index].flatten()
 
         x = z_data
         y = self.slider_source.data[self.y_input.value]
@@ -476,7 +482,11 @@ class MetaModelVisualization(object):
         right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
 
         # Determine distance and alpha opacity of training points
-        data = self._training_points()
+        if self.is_structured_meta_model:
+            data = self._structured_training_points()
+        else:
+            data = self._unstructured_training_points()
+
         vert_color = np.zeros((len(data), 1))
         for i, info in enumerate(data):
             alpha = np.abs(info[0] - x_value) / self.limit_range[self.x_index]
@@ -522,14 +532,18 @@ class MetaModelVisualization(object):
         self.bot_plot_source.data = dict(x=x, y=y)
 
         self.bot_plot_fig = bot_plot_fig = figure(
-            plot_width=550, plot_height=200, x_range=(min(x_data), max(x_data)),
+            plot_width=550, plot_height=250, x_range=(min(x_data), max(x_data)),
             y_range=(min(y), max(y)),
             title="{} vs {}".format(self.x_input.value, self.output_select.value), tools="")
         bot_plot_fig.xaxis.axis_label = self.x_input.value
         bot_plot_fig.yaxis.axis_label = self.output_select.value
         bot_plot_fig.line(x='x', y='y', source=self.bot_plot_source)
 
-        data = self._training_points()
+        if self.is_structured_meta_model:
+            data = self._structured_training_points()
+        else:
+            data = self._unstructured_training_points()
+
         horiz_color = np.zeros((len(data), 1))
         for i, info in enumerate(data):
             alpha = np.abs(info[1] - y_value) / self.limit_range[self.y_index]
@@ -544,11 +558,12 @@ class MetaModelVisualization(object):
         self.bot_plot_scatter_source.data = dict(
             bot_slice_x=x_data,
             bot_slice_y=np.repeat(y_value, self.resolution))
+
         self.contour_plot.line(
             'bot_slice_x', 'bot_slice_y', source=self.bot_plot_scatter_source, color='black',
             line_width=2)
 
-        return bot_plot_fig
+        return self.bot_plot_fig
 
     def _update_all_plots(self):
         self.layout.children[0] = self._contour_data()
@@ -599,7 +614,50 @@ class MetaModelVisualization(object):
         self.output_variable = self.output_list.index(new)
         self._update_all_plots()
 
-    def _training_points(self):
+    def _structured_training_points(self):
+        # reate tuple of the input parameters
+        input_dimensions = tuple(self.surrogate_ref.params)
+
+        # Input training data and output training data
+        x_training = np.array([z for z in product(*input_dimensions)])
+        y_training = self.surrogate_ref.training_outputs[self.output_select.value].flatten()
+        print(x_training)
+
+        # Index of input/output variables
+        x_index = self.x_input.options.index(self.x_input.value)
+        y_index = self.y_input.options.index(self.y_input.value)
+
+        # Bounds of the input variables
+        bounds = [[min(i), max(i)] for i in self.input_data.values()]
+        limits = np.array(bounds)
+        # Limit range of how much training data will be seen
+        self.limit_range = limits[:, 1] - limits[:, 0]
+
+        # Vertically stack the x/y inputs and then transpose them
+        infos = np.vstack((x_training[:, x_index], x_training[:, y_index])).transpose()
+        points = x_training.copy()
+        # Set the first two columns of the points array to x/y inputs, respectively
+        points[:, x_index] = self.input_point_list[x_index]
+        points[:, y_index] = self.input_point_list[y_index]
+        points = np.divide(points, self.limit_range)
+        tree = cKDTree(points)
+        dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
+        scaled_x0 = np.divide(self.input_point_list, self.limit_range)
+        # Query the nearest neighbors tree for the closest points to the scaled x0 array
+        dists, idx = tree.query(scaled_x0, k=len(x_training), distance_upper_bound=dist_limit)
+
+        data = np.zeros((len(idx), 5))
+        for dist_index, i in enumerate(idx):
+            info = np.ones((5))
+            info[0:2] = infos[i, :]
+            info[2] = dists[dist_index] / dist_limit
+            info[3] = y_training[i]
+            info[4] = (1. - info[2] / self.dist_range) ** 0.5
+            data[dist_index] = info
+
+        return data
+
+    def _unstructured_training_points(self):
         """
         Calculate the training points and returns and array containing the position and alpha.
 
@@ -616,27 +674,12 @@ class MetaModelVisualization(object):
         # [x1, x2, x3, x4]
         # Input Data
         # Output Data
-        if not self.is_unstructured_meta_model:
-            stacked_data = stack_outputs(self.surrogate_ref.training_outputs)
-            training_data = {}
-            for name, values in zip(self.model_ref.pnames, self.model_ref.params):
-                training_data.update({name:values})
+        x_training = self.model_ref._training_input
+        y_training = np.squeeze(stack_outputs(self.model_ref._training_output), axis=1)
 
-            if stacked_data.ndim > 2:
-                x_training = np.squeeze(stack_outputs(training_data))
-                y_training = self.surrogate_ref.training_outputs[self.output_select.value].flatten()
-
-            else:
-                x_training = np.squeeze(stack_outputs(training_data))
-                y_training = stack_outputs(
-                    self.surrogate_ref.training_outputs).reshape(self.resolution, self.resolution)
-
-        else:
-            x_training = self.model_ref._training_input
-            y_training = np.squeeze(stack_outputs(self.model_ref._training_output), axis=1)
-
+        x_index = self.x_input.options.index(self.x_input.value)
+        y_index = self.y_input.options.index(self.y_input.value)
         output_variable = self.output_list.index(self.output_select.value)
-        data = np.zeros((0, 8))
 
         # Calculate the limits of each input parameter
         bounds = [[min(i), max(i)] for i in self.input_data.values()]
@@ -644,11 +687,11 @@ class MetaModelVisualization(object):
         self.limit_range = limits[:, 1] - limits[:, 0]
 
         # Vertically stack the x/y inputs and then transpose them
-        infos = np.vstack((x_training[:, self.x_index], x_training[:, self.y_index])).transpose()
+        infos = np.vstack((x_training[:, x_index], x_training[:, y_index])).transpose()
         points = x_training.copy()
         # Set the first two columns of the points array to x/y inputs, respectively
-        points[:, self.x_index] = self.input_point_list[self.x_index]
-        points[:, self.y_index] = self.input_point_list[self.y_index]
+        points[:, x_index] = self.input_point_list[x_index]
+        points[:, y_index] = self.input_point_list[y_index]
         points = np.divide(points, self.limit_range)
         tree = cKDTree(points)
         dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
@@ -664,13 +707,7 @@ class MetaModelVisualization(object):
             info = np.ones((5))
             info[0:2] = infos[i, :]
             info[2] = dists[dist_index] / dist_limit
-            if not self.is_unstructured_meta_model:
-                if stacked_data.ndim > 2:
-                    info[3] = y_training[i]
-                else:
-                    info[3] = y_training[i, output_variable]
-            else:
-                info[3] = y_training[i, output_variable]
+            info[3] = y_training[i, output_variable]
             info[4] = (1. - info[2] / self.dist_range) ** 0.5
             data[dist_index] = info
 
