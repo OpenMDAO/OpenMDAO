@@ -592,6 +592,45 @@ class TestExecComp(unittest.TestCase):
 
         assert_rel_error(self, C1._outputs['y'], math.sin(2.0), 0.00001)
 
+    def test_np(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=np.sin(x)', x=2.0))
+        prob.setup()
+
+        with self.assertRaises(Exception) as context:
+          prob.run_model()
+
+        self.assertEqual(str(context.exception),
+            "ExecComp (C1): Error occurred evaluating 'y=np.sin(x)'\n"
+            "    ExecComp supports a subset of numpy functions directly, without the 'np' prefix.\n"
+            "    'sin' is supported (See the documentation).")
+
+    def test_numpy(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=numpy.sin(x)', x=2.0))
+        prob.setup()
+
+        with self.assertRaises(Exception) as context:
+          prob.run_model()
+
+        self.assertEqual(str(context.exception),
+            "ExecComp (C1): Error occurred evaluating 'y=numpy.sin(x)'\n"
+            "    ExecComp supports a subset of numpy functions directly, without the 'numpy' prefix.\n"
+            "    'sin' is supported (See the documentation).")
+
+    def test_numpy_fft(self):
+        prob = om.Problem()
+        prob.model.add_subsystem('C1', om.ExecComp('y=numpy.fft(x)', x=2.0))
+        prob.setup()
+
+        with self.assertRaises(Exception) as context:
+          prob.run_model()
+
+        self.assertEqual(str(context.exception),
+            "ExecComp (C1): Error occurred evaluating 'y=numpy.fft(x)'\n"
+            "    ExecComp supports a subset of numpy functions directly, without the 'numpy' prefix.\n"
+            "    'fft' is not supported (See the documentation).")
+
     def test_array(self):
         prob = om.Problem()
         C1 = prob.model.add_subsystem('C1', om.ExecComp('y=x[1]',
@@ -1027,7 +1066,7 @@ class TestExecComp(unittest.TestCase):
 class TestExecCompParameterized(unittest.TestCase):
 
     @parameterized.expand(itertools.product([
-      func_name for func_name in _expr_dict if not func_name.startswith('_')
+      func_name for func_name in _expr_dict if func_name not in ('np', 'numpy')
     ]), name_func=lambda f, n, p: 'test_exec_comp_value_' + '_'.join(a for a in p.args))
     def test_exec_comp_value(self, f):
         test_data = _ufunc_test_data[f]
@@ -1072,7 +1111,7 @@ class TestExecCompParameterized(unittest.TestCase):
                 print(f, 'does not support complex-step differentiation')
 
     @parameterized.expand(itertools.product([
-      func_name for func_name in _expr_dict if not func_name.startswith('_')
+      func_name for func_name in _expr_dict if func_name not in ('np', 'numpy')
     ]), name_func=lambda f, n, p: 'test_exec_comp_jac_' + '_'.join(a for a in p.args))
     def test_exec_comp_jac(self, f):
         test_data = _ufunc_test_data[f]

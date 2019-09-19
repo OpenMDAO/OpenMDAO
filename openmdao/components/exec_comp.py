@@ -423,8 +423,13 @@ class ExecComp(ExplicitComponent):
         outputs : `Vector`
             `Vector` containing outputs.
         """
-        for expr in self._codes:
-            exec(expr, _expr_dict, _IODict(outputs, inputs))
+        for i, expr in enumerate(self._codes):
+            try:
+                exec(expr, _expr_dict, _IODict(outputs, inputs))
+            except Exception as err:
+                raise RuntimeError("%s: Error occurred evaluating '%s'\n%s"
+                                   % (self.msginfo, self._exprs[i], str(err)))
+
 
     def compute_partials(self, inputs, partials):
         """
@@ -657,3 +662,43 @@ def _cs_abs(x):
 
 
 _expr_dict['abs'] = _cs_abs
+
+
+class _NumpyMsg(object):
+    """
+    A class that will raise an error if an attempt is made to access any attribute/function.
+    """
+
+    def __init__(self, namespace):
+        """
+        Construct the _NumpyMsg object.
+
+        Parameters
+        ----------
+        namespace : str
+            The numpy namespace (e.g. 'numpy' or 'np).
+        """
+        self.namespace = namespace
+
+    def __getattr__(self, name):
+        """
+        Attempt to access an attribute/function.
+
+        Parameters
+        ----------
+        name : str
+            The name of the attribute/function.
+
+        Raises
+        ------
+        RuntimeError
+            When an attempt is made to access any attribute/function.
+        """
+        raise RuntimeError('\n'.join([
+            "    ExecComp supports a subset of numpy functions directly, without the '%s' prefix.",
+            "    '%s' is %ssupported (See the documentation)."
+        ]) % (self.namespace, name, '' if name in _expr_dict else 'not '))
+
+
+_expr_dict['np'] = _NumpyMsg('np')
+_expr_dict['numpy'] = _NumpyMsg('numpy')
