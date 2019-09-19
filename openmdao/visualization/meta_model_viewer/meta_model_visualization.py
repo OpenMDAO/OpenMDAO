@@ -216,6 +216,8 @@ class MetaModelVisualization(object):
         self.slider_source = ColumnDataSource(data=self.input_data_dict)
         self.source = ColumnDataSource(data=dict(
             z=np.random.rand(self.resolution, self.resolution)))
+        self.contour_training_data_source = ColumnDataSource(
+            data=dict(x=np.repeat(0, self.resolution), y=np.repeat(0, self.resolution)))
 
         self.bot_plot_source = ColumnDataSource(data=dict(
             x=np.repeat(0, self.resolution), y=np.repeat(0, self.resolution)))
@@ -440,7 +442,10 @@ class MetaModelVisualization(object):
 
         if len(data):
             data = np.array(data)
-            self.contour_plot.circle(x=data[:, 0], y=data[:, 1], size=5, color='white', alpha=0.50)
+            self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1])
+            self.contour_plot.circle(
+                x='x', y='y', source=self.contour_training_data_source,
+                size=5, color='white', alpha=0.50)
 
         return self.contour_plot
 
@@ -576,10 +581,13 @@ class MetaModelVisualization(object):
 
     # Event handler functions
     def _update(self, attr, old, new):
-        self._update_all_plots()
+        self._contour_data()
+        self._right_plot()
+        self._bot_plot()
 
     def _scatter_plots_update(self, attr, old, new):
-        self._update_subplots()
+        self._right_plot()
+        self._bot_plot()
 
     def _scatter_input(self, attr, old, new):
         self.dist_range = float(new)
@@ -597,18 +605,14 @@ class MetaModelVisualization(object):
             raise ValueError("Inputs should not equal each other")
         else:
             self.x_input.value = new
-            self.layout.children[0] = self._contour_data()
-            self.layout.children[1] = self._right_plot()
-            self.layout2.children[0] = self._bot_plot()
+            self._update_all_plots()
 
     def _y_input_update(self, attr, old, new):
         if not self._input_dropdown_checks(self.x_input.value, new):
             raise ValueError("Inputs should not equal each other")
         else:
             self.y_input.value = new
-            self.layout.children[0] = self._contour_data()
-            self.layout.children[1] = self._right_plot()
-            self.layout2.children[0] = self._bot_plot()
+            self._update_all_plots()
 
     def _output_value_update(self, attr, old, new):
         self.output_variable = self.output_list.index(new)
@@ -621,7 +625,6 @@ class MetaModelVisualization(object):
         # Input training data and output training data
         x_training = np.array([z for z in product(*input_dimensions)])
         y_training = self.surrogate_ref.training_outputs[self.output_select.value].flatten()
-        print(x_training)
 
         # Index of input/output variables
         x_index = self.x_input.options.index(self.x_input.value)
