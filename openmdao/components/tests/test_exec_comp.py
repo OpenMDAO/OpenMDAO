@@ -594,16 +594,16 @@ class TestExecComp(unittest.TestCase):
 
     def test_np(self):
         prob = om.Problem()
-        prob.model.add_subsystem('C1', om.ExecComp('y=np.sin(x)', x=2.0))
+        prob.model.add_subsystem('C1', om.ExecComp(['y1=sin(x)', 'y2=np.cos(x)'], x=2.0))
         prob.setup()
 
         with self.assertRaises(Exception) as context:
           prob.run_model()
 
         self.assertEqual(str(context.exception),
-            "ExecComp (C1): Error occurred evaluating 'y=np.sin(x)'\n"
+            "ExecComp (C1): Error occurred evaluating 'y2=np.cos(x)'\n"
             "    ExecComp supports a subset of numpy functions directly, without the 'np' prefix.\n"
-            "    'sin' is supported (See the documentation).")
+            "    'cos' is supported (See the documentation).")
 
     def test_numpy(self):
         prob = om.Problem()
