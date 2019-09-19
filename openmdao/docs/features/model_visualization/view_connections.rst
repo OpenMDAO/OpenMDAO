@@ -8,7 +8,8 @@ View Connections from Command Line
 ##################################
 
 The :code:`openmdao view_connections` command generates a table of connection information for all input and
-output variables in the model.  This is documented on :ref:`openmdao view_connections <om-command-view_connections>`.
+output variables in the model.  For more in-depth documentation, see
+:ref:`openmdao view_connections <om-command-view_connections>`.
 
 View Connections from Script
 ############################
@@ -34,9 +35,4 @@ browser. The page will look like this.
    An example of a connection viewer.
 
 
-Each column in the table can be sorted by clicking on the column header, and filtered by typing
-text into the 'filter column' field.  The column will be filtered by doing a case insenstive
-substring match of the text in the field.  By default, the promoted input and output name columns
-are shown and the absolute name columns are hidden, but toggle buttons at the bottom of the
-table allow any column to be shown or hidden.
 

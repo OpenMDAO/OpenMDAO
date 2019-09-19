@@ -309,27 +309,21 @@ def config_summary(problem, stream=sys.stdout):
         proc_names = problem.comm.gather((sysnames, grpnames, ln_solvers, nl_solvers), root=0)
         grpnames = set()
         sysnames = set()
-        ln_solvers = Counter()
-        nl_solvers = Counter()
-        ln_seen = set()
-        nl_seen = set()
+        ln_solvers = set()
+        nl_solvers = set()
         if proc_names is not None:
-            for rank in range(problem.comm.size):
-                systems, grps, lnsols, nlsols = proc_names[rank]
+            for systems, grps, lnsols, nlsols in proc_names:
                 sysnames.update(systems)
                 grpnames.update(grps)
-                lnlst = [(path, slv) for path, slv in lnsols if path not in ln_seen]
-                ln_seen.update([path for path, _ in lnsols])
-                ln_solvers.update([slv for _, slv in lnlst])
-
-                nllst = [(path, slv) for path, slv in nlsols if path not in nl_seen]
-                nl_seen.update([path for path, _ in nlsols])
-                nl_solvers.update([slv for _, slv in nllst])
+                ln_solvers.update(lnsols)
                 nl_solvers.update(nlsols)
     else:
         global_max_depth = max_depth
-        ln_solvers = Counter([slv for _, slv in ln_solvers])
-        nl_solvers = Counter([slv for _, slv in nl_solvers])
+        ln_solvers = set(ln_solvers)
+        nl_solvers = set(nl_solvers)
+
+    ln_solvers = Counter([sname for _, sname in ln_solvers])
+    nl_solvers = Counter([sname for _, sname in nl_solvers])
 
     # this gives us a printer that only prints on rank 0
     printer = _get_printer(problem.comm, stream)
@@ -409,8 +403,22 @@ def config_summary(problem, stream=sys.stdout):
 
     printer()
     printer("Driver type: %s" % problem.driver.__class__.__name__)
-    printer("Linear Solvers: %s" % ln_solvers.most_common())
-    printer("Nonlinear Solvers: %s" % nl_solvers.most_common())
+    linstr = []
+    for slvname, num in ln_solvers.most_common():
+        if num > 1:
+            linstr.append('{} x {}'.format(slvname, num))
+        else:
+            linstr.append(slvname)
+    printer("Linear Solvers: {}".format(', '.join(linstr)))
+
+
+    nlstr = []
+    for slvname, num in nl_solvers.most_common():
+        if num > 1:
+            nlstr.append('{} x {}'.format(slvname, num))
+        else:
+            nlstr.append(slvname)
+    printer("Nonlinear Solvers: {}".format(', '.join(nlstr)))
 
 
 @contextmanager

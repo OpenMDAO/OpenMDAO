@@ -14,7 +14,6 @@
 
     .promoted {
         color: blue;
-        font-style: italic;
     }
 
     .middle {
@@ -50,7 +49,6 @@ var table =
         height: 500,
         data:tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
-        // footerElement:"<span><button onclick='src_toggle(this)'>Use Absolute Output Names</button><button onclick='tgt_toggle(this)'>Use Absolute Input Names</button></span>",
         footerElement:"<p class='middle'>" +
                             "<input type='checkbox' onclick='src_abs_toggle(this)'>Absolute Outputs</input>" +
                             "<input type='checkbox' checked='true' onclick='src_prom_toggle(this)'>Promoted Outputs</input>" +

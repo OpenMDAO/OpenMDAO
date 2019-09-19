@@ -32,7 +32,7 @@ optional_dependencies['all'] = sorted([
     dependency
     for dependencies in optional_dependencies.values()
     for dependency in dependencies
-])
+] + ['colorama'])
 
 
 setup(

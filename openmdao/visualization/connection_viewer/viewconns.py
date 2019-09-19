@@ -29,7 +29,7 @@ def _val2str(val):
 
 
 def view_connections(root, outfile='connections.html', show_browser=True,
-                     src_filter='', tgt_filter='', precision=6, title=None):
+                     precision=6, title=None):
     """
     Generate a self-contained html file containing a detailed connection viewer.
 
@@ -46,12 +46,6 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
-
-    src_filter : str, optional
-        If defined, use this as the initial value for the source system filter.
-
-    tgt_filter : str, optional
-        If defined, use this as the initial value for the target system filter.
 
     precision : int, optional
         Sets the precision for displaying array values.
@@ -167,8 +161,6 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     data = {
         'title': title,
         'table': table,
-        'src_filter': src_filter,
-        'tgt_filter': tgt_filter,
     }
 
     viewer = 'connect_table.html'

@@ -89,12 +89,23 @@ openmdao view_connections
 #########################
 
 The :code:`openmdao view_connections` command generates a table of connection information for all input and
-output variables in the model.  Units can be compared for each connection, and unconnected inputs
-and outputs can be easily identified.  The table can be sorted by any column by clicking on the
+output variables in the model.  It's primary purpose is to help debug a model by making the following
+things easier:
+
+
+    - Identifying unconnected inputs
+    - Highlighting unit conversions or missing units
+    - Identifying missing or unwanted implicit connections
+
+
+The table can be sorted by any column by clicking on the
 column header, and a column can be filtered by typing text into the 'filter column' field found
-at the top of each column.  When units differ between an output and an input, they are highlighted in
-red.  Below is an example of a connection viewer for a pycycle propulsor
-model obtained using the command:
+at the top of each column.  Also, any column can be shown or hidden using the toggle buttons at
+the bottom of the table.  When input and output units differ, they are highlighted in
+red.  In the promoted input and output columns, variables that are promoted at some level in
+the model are shown in blue, while variables that are never promoted are shown in black.
+
+Below is an example of a connection viewer for a pycycle propulsor model obtained using the command:
 
 .. code-block:: none
 
@@ -109,11 +120,21 @@ model obtained using the command:
 
 
 By default the promoted names columns of both inputs and outputs are shown, but in the example
-above, the absolute input names are shown and the promoted input names are hidden.  The user can
-choose to show or hide any of the table columns by clicking on the toggle buttons at the bottom
-of the table.
+above, the absolute input names are shown and the promoted input names are hidden.
 
-Unconnected inputs can easily be identified by filtering either
+Unconnected inputs can easily be identified by typing 'NO CONNECTION' or 'NO ', into
+the filter field of either the absolute or promoted output column.  Unconnected outputs can
+be shown similarly by typing 'NO CONNECTION' or 'NO ' into the filter field of either the absolute
+or promoted input column.
+
+When showing promoted output and promoted input columns, if the promoted output name equals the
+promoted input name, that means the the connection is an implicit connection.  Otherwise the
+connection is explicit, meaning somewhere in the model there is an explicit call to `connect`
+that producted the connection.
+
+In OpenMDAO, multiple inputs can be promoted to the same name, and by sorting the promoted inputs
+column, all such inputs will be grouped together.  This can make it much easier to spot either
+missing or unwanted implicit connections.
 
 
 .. _om-command-tree:
@@ -122,10 +143,13 @@ openmdao tree
 #############
 
 The :code:`openmdao tree` command prints an indented list of all systems in the model tree.  Each system's
-type and name are shown, along with linear and nonlinear solvers if they differ from the defaults,
-which are LinearRunOnce and NonlinearRunOnce respectively.  If the `-c` option is used, the tree will print
-in color if the terminal supports it and the *colorama* package is installed.  The tree Command
-also allows specific attributes and/or vector variables to be printed out along with their
+type and name are shown, along with size of their inputs and outputs, and their linear and nonlinear solvers if
+they differ from the defaults, which are LinearRunOnce and NonlinearRunOnce respectively.
+If the `-c` option is used, the tree will print in color if the terminal supports it and
+the *colorama* package is installed. If colors are used, implicit and explicit components will be
+displayed using different colors.
+
+The tree command also allows specific attributes and/or vector variables to be printed out along with their
 corresponding system in the tree.
 
 Here's an example of the tree output for a simple circuit model:
@@ -144,6 +168,7 @@ The :code:`openmdao summary` command prints a high level summary of the model.  
 .. embed-shell-cmd::
     :cmd: openmdao summary circuit.py
     :dir: ../test_suite/scripts
+
 
 .. _om-command-cite:
 
