@@ -430,7 +430,6 @@ class ExecComp(ExplicitComponent):
                 raise RuntimeError("%s: Error occurred evaluating '%s'\n%s"
                                    % (self.msginfo, self._exprs[i], str(err)))
 
-
     def compute_partials(self, inputs, partials):
         """
         Use complex step method to update the given Jacobian.

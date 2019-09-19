@@ -1066,7 +1066,7 @@ class TestExecComp(unittest.TestCase):
 class TestExecCompParameterized(unittest.TestCase):
 
     @parameterized.expand(itertools.product([
-      func_name for func_name in _expr_dict if func_name not in ('np', 'numpy')
+      func_name for func_name in _expr_dict if func_name not in ('np', 'numpy', '__builtins__')
     ]), name_func=lambda f, n, p: 'test_exec_comp_value_' + '_'.join(a for a in p.args))
     def test_exec_comp_value(self, f):
         test_data = _ufunc_test_data[f]
@@ -1111,7 +1111,7 @@ class TestExecCompParameterized(unittest.TestCase):
                 print(f, 'does not support complex-step differentiation')
 
     @parameterized.expand(itertools.product([
-      func_name for func_name in _expr_dict if func_name not in ('np', 'numpy')
+      func_name for func_name in _expr_dict if func_name not in ('np', 'numpy', '__builtins__')
     ]), name_func=lambda f, n, p: 'test_exec_comp_jac_' + '_'.join(a for a in p.args))
     def test_exec_comp_jac(self, f):
         test_data = _ufunc_test_data[f]
