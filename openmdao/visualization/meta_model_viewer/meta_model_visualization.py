@@ -61,6 +61,8 @@ class MetaModelVisualization(object):
         Boolean used to signal whether the meta model is structured or unstructured
     slider_source : ColumnDataSource
         Data source containing dictionary of sliders
+    contour_training_data_source : ColumnDataSource
+        Data source containing dictionary of training data points
     bot_plot_source : ColumnDataSource
         Data source containing data for the bottom subplot
     bot_plot_scatter_source : ColumnDataSource
@@ -652,7 +654,10 @@ class MetaModelVisualization(object):
         data = np.zeros((len(idx), 5))
         for dist_index, i in enumerate(idx):
             info = np.ones((5))
-            info[0:2] = infos[i, :]
+            try:
+                info[0:2] = infos[i, :]
+            except IndexError:
+                print("ERROR: Scatter distance value too low. Try: 0.1")
             info[2] = dists[dist_index] / dist_limit
             info[3] = y_training[i]
             info[4] = (1. - info[2] / self.dist_range) ** 0.5
