@@ -90,13 +90,10 @@ openmdao view_connections
 
 The :code:`openmdao view_connections` command generates a table of connection information for all input and
 output variables in the model.  Units can be compared for each connection, and unconnected inputs
-and outputs can be easily identified.  The displayed variables can be filtered by source system
-and/or target system.  They can also be filtered by NO CONNECTION, which will show all of the
-unconnected inputs or outputs, depending on whether the NO CONNECTION filter is active for the
-source or target side.  When units differ between a source and a target, they are highlighted in
-red, and when inputs are connected to outputs outside of the currently-selected, top-level system,
-they are highlighted in purple.  This highlighting can be used to easily identify variables that are connected
-across group boundaries.  Below is an example of a connection viewer for a pycycle propulsor
+and outputs can be easily identified.  The table can be sorted by any column by clicking on the
+column header, and a column can be filtered by typing text into the 'filter column' field found
+at the top of each column.  When units differ between an output and an input, they are highlighted in
+red.  Below is an example of a connection viewer for a pycycle propulsor
 model obtained using the command:
 
 .. code-block:: none
@@ -109,6 +106,15 @@ model obtained using the command:
    :alt: An example of a connection viewer
 
    An example of a connection viewer.
+
+
+By default the promoted names columns of both inputs and outputs are shown, but in the example
+above, the absolute input names are shown and the promoted input names are hidden.  The user can
+choose to show or hide any of the table columns by clicking on the toggle buttons at the bottom
+of the table.
+
+Unconnected inputs can easily be identified by filtering either
+
 
 .. _om-command-tree:
 
