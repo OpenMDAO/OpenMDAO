@@ -16,7 +16,7 @@ From your python environment (we recommend `Anaconda <https://www.anaconda.com/d
 .. note::
 
     The [all] suffix to the install command ensures that you get all the optional dependencies
-    (e.g. for testing and visualization).  You can omit this for a bare bones installation.
+    (e.g. for testing and visualization).  You can omit this for a minimal installation.
 
 
 .. _paraboloid_min:
