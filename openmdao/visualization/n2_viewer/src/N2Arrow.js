@@ -7,11 +7,11 @@ class N2Arrow {
      * Setup and draw the arrow.
      * @param {Object} attribs
      * @param {Object} attribs.start Coordinates of the starting node
-     * @param {number} attribs.start.col
      * @param {number} attribs.start.row
-     * @param {Object} attribs.end Coodinates of the ending node, which the arrow points to
-     * @param {number} attribs.end.col
+     * @param {number} attribs.start.col
+     * @param {Object} attribs.end Coordinates of the ending node, which the arrow points to
      * @param {number} attribs.end.row
+     * @param {number} attribs.end.col
      * @param {string} attribs.color Color of the line/circle (arrow is black)
      * @param {number} attribs.width Width of the line
      */
@@ -21,7 +21,7 @@ class N2Arrow {
         this.color = attribs.color;
         this.width = attribs.width;
 
-        this.middle = { col: -1, row: -1 };
+        this.middle = { row: -1, col: -1 };
 
         this.startPt = { x: -1, y: -1 };
         this.midPt = { x: -1, y: -1 };
@@ -36,8 +36,8 @@ class N2Arrow {
      * the points corresponding to the associated col, row in the matrix.
      */
     computePts() {
-        this.middle.col = this.end.col;
         this.middle.row = this.start.row;
+        this.middle.col = this.end.col;
         let offsetAbsX = n2Dx * .125;
         let offsetAbsY = n2Dy * .125 + 3; // + to account for the arrow size
 

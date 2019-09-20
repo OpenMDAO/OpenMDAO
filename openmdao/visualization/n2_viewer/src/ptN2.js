@@ -1,7 +1,9 @@
 function PtN2Diagram(parentDiv, modelData) {
     // console.log(modelData);
     var root = modelData.tree;
+    console.log("root: ", root);
     var conns = modelData.connections_list;
+    console.log("conns: ", conns)
     // console.log(conns);
     var abs2prom = modelData.hasOwnProperty("abs2prom") ? modelData.abs2prom : undefined;
 
@@ -147,7 +149,7 @@ function PtN2Diagram(parentDiv, modelData) {
             var c = Math.floor(coords[0] * d3RightTextNodesArrayZoomed.length / WIDTH_N2_PX);
             var r = Math.floor(coords[1] * d3RightTextNodesArrayZoomed.length / HEIGHT_PX);
             if (r == c || r < 0 || c < 0 || r >= d3RightTextNodesArrayZoomed.length || c >= d3RightTextNodesArrayZoomed.length) return;
-            if (matrix.node(r,c) !== undefined) return;
+            if (matrix.node(r, c) !== undefined) return;
 
             var param = d3RightTextNodesArrayZoomed[c],
                 unknown = d3RightTextNodesArrayZoomed[r];
@@ -183,7 +185,7 @@ function PtN2Diagram(parentDiv, modelData) {
             var c = Math.floor(coords[0] * d3RightTextNodesArrayZoomed.length / WIDTH_N2_PX);
             var r = Math.floor(coords[1] * d3RightTextNodesArrayZoomed.length / HEIGHT_PX);
             if (r == c || r < 0 || c < 0 || r >= d3RightTextNodesArrayZoomed.length || c >= d3RightTextNodesArrayZoomed.length) return;
-            if (matrix.node(r,c) !== undefined) return;
+            if (matrix.node(r, c) !== undefined) return;
             if (n2BackgroundRectR0 == r && n2BackgroundRectC0 == c) return;
             //n2Group.selectAll(".n2_hover_elements_" + n2BackgroundRectR0 + "_" + n2BackgroundRectC0).remove();
             n2Group.selectAll(".n2_hover_elements").remove();
@@ -570,7 +572,8 @@ function PtN2Diagram(parentDiv, modelData) {
 
 
         ClearArrowsAndConnects()
-        DrawMatrix();
+        // DrawMatrix();
+        matrix.draw();
     }
 
     updateFunc = Update;
@@ -684,7 +687,7 @@ function PtN2Diagram(parentDiv, modelData) {
             }
             d.absPathName += d.name;
         }
-        if (d.type === "unknown" || d.type === "param" || d.type === "unconnected_param") {
+        if (d.type.match(/^unknown$|^param$|^unconnected_param$/)) {
             var parentComponent = (d.originalParent) ? d.originalParent : d.parent;
             if (parentComponent.type === "subsystem" && parentComponent.subsystem_type === "component") {
                 d.parentComponent = parentComponent;
@@ -878,43 +881,38 @@ function PtN2Diagram(parentDiv, modelData) {
 
         }
 
-
+        /** Recurse through the tree and add up the number of leaves that each
+         * node has, based on their children array.
+         * @param {Object} d The starting node.
+         */
         function ComputeLeaves(d) {
             if (d.varIsHidden) {
                 d.numLeaves = 0;
-                return;
             }
-            var doRecurse = d.children && !d.isMinimized;
-            d.numLeaves = doRecurse ? 0 : 1; //no children: init to 0 because will be added later
-            if (!doRecurse) return;
+            else if (d.hasOwnProperty('children') && (!d.isMinimized)) {
+                d.numLeaves = 0;
+                d.children.forEach(function (child) {
+                    ComputeLeaves(child);
+                    d.numLeaves += child.numLeaves;
+                })
+            }
+            else {
+                d.numLeaves = 1;
+            }
 
-            for (var i = 0; i < d.children.length; ++i) {
-                ComputeLeaves(d.children[i]);
-                d.numLeaves += d.children[i].numLeaves;
-            }
+            d.numSolverLeaves = d.numLeaves;
         }
 
-        function ComputeSolverLeaves(d) {
-            if (d.varIsHidden) {
-                d.numSolverLeaves = 0;
-                return;
-            }
-
-            var doRecurse = d.children && !d.isMinimized;
-            d.numSolverLeaves = doRecurse ? 0 : 1; //no children: init to 0 because will be added later
-            if (!doRecurse) return;
-
-            for (var i = 0; i < d.children.length; ++i) {
-                ComputeSolverLeaves(d.children[i]);
-                d.numSolverLeaves += d.children[i].numSolverLeaves;
-            }
-        }
-
+        // ComputeNormalizedPositions(root, 0, false, null);
         function ComputeNormalizedPositions(d, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
             isChildOfZoomed = (isChildOfZoomed) ? true : (d === zoomedElement);
+
+            /* console.log("ComputeNormalizedPositions(d: ", d, ", leafCounter: ", leafCounter, ", isChildOfZoomed: ",
+                isChildOfZoomed, ", earliestMinimizedParent: ", earliestMinimizedParent, ")"); */
+
             if (earliestMinimizedParent == null && isChildOfZoomed) {
                 if (!d.varIsHidden) d3NodesArray.push(d);
-                if (!d.children || d.isMinimized) { //at a "leaf" node
+                if (!d.propExists('children') || d.isMinimized) { //at a "leaf" node
                     if (!d.varIsHidden) d3RightTextNodesArrayZoomed.push(d);
                     earliestMinimizedParent = d;
                 }
@@ -937,7 +935,7 @@ function PtN2Diagram(parentDiv, modelData) {
                 d.height = 1e-6;
             }
 
-            if (d.children) {
+            if (d.propExists('children')) {
                 for (var i = 0; i < d.children.length; ++i) {
                     ComputeNormalizedPositions(d.children[i], leafCounter, isChildOfZoomed, earliestMinimizedParent);
                     if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
@@ -952,7 +950,7 @@ function PtN2Diagram(parentDiv, modelData) {
             isChildOfZoomed = (isChildOfZoomed) ? true : (d === zoomedElement);
             if (earliestMinimizedParent == null && isChildOfZoomed) {
                 if (d.type === "subsystem" || d.type === "root") d3SolverNodesArray.push(d);
-                if (!d.children || d.isMinimized) { //at a "leaf" node
+                if (!d.hasOwnProperty('children') || d.isMinimized) { //at a "leaf" node
                     if ((d.type !== "param" && d.type !== "unconnected_param") && !d.varIsHidden) d3SolverRightTextNodesArrayZoomed.push(d);
                     earliestMinimizedParent = d;
                 }
@@ -967,10 +965,10 @@ function PtN2Diagram(parentDiv, modelData) {
             d.ySolver = leafCounter / root.numSolverLeaves;
             d.widthSolver = (d.subsystem_children && !d.isMinimized) ? (columnSolverWidthsPx[node.depth] / widthPSolverTreePx) : 1 - node.xSolver;//1-d.x;
 
-            d.heightSolver = node.numSolverLeaves / root.numSolverLeaves; 111
+            d.heightSolver = node.numSolverLeaves / root.numSolverLeaves; // 111
 
             if (d.varIsHidden) { //param or hidden leaf leaving
-                d.xSolver = columnLocationsPx[d.parentComponent.depthqqq + 1] / widthPTreePx;
+                d.xSolver = columnLocationsPx[d.parentComponent.depth + 1] / widthPTreePx;
                 d.ySolver = d.parentComponent.y;
                 d.widthSolver = 1e-6;
                 d.heightSolver = 1e-6;
@@ -991,8 +989,6 @@ function PtN2Diagram(parentDiv, modelData) {
         UpdateSolverTextWidths(zoomedElement);
 
         ComputeLeaves(root);
-
-        ComputeSolverLeaves(root);
 
         d3NodesArray = [];
         d3RightTextNodesArrayZoomed = [];
@@ -1320,7 +1316,7 @@ function PtN2Diagram(parentDiv, modelData) {
     }
 
     function MouseoverOffDiagN2(d) {
-        // console.log('MouseoverOffDiagN2:'); console.log(d);
+        //console.log('MouseoverOffDiagN2:'); console.log(d);
 
         function GetObjectsInChildrenWithCycleArrows(d, arr) {
             if (d.cycleArrows) {
@@ -1446,7 +1442,7 @@ function PtN2Diagram(parentDiv, modelData) {
         for (var i = 0; i < d3RightTextNodesArrayZoomed.length; ++i) {
             var leftTextWidthDependency = d3RightTextNodesArrayZoomed[i].nameWidthPx;
             var box = d3RightTextNodesArrayZoomedBoxInfo[i];
-            if (matrix.node(hoveredIndexRC,i) !== undefined) { //i is column here
+            if (matrix.node(hoveredIndexRC, i) !== undefined) { //i is column here
                 if (i != hoveredIndexRC) {
                     new N2Arrow({
                         end: { col: i, row: i },
@@ -1458,7 +1454,7 @@ function PtN2Diagram(parentDiv, modelData) {
                 }
             }
 
-            if (matrix.node(i,hoveredIndexRC) !== undefined) { //i is row here
+            if (matrix.node(i, hoveredIndexRC) !== undefined) { //i is row here
                 if (i != hoveredIndexRC) {
                     new N2Arrow({
                         start: { col: i, row: i },
