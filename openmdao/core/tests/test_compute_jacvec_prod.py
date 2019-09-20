@@ -42,8 +42,7 @@ class SubProbComp(om.ExplicitComponent):
 
     def compute(self, inputs, outputs):
         p = self.prob
-        x = inputs['x']
-        p['comp.x'] = x
+        p['comp.x'] = inputs['x']
         inp = inputs['inp']
         for i in range(self.num_nodes):
             p['comp.inp'] = inp
