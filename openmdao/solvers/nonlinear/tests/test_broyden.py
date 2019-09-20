@@ -8,6 +8,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
@@ -894,6 +895,49 @@ class BroydenMPITestCase(unittest.TestCase):
         for key, val in iteritems(totals):
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
 
+    def test_cs_around_broyden_linesearch(self):
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.ParallelGroup(), promotes=['*'])
+
+        model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
+        model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
+        sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])
+
+        model.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                   z=np.array([0.0, 0.0]), x=0.0),
+                            promotes=['obj', 'x', 'z', 'y1', 'y2'])
+
+        model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'),
+                            promotes=['con1', 'y1'])
+        model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'),
+                            promotes=['con2', 'y2'])
+
+        sub.nonlinear_solver = om.BroydenSolver()
+        sub.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
+        sub.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
+
+        prob.model.add_design_var('x', lower=-100, upper=100)
+        prob.model.add_design_var('z', lower=-100, upper=100)
+        prob.model.add_objective('obj')
+        prob.model.add_constraint('con1', upper=0.0)
+        prob.model.add_constraint('con2', upper=0.0)
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.set_solver_print(level=2)
+
+        prob.run_model()
+
+        assert_rel_error(self, prob.get_val('y1', get_remote=True), 25.58830237, .00001)
+
+        totals = prob.check_totals(method='cs', out_stream=None)
+
+        for key, val in iteritems(totals):
+            assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
+
     def test_cs_around_broyden_compute_jac_false(self):
         prob = om.Problem()
         model = prob.model
@@ -979,6 +1023,57 @@ class BroydenMPITestCase(unittest.TestCase):
         for key, val in iteritems(totals):
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
 
+    def test_distributed_comp(self):
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        sub.add_subsystem('d1', DistribExecComp(['y1 = 28 - 0.2*y2', 'y1 = 18 - 0.2*y2'], arr_size=2),
+                          promotes=['y1', 'y2'])
+        sub.add_subsystem('d2', DistribExecComp(['y2 = y1**.5 + 7', 'y2 = y1**.5 - 3'], arr_size=2),
+                          promotes=['y1', 'y2'])
+
+        sub.nonlinear_solver = om.BroydenSolver()
+        sub.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.set_solver_print(level=2)
+
+        prob.run_model()
+
+        # TODO - prob.get not working correctly on distributed vars. Once this is fixed, we can
+        # test all values on all ranks.
+        if model.comm.rank == 0:
+            assert_rel_error(self, prob.get_val('y1', get_remote=True), 25.58830237, .00001)
+        elif model.comm.rank == 1:
+            assert_rel_error(self, prob.get_val('y1', get_remote=True), 17.75721382, .00001)
+
+    def test_distributed_comp_states(self):
+        prob = om.Problem()
+        model = prob.model
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+
+        sub.add_subsystem('d1', DistribExecComp(['y1 = 28 - 0.2*y2', 'y1 = 18 - 0.2*y2'], arr_size=2),
+                          promotes=['y1', 'y2'])
+        sub.add_subsystem('d2', DistribExecComp(['y2 = y1**.5 + 7', 'y2 = y1**.5 - 3'], arr_size=2),
+                          promotes=['y1', 'y2'])
+
+        sub.nonlinear_solver = om.BroydenSolver(state_vars=['y1', 'y2'])
+        sub.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
+
+        prob.setup(check=False, force_alloc_complex=True)
+        prob.set_solver_print(level=2)
+
+        prob.run_model()
+
+        # TODO - prob.get not working correctly on distributed vars. Once this is fixed, we can
+        # test all values on all ranks.
+        if model.comm.rank == 0:
+            assert_rel_error(self, prob.get_val('y1', get_remote=True), 25.58830237, .00001)
+        elif model.comm.rank == 1:
+            assert_rel_error(self, prob.get_val('y1', get_remote=True), 17.75721382, .00001)
 
 if __name__ == "__main__":
     unittest.main()
