@@ -767,7 +767,8 @@ class BroydenSolver(NonlinearSolver):
                         inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
 
                 if wrt_name in d_res:
-                    if mpi_size > 1 and j >= gstart and j < gend:
+                    if mpi_size > 1:
+                        if j >= gstart and j < gend:
                             d_wrt[j - gstart] = 0.0
                     else:
                         d_wrt[j] = 0.0
