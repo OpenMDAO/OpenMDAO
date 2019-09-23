@@ -15,7 +15,6 @@ import os
 import time
 from numbers import Integral
 import itertools
-from pprint import pprint
 
 from six import iteritems, itervalues, string_types
 
@@ -32,7 +31,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
-from openmdao.utils.general_utils import filter_var_based_on_tags, convert_user_defined_tags_to_set
+from openmdao.utils.general_utils import make_set, var_name_match_includes_excludes
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -3028,6 +3027,8 @@ class System(object):
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
+                    includes=None,
+                    excludes=None,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
@@ -3059,6 +3060,12 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3075,12 +3082,13 @@ class System(object):
         meta = self._var_abs2meta
         inputs = []
 
-        tags = convert_user_defined_tags_to_set(tags)
-
         for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
-
             # Filter based on tags
-            if filter_var_based_on_tags(tags, meta[var_name]):
+            if tags and not (make_set(tags) & meta[var_name]['tags']):
+                continue
+
+            if not var_name_match_includes_excludes(var_name, self._var_abs2prom['input'][var_name],
+                                                    includes, excludes):
                 continue
 
             var_meta = {}
@@ -3096,10 +3104,16 @@ class System(object):
             inputs.append((var_name, var_meta))
 
         if self._discrete_inputs:
-            for var_name, val in iteritems(self._discrete_inputs):
+            disc_meta = self._discrete_inputs._dict
 
+            for var_name, val in iteritems(self._discrete_inputs):
                 # Filter based on tags
-                if filter_var_based_on_tags(tags, self._discrete_inputs._dict[var_name]):
+                if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
+                    continue
+
+                if not var_name_match_includes_excludes(var_name,
+                                                        self._var_abs2prom['input'][var_name],
+                                                        includes, excludes):
                     continue
 
                 var_meta = {}
@@ -3113,7 +3127,9 @@ class System(object):
                 if shape:
                     var_meta['shape'] = ''
 
-                inputs.append((var_name, var_meta))
+                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
+
+                inputs.append((abs_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3136,6 +3152,8 @@ class System(object):
                      hierarchical=True,
                      print_arrays=False,
                      tags=None,
+                     includes=None,
+                     excludes=None,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -3181,6 +3199,12 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3198,16 +3222,18 @@ class System(object):
         meta = self._var_abs2meta  # This only includes metadata for this process.
         states = self._list_states()
 
-        tags = convert_user_defined_tags_to_set(tags)
-
         # Go though the hierarchy. Printing Systems
         # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
         for var_name, val in iteritems(self._outputs._views):
-
             # Filter based on tags
-            if filter_var_based_on_tags(tags, meta[var_name]):
+            if tags and not (make_set(tags) & meta[var_name]['tags']):
+                continue
+
+            if not var_name_match_includes_excludes(var_name,
+                                                    self._var_abs2prom['output'][var_name],
+                                                    includes, excludes):
                 continue
 
             if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
@@ -3238,9 +3264,16 @@ class System(object):
                 expl_outputs.append((var_name, var_meta))
 
         if self._discrete_outputs and not residuals_tol:
+            disc_meta = self._discrete_outputs._dict
+
             for var_name, val in iteritems(self._discrete_outputs):
                 # Filter based on tags
-                if filter_var_based_on_tags(tags, self._discrete_outputs._dict[var_name]):
+                if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
+                    continue
+
+                if not var_name_match_includes_excludes(var_name,
+                                                        self._var_abs2prom['output'][var_name],
+                                                        includes, excludes):
                     continue
 
                 var_meta = {}
@@ -3263,10 +3296,12 @@ class System(object):
                     var_meta['ref0'] = ''
                     var_meta['res_ref'] = ''
 
+                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
+
                 if var_name in states:
-                    impl_outputs.append((var_name, var_meta))
+                    impl_outputs.append((abs_name, var_meta))
                 else:
-                    expl_outputs.append((var_name, var_meta))
+                    expl_outputs.append((abs_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3357,12 +3392,42 @@ class System(object):
                                     np.append(var_dict[name]['resids'],
                                               proc_vars[name]['resids'])
 
-        # get list of var names in execution order, based on the order subsystems were setup
+        inputs = var_type is 'input'
+        outputs = not inputs
+        var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
+
+        write_var_table(self.pathname, var_list, var_type, var_dict,
+                        hierarchical, print_arrays, out_stream)
+
+    def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None):
+        """
+        Get list of variable names in execution order, based on the order subsystems were setup.
+
+        Parameters
+        ----------
+        outputs : bool, optional
+            Get names of output variables. Default is False.
+        inputs : bool, optional
+            Get names of input variables. Default is False.
+        variables : Collection (list or dict)
+            Absolute path names of the subset of variables to include.
+            If None then all variables will be included. Default is None.
+
+        Returns
+        -------
+        list
+            list of variable names in execution order
+        """
         var_list = []
 
-        in_or_out = 'input' if var_type is 'input' else 'output'
-        real_vars = self._var_allprocs_abs_names[in_or_out]
-        disc_vars = self._var_allprocs_discrete[in_or_out]
+        real_vars = self._var_allprocs_abs_names
+        disc_vars = self._var_allprocs_discrete
+
+        in_or_out = []
+        if inputs:
+            in_or_out.append('input')
+        if outputs:
+            in_or_out.append('output')
 
         if self._subsystems_allprocs:
             for subsys in self._subsystems_allprocs:
@@ -3370,24 +3435,24 @@ class System(object):
                 # but subsys.name will be properly defined.
                 path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name
                 path += '.'
-                for var_name in real_vars:
-                    if var_name in var_dict and var_name.startswith(path):
-                        var_list.append(var_name)
-                for var_name in disc_vars:
-                    if var_name in var_dict and var_name.startswith(path):
-                        var_list.append(var_name)
+                for var_type in in_or_out:
+                    for var_name in real_vars[var_type]:
+                        if (not variables or var_name in variables) and var_name.startswith(path):
+                            var_list.append(var_name)
+                    for var_name in disc_vars[var_type]:
+                        if (not variables or var_name in variables) and var_name.startswith(path):
+                            var_list.append(var_name)
         else:
             # For components with no children, self._subsystems_allprocs is empty.
-            for var_name in real_vars:
-                if var_name in var_dict:
-                    var_list.append(var_name)
+            for var_type in in_or_out:
+                for var_name in real_vars[var_type]:
+                    if not variables or var_name in variables:
+                        var_list.append(var_name)
+                for var_name in disc_vars[var_type]:
+                    if not variables or var_name in variables:
+                        var_list.append(var_name)
 
-            for var_name in disc_vars:
-                if var_name in var_dict:
-                    var_list.append(var_name)
-
-        write_var_table(self.pathname, var_list, var_type, var_dict,
-                        hierarchical, print_arrays, out_stream)
+        return var_list
 
     def run_solve_nonlinear(self):
         """
