@@ -51,7 +51,14 @@ The following example shows how to use these methods.
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs
     :layout: interleave
 
-You can also make use of the variable tagging feature when getting values from cases. This example shows how to do
+The :code:`Case.list_inputs` and :code:`Case.list_outputs` have optional filtering arguments. This is shown in these
+examples.
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs_with_includes_excludes
+    :layout: interleave
+
+Finally, you can also make use of the variable tagging feature when getting values from cases. This example shows how to do
 that.
 
 .. embed-code::
