@@ -408,8 +408,8 @@ class MetaModelVisualization(object):
 
         self.source.data = dict(z=[self.Z])
 
-        xlins = self.xlins_mesh
-        ylins = self.ylins_mesh
+        self.contour_x_range = xlins = self.xlins_mesh
+        self.contour_y_range = ylins = self.ylins_mesh
 
         # Color bar formatting
         color_mapper = LinearColorMapper(
@@ -480,9 +480,10 @@ class MetaModelVisualization(object):
 
         # Create and format figure
         self.right_plot_fig = right_plot_fig = figure(
-            plot_width=250, plot_height=500, x_range=(min(x), max(x)),
-            y_range=(min(y_data), max(y_data)),
-            title="{} vs {}".format(self.y_input.value, self.output_select.value), tools="")
+            plot_width=250, plot_height=500,
+            x_range=(min(x), max(x)),
+            y_range=(min(self.contour_y_range), max(self.contour_y_range)),
+            title="{} vs {}".format(self.y_input.value, self.output_select.value), tools="pan")
         right_plot_fig.xaxis.axis_label = self.output_select.value
         right_plot_fig.yaxis.axis_label = self.y_input.value
         right_plot_fig.xaxis.major_label_orientation = math.pi / 9
@@ -539,7 +540,8 @@ class MetaModelVisualization(object):
         self.bot_plot_source.data = dict(x=x, y=y)
 
         self.bot_plot_fig = bot_plot_fig = figure(
-            plot_width=550, plot_height=250, x_range=(min(x_data), max(x_data)),
+            plot_width=550, plot_height=250,
+            x_range=(min(self.contour_x_range), max(self.contour_x_range)),
             y_range=(min(y), max(y)),
             title="{} vs {}".format(self.x_input.value, self.output_select.value), tools="")
         bot_plot_fig.xaxis.axis_label = self.x_input.value
@@ -583,13 +585,15 @@ class MetaModelVisualization(object):
 
     # Event handler functions
     def _update(self, attr, old, new):
-        self._contour_data()
-        self._right_plot()
-        self._bot_plot()
+        # self._contour_data()
+        # self._right_plot()
+        # self._bot_plot()
+        self._update_all_plots()
 
     def _scatter_plots_update(self, attr, old, new):
-        self._right_plot()
-        self._bot_plot()
+        # self._right_plot()
+        # self._bot_plot()
+        self._update_subplots()
 
     def _scatter_input(self, attr, old, new):
         self.dist_range = float(new)
