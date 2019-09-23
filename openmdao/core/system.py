@@ -3942,9 +3942,8 @@ class System(object):
             for i, name in enumerate(self._var_allprocs_abs_names['output']):
 
                 # Skip if we are only interested in a subset of the vars.
-                if var_list:
-                    if name not in var_list:
-                        continue
+                if var_list and name not in var_list:
+                    continue
 
                 distrib = abs2meta[name]['distributed']
                 found = False
