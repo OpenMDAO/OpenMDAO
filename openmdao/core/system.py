@@ -31,7 +31,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
-from openmdao.utils.general_utils import make_set
+from openmdao.utils.general_utils import make_set, var_name_match_includes_excludes
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -3015,6 +3015,8 @@ class System(object):
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
+                    includes=None,
+                    excludes=None,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
@@ -3046,6 +3048,12 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3067,6 +3075,10 @@ class System(object):
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
+            if not var_name_match_includes_excludes(var_name, self._var_abs2prom['input'][var_name],
+                                                    includes, excludes):
+                continue
+
             var_meta = {}
             if values:
                 var_meta['value'] = val
@@ -3085,6 +3097,11 @@ class System(object):
             for var_name, val in iteritems(self._discrete_inputs):
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
+                    continue
+
+                if not var_name_match_includes_excludes(var_name,
+                                                        self._var_abs2prom['input'][var_name],
+                                                        includes, excludes):
                     continue
 
                 var_meta = {}
@@ -3123,6 +3140,8 @@ class System(object):
                      hierarchical=True,
                      print_arrays=False,
                      tags=None,
+                     includes=None,
+                     excludes=None,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -3168,6 +3187,12 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3192,6 +3217,11 @@ class System(object):
         for var_name, val in iteritems(self._outputs._views):
             # Filter based on tags
             if tags and not (make_set(tags) & meta[var_name]['tags']):
+                continue
+
+            if not var_name_match_includes_excludes(var_name,
+                                                    self._var_abs2prom['output'][var_name],
+                                                    includes, excludes):
                 continue
 
             if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
@@ -3227,6 +3257,11 @@ class System(object):
             for var_name, val in iteritems(self._discrete_outputs):
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
+                    continue
+
+                if not var_name_match_includes_excludes(var_name,
+                                                        self._var_abs2prom['output'][var_name],
+                                                        includes, excludes):
                     continue
 
                 var_meta = {}

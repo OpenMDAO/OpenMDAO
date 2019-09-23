@@ -829,3 +829,43 @@ def make_set(str_data, name=None):
         raise TypeError("The {} argument should be str, set, or list: {}".format(name, str_data))
     else:
         raise TypeError("The argument should be str, set, or list: {}".format(str_data))
+
+
+def var_name_match_includes_excludes(name, prom_name, includes, excludes):
+    """
+    Check to see if the name passes thru the includes and excludes filter.
+
+    Parameters
+    ----------
+    name : str
+        Unpromoted var name to be checked for match.
+    prom_name : str
+        Promoted var name to be checked for match.
+    includes : None or list_like
+        List of glob patterns for name to include in the filtering.
+    excludes : None or list_like
+        List of glob patterns for name to exclude in the filtering.
+
+    Returns
+    -------
+    bool
+        Return True if the name passes through the filtering of includes and excludes.
+    """
+    # Process includes
+    if includes is not None:
+        for pattern in includes:
+            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
+                break
+        else:  # didn't find any match
+            return False
+
+    # Process excludes
+    if excludes is not None:
+        match = False
+        for pattern in excludes:
+            if fnmatchcase(name, pattern) or fnmatchcase(prom_name, pattern):
+                match = True
+                break
+        return not match
+
+    return True

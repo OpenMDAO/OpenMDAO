@@ -1123,6 +1123,15 @@ class ListFeatureTestCase(unittest.TestCase):
         # list only explicit outputs
         outputs = prob.model.list_outputs(implicit=False, values=False)
 
+    def test_for_docs_list_includes_excludes(self):
+        # list inputs
+        inputs = prob.model.list_inputs(values=False, includes=['*comp2*',])
+        inputs = prob.model.list_inputs(values=False, excludes=['*comp2*',])
+
+        # list only explicit outputs
+        outputs = prob.model.list_outputs(implicit=False, values=False, includes=['*b',])
+        outputs = prob.model.list_outputs(implicit=False, values=False, excludes=['*b',])
+
     def test_list_no_values(self):
         # list inputs
         inputs = prob.model.list_inputs(values=False)
