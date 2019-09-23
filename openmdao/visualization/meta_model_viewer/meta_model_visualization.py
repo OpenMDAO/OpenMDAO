@@ -730,6 +730,8 @@ def view_metamodel(meta_model_comp, port_number):
     ----------
     meta_model_comp : MetaModelStructuredComp or MetaModelUnStructuredComp
         The metamodel component.
+    port_number : int
+        Bokeh plot port number.
     """
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler
