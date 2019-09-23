@@ -168,7 +168,6 @@ class MetaModelVisualization(object):
                 training_data_gradients=self.surrogate_ref.options['training_data_gradients'],
                 vec_size=1)
 
-            # self.resolution = self.surrogate_ref.params.__len__()
         # Pair input list names with their respective data
         self.input_data = {}
 
@@ -464,6 +463,7 @@ class MetaModelVisualization(object):
         Bokeh figure
         """
         # Sets data for x/y inputs
+
         y_data = self.input_data_dict[self.y_input.value]
         x_value = self.x_input_slider.value
         # Rounds the x_data to match the input_data_dict value
@@ -471,7 +471,7 @@ class MetaModelVisualization(object):
             np.around(self.input_data_dict[self.x_input.value], 5) == np.around(x_value, 5))[0]
 
         # Make slice in Z data at the point calculated before and add it to the data source
-        z_data = self.Z[subplot_value_index].flatten()
+        z_data = self.Z[:, subplot_value_index].flatten()
 
         x = z_data
         y = self.slider_source.data[self.y_input.value]
@@ -530,10 +530,10 @@ class MetaModelVisualization(object):
         """
         x_data = self.input_data_dict[self.x_input.value]
         y_value = self.y_input_slider.value
-        alt_index = np.where(
+        subplot_value_index = np.where(
             np.around(self.input_data_dict[self.y_input.value], 5) == np.around(y_value, 5))[0]
 
-        z_data = self.Z[alt_index].flatten()
+        z_data = self.Z[subplot_value_index, :].flatten()
 
         x = self.slider_source.data[self.x_input.value]
         y = z_data
