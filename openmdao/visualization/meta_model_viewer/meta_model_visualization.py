@@ -646,10 +646,15 @@ class MetaModelVisualization(object):
         points[:, y_index] = self.input_point_list[y_index]
         points = np.divide(points, self.limit_range)
         tree = cKDTree(points)
-        dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
+        dist_limit = np.linalg.norm(self.dist_range * self.limit_range) * 0.1
         scaled_x0 = np.divide(self.input_point_list, self.limit_range)
         # Query the nearest neighbors tree for the closest points to the scaled x0 array
         dists, idx = tree.query(scaled_x0, k=len(x_training), distance_upper_bound=dist_limit)
+
+        # kdtree query always returns requested k even if there are not enough valid points
+        idx_finite = np.where(np.isfinite(dists))
+        dists = dists[idx_finite]
+        idx = idx[idx_finite]
 
         data = np.zeros((len(idx), 5))
         for dist_index, i in enumerate(idx):
