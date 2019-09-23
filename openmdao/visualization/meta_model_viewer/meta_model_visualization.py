@@ -1,7 +1,13 @@
 """Define output of Meta Models and visualize the results."""
 
+import warnings
 from collections import OrderedDict
 import math
+from itertools import product
+
+from scipy.spatial import cKDTree
+import numpy as np
+
 from bokeh.io import curdoc
 from bokeh.layouts import row, column
 from bokeh.plotting import figure
@@ -10,11 +16,6 @@ from bokeh.models import ColorBar, BasicTicker, LinearColorMapper, Range1d
 from bokeh.models.widgets import TextInput, Select
 from bokeh.models.ranges import DataRange1d
 from bokeh.server.server import Server
-
-from scipy.spatial import cKDTree
-import numpy as np
-import warnings
-from itertools import product
 
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
