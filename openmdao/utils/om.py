@@ -249,8 +249,10 @@ def _meta_model_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-m', '--pathname', action='store', dest='pathname',
+    parser.add_argument('-m', '--metamodel_pathname', action='store', dest='pathname',
                         help='pathname of the metamodel component.')
+    parser.add_argument('-p', '--port_number', default=5007, action='store', dest='port_number',
+                        help='Port number to open viewer')
 
 
 def _meta_model_cmd(options):
@@ -273,11 +275,12 @@ def _meta_model_cmd(options):
         mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp)
 
         pathname = options.pathname
+        port_number = options.port_number
 
         if pathname:
             comp = prob.model._get_subsystem(pathname)
             if comp and isinstance(comp, mm_types):
-                view_metamodel(comp)
+                view_metamodel(comp, port_number)
                 return
         else:
             comp = None
@@ -293,7 +296,7 @@ def _meta_model_cmd(options):
 
         elif mm_count == 1 and not pathname:
             comp = metamodels[mm_names[0]]
-            view_metamodel(comp)
+            view_metamodel(comp, port_number)
 
         else:
             try_str = "Try one of the following: {}.".format(mm_names)

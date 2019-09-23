@@ -11,15 +11,14 @@ from bokeh.models.widgets import TextInput, Select
 from bokeh.models.ranges import DataRange1d
 from bokeh.server.server import Server
 
-# Misc Imports
 from scipy.spatial import cKDTree
 import numpy as np
-import openmdao.api as om
 import warnings
 from itertools import product
 
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.core.problem import Problem
 
 
 def stack_outputs(outputs_dict):
@@ -49,7 +48,7 @@ class MetaModelVisualization(object):
 
     Attributes
     ----------
-    prob : om.Problem
+    prob : Problem
         Name of variable corresponding to Problem Component
     surrogate_ref : MetaModel
         Name of Meta Model Component object reference
@@ -132,7 +131,7 @@ class MetaModelVisualization(object):
         doc : Document
             The bokeh document to build.
         """
-        self.prob = om.Problem()
+        self.prob = Problem()
         self.surrogate_ref = surrogate_ref
         self.resolution = resolution
 
@@ -141,27 +140,27 @@ class MetaModelVisualization(object):
             self.is_structured_meta_model = False
 
             # self.resolution = resolution
-            self.input_list = [i[0] for i in self.surrogate_ref._surrogate_input_names]
+            self.input_list = [name[0] for name in self.surrogate_ref._surrogate_input_names]
 
             if len(self.input_list) < 2:
                 raise ValueError('Must have more than one input value')
 
-            self.output_list = [i[0] for i in self.surrogate_ref._surrogate_output_names]
+            self.output_list = [name[0] for name in self.surrogate_ref._surrogate_output_names]
 
-            self.model_ref = om.MetaModelUnStructuredComp(
+            self.model_ref = MetaModelUnStructuredComp(
                 default_surrogate=self.surrogate_ref.options['default_surrogate'])
 
         elif isinstance(self.surrogate_ref, MetaModelStructuredComp):
             self.is_structured_meta_model = True
 
-            self.input_list = [i for i in self.surrogate_ref._static_var_rel_names['input']]
+            self.input_list = [name for name in self.surrogate_ref._var_rel_names['input']]
 
             if len(self.input_list) < 2:
                 raise ValueError('Must have more than one input value')
 
-            self.output_list = [i for i in self.surrogate_ref._static_var_rel_names['output']]
+            self.output_list = [name for name in self.surrogate_ref._var_rel_names['output']]
 
-            self.model_ref = om.MetaModelStructuredComp(
+            self.model_ref = MetaModelStructuredComp(
                 distributed=self.surrogate_ref.options['distributed'],
                 extrapolate=self.surrogate_ref.options['extrapolate'],
                 method=self.surrogate_ref.options['method'],
@@ -174,7 +173,7 @@ class MetaModelVisualization(object):
 
         self._empty_prob_comp()
 
-        self.prob = om.Problem()
+        self.prob = Problem()
         self.prob.model.add_subsystem('interp', self.model_ref)
         self.prob.setup()
 
@@ -282,10 +281,10 @@ class MetaModelVisualization(object):
             for name in self.input_list:
                 try:
                     self.input_data[name] = {
-                        i for i in self.surrogate_ref.options[str('train:' + name)]}
+                        i for i in self.surrogate_ref.options['train:' + str(name)]}
                     self.model_ref.add_input(
                         name, 0.,
-                        training_data=[i for i in self.surrogate_ref.options[str('train:' + name)]])
+                        training_data=[i for i in self.surrogate_ref.options['train:' + str(name)]])
                 except TypeError:
                     msg = "No training data present for one or more parameters"
                     raise TypeError(msg)
@@ -293,7 +292,7 @@ class MetaModelVisualization(object):
             for name in self.output_list:
                 self.model_ref.add_output(
                     name, 0.,
-                    training_data=[i for i in self.surrogate_ref.options[str('train:' + name)]])
+                    training_data=[i for i in self.surrogate_ref.options['train:' + str(name)]])
 
     def _slider_attrs(self):
         """
@@ -722,7 +721,7 @@ class MetaModelVisualization(object):
         return data
 
 
-def view_metamodel(meta_model_comp):
+def view_metamodel(meta_model_comp, port_number):
     """
     Visualize a metamodel.
 
@@ -738,6 +737,6 @@ def view_metamodel(meta_model_comp):
         MetaModelVisualization(meta_model_comp, doc=doc)
 
     # print('Opening Bokeh application on http://localhost:5006/')
-    server = Server({'/': Application(FunctionHandler(make_doc))}, port=5007)
+    server = Server({'/': Application(FunctionHandler(make_doc))}, port=int(port_number))
     server.io_loop.add_callback(server.show, "/")
     server.io_loop.start()
