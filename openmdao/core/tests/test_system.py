@@ -273,59 +273,41 @@ class TestSystem(unittest.TestCase):
         p.run_model()
 
         # Inputs with no includes or excludes
-        stream = cStringIO()
-        model.list_inputs(out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(int(text.split()[0]), 11)  # First word is the # of inputs
+        inputs = model.list_inputs(out_stream=None)
+        self.assertEqual( len(inputs), 11)
 
         # Inputs with includes
-        stream = cStringIO()
-        model.list_inputs(includes=['*V_out*'], out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(int(text.split()[0]), 3)
+        inputs = model.list_inputs(includes=['*V_out*'], out_stream=None)
+        self.assertEqual( len(inputs), 3)
 
         # Inputs with includes matching a promoted name
-        stream = cStringIO()
-        model.list_inputs(includes=['*Vg*'], out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(int(text.split()[0]), 2)
+        inputs = model.list_inputs(includes=['*Vg*'], out_stream=None)
+        self.assertEqual( len(inputs), 2)
 
         # Inputs with excludes
-        stream = cStringIO()
-        model.list_inputs(excludes=['*V_out*'], out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(int(text.split()[0]), 8)
+        inputs = model.list_inputs(excludes=['*V_out*'], out_stream=None)
+        self.assertEqual( len(inputs), 8)
 
         # Inputs with excludes matching a promoted name
-        stream = cStringIO()
-        model.list_inputs(excludes=['*Vg*'], out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(int(text.split()[0]), 9)
+        inputs = model.list_inputs(excludes=['*Vg*'], out_stream=None)
+        self.assertEqual( len(inputs), 9)
 
         # Inputs with includes and excludes
-        stream = cStringIO()
-        model.list_inputs(includes=['*V_out*'], excludes=['*Vg*'], out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(int(text.split()[0]), 1)
+        inputs = model.list_inputs(includes=['*V_out*'], excludes=['*Vg*'], out_stream=None)
+        self.assertEqual( len(inputs), 1)
 
 
         # Outputs with no includes or excludes. Explicit only
-        stream = cStringIO()
-        model.list_outputs(implicit=False, out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(int(text.split()[0]), 5)  # First word is the # of outputs
+        outputs = model.list_outputs(implicit=False, out_stream=None)
+        self.assertEqual( len(outputs), 5)
 
         # Outputs with includes. Explicit only
-        stream = cStringIO()
-        model.list_outputs(includes=['*I'], implicit=False, out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(int(text.split()[0]), 4)
+        outputs = model.list_outputs(includes=['*I'], implicit=False, out_stream=None)
+        self.assertEqual( len(outputs), 4)
 
         # Outputs with excludes. Explicit only
-        stream = cStringIO()
-        model.list_outputs(excludes=['circuit*'], implicit=False, out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(int(text.split()[0]), 2)
+        outputs = model.list_outputs(excludes=['circuit*'], implicit=False, out_stream=None)
+        self.assertEqual( len(outputs), 2)
 
 if __name__ == "__main__":
     unittest.main()
