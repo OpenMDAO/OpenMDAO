@@ -51,8 +51,8 @@ The following example shows how to use these methods.
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs
     :layout: interleave
 
-The :code:`Case.list_inputs` and :code:`Case.list_outputs` have optional filtering arguments. This is shown in these
-examples.
+The :code:`Case.list_inputs` and :code:`Case.list_outputs` methods have optional arguments that let you filter based on
+variable names what gets listed. This is shown in these examples.
 
 .. embed-code::
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs_with_includes_excludes

@@ -13,7 +13,8 @@ import numpy as np
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.general_utils import warn_deprecation, make_set, var_name_match_includes_excludes
+from openmdao.utils.general_utils import warn_deprecation, make_set, \
+    var_name_match_includes_excludes
 from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
