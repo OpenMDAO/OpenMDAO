@@ -13,8 +13,8 @@ import numpy as np
 from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.general_utils import warn_deprecation
-from openmdao.utils.general_utils import make_set
+from openmdao.utils.general_utils import warn_deprecation, make_set, \
+    var_name_match_includes_excludes
 from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
@@ -406,6 +406,8 @@ class Case(object):
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
+                    includes=None,
+                    excludes=None,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
@@ -435,6 +437,12 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -451,6 +459,11 @@ class Case(object):
             for var_name in self.inputs.absolute_names():
                 # Filter based on tags
                 if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+                    continue
+
+                if not var_name_match_includes_excludes(var_name,
+                                                        self._abs2prom['input'][var_name],
+                                                        includes, excludes):
                     continue
 
                 var_meta = {}
@@ -489,6 +502,8 @@ class Case(object):
                      hierarchical=True,
                      print_arrays=False,
                      tags=None,
+                     includes=None,
+                     excludes=None,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -532,6 +547,12 @@ class Case(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -548,6 +569,10 @@ class Case(object):
         for var_name in self.outputs.absolute_names():
             # Filter based on tags
             if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
+                continue
+
+            if not var_name_match_includes_excludes(var_name, self._abs2prom['output'][var_name],
+                                                    includes, excludes):
                 continue
 
             # check if residuals were recorded, skip if within specifed tolerance

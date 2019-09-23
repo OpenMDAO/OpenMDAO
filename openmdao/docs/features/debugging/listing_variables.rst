@@ -117,6 +117,17 @@ you can enable the display of promoted names by setting the optional argument,
     openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_list_prom_names
     :layout: interleave
 
+*List Variables Filtered by Name*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can use the :code:`includes` and :code:`excludes` optional arguments to filter what variables are returned from
+:code:`System.list_inputs` and :code:`System.list_outputs`. Here are some short examples showing this feature.
+
+.. embed-code::
+    openmdao.core.tests.test_impl_comp.ListFeatureTestCase.test_for_docs_list_includes_excludes
+    :layout: interleave
+
+
 *List Variables Filtered by Tags*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
