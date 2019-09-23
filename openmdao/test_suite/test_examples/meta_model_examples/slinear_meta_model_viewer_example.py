@@ -1,6 +1,5 @@
 import numpy as np
 import openmdao.api as om
-from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 
 num_train = 10
 
@@ -33,5 +32,3 @@ mm.add_output('f', 0.0, t_data)
 
 prob.setup()
 prob.final_setup()
-
-MetaModelVisualization(mm)

@@ -1,7 +1,6 @@
 """Example script for meta model viewer."""
 import numpy as np
 import openmdao.api as om
-from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 
 # Model
 interp = om.MetaModelUnStructuredComp()
@@ -30,5 +29,3 @@ prob = om.Problem()
 prob.model.add_subsystem('interp', interp)
 prob.setup()
 prob.final_setup()
-
-viz = MetaModelVisualization(interp)
