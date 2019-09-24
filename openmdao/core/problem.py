@@ -673,6 +673,12 @@ class Problem(object):
             Variables whose derivatives will be computed.
         wrt : list of str
             Variables with respect to which the derivatives will be computed.
+        mode : str
+            Derivative direction ('fwd' or 'rev').
+        seed : dict or list
+            Either a dict keyed by 'wrt' varnames (fwd) or 'of' varnames (rev), containing
+            dresidual (fwd) or doutput (rev) values, OR a list of dresidual or doutput
+            values that matches the corresponding 'wrt' (fwd) or 'of' (rev) varname list.
 
         Returns
         -------
