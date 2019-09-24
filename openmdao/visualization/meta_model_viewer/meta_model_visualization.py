@@ -171,11 +171,7 @@ class MetaModelVisualization(object):
         # Pair input list names with their respective data
         self.input_data = {}
 
-        self._empty_prob_comp()
-
-        self.prob = Problem()
-        self.prob.model.add_subsystem('interp', self.model_ref)
-        self.prob.setup()
+        self._setup_empty_prob_comp()
 
         # Setup dropdown menus for x/y inputs and the output value
         self.x_input = Select(title="X Input:", value=[x for x in self.input_list][0],
@@ -207,6 +203,11 @@ class MetaModelVisualization(object):
         # Length of inputs and outputs
         self.num_of_inputs = len(self.input_list)
         self.num_of_outputs = len(self.output_list)
+
+        # Precalculate the problem bounds.
+        bounds = [[min(i), max(i)] for i in self.input_data.values()]
+        limits = np.array(bounds)
+        self.limit_range = limits[:, 1] - limits[:, 0]
 
         # Positional indicies
         self.x_index = 0
@@ -252,7 +253,7 @@ class MetaModelVisualization(object):
         doc.add_root(self.layout2)
         doc.title = 'Meta Model Visualization'
 
-    def _empty_prob_comp(self):
+    def _setup_empty_prob_comp(self):
         """
         Take data from surrogate ref and pass it into new surrogate model with empty Problem model.
 
@@ -293,6 +294,10 @@ class MetaModelVisualization(object):
                 self.model_ref.add_output(
                     name, 0.,
                     training_data=[i for i in self.surrogate_ref.options['train:' + str(name)]])
+
+
+        self.prob.model.add_subsystem('interp', self.model_ref)
+        self.prob.setup()
 
     def _slider_attrs(self):
         """
@@ -491,19 +496,17 @@ class MetaModelVisualization(object):
 
         # Determine distance and alpha opacity of training points
         if self.is_structured_meta_model:
-            data = self._structured_training_points()
+            data = self._structured_training_points(compute_distance=True)
         else:
-            data = self._unstructured_training_points()
+            data = self._unstructured_training_points(compute_distance=True)
 
-        vert_color = np.zeros((len(data), 1))
+        alphas = np.zeros((len(data), ))
         for i, info in enumerate(data):
             alpha = np.abs(info[0] - x_value) / self.limit_range[self.x_index]
             if alpha < self.dist_range:
-                vert_color[i, -1] = 1
+                alphas[i] = 1
                 # (1 - alpha / self.dist_range) * info[-1]
 
-        color = np.column_stack((data[:, -4:-1] - 1, vert_color))
-        alphas = [0 if math.isnan(x) else x for x in color[:, 3]]
         right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None, fill_color='#000000',
                                fill_alpha=alphas)
 
@@ -550,19 +553,17 @@ class MetaModelVisualization(object):
         bot_plot_fig.line(x='x', y='y', source=self.bot_plot_source)
 
         if self.is_structured_meta_model:
-            data = self._structured_training_points()
+            data = self._structured_training_points(compute_distance=True)
         else:
-            data = self._unstructured_training_points()
+            data = self._unstructured_training_points(compute_distance=True)
 
-        horiz_color = np.zeros((len(data), 1))
+        alphas = np.zeros((len(data), ))
         for i, info in enumerate(data):
             alpha = np.abs(info[1] - y_value) / self.limit_range[self.y_index]
             if alpha < self.dist_range:
-                horiz_color[i, -1] = 1
-                # (1 - alpha / self.dist_range) * info[-2]
+                alphas[i] = 1
+                # (1 - alpha / self.dist_range) * info[-1]
 
-        color = np.column_stack((data[:, -4:-1] - 1, horiz_color))
-        alphas = [0 if math.isnan(x) else x for x in color[:, 3]]
         bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
                              fill_alpha=alphas)
 
@@ -626,7 +627,61 @@ class MetaModelVisualization(object):
         self.output_variable = self.output_list.index(new)
         self._update_all_plots()
 
-    def _structured_training_points(self):
+    def _unstructured_training_points(self, compute_distance=False):
+        """
+        Calculate the training points and returns and array containing the position and alpha.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        array
+            The array of training points and their alpha opacity with respect to the surrogate line
+        """
+        # x_training contains
+        # [x1, x2, x3, x4]
+        # Input Data
+        # Output Data
+        x_training = self.model_ref._training_input
+        y_training = np.squeeze(stack_outputs(self.model_ref._training_output), axis=1)
+
+        x_index = self.x_input.options.index(self.x_input.value)
+        y_index = self.y_input.options.index(self.y_input.value)
+        output_variable = self.output_list.index(self.output_select.value)
+
+        # Vertically stack the x/y inputs and then transpose them
+        infos = np.vstack((x_training[:, x_index], x_training[:, y_index])).transpose()
+        if not compute_distance:
+            return infos
+
+        points = x_training.copy()
+        # Set the first two columns of the points array to x/y inputs, respectively
+        points[:, x_index] = self.input_point_list[x_index]
+        points[:, y_index] = self.input_point_list[y_index]
+        points = np.divide(points, self.limit_range)
+        tree = cKDTree(points)
+        dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
+        scaled_x0 = np.divide(self.input_point_list, self.limit_range)
+        # Query the nearest neighbors tree for the closest points to the scaled x0 array
+        dists, idx = tree.query(scaled_x0, k=len(x_training), distance_upper_bound=dist_limit)
+
+        # info contains:
+        # [x_value, y_value, ND-distance, func_value, alpha]
+
+        data = np.zeros((len(idx), 5))
+        for dist_index, i in enumerate(idx):
+            info = np.ones((5))
+            info[0:2] = infos[i, :]
+            info[2] = dists[dist_index] / dist_limit
+            info[3] = y_training[i, output_variable]
+            info[4] = (1. - info[2] / self.dist_range) ** 0.5
+            data[dist_index] = info
+
+        return data
+
+    def _structured_training_points(self, compute_distance=False):
         # reate tuple of the input parameters
         input_dimensions = tuple(self.surrogate_ref.params)
 
@@ -638,14 +693,11 @@ class MetaModelVisualization(object):
         x_index = self.x_input.options.index(self.x_input.value)
         y_index = self.y_input.options.index(self.y_input.value)
 
-        # Bounds of the input variables
-        bounds = [[min(i), max(i)] for i in self.input_data.values()]
-        limits = np.array(bounds)
-        # Limit range of how much training data will be seen
-        self.limit_range = limits[:, 1] - limits[:, 0]
-
         # Vertically stack the x/y inputs and then transpose them
         infos = np.vstack((self.x_training[:, x_index], self.x_training[:, y_index])).transpose()
+        if not compute_distance:
+            return infos
+
         points = self.x_training.copy()
         # Set the first two columns of the points array to x/y inputs, respectively
         points[:, x_index] = self.input_point_list[x_index]
@@ -657,32 +709,26 @@ class MetaModelVisualization(object):
         # Nearest points to x slice
 
         if self.x_training.shape[1] < 3:
-            two_dimension_tree = self._two_dimension_input(scaled_x0, points)
-            x_tree = two_dimension_tree[0]
-            y_tree = two_dimension_tree[1]
+            x_tree, y_tree = self._two_dimension_input(scaled_x0, points)
         elif self.x_training.shape[1] > 2:
-            mutlidimension_tree = self._multidimension_input(scaled_x0, points)
-            x_tree = mutlidimension_tree[0]
-            y_tree = mutlidimension_tree[1]
-            x_idx = mutlidimension_tree[2]
-            y_idx = mutlidimension_tree[3]
+            x_tree, y_tree = self._multidimension_input(scaled_x0, points)
 
-        # [x_value, y_value, ND-distance, func_value, alpha]
         # [x_value, y_value, ND-distance_X, func_value, x_alpha, ND-distance_Y, y_alpha]
 
-        data = np.zeros((len(x_idx), 7))
-        for dist_index, i in enumerate(y_idx):
+        n = len(x_tree)
+        data = np.zeros((n, 7))
+        for i in range(n):
             info = np.ones((7))
             try:
                 info[0:2] = infos[i, :]
             except IndexError:
                 print("ERROR: Scatter distance value too low. Try: 0.1")
-            info[2] = x_tree[dist_index] / self.dist_limit
+            info[2] = x_tree[i] / self.dist_limit
             info[3] = self.y_training[i]
             info[4] = (1. - info[2] / self.dist_range) ** 0.5
-            info[5] = y_tree[dist_index] / self.dist_limit
+            info[5] = y_tree[i] / self.dist_limit
             info[6] = (1. - info[5] / self.dist_range) ** 0.5
-            data[dist_index] = info
+            data[i] = info
 
         return data
 
@@ -717,63 +763,7 @@ class MetaModelVisualization(object):
         idx_finite = np.where(np.isfinite(y_dists))
         y_dists = y_dists[idx_finite]
 
-        return [x_dists, y_dists, x_idx, y_idx]
-
-    def _unstructured_training_points(self):
-        """
-        Calculate the training points and returns and array containing the position and alpha.
-
-        Parameters
-        ----------
-        None
-
-        Returns
-        -------
-        array
-            The array of training points and their alpha opacity with respect to the surrogate line
-        """
-        # x_training contains
-        # [x1, x2, x3, x4]
-        # Input Data
-        # Output Data
-        x_training = self.model_ref._training_input
-        y_training = np.squeeze(stack_outputs(self.model_ref._training_output), axis=1)
-
-        x_index = self.x_input.options.index(self.x_input.value)
-        y_index = self.y_input.options.index(self.y_input.value)
-        output_variable = self.output_list.index(self.output_select.value)
-
-        # Calculate the limits of each input parameter
-        bounds = [[min(i), max(i)] for i in self.input_data.values()]
-        limits = np.array(bounds)
-        self.limit_range = limits[:, 1] - limits[:, 0]
-
-        # Vertically stack the x/y inputs and then transpose them
-        infos = np.vstack((x_training[:, x_index], x_training[:, y_index])).transpose()
-        points = x_training.copy()
-        # Set the first two columns of the points array to x/y inputs, respectively
-        points[:, x_index] = self.input_point_list[x_index]
-        points[:, y_index] = self.input_point_list[y_index]
-        points = np.divide(points, self.limit_range)
-        tree = cKDTree(points)
-        dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
-        scaled_x0 = np.divide(self.input_point_list, self.limit_range)
-        # Query the nearest neighbors tree for the closest points to the scaled x0 array
-        dists, idx = tree.query(scaled_x0, k=len(x_training), distance_upper_bound=dist_limit)
-
-        # info contains:
-        # [x_value, y_value, ND-distance, func_value, alpha]
-
-        data = np.zeros((len(idx), 5))
-        for dist_index, i in enumerate(idx):
-            info = np.ones((5))
-            info[0:2] = infos[i, :]
-            info[2] = dists[dist_index] / dist_limit
-            info[3] = y_training[i, output_variable]
-            info[4] = (1. - info[2] / self.dist_range) ** 0.5
-            data[dist_index] = info
-
-        return data
+        return [x_dists, y_dists]
 
 
 def view_metamodel(meta_model_comp, port_number):
