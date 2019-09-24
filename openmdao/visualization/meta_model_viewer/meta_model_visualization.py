@@ -664,12 +664,14 @@ class MetaModelVisualization(object):
             mutlidimension_tree = self._multidimension_input(scaled_x0, points)
             x_tree = mutlidimension_tree[0]
             y_tree = mutlidimension_tree[1]
+            x_idx = mutlidimension_tree[2]
+            y_idx = mutlidimension_tree[3]
 
         # [x_value, y_value, ND-distance, func_value, alpha]
         # [x_value, y_value, ND-distance_X, func_value, x_alpha, ND-distance_Y, y_alpha]
 
-        data = np.zeros((len(x_tree), 7))
-        for dist_index, i in enumerate(range(0, len(x_tree))):
+        data = np.zeros((len(x_idx), 7))
+        for dist_index, i in enumerate(y_idx):
             info = np.ones((7))
             try:
                 info[0:2] = infos[i, :]
@@ -695,9 +697,9 @@ class MetaModelVisualization(object):
         return [x_tree, y_tree]
 
     def _multidimension_input(self, scaled_points, training_points):
-        x = np.delete(scaled_points, 0, 0)
+        x = np.delete(scaled_points, self.x_input.options.index(self.x_input.value), 0)
         x_tree_training_points = np.delete(training_points, 0, axis=1)
-        y = np.delete(scaled_points, 1, 0)
+        y = np.delete(scaled_points, self.y_input.options.index(self.y_input.value), 0)
         y_tree_training_points = np.delete(training_points, 1, axis=1)
 
         x_tree = cKDTree(x_tree_training_points)
@@ -709,7 +711,7 @@ class MetaModelVisualization(object):
         y_dists, y_idx = y_tree.query(
             y, k=len(self.x_training), distance_upper_bound=self.dist_limit)
 
-        return [x_dists, y_dists]
+        return [x_dists, y_dists, x_idx, y_idx]
 
     def _unstructured_training_points(self):
         """
