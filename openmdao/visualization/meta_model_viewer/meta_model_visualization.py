@@ -707,7 +707,13 @@ class MetaModelVisualization(object):
         x_dists, x_idx = x_tree.query(
             x, k=len(self.x_training), distance_upper_bound=self.dist_limit)
         y_dists, y_idx = y_tree.query(
-            y, k=len(self.x_training), distance_upper_bound=self.dist_limit)
+            y, k=len(self.y_training), distance_upper_bound=self.dist_limit)
+
+        # kdtree query always returns requested k even if there are not enough valid points
+        idx_finite = np.where(np.isfinite(x_dists))
+        x_dists = x_dists[idx_finite]
+        idx_finite = np.where(np.isfinite(y_dists))
+        y_dists = y_dists[idx_finite]
 
         return [x_dists, y_dists]
 
