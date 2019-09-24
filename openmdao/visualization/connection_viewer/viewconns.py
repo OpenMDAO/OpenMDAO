@@ -100,7 +100,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
             vals[t] = val
 
-    vals['NO CONNECTION'] = ''
+    NOCONN = '[NO CONNECTION]'
+    vals[NOCONN] = ''
 
     src_systems = set()
     tgt_systems = set()
@@ -115,9 +116,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             tgt_systems.add('.'.join(parts[:i]))
 
     src_systems = [{'name': n} for n in sorted(src_systems)]
-    src_systems.insert(1, {'name': "NO CONNECTION"})
+    src_systems.insert(1, {'name': NOCONN})
     tgt_systems = [{'name': n} for n in sorted(tgt_systems)]
-    tgt_systems.insert(1, {'name': "NO CONNECTION"})
+    tgt_systems.insert(1, {'name': NOCONN})
 
     tprom = system._var_allprocs_abs2prom['input']
     sprom = system._var_allprocs_abs2prom['output']
@@ -142,7 +143,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     for t in system._var_abs_names['input']:
         if t not in connections:
-            row = {'id': idx, 'src': 'NO CONNECTION', 'sprom': 'NO CONNECTION', 'sunits': '',
+            row = {'id': idx, 'src': NOCONN, 'sprom': NOCONN, 'sunits': '',
                    'val': _val2str(vals[t]), 'tunits': units[t], 'tprom': tprom[t], 'tgt': t}
             table.append(row)
             idx += 1
@@ -151,7 +152,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         if src not in src2tgts:
             row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': units[src],
                    'val': _val2str(system._outputs[src]),
-                   'tunits': '', 'tprom': 'NO CONNECTION', 'tgt': 'NO CONNECTION'}
+                   'tunits': '', 'tprom': NOCONN, 'tgt': NOCONN}
             table.append(row)
             idx += 1
 

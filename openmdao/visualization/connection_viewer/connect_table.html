@@ -19,7 +19,13 @@
     .middle {
         text-align: center;
         width: 100%;
-        display: inline-block;
+        display:table;
+    }
+
+    .toggle {
+        width: 5%;
+        display:table-cell;
+        text-align: center;
     }
 
     input {
@@ -50,13 +56,13 @@ var table =
         data:tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
         footerElement:"<p class='middle'>" +
-                            "<input type='checkbox' onclick='src_abs_toggle(this)'>Absolute Outputs</input>" +
-                            "<input type='checkbox' checked='true' onclick='src_prom_toggle(this)'>Promoted Outputs</input>" +
-                            "<input type='checkbox' checked='true' onclick='sunits_toggle(this)'>Output Units</input>" +
-                            "<input type='checkbox' checked='true' onclick='values_toggle(this)'>Values</input>" +
-                            "<input type='checkbox' checked='true' onclick='tunits_toggle(this)'>Input Units</input>" +
-                            "<input type='checkbox' onclick='tgt_abs_toggle(this)'>Absolute Inputs</input>" +
-                            "<input type='checkbox' checked='true' onclick='tgt_prom_toggle(this)'>Promoted Inputs</input></p>",
+                            "<span class='toggle'><input type='checkbox' onclick='src_abs_toggle(this)'>Absolute Outputs</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='src_prom_toggle(this)'>Promoted Outputs</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='sunits_toggle(this)'>Output Units</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='values_toggle(this)'>Values</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='tunits_toggle(this)'>Input Units</input></span>" +
+                            "<span class='toggle'><input type='checkbox' onclick='tgt_abs_toggle(this)'>Absolute Inputs</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='tgt_prom_toggle(this)'>Promoted Inputs</input></span></p>",
         columns:[ //Define Table Columns
                 {title: "Output (absolute)", field:"src", align:"left", headerFilter:true,
                     visible:false, minWidth:300,

@@ -122,13 +122,13 @@ Below is an example of a connection viewer for a pycycle propulsor model obtaine
 By default the promoted names columns of both inputs and outputs are shown, but in the example
 above, the absolute input names are shown and the promoted input names are hidden.
 
-Unconnected inputs can easily be identified by typing 'NO CONNECTION' or 'NO ', into
-the filter field of either the absolute or promoted output column.  Unconnected outputs can
-be shown similarly by typing 'NO CONNECTION' or 'NO ' into the filter field of either the absolute
-or promoted input column.
+Unconnected inputs can easily be identified by typing '[NO CONNECTION]' or '[', into
+the filter field of either the absolute or promoted *output* column.  Unconnected outputs can
+be shown similarly by typing '[NO CONNECTION]' or '[' into the filter field of either the absolute
+or promoted *input* column.
 
 When showing promoted output and promoted input columns, if the promoted output name equals the
-promoted input name, that means the the connection is an implicit connection.  Otherwise the
+promoted input name, that means the connection is an implicit connection.  Otherwise the
 connection is explicit, meaning somewhere in the model there is an explicit call to `connect`
 that producted the connection.
 
