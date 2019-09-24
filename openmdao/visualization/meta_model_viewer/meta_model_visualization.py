@@ -631,8 +631,8 @@ class MetaModelVisualization(object):
         input_dimensions = tuple(self.surrogate_ref.params)
 
         # Input training data and output training data
-        x_training = np.array([z for z in product(*input_dimensions)])
-        y_training = self.surrogate_ref.training_outputs[self.output_select.value].flatten()
+        self.x_training = np.array([z for z in product(*input_dimensions)])
+        self.y_training = self.surrogate_ref.training_outputs[self.output_select.value].flatten()
 
         # Index of input/output variables
         x_index = self.x_input.options.index(self.x_input.value)
@@ -645,22 +645,25 @@ class MetaModelVisualization(object):
         self.limit_range = limits[:, 1] - limits[:, 0]
 
         # Vertically stack the x/y inputs and then transpose them
-        infos = np.vstack((x_training[:, x_index], x_training[:, y_index])).transpose()
-        points = x_training.copy()
+        infos = np.vstack((self.x_training[:, x_index], self.x_training[:, y_index])).transpose()
+        points = self.x_training.copy()
         # Set the first two columns of the points array to x/y inputs, respectively
         points[:, x_index] = self.input_point_list[x_index]
         points[:, y_index] = self.input_point_list[y_index]
         points = np.divide(points, self.limit_range)
-        dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
+        self.dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
         scaled_x0 = np.divide(self.input_point_list, self.limit_range)
         # Query the nearest neighbors tree for the closest points to the scaled x0 array
         # Nearest points to x slice
-        x = np.delete(scaled_x0, x_index, 0)
-        y = np.delete(scaled_x0, y_index, 0)
-        x_tree = [abs(x - number) for number in points[:, x_index]]
-        print(x_tree[:5])
-        y_tree = [abs(y - number) for number in points[:, y_index]]
-        print(y_tree[:5])
+
+        if self.x_training.shape[1] < 3:
+            two_dimension_tree = self._two_dimension_input(scaled_x0, points)
+            x_tree = two_dimension_tree[0]
+            y_tree = two_dimension_tree[1]
+        elif self.x_training.shape[1] > 2:
+            mutlidimension_tree = self._multidimension_input(scaled_x0, points)
+            x_tree = mutlidimension_tree[0]
+            y_tree = mutlidimension_tree[1]
 
         # [x_value, y_value, ND-distance, func_value, alpha]
         # [x_value, y_value, ND-distance_X, func_value, x_alpha, ND-distance_Y, y_alpha]
@@ -672,14 +675,41 @@ class MetaModelVisualization(object):
                 info[0:2] = infos[i, :]
             except IndexError:
                 print("ERROR: Scatter distance value too low. Try: 0.1")
-            info[2] = x_tree[dist_index] / dist_limit
-            info[3] = y_training[i]
+            info[2] = x_tree[dist_index] / self.dist_limit
+            info[3] = self.y_training[i]
             info[4] = (1. - info[2] / self.dist_range) ** 0.5
-            info[5] = y_tree[dist_index] / dist_limit
+            info[5] = y_tree[dist_index] / self.dist_limit
             info[6] = (1. - info[5] / self.dist_range) ** 0.5
             data[dist_index] = info
 
         return data
+
+    def _two_dimension_input(self, scaled_points, training_points):
+        # array, index, axis
+        x = np.delete(scaled_points, 0, 0)
+        y = np.delete(scaled_points, 1, 0)
+
+        x_tree = [abs(x - number) for number in training_points[:, 0]]
+        y_tree = [abs(y - number) for number in training_points[:, 1]]
+
+        return [x_tree, y_tree]
+
+    def _multidimension_input(self, scaled_points, training_points):
+        x = np.delete(scaled_points, 0, 0)
+        x_tree_training_points = np.delete(training_points, 0, axis=1)
+        y = np.delete(scaled_points, 1, 0)
+        y_tree_training_points = np.delete(training_points, 1, axis=1)
+
+        x_tree = cKDTree(x_tree_training_points)
+        y_tree = cKDTree(y_tree_training_points)
+        # Query the nearest neighbors tree for the closest points to the scaled x0 array
+
+        x_dists, x_idx = x_tree.query(
+            x, k=len(self.x_training), distance_upper_bound=self.dist_limit)
+        y_dists, y_idx = y_tree.query(
+            y, k=len(self.x_training), distance_upper_bound=self.dist_limit)
+
+        return [x_dists, y_dists]
 
     def _unstructured_training_points(self):
         """
