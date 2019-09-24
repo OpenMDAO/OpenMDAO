@@ -664,6 +664,21 @@ class Problem(object):
         return self.driver.run()
 
     def compute_jacvec_product(self, of, wrt, mode, seed):
+        """
+        Given a seed and 'of' and 'wrt' variables, compute the total jacobian vector product.
+
+        Parameters
+        ----------
+        of : list of str
+            Variables whose derivatives will be computed.
+        wrt : list of str
+            Variables with respect to which the derivatives will be computed.
+
+        Returns
+        -------
+        dict
+            The total jacobian vector product, keyed by variable name.
+        """
         if mode == 'fwd':
             if len(wrt) != len(seed):
                 raise RuntimeError("seed and 'wrt' list must be the same length in fwd mode.")
@@ -678,6 +693,9 @@ class Problem(object):
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
 
+        print("RVEC:", rkind)
+        print("LVEC:", lkind)
+
         # set seed values into dresids (fwd) or doutputs (rev)
         try:
             seed[rnames[0]]
@@ -685,17 +703,24 @@ class Problem(object):
             for i, name in enumerate(rnames):
                 rvec[name] = seed[i]
         else:
-            vals = [seed[n] for n in rnames]
-        for name in rnames:
-            rvec[name] = seed[name]
+            for name in rnames:
+                rvec[name] = seed[name]
+                print("   RVEC[%s] = %s" % (name, rvec[name]))
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
         rvec._data *= -1.
 
+        print("   PRE solve_linear")
+        print("   RVEC:", rvec._data)
+        print("   LVEC:", lvec._data)
         self.model.run_solve_linear(['linear'], mode)
+        print("   POST solve_linear")
+        print("   RVEC:", rvec._data)
+        for n in lvec._views:
+            print("   LVEC[%s] = %s" % (n, lvec[n]))
 
-        return {n: lvec[n] for n in lnames}
+        return {n: lvec[n].copy() for n in lnames}
 
     def run_once(self):
         """

@@ -150,7 +150,7 @@ class NonlinearBlockGS(NonlinearSolver):
                     temp_norm = np.linalg.norm(temp)
 
                 if temp_norm == 0.:
-                    temp_norm = 1e-12  # prevent division by 0 in the next line
+                    temp_norm = 1e-12  # prevent division by 0 below
 
                 # If MPI, piggyback on the output and residual vectors to perform a distributed
                 # dot product.
