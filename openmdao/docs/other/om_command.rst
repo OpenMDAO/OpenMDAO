@@ -89,7 +89,7 @@ openmdao view_connections
 #########################
 
 The :code:`openmdao view_connections` command generates a table of connection information for all input and
-output variables in the model.  It's primary purpose is to help debug a model by making the following
+output variables in the model.  Its primary purpose is to help debug a model by making the following
 things easier:
 
 

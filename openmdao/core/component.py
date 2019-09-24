@@ -35,13 +35,16 @@ global_meta_names = {
 }
 
 _full_slice = slice(None)
-
-_forbidden_chars = ['.', '*', '?', '!', '[', ']', ' ', '\t']
+_forbidden_chars = ['.', '*', '?', '!', '[', ']']
+_whitespace = set([' ', '\t', '\r', '\n'])
 
 
 def _valid_var_name(name):
     """
     Determine if the proposed name is a valid variable name.
+
+    Leading and trailing whitespace is illegal, and a specific list of characters
+    are illegal anywhere in the string.
 
     Parameters
     ----------
@@ -53,13 +56,13 @@ def _valid_var_name(name):
     bool
         True if the proposed name is a valid variable name, else False.
     """
-    global _forbidden_chars
+    global _forbidden_chars, _whitespace
     if not name:
         return False
     for char in _forbidden_chars:
         if char in name:
             return False
-    return True
+    return name[0] not in _whitespace and name[-1] not in _whitespace
 
 
 class Component(System):
