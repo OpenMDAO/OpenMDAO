@@ -499,7 +499,7 @@ class MetaModelVisualization(object):
         if self.is_structured_meta_model:
             data = self._structured_training_points(compute_distance=True, source='right')
         else:
-            data = self._unstructured_training_points(compute_distance=True)
+            data = self._unstructured_training_points(compute_distance=True, source='right')
 
         alphas = np.zeros((len(data), ))
         for i, info in enumerate(data):
@@ -624,7 +624,7 @@ class MetaModelVisualization(object):
         self.output_variable = self.output_list.index(new)
         self._update_all_plots()
 
-    def _unstructured_training_points(self, compute_distance=False):
+    def _unstructured_training_points(self, compute_distance=False, source='bottom'):
         """
         Calculate the training points and returns and array containing the position and alpha.
 
@@ -655,14 +655,24 @@ class MetaModelVisualization(object):
 
         points = x_training.copy()
         # Set the first two columns of the points array to x/y inputs, respectively
-        points[:, x_index] = self.input_point_list[x_index]
-        points[:, y_index] = self.input_point_list[y_index]
         points = np.divide(points, self.limit_range)
-        tree = cKDTree(points)
+
         dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
         scaled_x0 = np.divide(self.input_point_list, self.limit_range)
-        # Query the nearest neighbors tree for the closest points to the scaled x0 array
-        dists, idx = tree.query(scaled_x0, k=len(x_training), distance_upper_bound=dist_limit)
+
+        if x_training.shape[1] < 3:
+
+            tree = cKDTree(points)
+            # Query the nearest neighbors tree for the closest points to the scaled x0 array
+            dists, idx = tree.query(scaled_x0, k=len(x_training), distance_upper_bound=self.dist_range)
+
+            # kdtree query always returns requested k even if there are not enough valid points
+            idx_finite = np.where(np.isfinite(dists))
+            dists = dists[idx_finite]
+            idx = idx[idx_finite]
+
+        else:
+            dists, idx = self._multidimension_input(scaled_x0, points, source=source)
 
         # info contains:
         # [x_value, y_value, ND-distance, func_value, alpha]
@@ -673,7 +683,7 @@ class MetaModelVisualization(object):
             info[0:2] = infos[i, :]
             info[2] = dists[dist_index] / dist_limit
             info[3] = training_output[i, output_variable]
-            info[4] = 0.0 #(1. - info[2] / self.dist_range) ** 0.5
+            #info[4] = 0.0 #(1. - info[2] / self.dist_range) ** 0.5
             data[dist_index] = info
 
         return data
@@ -705,7 +715,7 @@ class MetaModelVisualization(object):
         # Nearest points to x slice
 
         if x_training.shape[1] < 3:
-            x_tree, y_tree = self._two_dimension_input(scaled_x0, points)
+            x_tree = self._two_dimension_input(scaled_x0, points)
         else:
             x_tree, x_idx = self._multidimension_input(scaled_x0, points, source=source)
 
@@ -718,31 +728,35 @@ class MetaModelVisualization(object):
         else:
             temp_range = x_idx
 
-        for i, j in enumerate(temp_range):
+        for dist_index, j in enumerate(temp_range):
             info = np.ones((7))
             try:
                 info[0:2] = infos[j, :]
             except IndexError:
                 print("ERROR: Scatter distance value too low. Try: 0.1")
 
-            info[2] = x_tree[i] * self.dist_limit
+            info[2] = x_tree[dist_index] * self.dist_limit
             info[3] = training_output[j]
-            info[4] = 0.0 # (1. - info[2] / self.dist_range) ** 0.5
+            #info[4] = 0.0 # (1. - info[2] / self.dist_range) ** 0.5
             #info[5] = y_tree[i] * self.dist_limit
-            info[6] = 0.0 # (1. - info[5] / self.dist_range) ** 0.5
-            data[i] = info
+            #info[6] = 0.0 # (1. - info[5] / self.dist_range) ** 0.5
+            data[dist_index] = info
 
         return data
 
-    def _two_dimension_input(self, scaled_points, training_points):
+    def _two_dimension_input(self, scaled_points, training_points, source='bottom'):
         # array, index, axis
-        x = np.delete(scaled_points, 0, axis=0)
-        y = np.delete(scaled_points, 1, axis=0)
+        if source == 'right':
+            col_idx = 1
+        else:
+            col_idx = 0
 
-        x_tree = [abs(x - number) for number in training_points[:, 0]]
-        y_tree = [abs(y - number) for number in training_points[:, 1]]
+        x = np.delete(scaled_points, col_idx, axis=0)
+        x_training_points = np.delete(training_points, col_idx, axis=1)
 
-        return [x_tree, y_tree]
+        x_tree = np.abs(x - x_training_points)
+
+        return x_tree
 
     def _multidimension_input(self, scaled_points, training_points, source='bottom'):
         if source == 'right':
@@ -758,7 +772,7 @@ class MetaModelVisualization(object):
 
         # Query the nearest neighbors tree for the closest points to the scaled x0 array
         dists, idx = x_tree.query(x, k=len(x_training_points),
-                                  distance_upper_bound=self.dist_limit)
+                                  distance_upper_bound=self.dist_range)
 
         # kdtree query always returns requested k even if there are not enough valid points
         idx_finite = np.where(np.isfinite(dists))
