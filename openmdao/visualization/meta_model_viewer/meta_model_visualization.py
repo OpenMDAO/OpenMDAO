@@ -499,7 +499,8 @@ class MetaModelVisualization(object):
         for i, info in enumerate(data):
             alpha = np.abs(info[0] - x_value) / self.limit_range[self.x_index]
             if alpha < self.dist_range:
-                vert_color[i, -1] = (1 - alpha / self.dist_range) * info[-1]
+                vert_color[i, -1] = 1
+                # (1 - alpha / self.dist_range) * info[-1]
 
         color = np.column_stack((data[:, -4:-1] - 1, vert_color))
         alphas = [0 if math.isnan(x) else x for x in color[:, 3]]
@@ -557,7 +558,8 @@ class MetaModelVisualization(object):
         for i, info in enumerate(data):
             alpha = np.abs(info[1] - y_value) / self.limit_range[self.y_index]
             if alpha < self.dist_range:
-                horiz_color[i, -1] = (1 - alpha / self.dist_range) * info[-1]
+                horiz_color[i, -1] = 1
+                # (1 - alpha / self.dist_range) * info[-2]
 
         color = np.column_stack((data[:, -4:-1] - 1, horiz_color))
         alphas = [0 if math.isnan(x) else x for x in color[:, 3]]
@@ -649,22 +651,32 @@ class MetaModelVisualization(object):
         points[:, x_index] = self.input_point_list[x_index]
         points[:, y_index] = self.input_point_list[y_index]
         points = np.divide(points, self.limit_range)
-        tree = cKDTree(points)
         dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
         scaled_x0 = np.divide(self.input_point_list, self.limit_range)
         # Query the nearest neighbors tree for the closest points to the scaled x0 array
-        dists, idx = tree.query(scaled_x0, k=len(x_training), distance_upper_bound=dist_limit)
+        # Nearest points to x slice
+        x = np.delete(scaled_x0, x_index, 0)
+        y = np.delete(scaled_x0, y_index, 0)
+        x_tree = [abs(x - number) for number in points[:, x_index]]
+        print(x_tree[:5])
+        y_tree = [abs(y - number) for number in points[:, y_index]]
+        print(y_tree[:5])
 
-        data = np.zeros((len(idx), 5))
-        for dist_index, i in enumerate(idx):
-            info = np.ones((5))
+        # [x_value, y_value, ND-distance, func_value, alpha]
+        # [x_value, y_value, ND-distance_X, func_value, x_alpha, ND-distance_Y, y_alpha]
+
+        data = np.zeros((len(x_tree), 7))
+        for dist_index, i in enumerate(range(0, len(x_tree))):
+            info = np.ones((7))
             try:
                 info[0:2] = infos[i, :]
             except IndexError:
                 print("ERROR: Scatter distance value too low. Try: 0.1")
-            info[2] = dists[dist_index] / dist_limit
+            info[2] = x_tree[dist_index] / dist_limit
             info[3] = y_training[i]
             info[4] = (1. - info[2] / self.dist_range) ** 0.5
+            info[5] = y_tree[dist_index] / dist_limit
+            info[6] = (1. - info[5] / self.dist_range) ** 0.5
             data[dist_index] = info
 
         return data
