@@ -19,6 +19,11 @@ def get_comp(size):
 
 
 class SubProbComp(om.ExplicitComponent):
+    """
+    This component contains a sub-Problem with a component that will be solved over num_nodes
+    points instead of creating num_nodes instances of that same component and connecting them
+    together.
+    """
     def __init__(self, input_size, num_nodes, mode, **kwargs):
         super(SubProbComp, self).__init__(**kwargs)
         self.prob = None
@@ -78,9 +83,7 @@ class SubProbComp(om.ExplicitComponent):
                 for i in range(self.num_nodes):
                     p.model._vectors['output']['linear'].set_const(0.0)
                     p.model._vectors['residual']['linear'].set_const(0.0)
-                    print(i, "SEED:", seed)
                     jvp = p.compute_jacvec_product(of=['comp.out'], wrt=['indep.x','indep.inp'], mode='fwd', seed=seed)
-                    print("JVP:", jvp)
                     seed['indep.inp'][:] = jvp['comp.out']
 
                 if rhsname == 'indep.x':
@@ -88,27 +91,46 @@ class SubProbComp(om.ExplicitComponent):
                 else:
                     partials[self.pathname + '.out', self.pathname + '.inp'][0, 0] = jvp[self.pathname + '.out']
 
-        print("partials:", list(partials.items()))
-
     def _compute_partials_rev(self, inputs, partials):
         p = self.prob
         p['indep.x'] = inputs['x']
         p['indep.inp'] = inputs['inp']
         seed = {'comp.out': np.ones(1)}
-        p.run_model()
+
+        stack = []
+        comp = p.model.comp
+        comp._inputs['inp'] = inputs['inp']
+        # store the inputs to each comp (the comp at each node point) by doing nonlinear solves
+        # and storing what the inputs are for each node point.  We'll set these inputs back
+        # later when we linearize about each node point.
+        for i in range(self.num_nodes):
+            stack.append(comp._inputs['inp'][0])
+            comp._inputs['x'] = inputs['x']
+            comp._solve_nonlinear()
+            comp._inputs['inp'] = comp._outputs['out']
 
         for i in range(self.num_nodes):
             p.model._vectors['output']['linear'].set_const(0.0)
             p.model._vectors['residual']['linear'].set_const(0.0)
-            print("SEED:", seed)
+            comp._inputs['inp'] = stack.pop()
+            comp._inputs['x'] = inputs['x']
+            p.model._linearize(None)
             jvp = p.compute_jacvec_product(of=['comp.out'], wrt=['indep.x','indep.inp'], mode='rev', seed=seed)
-            print("JVP:", jvp['indep.inp'])
             seed['comp.out'][:] = jvp['indep.inp']
 
-        partials[self.pathname + '.out', self.pathname + '.x'] = jvp['indep.x']
-        partials[self.pathname + '.out', self.pathname + '.inp'] = jvp['indep.inp']
+            # all of the comp.x's are connected to indep.x, so we have to accumulate their
+            # contributions together
+            partials[self.pathname + '.out', self.pathname + '.x'] += jvp['indep.x']
 
-        print("partials:", list(partials.items()))
+            # this one doesn't get accumulated because each comp.inp contributes to the
+            # previous comp's .out (or to indep.inp in the case of the first comp) only.
+            # Note that we have to handle this explicitly here because normally in OpenMDAO
+            # we accumulate derivatives when we do reverse transfers.  We can't do that
+            # here because we only have one instance of our component, so instead of
+            # accumulating into separate 'comp.out' variables for each comp instance,
+            # we would be accumulating into a single comp.out variable, which would make
+            # our derivative too big.
+            partials[self.pathname + '.out', self.pathname + '.inp'] = jvp['indep.inp']
 
     def compute_partials(self, inputs, partials):
         if self.mode == 'fwd':
@@ -156,7 +178,7 @@ class TestPComputeJacvecProd(unittest.TestCase):
         size = 5
         p = self._build_om_model(size)
         p.setup(mode='fwd')
-        p['indep.x'] = np.arange(size-1, dtype=float)  #np.random.random(size - 1)
+        p['indep.x'] = np.arange(size-1, dtype=float) + 1. #np.random.random(size - 1)
         p['indep.inp'] = np.array([7.])  #np.random.random(1)[0]
         p.final_setup()
 
@@ -179,7 +201,7 @@ class TestPComputeJacvecProd(unittest.TestCase):
         size = 5
         p = self._build_om_model(size)
         p.setup(mode='rev')
-        p['indep.x'] = np.arange(size-1, dtype=float)  #np.random.random(size - 1)
+        p['indep.x'] = np.arange(size-1, dtype=float) + 1. #np.random.random(size - 1)
         p['indep.inp'] = np.array([7.])  #np.random.random(1)[0]
         p.final_setup()
 
