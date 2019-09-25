@@ -139,8 +139,6 @@ class SubProbComp(om.ExplicitComponent):
             self._compute_partials_rev(inputs, partials)
 
 
-
-
 class TestPComputeJacvecProd(unittest.TestCase):
 
     def _build_om_model(self, size):
