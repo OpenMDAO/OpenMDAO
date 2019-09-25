@@ -63,19 +63,19 @@ class MetaModelVisualization(object):
         Data source containing dictionary of sliders
     contour_training_data_source : ColumnDataSource
         Data source containing dictionary of training data points
-    bot_plot_source : ColumnDataSource
+    bottom_plot_source : ColumnDataSource
         Data source containing data for the bottom subplot
-    bot_plot_scatter_source : ColumnDataSource
+    bottom_plot_scatter_source : ColumnDataSource
         Data source containing scatter point data for the bottom subplot
     right_plot_source : ColumnDataSource
         Data source containing data for the right subplot
     right_plot_scatter_source : ColumnDataSource
         Data source containing scatter point data for the right subplot
-    source : ColumnDataSource
+    contour_plot_source : ColumnDataSource
         Data source containing data for the contour plot
-    input_list : list
+    input_names : list
         List of input data titles as strings
-    output_list : list
+    output_names : list
         List of output data titles as strings
     training_inputs : dict
         Dictionary of input training data
@@ -97,6 +97,8 @@ class MetaModelVisualization(object):
         Number of inputs
     num_of_outputs : int
         Number of outputs
+    limit_range : array
+        Array containing the range of each input
     scatter_distance : TextInput
         Text input for user to enter custom value to calculate distance of training points around
         slice line
@@ -111,9 +113,9 @@ class MetaModelVisualization(object):
         Value of output axis column
     sliders_and_selects : layout
         Layout containing the sliders and select elements
-    layout : layout
+    doc_layout : layout
         Contains first row of plots
-    layout2 : layout
+    doc_layout2 : layout
         Contains second row of plots
     z : array
         A 2D array containing contour plot data
@@ -136,30 +138,31 @@ class MetaModelVisualization(object):
         self.surrogate_ref = surrogate_ref
         self.resolution = resolution
 
-        # Create list of inputs
+        # If the surrogate model coming in is structured
         if isinstance(self.surrogate_ref, MetaModelUnStructuredComp):
             self.is_structured_meta_model = False
 
-            # self.resolution = resolution
-            self.input_list = [name[0] for name in self.surrogate_ref._surrogate_input_names]
-
-            if len(self.input_list) < 2:
+            # Create list of input names, check if it has more than one input, then create list
+            # of outputs
+            self.input_names = [name[0] for name in self.surrogate_ref._surrogate_input_names]
+            if len(self.input_names) < 2:
                 raise ValueError('Must have more than one input value')
+            self.output_names = [name[0] for name in self.surrogate_ref._surrogate_output_names]
 
-            self.output_list = [name[0] for name in self.surrogate_ref._surrogate_output_names]
-
+            # Create reference for untructured component
             self.model_ref = MetaModelUnStructuredComp(
                 default_surrogate=self.surrogate_ref.options['default_surrogate'])
 
+        # If the surrogate model coming in is unstructured
         elif isinstance(self.surrogate_ref, MetaModelStructuredComp):
             self.is_structured_meta_model = True
 
-            self.input_list = [name for name in self.surrogate_ref._var_rel_names['input']]
+            self.input_names = [name for name in self.surrogate_ref._var_rel_names['input']]
 
-            if len(self.input_list) < 2:
+            if len(self.input_names) < 2:
                 raise ValueError('Must have more than one input value')
 
-            self.output_list = [name for name in self.surrogate_ref._var_rel_names['output']]
+            self.output_names = [name for name in self.surrogate_ref._var_rel_names['output']]
 
             self.model_ref = MetaModelStructuredComp(
                 distributed=self.surrogate_ref.options['distributed'],
@@ -174,19 +177,19 @@ class MetaModelVisualization(object):
         self._setup_empty_prob_comp()
 
         # Setup dropdown menus for x/y inputs and the output value
-        self.x_input_select = Select(title="X Input:", value=[x for x in self.input_list][0],
-                              options=[x for x in self.input_list])
+        self.x_input_select = Select(title="X Input:", value=[x for x in self.input_names][0],
+                                     options=[x for x in self.input_names])
         self.x_input_select.on_change('value', self._x_input_update)
 
-        self.y_input_select = Select(title="Y Input:", value=[x for x in self.input_list][1],
-                              options=[x for x in self.input_list])
+        self.y_input_select = Select(title="Y Input:", value=[x for x in self.input_names][1],
+                                     options=[x for x in self.input_names])
         self.y_input_select.on_change('value', self._y_input_update)
 
-        self.output_select = Select(title="Output:", value=[x for x in self.output_list][0],
-                                    options=[x for x in self.output_list])
+        self.output_select = Select(title="Output:", value=[x for x in self.output_names][0],
+                                    options=[x for x in self.output_names])
         self.output_select.on_change('value', self._output_value_update)
 
-        # Create sliders in a loop
+        # Create sliders for each input
         self.slider_dict = {}
         self.predict_inputs = {}
         for title, values in self.training_inputs.items():
@@ -201,8 +204,8 @@ class MetaModelVisualization(object):
         self._slider_attrs()
 
         # Length of inputs and outputs
-        self.num_of_inputs = len(self.input_list)
-        self.num_of_outputs = len(self.output_list)
+        self.num_of_inputs = len(self.input_names)
+        self.num_of_outputs = len(self.output_names)
 
         # Precalculate the problem bounds.
         bounds = [[min(i), max(i)] for i in self.training_inputs.values()]
@@ -212,24 +215,30 @@ class MetaModelVisualization(object):
         # Positional indicies
         self.x_index = 0
         self.y_index = 1
-        self.output_variable = self.output_list.index(self.output_select.value)
+        self.output_variable = self.output_names.index(self.output_select.value)
 
-        # Most data sources are filled with initial values
+        # Data sources are filled with initial values
+        # Slider Column Data Source
         self.slider_source = ColumnDataSource(data=self.predict_inputs)
-        self.source = ColumnDataSource(data=dict(
+
+        # Contour plot Column Data Source
+        self.contour_plot_source = ColumnDataSource(data=dict(
             z=np.random.rand(self.resolution, self.resolution)))
         self.contour_training_data_source = ColumnDataSource(
             data=dict(x=np.repeat(0, self.resolution), y=np.repeat(0, self.resolution)))
 
-        self.bot_plot_source = ColumnDataSource(data=dict(
+        # Bottom plot Column Data Source
+        self.bottom_plot_source = ColumnDataSource(data=dict(
             x=np.repeat(0, self.resolution), y=np.repeat(0, self.resolution)))
-        self.bot_plot_scatter_source = ColumnDataSource(data=dict(
+        self.bottom_plot_scatter_source = ColumnDataSource(data=dict(
             bot_slice_x=np.repeat(0, self.resolution), bot_slice_y=np.repeat(0, self.resolution)))
 
+        # Right plot Column Data Source
         self.right_plot_source = ColumnDataSource(data=dict(
             x=np.repeat(0, self.resolution), y=np.repeat(0, self.resolution)))
         self.right_plot_scatter_source = ColumnDataSource(data=dict(
-            left_slice_x=np.repeat(0, self.resolution), left_slice_y=np.repeat(0, self.resolution)))
+            right_slice_x=np.repeat(0, self.resolution),
+            right_slice_y=np.repeat(0, self.resolution)))
 
         # Text input to change the distance of reach when searching for nearest data points
         self.scatter_distance = TextInput(value="0.1", title="Scatter Distance")
@@ -238,19 +247,20 @@ class MetaModelVisualization(object):
 
         # Grouping all of the sliders and dropdowns into one column
         sliders = [i for i in self.slider_dict.values()]
-        sliders.extend([self.x_input_select, self.y_input_select, self.output_select, self.scatter_distance])
+        sliders.extend(
+            [self.x_input_select, self.y_input_select, self.output_select, self.scatter_distance])
         self.sliders_and_selects = row(
             column(*sliders))
 
         # Layout creation
-        self.layout = row(self._contour_data(), self._right_plot(), self.sliders_and_selects)
-        self.layout2 = row(self._bottom_plot())
+        self.doc_layout = row(self._contour_data(), self._right_plot(), self.sliders_and_selects)
+        self.doc_layout2 = row(self._bottom_plot())
 
         if doc is None:
             doc = curdoc()
 
-        doc.add_root(self.layout)
-        doc.add_root(self.layout2)
+        doc.add_root(self.doc_layout)
+        doc.add_root(self.doc_layout2)
         doc.title = 'Meta Model Visualization'
 
     def _setup_empty_prob_comp(self):
@@ -262,24 +272,29 @@ class MetaModelVisualization(object):
         None
 
         """
+        # Check for structured or unstructured
         if self.is_structured_meta_model:
-            for idx, name in enumerate(self.input_list):
+            # Loop through the input names
+            for idx, name in enumerate(self.input_names):
+                # Check for no training data
                 try:
+                    # Append the input data/titles to a dictionary
                     self.training_inputs[name] = self.surrogate_ref.params[idx]
-                    self.model_ref.add_input(
-                        name, 0.,
-                        training_data=self.surrogate_ref.params[idx])
+                    # Also, append the data as an 'add_input' to the model reference
+                    self.model_ref.add_input(name, 0.,
+                                             training_data=self.surrogate_ref.params[idx])
                 except TypeError:
                     msg = "No training data present for one or more parameters"
                     raise TypeError(msg)
 
-            for idx, name in enumerate(self.output_list):
+            # Add the outputs to the model reference
+            for idx, name in enumerate(self.output_names):
                 self.model_ref.add_output(
                     name, 0.,
                     training_data=self.surrogate_ref.training_outputs[name])
 
         else:
-            for name in self.input_list:
+            for name in self.input_names:
                 try:
                     self.training_inputs[name] = {
                         i for i in self.surrogate_ref.options['train:' + str(name)]}
@@ -290,18 +305,18 @@ class MetaModelVisualization(object):
                     msg = "No training data present for one or more parameters"
                     raise TypeError(msg)
 
-            for name in self.output_list:
+            for name in self.output_names:
                 self.model_ref.add_output(
                     name, 0.,
                     training_data=[i for i in self.surrogate_ref.options['train:' + str(name)]])
 
-
+        # Add the subsystem and setup
         self.prob.model.add_subsystem('interp', self.model_ref)
         self.prob.setup()
 
     def _slider_attrs(self):
         """
-        Assign slider objects and callback functions.
+        Assign data to slider objects and callback functions.
 
         Parameters
         ----------
@@ -312,13 +327,20 @@ class MetaModelVisualization(object):
             # Checks if there is a callback previously assigned and then clears it
             if len(slider_object._callbacks) == 1:
                 slider_object._callbacks.clear()
+
+            # Check if the name matches the 'x input' title
             if name == self.x_input_select.value:
+                # Set the object and add an event handler
                 self.x_input_slider = slider_object
                 self.x_input_slider.on_change('value', self._scatter_plots_update)
+
+            # Check if the name matches the 'y input' title
             elif name == self.y_input_select.value:
+                # Set the object and add an event handler
                 self.y_input_slider = slider_object
                 self.y_input_slider.on_change('value', self._scatter_plots_update)
             else:
+                # If it is not an x or y input then just assign it the event handler
                 slider_object.on_change('value', self._update)
 
     def _make_predictions(self, data):
@@ -335,41 +357,60 @@ class MetaModelVisualization(object):
         array
             np.stack of predicted points.
         """
-        outputs = {i: [] for i in self.output_list}
-        print("Making Predictions")
+        # Create dictionary with an empty list
+        outputs = {i: [] for i in self.output_names}
 
         # Parse dict into shape [n**2, number of inputs] list
         inputs = np.empty([self.resolution**2, self.num_of_inputs])
         for idx, values in enumerate(data.values()):
             inputs[:, idx] = values.flatten()
 
+        # Check for structured or unstructured
         if self.is_structured_meta_model:
+            # Assign each row of the data coming in to a tuple. Loop through the tuple, and append
+            # the name of the input and value.
             for idx, tup in enumerate(inputs):
                 for name, val in zip(data.keys(), tup):
                     self.prob[str.format(self.model_ref.name + '.' + name)] = val
                 self.prob.run_model()
-                for i in self.output_list:
+                # Append the predicted value(s)
+                for i in self.output_names:
                     outputs[i].append(
                         np.array(self.prob[str.format(self.model_ref.name + '.' + i)]))
+
         else:
-            # Pair data points with their respective prob name. Loop to make predictions
             for idx, tup in enumerate(inputs):
                 for name, val in zip(data.keys(), tup):
                     self.prob[str.format(self.model_ref.name + '.' + name)] = val
                 self.prob.run_model()
-                for i in self.output_list:
+                for i in self.output_names:
                     outputs[i].append(float(self.prob[str.format(self.model_ref.name + '.' + i)]))
 
         return stack_outputs(outputs)
 
-    def _cont_data_calcs(self):
+    def _contour_data_calcs(self):
+        """
+        Parse input data into a dictionary to be predicted at.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        dict
+            Dictionary of training data to be predicted at.
+        """
+        # Create initial data array of training points
         resolution = self.resolution
         x_data = np.zeros((resolution, resolution, self.num_of_inputs))
 
         self._slider_attrs()
 
+        # Broadcast the inputs to every row of x_data array
         x_data[:, :, :] = np.array(self.input_point_list)
 
+        # Find the x/y input titles and match their index positions
         for idx, (title, values) in enumerate(self.slider_source.data.items()):
             if title == self.x_input_select.value:
                 self.xlins_mesh = values
@@ -378,7 +419,9 @@ class MetaModelVisualization(object):
                 self.ylins_mesh = values
                 y_index_position = idx
 
+        # Make meshgrid from the x/y inputs to be plotted
         X, Y = np.meshgrid(self.xlins_mesh, self.ylins_mesh)
+        # Move the x/y inputs to their respective positions in x_data
         x_data[:, :, x_index_position] = X
         x_data[:, :, y_index_position] = Y
 
@@ -405,12 +448,12 @@ class MetaModelVisualization(object):
         self.input_point_list = [i.value for i in self.slider_dict.values()]
 
         # Pass the dict to make predictions and then reshape the output to (n, n, number of outputs)
-        y_data[:, :, :] = self._make_predictions(self._cont_data_calcs()).reshape(
+        y_data[:, :, :] = self._make_predictions(self._contour_data_calcs()).reshape(
             (resolution, resolution, self.num_of_outputs))
         self.Z = y_data[:, :, self.output_variable]
         self.Z = self.Z.reshape(resolution, resolution)
 
-        self.source.data = dict(z=[self.Z])
+        self.contour_plot_source.data = dict(z=[self.Z])
 
         self.contour_x_range = xlins = self.xlins_mesh
         self.contour_y_range = ylins = self.ylins_mesh
@@ -436,7 +479,7 @@ class MetaModelVisualization(object):
         contour_plot.add_layout(color_bar, 'right')
         contour_plot.x_range = Range1d(min(xlins), max(xlins))
         contour_plot.y_range = Range1d(min(ylins), max(ylins))
-        contour_plot.image(image='z', source=self.source, x=min(xlins), y=min(ylins),
+        contour_plot.image(image='z', source=self.contour_plot_source, x=min(xlins), y=min(ylins),
                            dh=(max(ylins) - min(ylins)), dw=(max(xlins) - min(xlins)),
                            palette="Viridis11")
 
@@ -475,7 +518,8 @@ class MetaModelVisualization(object):
         x_value = self.x_input_slider.value
         # Rounds the x_data to match the predict_inputs value
         subplot_value_index = np.where(
-            np.around(self.predict_inputs[self.x_input_select.value], 5) == np.around(x_value, 5))[0]
+            np.around(self.predict_inputs[self.x_input_select.value], 5) ==
+            np.around(x_value, 5))[0]
 
         # Make slice in Z data at the point calculated before and add it to the data source
         z_data = self.Z[:, subplot_value_index].flatten()
@@ -509,10 +553,10 @@ class MetaModelVisualization(object):
 
         # Set the right_plot data source to new values
         self.right_plot_scatter_source.data = dict(
-            left_slice_x=np.repeat(x_value, self.resolution), left_slice_y=y_data)
+            right_slice_x=np.repeat(x_value, self.resolution), right_slice_y=y_data)
 
         self.contour_plot.line(
-            'left_slice_x', 'left_slice_y', source=self.right_plot_scatter_source,
+            'right_slice_x', 'right_slice_y', source=self.right_plot_scatter_source,
             color='black', line_width=2)
 
         return self.right_plot_fig
@@ -535,13 +579,14 @@ class MetaModelVisualization(object):
         self.input_point_list = [i.value for i in self.slider_dict.values()]
 
         subplot_value_index = np.where(
-            np.around(self.predict_inputs[self.y_input_select.value], 5) == np.around(y_value, 5))[0]
+            np.around(self.predict_inputs[self.y_input_select.value], 5) ==
+            np.around(y_value, 5))[0]
 
         z_data = self.Z[subplot_value_index, :].flatten()
 
         x = self.slider_source.data[x_idx]
         y = z_data
-        self.bot_plot_source.data = dict(x=x, y=y)
+        self.bottom_plot_source.data = dict(x=x, y=y)
 
         self.bot_plot_fig = bot_plot_fig = figure(
             plot_width=550, plot_height=250,
@@ -550,7 +595,7 @@ class MetaModelVisualization(object):
             title="{} vs {}".format(x_idx, self.output_select.value), tools="")
         bot_plot_fig.xaxis.axis_label = x_idx
         bot_plot_fig.yaxis.axis_label = self.output_select.value
-        bot_plot_fig.line(x='x', y='y', source=self.bot_plot_source)
+        bot_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
 
         if self.is_structured_meta_model:
             data = self._structured_training_points(compute_distance=True)
@@ -562,24 +607,24 @@ class MetaModelVisualization(object):
         bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
                              fill_alpha=alphas.tolist())
 
-        self.bot_plot_scatter_source.data = dict(
+        self.bottom_plot_scatter_source.data = dict(
             bot_slice_x=x_data,
             bot_slice_y=np.repeat(y_value, self.resolution))
 
         self.contour_plot.line(
-            'bot_slice_x', 'bot_slice_y', source=self.bot_plot_scatter_source, color='black',
+            'bot_slice_x', 'bot_slice_y', source=self.bottom_plot_scatter_source, color='black',
             line_width=2)
 
         return self.bot_plot_fig
 
     def _update_all_plots(self):
-        self.layout.children[0] = self._contour_data()
-        self.layout.children[1] = self._right_plot()
-        self.layout2.children[0] = self._bottom_plot()
+        self.doc_layout.children[0] = self._contour_data()
+        self.doc_layout.children[1] = self._right_plot()
+        self.doc_layout2.children[0] = self._bottom_plot()
 
     def _update_subplots(self):
-        self.layout.children[1] = self._right_plot()
-        self.layout2.children[0] = self._bottom_plot()
+        self.doc_layout.children[1] = self._right_plot()
+        self.doc_doc_layout2.children[0] = self._bottom_plot()
 
     # Event handler functions
     def _update(self, attr, old, new):
@@ -614,7 +659,7 @@ class MetaModelVisualization(object):
             self._update_all_plots()
 
     def _output_value_update(self, attr, old, new):
-        self.output_variable = self.output_list.index(new)
+        self.output_variable = self.output_names.index(new)
         self._update_all_plots()
 
     def _unstructured_training_points(self, compute_distance=False, source='bottom'):
@@ -623,15 +668,16 @@ class MetaModelVisualization(object):
 
         Parameters
         ----------
-        None
+        compute_distance : bool
+            If true, compute the distance of training points from surrogate line.
+        source : str
+            Where the method is being called from.
 
         Returns
         -------
         array
             The array of training points and their alpha opacity with respect to the surrogate line
         """
-        # x_training contains
-        # [x1, x2, x3, x4]
         # Input Data
         # Output Data
         x_training = self.model_ref._training_input
@@ -639,7 +685,7 @@ class MetaModelVisualization(object):
 
         x_index = self.x_input_select.options.index(self.x_input_select.value)
         y_index = self.y_input_select.options.index(self.y_input_select.value)
-        output_variable = self.output_list.index(self.output_select.value)
+        output_variable = self.output_names.index(self.output_select.value)
 
         # Vertically stack the x/y inputs and then transpose them
         infos = np.vstack((x_training[:, x_index], x_training[:, y_index])).transpose()
@@ -657,7 +703,8 @@ class MetaModelVisualization(object):
 
             tree = cKDTree(points)
             # Query the nearest neighbors tree for the closest points to the scaled x0 array
-            dists, idx = tree.query(scaled_x0, k=len(x_training), distance_upper_bound=self.dist_range)
+            dists, idx = tree.query(
+                scaled_x0, k=len(x_training), distance_upper_bound=self.dist_range)
 
             # kdtree query always returns requested k even if there are not enough valid points
             idx_finite = np.where(np.isfinite(dists))
@@ -677,7 +724,7 @@ class MetaModelVisualization(object):
             info[2] = dists[dist_index]
             info[3] = training_output[i, output_variable]
             data[dist_index] = info
-
+        print(data.shape[1])
         return data
 
     def _structured_training_points(self, compute_distance=False, source='bottom'):
@@ -710,7 +757,6 @@ class MetaModelVisualization(object):
             x_tree, x_idx = self._two_dimension_input(scaled_x0, points, source=source)
         else:
             x_tree, x_idx = self._multidimension_input(scaled_x0, points, source=source)
-
 
         # format for 'data'
         # [x_value, y_value, ND-distance_(x or y), func_value]

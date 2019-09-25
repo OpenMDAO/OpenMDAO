@@ -91,7 +91,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         viz = MetaModelVisualization(interp)
         training_points_output = viz._unstructured_training_points()
 
-        self.assertTrue(training_points_output.shape[1] == 5)
+        self.assertTrue(training_points_output.shape[1] == 2)
 
     def test_training_point_array_for_nan_values(self):
 
@@ -119,7 +119,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         viz = MetaModelVisualization(interp)
         training_points_output = viz._unstructured_training_points()
 
-        for i in range(0, 4):
+        for i in range(0, 2):
             self.assertFalse(np.any(np.isnan(training_points_output[:, i])))
 
     def test_make_predictions(self):
