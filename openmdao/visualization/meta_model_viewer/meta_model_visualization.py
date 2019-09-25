@@ -444,17 +444,24 @@ class MetaModelVisualization(object):
         Bokeh Image Plot
         """
         resolution = self.resolution
+        # Output data array initialization
         y_data = np.zeros((resolution, resolution, self.num_of_outputs))
         self.input_point_list = [i.value for i in self.slider_dict.values()]
 
-        # Pass the dict to make predictions and then reshape the output to (n, n, number of outputs)
+        # Pass the dict to make predictions and then reshape the output to
+        # (resolution, resolution, number of outputs)
         y_data[:, :, :] = self._make_predictions(self._contour_data_calcs()).reshape(
             (resolution, resolution, self.num_of_outputs))
+        # Use the output variable to pull the correct column of data from the predicted
+        # data (y_data)
         self.Z = y_data[:, :, self.output_variable]
+        # Reshape it to be 2D
         self.Z = self.Z.reshape(resolution, resolution)
 
+        # Update the data source with new data
         self.contour_plot_source.data = dict(z=[self.Z])
 
+        # Min to max of training data
         self.contour_x_range = xlins = self.xlins_mesh
         self.contour_y_range = ylins = self.ylins_mesh
 
@@ -490,6 +497,7 @@ class MetaModelVisualization(object):
             data = self._unstructured_training_points()
 
         if len(data):
+            # Add training data points overlay to contour plot
             data = np.array(data)
             self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1])
             self.contour_plot.circle(
@@ -510,12 +518,15 @@ class MetaModelVisualization(object):
         -------
         Bokeh figure
         """
-        # Sets data for x/y inputs
+        # List of the current positions of the sliders
         self.input_point_list = [i.value for i in self.slider_dict.values()]
 
+        # Find the title of the y input and match it with the data
         y_idx = self.y_input_select.value
         y_data = self.predict_inputs[y_idx]
+        # Find the position of the x_input slider
         x_value = self.x_input_slider.value
+
         # Rounds the x_data to match the predict_inputs value
         subplot_value_index = np.where(
             np.around(self.predict_inputs[self.x_input_select.value], 5) ==
@@ -527,6 +538,7 @@ class MetaModelVisualization(object):
         x = z_data
         y = self.slider_source.data[y_idx]
 
+        # Update the data source with new data
         self.right_plot_source.data = dict(x=x, y=y)
 
         # Create and format figure
@@ -548,6 +560,7 @@ class MetaModelVisualization(object):
 
         alphas = 1.0 - data[:, 2] / self.dist_range
 
+        # Training data scatter plot
         right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None, fill_color='#000000',
                                fill_alpha=alphas.tolist())
 
@@ -573,21 +586,30 @@ class MetaModelVisualization(object):
         -------
         Bokeh figure
         """
-        x_idx = self.x_input_select.value
-        x_data = self.predict_inputs[x_idx]
-        y_value = self.y_input_slider.value
+        # List of the current positions of the sliders
         self.input_point_list = [i.value for i in self.slider_dict.values()]
 
+        # Find the title of the x input and match it with the data
+        x_idx = self.x_input_select.value
+        x_data = self.predict_inputs[x_idx]
+        # Find the position of the y_input slider
+        y_value = self.y_input_slider.value
+
+        # Rounds the y_data to match the predict_inputs value
         subplot_value_index = np.where(
             np.around(self.predict_inputs[self.y_input_select.value], 5) ==
             np.around(y_value, 5))[0]
 
+        # Make slice in Z data at the point calculated before and add it to the data source
         z_data = self.Z[subplot_value_index, :].flatten()
 
         x = self.slider_source.data[x_idx]
         y = z_data
+
+        # Update the data source with new data
         self.bottom_plot_source.data = dict(x=x, y=y)
 
+        # Create and format figure
         self.bot_plot_fig = bot_plot_fig = figure(
             plot_width=550, plot_height=250,
             x_range=(min(self.contour_x_range), max(self.contour_x_range)),
@@ -597,6 +619,7 @@ class MetaModelVisualization(object):
         bot_plot_fig.yaxis.axis_label = self.output_select.value
         bot_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
 
+        # Determine distance and alpha opacity of training points
         if self.is_structured_meta_model:
             data = self._structured_training_points(compute_distance=True)
         else:
@@ -604,9 +627,11 @@ class MetaModelVisualization(object):
 
         alphas = 1.0 - data[:, 2] / self.dist_range
 
+        # Training data scatter plot
         bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
                              fill_alpha=alphas.tolist())
 
+        # Set the right_plot data source to new values
         self.bottom_plot_scatter_source.data = dict(
             bot_slice_x=x_data,
             bot_slice_y=np.repeat(y_value, self.resolution))
@@ -617,51 +642,6 @@ class MetaModelVisualization(object):
 
         return self.bot_plot_fig
 
-    def _update_all_plots(self):
-        self.doc_layout.children[0] = self._contour_data()
-        self.doc_layout.children[1] = self._right_plot()
-        self.doc_layout2.children[0] = self._bottom_plot()
-
-    def _update_subplots(self):
-        self.doc_layout.children[1] = self._right_plot()
-        self.doc_doc_layout2.children[0] = self._bottom_plot()
-
-    # Event handler functions
-    def _update(self, attr, old, new):
-        self._update_all_plots()
-
-    def _scatter_plots_update(self, attr, old, new):
-        self._update_subplots()
-
-    def _scatter_input(self, attr, old, new):
-        self.dist_range = float(new)
-        self._update_all_plots()
-
-    def _input_dropdown_checks(self, x, y):
-        # Checks to see if x and y inputs are equal to each other
-        if x == y:
-            return False
-        else:
-            return True
-
-    def _x_input_update(self, attr, old, new):
-        if not self._input_dropdown_checks(new, self.y_input_select.value):
-            raise ValueError("Inputs should not equal each other")
-        else:
-            self.x_input_select.value = new
-            self._update_all_plots()
-
-    def _y_input_update(self, attr, old, new):
-        if not self._input_dropdown_checks(self.x_input_select.value, new):
-            raise ValueError("Inputs should not equal each other")
-        else:
-            self.y_input_select.value = new
-            self._update_all_plots()
-
-    def _output_value_update(self, attr, old, new):
-        self.output_variable = self.output_names.index(new)
-        self._update_all_plots()
-
     def _unstructured_training_points(self, compute_distance=False, source='bottom'):
         """
         Calculate the training points and returns and array containing the position and alpha.
@@ -671,18 +651,18 @@ class MetaModelVisualization(object):
         compute_distance : bool
             If true, compute the distance of training points from surrogate line.
         source : str
-            Where the method is being called from.
+            Which subplot the method is being called from.
 
         Returns
         -------
         array
             The array of training points and their alpha opacity with respect to the surrogate line
         """
-        # Input Data
-        # Output Data
+        # Input training data and output training data
         x_training = self.model_ref._training_input
         training_output = np.squeeze(stack_outputs(self.model_ref._training_output), axis=1)
 
+        # Index of input/output variables
         x_index = self.x_input_select.options.index(self.x_input_select.value)
         y_index = self.y_input_select.options.index(self.y_input_select.value)
         output_variable = self.output_names.index(self.output_select.value)
@@ -693,12 +673,14 @@ class MetaModelVisualization(object):
             return infos
 
         points = x_training.copy()
-        # Set the first two columns of the points array to x/y inputs, respectively
-        points = np.divide(points, self.limit_range)
 
+        # Normalize so each dimension spans [0, 1]
+        points = np.divide(points, self.limit_range)
         dist_limit = np.linalg.norm(self.dist_range * self.limit_range)
         scaled_x0 = np.divide(self.input_point_list, self.limit_range)
 
+        # Query the nearest neighbors tree for the closest points to the scaled x0 array
+        # Nearest points to x slice
         if x_training.shape[1] < 3:
 
             tree = cKDTree(points)
@@ -714,21 +696,34 @@ class MetaModelVisualization(object):
         else:
             dists, idx = self._multidimension_input(scaled_x0, points, source=source)
 
-        # info contains:
+        # data contains:
         # [x_value, y_value, ND-distance, func_value, alpha]
 
         data = np.zeros((len(idx), 4))
-        for dist_index, i in enumerate(idx):
-            info = np.ones((4))
-            info[0:2] = infos[i, :]
-            info[2] = dists[dist_index]
-            info[3] = training_output[i, output_variable]
-            data[dist_index] = info
-        print(data.shape[1])
+        for dist_index, j in enumerate(idx):
+            data[dist_index, 0:2] = infos[j, :]
+            data[dist_index, 2] = dists[dist_index]
+            data[dist_index, 3] = training_output[j, output_variable]
+
         return data
 
     def _structured_training_points(self, compute_distance=False, source='bottom'):
-        # reate tuple of the input parameters
+        """
+        Calculate the training points and returns and array containing the position and alpha.
+
+        Parameters
+        ----------
+        compute_distance : bool
+            If true, compute the distance of training points from surrogate line.
+        source : str
+            Which subplot the method is being called from.
+
+        Returns
+        -------
+        array
+            The array of training points and their alpha opacity with respect to the surrogate line
+        """
+        # Create tuple of the input parameters
         input_dimensions = tuple(self.surrogate_ref.params)
 
         # Input training data and output training data
@@ -808,6 +803,51 @@ class MetaModelVisualization(object):
         dists_finite = dists[idx_finite]
         idx = idx[idx_finite]
         return dists_finite, idx
+
+    # Event handler functions
+    def _update_all_plots(self):
+        self.doc_layout.children[0] = self._contour_data()
+        self.doc_layout.children[1] = self._right_plot()
+        self.doc_layout2.children[0] = self._bottom_plot()
+
+    def _update_subplots(self):
+        self.doc_layout.children[1] = self._right_plot()
+        self.doc_layout2.children[0] = self._bottom_plot()
+
+    def _update(self, attr, old, new):
+        self._update_all_plots()
+
+    def _scatter_plots_update(self, attr, old, new):
+        self._update_subplots()
+
+    def _scatter_input(self, attr, old, new):
+        self.dist_range = float(new)
+        self._update_all_plots()
+
+    def _input_dropdown_checks(self, x, y):
+        # Checks to see if x and y inputs are equal to each other
+        if x == y:
+            return False
+        else:
+            return True
+
+    def _x_input_update(self, attr, old, new):
+        if not self._input_dropdown_checks(new, self.y_input_select.value):
+            raise ValueError("Inputs should not equal each other")
+        else:
+            self.x_input_select.value = new
+            self._update_all_plots()
+
+    def _y_input_update(self, attr, old, new):
+        if not self._input_dropdown_checks(self.x_input_select.value, new):
+            raise ValueError("Inputs should not equal each other")
+        else:
+            self.y_input_select.value = new
+            self._update_all_plots()
+
+    def _output_value_update(self, attr, old, new):
+        self.output_variable = self.output_names.index(new)
+        self._update_all_plots()
 
 
 def view_metamodel(meta_model_comp, port_number):
