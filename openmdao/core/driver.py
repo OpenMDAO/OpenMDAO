@@ -164,6 +164,7 @@ class Driver(object):
 
         self._coloring_info = coloring_mod._DEF_COMP_SPARSITY_ARGS.copy()
         self._coloring_info['coloring'] = None
+        self._coloring_info['orig_coloring'] = None
 
         self._total_jac_sparsity = None
         self._res_jacs = {}
@@ -297,6 +298,9 @@ class Driver(object):
 
         # set up simultaneous deriv coloring
         if coloring_mod._use_total_sparsity:
+            # reset the coloring
+            self._coloring_info['coloring'] = self._coloring_info['orig_coloring']
+
             coloring = self._get_static_coloring()
             if coloring is not None and self.supports['simultaneous_derivatives']:
                 if model._owns_approx_jac:
@@ -1028,6 +1032,7 @@ class Driver(object):
         self._coloring_info['orders'] = orders
         self._coloring_info['perturb_size'] = perturb_size
         self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
+        self._coloring_info['orig_coloring'] = coloring_mod._DYN_COLORING
         self._coloring_info['show_summary'] = show_summary
         self._coloring_info['show_sparsity'] = show_sparsity
 
@@ -1047,6 +1052,7 @@ class Driver(object):
                 # force the generation of a dynamic coloring this time
                 coloring = coloring_mod._DYN_COLORING
             self._coloring_info['coloring'] = coloring
+            self._coloring_info['orig_coloring'] = coloring
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())

@@ -66,6 +66,9 @@ _DEFAULT_COLORING_META = {
     'wrt_matches': None,
     'per_instance': False,
     'coloring': None,
+    'orig_coloring': None,
+    'dynamic': False,
+    'static': None,
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
@@ -799,6 +802,9 @@ class System(object):
         # save a ref to the problem level options.
         self._problem_options = prob_options
 
+        # reset any coloring to exactly what the user specified
+        self._coloring_info['coloring'] = self._coloring_info['orig_coloring']
+
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
             recurse = True
@@ -923,6 +929,8 @@ class System(object):
             If True, set fixed coloring in all subsystems that declare a coloring. Ignored
             if a specific coloring is passed in.
         """
+        self._coloring_info['orig_coloring'] = coloring
+
         if coloring not in (_STD_COLORING_FNAME, _DYN_COLORING):
             if recurse:
                 simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
@@ -1003,6 +1011,9 @@ class System(object):
         # start with defaults
         options = _DEFAULT_COLORING_META.copy()
         options.update(approx.DEFAULT_OPTIONS)
+
+        if self._coloring_info['orig_coloring'] is None:
+            options['orig_coloring'] = _DYN_COLORING
 
         if self._coloring_info['coloring'] is None:
             # calling declare_coloring turns on dynamic coloring.  Calling use_fixed_coloring
