@@ -711,16 +711,16 @@ class MetaModelVisualization(object):
         else:
             x_tree, x_idx = self._multidimension_input(scaled_x0, points, source=source)
 
-        # [x_value, y_value, ND-distance_X, func_value, x_alpha, ND-distance_Y, y_alpha]
+
+        # format for 'data'
+        # [x_value, y_value, ND-distance_(x or y), func_value]
 
         n = len(x_tree)
         data = np.zeros((n, 4))
         for dist_index, j in enumerate(x_idx):
-            info = np.ones((4))
-            info[0:2] = infos[j, :]
-            info[2] = x_tree[dist_index]
-            info[3] = training_output[j]
-            data[dist_index] = info
+            data[dist_index, 0:2] = infos[j, :]
+            data[dist_index, 2] = x_tree[dist_index]
+            data[dist_index, 3] = training_output[j]
 
         return data
 
