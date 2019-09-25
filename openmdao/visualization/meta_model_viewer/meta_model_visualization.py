@@ -368,7 +368,6 @@ class MetaModelVisualization(object):
 
         self._slider_attrs()
 
-        self.input_point_list = [i.value for i in self.slider_dict.values()]
         x_data[:, :, :] = np.array(self.input_point_list)
 
         for idx, (title, values) in enumerate(self.slider_source.data.items()):
@@ -403,6 +402,7 @@ class MetaModelVisualization(object):
         """
         resolution = self.resolution
         y_data = np.zeros((resolution, resolution, self.num_of_outputs))
+        self.input_point_list = [i.value for i in self.slider_dict.values()]
 
         # Pass the dict to make predictions and then reshape the output to (n, n, number of outputs)
         y_data[:, :, :] = self._make_predictions(self._cont_data_calcs()).reshape(
@@ -468,6 +468,7 @@ class MetaModelVisualization(object):
         Bokeh figure
         """
         # Sets data for x/y inputs
+        self.input_point_list = [i.value for i in self.slider_dict.values()]
 
         y_idx = self.y_input_select.value
         y_data = self.predict_inputs[y_idx]
@@ -501,15 +502,10 @@ class MetaModelVisualization(object):
         else:
             data = self._unstructured_training_points(compute_distance=True, source='right')
 
-        alphas = np.zeros((len(data), ))
-        for i, info in enumerate(data):
-            #alpha = np.abs(info[0] - x_value) / self.limit_range[self.x_index]
-            #if alpha < self.dist_range:
-            alphas[i] = 1
-                # (1 - alpha / self.dist_range) * info[-1]
+        alphas = 1.0 - data[:, 2] / self.dist_range
 
         right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None, fill_color='#000000',
-                               fill_alpha=alphas)
+                               fill_alpha=alphas.tolist())
 
         # Set the right_plot data source to new values
         self.right_plot_scatter_source.data = dict(
@@ -536,6 +532,8 @@ class MetaModelVisualization(object):
         x_idx = self.x_input_select.value
         x_data = self.predict_inputs[x_idx]
         y_value = self.y_input_slider.value
+        self.input_point_list = [i.value for i in self.slider_dict.values()]
+
         subplot_value_index = np.where(
             np.around(self.predict_inputs[self.y_input_select.value], 5) == np.around(y_value, 5))[0]
 
@@ -559,15 +557,10 @@ class MetaModelVisualization(object):
         else:
             data = self._unstructured_training_points(compute_distance=True)
 
-        alphas = np.zeros((len(data), ))
-        for i, info in enumerate(data):
-            #alpha = np.abs(info[1] - y_value) / self.limit_range[self.y_index]
-            #if alpha < self.dist_range:
-            alphas[i] = 1
-                # (1 - alpha / self.dist_range) * info[-1]
+        alphas = 1.0 - data[:, 2] / self.dist_range
 
         bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
-                             fill_alpha=alphas)
+                             fill_alpha=alphas.tolist())
 
         self.bot_plot_scatter_source.data = dict(
             bot_slice_x=x_data,
@@ -677,13 +670,12 @@ class MetaModelVisualization(object):
         # info contains:
         # [x_value, y_value, ND-distance, func_value, alpha]
 
-        data = np.zeros((len(idx), 5))
+        data = np.zeros((len(idx), 4))
         for dist_index, i in enumerate(idx):
-            info = np.ones((5))
+            info = np.ones((4))
             info[0:2] = infos[i, :]
-            info[2] = dists[dist_index] / dist_limit
+            info[2] = dists[dist_index]
             info[3] = training_output[i, output_variable]
-            #info[4] = 0.0 #(1. - info[2] / self.dist_range) ** 0.5
             data[dist_index] = info
 
         return data
@@ -715,31 +707,19 @@ class MetaModelVisualization(object):
         # Nearest points to x slice
 
         if x_training.shape[1] < 3:
-            x_tree = self._two_dimension_input(scaled_x0, points)
+            x_tree, x_idx = self._two_dimension_input(scaled_x0, points, source=source)
         else:
             x_tree, x_idx = self._multidimension_input(scaled_x0, points, source=source)
 
         # [x_value, y_value, ND-distance_X, func_value, x_alpha, ND-distance_Y, y_alpha]
 
         n = len(x_tree)
-        data = np.zeros((n, 7))
-        if x_training.shape[1] < 3:
-            temp_range = np.range(n)
-        else:
-            temp_range = x_idx
-
-        for dist_index, j in enumerate(temp_range):
-            info = np.ones((7))
-            try:
-                info[0:2] = infos[j, :]
-            except IndexError:
-                print("ERROR: Scatter distance value too low. Try: 0.1")
-
-            info[2] = x_tree[dist_index] * self.dist_limit
+        data = np.zeros((n, 4))
+        for dist_index, j in enumerate(x_idx):
+            info = np.ones((4))
+            info[0:2] = infos[j, :]
+            info[2] = x_tree[dist_index]
             info[3] = training_output[j]
-            #info[4] = 0.0 # (1. - info[2] / self.dist_range) ** 0.5
-            #info[5] = y_tree[i] * self.dist_limit
-            #info[6] = 0.0 # (1. - info[5] / self.dist_range) ** 0.5
             data[dist_index] = info
 
         return data
@@ -752,11 +732,14 @@ class MetaModelVisualization(object):
             col_idx = 0
 
         x = np.delete(scaled_points, col_idx, axis=0)
-        x_training_points = np.delete(training_points, col_idx, axis=1)
+        x_training_points = np.delete(training_points, col_idx, axis=1).flatten()
 
         x_tree = np.abs(x - x_training_points)
 
-        return x_tree
+        # Only return points that are within our distance-viewing paramter.
+        idx = np.where(x_tree <= self.dist_range)
+        x_tree = x_tree[idx]
+        return x_tree, idx[0]
 
     def _multidimension_input(self, scaled_points, training_points, source='bottom'):
         if source == 'right':
