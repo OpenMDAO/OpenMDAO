@@ -1357,10 +1357,9 @@ class Component(System):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
             if coloring_mod._use_partial_sparsity:
-                is_dynamic = self._coloring_info['coloring'] is coloring_mod._DYN_COLORING
                 coloring = self._get_coloring()
                 if coloring is not None:
-                    if not is_dynamic:
+                    if not self._coloring_info['dynamic']:
                         coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
 
