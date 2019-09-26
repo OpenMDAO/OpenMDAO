@@ -1,11 +1,11 @@
-function PtN2Diagram(parentDiv, modelData) {
-    // console.log(modelData);
-    var root = modelData.tree;
-    console.log("root: ", root);
-    var conns = modelData.connections_list;
-    console.log("conns: ", conns)
-    // console.log(conns);
-    var abs2prom = modelData.hasOwnProperty("abs2prom") ? modelData.abs2prom : undefined;
+function PtN2Diagram(parentDiv, modelJSON) {
+    var model = new ModelData(modelJSON);
+
+    // TODO: Get rid of all these after refactoring
+    var root = model.root;
+    var conns = model.conns;
+    var abs2prom = model.abs2prom;
+    var maxDepth = model.maxDepth;
 
     var FONT_SIZE_PX = 11;
     var svgStyleElement = document.createElement("style");
@@ -14,10 +14,6 @@ function PtN2Diagram(parentDiv, modelData) {
 
     var DEFAULT_TRANSITION_START_DELAY = 100;
     var transitionStartDelay = DEFAULT_TRANSITION_START_DELAY;
-    var idCounter = 0;
-    var maxDepth = 1;
-
-    var maxSystemDepth = 1; // For use with the right hand side solver tree. Only want max depth of solvers, not params,..
 
     var RIGHT_TEXT_MARGIN_PX = 8; // How much space in px (left and) right of text in partition tree
 
@@ -66,173 +62,26 @@ function PtN2Diagram(parentDiv, modelData) {
     var pTreeGroup = svg.append("g").attr("id", "tree"); // id given just so it is easier to see in Chrome dev tools when debugging
     var pSolverTreeGroup = svg.append("g").attr("id", "solver_tree");
 
-    function InitSubSystemChildren(d) {
-        for (var i = 0; i < d.children.length; ++i) {
-            var child = d.children[i];
-            if (child.type === "subsystem") {
-                if (!d.hasOwnProperty("subsystem_children")) {
-                    d.subsystem_children = [];
-                }
-                d.subsystem_children.push(child);
-                InitSubSystemChildren(child);
-            }
-        }
-    }
-
-    function updateRootTypes() {
-
-        var stack = []
-        for (var i = 0; i < root.children.length; ++i) {
-            stack.push(root.children[i]);
-        }
-
-        while (stack.length > 0) {
-            var cur_ele = stack.pop();
-            if (cur_ele.type === "param") {
-                if (!hasInputConnection(cur_ele.absPathName) && !hasOutputConnection(cur_ele.absPathName)) {
-                    cur_ele.type = "unconnected_param";
-                }
-            }
-
-            if (cur_ele.hasOwnProperty('children')) {
-                for (var j = 0; j < cur_ele.children.length; ++j) {
-                    stack.push(cur_ele.children[j]);
-                }
-            }
-        }
-    }
-
-    function hasInputConnection(target) {
-        for (i = 0; i < conns.length; ++i) {
-            if (conns[i].tgt === target) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    function hasOutputConnection(target) {
-        for (i = 0; i < conns.length; ++i) {
-            if (conns[i].src === target) {
-                return true;
-            }
-        }
-    }
-    hasInputConn = hasInputConnection;
-
     var n2BackgroundRectR0 = -1, n2BackgroundRectC0 = -1;
-    var newConnsDict = {};
-    function PrintConnects() {
-        var text = "Connections:";
-        for (var key in newConnsDict) {
-            var d = newConnsDict[key];
-            var param = d3RightTextNodesArrayZoomed[d.col],
-                unknown = d3RightTextNodesArrayZoomed[d.row];
-            var paramName = (zoomedElement.promotions && zoomedElement.promotions[param.absPathName] !== undefined) ?
-                "<b>" + zoomedElement.promotions[param.absPathName] + "</b>" :
-                ((zoomedElement === root) ? param.absPathName : param.absPathName.slice(zoomedElement.absPathName.length + 1));
-            var unknownName = (zoomedElement.promotions && zoomedElement.promotions[unknown.absPathName] !== undefined) ?
-                "<b>" + zoomedElement.promotions[unknown.absPathName] + "</b>" :
-                ((zoomedElement === root) ? unknown.absPathName : unknown.absPathName.slice(zoomedElement.absPathName.length + 1));
 
-            text += "<br />self.connect(\"" + unknownName + "\", \"" + paramName + "\")";
-        }
-        parentDiv.querySelector("#connectionId").innerHTML = "";
-    }
     var n2BackgroundRect = n2Group.append("rect")
         .attr("class", "background")
         .attr("width", WIDTH_N2_PX)
-        .attr("height", HEIGHT_PX)
-        .on("click", function () {
-            var coords = d3.mouse(this);
-            var c = Math.floor(coords[0] * d3RightTextNodesArrayZoomed.length / WIDTH_N2_PX);
-            var r = Math.floor(coords[1] * d3RightTextNodesArrayZoomed.length / HEIGHT_PX);
-            if (r == c || r < 0 || c < 0 || r >= d3RightTextNodesArrayZoomed.length || c >= d3RightTextNodesArrayZoomed.length) return;
-            if (matrix.node(r, c) !== undefined) return;
-
-            var param = d3RightTextNodesArrayZoomed[c],
-                unknown = d3RightTextNodesArrayZoomed[r];
-            if (param.type !== "param" && unknown.type !== "unknown") return;
-
-            var newClassName = "n2_hover_elements_" + r + "_" + c;
-            var selection = n2Group.selectAll("." + newClassName);
-            if (selection.size() > 0) {
-                delete newConnsDict[r + "_" + c];
-                selection.remove();
-            }
-            else {
-                newConnsDict[r + "_" + c] = { "r": r, "c": c };
-                n2Group.selectAll("path.n2_hover_elements, circle.n2_hover_elements")
-                    .attr("class", newClassName);
-            }
-            PrintConnects();
-        })
-        .on("mouseover", function () {
-            n2BackgroundRectR0 = -1;
-            n2BackgroundRectC0 = -1;
-            n2Group.selectAll(".n2_hover_elements").remove();
-            PrintConnects();
-        })
-        .on("mouseleave", function () {
-            n2BackgroundRectR0 = -1;
-            n2BackgroundRectC0 = -1;
-            n2Group.selectAll(".n2_hover_elements").remove();
-            PrintConnects();
-        })
-        .on("mousemove", function () {
-            var coords = d3.mouse(this);
-            var c = Math.floor(coords[0] * d3RightTextNodesArrayZoomed.length / WIDTH_N2_PX);
-            var r = Math.floor(coords[1] * d3RightTextNodesArrayZoomed.length / HEIGHT_PX);
-            if (r == c || r < 0 || c < 0 || r >= d3RightTextNodesArrayZoomed.length || c >= d3RightTextNodesArrayZoomed.length) return;
-            if (matrix.node(r, c) !== undefined) return;
-            if (n2BackgroundRectR0 == r && n2BackgroundRectC0 == c) return;
-            //n2Group.selectAll(".n2_hover_elements_" + n2BackgroundRectR0 + "_" + n2BackgroundRectC0).remove();
-            n2Group.selectAll(".n2_hover_elements").remove();
-            n2BackgroundRectR0 = r;
-            n2BackgroundRectC0 = c;
-
-            var lineWidth = Math.min(5, n2Dx * .5, n2Dy * .5);
-            arrowMarker.attr("markerWidth", lineWidth * .4)
-                .attr("markerHeight", lineWidth * .4);
-
-            var param = d3RightTextNodesArrayZoomed[c],
-                unknown = d3RightTextNodesArrayZoomed[r];
-            if (param.type !== "param" && unknown.type !== "unknown") return;
-            var leftTextWidthR = d3RightTextNodesArrayZoomed[r].nameWidthPx,
-                leftTextWidthC = d3RightTextNodesArrayZoomed[c].nameWidthPx;
-            DrawRect(-leftTextWidthR - PTREE_N2_GAP_PX, n2Dy * r, leftTextWidthR, n2Dy, "blue"); //highlight var name
-            DrawRect(-leftTextWidthC - PTREE_N2_GAP_PX, n2Dy * c, leftTextWidthC, n2Dy, "blue"); //highlight var name
-
-            PrintConnects();
-
-            if (newConnsDict[r + "_" + c] === undefined) {
-                var paramName = (zoomedElement.promotions && zoomedElement.promotions[param.absPathName] !== undefined) ?
-                    "<b>" + zoomedElement.promotions[param.absPathName] + "</b>" :
-                    ((zoomedElement === root) ? param.absPathName : param.absPathName.slice(zoomedElement.absPathName.length + 1));
-                var unknownName = (zoomedElement.promotions && zoomedElement.promotions[unknown.absPathName] !== undefined) ?
-                    "<b>" + zoomedElement.promotions[unknown.absPathName] + "</b>" :
-                    ((zoomedElement === root) ? unknown.absPathName : unknown.absPathName.slice(zoomedElement.absPathName.length + 1));
-
-            }
-        });
+        .attr("height", HEIGHT_PX);
 
     setN2ElementsGroup();
-    var zoomedElement0 = root;
-    var lastRightClickedElement = root;
 
-    ExpandColonVars(root);
-    FlattenColonGroups(root);
-    InitTree(root, null, 1);
-    updateRootTypes();
-    InitSubSystemChildren(root);
+
+
+    var zoomedElement0 = model.root;
+    var lastRightClickedElement = model.root;
+
     ComputeLayout();
     ComputeConnections();
     matrix = new N2Matrix(d3RightTextNodesArrayZoomed);
-    // ComputeMatrixN2(true);
 
     var collapseDepthElement = parentDiv.querySelector("#idCollapseDepthDiv");
-    for (var i = 2; i <= maxDepth; ++i) {
+    for (var i = 2; i <= model.maxDepth; ++i) {
         var option = document.createElement("span");
         option.className = "fakeLink";
         option.id = "idCollapseDepthOption" + i + "";
@@ -264,7 +113,7 @@ function PtN2Diagram(parentDiv, modelData) {
             matrix = new N2Matrix(d3RightTextNodesArrayZoomed);
         }
 
-        for (var i = 2; i <= maxDepth; ++i) {
+        for (var i = 2; i <= model.maxDepth; ++i) {
             parentDiv.querySelector("#idCollapseDepthOption" + i + "").style.display = (i <= zoomedElement.depth) ? "none" : "block";
         }
 
@@ -584,79 +433,8 @@ function PtN2Diagram(parentDiv, modelData) {
 
     function ClearArrowsAndConnects() {
         ClearArrows();
-        newConnsDict = {};
-        PrintConnects();
-    }
-
-    function ExpandColonVars(d) {
-        function findNameInIndex(arr, name) {
-            for (var i = 0; i < arr.length; ++i) {
-                if (arr[i].name === name) return i;
-            }
-            return -1;
-        }
-
-        function addChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
-            if (arrayOfNames.length == arrayOfNamesIndex) return;
-
-            var name = arrayOfNames[arrayOfNamesIndex];
-
-            if (!parent.hasOwnProperty("children")) {
-                parent.children = [];
-            }
-
-            var parentI = findNameInIndex(parent.children, name);
-            if (parentI == -1) { //new name not found in parent, create new
-                var newObj = {
-                    "name": name,
-                    "type": type,
-                    "splitByColon": true,
-                    "originalParent": originalParent
-                };
-                if (type === "param" && type === "unconnected_param") {
-                    parent.children.splice(0, 0, newObj);
-                }
-                else {
-                    parent.children.push(newObj);
-                }
-                addChildren(originalParent, newObj, arrayOfNames, arrayOfNamesIndex + 1, type);
-            } else { //new name already found in parent, keep traversing
-                addChildren(originalParent, parent.children[parentI], arrayOfNames, arrayOfNamesIndex + 1, type);
-            }
-        }
-
-        if (!d.children) return;
-        for (var i = 0; i < d.children.length; ++i) {
-
-            var splitArray = d.children[i].name.split(":");
-            if (splitArray.length > 1) {
-                if (!d.hasOwnProperty("subsystem_type") || d.subsystem_type !== "component") {
-                    alert("error: there is a colon named object whose parent is not a component");
-                    return;
-                }
-                var type = d.children[i].type;
-                d.children.splice(i--, 1);
-                addChildren(d, d, splitArray, 0, type);
-            }
-        }
-        for (var i = 0; i < d.children.length; ++i) {
-            ExpandColonVars(d.children[i]);
-        }
-    }
-
-    function FlattenColonGroups(d) {
-        if (!d.children) return;
-        while (d.splitByColon && d.children && d.children.length == 1 && d.children[0].splitByColon) {
-            //alert("combine " + d.name + " " + d.children[0].name);
-            var child = d.children[0];
-            d.name += ":" + child.name;
-            d.children = (child.hasOwnProperty("children") && child.children.length >= 1) ? child.children : null; //absorb childs children
-            if (d.children == null) delete d.children;
-        }
-        if (!d.children) return;
-        for (var i = 0; i < d.children.length; ++i) {
-            FlattenColonGroups(d.children[i]);
-        }
+        // newConnsDict = {};
+        // PrintConnects();
     }
 
     function GetText(d) {
@@ -673,59 +451,12 @@ function PtN2Diagram(parentDiv, modelData) {
         return retVal;
     }
 
-    //Sets parents, depth, and nameWidthPx of all nodes.  Also finds and sets maxDepth.
-    function InitTree(d, parent, depth) {
-        d.numLeaves = 0; //for nested params
-        d.depth = depth;
-        d.parent = parent;
-        d.id = ++idCounter; //id starts at 1 for if comparision
-        d.absPathName = "";
-        if (d.parent) { //not root node? d.parent.absPathName : "";
-            if (d.parent.absPathName !== "") {
-                d.absPathName += d.parent.absPathName;
-                d.absPathName += (d.parent.splitByColon) ? ":" : ".";
-            }
-            d.absPathName += d.name;
-        }
-        if (d.type.match(/^unknown$|^param$|^unconnected_param$/)) {
-            var parentComponent = (d.originalParent) ? d.originalParent : d.parent;
-            if (parentComponent.type === "subsystem" && parentComponent.subsystem_type === "component") {
-                d.parentComponent = parentComponent;
-            }
-            else {
-                alert("error: there is a param or unknown without a parent component!");
-            }
-        }
-        if (d.splitByColon) {
-            d.colonName = d.name;
-            for (var obj = d.parent; obj.splitByColon; obj = obj.parent) {
-                d.colonName = obj.name + ":" + d.colonName;
-            }
-        }
-        maxDepth = Math.max(depth, maxDepth);
-
-        if (d.type === "subsystem") {
-            maxSystemDepth = Math.max(depth, maxSystemDepth);
-        }
-
-        if (d.children) {
-            for (var i = 0; i < d.children.length; ++i) {
-                var implicit = InitTree(d.children[i], d, depth + 1);
-                if (implicit) {
-                    d.implicit = true;
-                }
-            }
-        }
-        return (d.implicit) ? true : false;
-    }
-
-
     function ComputeLayout() {
-        var columnWidthsPx = new Array(maxDepth + 1).fill(0.0),// since depth is one based
-            columnLocationsPx = new Array(maxDepth + 1).fill(0.0);
+        var columnWidthsPx = new Array(model.maxDepth + 1).fill(0.0),// since depth is one based
+            columnLocationsPx = new Array(model.maxDepth + 1).fill(0.0);
 
-        var columnSolverWidthsPx = new Array(maxDepth + 1).fill(0.0),// since depth is one based
-            columnSolverLocationsPx = new Array(maxDepth + 1).fill(0.0);
+        var columnSolverWidthsPx = new Array(model.maxDepth + 1).fill(0.0),// since depth is one based
+            columnSolverLocationsPx = new Array(model.maxDepth + 1).fill(0.0);
 
         var textWidthGroup = svg.append("svg:g").attr("class", "partition_group");
         var textWidthText = textWidthGroup.append("svg:text")
@@ -799,7 +530,7 @@ function PtN2Diagram(parentDiv, modelData) {
 
         function ComputeColumnWidths(d) {
             var greatestDepth = 0;
-            var leafWidthsPx = new Array(maxDepth + 1).fill(0.0);
+            var leafWidthsPx = new Array(model.maxDepth + 1).fill(0.0);
 
             function DoComputeColumnWidths(d) {
                 if (d.varIsHidden) return;
@@ -842,7 +573,7 @@ function PtN2Diagram(parentDiv, modelData) {
 
         function ComputeSolverColumnWidths(d) {
             var greatestDepth = 0;
-            var leafSolverWidthsPx = new Array(maxDepth + 1).fill(0.0);
+            var leafSolverWidthsPx = new Array(model.maxDepth + 1).fill(0.0);
 
             function DoComputeSolverColumnWidths(d) {
                 var heightPx = HEIGHT_PX * d.numSolverLeaves / zoomedElement.numSolverLeaves;
@@ -1003,13 +734,13 @@ function PtN2Diagram(parentDiv, modelData) {
         // Now the column_width array is relative to the zoomedElement
         //    and the computation of the widths only includes visible items after the zoom
         widthPTreePx = 0;
-        for (var depth = 1; depth <= maxDepth; ++depth) {
+        for (var depth = 1; depth <= model.maxDepth; ++depth) {
             columnLocationsPx[depth] = widthPTreePx;
             widthPTreePx += columnWidthsPx[depth];
         }
 
         widthPSolverTreePx = 0;
-        for (var depth = 1; depth <= maxDepth; ++depth) {
+        for (var depth = 1; depth <= model.maxDepth; ++depth) {
             columnSolverLocationsPx[depth] = widthPSolverTreePx;
             widthPSolverTreePx += columnSolverWidthsPx[depth];
         }
@@ -1209,7 +940,7 @@ function PtN2Diagram(parentDiv, modelData) {
 
         ClearConnections(root);
 
-        var sys_pathnames = modelData.sys_pathnames_list;
+        var sys_pathnames = model.sys_pathnames_list;
 
         for (var i = 0; i < conns.length; ++i) {
             var srcSplitArray = conns[i].src.split(/\.|:/);
@@ -1662,25 +1393,12 @@ function PtN2Diagram(parentDiv, modelData) {
     };
 }
 
-var zoomedElement = modelData['tree'];
+var zoomedElement = modelData.tree;
 var updateFunc;
 var mouseOverOffDiagN2;
 var mouseOverOnDiagN2;
 var mouseOutN2;
 var mouseClickN2;
-var hasInputConn;
 var treeData, connectionList;
-modelData.tree.name = 'model'; //Change 'root' to 'model'
-function ChangeBlankSolverToNone(d) {
-    if (d.linear_solver === "") d.linear_solver = "None";
-    if (d.nonlinear_solver === "") d.nonlinear_solver = "None";
-    if (d.children) {
-        for (var i = 0; i < d.children.length; ++i) {
-            ChangeBlankSolverToNone(d.children[i]);
-        }
-    }
-}
-ChangeBlankSolverToNone(modelData.tree);
 
 var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData);
-

@@ -1,10 +1,9 @@
 /**
- * Use the model tree to build a matrix, display it, and perform
+ * Use the model tree to build a matrix, display, and perform
  * operations with it.
  */
 class N2Matrix {
     constructor(nodes) {
-        console.log("nodes: ", nodes);
         this.nodes = nodes;
 
         n2Dx0 = n2Dx;
@@ -103,8 +102,8 @@ class N2Matrix {
         }
     }
 
-    /** Decide how each node will be drawn based on its location in the matrix,
-     * type, source, target, and/or other conditions.
+    /** Decide what object ach node will be drawn as, based on its
+     * location in the matrix, type, source, target, and/or other conditions.
      */
     determineSymbolTypes() {
         this.symbols = {

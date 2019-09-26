@@ -1,11 +1,29 @@
 /** A faster way to find an object in an array than indexOf.
- * @param {array} array The array to search.
+ * @param {array} arr The array to search.
  * @param {Object} obj The object to search for.
- * @returns The index of the object or -1 if not found.
+ * @returns The index of the first matching object, or -1 if not found.
  */
-function indexFor(array, obj) {
+function indexFor(arr, obj) {
+    for (let i = 0; i < arr.length; i++) {
+        if (arr[i] === obj) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+/** Find the index of an object in the array with the first member
+ * that matches the supplied value.
+ * @param {array} arr The array to search.
+ * @param {string} memName The name of the object member.
+ * @param {Object} val The value of the object member to match.
+ * @returns The index of the first matching object or -1 if not found.
+ */
+function indexForMember(arr, memName, val) {
     for (let i = 0; i < array.length; i++) {
-        if (array[i] === obj) {
+        if (array[i].hasOwnProperty(memName) &&
+            array[i][memName] === obj) {
             return i;
         }
     }
