@@ -39,7 +39,7 @@ Structred MetaModel Example Script
 
 
 Unstructred MetaModel Example Script
------------------------------------
+-------------------------------------
 To view this example metamodel, copy the following script into a file named :code:`unstructured_meta_model_example.py` and then
 run :code:`openmdao view_mm unstructured_meta_model_example.py` in the command line.
 
