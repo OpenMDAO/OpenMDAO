@@ -672,7 +672,7 @@ class Problem(object):
         of : list of str
             Variables whose derivatives will be computed.
         wrt : list of str
-            Variables with respect to which the derivatives will be computed.
+            Derivatives will be computed with respect to these variables.
         mode : str
             Derivative direction ('fwd' or 'rev').
         seed : dict or list
