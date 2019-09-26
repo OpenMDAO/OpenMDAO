@@ -67,7 +67,8 @@ _DEFAULT_COLORING_META = {
     'per_instance': False,
     'coloring': None,  # this will contain the actual Coloring object
     'dynamic': False,  # True if dynamic coloring is being used
-    'static': None,    # either _STD_COLORING_FNAME or a filename if use_fixed_coloring was called
+    'static': None,    # either _STD_COLORING_FNAME, a filename, or a Coloring object
+                       # if use_fixed_coloring was called
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
