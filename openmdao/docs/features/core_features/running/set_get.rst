@@ -102,7 +102,7 @@ When dealing with arrays, you can set or get specific indices or index ranges by
 
 An alternate method of specifying the indices is by making use of the :code:`slicer` object. This object serves as a
 helper function allowing the user to specify the indices value using the same syntax as you would when
-accessing a numpy array.
+accessing a numpy array. This example shows that usage.
 
 .. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_get_set_array_with_slicer
     :layout: interleave

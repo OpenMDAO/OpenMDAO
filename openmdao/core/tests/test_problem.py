@@ -1012,19 +1012,6 @@ class TestProblem(unittest.TestCase):
         import numpy as np
         import openmdao.api as om
 
-        # 1D array
-        prob = om.Problem()
-        prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
-                                                     x={'value': np.array([100.0, 33.3]),},
-                                                     y={'shape': (2, ), }))
-
-        prob.setup()
-        prob.run_model()
-
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[0]), 100.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[:1]), 100.0, 1e-6)
-
-        # 2D array
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
                                                      x={'value': np.array([[1., 2.], [3., 4.]]),},
@@ -1033,13 +1020,12 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[0,0]), 1.0, 1e-6)
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[:1,[1]]), [[2.0],], 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[:,0]), [1., 3.], 1e-6)
 
-        prob.set_val('comp.x', 50.0, indices=om.slicer[0,0])
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[0,0]), 50.0, 1e-6)
-        prob.set_val('comp.x', 60.0, indices=om.slicer[:1])
-        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[:1]), [[60.0, 60.0]], 1e-6)
+        prob.set_val('comp.x', [5., 6.], indices=om.slicer[:,0])
+        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[:,0]), [5., 6.], 1e-6)
+        prob.run_model()
+        assert_rel_error(self, prob.get_val('comp.y', indices=om.slicer[:,0]), [6., 7.], 1e-6)
 
     def test_feature_set_get_array(self):
         import numpy as np
