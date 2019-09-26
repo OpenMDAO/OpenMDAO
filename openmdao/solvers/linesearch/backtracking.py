@@ -263,7 +263,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         super(ArmijoGoldsteinLS, self)._declare_options()
         opt = self.options
         opt['maxiter'] = 5
-        opt.declare('c', default=0.1, lower=0.0, desc="Slope parameter for line of sufficient "
+        opt.declare('c', default=0.1, lower=0.0, upper=1.0, desc="Slope parameter for line of sufficient "
                     "decrease. The larger the step, the more decrease is required to terminate the "
                     "line search.")
         opt.declare('rho', default=0.5, lower=0.0, upper=1.0, desc="Contraction factor.")
