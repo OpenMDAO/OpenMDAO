@@ -658,7 +658,7 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         # This is pretty bogus, but it ensures that we get a few LS iterations.
         ls.options['c'] = 100.0  # FIXME c should be 0 <= c <= 1
 
-        prob.set_solver_print(level=0)
+        prob.set_solver_print(level=2)
 
         prob.setup()
         prob.run_model()
