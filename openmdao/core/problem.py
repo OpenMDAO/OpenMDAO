@@ -2161,3 +2161,29 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
+
+
+class Slicer(object):
+    """
+    Helper class that can be used with the indices argument for Problem set_val and get_val.
+    """
+
+    def __getitem__(self, val):
+        """
+        Pass through indices or slice.
+
+        Parameters
+        ----------
+        val : int or slice object or tuples of slice objects
+            Indices or slice to return.
+
+        Returns
+        -------
+        indices : int or slice object or tuples of slice objects
+            Indices or slice to return.
+        """
+        return val
+
+
+# instance of the Slicer class to be used by users for the set_val and get_val methods of Problem
+slicer = Slicer()
