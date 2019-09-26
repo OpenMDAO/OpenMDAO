@@ -1,7 +1,5 @@
 """Define output of Meta Models and visualize the results."""
 
-import warnings
-from collections import OrderedDict
 import math
 from itertools import product
 
@@ -14,7 +12,6 @@ from bokeh.plotting import figure
 from bokeh.models import Slider, ColumnDataSource
 from bokeh.models import ColorBar, BasicTicker, LinearColorMapper, Range1d
 from bokeh.models.widgets import TextInput, Select
-from bokeh.models.ranges import DataRange1d
 from bokeh.server.server import Server
 
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
@@ -350,7 +347,7 @@ class MetaModelVisualization(object):
         Parameters
         ----------
         data : dict
-            Dictionary containing Ordered Dict of training points.
+            Dictionary containing dictionary of training points.
 
         Returns
         -------
@@ -709,7 +706,7 @@ class MetaModelVisualization(object):
 
     def _structured_training_points(self, compute_distance=False, source='bottom'):
         """
-        Calculate the training points and returns and array containing the position and alpha.
+        Calculate the training points and return an array containing the position and alpha.
 
         Parameters
         ----------
@@ -766,15 +763,36 @@ class MetaModelVisualization(object):
         return data
 
     def _two_dimension_input(self, scaled_points, training_points, source='bottom'):
-        # array, index, axis
+        """
+        Calculate the distance of training points to the surrogate line.
+
+        Parameters
+        ----------
+        scaled_points : array
+            Array of normalized slider positions.
+        training_points : array
+            Array of input training data.
+        source : str
+            Which subplot the method is being called from.
+
+        Returns
+        -------
+        idx : array
+            Index of closest points that are within the dist range.
+        x_tree : array
+            One dimentional array of points that are within the dist range.
+        """
+        # Column of the input
         if source == 'right':
             col_idx = 1
         else:
             col_idx = 0
 
+        # Delete the axis of input from source to predicted 1D distance
         x = np.delete(scaled_points, col_idx, axis=0)
         x_training_points = np.delete(training_points, col_idx, axis=1).flatten()
 
+        # Tree of point distances
         x_tree = np.abs(x - x_training_points)
 
         # Only return points that are within our distance-viewing paramter.
@@ -783,18 +801,22 @@ class MetaModelVisualization(object):
         return x_tree, idx[0]
 
     def _multidimension_input(self, scaled_points, training_points, source='bottom'):
+
+        # Column of the input
         if source == 'right':
             col_idx = self.y_input_select.options.index(self.y_input_select.value)
 
         else:
             col_idx = self.x_input_select.options.index(self.x_input_select.value)
 
+        # Delete the axis of input from source to predicted distance
         x = np.delete(scaled_points, col_idx, axis=0)
         x_training_points = np.delete(training_points, col_idx, axis=1)
 
+        # Tree of point distances
         x_tree = cKDTree(x_training_points)
 
-        # Query the nearest neighbors tree for the closest points to the scaled x0 array
+        # Query the nearest neighbors tree for the closest points to the scaled array
         dists, idx = x_tree.query(x, k=len(x_training_points),
                                   distance_upper_bound=self.dist_range)
 
@@ -821,6 +843,7 @@ class MetaModelVisualization(object):
         self._update_subplots()
 
     def _scatter_input(self, attr, old, new):
+        # Text input update function of dist range value
         self.dist_range = float(new)
         self._update_all_plots()
 
@@ -832,6 +855,7 @@ class MetaModelVisualization(object):
             return True
 
     def _x_input_update(self, attr, old, new):
+        # Checks that x and y inputs are not equal to each other
         if not self._input_dropdown_checks(new, self.y_input_select.value):
             raise ValueError("Inputs should not equal each other")
         else:
@@ -839,6 +863,7 @@ class MetaModelVisualization(object):
             self._update_all_plots()
 
     def _y_input_update(self, attr, old, new):
+        # Checks that x and y inputs are not equal to each other
         if not self._input_dropdown_checks(self.x_input_select.value, new):
             raise ValueError("Inputs should not equal each other")
         else:
