@@ -58,6 +58,7 @@ In other words, the shape of the list has to match the shape of the actual data.
     :layout: interleave
 
 
+
 Residuals
 ---------
 
