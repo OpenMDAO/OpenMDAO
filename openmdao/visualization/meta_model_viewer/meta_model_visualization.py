@@ -863,13 +863,6 @@ class MetaModelVisualization(object):
         self.dist_range = float(new)
         self._update_all_plots()
 
-    def _input_dropdown_checks(self, x, y):
-        # Checks to see if x and y inputs are equal to each other
-        if x == y:
-            return False
-        else:
-            return True
-
     def _x_input_update(self, attr, old, new):
         # Checks that x and y inputs are not equal to each other
         if new == self.y_input_select.value:
