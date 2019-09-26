@@ -32,10 +32,3 @@ mm.add_output('f', 0.0, t_data)
 
 prob.setup()
 prob.final_setup()
-
-
-np.seterr(all='raise')
-from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
-MetaModelVisualization(mm)
-
-print('done')

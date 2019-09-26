@@ -579,7 +579,7 @@ _post_setup_map = {
              'Print citations referenced by problem'),
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
-    'meta_model': (_meta_model_parser, _meta_model_cmd, "Meta Model Viewer.")
+    'view_mm': (_meta_model_parser, _meta_model_cmd, "Meta Model Viewer.")
 }
 
 
