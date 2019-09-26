@@ -873,7 +873,6 @@ class MetaModelVisualization(object):
     def _x_input_update(self, attr, old, new):
         # Checks that x and y inputs are not equal to each other
         if new == self.y_input_select.value:
-        # if not self._input_dropdown_checks(new, self.y_input_select.value):
             raise ValueError("Inputs should not equal each other")
         else:
             self.x_input_select.value = new
@@ -882,7 +881,6 @@ class MetaModelVisualization(object):
     def _y_input_update(self, attr, old, new):
         # Checks that x and y inputs are not equal to each other
         if new == self.x_input_select.value:
-        # if not self._input_dropdown_checks(self.x_input_select.value, new):
             raise ValueError("Inputs should not equal each other")
         else:
             self.y_input_select.value = new
