@@ -1216,8 +1216,6 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         model.add_design_var('indeps.x0')
         model.add_design_var('indeps.x1')
 
-        #import wingdbstub
-
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
