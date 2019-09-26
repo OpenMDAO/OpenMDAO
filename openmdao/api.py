@@ -1,7 +1,7 @@
 """Key OpenMDAO classes can be imported from here."""
 
 # Core
-from openmdao.core.problem import Problem
+from openmdao.core.problem import Problem, slicer
 from openmdao.core.group import Group
 from openmdao.core.parallel_group import ParallelGroup
 from openmdao.core.explicitcomponent import ExplicitComponent
