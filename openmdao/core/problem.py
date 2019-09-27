@@ -8,7 +8,6 @@ import os
 import logging
 
 from collections import defaultdict, namedtuple
-from collections.abc import Mapping
 from fnmatch import fnmatchcase
 from itertools import product
 

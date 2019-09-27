@@ -163,7 +163,7 @@ class System(object):
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
-    _owned_var_sizes : ndarray
+    _owned_sizes : ndarray
         Array of local sizes for 'owned' or distributed vars only.
     _nodup_out_ranges : dict
         Range of each output/resid in the global non-duplicated array.
@@ -380,7 +380,7 @@ class System(object):
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
-        self._owned_var_sizes = None
+        self._owned_sizes = None
         self._var_offsets = None
         self._nodup_out_ranges = None
         self._nodup2local_out_inds = None
@@ -1484,7 +1484,7 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_sizes = {}
-        self._owned_var_sizes = None
+        self._owned_sizes = None
         self._nodup_out_ranges = None
         self._nodup2local_out_inds = None
         self._owning_rank = defaultdict(int)
@@ -3869,13 +3869,11 @@ class System(object):
             # order ranks with our rank first
             ordered_ranks = [iproc] + [r for r in range(self.comm.size) if r != iproc]
 
-            has_distribs = False
             contig_inds = []
             non_contig_inds = []
             # compute ranges/indices into the full non-duplicated output/resid arrays
             for i, name in enumerate(self._var_allprocs_abs_names['output']):
                 distrib = abs2meta[name]['distributed']
-                has_distribs |= distrib
                 found = False
                 # check each rank (this rank first) for the first nonzero size
                 for irank in ordered_ranks:
