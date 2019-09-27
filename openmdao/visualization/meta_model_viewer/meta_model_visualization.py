@@ -44,7 +44,7 @@ class MetaModelVisualization(object):
     ----------
     prob : Problem
         Name of variable corresponding to Problem Component
-    surrogate_model : MetaModel
+    model : MetaModel
         Name of Meta Model Component object reference
     meta_model : MetaModel
         Name of empty Meta Model Component object reference
@@ -114,13 +114,13 @@ class MetaModelVisualization(object):
         A 2D array containing contour plot data
     """
 
-    def __init__(self, surrogate_model, resolution=50, doc=None):
+    def __init__(self, model, resolution=50, doc=None):
         """
         Initialize parameters.
 
         Parameters
         ----------
-        surrogate_model : MetaModelComponent
+        model : MetaModelComponent
             Reference to meta model component
         resolution : int
             Value used to calculate the size of contour plot meshgrid
@@ -128,46 +128,45 @@ class MetaModelVisualization(object):
             The bokeh document to build.
         """
         self.prob = Problem()
-        self.surrogate_model = surrogate_model
         self.resolution = resolution
 
         # If the surrogate model coming in is structured
-        if isinstance(self.surrogate_model, MetaModelUnStructuredComp):
+        if isinstance(model, MetaModelUnStructuredComp):
             self.is_structured_meta_model = False
 
             # Create list of input names, check if it has more than one input, then create list
             # of outputs
-            self.input_names = [name[0] for name in self.surrogate_model._surrogate_input_names]
+            self.input_names = [name[0] for name in model._surrogate_input_names]
             if len(self.input_names) < 2:
                 raise ValueError('Must have more than one input value')
-            self.output_names = [name[0] for name in self.surrogate_model._surrogate_output_names]
+            self.output_names = [name[0] for name in model._surrogate_output_names]
 
             # Create reference for untructured component
             self.meta_model = MetaModelUnStructuredComp(
-                default_surrogate=self.surrogate_model.options['default_surrogate'])
+                default_surrogate=model.options['default_surrogate'])
 
         # If the surrogate model coming in is unstructured
-        elif isinstance(self.surrogate_model, MetaModelStructuredComp):
+        elif isinstance(model, MetaModelStructuredComp):
             self.is_structured_meta_model = True
 
-            self.input_names = [name for name in self.surrogate_model._var_rel_names['input']]
+            self.input_names = [name for name in model._var_rel_names['input']]
 
             if len(self.input_names) < 2:
                 raise ValueError('Must have more than one input value')
 
-            self.output_names = [name for name in self.surrogate_model._var_rel_names['output']]
+            self.output_names = [name for name in model._var_rel_names['output']]
 
             self.meta_model = MetaModelStructuredComp(
-                distributed=self.surrogate_model.options['distributed'],
-                extrapolate=self.surrogate_model.options['extrapolate'],
-                method=self.surrogate_model.options['method'],
-                training_data_gradients=self.surrogate_model.options['training_data_gradients'],
+                distributed=model.options['distributed'],
+                extrapolate=model.options['extrapolate'],
+                method=model.options['method'],
+                training_data_gradients=model.options['training_data_gradients'],
                 vec_size=1)
 
         # Pair input list names with their respective data
         self.training_inputs = {}
 
-        self._setup_empty_prob_comp()
+        self._setup_empty_prob_comp(model)
 
         # Setup dropdown menus for x/y inputs and the output value
         self.x_input_select = Select(title="X Input:", value=[x for x in self.input_names][0],
@@ -255,13 +254,14 @@ class MetaModelVisualization(object):
         doc.add_root(self.doc_layout2)
         doc.title = 'Meta Model Visualization'
 
-    def _setup_empty_prob_comp(self):
+    def _setup_empty_prob_comp(self, metamodel):
         """
         Take data from surrogate ref and pass it into new surrogate model with empty Problem model.
 
         Parameters
         ----------
-        None
+        metamodel : MetaModelComponent
+            Reference to meta model component
 
         """
         # Check for structured or unstructured
@@ -271,10 +271,10 @@ class MetaModelVisualization(object):
                 # Check for no training data
                 try:
                     # Append the input data/titles to a dictionary
-                    self.training_inputs[name] = self.surrogate_model.params[idx]
+                    self.training_inputs[name] = metamodel.params[idx]
                     # Also, append the data as an 'add_input' to the model reference
                     self.meta_model.add_input(name, 0.,
-                                              training_data=self.surrogate_model.params[idx])
+                                              training_data=metamodel.params[idx])
                 except TypeError:
                     msg = "No training data present for one or more parameters"
                     raise TypeError(msg)
@@ -283,17 +283,17 @@ class MetaModelVisualization(object):
             for idx, name in enumerate(self.output_names):
                 self.meta_model.add_output(
                     name, 0.,
-                    training_data=self.surrogate_model.training_outputs[name])
+                    training_data=metamodel.training_outputs[name])
 
         else:
             for name in self.input_names:
                 try:
                     self.training_inputs[name] = {
-                        title for title in self.surrogate_model.options['train:' + str(name)]}
+                        title for title in metamodel.options['train:' + str(name)]}
                     self.meta_model.add_input(
                         name, 0.,
                         training_data=[
-                            title for title in self.surrogate_model.options['train:' + str(name)]])
+                            title for title in metamodel.options['train:' + str(name)]])
                 except TypeError:
                     msg = "No training data present for one or more parameters"
                     raise TypeError(msg)
@@ -302,7 +302,7 @@ class MetaModelVisualization(object):
                 self.meta_model.add_output(
                     name, 0.,
                     training_data=[
-                        title for title in self.surrogate_model.options['train:' + str(name)]])
+                        title for title in metamodel.options['train:' + str(name)]])
 
         # Add the subsystem and setup
         self.prob.model.add_subsystem('interp', self.meta_model)
@@ -719,11 +719,11 @@ class MetaModelVisualization(object):
             The array of training points and their alpha opacity with respect to the surrogate line
         """
         # Create tuple of the input parameters
-        input_dimensions = tuple(self.surrogate_model.params)
+        input_dimensions = tuple(self.meta_model.params)
 
         # Input training data and output training data
         x_training = np.array([z for z in product(*input_dimensions)])
-        training_output = self.surrogate_model.training_outputs[self.output_select.value].flatten()
+        training_output = self.meta_model.training_outputs[self.output_select.value].flatten()
 
         # Index of input/output variables
         x_index = self.x_input_select.options.index(self.x_input_select.value)
