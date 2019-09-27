@@ -302,11 +302,14 @@ def _meta_model_cmd(options):
             try_str = "Try one of the following: {}.".format(mm_names)
 
             if not pathname:
-                raise AttributeError("Metamodel not specified.\n {}".format(try_str))
+                print("\nMetamodel not specified. {}".format(try_str))
+                exit()
             elif not comp:
-                raise AttributeError("Metamodel '{}' not found.\n {}".format(pathname, try_str))
+                print("\nMetamodel '{}' not found.\n {}".format(pathname, try_str))
+                exit()
             else:
-                raise AttributeError("'{}' is not a Metamodel.\n {}".format(pathname, try_str))
+                print("\n'{}' is not a Metamodel.\n {}".format(pathname, try_str))
+                exit()
 
     return _view_metamodel
 
