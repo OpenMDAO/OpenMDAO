@@ -35,7 +35,7 @@ from openmdao.utils.general_utils import make_set, var_name_match_includes_exclu
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
-    _STD_COLORING_FNAME, _DYN_COLORING, _DEF_COMP_SPARSITY_ARGS
+    _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
@@ -65,7 +65,10 @@ _DEFAULT_COLORING_META = {
     'method': 'fd',
     'wrt_matches': None,
     'per_instance': False,
-    'coloring': None,
+    'coloring': None,  # this will contain the actual Coloring object
+    'dynamic': False,  # True if dynamic coloring is being used
+    'static': None,    # either _STD_COLORING_FNAME, a filename, or a Coloring object
+                       # if use_fixed_coloring was called
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
@@ -799,6 +802,10 @@ class System(object):
         # save a ref to the problem level options.
         self._problem_options = prob_options
 
+        # reset any coloring if a Coloring object was not set explicitly
+        if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
+            self._coloring_info['coloring'] = None
+
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
             recurse = True
@@ -923,27 +930,23 @@ class System(object):
             If True, set fixed coloring in all subsystems that declare a coloring. Ignored
             if a specific coloring is passed in.
         """
-        if coloring not in (_STD_COLORING_FNAME, _DYN_COLORING):
+        if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
+            self._coloring_info['dynamic'] = True
+            return  # don't use static this time
+
+        self._coloring_info['static'] = coloring
+        self._coloring_info['dynamic'] = False
+
+        if coloring is not _STD_COLORING_FNAME:
             if recurse:
                 simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
                                "coloring was set, so recurse was ignored." % self.pathname)
-            self._coloring_info['coloring'] = coloring
             if isinstance(coloring, Coloring):
                 approx = self._get_approx_scheme(coloring._meta['method'])
                 # force regen of approx groups on next call to compute_approximations
                 approx._colored_approx_groups = None
                 approx._approx_groups = None
             return
-
-        if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
-            # force the generation of a dynamic coloring this time
-            coloring = _DYN_COLORING
-
-        if self._coloring_info['coloring'] is None:
-            simple_warning('%s: use_fixed_coloring() ignored because no coloring was declared.' %
-                           self.pathname)
-        else:
-            self._coloring_info['coloring'] = coloring
 
         if recurse:
             for s in self._subsystems_myproc:
@@ -1004,13 +1007,11 @@ class System(object):
         options = _DEFAULT_COLORING_META.copy()
         options.update(approx.DEFAULT_OPTIONS)
 
-        if self._coloring_info['coloring'] is None:
-            # calling declare_coloring turns on dynamic coloring.  Calling use_fixed_coloring
-            # will switch it to use a static coloring.
-            options['coloring'] = _DYN_COLORING
+        if self._coloring_info['static'] is None:
+            options['dynamic'] = True
         else:
-            # this will handle cases where use_fixed_coloring was called before declare_coloring
-            options['coloring'] = self._coloring_info['coloring']
+            options['dynamic'] = False
+            options['static'] = self._coloring_info['static']
 
         options['wrt_patterns'] = [wrt] if isinstance(wrt, string_types) else wrt
         options['method'] = method
@@ -1021,6 +1022,7 @@ class System(object):
         options['perturb_size'] = perturb_size
         options['show_summary'] = show_summary
         options['show_sparsity'] = show_sparsity
+        options['coloring'] = self._coloring_info['coloring']
         if form is not None:
             options['form'] = form
         if step is not None:
@@ -1066,6 +1068,7 @@ class System(object):
 
         # don't override metadata if it's already declared
         info = self._coloring_info
+
         info.update(**overrides)
         if isinstance(info['wrt_patterns'], string_types):
             info['wrt_patterns'] = [info['wrt_patterns']]
@@ -1108,8 +1111,8 @@ class System(object):
 
         starting_resids = self._residuals._data.copy()
 
-        if self._coloring_info['coloring'] is None:
-            self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
+        if self._coloring_info['coloring'] is None and self._coloring_info['static'] is None:
+            self._coloring_info['dynamic'] = True
 
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
@@ -1294,15 +1297,15 @@ class System(object):
         """
         info = self._coloring_info
         coloring = info['coloring']
+        if coloring is not None:
+            return coloring
 
-        if coloring is _DYN_COLORING:
-            return None
-
-        if coloring is _STD_COLORING_FNAME or isinstance(coloring, string_types):
-            if coloring is _STD_COLORING_FNAME:
+        static = info['static']
+        if static is _STD_COLORING_FNAME or isinstance(static, string_types):
+            if static is _STD_COLORING_FNAME:
                 fname = self.get_approx_coloring_fname()
             else:
-                fname = coloring
+                fname = static
             print("%s: loading coloring from file %s" % (self.msginfo, fname))
             info['coloring'] = coloring = Coloring.load(fname)
             if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
@@ -1315,6 +1318,13 @@ class System(object):
             # force regen of approx groups during next compute_approximations
             approx._colored_approx_groups = None
             approx._approx_groups = None
+        elif isinstance(static, coloring_mod.Coloring):
+            info['coloring'] = coloring = static
+
+        if coloring is not None:
+            info['dynamic'] = False
+
+        info['static'] = coloring
 
         return coloring
 
@@ -1330,7 +1340,7 @@ class System(object):
             Coloring object, possible loaded from a file or dynamically generated, or None
         """
         coloring = self._get_static_coloring()
-        if coloring is None and self._coloring_info['coloring'] is _DYN_COLORING:
+        if coloring is None and self._coloring_info['dynamic']:
             self._coloring_info['coloring'] = coloring = self._compute_approx_coloring()[0]
             self._coloring_info.update(coloring._meta)
 

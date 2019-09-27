@@ -63,8 +63,6 @@ _force_dyn_coloring = False
 # path or system pathname
 _STD_COLORING_FNAME = object()
 
-# used to indicate that we should dynamically generate a coloring
-_DYN_COLORING = object()
 
 # default values related to the computation of a sparsity matrix
 _DEF_COMP_SPARSITY_ARGS = {
