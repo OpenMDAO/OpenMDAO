@@ -527,7 +527,7 @@ class LintTestCase(unittest.TestCase):
 
             # Loop over files
             for file_name in os.listdir(dirpath):
-                if file_name != '__init__.py' and file_name[-3:] == '.py' and not os.path.isdir(file_name):
+                if not file_name.startswith("_") and file_name[-3:] == '.py' and not os.path.isdir(file_name):
                     if print_info:
                         print(file_name)
 
