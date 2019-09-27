@@ -884,7 +884,7 @@ class MetaModelVisualization(object):
         self._update_all_plots()
 
 
-def view_metamodel(meta_model_comp, port_number):
+def view_metamodel(meta_model_comp, resolution, port_number):
     """
     Visualize a metamodel.
 
@@ -899,7 +899,7 @@ def view_metamodel(meta_model_comp, port_number):
     from bokeh.application.handlers import FunctionHandler
 
     def make_doc(doc):
-        MetaModelVisualization(meta_model_comp, doc=doc)
+        MetaModelVisualization(meta_model_comp, resolution, doc=doc)
 
     # print('Opening Bokeh application on http://localhost:5006/')
     server = Server({'/': Application(FunctionHandler(make_doc))}, port=int(port_number))
