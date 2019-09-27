@@ -223,7 +223,7 @@ class pyOptSparseDriver(Driver):
 
         # compute dynamic simul deriv coloring or just sparsity if option is set
         if coloring_mod._use_total_sparsity:
-            if self._coloring_info['coloring'] is coloring_mod._DYN_COLORING:
+            if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
                 coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
                                                     fname=self._get_total_coloring_fname())
                 self._setup_tot_jac_sparsity()
