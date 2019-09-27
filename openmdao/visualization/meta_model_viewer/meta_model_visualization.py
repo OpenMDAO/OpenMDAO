@@ -44,8 +44,6 @@ class MetaModelVisualization(object):
     ----------
     prob : Problem
         Name of variable corresponding to Problem Component
-    model : MetaModel
-        Name of Meta Model Component object reference
     meta_model : MetaModel
         Name of empty Meta Model Component object reference
     resolution : int
