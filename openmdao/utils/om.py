@@ -281,7 +281,7 @@ def _meta_model_cmd(options):
             comp = prob.model._get_subsystem(pathname)
             if comp and isinstance(comp, mm_types):
                 view_metamodel(comp, port_number)
-                return
+                exit()
         else:
             comp = None
 
@@ -297,6 +297,7 @@ def _meta_model_cmd(options):
         elif mm_count == 1 and not pathname:
             comp = metamodels[mm_names[0]]
             view_metamodel(comp, port_number)
+            exit()
 
         else:
             try_str = "Try one of the following: {}.".format(mm_names)
