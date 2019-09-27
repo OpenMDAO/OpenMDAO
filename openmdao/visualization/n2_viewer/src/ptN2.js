@@ -9,15 +9,15 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
     var FONT_SIZE_PX = 11;
     var svgStyleElement = document.createElement("style");
-    var outputNamingType = "Absolute";
+    // var outputNamingType = "Absolute";
     var showPath = false; //default off
 
     var DEFAULT_TRANSITION_START_DELAY = 100;
     var transitionStartDelay = DEFAULT_TRANSITION_START_DELAY;
 
-    var RIGHT_TEXT_MARGIN_PX = 8; // How much space in px (left and) right of text in partition tree
+    // var RIGHT_TEXT_MARGIN_PX = 8; // How much space in px (left and) right of text in partition tree
 
-    var text_width_cache = {}; // used to speed up GetTextWidth using memoization
+    // var text_width_cache = {}; // used to speed up GetTextWidth using memoization
 
     //N^2 vars
     var backButtonHistory = [], forwardButtonHistory = [];
@@ -437,33 +437,12 @@ function PtN2Diagram(parentDiv, modelJSON) {
         // PrintConnects();
     }
 
-    function GetText(d) {
-        var retVal = d.name;
-        if (outputNamingType === "Promoted" && (d.type === "unknown" || d.type === "param" || d.type === "unconnected_param") && zoomedElement.promotions && zoomedElement.promotions[d.absPathName] !== undefined) {
-            retVal = zoomedElement.promotions[d.absPathName];
-        }
-        if (d.splitByColon && d.children && d.children.length > 0) retVal += ":";
-        return retVal;
-    }
-
     function GetSolverText(d) {
         var retVal = showLinearSolverNames ? d.linear_solver : d.nonlinear_solver;
         return retVal;
     }
 
     function ComputeLayout() {
-        var columnWidthsPx = new Array(model.maxDepth + 1).fill(0.0),// since depth is one based
-            columnLocationsPx = new Array(model.maxDepth + 1).fill(0.0);
-
-        var columnSolverWidthsPx = new Array(model.maxDepth + 1).fill(0.0),// since depth is one based
-            columnSolverLocationsPx = new Array(model.maxDepth + 1).fill(0.0);
-
-        var textWidthGroup = svg.append("svg:g").attr("class", "partition_group");
-        var textWidthText = textWidthGroup.append("svg:text")
-            .text("")
-            .attr("x", -50); // Put text off screen
-        var textWidthTextNode = textWidthText.node();
-
         var autoCompleteSetNames = {}, autoCompleteSetPathNames = {};
 
         function PopulateAutoCompleteList(d) {
@@ -495,151 +474,8 @@ function PtN2Diagram(parentDiv, modelJSON) {
             }
         }
 
-        function GetTextWidth(s) {
-            var width;
-
-            if (text_width_cache[s] != null)
-                return text_width_cache[s];
-
-            textWidthText.text(s);
-            width = textWidthTextNode.getBoundingClientRect().width;
-
-            text_width_cache[s] = width;
-            return width;
-        }
-
-        function UpdateTextWidths(d) {
-            if (d.varIsHidden) return;
-            d.nameWidthPx = GetTextWidth(GetText(d)) + 2 * RIGHT_TEXT_MARGIN_PX;
-            if (d.children) {
-                for (var i = 0; i < d.children.length; ++i) {
-                    UpdateTextWidths(d.children[i]);
-                }
-            }
-        }
-
-        function UpdateSolverTextWidths(d) {
-            if ((d.type === "param" || d.type === "unconnected_param") || d.varIsHidden) return;
-            d.nameSolverWidthPx = GetTextWidth(GetSolverText(d)) + 2 * RIGHT_TEXT_MARGIN_PX;
-            if (d.children) {
-                for (var i = 0; i < d.children.length; ++i) {
-                    UpdateSolverTextWidths(d.children[i]);
-                }
-            }
-        }
-
-        function ComputeColumnWidths(d) {
-            var greatestDepth = 0;
-            var leafWidthsPx = new Array(model.maxDepth + 1).fill(0.0);
-
-            function DoComputeColumnWidths(d) {
-                if (d.varIsHidden) return;
-
-                var heightPx = HEIGHT_PX * d.numLeaves / zoomedElement.numLeaves;
-                d.textOpacity0 = d.hasOwnProperty('textOpacity') ? d.textOpacity : 0;
-                d.textOpacity = (heightPx > FONT_SIZE_PX) ? 1 : 0;
-                var hasVisibleDetail = (heightPx >= 2.0);
-                var widthPx = 1e-3;
-                if (hasVisibleDetail) widthPx = MIN_COLUMN_WIDTH_PX;
-                if (d.textOpacity > 0.5) widthPx = d.nameWidthPx;
-
-                greatestDepth = Math.max(greatestDepth, d.depth);
-
-                if (d.children && !d.isMinimized) { //not leaf
-                    columnWidthsPx[d.depth] = Math.max(columnWidthsPx[d.depth], widthPx);
-                    for (var i = 0; i < d.children.length; ++i) {
-                        DoComputeColumnWidths(d.children[i]);
-                    }
-                }
-                else { //leaf
-                    leafWidthsPx[d.depth] = Math.max(leafWidthsPx[d.depth], widthPx);
-                }
-            }
-
-            DoComputeColumnWidths(d);
-
-
-            var sum = 0;
-            var lastColumnWidth = 0;
-            for (var i = leafWidthsPx.length - 1; i >= zoomedElement.depth; --i) {
-                sum += columnWidthsPx[i];
-                var lastWidthNeeded = leafWidthsPx[i] - sum;
-                lastColumnWidth = Math.max(lastWidthNeeded, lastColumnWidth);
-            }
-            columnWidthsPx[zoomedElement.depth - 1] = PARENT_NODE_WIDTH_PX;
-            columnWidthsPx[greatestDepth] = lastColumnWidth;
-
-        }
-
-        function ComputeSolverColumnWidths(d) {
-            var greatestDepth = 0;
-            var leafSolverWidthsPx = new Array(model.maxDepth + 1).fill(0.0);
-
-            function DoComputeSolverColumnWidths(d) {
-                var heightPx = HEIGHT_PX * d.numSolverLeaves / zoomedElement.numSolverLeaves;
-                d.textOpacity0 = d.hasOwnProperty('textOpacity') ? d.textOpacity : 0;
-                d.textOpacity = (heightPx > FONT_SIZE_PX) ? 1 : 0;
-                var hasVisibleDetail = (heightPx >= 2.0);
-                var widthPx = 1e-3;
-                if (hasVisibleDetail) widthPx = MIN_COLUMN_WIDTH_PX;
-                if (d.textOpacity > 0.5) widthPx = d.nameSolverWidthPx;
-
-                greatestDepth = Math.max(greatestDepth, d.depth);
-
-                if (d.subsystem_children && !d.isMinimized) { //not leaf
-                    columnSolverWidthsPx[d.depth] = Math.max(columnSolverWidthsPx[d.depth], widthPx);
-                    for (var i = 0; i < d.subsystem_children.length; ++i) {
-                        DoComputeSolverColumnWidths(d.subsystem_children[i]);
-                    }
-                }
-                else { //leaf
-                    leafSolverWidthsPx[d.depth] = Math.max(leafSolverWidthsPx[d.depth], widthPx);
-                }
-            }
-
-            DoComputeSolverColumnWidths(d);
-
-
-            var sum = 0;
-            var lastColumnWidth = 0;
-            for (var i = leafSolverWidthsPx.length - 1; i >= zoomedElement.depth; --i) {
-                sum += columnSolverWidthsPx[i];
-                var lastWidthNeeded = leafSolverWidthsPx[i] - sum;
-                lastColumnWidth = Math.max(lastWidthNeeded, lastColumnWidth);
-            }
-            columnSolverWidthsPx[zoomedElement.depth - 1] = PARENT_NODE_WIDTH_PX;
-            columnSolverWidthsPx[greatestDepth] = lastColumnWidth;
-
-        }
-
-        /** Recurse through the tree and add up the number of leaves that each
-         * node has, based on their children array.
-         * @param {Object} d The starting node.
-         */
-        function ComputeLeaves(d) {
-            if (d.varIsHidden) {
-                d.numLeaves = 0;
-            }
-            else if (d.hasOwnProperty('children') && (!d.isMinimized)) {
-                d.numLeaves = 0;
-                d.children.forEach(function (child) {
-                    ComputeLeaves(child);
-                    d.numLeaves += child.numLeaves;
-                })
-            }
-            else {
-                d.numLeaves = 1;
-            }
-
-            d.numSolverLeaves = d.numLeaves;
-        }
-
-        // ComputeNormalizedPositions(root, 0, false, null);
         function ComputeNormalizedPositions(d, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
             isChildOfZoomed = (isChildOfZoomed) ? true : (d === zoomedElement);
-
-            /* console.log("ComputeNormalizedPositions(d: ", d, ", leafCounter: ", leafCounter, ", isChildOfZoomed: ",
-                isChildOfZoomed, ", earliestMinimizedParent: ", earliestMinimizedParent, ")"); */
 
             if (earliestMinimizedParent == null && isChildOfZoomed) {
                 if (!d.varIsHidden) d3NodesArray.push(d);
@@ -715,37 +551,13 @@ function PtN2Diagram(parentDiv, modelJSON) {
             }
         }
 
-        UpdateTextWidths(zoomedElement);
-
-        UpdateSolverTextWidths(zoomedElement);
-
-        ComputeLeaves(root);
-
         d3NodesArray = [];
         d3RightTextNodesArrayZoomed = [];
 
         d3SolverNodesArray = [];
         d3SolverRightTextNodesArrayZoomed = [];
 
-        ComputeColumnWidths(zoomedElement);
-
-        ComputeSolverColumnWidths(zoomedElement);
-
-        // Now the column_width array is relative to the zoomedElement
-        //    and the computation of the widths only includes visible items after the zoom
-        widthPTreePx = 0;
-        for (var depth = 1; depth <= model.maxDepth; ++depth) {
-            columnLocationsPx[depth] = widthPTreePx;
-            widthPTreePx += columnWidthsPx[depth];
-        }
-
-        widthPSolverTreePx = 0;
-        for (var depth = 1; depth <= model.maxDepth; ++depth) {
-            columnSolverLocationsPx[depth] = widthPSolverTreePx;
-            widthPSolverTreePx += columnSolverWidthsPx[depth];
-        }
-
-        ComputeNormalizedPositions(root, 0, false, null);
+         ComputeNormalizedPositions(root, 0, false, null);
         if (zoomedElement.parent) {
             d3NodesArray.push(zoomedElement.parent);
         }
