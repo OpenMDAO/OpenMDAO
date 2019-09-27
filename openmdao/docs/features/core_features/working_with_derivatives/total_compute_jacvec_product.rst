@@ -13,3 +13,10 @@ method of :code:`System` can be used to compute partial jacobian vector products
 .. automethod:: openmdao.core.problem.Problem.compute_jacvec_product
     :noindex:
 
+
+Here's an example of a component that embeds a sub-problem and uses :code:`compute_jacvec_product`
+on that sub-problem to compute its jacobian.
+
+.. embed-code::
+    openmdao.core.tests.test_compute_jacvec_prod.SubProbComp
+
