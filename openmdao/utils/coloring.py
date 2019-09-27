@@ -56,7 +56,8 @@ _use_partial_sparsity = True
 
 # If True, ignore use_fixed_coloring if the coloring passed to it is _STD_COLORING_FNAME.
 # This is used when the 'openmdao partial_coloring' or 'openmdao total_coloring' commands
-# are running, because the intent there is to generate new coloring files.
+# are running, because the intent there is to generate new coloring files regardless of
+# whether use_fixed_coloring was called.
 _force_dyn_coloring = False
 
 # used as an indicator that we should automatically name coloring file based on class module
@@ -66,12 +67,13 @@ _STD_COLORING_FNAME = object()
 
 # default values related to the computation of a sparsity matrix
 _DEF_COMP_SPARSITY_ARGS = {
-    'tol': 1e-25,
-    'orders': None,
-    'num_full_jacs': 3,
-    'perturb_size': 1e-9,
-    'show_summary': True,
-    'show_sparsity': False,
+    'tol': 1e-25,     # use this tolerance to determine what's a zero when determining sparsity
+    'orders': None,   # num orders += around 'tol' for the tolerance sweep when determining sparsity
+    'num_full_jacs': 3,      # number of full jacobians to generate before computing sparsity
+    'perturb_size': 1e-9,    # size of input/output perturbation during generation of sparsity
+    'min_improve_pct': 10.,  # don't use coloring unless at least 10% decrease in number of solves
+    'show_summary': True,    # if True, print a short summary of the coloring
+    'show_sparsity': False,  # if True, show a plot of the sparsity
 }
 
 
@@ -1566,12 +1568,15 @@ def _compute_coloring(J, mode):
         See Coloring class docstring.
     """
     start_time = time.time()
+    nrows, ncols = J.shape
+    best_nocolor = min(nrows, ncols)
 
     if mode == 'auto':  # use bidirectional coloring
-        return MNCO_bidir(J)
+        coloring = MNCO_bidir(J)
+        if coloring.total_solves() < best_nocolor:
+            return coloring
 
     rev = mode == 'rev'
-    nrows, ncols = J.shape
 
     coloring = Coloring(sparsity=J)
 
@@ -1585,10 +1590,10 @@ def _compute_coloring(J, mode):
         for col in lst:
             col2rows[col] = np.nonzero(J[:, col])[0]
 
-    if mode == 'fwd':
-        coloring._fwd = (col_groups, col2rows)
-    else:
+    if rev:
         coloring._rev = (col_groups, col2rows)
+    else:  # fwd
+        coloring._fwd = (col_groups, col2rows)
 
     coloring._meta['coloring_time'] = time.time() - start_time
 
