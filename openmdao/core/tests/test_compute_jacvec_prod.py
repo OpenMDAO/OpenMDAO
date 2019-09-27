@@ -133,6 +133,8 @@ class SubProbComp(om.ExplicitComponent):
             partials[self.pathname + '.out', self.pathname + '.inp'] = jvp['indep.inp']
 
     def compute_partials(self, inputs, partials):
+        # note that typically you would only have to define partials for one direction,
+        # either fwd OR rev, not both.
         if self.mode == 'fwd':
             self._compute_partials_fwd(inputs, partials)
         else:

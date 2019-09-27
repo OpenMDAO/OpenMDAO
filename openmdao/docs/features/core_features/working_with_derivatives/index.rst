@@ -44,14 +44,6 @@ Computing Total Derivatives Across a Model
     picking_mode.rst
     compute_totals.rst
     check_total_derivatives.rst
-
-
-Matrix Free Total Derivatives
------------------------------
-
-.. toctree::
-    :maxdepth: 1
-
     total_compute_jacvec_product.rst
 
 
