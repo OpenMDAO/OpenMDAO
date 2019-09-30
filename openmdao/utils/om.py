@@ -284,7 +284,7 @@ def _meta_model_cmd(options):
             comp = prob.model._get_subsystem(pathname)
             if comp and isinstance(comp, mm_types):
                 view_metamodel(comp, resolution, port_number)
-                return
+                exit()
         else:
             comp = None
 

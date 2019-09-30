@@ -1,10 +1,16 @@
 import unittest
 
 import numpy as np
+
+try:
+    from bokeh import bokeh
+except ImportError:
+    bokeh = None
+
 import openmdao.api as om
 from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 
-
+@unittest.skipUnless(bokeh, "Bokeh is required")
 class UnstructuredMetaModelCompTests(unittest.TestCase):
 
     def test_missing_training_data_in_parameter(self):
@@ -182,8 +188,6 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
-        viz = MetaModelVisualization(interp)
-
     def test_not_top_level_prob(self):
         # Model
         interp = om.MetaModelUnStructuredComp()
@@ -211,8 +215,6 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob = om.Problem(model=interp)
         prob.setup()
         prob.final_setup()
-
-        viz = MetaModelVisualization(interp)
 
 
 if __name__ == '__main__':
