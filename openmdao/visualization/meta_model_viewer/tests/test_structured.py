@@ -166,7 +166,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         self.assertTrue(expected_output in output)
 
     def test_invalid_metamodel(self):
-        script = example.__file__
+        script = os.path.abspath(example.__file__).replace('.pyc', '.py') # PY2
         cmd = 'openmdao view_mm {} -m {}'.format(script, 'interp')
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
         expected_output = '\n'.join([
