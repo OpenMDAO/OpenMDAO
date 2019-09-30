@@ -15,7 +15,7 @@ import numpy as np
 from scipy.sparse import coo_matrix
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
-    ExplicitComponent, NonlinearBlockGS
+    ExplicitComponent, NonlinearBlockGS, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.mpi import MPI
@@ -43,6 +43,8 @@ except ImportError:
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
 if OPTIMIZER:
     from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+else:
+    pyOptSparseDriver = None
 
 
 def setup_vars(self, ofs, wrts):
@@ -592,7 +594,7 @@ class TestColoring(unittest.TestCase):
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, method)
 
-    def test_partials_no_improvement(self):
+    def test_partials_min_improvement(self):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model
 
@@ -671,11 +673,17 @@ class TestColoring(unittest.TestCase):
         nruns = model._nruns - start_nruns
         self.assertEqual(nruns, 3)
 
-    @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
-    def test_simple_totals_min_improvement_pyoptsparse(self):
+    @parameterized.expand(itertools.product(
+        [pyOptSparseDriver, ScipyOptimizeDriver],
+        ), name_func=_test_func_name
+    )
+    def test_simple_totals_min_improvement(self, optim):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
-        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        if optim is None:
+            raise unitest.SkipTest('requires pyoptsparse SLSQP.')
+        prob.driver = optim(optimizer='SLSQP')
+        
         prob.driver.declare_coloring()
 
         mask = np.array(

@@ -1666,7 +1666,8 @@ def compute_total_coloring(problem, mode=None,
                                           "from nonlinear ones.")
             _initialize_model_approx(model, driver, ofs, wrts)
             if model._coloring_info['coloring'] is None:
-                kwargs = {n:v for n, v in model._coloring_info.items() if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
+                kwargs = {n: v for n, v in model._coloring_info.items()
+                          if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
                 kwargs['method'] = list(model._approx_schemes)[0]
                 model.declare_coloring(**kwargs)
             if run_model:

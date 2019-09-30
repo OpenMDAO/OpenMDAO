@@ -248,7 +248,7 @@ class pyOptSparseDriver(Driver):
                     info['coloring'] = info['static'] = info['dynamic'] = None
                     simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less "
                                    "than min allowed (%.1f%%)." % (self.msginfo, pct,
-                                                                  info['min_improve_pct']))
+                                                                   info['min_improve_pct']))
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
         opt_prob = Optimization(self.options['title'], self._objfunc, comm=comm)
