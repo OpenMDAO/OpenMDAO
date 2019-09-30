@@ -71,7 +71,7 @@ _DEF_COMP_SPARSITY_ARGS = {
     'orders': None,   # num orders += around 'tol' for the tolerance sweep when determining sparsity
     'num_full_jacs': 3,      # number of full jacobians to generate before computing sparsity
     'perturb_size': 1e-9,    # size of input/output perturbation during generation of sparsity
-    'min_improve_pct': 10.,  # don't use coloring unless at least 10% decrease in number of solves
+    'min_improve_pct': 5.,   # don't use coloring unless at least 5% decrease in number of solves
     'show_summary': True,    # if True, print a short summary of the coloring
     'show_sparsity': False,  # if True, show a plot of the sparsity
 }

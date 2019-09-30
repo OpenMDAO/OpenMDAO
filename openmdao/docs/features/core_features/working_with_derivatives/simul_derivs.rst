@@ -62,24 +62,32 @@ For example:
 
 If you want to change the number of `compute_totals` calls that the coloring algorithm uses to
 compute the jacobian sparsity (default is 3), the tolerance used to determine nonzeros
-(default is 1e-15), or the number of orders to use for the tolerance sweep (default is 15),
-you can pass the `num_full_jacs`, `tol`, and `orders` args. For example:
+(default is 1e-25), you can pass the `num_full_jacs`, and `tol` args.
+You can also pass the `min_improve_pct` arg, which specifies how much the coloring must
+reduce the number of linear solves required to generate the total jacobian else coloring will
+be deactivated.
+
+For example:
 
 .. code-block:: python
 
-    prob.driver.declare_coloring(num_full_jacs=2, tol=1e-20, orders=20)
+    prob.driver.declare_coloring(num_full_jacs=2, tol=1e-20, min_improve_pct=10.)
 
 
-If you want to set a specific tolerance and skip the tolerance sweep, you can set
-:code:`orders=None`.  This can be useful if you have a very noisy jacobian that contains lots
-of small numbers and the tolerance sweep is unable to pick a tolerance.  You can set the
-tolerance to a small enough value that you're sure that you're not missing any entries that
-should be treated as nonzero.  Here's an example:
+If you want to perform a tolerance sweep, trying out a range of tolerances when determining
+what values of the sparsity matrix should be considered zero, then you can set the `orders`
+arg.  OpenMDAO will then sweep over tolerances from the given `tol` plus and minus `orders`
+orders of magnitude.  For each tolerance, it checks the number of nonzero values, and chooses
+a tolerance from the largest group of tolerances that share the same number of nonzeros. If
+it can't find at least two tolerances that result in the same number of nonzeros, an exception
+is raised.
+
+Here's an example:
 
 
 .. code-block:: python
 
-    prob.driver.declare_coloring(tol=1e-35, orders=None)
+    prob.driver.declare_coloring(tol=1e-35, orders=20)
 
 
 Whenever a dynamic coloring is computed, the coloring is written to a file called
