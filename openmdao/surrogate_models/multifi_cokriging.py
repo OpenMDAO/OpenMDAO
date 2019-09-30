@@ -149,8 +149,9 @@ def l1_cross_distances(X, Y=None):
         The array of componentwise L1 cross-distances.
 
     """
+    X = array2d(X)
+
     if Y is None:
-        X = array2d(X)
         n_samples, n_features = X.shape
         n_nonzero_cross_dist = n_samples * (n_samples - 1) // 2
         D = np.zeros((n_nonzero_cross_dist, n_features))
@@ -160,7 +161,6 @@ def l1_cross_distances(X, Y=None):
             ll_1 = ll_0 + n_samples - k - 1
             D[ll_0:ll_1] = np.abs(X[k] - X[(k + 1):])
     else:
-        X = array2d(X)
         Y = array2d(Y)
         n_samples_X, n_features_X = X.shape
         n_samples_Y, n_features_Y = Y.shape
