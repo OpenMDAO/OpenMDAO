@@ -173,7 +173,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
             "Metamodel 'interp' not found.",
             " Try one of the following: ['mm']."
         ])
-        self.assertTrue(expected_output in output)
+        self.assertTrue(expected_output in output.replace('\r', ''))
 
 if __name__ == '__main__':
     unittest.main()
