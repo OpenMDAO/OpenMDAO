@@ -2174,7 +2174,7 @@ class Group(System):
         if comps_only:
             systems = [s.pathname for s in self.system_iter(recurse=True, typ=Component)]
         else:
-            systems = [s.pathname for s in self._subsystems_myproc]
+            systems = [s.name for s in self._subsystems_myproc]
 
         if MPI:
             sysbyproc = self.comm.allgather(systems)
@@ -2202,6 +2202,7 @@ class Group(System):
 
         for key in edge_data:
             src_sys, tgt_sys = key
-            graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
+            if comps_only or src_sys != tgt_sys:
+                graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph

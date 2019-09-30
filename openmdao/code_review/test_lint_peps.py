@@ -27,7 +27,7 @@ dir_excludes = [
 
 file_excludes = [
     'test_*',
-    '__init__.py',
+    '_*.py',
 ]
 
 ignores = {

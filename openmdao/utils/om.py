@@ -12,6 +12,9 @@ from six import iteritems
 from openmdao.core.problem import Problem
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
@@ -234,6 +237,80 @@ def _view_connections_cmd(options):
                          title=title)
         exit()
     return _viewconns
+
+
+def _meta_model_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao meta_model' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('-m', '--metamodel_pathname', action='store', dest='pathname',
+                        help='pathname of the metamodel component.')
+    parser.add_argument('-p', '--port_number', default=5007, action='store', dest='port_number',
+                        help='Port number to open viewer')
+
+
+def _meta_model_cmd(options):
+    """
+    Return the post_setup hook function for 'openmdao meta_model'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+
+    Returns
+    -------
+    function
+        The post-setup hook function.
+    """
+    def _view_metamodel(prob):
+        Problem._post_setup_func = None
+
+        mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp)
+
+        pathname = options.pathname
+        port_number = options.port_number
+
+        if pathname:
+            comp = prob.model._get_subsystem(pathname)
+            if comp and isinstance(comp, mm_types):
+                view_metamodel(comp, port_number)
+                exit()
+        else:
+            comp = None
+
+        metamodels = {mm.pathname: mm for
+                      mm in prob.model.system_iter(include_self=True, typ=mm_types)}
+
+        mm_names = list(metamodels.keys())
+        mm_count = len(mm_names)
+
+        if mm_count == 0:
+            print("No Metamodel components found in model.")
+
+        elif mm_count == 1 and not pathname:
+            comp = metamodels[mm_names[0]]
+            view_metamodel(comp, port_number)
+            exit()
+
+        else:
+            try_str = "Try one of the following: {}.".format(mm_names)
+
+            if not pathname:
+                print("\nMetamodel not specified. {}".format(try_str))
+            elif not comp:
+                print("\nMetamodel '{}' not found.\n {}".format(pathname, try_str))
+            else:
+                print("\n'{}' is not a Metamodel.\n {}".format(pathname, try_str))
+        exit()
+
+    return _view_metamodel
 
 
 def _config_summary_setup_parser(parser):
@@ -504,6 +581,7 @@ _post_setup_map = {
              'Print citations referenced by problem'),
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
+    'view_mm': (_meta_model_parser, _meta_model_cmd, "Meta Model Viewer.")
 }
 
 
@@ -527,7 +605,7 @@ _non_post_setup_map = {
                       'Colored jacobian viewer.'),
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd, 'XDSM viewer.'),
     'scaffold': (_scaffold_setup_parser, _scaffold_exec,
-                 'Generate a simple scaffold for a component.')
+                 'Generate a simple scaffold for a component.'),
 }
 
 

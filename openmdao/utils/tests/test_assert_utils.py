@@ -7,6 +7,7 @@ from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar_feature import SellarNoDerivativesCS
+from openmdao.test_suite.components.partial_check_feature import BrokenDerivComp
 from openmdao.utils.assert_utils import assert_check_partials, assert_no_approx_partials, assert_no_dict_jacobians
 
 
@@ -40,32 +41,13 @@ class TestAssertUtils(unittest.TestCase):
         prob.run_model()
 
         data = prob.check_partials(out_stream=None)
-        atol = 1.e-6
-        rtol = 1.e-6
-        assert_check_partials(data, atol, rtol)
+
+        assert_check_partials(data, atol=1.e-6, rtol=1.e-6)
 
     def test_assert_check_partials_exception_expected(self):
 
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-
-                self.add_output('y', 5.5)
-
-                self.declare_partials(of='*', wrt='*')
-
-            def compute(self, inputs, outputs):
-                outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
-
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
-
         prob = om.Problem()
-        prob.model = MyComp()
+        prob.model = BrokenDerivComp()
 
         prob.set_solver_print(level=0)
 
@@ -74,10 +56,8 @@ class TestAssertUtils(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        atol = 1.e-6
-        rtol = 1.e-6
         try:
-            assert_check_partials(data, atol, rtol)
+            assert_check_partials(data, atol=1.e-6, rtol=1.e-6)
         except ValueError as err:
             err_string = str(err)
             self.assertEqual(err_string.count('Assert Check Partials failed for the following Components'), 1)
@@ -93,48 +73,6 @@ class TestAssertUtils(unittest.TestCase):
             self.assertEqual(err_string.count('rev-fd'), 4)
         else:
             self.fail('Exception expected.')
-
-    def test_feature_assert_check_partials_exception_expected(self):
-
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.utils.assert_utils import assert_check_partials
-
-        class MyComp(om.ExplicitComponent):
-            def setup(self):
-                self.add_input('x1', 3.0)
-                self.add_input('x2', 5.0)
-
-                self.add_output('y', 5.5)
-
-                self.declare_partials(of='*', wrt='*')
-
-            def compute(self, inputs, outputs):
-                """ Compute outputs. """
-                outputs['y'] = 3.0 * inputs['x1'] + 4.0 * inputs['x2']
-
-            def compute_partials(self, inputs, partials):
-                """Intentionally incorrect derivative."""
-                J = partials
-                J['y', 'x1'] = np.array([4.0])
-                J['y', 'x2'] = np.array([40])
-
-        prob = om.Problem()
-        prob.model = MyComp()
-
-        prob.set_solver_print(level=0)
-
-        prob.setup()
-        prob.run_model()
-
-        data = prob.check_partials(out_stream=None)
-
-        atol = 1.e-6
-        rtol = 1.e-6
-        try:
-            assert_check_partials(data, atol, rtol)
-        except ValueError as err:
-            print(str(err))
 
     def test_assert_no_approx_partials_exception_expected(self):
 
@@ -231,11 +169,8 @@ class TestAssertUtils(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        atol = 1.e-6
-        rtol = 1.e-6
-
         try:
-            assert_check_partials(data, atol, rtol)
+            assert_check_partials(data, atol=1.e-6, rtol=1.e-6)
         except ValueError as err:
             err_string = str(err)
             self.assertEqual(err_string.count('Assert Check Partials failed for the following Components'), 1)
