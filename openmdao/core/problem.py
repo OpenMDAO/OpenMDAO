@@ -975,11 +975,12 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        coloring = driver._coloring_info['coloring']
-        if coloring is coloring_mod._STD_COLORING_FNAME:
+        info = driver._coloring_info
+        coloring = info['coloring']
+        if coloring is None and info['static'] is not None:
             coloring = driver._get_static_coloring()
-        if (coloring and coloring is not coloring_mod._DYN_COLORING and
-                coloring_mod._use_total_sparsity):
+
+        if coloring and coloring_mod._use_total_sparsity:
             # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
             if coloring._fwd and coloring._rev:
@@ -2215,3 +2216,29 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
+
+
+class Slicer(object):
+    """
+    Helper class that can be used with the indices argument for Problem set_val and get_val.
+    """
+
+    def __getitem__(self, val):
+        """
+        Pass through indices or slice.
+
+        Parameters
+        ----------
+        val : int or slice object or tuples of slice objects
+            Indices or slice to return.
+
+        Returns
+        -------
+        indices : int or slice object or tuples of slice objects
+            Indices or slice to return.
+        """
+        return val
+
+
+# instance of the Slicer class to be used by users for the set_val and get_val methods of Problem
+slicer = Slicer()

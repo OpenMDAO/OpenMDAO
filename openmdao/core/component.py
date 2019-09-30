@@ -35,11 +35,16 @@ global_meta_names = {
 }
 
 _full_slice = slice(None)
+_forbidden_chars = ['.', '*', '?', '!', '[', ']']
+_whitespace = set([' ', '\t', '\r', '\n'])
 
 
 def _valid_var_name(name):
     """
     Determine if the proposed name is a valid variable name.
+
+    Leading and trailing whitespace is illegal, and a specific list of characters
+    are illegal anywhere in the string.
 
     Parameters
     ----------
@@ -51,9 +56,13 @@ def _valid_var_name(name):
     bool
         True if the proposed name is a valid variable name, else False.
     """
-    forbidden_chars = ['.', '*', '?', '!', '[', ']']
-
-    return not any([True for character in forbidden_chars if character in name])
+    global _forbidden_chars, _whitespace
+    if not name:
+        return False
+    for char in _forbidden_chars:
+        if char in name:
+            return False
+    return name[0] not in _whitespace and name[-1] not in _whitespace
 
 
 class Component(System):
@@ -486,8 +495,6 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
-        if not name:
-            raise NameError('%s: The name argument should be a non-empty string.' % self.msginfo)
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
@@ -571,8 +578,6 @@ class Component(System):
         # First, type check all arguments
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
-        if not name:
-            raise NameError('%s: The name argument should be a non-empty string.' % self.msginfo)
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid input name." % (self.msginfo, name))
         if tags is not None and not isinstance(tags, (str, list)):
@@ -659,8 +664,6 @@ class Component(System):
 
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
-        if not name:
-            raise NameError('%s: The name argument should be a non-empty string.' % self.msginfo)
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
         if not isscalar(val) and not isinstance(val, (list, tuple, ndarray, Iterable)):
@@ -790,8 +793,6 @@ class Component(System):
         """
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
-        if not name:
-            raise NameError('%s: The name argument should be a non-empty string.' % self.msginfo)
         if not _valid_var_name(name):
             raise NameError("%s: '%s' is not a valid output name." % (self.msginfo, name))
         if tags is not None and not isinstance(tags, (str, set, list)):
@@ -1356,10 +1357,9 @@ class Component(System):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
             if coloring_mod._use_partial_sparsity:
-                is_dynamic = self._coloring_info['coloring'] is coloring_mod._DYN_COLORING
                 coloring = self._get_coloring()
                 if coloring is not None:
-                    if not is_dynamic:
+                    if not self._coloring_info['dynamic']:
                         coloring._check_config_partial(self)
                     self._update_subjac_sparsity(coloring.get_subjac_sparsity())
 

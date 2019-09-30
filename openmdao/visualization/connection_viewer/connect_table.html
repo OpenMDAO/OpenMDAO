@@ -14,8 +14,24 @@
 
     .promoted {
         color: blue;
-        font-style: italic;
     }
+
+    .middle {
+        text-align: center;
+        width: 100%;
+        display:table;
+    }
+
+    .toggle {
+        width: 5%;
+        display:table-cell;
+        text-align: center;
+    }
+
+    input {
+        margin: 3px 5px 3px 5px;
+    }
+
 
     <tabulator_style>
 </style>
@@ -33,96 +49,117 @@ document.title = data.title;
 document.getElementById("conn_title").innerHTML = data.title
 
 var table =
-      new Tabulator("#connection-table", {
-                    // set height of table (in CSS or here), this enables the Virtual DOM and
-                    // improves render speed dramatically (can be any valid css height value)
-                    height: 500,
-                    data:tabledata, //assign data to table
-                    layout:"fitColumns", //"fitDataFill",
-                    footerElement:"<span><button onclick='src_toggle(this)'>Use Absolute Output Names</button><button onclick='tgt_toggle(this)'>Use Absolute Input Names</button></span>",
-                    columns:[ //Define Table Columns
-                            {title: "Output", field:"src", align:"left", headerFilter:true,
-                             visible:false, minWidth:300,
-                            tooltip:function(cell){
-                                return cell.getData().sprom;
-                            }},
-                            {title: "Output", field:"sprom", align:"left", headerFilter:true, minWidth:300,
-                             formatter:function(cell, formmaterParams, onRendered) {
-                                var promname = cell.getData().sprom;
-                                if (promname == cell.getData().src) {
-                                    return promname;
-                                }
-                                else {
-                                    return "<span class='promoted'>" + promname + "</span>";
-                                }
-                            },
-                            tooltip:function(cell){
-                                return cell.getData().src;
-                            }},
-                            {title: "Units", field:"sunits", align:"center", headerFilter:true,
-                             formatter:function(cell, formatterParams){
-                                var value = cell.getValue();
-                                if(value.startsWith("!")){
-                                    return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
-                                }else{
-                                    return value;
-                                }
-                             }},
-                            {title: "Value", field:"val", align:"center", headerFilter:true},
-                            {title: "Units", field:"tunits", align:"center", headerFilter:true,
-                                formatter:function(cell, formatterParams){
-                                    var value = cell.getValue();
-                                    if(value.startsWith("!")){
-                                        return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
-                                    }else{
-                                        return value;
-                                    }
-                                }
-                            },
-                            {title: "Input", field:"tgt", align:"left", headerFilter:true,
-                             visible:false, minWidth:300,
-                             tooltip:function(cell){
-                                return cell.getData().tprom;
-                             }},
-                            {title: "Input", field:"tprom", align:"left", headerFilter:true,
-                             minWidth:300,
-                             formatter:function(cell, formmaterParams, onRendered) {
-                                var promname = cell.getData().tprom;
-                                if (promname == cell.getData().tgt) {
-                                    return promname;
-                                }
-                                else {
-                                    return "<span class='promoted'>" + promname + "</span>";
-                                }
-                             },
-                             tooltip:function(cell){
-                                return cell.getData().tgt;
-                            }},
-                    ],
+    new Tabulator("#connection-table", {
+        // set height of table (in CSS or here), this enables the Virtual DOM and
+        // improves render speed dramatically (can be any valid css height value)
+        height: 500,
+        data:tabledata, //assign data to table
+        layout:"fitColumns", //"fitDataFill",
+        footerElement:"<p class='middle'>" +
+                            "<span class='toggle'><input type='checkbox' onclick='src_abs_toggle(this)'>Absolute Outputs</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='src_prom_toggle(this)'>Promoted Outputs</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='sunits_toggle(this)'>Output Units</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='values_toggle(this)'>Values</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='tunits_toggle(this)'>Input Units</input></span>" +
+                            "<span class='toggle'><input type='checkbox' onclick='tgt_abs_toggle(this)'>Absolute Inputs</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='tgt_prom_toggle(this)'>Promoted Inputs</input></span></p>",
+        columns:[ //Define Table Columns
+                {title: "Output (absolute)", field:"src", align:"left", headerFilter:true,
+                    visible:false, minWidth:300,
+                tooltip:function(cell){
+                    return cell.getData().sprom;
+                }},
+                {title: "Output (promoted)", field:"sprom", align:"left", headerFilter:true, minWidth:300,
+                    formatter:function(cell, formmaterParams, onRendered) {
+                    var promname = cell.getData().sprom;
+                    if (promname == cell.getData().src) {
+                        return promname;
+                    }
+                    else {
+                        return "<span class='promoted'>" + promname + "</span>";
+                    }
+                },
+                tooltip:function(cell){
+                    return cell.getData().src;
+                }},
+                {title: "Units", field:"sunits", align:"center", headerFilter:true,
+                    formatter:function(cell, formatterParams){
+                    var value = cell.getValue();
+                    if(value.startsWith("!")){
+                        return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
+                    }else{
+                        return value;
+                    }
+                    }},
+                {title: "Value", field:"val", align:"center", headerFilter:true},
+                {title: "Units", field:"tunits", align:"center", headerFilter:true,
+                    formatter:function(cell, formatterParams){
+                        var value = cell.getValue();
+                        if(value.startsWith("!")){
+                            return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
+                        }else{
+                            return value;
+                        }
+                    }
+                },
+                {title: "Input (absolute)", field:"tgt", align:"left", headerFilter:true,
+                    visible:false, minWidth:300,
+                    tooltip:function(cell){
+                    return cell.getData().tprom;
+                    }},
+                {title: "Input (promoted)", field:"tprom", align:"left", headerFilter:true,
+                    minWidth:300,
+                    formatter:function(cell, formmaterParams, onRendered) {
+                    var promname = cell.getData().tprom;
+                    if (promname == cell.getData().tgt) {
+                        return promname;
+                    }
+                    else {
+                        return "<span class='promoted'>" + promname + "</span>";
+                    }
+                    },
+                    tooltip:function(cell){
+                    return cell.getData().tgt;
+                }},
+        ],
 });
 
 
-function src_toggle(tbutton) {
+function src_abs_toggle(tbutton) {
     table.toggleColumn("src");
-    table.toggleColumn("sprom");
-    if (tbutton.innerHTML.startsWith("Use Absolute")) {
-        tbutton.innerHTML = "Use Promoted Output Names";
-    }
-    else {
-        tbutton.innerHTML = "Use Absolute Output Names";
-    }
+    table.redraw();
 }
 
-function tgt_toggle(tbutton) {
-    table.toggleColumn("tgt");
-    table.toggleColumn("tprom");
-    if (tbutton.innerHTML.startsWith("Use Absolute")) {
-        tbutton.innerHTML = "Use Promoted Input Names";
-    }
-    else {
-        tbutton.innerHTML = "Use Absolute Input Names";
-    }
+function src_prom_toggle(tbutton) {
+    table.toggleColumn("sprom");
+    table.redraw();
 }
+
+function tgt_abs_toggle(tbutton) {
+    table.toggleColumn("tgt");
+    table.redraw();
+}
+
+function tgt_prom_toggle(tbutton) {
+    table.toggleColumn("tprom");
+    table.redraw();
+}
+
+function values_toggle(tbutton) {
+    table.toggleColumn("val");
+    table.redraw();
+}
+
+function sunits_toggle(tbutton) {
+    table.toggleColumn("sunits");
+    table.redraw();
+}
+
+function tunits_toggle(tbutton) {
+    table.toggleColumn("tunits");
+    table.redraw();
+}
+
 
 </script>
 </body>

@@ -43,8 +43,8 @@ class TestDebug(unittest.TestCase):
             "Total connections: 10   Total transfer data size: 72",
             "",
             "Driver type: Driver",
-            "Linear Solvers: [('LinearRunOnce', 1)]",
-            "Nonlinear Solvers: [('NonlinearRunOnce', 1)]"
+            "Linear Solvers: [LinearRunOnce]",
+            "Nonlinear Solvers: [NonlinearRunOnce]"
         ]
 
         for i in range(len(expected)):

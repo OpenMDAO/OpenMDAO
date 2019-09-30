@@ -164,6 +164,8 @@ class Driver(object):
 
         self._coloring_info = coloring_mod._DEF_COMP_SPARSITY_ARGS.copy()
         self._coloring_info['coloring'] = None
+        self._coloring_info['dynamic'] = False
+        self._coloring_info['static'] = None
 
         self._total_jac_sparsity = None
         self._res_jacs = {}
@@ -297,6 +299,10 @@ class Driver(object):
 
         # set up simultaneous deriv coloring
         if coloring_mod._use_total_sparsity:
+            # reset the coloring
+            if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
+                self._coloring_info['coloring'] = None
+
             coloring = self._get_static_coloring()
             if coloring is not None and self.supports['simultaneous_derivatives']:
                 if model._owns_approx_jac:
@@ -1027,7 +1033,11 @@ class Driver(object):
         self._coloring_info['tol'] = tol
         self._coloring_info['orders'] = orders
         self._coloring_info['perturb_size'] = perturb_size
-        self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
+        if self._coloring_info['static'] is None:
+            self._coloring_info['dynamic'] = True
+        else:
+            self._coloring_info['dynamic'] = False
+        self._coloring_info['coloring'] = None
         self._coloring_info['show_summary'] = show_summary
         self._coloring_info['show_sparsity'] = show_sparsity
 
@@ -1045,8 +1055,13 @@ class Driver(object):
         if self.supports['simultaneous_derivatives']:
             if coloring_mod._force_dyn_coloring and coloring is coloring_mod._STD_COLORING_FNAME:
                 # force the generation of a dynamic coloring this time
-                coloring = coloring_mod._DYN_COLORING
-            self._coloring_info['coloring'] = coloring
+                self._coloring_info['dynamic'] = True
+                self._coloring_info['static'] = None
+            else:
+                self._coloring_info['static'] = coloring
+                self._coloring_info['dynamic'] = False
+
+            self._coloring_info['coloring'] = None
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
@@ -1087,16 +1102,22 @@ class Driver(object):
             The pre-existing or loaded Coloring, or None
         """
         info = self._coloring_info
-        coloring = info['coloring']
+        static = info['static']
 
-        if isinstance(coloring, coloring_mod.Coloring):
+        if isinstance(static, coloring_mod.Coloring):
+            coloring = static
+            info['coloring'] = coloring
+        else:
+            coloring = info['coloring']
+
+        if coloring is not None:
             return coloring
 
-        if coloring is coloring_mod._STD_COLORING_FNAME or isinstance(coloring, string_types):
-            if coloring is coloring_mod._STD_COLORING_FNAME:
+        if static is coloring_mod._STD_COLORING_FNAME or isinstance(static, string_types):
+            if static is coloring_mod._STD_COLORING_FNAME:
                 fname = self._get_total_coloring_fname()
             else:
-                fname = coloring
+                fname = static
             print("loading total coloring from file %s" % fname)
             coloring = info['coloring'] = coloring_mod.Coloring.load(fname)
             info.update(coloring._meta)

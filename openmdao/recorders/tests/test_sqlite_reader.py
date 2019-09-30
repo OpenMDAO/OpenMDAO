@@ -1141,6 +1141,57 @@ class TestSqliteCaseReader(unittest.TestCase):
         outputs = case.list_outputs(out_stream=None, tags=["tag1", "tag3"])
         self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
 
+    def test_list_inputs_with_includes_excludes(self):
+        prob = SellarProblem()
+
+        prob.model.add_recorder(self.recorder)
+
+        prob.setup()
+
+        d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComp)
+        d1.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
+        d1.add_recorder(self.recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        system_cases = cr.list_cases('root.d1')
+        case = cr.get_case(system_cases[-1])
+
+        # inputs with no includes or excludes. Should get d1.z, d1.x, and d1.y2
+        inputs = case.list_inputs(out_stream=None)
+        self.assertEqual( len(inputs), 3)
+
+        # inputs with includes
+        inputs = case.list_inputs(includes = ['*z'], out_stream=None)
+        self.assertEqual(len(inputs), 1)
+
+        # inputs with excludes
+        inputs = case.list_inputs(excludes = ['*z'], out_stream=None)
+        self.assertEqual(len(inputs), 2)
+
+        # inputs with includes and excludes
+        inputs = case.list_inputs(includes = ['*z'], excludes = ['d1*'], out_stream=None)
+        self.assertEqual(len(inputs), 0)
+
+        # outputs with no includes or excludes. Should get d1.y1
+        outputs = case.list_outputs(out_stream=None)
+        self.assertEqual( len(outputs), 1)
+
+        # outputs with includes
+        outputs = case.list_outputs(includes = ['*z'], out_stream=None)
+        self.assertEqual( len(outputs), 0)
+
+        # outputs with excludes
+        outputs = case.list_outputs(excludes = ['*z'], out_stream=None)
+        self.assertEqual( len(outputs), 1)
+
+        # outputs with includes and excludes
+        outputs = case.list_outputs(includes = ['d1*'], excludes = ['*z'], out_stream=None)
+        self.assertEqual( len(outputs), 1)
+
     def test_list_discrete(self):
         model = om.Group()
 
@@ -3187,6 +3238,47 @@ class TestFeatureSqliteReader(unittest.TestCase):
         # Outputs with tag that does match
         outputs = case.list_outputs(tags="tag1")
         self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
+
+    def test_feature_list_inputs_and_outputs_with_includes_excludes(self):
+        import openmdao.api as om
+        from openmdao.core.tests.test_expl_comp import RectangleComp
+
+        model = om.Group()
+        prob = om.Problem(model)
+        model.add_recorder(om.SqliteRecorder('cases.sql'))
+
+        indep = om.IndepVarComp()
+        indep.add_output('length', val=100.)
+        indep.add_output('width', val=60.)
+
+        model.add_subsystem('rect', RectangleComp(), promotes=['length', 'width', 'area'])
+        model.add_subsystem('indep', indep, promotes=['length', 'width'])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+
+        cases = cr.get_cases()
+        case = cases[0]
+
+        # Inputs with includes
+        inputs = case.list_inputs(includes=['*length'], out_stream=None)
+        self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.length',]))
+
+        # Inputs with multiple tags
+        inputs = case.list_inputs(excludes=['*length'], out_stream=None)
+        self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.width',]))
+
+        # Outputs with includes
+        outputs = case.list_outputs(includes=['*area'], out_stream=None)
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
+
+        # Outputs with excludes
+        outputs = case.list_outputs(excludes=['*area'], out_stream=None)
+        self.assertEqual(sorted([outp[0] for outp in outputs]), sorted(['indep.width', 'indep.length']))
 
     def test_feature_get_val(self):
         import openmdao.api as om

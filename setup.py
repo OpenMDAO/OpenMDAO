@@ -17,6 +17,9 @@ optional_dependencies = {
         'redbaron',
         'sphinx>=1.8.5',
     ],
+    'visualization': [
+        'bokeh>=1.3.4'
+    ],
     'test': [
         'coverage',
         'parameterized',
@@ -32,7 +35,7 @@ optional_dependencies['all'] = sorted([
     dependency
     for dependencies in optional_dependencies.values()
     for dependency in dependencies
-])
+] + ['colorama'])
 
 
 setup(
@@ -98,6 +101,7 @@ setup(
         'openmdao.visualization.connection_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.xdsm_viewer',
+        'openmdao.visualization.meta_model_viewer',
         'openmdao.surrogate_models',
         'openmdao.surrogate_models.nn_interpolators'
     ],
@@ -143,7 +147,7 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'six',
+        'six'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""
