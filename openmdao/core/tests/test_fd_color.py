@@ -619,7 +619,7 @@ class TestColoring(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        with assert_warning(UserWarning, 'SparseCompExplicit (comp): Coloring was deactivated.  Improvement of 16.667% was less than min allowed (20.000%)'):
+        with assert_warning(UserWarning, 'SparseCompExplicit (comp): Coloring was deactivated.  Improvement of 16.7% was less than min allowed (20.0%).'):
             comp._linearize()
 
         jac = comp._jacobian._subjacs_info
@@ -676,7 +676,7 @@ class TestColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
         prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-        prob.driver.declare_coloring(min_improve_pct=25.)
+        prob.driver.declare_coloring()
 
         mask = np.array(
             [[1, 0, 1, 1, 1],
@@ -694,26 +694,26 @@ class TestColoring(unittest.TestCase):
         comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=isplit, osplit=2))
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
-        model.declare_coloring('*', method='cs')
 
         model.comp.add_objective('y0', index=0)  # pyoptsparse SLSQP requires a scalar objective, so pick index 0
         model.comp.add_constraint('y1', lower=[1., 2.])
         model.add_design_var('indeps.x0', lower=np.ones(3), upper=np.ones(3)+.1)
         model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
         model.approx_totals(method='cs')
+        model.declare_coloring(min_improve_pct=25.)
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         
-        with assert_warning(UserWarning, ""):
+        with assert_warning(UserWarning, "CounterGroup (<model>): Coloring was deactivated.  Improvement of 20.0% was less than min allowed (25.0%)."):
             prob.run_driver()  # need this to trigger the dynamic coloring
 
         prob.driver._total_jac = None
 
         start_nruns = model._nruns
         derivs = prob.compute_totals()
-        _check_total_matrix(model, derivs, sparsity[[0,3,4],:], 'cs')
         nruns = model._nruns - start_nruns
-        self.assertEqual(nruns, 3)
+        _check_total_matrix(model, derivs, sparsity[[0,3,4],:], 'cs')
+        self.assertEqual(nruns, 5)
 
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],
