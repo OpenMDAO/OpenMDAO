@@ -5,14 +5,13 @@ import os
 import numpy as np
 
 try:
-    from bokeh import bokeh
+    import bokeh
+    from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 except ImportError:
     bokeh = None
 
 import openmdao.api as om
-from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 import openmdao.test_suite.test_examples.meta_model_examples.structured_meta_model_example as example
-
 
 @unittest.skipUnless(bokeh, "Bokeh is required")
 class StructuredMetaModelCompTests(unittest.TestCase):
