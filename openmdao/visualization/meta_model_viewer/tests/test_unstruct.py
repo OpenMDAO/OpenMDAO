@@ -1,12 +1,16 @@
 import unittest
-import subprocess
-import os
 
 import numpy as np
+
+try:
+    from bokeh import bokeh
+except ImportError:
+    bokeh = None
+
 import openmdao.api as om
 from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
-import openmdao.test_suite.test_examples.meta_model_examples.structured_meta_model_example as example
 
+@unittest.skipUnless(bokeh, "Bokeh is required")
 class UnstructuredMetaModelCompTests(unittest.TestCase):
 
     def test_missing_training_data_in_parameter(self):
@@ -211,23 +215,6 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         prob = om.Problem(model=interp)
         prob.setup()
         prob.final_setup()
-
-    def test_unspecified_metamodel(self):
-        script = os.path.join(os.path.dirname(__file__), 'example.py')
-        cmd = 'openmdao view_mm {}'.format(script)
-        output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
-        expected_output = "Metamodel not specified. Try one of the following: ['interp1', 'interp2']."
-        self.assertTrue(expected_output in output)
-
-    def test_invalid_metamodel(self):
-        script = example.__file__
-        cmd = 'openmdao view_mm {} -m {}'.format(script, 'interp')
-        output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
-        expected_output = '\n'.join([
-            "Metamodel 'interp' not found.",
-            " Try one of the following: ['mm']."
-        ])
-        self.assertTrue(expected_output in output)
 
 
 if __name__ == '__main__':
