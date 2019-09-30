@@ -681,9 +681,9 @@ class TestColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
         if optim is None:
-            raise unitest.SkipTest('requires pyoptsparse SLSQP.')
+            raise unittest.SkipTest('requires pyoptsparse SLSQP.')
         prob.driver = optim(optimizer='SLSQP')
-        
+
         prob.driver.declare_coloring()
 
         mask = np.array(
@@ -711,7 +711,7 @@ class TestColoring(unittest.TestCase):
         model.declare_coloring(min_improve_pct=25.)
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
-        
+
         with assert_warning(UserWarning, "CounterGroup (<model>): Coloring was deactivated.  Improvement of 20.0% was less than min allowed (25.0%)."):
             prob.run_driver()  # need this to trigger the dynamic coloring
 
