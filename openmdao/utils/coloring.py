@@ -56,7 +56,8 @@ _use_partial_sparsity = True
 
 # If True, ignore use_fixed_coloring if the coloring passed to it is _STD_COLORING_FNAME.
 # This is used when the 'openmdao partial_coloring' or 'openmdao total_coloring' commands
-# are running, because the intent there is to generate new coloring files.
+# are running, because the intent there is to generate new coloring files regardless of
+# whether use_fixed_coloring was called.
 _force_dyn_coloring = False
 
 # used as an indicator that we should automatically name coloring file based on class module
@@ -66,12 +67,13 @@ _STD_COLORING_FNAME = object()
 
 # default values related to the computation of a sparsity matrix
 _DEF_COMP_SPARSITY_ARGS = {
-    'tol': 1e-25,
-    'orders': None,
-    'num_full_jacs': 3,
-    'perturb_size': 1e-9,
-    'show_summary': True,
-    'show_sparsity': False,
+    'tol': 1e-25,     # use this tolerance to determine what's a zero when determining sparsity
+    'orders': None,   # num orders += around 'tol' for the tolerance sweep when determining sparsity
+    'num_full_jacs': 3,      # number of full jacobians to generate before computing sparsity
+    'perturb_size': 1e-9,    # size of input/output perturbation during generation of sparsity
+    'min_improve_pct': 5.,   # don't use coloring unless at least 5% decrease in number of solves
+    'show_summary': True,    # if True, print a short summary of the coloring
+    'show_sparsity': False,  # if True, show a plot of the sparsity
 }
 
 
@@ -262,11 +264,11 @@ class Coloring(object):
         rev_size = self._shape[0] if self._shape else -1  # nrows
         fwd_size = self._shape[1] if self._shape else -1  # ncols
 
-        tot_colors = self.total_solves()
+        tot_solves = self.total_solves()
 
         fwd_solves = rev_solves = 0
-        if tot_colors == 0:  # no coloring found
-            tot_colors = tot_size = min([rev_size, fwd_size])
+        if tot_solves == 0:  # no coloring found
+            tot_solves = tot_size = min([rev_size, fwd_size])
             pct = 0.
         else:
             fwd_lists = self._fwd[0] if self._fwd else []
@@ -288,12 +290,12 @@ class Coloring(object):
             if tot_size <= 0:
                 pct = 0.
             else:
-                pct = ((tot_size - tot_colors) / tot_size * 100)
+                pct = ((tot_size - tot_solves) / tot_size * 100)
 
         if tot_size < 0:
             tot_size = '?'
 
-        return tot_size, tot_colors, fwd_solves, rev_solves, pct
+        return tot_size, tot_solves, fwd_solves, rev_solves, pct
 
     def total_solves(self, do_fwd=True, do_rev=True):
         """
@@ -1566,17 +1568,25 @@ def _compute_coloring(J, mode):
         See Coloring class docstring.
     """
     start_time = time.time()
+    nrows, ncols = J.shape
+    best_nocolor = min(nrows, ncols)  # lowest number of solves possible if we don't use coloring
 
     if mode == 'auto':  # use bidirectional coloring
-        return MNCO_bidir(J)
+        coloring = MNCO_bidir(J)
+        if coloring.total_solves() < best_nocolor:
+            return coloring
+        elif ncols <= nrows:
+            mode = 'fwd'
+        else:
+            mode == 'rev'
 
     rev = mode == 'rev'
-    nrows, ncols = J.shape
 
     coloring = Coloring(sparsity=J)
 
     if rev:
         J = J.T
+
     col_groups = _split_groups(_get_full_disjoint_cols(J))
 
     full_slice = slice(None)
@@ -1585,10 +1595,10 @@ def _compute_coloring(J, mode):
         for col in lst:
             col2rows[col] = np.nonzero(J[:, col])[0]
 
-    if mode == 'fwd':
-        coloring._fwd = (col_groups, col2rows)
-    else:
+    if rev:
         coloring._rev = (col_groups, col2rows)
+    else:  # fwd
+        coloring._fwd = (col_groups, col2rows)
 
     coloring._meta['coloring_time'] = time.time() - start_time
 
@@ -1656,7 +1666,10 @@ def compute_total_coloring(problem, mode=None,
                                           "from nonlinear ones.")
             _initialize_model_approx(model, driver, ofs, wrts)
             if model._coloring_info['coloring'] is None:
-                model.declare_coloring(method=list(model._approx_schemes)[0])
+                kwargs = {n: v for n, v in model._coloring_info.items()
+                          if n in _DEF_COMP_SPARSITY_ARGS and v is not None}
+                kwargs['method'] = list(model._approx_schemes)[0]
+                model.declare_coloring(**kwargs)
             if run_model:
                 problem.run_model()
             coloring = model._compute_approx_coloring(wrt_patterns='*',
@@ -1668,21 +1681,22 @@ def compute_total_coloring(problem, mode=None,
                                                    orders=orders, setup=setup,
                                                    run_model=run_model)
             coloring = _compute_coloring(J, mode)
-            coloring._row_vars = ofs
-            coloring._row_var_sizes = of_sizes
-            coloring._col_vars = wrts
-            coloring._col_var_sizes = wrt_sizes
+            if coloring is not None:
+                coloring._row_vars = ofs
+                coloring._row_var_sizes = of_sizes
+                coloring._col_vars = wrts
+                coloring._col_var_sizes = wrt_sizes
 
-            # save metadata we used to create the coloring
-            coloring._meta.update(sparsity_info)
+                # save metadata we used to create the coloring
+                coloring._meta.update(sparsity_info)
 
-            driver._total_jac = None
+                driver._total_jac = None
 
-            system = problem.model
-            if fname is not None:
-                if ((system._full_comm is not None and system._full_comm.rank == 0) or
-                        (system._full_comm is None and system.comm.rank == 0)):
-                    coloring.save(fname)
+                system = problem.model
+                if fname is not None:
+                    if ((system._full_comm is not None and system._full_comm.rank == 0) or
+                            (system._full_comm is None and system.comm.rank == 0)):
+                        coloring.save(fname)
 
     elif bool_jac is not None:
         J = bool_jac
@@ -1690,7 +1704,7 @@ def compute_total_coloring(problem, mode=None,
             mode = 'auto'
         driver = None
         coloring = _compute_coloring(J, mode)
-        if fname is not None:
+        if coloring is not None and fname is not None:
             coloring.save(fname)
     else:
         raise RuntimeError("You must supply either problem or bool_jac to "
@@ -1762,14 +1776,15 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     coloring = compute_total_coloring(problem, num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                                       setup=False, run_model=run_model, fname=fname)
 
-    if driver._coloring_info['show_sparsity']:
-        coloring.display_txt()
-    if driver._coloring_info['show_summary']:
-        coloring.summary()
+    if coloring is not None:
+        if driver._coloring_info['show_sparsity']:
+            coloring.display_txt()
+        if driver._coloring_info['show_summary']:
+            coloring.summary()
 
-    driver._coloring_info['coloring'] = coloring
-    driver._setup_simul_coloring()
-    driver._setup_tot_jac_sparsity()
+        driver._coloring_info['coloring'] = coloring
+        driver._setup_simul_coloring()
+        driver._setup_tot_jac_sparsity()
 
     return coloring
 
@@ -1848,11 +1863,12 @@ def _total_coloring_cmd(options):
                                                   orders=options.orders,
                                                   setup=False, run_model=True, fname=outfile)
 
-            if options.show_sparsity_text:
-                coloring.display_txt()
-            if options.show_sparsity:
-                coloring.display()
-            coloring.summary()
+            if coloring is not None:
+                if options.show_sparsity_text:
+                    coloring.display_txt()
+                if options.show_sparsity:
+                    coloring.display()
+                coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
@@ -1997,7 +2013,8 @@ def _partial_coloring_cmd(options):
                                     print("The following error occurred while attempting to "
                                           "compute coloring for %s:\n %s" % (s.pathname, tb))
                                 else:
-                                    _show(s, options, coloring)
+                                    if coloring is not None:
+                                        _show(s, options, coloring)
                                 if options.norecurse:
                                     break
                     else:
@@ -2011,9 +2028,10 @@ def _partial_coloring_cmd(options):
                         print("No coloring found.")
                     else:
                         for c in colorings:
-                            path = c._meta['pathname']
-                            s = prob.model._get_subsystem(path) if path else prob.model
-                            _show(s, options, c)
+                            if c is not None:
+                                path = c._meta['pathname']
+                                s = prob.model._get_subsystem(path) if path else prob.model
+                                _show(s, options, c)
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()

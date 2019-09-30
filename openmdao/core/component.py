@@ -996,6 +996,7 @@ class Component(System):
                          tol=_DEFAULT_COLORING_META['tol'],
                          orders=_DEFAULT_COLORING_META['orders'],
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
+                         min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
                          show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
         """
@@ -1026,6 +1027,9 @@ class Component(System):
             Number of orders above and below the tolerance to check during the tolerance sweep.
         perturb_size : float
             Size of input/output perturbation during generation of sparsity.
+        min_improve_pct : float
+            If coloring does not improve (decrease) the number of solves more than the given
+            percentage, coloring will not be used.
         show_summary : bool
             If True, display summary information after generating coloring.
         show_sparsity : bool
@@ -1033,7 +1037,7 @@ class Component(System):
         """
         super(Component, self).declare_coloring(wrt, method, form, step, per_instance,
                                                 num_full_jacs,
-                                                tol, orders, perturb_size,
+                                                tol, orders, perturb_size, min_improve_pct,
                                                 show_summary, show_sparsity)
         # create approx partials for all matches
         meta = self.declare_partials('*', wrt, method=method, step=step, form=form)

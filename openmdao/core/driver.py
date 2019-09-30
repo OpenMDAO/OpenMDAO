@@ -1009,6 +1009,7 @@ class Driver(object):
                          tol=coloring_mod._DEF_COMP_SPARSITY_ARGS['tol'],
                          orders=coloring_mod._DEF_COMP_SPARSITY_ARGS['orders'],
                          perturb_size=coloring_mod._DEF_COMP_SPARSITY_ARGS['perturb_size'],
+                         min_improve_pct=coloring_mod._DEF_COMP_SPARSITY_ARGS['min_improve_pct'],
                          show_summary=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_summary'],
                          show_sparsity=coloring_mod._DEF_COMP_SPARSITY_ARGS['show_sparsity']):
         """
@@ -1024,6 +1025,9 @@ class Driver(object):
             Number of orders above and below the tolerance to check during the tolerance sweep.
         perturb_size : float
             Size of input/output perturbation during generation of sparsity.
+        min_improve_pct : float
+            If coloring does not improve (decrease) the number of solves more than the given
+            percentage, coloring will not be used.
         show_summary : bool
             If True, display summary information after generating coloring.
         show_sparsity : bool
@@ -1033,6 +1037,7 @@ class Driver(object):
         self._coloring_info['tol'] = tol
         self._coloring_info['orders'] = orders
         self._coloring_info['perturb_size'] = perturb_size
+        self._coloring_info['min_improve_pct'] = min_improve_pct
         if self._coloring_info['static'] is None:
             self._coloring_info['dynamic'] = True
         else:

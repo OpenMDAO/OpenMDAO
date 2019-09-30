@@ -673,7 +673,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
             sys.stdout = save_out
 
         self.assertTrue('Jacobian shape: (50, 50)  (100.00% nonzero)' in summary)
-        self.assertTrue('FWD solves: 0   REV solves: 50' in summary)
+        self.assertTrue('FWD solves: 50   REV solves: 0' in summary)
         self.assertTrue('Total colors vs. total size: 50 vs 50  (0.0% improvement)' in summary)
         self.assertFalse('Time to compute sparsity:' in summary)
         self.assertTrue('Time to compute coloring:' in summary)
@@ -687,7 +687,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         dense_J = np.ones((50, 50), dtype=bool)
         coloring = _compute_coloring(dense_J, 'auto')
         rep = repr(coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: rev, ncolors: 50, shape: (50, 50)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 50, shape: (50, 50)')
 
     def test_bad_mode(self):
         p_color_rev = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
@@ -1049,6 +1049,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               sizes=[3, 4, 5], color='partial', fixed=False)
         p.run_driver()
 
+        print('++++++++++++')
         p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
                                 sizes=[3, 4, 5, 6], color='partial', fixed=True)
 
@@ -1056,7 +1057,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             p.run_driver()
 
         self.assertEqual(str(ctx.exception), "DumbComp (comp): Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['z'].\n   The following column vars were added: ['z_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
-                         
+
     def test_removed_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
                               sizes=[3, 4, 5], color='total', fixed=False)
