@@ -1273,9 +1273,7 @@ class System(object):
             # total coloring
             return os.path.join(directory, 'total_coloring.pkl')
 
-        per_instance = self._coloring_info.get('per_instance')
-
-        if per_instance:
+        if self._coloring_info.get('per_instance'):
             # base the name on the instance pathname
             fname = 'coloring_' + self.pathname.replace('.', '_') + '.pkl'
         else:
