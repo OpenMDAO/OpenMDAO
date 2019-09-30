@@ -1,23 +1,29 @@
 function PtN2Diagram(parentDiv, modelJSON) {
     var model = new ModelData(modelJSON);
 
-    // TODO: Get rid of all these after refactoring
+    setD3ContentDiv();
+    var layout = new N2SVGLayout(model, model.root);
+    var svg = layout.svg;
+
+    // TODO: Get rid of all these after refactoring ///////////////
     var root = model.root;
     var conns = model.conns;
     var abs2prom = model.abs2prom;
     var maxDepth = model.maxDepth;
+    d3NodesArray = layout.zoomedNodes;
+    d3RightTextNodesArrayZoomed = layout.visibleNodes;
+
+    d3SolverNodesArray = layout.zoomedSolverNodes;
+    d3SolverRightTextNodesArrayZoomed = layout.visibleSolverNodes;
+    var RIGHT_TEXT_MARGIN_PX = N2SVGLayout.rightTextMarginPx;
+    ///////////////////////////////////////////////////////////////
 
     var FONT_SIZE_PX = 11;
     var svgStyleElement = document.createElement("style");
-    // var outputNamingType = "Absolute";
     var showPath = false; //default off
 
     var DEFAULT_TRANSITION_START_DELAY = 100;
     var transitionStartDelay = DEFAULT_TRANSITION_START_DELAY;
-
-    // var RIGHT_TEXT_MARGIN_PX = 8; // How much space in px (left and) right of text in partition tree
-
-    // var text_width_cache = {}; // used to speed up GetTextWidth using memoization
 
     //N^2 vars
     var backButtonHistory = [], forwardButtonHistory = [];
@@ -39,7 +45,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
     CreateDomLayout();
     CreateToolbar();
 
-    setD3ContentDiv();
+    
 
     parentDiv.querySelector("#svgId").appendChild(svgStyleElement);
     UpdateSvgCss(svgStyleElement, FONT_SIZE_PX);
@@ -235,7 +241,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
                 if (d.depth < zoomedElement.depth) return 0;
                 return d.textOpacity0;
             })
-            .text(GetText);
+            .text(layout.GetText);
 
         var nodeUpdate = nodeEnter.merge(sel).transition(sharedTransition)
             .attr("class", function (d) {
@@ -262,7 +268,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
                 if (d.depth < zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
-            .text(GetText);
+            .text(layout.GetText);
 
 
         // Transition exiting nodes to the parent's new position.
@@ -365,7 +371,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
                 if (d.depth < zoomedElement.depth) return 0;
                 return d.textOpacity0;
             })
-            .text(GetSolverText);
+            .text(layout.getSolverText);
 
         var nodeSolverUpdate = nodeSolverEnter.merge(selSolver).transition(sharedTransition)
             .attr("class", function (d) {
@@ -394,7 +400,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
                 if (d.depth < zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
-            .text(GetSolverText);
+            .text(layout.getSolverText);
 
 
         // Transition exiting nodes to the parent's new position.
@@ -437,11 +443,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
         // PrintConnects();
     }
 
-    function GetSolverText(d) {
-        var retVal = showLinearSolverNames ? d.linear_solver : d.nonlinear_solver;
-        return retVal;
-    }
-
     function ComputeLayout() {
         var autoCompleteSetNames = {}, autoCompleteSetPathNames = {};
 
@@ -474,90 +475,14 @@ function PtN2Diagram(parentDiv, modelJSON) {
             }
         }
 
-        function ComputeNormalizedPositions(d, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
-            isChildOfZoomed = (isChildOfZoomed) ? true : (d === zoomedElement);
-
-            if (earliestMinimizedParent == null && isChildOfZoomed) {
-                if (!d.varIsHidden) d3NodesArray.push(d);
-                if (!d.propExists('children') || d.isMinimized) { //at a "leaf" node
-                    if (!d.varIsHidden) d3RightTextNodesArrayZoomed.push(d);
-                    earliestMinimizedParent = d;
-                }
-            }
-            var node = (earliestMinimizedParent) ? earliestMinimizedParent : d;
-            d.rootIndex0 = d.hasOwnProperty('rootIndex') ? d.rootIndex : leafCounter;
-            d.rootIndex = leafCounter;
-            d.x0 = d.hasOwnProperty('x') ? d.x : 1e-6;
-            d.y0 = d.hasOwnProperty('y') ? d.y : 1e-6;
-            d.width0 = d.hasOwnProperty('width') ? d.width : 1e-6;
-            d.height0 = d.hasOwnProperty('height') ? d.height : 1e-6;
-            d.x = columnLocationsPx[node.depth] / widthPTreePx;
-            d.y = leafCounter / root.numLeaves;
-            d.width = (d.children && !d.isMinimized) ? (columnWidthsPx[node.depth] / widthPTreePx) : 1 - node.x;//1-d.x;
-            d.height = node.numLeaves / root.numLeaves;
-            if (d.varIsHidden) { //param or hidden leaf leaving
-                d.x = columnLocationsPx[d.parentComponent.depth + 1] / widthPTreePx;
-                d.y = d.parentComponent.y;
-                d.width = 1e-6;
-                d.height = 1e-6;
-            }
-
-            if (d.propExists('children')) {
-                for (var i = 0; i < d.children.length; ++i) {
-                    ComputeNormalizedPositions(d.children[i], leafCounter, isChildOfZoomed, earliestMinimizedParent);
-                    if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
-                        leafCounter += d.children[i].numLeaves;
-                    }
-                }
-            }
-        }
-
-
-        function ComputeSolverNormalizedPositions(d, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
-            isChildOfZoomed = (isChildOfZoomed) ? true : (d === zoomedElement);
-            if (earliestMinimizedParent == null && isChildOfZoomed) {
-                if (d.type === "subsystem" || d.type === "root") d3SolverNodesArray.push(d);
-                if (!d.hasOwnProperty('children') || d.isMinimized) { //at a "leaf" node
-                    if ((d.type !== "param" && d.type !== "unconnected_param") && !d.varIsHidden) d3SolverRightTextNodesArrayZoomed.push(d);
-                    earliestMinimizedParent = d;
-                }
-            }
-            var node = (earliestMinimizedParent) ? earliestMinimizedParent : d;
-            d.rootIndex0 = d.hasOwnProperty('rootIndex') ? d.rootIndex : leafCounter;
-            d.xSolver0 = d.hasOwnProperty('xSolver') ? d.xSolver : 1e-6;
-            d.ySolver0 = d.hasOwnProperty('ySolver') ? d.ySolver : 1e-6;
-            d.widthSolver0 = d.hasOwnProperty('widthSolver') ? d.widthSolver : 1e-6;
-            d.heightSolver0 = d.hasOwnProperty('heightSolver') ? d.heightSolver : 1e-6;
-            d.xSolver = columnSolverLocationsPx[node.depth] / widthPSolverTreePx;
-            d.ySolver = leafCounter / root.numSolverLeaves;
-            d.widthSolver = (d.subsystem_children && !d.isMinimized) ? (columnSolverWidthsPx[node.depth] / widthPSolverTreePx) : 1 - node.xSolver;//1-d.x;
-
-            d.heightSolver = node.numSolverLeaves / root.numSolverLeaves; // 111
-
-            if (d.varIsHidden) { //param or hidden leaf leaving
-                d.xSolver = columnLocationsPx[d.parentComponent.depth + 1] / widthPTreePx;
-                d.ySolver = d.parentComponent.y;
-                d.widthSolver = 1e-6;
-                d.heightSolver = 1e-6;
-            }
-
-            if (d.children) {
-                for (var i = 0; i < d.children.length; ++i) {
-                    ComputeSolverNormalizedPositions(d.children[i], leafCounter, isChildOfZoomed, earliestMinimizedParent);
-                    if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
-                        leafCounter += d.children[i].numSolverLeaves;
-                    }
-                }
-            }
-        }
-
+        /*
         d3NodesArray = [];
         d3RightTextNodesArrayZoomed = [];
 
         d3SolverNodesArray = [];
         d3SolverRightTextNodesArrayZoomed = [];
 
-         ComputeNormalizedPositions(root, 0, false, null);
+        ComputeNormalizedPositions(root, 0, false, null);
         if (zoomedElement.parent) {
             d3NodesArray.push(zoomedElement.parent);
         }
@@ -566,7 +491,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         if (zoomedElement.parent) {
             d3SolverNodesArray.push(zoomedElement.parent);
         }
-
+*/
         if (updateRecomputesAutoComplete) {
             autoCompleteListNames = [];
             autoCompleteListPathNames = [];
@@ -584,7 +509,8 @@ function PtN2Diagram(parentDiv, modelJSON) {
             }
         }
 
-        textWidthGroup.remove();
+        // Not sure if necessary...
+        // textWidthGroup.remove();
     }
 
     var lastLeftClickedEle;

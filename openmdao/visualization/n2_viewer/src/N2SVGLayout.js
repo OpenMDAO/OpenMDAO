@@ -7,12 +7,24 @@ let N2SVGLayout_statics = {
     'parentNodeWidthPx': 40
 };
 
+/** Calculates and stores the size and positions of visible elements. */
 class N2SVGLayout {
+
+    /** Compute the new layout based on the model data and the zoomed element.
+     * @param {ModelData} model The pre-processed model object.
+     * @param {Object} zoomedElement The element the new layout is based around.
+     */
     constructor(model, zoomedElement) {
         this.model = model;
         this.zoomedElement = zoomedElement;
 
         this.outputNamingType = "Absolute";
+        this.zoomedNodes = []; // Child nodes of the current zoomed element
+        this.visibleNodes = []; // Zoomed nodes that are actually drawn
+
+        this.zoomedSolverNodes = []; // Child solver nodes of the current zoomed element
+        this.visibleSolverNodes = []; // Zoomed solver nodes that are actually drawn
+
         this.svg = d3.select("#svgId");
 
         this.setupTextRenderer();
@@ -22,6 +34,12 @@ class N2SVGLayout {
         this.computeColumnWidths();
         this.computeSolverColumnWidths();
         this.setColumnLocations();
+
+        this.computeNormalizedPositions(this.model.root, 0, false, null);
+        if (this.zoomedElement.parent) this.zoomedNodes.push(this.zoomedElement.parent);
+
+        this.computeSolverNormalizedPositions(this.model.root, 0, false, null);
+        if (this.zoomedElement.parent) this.zoomedSolverNodes.push(this.zoomedElement.parent);
     }
 
     /** Switch back and forth between showing the linear or non-linear solver names. 
@@ -103,7 +121,7 @@ class N2SVGLayout {
     updateTextWidths(element = this.zoomedElement) {
         if (element.varIsHidden) return;
 
-        element.nameWidthPx = this.getTextWidth(this.GetText(element)) + 2 *
+        element.nameWidthPx = this.getTextWidth(this.getText(element)) + 2 *
             N2SVGLayout.rightTextMarginPx;
 
         if (Array.isArray(element.children)) {
@@ -248,6 +266,97 @@ class N2SVGLayout {
 
             this.solverCols[depth].location = this.widthPSolverTreePx;
             this.widthPSolverTreePx += this.solverCols[depth].width;
+        }
+    }
+
+    computeNormalizedPositions(element, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
+        if (!isChildOfZoomed) {
+            isChildOfZoomed = (element === this.zoomedElement);
+        }
+
+        if (earliestMinimizedParent == null && isChildOfZoomed) {
+            if (!element.varIsHidden) this.zoomedNodes.push(element);
+            if (!Array.isArray(element.children) || element.isMinimized) { //at a "leaf" node
+                if (!element.varIsHidden) this.visibleNodes.push(element);
+                earliestMinimizedParent = element;
+            }
+        }
+
+        let node = (earliestMinimizedParent) ? earliestMinimizedParent : element;
+        element.rootIndex0 = element.hasOwnProperty('rootIndex') ? element.rootIndex : leafCounter;
+        element.rootIndex = leafCounter;
+        element.x0 = element.hasOwnProperty('x') ? element.x : 1e-6;
+        element.y0 = element.hasOwnProperty('y') ? element.y : 1e-6;
+        element.width0 = element.hasOwnProperty('width') ? element.width : 1e-6;
+        element.height0 = element.hasOwnProperty('height') ? element.height : 1e-6;
+        element.x = this.cols[node.depth].location / this.widthPTreePx;
+        element.y = leafCounter / this.model.root.numLeaves;
+        element.width = (Array.isArray(element.children) && !element.isMinimized) ?
+            (this.cols[node.depth].width / this.widthPTreePx) : 1 - node.x;
+        element.height = node.numLeaves / this.model.root.numLeaves;
+        if (element.varIsHidden) { //param or hidden leaf leaving
+            element.x = this.cols[element.parentComponent.depth + 1].location / this.widthPTreePx;
+            element.y = element.parentComponent.y;
+            element.width = 1e-6;
+            element.height = 1e-6;
+        }
+
+        if (Array.isArray(element.children)) {
+            for (let i = 0; i < element.children.length; ++i) {
+                this.computeNormalizedPositions(element.children[i], leafCounter,
+                    isChildOfZoomed, earliestMinimizedParent);
+                if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
+                    leafCounter += element.children[i].numLeaves;
+                }
+            }
+        }
+    }
+
+    computeSolverNormalizedPositions(element, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
+        if (!isChildOfZoomed) {
+            isChildOfZoomed = (element === this.zoomedElement);
+        }
+
+        if (earliestMinimizedParent == null && isChildOfZoomed) {
+            if (element.type.match(/^(subsystem|root)$/)) {
+                this.zoomedSolverNodes.push(element);
+            } 
+            if (!Array.isArray(element.children) || element.isMinimized) { //at a "leaf" node
+                if (! element.type.match(/^(param|unconnected_param)$/) && !element.varIsHidden) {
+                    this.visibleSolverNodes.push(element);
+                }
+                earliestMinimizedParent = element;
+            }
+        }
+        let node = (earliestMinimizedParent) ? earliestMinimizedParent : element;
+        element.rootIndex0 = element.hasOwnProperty('rootIndex') ? element.rootIndex : leafCounter;
+        element.xSolver0 = element.hasOwnProperty('xSolver') ? element.xSolver : 1e-6;
+        element.ySolver0 = element.hasOwnProperty('ySolver') ? element.ySolver : 1e-6;
+        element.widthSolver0 = element.hasOwnProperty('widthSolver') ? element.widthSolver : 1e-6;
+        element.heightSolver0 = element.hasOwnProperty('heightSolver') ? element.heightSolver : 1e-6;
+        element.xSolver = this.solverCols[node.depth].location / this.widthPSolverTreePx;
+        element.ySolver = leafCounter / this.model.root.numSolverLeaves;
+        element.widthSolver = (element.subsystem_children && !element.isMinimized) ?
+            (this.solverCols[node.depth].width / this.widthPSolverTreePx) :
+            1 - node.xSolver; //1-d.x;
+
+        element.heightSolver = node.numSolverLeaves / this.model.root.numSolverLeaves; // 111
+
+        if (element.varIsHidden) { //param or hidden leaf leaving
+            element.xSolver = this.cols[d.parentComponent.depth + 1].location / this.widthPTreePx;
+            element.ySolver = element.parentComponent.y;
+            element.widthSolver = 1e-6;
+            element.heightSolver = 1e-6;
+        }
+
+        if (Array.isArray(element.children)) {
+            for (let i = 0; i < element.children.length; ++i) {
+                this.computeSolverNormalizedPositions(element.children[i], 
+                    leafCounter, isChildOfZoomed, earliestMinimizedParent);
+                if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
+                    leafCounter += element.children[i].numSolverLeaves;
+                }
+            }
         }
     }
 }
