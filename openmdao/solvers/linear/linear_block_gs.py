@@ -45,7 +45,6 @@ class LinearBlockGS(BlockLinearSolver):
 
         else:  # rev
             subsystems = system._subsystems_allprocs
-            subinds = system._subsystems_myproc_inds
             for isub in range(len(system._subsystems_allprocs) - 1, -1, -1):
                 subsys = subsystems[isub]
                 local = subsys.name in system._loc_subsys_map

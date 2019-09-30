@@ -2,8 +2,9 @@
 
 import sys
 import unittest
+import itertools
 
-from six import assertRaisesRegex, StringIO, assertRegex, iteritems
+from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
 
@@ -13,6 +14,11 @@ from openmdao.core.driver import Driver
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 
 class SellarOneComp(om.ImplicitComponent):
@@ -469,6 +475,53 @@ class TestProblem(unittest.TestCase):
         derivs = p.compute_totals()
 
         assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+
+    @parameterized.expand(itertools.product(['fwd', 'rev']))
+    def test_compute_jacvec_product(self, mode):
+
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.setup(mode=mode)
+        prob.run_model()
+
+        of = ['obj', 'con1']
+        wrt = ['x', 'z']
+        
+        if mode == 'fwd':
+            seed_names = wrt
+            result_names = of
+            rvec = prob.model._vectors['output']['linear']
+            lvec = prob.model._vectors['residual']['linear']
+        else:
+            seed_names = of
+            result_names = wrt
+            rvec = prob.model._vectors['residual']['linear']
+            lvec = prob.model._vectors['output']['linear']
+        
+        J = prob.compute_totals(of, wrt, return_format='array')
+
+        seed = []
+        rvec._data[:] = 0.
+        lvec._data[:] = 0.
+        for name in seed_names:
+            seed.append(np.random.random(rvec[name].size))
+
+        resdict = prob.compute_jacvec_product(of, wrt, mode, seed)
+        result = []
+        for name in result_names:
+            result.append(resdict[name].flat)
+        result = np.hstack(result)
+
+        testvec = np.hstack(seed)
+
+        if mode == 'fwd':
+            checkvec = J.dot(testvec)
+        else:
+            checkvec = J.T.dot(testvec)
+
+        np.testing.assert_allclose(checkvec, result)
 
     def test_feature_set_indeps(self):
         import openmdao.api as om
