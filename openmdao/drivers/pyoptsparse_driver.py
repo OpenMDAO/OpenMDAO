@@ -22,7 +22,7 @@ from pyoptsparse import Optimization
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.mpi import FakeComm
 
 
@@ -223,18 +223,32 @@ class pyOptSparseDriver(Driver):
 
         # compute dynamic simul deriv coloring or just sparsity if option is set
         if coloring_mod._use_total_sparsity:
+            coloring = None
             if self._coloring_info['coloring'] is None and self._coloring_info['dynamic']:
                 coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
                                                     fname=self._get_total_coloring_fname())
+                coloring = self._coloring_info['coloring']
                 self._setup_tot_jac_sparsity()
             elif self.options['dynamic_simul_derivs']:
                 warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
                                  "the 'declare_coloring' function instead.")
                 coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
                                                     fname=self._get_total_coloring_fname())
+                coloring = self._coloring_info['coloring']
+
                 self._setup_tot_jac_sparsity()
             elif self.options['dynamic_derivs_sparsity']:
                 coloring_mod.dynamic_derivs_sparsity(self)
+
+            if coloring is not None:
+                # if the improvement wasn't large enough, don't use coloring
+                pct = coloring._solves_info()[-1]
+                info = self._coloring_info
+                if info['min_improve_pct'] > pct:
+                    info['coloring'] = info['static'] = info['dynamic'] = None
+                    simple_warning("%s: Coloring was deactivated.  Improvement of %.3f%% was less "
+                                   "than min allowed (%.3f%%)" % (self.msginfo, pct,
+                                                                  info['min_improve_pct']))
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
         opt_prob = Optimization(self.options['title'], self._objfunc, comm=comm)

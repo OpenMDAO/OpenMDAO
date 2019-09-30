@@ -16,7 +16,7 @@ from scipy.sparse import coo_matrix
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExecComp, \
     ExplicitComponent, NonlinearBlockGS
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import compute_total_coloring
@@ -592,6 +592,39 @@ class TestColoring(unittest.TestCase):
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, method)
 
+    def test_partials_no_improvement(self):
+        prob = Problem(coloring_dir=self.tempdir)
+        model = prob.model
+
+        mask = np.array(
+                [[1, 0, 1, 0, 1, 1],
+                 [1, 1, 1, 0, 0, 1],
+                 [0, 1, 0, 1, 1, 0],
+                 [1, 0, 1, 0, 0, 1]]
+            )
+
+        isplit = 2
+        sparsity = setup_sparsity(mask)
+        indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs',
+                                                              isplit=isplit, osplit=2))
+        comp.declare_coloring('x*', method='cs', min_improve_pct=20)
+
+        for conn in conns:
+            model.connect(*conn)
+
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        with assert_warning(UserWarning, 'SparseCompExplicit (comp): Coloring was deactivated.  Improvement of 16.667% was less than min allowed (20.000%)'):
+            comp._linearize()
+
+        jac = comp._jacobian._subjacs_info
+        _check_partial_matrix(comp, jac, sparsity, 'cs')
+
     @parameterized.expand(itertools.product(
         ['fd', 'cs'],
         ), name_func=_test_func_name
@@ -635,6 +668,50 @@ class TestColoring(unittest.TestCase):
         start_nruns = model._nruns
         derivs = prob.compute_totals()
         _check_total_matrix(model, derivs, sparsity[[0,3,4],:], method)
+        nruns = model._nruns - start_nruns
+        self.assertEqual(nruns, 3)
+
+    @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
+    def test_simple_totals_min_improvement_pyoptsparse(self):
+        prob = Problem(coloring_dir=self.tempdir)
+        model = prob.model = CounterGroup()
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        prob.driver.declare_coloring(min_improve_pct=25.)
+
+        mask = np.array(
+            [[1, 0, 1, 1, 1],
+             [1, 1, 0, 1, 1],
+             [0, 1, 1, 1, 1],
+             [1, 0, 1, 0, 0],
+             [0, 1, 1, 0, 1]]
+        )
+
+        isplit = 2
+        sparsity = setup_sparsity(mask)
+        indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
+
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp', SparseCompExplicit(sparsity, 'cs', isplit=isplit, osplit=2))
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
+        model.declare_coloring('*', method='cs')
+
+        model.comp.add_objective('y0', index=0)  # pyoptsparse SLSQP requires a scalar objective, so pick index 0
+        model.comp.add_constraint('y1', lower=[1., 2.])
+        model.add_design_var('indeps.x0', lower=np.ones(3), upper=np.ones(3)+.1)
+        model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
+        model.approx_totals(method='cs')
+        prob.setup(check=False, mode='fwd')
+        prob.set_solver_print(level=0)
+        
+        with assert_warning(UserWarning, ""):
+            prob.run_driver()  # need this to trigger the dynamic coloring
+
+        prob.driver._total_jac = None
+
+        start_nruns = model._nruns
+        derivs = prob.compute_totals()
+        _check_total_matrix(model, derivs, sparsity[[0,3,4],:], 'cs')
         nruns = model._nruns - start_nruns
         self.assertEqual(nruns, 3)
 

@@ -31,7 +31,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
-from openmdao.utils.general_utils import make_set, var_name_match_includes_excludes
+from openmdao.utils.general_utils import make_set, var_name_match_includes_excludes, simple_warning
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -962,6 +962,7 @@ class System(object):
                          tol=_DEFAULT_COLORING_META['tol'],
                          orders=_DEFAULT_COLORING_META['orders'],
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
+                         min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
                          show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
         """
@@ -992,6 +993,9 @@ class System(object):
             Number of orders above and below the tolerance to check during the tolerance sweep.
         perturb_size : float
             Size of input/output perturbation during generation of sparsity.
+        min_improve_pct : float
+            If coloring does not improve (decrease) the number of solves more than the given
+            percentage, coloring will not be used.
         show_summary : bool
             If True, display summary information after generating coloring.
         show_sparsity : bool
@@ -1020,6 +1024,7 @@ class System(object):
         options['tol'] = tol
         options['orders'] = orders
         options['perturb_size'] = perturb_size
+        options['min_improve_pct'] = min_improve_pct
         options['show_summary'] = show_summary
         options['show_sparsity'] = show_sparsity
         options['coloring'] = self._coloring_info['coloring']
@@ -1062,9 +1067,10 @@ class System(object):
                     if s._coloring_info['coloring'] is not None:
                         coloring = s._compute_approx_coloring(recurse=False, **overrides)[0]
                         colorings.append(coloring)
-                        coloring._meta['pathname'] = s.pathname
-                        coloring._meta['class'] = type(s).__name__
-            return colorings
+                        if coloring is not None:
+                            coloring._meta['pathname'] = s.pathname
+                            coloring._meta['class'] = type(s).__name__
+            return [c for c in colorings if c is not None] or [None]
 
         # don't override metadata if it's already declared
         info = self._coloring_info
@@ -1163,6 +1169,15 @@ class System(object):
             ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
 
         coloring = _compute_coloring(sparsity, 'fwd')
+
+        # if the improvement wasn't large enough, don't use coloring
+        pct = coloring._solves_info()[-1]
+        if info['min_improve_pct'] > pct:
+            info['coloring'] = info['static'] = info['dynamic'] = None
+            simple_warning("%s: Coloring was deactivated.  Improvement of %.3f%% was less than min "
+                           "allowed (%.3f%%)" % (self.msginfo, pct, info['min_improve_pct']))
+            return [None]
+
         coloring._row_vars = [t[0] for t in ordered_of_info]
         coloring._col_vars = [t[0] for t in ordered_wrt_info]
         coloring._row_var_sizes = [t[2] - t[1] for t in ordered_of_info]
@@ -1342,7 +1357,8 @@ class System(object):
         coloring = self._get_static_coloring()
         if coloring is None and self._coloring_info['dynamic']:
             self._coloring_info['coloring'] = coloring = self._compute_approx_coloring()[0]
-            self._coloring_info.update(coloring._meta)
+            if coloring is not None:
+                self._coloring_info.update(coloring._meta)
 
         return coloring
 

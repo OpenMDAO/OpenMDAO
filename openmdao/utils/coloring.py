@@ -264,11 +264,11 @@ class Coloring(object):
         rev_size = self._shape[0] if self._shape else -1  # nrows
         fwd_size = self._shape[1] if self._shape else -1  # ncols
 
-        tot_colors = self.total_solves()
+        tot_solves = self.total_solves()
 
         fwd_solves = rev_solves = 0
-        if tot_colors == 0:  # no coloring found
-            tot_colors = tot_size = min([rev_size, fwd_size])
+        if tot_solves == 0:  # no coloring found
+            tot_solves = tot_size = min([rev_size, fwd_size])
             pct = 0.
         else:
             fwd_lists = self._fwd[0] if self._fwd else []
@@ -290,12 +290,12 @@ class Coloring(object):
             if tot_size <= 0:
                 pct = 0.
             else:
-                pct = ((tot_size - tot_colors) / tot_size * 100)
+                pct = ((tot_size - tot_solves) / tot_size * 100)
 
         if tot_size < 0:
             tot_size = '?'
 
-        return tot_size, tot_colors, fwd_solves, rev_solves, pct
+        return tot_size, tot_solves, fwd_solves, rev_solves, pct
 
     def total_solves(self, do_fwd=True, do_rev=True):
         """
@@ -1569,12 +1569,16 @@ def _compute_coloring(J, mode):
     """
     start_time = time.time()
     nrows, ncols = J.shape
-    best_nocolor = min(nrows, ncols)
+    best_nocolor = min(nrows, ncols)  # lowest number of solves possible if we don't use coloring
 
     if mode == 'auto':  # use bidirectional coloring
         coloring = MNCO_bidir(J)
         if coloring.total_solves() < best_nocolor:
             return coloring
+        elif ncols <= nrows:
+            mode = 'fwd'
+        else:
+            mode == 'rev'
 
     rev = mode == 'rev'
 
@@ -1582,6 +1586,7 @@ def _compute_coloring(J, mode):
 
     if rev:
         J = J.T
+
     col_groups = _split_groups(_get_full_disjoint_cols(J))
 
     full_slice = slice(None)
@@ -1673,21 +1678,22 @@ def compute_total_coloring(problem, mode=None,
                                                    orders=orders, setup=setup,
                                                    run_model=run_model)
             coloring = _compute_coloring(J, mode)
-            coloring._row_vars = ofs
-            coloring._row_var_sizes = of_sizes
-            coloring._col_vars = wrts
-            coloring._col_var_sizes = wrt_sizes
+            if coloring is not None:
+                coloring._row_vars = ofs
+                coloring._row_var_sizes = of_sizes
+                coloring._col_vars = wrts
+                coloring._col_var_sizes = wrt_sizes
 
-            # save metadata we used to create the coloring
-            coloring._meta.update(sparsity_info)
+                # save metadata we used to create the coloring
+                coloring._meta.update(sparsity_info)
 
-            driver._total_jac = None
+                driver._total_jac = None
 
-            system = problem.model
-            if fname is not None:
-                if ((system._full_comm is not None and system._full_comm.rank == 0) or
-                        (system._full_comm is None and system.comm.rank == 0)):
-                    coloring.save(fname)
+                system = problem.model
+                if fname is not None:
+                    if ((system._full_comm is not None and system._full_comm.rank == 0) or
+                            (system._full_comm is None and system.comm.rank == 0)):
+                        coloring.save(fname)
 
     elif bool_jac is not None:
         J = bool_jac
@@ -1695,7 +1701,7 @@ def compute_total_coloring(problem, mode=None,
             mode = 'auto'
         driver = None
         coloring = _compute_coloring(J, mode)
-        if fname is not None:
+        if coloring is not None and fname is not None:
             coloring.save(fname)
     else:
         raise RuntimeError("You must supply either problem or bool_jac to "
@@ -1767,14 +1773,15 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     coloring = compute_total_coloring(problem, num_full_jacs=num_full_jacs, tol=tol, orders=orders,
                                       setup=False, run_model=run_model, fname=fname)
 
-    if driver._coloring_info['show_sparsity']:
-        coloring.display_txt()
-    if driver._coloring_info['show_summary']:
-        coloring.summary()
+    if coloring is not None:
+        if driver._coloring_info['show_sparsity']:
+            coloring.display_txt()
+        if driver._coloring_info['show_summary']:
+            coloring.summary()
 
-    driver._coloring_info['coloring'] = coloring
-    driver._setup_simul_coloring()
-    driver._setup_tot_jac_sparsity()
+        driver._coloring_info['coloring'] = coloring
+        driver._setup_simul_coloring()
+        driver._setup_tot_jac_sparsity()
 
     return coloring
 
@@ -1853,11 +1860,12 @@ def _total_coloring_cmd(options):
                                                   orders=options.orders,
                                                   setup=False, run_model=True, fname=outfile)
 
-            if options.show_sparsity_text:
-                coloring.display_txt()
-            if options.show_sparsity:
-                coloring.display()
-            coloring.summary()
+            if coloring is not None:
+                if options.show_sparsity_text:
+                    coloring.display_txt()
+                if options.show_sparsity:
+                    coloring.display()
+                coloring.summary()
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
@@ -2002,7 +2010,8 @@ def _partial_coloring_cmd(options):
                                     print("The following error occurred while attempting to "
                                           "compute coloring for %s:\n %s" % (s.pathname, tb))
                                 else:
-                                    _show(s, options, coloring)
+                                    if coloring is not None:
+                                        _show(s, options, coloring)
                                 if options.norecurse:
                                     break
                     else:
@@ -2016,9 +2025,10 @@ def _partial_coloring_cmd(options):
                         print("No coloring found.")
                     else:
                         for c in colorings:
-                            path = c._meta['pathname']
-                            s = prob.model._get_subsystem(path) if path else prob.model
-                            _show(s, options, c)
+                            if c is not None:
+                                path = c._meta['pathname']
+                                s = prob.model._get_subsystem(path) if path else prob.model
+                                _show(s, options, c)
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
