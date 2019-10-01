@@ -93,6 +93,10 @@ class MetaModelVisualization(object):
     scatter_distance : TextInput
         Text input for user to enter custom value to calculate distance of training points around
         slice line
+    right_alphas : array
+        Array of points containing alpha values for right plot
+    bottom_alphas : array
+        Array of points containing alpha values for bottom plot
     dist_range : float
         Value taken from scatter_distance used for calculating distance of training points around
         slice line
