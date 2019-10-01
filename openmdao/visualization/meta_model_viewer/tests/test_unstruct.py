@@ -1,11 +1,16 @@
 import unittest
-import subprocess
-import os
 
 import numpy as np
-import openmdao.api as om
-from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 
+try:
+    import bokeh
+    from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
+except ImportError:
+    bokeh = None
+
+import openmdao.api as om
+
+@unittest.skipUnless(bokeh, "Bokeh is required")
 class UnstructuredMetaModelCompTests(unittest.TestCase):
 
     def test_missing_training_data_in_parameter(self):
