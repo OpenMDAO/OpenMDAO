@@ -79,8 +79,10 @@ _DEF_COMP_SPARSITY_ARGS = {
 
 # A dict containing colorings that have been generated during the current execution.
 # When a dynamic coloring is specified for a particular class and per_instance is False,
-#
+# this dict can be checked for an existing class version of the coloring that can be used
+# for that instance.
 _CLASS_COLORINGS = {}
+
 
 # numpy versions before 1.12 don't use the 'axis' arg passed to count_nonzero and always
 # return an int instead of an array of ints, so create our own function for those versions.

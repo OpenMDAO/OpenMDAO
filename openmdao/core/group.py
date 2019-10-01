@@ -2079,10 +2079,7 @@ class Group(System):
         approx = self._get_approx_scheme(method)
         # reset the approx if necessary
         approx._exec_dict = defaultdict(list)
-        approx._approx_groups = None
-        if wrt_matches:
-            # if coloring is active, force regen of coloring approxs
-            approx._colored_approx_groups = None
+        approx._reset()
 
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:

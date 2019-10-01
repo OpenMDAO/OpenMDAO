@@ -41,12 +41,19 @@ class ApproximationScheme(object):
         Initialize the ApproximationScheme.
         """
         self._approx_groups = None
-        self._colored_approx_groups = []
+        self._colored_approx_groups = None
         self._j_colored = None
         self._j_data_sizes = None
         self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._exec_dict = defaultdict(list)
+
+    def _reset(self):
+        """
+        Get rid of any existing approx groups.
+        """
+        self._colored_approx_groups = None
+        self._approx_groups = None
 
     def _get_approx_groups(self, system, under_cs=False):
         """
