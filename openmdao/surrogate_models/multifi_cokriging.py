@@ -13,6 +13,7 @@ from scikit-learn package here to avoid scikit-learn dependency.
 ISAE/DMSM - ONERA/DCPS
 """
 from six.moves import range
+from types import FunctionType
 
 import numpy as np
 from numpy import atleast_2d as array2d
@@ -498,8 +499,7 @@ class MultiFiCoKriging(object):
             # Determine Gaussian Process model parameters
             if self.theta[lvl] is None:
                 # Maximum Likelihood Estimation of the parameters
-                sol = self._max_rlf(
-                    lvl=lvl, initial_range=initial_range, tol=tol)
+                sol = self._max_rlf(lvl=lvl, initial_range=initial_range, tol=tol)
                 self.theta[lvl] = sol['theta']
                 self.rlf_value[lvl] = sol['rlf_value']
 
@@ -708,7 +708,6 @@ class MultiFiCoKriging(object):
         mu[:, 0] = (np.dot(f, beta) + np.dot(r_, gamma)).ravel()
 
         if eval_MSE:
-            self.sigma2_rho = nlevel * [None]
             MSE = np.zeros((n_eval, nlevel))
             r_t = solve_triangular(C, r_.T, lower=True)
             G = self.G[0]
@@ -899,82 +898,72 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
     Attributes
     ----------
-    initial_range : float
-        Initial range for the optimizer.
     model : MultiFiCoKriging
         Contains MultiFiCoKriging surrogate.
-    tolerance : float
-        Optimizer terminates when the tolerance tol is reached.
     """
 
-    def __init__(self, regr='constant', rho_regr='constant', normalize=True,
-                 theta=None, theta0=None, thetaL=None, thetaU=None,
-                 tolerance=TOLERANCE_DEFAULT, initial_range=INITIAL_RANGE_DEFAULT):
+    def __init__(self, **kwargs):
         """
         Initialize all attributes.
-
-        Parameters
-        ----------
-        normalize : bool, optional
-            When true, normalize X and Y so that the mean is at zero.
-        regr : string or callable, optional
-            A regression function returning an array of outputs of the linear
-            regression functional basis for Universal Kriging purpose.
-            regr is assumed to be the same for all levels of code.
-            Default assumes a simple constant regression trend.
-            Available built-in regression models are:
-            'constant', 'linear'
-        rho_regr : string or callable, optional
-            A regression function returning an array of outputs of the linear
-            regression functional basis. Defines the regression function for the
-            autoregressive parameter rho.
-            rho_regr is assumed to be the same for all levels of code.
-            Default assumes a simple constant regression trend.
-            Available built-in regression models are:
-            'constant', 'linear'
-        theta : double, array_like or list, optional
-            Value of correlation parameters if they are known; no optimization is run.
-            Default is None, so that optimization is run.
-            if double: value is replicated for all features and all levels.
-            if array_like: an array with shape (n_features, ) for
-            isotropic calculation. It is replicated for all levels.
-            if list: a list of nlevel arrays specifying value for each level
-        theta0 : double, array_like or list, optional
-            Starting point for the maximum likelihood estimation of the
-            best set of parameters.
-            Default is None and meaning use of the default 0.5*np.ones(n_features)
-            if double: value is replicated for all features and all levels.
-            if array_like: an array with shape (n_features, ) for
-            isotropic calculation. It is replicated for all levels.
-            if list: a list of nlevel arrays specifying value for each level
-        thetaL : double, array_like or list, optional
-            Lower bound on the autocorrelation parameters for maximum
-            likelihood estimation.
-            Default is None meaning use of the default 1e-5*np.ones(n_features).
-            if double: value is replicated for all features and all levels.
-            if array_like: An array with shape matching theta0's. It is replicated
-            for all levels of code.
-            if list: a list of nlevel arrays specifying value for each level
-        thetaU : double, array_like or list, optional
-            Upper bound on the autocorrelation parameters for maximum
-            likelihood estimation.
-            Default is None meaning use of default value 50*np.ones(n_features).
-            if double: value is replicated for all features and all levels.
-            if array_like: An array with shape matching theta0's. It is replicated
-            for all levels of code.
-            if list: a list of nlevel arrays specifying value for each level
-        tolerance : float
-            Optimizer terminates when the tolerance tol is reached.
-        initial_range : float
-            Initial range for the optimizer.
         """
-        super(MultiFiCoKrigingSurrogate, self).__init__()
+        super(MultiFiCoKrigingSurrogate, self).__init__(**kwargs)
+        self.model = None
 
-        self.tolerance = tolerance
-        self.initial_range = initial_range
-        self.model = MultiFiCoKriging(regr=regr, rho_regr=rho_regr, theta=theta,
-                                      theta0=theta0, thetaL=thetaL, thetaU=thetaU,
-                                      normalize=normalize)
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        opt = self.options
+        opt.declare('normalize', default=True, types=bool,
+                    desc="When true, normalize X and Y so that the mean is at zero.")
+        opt.declare('regr', default='constant', types=(object, ),
+                    desc="A regression function returning an array of outputs of the linear "
+                    "regression functional basis for Universal Kriging purpose. regr is assumed "
+                    "to be the same for all levels of code. Default assumes a simple constant "
+                    "regression trend. Available built-in regression models can be accessed by "
+                    "setting this option to the strings 'constant' or 'linear'")
+        opt.declare('rho_regr', default='constant', types=(object, ),
+                    desc="A regression function returning an array of outputs of the linear "
+                    "regression functional basis. Defines the regression function for the "
+                    "autoregressive parameter rho.. regr is assumed to be the same for all levels "
+                    "of code. Default assumes a simple constant regression trend. Available "
+                    "built-in regression models can be accessed by setting this option to the "
+                    "strings 'constant' or 'linear'")
+        opt.declare('theta', default=None, allow_none=True,
+                    desc="Value of correlation parameters. If they are known, then no "
+                    "optimization is run. Default is None, so that optimization is run. if double, "
+                    "then value is replicated for all features and all levels. if array_like, "
+                    "then an array with shape (n_features, ) for isotropic calculation. It is "
+                    "replicated for all levels. if list, then a list of nlevel arrays specifying "
+                    "value for each level")
+        opt.declare('theta0', default=None, allow_none=True,
+                    desc="Starting point for the maximum likelihood estimation of the best set "
+                    "of parameters. "
+                    "Default is None and meaning use of the default 0.5*np.ones(n_features) "
+                    "if double: value is replicated for all features and all levels. "
+                    "if array_like: an array with shape (n_features, ) for "
+                    "isotropic calculation. It is replicated for all levels. "
+                    "if list: a list of nlevel arrays specifying value for each level")
+        opt.declare('thetaL', default=None, allow_none=True,
+                    desc="Lower bound on the autocorrelation parameters for maximum "
+                    "likelihood estimation."
+                    "Default is None meaning use of the default 1e-5*np.ones(n_features). "
+                    "if double: value is replicated for all features and all levels. "
+                    "if array_like: An array with shape matching theta0s. It is replicate "
+                    "for all levels of code. "
+                    "if list: a list of nlevel arrays specifying value for each level")
+        opt.declare('thetaU', default=None, allow_none=True,
+                    desc="Upper bound on the autocorrelation parameters for maximum "
+                    "likelihood estimation. "
+                    "Default is None meaning use of default value 50*np.ones(n_features). "
+                    "if double: value is replicated for all features and all levels. "
+                    "if array_like: An array with shape matching theta0's. It is replicated "
+                    "for all levels of code. "
+                    "if list: a list of nlevel arrays specifying value for each level")
+        opt.declare('tolerance', default=TOLERANCE_DEFAULT,
+                    desc='Optimizer terminates when the tolerance tol is reached.')
+        opt.declare('initial_range', default=INITIAL_RANGE_DEFAULT,
+                    desc='Initial range for the optimizer.')
 
     def predict(self, new_x):
         """
@@ -1012,9 +1001,16 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
             An array with shape (n_samples_X, n_features) with the observations of the scalar
             output to be predicted.
         """
+        opt = self.options
+        if not self.model:
+            self.model = MultiFiCoKriging(regr=opt['regr'], rho_regr=opt['rho_regr'],
+                                          theta=opt['theta'], theta0=opt['theta0'],
+                                          thetaL=opt['thetaL'], thetaU=opt['thetaU'],
+                                          normalize=opt['normalize'])
+
         X, Y = self._fit_adapter(X, Y)
-        self.model.fit(X, Y, tol=self.tolerance,
-                       initial_range=self.initial_range)
+        self.model.fit(X, Y, tol=opt['tolerance'],
+                       initial_range=opt['initial_range'])
 
     def _fit_adapter(self, X, Y):
         """
