@@ -488,7 +488,7 @@ class TestProblem(unittest.TestCase):
 
         of = ['obj', 'con1']
         wrt = ['x', 'z']
-        
+
         if mode == 'fwd':
             seed_names = wrt
             result_names = of
@@ -499,12 +499,10 @@ class TestProblem(unittest.TestCase):
             result_names = wrt
             rvec = prob.model._vectors['residual']['linear']
             lvec = prob.model._vectors['output']['linear']
-        
+
         J = prob.compute_totals(of, wrt, return_format='array')
 
         seed = []
-        rvec._data[:] = 0.
-        lvec._data[:] = 0.
         for name in seed_names:
             seed.append(np.random.random(rvec[name].size))
 

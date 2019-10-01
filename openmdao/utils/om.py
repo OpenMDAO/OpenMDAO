@@ -14,7 +14,11 @@ from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
-from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
+try:
+    import bokeh
+    from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
+except ImportError:
+    bokeh = None
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
@@ -270,6 +274,11 @@ def _meta_model_cmd(options):
         The post-setup hook function.
     """
     def _view_metamodel(prob):
+        if bokeh is None:
+            print("bokeh must be installed to view a MetaModel.  Use the command:\n",
+                  "    pip install bokeh")
+            exit()
+
         Problem._post_setup_func = None
 
         mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp)

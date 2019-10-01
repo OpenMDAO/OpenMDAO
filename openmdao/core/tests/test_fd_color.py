@@ -778,7 +778,7 @@ class TestColoring(unittest.TestCase):
         prob = Problem(coloring_dir=self.tempdir)
         model = prob.model = CounterGroup()
         if optim is None:
-            raise unitest.SkipTest('requires pyoptsparse SLSQP.')
+            raise unittest.SkipTest('requires pyoptsparse SLSQP.')
         prob.driver = optim(optimizer='SLSQP')
 
         prob.driver.declare_coloring()
