@@ -1110,12 +1110,12 @@ class System(object):
         if not info['per_instance'] and coloring_fname in coloring_mod._CLASS_COLORINGS:
             info['coloring'] = coloring = coloring_mod._CLASS_COLORINGS[coloring_fname]
             if coloring is None:
-                print("Class coloring for class '{}' wasn't good enough, "
-                      "so skipping for '{}'".format(type(self).__name__), self.pathname)
+                print("\nClass coloring for class '{}' wasn't good enough, "
+                      "so skipping for '{}'".format(type(self).__name__, self.pathname))
                 info['static'] = info['dynamic'] = None
             else:
-                print("{} using class coloring for class '{}'".format(self.pathname,
-                                                                      type(self).__name__))
+                print("\n{} using class coloring for class '{}'".format(self.pathname,
+                                                                        type(self).__name__))
                 info.update(coloring._meta)
                 # force regen of approx groups during next compute_approximations
                 approx_scheme._reset()
@@ -1213,7 +1213,7 @@ class System(object):
         approx._reset()
 
         if info['show_sparsity'] or info['show_summary']:
-            print("\nApprox coloring for '%s' (class %s)\n" % (self.pathname, type(self).__name__))
+            print("\nApprox coloring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
         if info['show_sparsity']:
             coloring.display_txt()

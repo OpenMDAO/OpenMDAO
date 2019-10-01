@@ -505,20 +505,20 @@ class Coloring(object):
             tot_size = min(nrows, ncols)
             if tot_size < 0:
                 tot_size = '?'
-            print("\nSimultaneous derivatives can't improve on the total number of solves "
+            print("Simultaneous derivatives can't improve on the total number of solves "
                   "required (%s) for this configuration" % tot_size)
         else:
             tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
 
-            print("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
-            print("\nTotal colors vs. total size: %d vs %s  (%.1f%% improvement)" %
+            print("FWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
+            print("Total colors vs. total size: %d vs %s  (%.1f%% improvement)" %
                   (tot_colors, tot_size, pct))
 
         meta = self._meta
         print()
         good_tol = meta.get('good_tol')
         if good_tol is not None:
-            print("\nSparsity computed using tolerance: %g" % meta['good_tol'])
+            print("Sparsity computed using tolerance: %g" % meta['good_tol'])
             print("Most common number of nonzero entries (%d of %d) repeated %d times out of %d "
                   "tolerances tested.\n" % (meta['J_size'] - meta['zero_entries'], meta['J_size'],
                                             meta['nz_matches'], meta['n_tested']))
@@ -1974,8 +1974,8 @@ def _partial_coloring_cmd(options):
             print('\n')
 
         if not coloring._meta.get('show_summary'):
-            print("\nApprox coloring for '%s' (class %s)\n" % (system.pathname,
-                                                               type(system).__name__))
+            print("\nApprox coloring for '%s' (class %s)" % (system.pathname,
+                                                             type(system).__name__))
             coloring.summary()
             print('\n')
 
