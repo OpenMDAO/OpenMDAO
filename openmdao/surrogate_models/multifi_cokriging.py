@@ -188,6 +188,12 @@ class MultiFiCoKriging(object):
     ----------
     corr : Object
         Correlation function to use, default is squared_exponential_correlation.
+    n_features : ndarry
+        Number of features for each fidelity level.
+    n_samples : ndarry
+        Number of samples for each fidelity level.
+    nlevel : int
+        Number of fidelity levels.
     normalize : bool, optional
         When true, normalize X and Y so that the mean is at zero.
     regr : string or callable
@@ -366,6 +372,10 @@ class MultiFiCoKriging(object):
         self.X_std = 1
         self.y_mean = 0
         self.y_std = 1
+
+        self.n_features = None
+        self.n_samples = None
+        self.nlevel = None
 
         self._nfev = 0
 
