@@ -169,7 +169,6 @@ class TestPComputeJacvecProd(unittest.TestCase):
         p.model.connect('indep.x', 'comp.x')
         p.model.connect('indep.inp', 'comp.inp')
 
-        #p.model.linear_solver = om.DirectSolver()
         p.setup(mode=mode)
 
         return p
