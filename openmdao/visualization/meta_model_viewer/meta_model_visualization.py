@@ -551,11 +551,11 @@ class MetaModelVisualization(object):
         else:
             data = self._unstructured_training_points(compute_distance=True, source='right')
 
-        alphas = 1.0 - data[:, 2] / self.dist_range
+        self.right_alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
         right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None, fill_color='#000000',
-                               fill_alpha=alphas.tolist())
+                               fill_alpha=self.right_alphas.tolist())
 
         # Set the right_plot data source to new values
         self.right_plot_scatter_source.data = dict(
@@ -618,11 +618,11 @@ class MetaModelVisualization(object):
         else:
             data = self._unstructured_training_points(compute_distance=True)
 
-        alphas = 1.0 - data[:, 2] / self.dist_range
+        self.bottom_alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
         bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
-                             fill_alpha=alphas.tolist())
+                             fill_alpha=self.bottom_alphas.tolist())
 
         # Set the right_plot data source to new values
         self.bottom_plot_scatter_source.data = dict(
