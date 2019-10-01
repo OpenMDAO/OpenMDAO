@@ -698,6 +698,8 @@ class Problem(object):
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
 
+        rvec._data[:] = 0.
+
         # set seed values into dresids (fwd) or doutputs (rev)
         try:
             seed[rnames[0]]
