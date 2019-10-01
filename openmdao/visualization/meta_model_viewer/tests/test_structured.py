@@ -29,6 +29,29 @@ class StructuredMetaModelCompTests(unittest.TestCase):
                                   [  8.48953212,   5.57319475,   8.21241294,  16.40718668,  30.15751598, 49.46340083,  74.32484124, 104.74183721, 140.71438873, 182.2424958 ],
                                   [ 10.96088904,   3.72881146,   2.05228945,   5.93132298,  15.36591208, 30.35605673,  50.90175693,  77.00301269, 108.65982401, 145.87219088]])
 
+        num_train = 10
+
+        x0_min, x0_max = -5.0, 10.0
+        x1_min, x1_max = 0.0, 15.0
+        train_x0 = np.linspace(x0_min, x0_max, num_train)
+        train_x1 = np.linspace(x1_min, x1_max, num_train)
+        t_data = self.grid_data
+
+        prob = om.Problem()
+        ivc = om.IndepVarComp()
+        ivc.add_output('x0', 0.0)
+        ivc.add_output('x1', 0.0)
+
+        prob.model.add_subsystem('p', ivc, promotes=['*'])
+        self.mm = mm = prob.model.add_subsystem('mm', om.MetaModelStructuredComp(method='slinear'),
+                                    promotes=['x0', 'x1'])
+        mm.add_input('x0', 0.0, train_x0)
+        mm.add_input('x1', 0.0, train_x1)
+        mm.add_output('f', 0.0, t_data)
+
+        prob.setup()
+        prob.final_setup()
+
     def test_working_scipy_slinear(self):
 
         # Create regular grid interpolator instance
@@ -181,29 +204,6 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
     def test_aligned_training_points_right(self):
 
-        num_train = 10
-
-        x0_min, x0_max = -5.0, 10.0
-        x1_min, x1_max = 0.0, 15.0
-        train_x0 = np.linspace(x0_min, x0_max, num_train)
-        train_x1 = np.linspace(x1_min, x1_max, num_train)
-        t_data = self.grid_data
-
-        prob = om.Problem()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x0', 0.0)
-        ivc.add_output('x1', 0.0)
-
-        prob.model.add_subsystem('p', ivc, promotes=['*'])
-        mm = prob.model.add_subsystem('mm', om.MetaModelStructuredComp(method='slinear'),
-                                    promotes=['x0', 'x1'])
-        mm.add_input('x0', 0.0, train_x0)
-        mm.add_input('x1', 0.0, train_x1)
-        mm.add_output('f', 0.0, t_data)
-
-        prob.setup()
-        prob.final_setup()
-
         known_points = np.array([[ 10.        ,   0.        ,   0.        ,  10.96088904],
                                 [ 10.        ,   1.66666667,   0.        ,   3.72881146],
                                 [ 10.        ,   3.33333333,   0.        ,   2.05228945],
@@ -215,7 +215,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
                                 [ 10.        ,  13.33333333,   0.        , 108.65982401],
                                 [ 10.        ,  15.        ,   0.        , 145.87219088]])
 
-        adjusted_points = MetaModelVisualization(mm)
+        adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [10, 0]
         new_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
 
@@ -223,29 +223,6 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         assert_almost_equal(known_points, new_points, decimal=8)
 
     def test_aligned_training_points_bottom(self):
-
-        num_train = 10
-
-        x0_min, x0_max = -5.0, 10.0
-        x1_min, x1_max = 0.0, 15.0
-        train_x0 = np.linspace(x0_min, x0_max, num_train)
-        train_x1 = np.linspace(x1_min, x1_max, num_train)
-        t_data = self.grid_data
-
-        prob = om.Problem()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x0', 0.0)
-        ivc.add_output('x1', 0.0)
-
-        prob.model.add_subsystem('p', ivc, promotes=['*'])
-        mm = prob.model.add_subsystem('mm', om.MetaModelStructuredComp(method='slinear'),
-                                    promotes=['x0', 'x1'])
-        mm.add_input('x0', 0.0, train_x0)
-        mm.add_input('x1', 0.0, train_x1)
-        mm.add_output('f', 0.0, t_data)
-
-        prob.setup()
-        prob.final_setup()
 
         known_points = np.array([[ -5.        ,  15.        ,   0.        ,  17.50829952],
                                 [ -3.33333333,  15.        ,   0.        ,   5.67897804],
@@ -258,7 +235,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
                                 [  8.33333333,  15.        ,   0.        , 182.2424958 ],
                                 [ 10.        ,  15.        ,   0.        , 145.87219088]])
 
-        adjusted_points = MetaModelVisualization(mm)
+        adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [10, 15]
         new_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
 
@@ -266,29 +243,6 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         assert_almost_equal(known_points, new_points, decimal=8)
 
     def test_in_between_training_points_right(self):
-
-        num_train = 10
-
-        x0_min, x0_max = -5.0, 10.0
-        x1_min, x1_max = 0.0, 15.0
-        train_x0 = np.linspace(x0_min, x0_max, num_train)
-        train_x1 = np.linspace(x1_min, x1_max, num_train)
-        t_data = self.grid_data
-
-        prob = om.Problem()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x0', 0.0)
-        ivc.add_output('x1', 0.0)
-
-        prob.model.add_subsystem('p', ivc, promotes=['*'])
-        mm = prob.model.add_subsystem('mm', om.MetaModelStructuredComp(method='slinear'),
-                                    promotes=['x0', 'x1'])
-        mm.add_input('x0', 0.0, train_x0)
-        mm.add_input('x1', 0.0, train_x1)
-        mm.add_output('f', 0.0, t_data)
-
-        prob.setup()
-        prob.final_setup()
 
         known_points = np.array([[0.00000000e+00, 0.00000000e+00, 5.44217687e-02, 5.56021126e+01],
                                 [0.00000000e+00, 1.66666667e+00, 5.44217687e-02, 3.83798904e+01],
@@ -311,7 +265,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
                                 [1.66666667e+00, 1.33333333e+01, 5.66893424e-02, 1.01761326e+02],
                                 [1.66666667e+00, 1.50000000e+01, 5.66893424e-02, 1.36629336e+02]])
 
-        adjusted_points = MetaModelVisualization(mm)
+        adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [0.8163265306122387, 0.0]
         new_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
 
@@ -319,29 +273,6 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         assert_almost_equal(known_points, new_points, decimal=6)
 
     def test_in_between_training_points_bottom(self):
-
-        num_train = 10
-
-        x0_min, x0_max = -5.0, 10.0
-        x1_min, x1_max = 0.0, 15.0
-        train_x0 = np.linspace(x0_min, x0_max, num_train)
-        train_x1 = np.linspace(x1_min, x1_max, num_train)
-        t_data = self.grid_data
-
-        prob = om.Problem()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x0', 0.0)
-        ivc.add_output('x1', 0.0)
-
-        prob.model.add_subsystem('p', ivc, promotes=['*'])
-        mm = prob.model.add_subsystem('mm', om.MetaModelStructuredComp(method='slinear'),
-                                    promotes=['x0', 'x1'])
-        mm.add_input('x0', 0.0, train_x0)
-        mm.add_input('x1', 0.0, train_x1)
-        mm.add_output('f', 0.0, t_data)
-
-        prob.setup()
-        prob.final_setup()
 
         known_points = np.array([[-5.00000000e+00,  6.66666667e+00,  6.57596372e-02, 1.23408742e+02],
                                 [-5.00000000e+00,  8.33333333e+00,  4.53514739e-02, 9.11175424e+01],
@@ -364,7 +295,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
                                 [ 1.00000000e+01,  6.66666667e+00,  6.57596372e-02, 1.53659121e+01],
                                 [ 1.00000000e+01,  8.33333333e+00,  4.53514739e-02, 3.03560567e+01]])
 
-        adjusted_points = MetaModelVisualization(mm)
+        adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [-5, 7.653061224489797]
         new_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
 
@@ -372,29 +303,6 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         assert_almost_equal(known_points, new_points, decimal=6)
 
     def test_flip_inputs_aligned_points(self):
-
-        num_train = 10
-
-        x0_min, x0_max = -5.0, 10.0
-        x1_min, x1_max = 0.0, 15.0
-        train_x0 = np.linspace(x0_min, x0_max, num_train)
-        train_x1 = np.linspace(x1_min, x1_max, num_train)
-        t_data = self.grid_data
-
-        prob = om.Problem()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x0', 0.0)
-        ivc.add_output('x1', 0.0)
-
-        prob.model.add_subsystem('p', ivc, promotes=['*'])
-        mm = prob.model.add_subsystem('mm', om.MetaModelStructuredComp(method='slinear'),
-                                    promotes=['x0', 'x1'])
-        mm.add_input('x0', 0.0, train_x0)
-        mm.add_input('x1', 0.0, train_x1)
-        mm.add_output('f', 0.0, t_data)
-
-        prob.setup()
-        prob.final_setup()
 
         known_points_right = np.array([[6.66666667e+00, 0.00000000e+00, 2.26757370e-03, 2.01843121e+01],
                                       [6.66666667e+00, 1.66666667e+00, 2.26757370e-03, 1.91914092e+01],
@@ -418,7 +326,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
                                         [ 8.33333333e+00,  3.33333333e+00,  2.26757370e-03, 8.21241294e+00],
                                         [ 1.00000000e+01,  3.33333333e+00,  2.26757370e-03, 2.05228945e+00]])
 
-        adjusted_points = MetaModelVisualization(mm)
+        adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
         right_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
         bottom_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
@@ -430,33 +338,10 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
     def test_updated_scatter_distance(self):
 
-        num_train = 10
-
-        x0_min, x0_max = -5.0, 10.0
-        x1_min, x1_max = 0.0, 15.0
-        train_x0 = np.linspace(x0_min, x0_max, num_train)
-        train_x1 = np.linspace(x1_min, x1_max, num_train)
-        t_data = self.grid_data
-
-        prob = om.Problem()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x0', 0.0)
-        ivc.add_output('x1', 0.0)
-
-        prob.model.add_subsystem('p', ivc, promotes=['*'])
-        mm = prob.model.add_subsystem('mm', om.MetaModelStructuredComp(method='slinear'),
-                                    promotes=['x0', 'x1'])
-        mm.add_input('x0', 0.0, train_x0)
-        mm.add_input('x1', 0.0, train_x1)
-        mm.add_output('f', 0.0, t_data)
-
-        prob.setup()
-        prob.final_setup()
-
         known_points_bottom = np.genfromtxt('./known_data_point_files/updated_scatter_distance.csv', delimiter=',', usecols=(5,6,7,8))
         known_points_right = np.genfromtxt('./known_data_point_files/updated_scatter_distance.csv', delimiter=',', usecols=(0,1,2,3))
 
-        adjusted_points = MetaModelVisualization(mm)
+        adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
         adjusted_points.dist_range = 0.5
 
@@ -470,33 +355,10 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
     def test_five_alpha_points(self):
 
-        num_train = 10
-
-        x0_min, x0_max = -5.0, 10.0
-        x1_min, x1_max = 0.0, 15.0
-        train_x0 = np.linspace(x0_min, x0_max, num_train)
-        train_x1 = np.linspace(x1_min, x1_max, num_train)
-        t_data = self.grid_data
-
-        prob = om.Problem()
-        ivc = om.IndepVarComp()
-        ivc.add_output('x0', 0.0)
-        ivc.add_output('x1', 0.0)
-
-        prob.model.add_subsystem('p', ivc, promotes=['*'])
-        mm = prob.model.add_subsystem('mm', om.MetaModelStructuredComp(method='slinear'),
-                                    promotes=['x0', 'x1'])
-        mm.add_input('x0', 0.0, train_x0)
-        mm.add_input('x1', 0.0, train_x1)
-        mm.add_output('f', 0.0, t_data)
-
-        prob.setup()
-        prob.final_setup()
-
         known_points_bottom = np.genfromtxt('known_data_point_files/test_five_alpha_points.csv', delimiter=',', usecols=(1))
         known_points_right = np.genfromtxt('known_data_point_files/test_five_alpha_points.csv', delimiter=',', usecols=(0))
 
-        adjusted_points = MetaModelVisualization(mm)
+        adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
         adjusted_points.dist_range = 0.5
 
@@ -512,6 +374,22 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         # Make sure that arrays equal each other to the 6th decimal place
         assert_almost_equal(known_points_right, right_transparency, decimal=6)
         assert_almost_equal(known_points_bottom, bottom_transparency, decimal=6)
+
+    def test_single_line_of_alpha_points(self):
+
+        adjusted_points = MetaModelVisualization(self.mm)
+        adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
+
+        right_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
+        right_plot = adjusted_points._right_plot()
+
+        bottom_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
+        bottom_plot = adjusted_points._bottom_plot()
+
+
+        # Make sure that arrays equal each other to the 6th decimal place
+        self.assertTrue(len(adjusted_points.right_alphas) == 10)
+        self.assertTrue(len(adjusted_points.bottom_alphas) == 10)
 
 if __name__ == '__main__':
     unittest.main()
