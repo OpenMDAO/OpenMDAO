@@ -127,7 +127,7 @@ class FiniteDifference(ApproximationScheme):
         key = (abs_key[1], options['form'], options['order'],
                options['step'], options['step_calc'], options['directional'])
         self._exec_dict[key].append((abs_key, options))
-        self._approx_groups = None  # force later regen of approx_groups
+        self._reset()  # force later regen of approx_groups
 
     def _get_approx_data(self, system, data):
         """

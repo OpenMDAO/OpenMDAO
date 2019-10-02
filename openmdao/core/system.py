@@ -61,14 +61,14 @@ _supported_methods = {
 }
 
 _DEFAULT_COLORING_META = {
-    'wrt_patterns': ('*',),
-    'method': 'fd',
-    'wrt_matches': None,
-    'per_instance': False,
-    'coloring': None,  # this will contain the actual Coloring object
-    'dynamic': False,  # True if dynamic coloring is being used
-    'static': None,    # either _STD_COLORING_FNAME, a filename, or a Coloring object
-                       # if use_fixed_coloring was called
+    'wrt_patterns': ('*',),  # patterns used to match wrt variables
+    'method': 'fd',          # finite differencing method  ('fd' or 'cs')
+    'wrt_matches': None,     # where matched wrt names are stored
+    'per_instance': True,    # assume each instance can have a different coloring
+    'coloring': None,        # this will contain the actual Coloring object
+    'dynamic': False,        # True if dynamic coloring is being used
+    'static': None,          # either _STD_COLORING_FNAME, a filename, or a Coloring object
+                             # if use_fixed_coloring was called
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
@@ -944,8 +944,7 @@ class System(object):
             if isinstance(coloring, Coloring):
                 approx = self._get_approx_scheme(coloring._meta['method'])
                 # force regen of approx groups on next call to compute_approximations
-                approx._colored_approx_groups = None
-                approx._approx_groups = None
+                approx._reset()
             return
 
         if recurse:
@@ -1101,6 +1100,27 @@ class System(object):
 
         approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
 
+        if self._coloring_info['coloring'] is None and self._coloring_info['static'] is None:
+            self._coloring_info['dynamic'] = True
+
+        coloring_fname = self.get_approx_coloring_fname()
+
+        # if we find a previously computed class coloring for our class, just use that
+        # instead of regenerating a coloring.
+        if not info['per_instance'] and coloring_fname in coloring_mod._CLASS_COLORINGS:
+            info['coloring'] = coloring = coloring_mod._CLASS_COLORINGS[coloring_fname]
+            if coloring is None:
+                print("\nClass coloring for class '{}' wasn't good enough, "
+                      "so skipping for '{}'".format(type(self).__name__, self.pathname))
+                info['static'] = info['dynamic'] = None
+            else:
+                print("\n{} using class coloring for class '{}'".format(self.pathname,
+                                                                        type(self).__name__))
+                info.update(coloring._meta)
+                # force regen of approx groups during next compute_approximations
+                approx_scheme._reset()
+            return [coloring]
+
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
 
@@ -1116,9 +1136,6 @@ class System(object):
         out_offsets *= info['perturb_size']
 
         starting_resids = self._residuals._data.copy()
-
-        if self._coloring_info['coloring'] is None and self._coloring_info['static'] is None:
-            self._coloring_info['dynamic'] = True
 
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
@@ -1141,14 +1158,14 @@ class System(object):
                     self._apply_nonlinear()
 
                 for scheme in self._approx_schemes.values():
-                    scheme._approx_groups = None  # force a re-initialization of approx
+                    scheme._reset()  # force a re-initialization of approx
 
             self.run_linearize()
             self._jacobian._save_sparsity(self)
 
         sparsity_time = time.time() - sparsity_start_time
 
-        self._update_wrt_matches(self._coloring_info)
+        self._update_wrt_matches(info)
 
         ordered_of_info = list(self._jacobian_of_iter())
         ordered_wrt_info = list(self._jacobian_wrt_iter(info['wrt_matches']))
@@ -1176,6 +1193,8 @@ class System(object):
             info['coloring'] = info['static'] = info['dynamic'] = None
             simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less than min "
                            "allowed (%.1f%%)." % (self.msginfo, pct, info['min_improve_pct']))
+            if not info['per_instance']:
+                coloring_mod._CLASS_COLORINGS[coloring_fname] = None
             return [None]
 
         coloring._row_vars = [t[0] for t in ordered_of_info]
@@ -1191,11 +1210,10 @@ class System(object):
 
         approx = self._get_approx_scheme(coloring._meta['method'])
         # force regen of approx groups during next compute_approximations
-        approx._colored_approx_groups = None
-        approx._approx_groups = None
+        approx._reset()
 
         if info['show_sparsity'] or info['show_summary']:
-            print("\nApprox coloring for '%s' (class %s)\n" % (self.pathname, type(self).__name__))
+            print("\nApprox coloring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
         if info['show_sparsity']:
             coloring.display_txt()
@@ -1203,6 +1221,10 @@ class System(object):
             coloring.summary()
 
         self._save_coloring(coloring)
+
+        if not info['per_instance']:
+            # save the class coloring for other instances of this class to use
+            coloring_mod._CLASS_COLORINGS[coloring_fname] = coloring
 
         # restore original inputs/outputs
         self._inputs._data[:] = starting_inputs
@@ -1273,9 +1295,7 @@ class System(object):
             # total coloring
             return os.path.join(directory, 'total_coloring.pkl')
 
-        per_instance = self._coloring_info.get('per_instance')
-
-        if per_instance:
+        if self._coloring_info.get('per_instance'):
             # base the name on the instance pathname
             fname = 'coloring_' + self.pathname.replace('.', '_') + '.pkl'
         else:
@@ -1331,8 +1351,7 @@ class System(object):
             info.update(info['coloring']._meta)
             approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
-            approx._colored_approx_groups = None
-            approx._approx_groups = None
+            approx._reset()
         elif isinstance(static, coloring_mod.Coloring):
             info['coloring'] = coloring = static
 

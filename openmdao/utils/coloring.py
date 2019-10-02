@@ -77,6 +77,13 @@ _DEF_COMP_SPARSITY_ARGS = {
 }
 
 
+# A dict containing colorings that have been generated during the current execution.
+# When a dynamic coloring is specified for a particular class and per_instance is False,
+# this dict can be checked for an existing class version of the coloring that can be used
+# for that instance.
+_CLASS_COLORINGS = {}
+
+
 # numpy versions before 1.12 don't use the 'axis' arg passed to count_nonzero and always
 # return an int instead of an array of ints, so create our own function for those versions.
 if LooseVersion(np.__version__) >= LooseVersion("1.12"):
@@ -498,20 +505,20 @@ class Coloring(object):
             tot_size = min(nrows, ncols)
             if tot_size < 0:
                 tot_size = '?'
-            print("\nSimultaneous derivatives can't improve on the total number of solves "
+            print("Simultaneous derivatives can't improve on the total number of solves "
                   "required (%s) for this configuration" % tot_size)
         else:
             tot_size, tot_colors, fwd_solves, rev_solves, pct = self._solves_info()
 
-            print("\nFWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
-            print("\nTotal colors vs. total size: %d vs %s  (%.1f%% improvement)" %
+            print("FWD solves: %d   REV solves: %d" % (fwd_solves, rev_solves))
+            print("Total colors vs. total size: %d vs %s  (%.1f%% improvement)" %
                   (tot_colors, tot_size, pct))
 
         meta = self._meta
         print()
         good_tol = meta.get('good_tol')
         if good_tol is not None:
-            print("\nSparsity computed using tolerance: %g" % meta['good_tol'])
+            print("Sparsity computed using tolerance: %g" % meta['good_tol'])
             print("Most common number of nonzero entries (%d of %d) repeated %d times out of %d "
                   "tolerances tested.\n" % (meta['J_size'] - meta['zero_entries'], meta['J_size'],
                                             meta['nz_matches'], meta['n_tested']))
@@ -1910,6 +1917,8 @@ def _partial_coloring_setup_parser(parser):
                         'computing sparsity')
     parser.add_argument('--tol', action='store', dest='tol', default=1.e-15, type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
+    parser.add_argument('--per_instance', action='store', dest='per_instance',
+                        help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the colored jacobian.")
     parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
@@ -1925,10 +1934,13 @@ def _get_partial_coloring_kwargs(options):
     kwargs = {}
     names = ('method', 'form', 'step', 'num_full_jacs', 'perturb_size', 'tol')
     for name in names:
-        if getattr(options, name):
+        if getattr(options, name) is not None:
             kwargs[name] = getattr(options, name)
 
     kwargs['recurse'] = not options.norecurse
+    per_instance = getattr(options, 'per_instance')
+    kwargs['per_instance'] = (per_instance is None or
+                              per_instance.lower() not in ['false', '0', 'no'])
 
     return kwargs
 
@@ -1967,8 +1979,8 @@ def _partial_coloring_cmd(options):
             print('\n')
 
         if not coloring._meta.get('show_summary'):
-            print("\nApprox coloring for '%s' (class %s)\n" % (system.pathname,
-                                                               type(system).__name__))
+            print("\nApprox coloring for '%s' (class %s)" % (system.pathname,
+                                                             type(system).__name__))
             coloring.summary()
             print('\n')
 

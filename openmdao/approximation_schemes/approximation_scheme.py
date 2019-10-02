@@ -41,12 +41,19 @@ class ApproximationScheme(object):
         Initialize the ApproximationScheme.
         """
         self._approx_groups = None
-        self._colored_approx_groups = []
+        self._colored_approx_groups = None
         self._j_colored = None
         self._j_data_sizes = None
         self._j_data_offsets = None
         self._approx_groups_cached_under_cs = False
         self._exec_dict = defaultdict(list)
+
+    def _reset(self):
+        """
+        Get rid of any existing approx groups.
+        """
+        self._colored_approx_groups = None
+        self._approx_groups = None
 
     def _get_approx_groups(self, system, under_cs=False):
         """
@@ -304,36 +311,37 @@ class ApproximationScheme(object):
         do_rows_cols = self._j_colored is None
 
         # do colored solves first
-        for data, col_idxs, tmpJ, idx_info, nz_rows in colored_approx_groups:
-            colored_shape = (tmpJ['@nrows'], tmpJ['@ncols'])
+        if colored_approx_groups is not None:
+            for data, col_idxs, tmpJ, idx_info, nz_rows in colored_approx_groups:
+                colored_shape = (tmpJ['@nrows'], tmpJ['@ncols'])
 
-            if fd_count % num_par_fd == system._par_fd_id:
-                # run the finite difference
-                result = self._run_point(system, idx_info, data, results_array, total)
-                if par_fd_w_serial_model or not is_parallel:
-                    rowmap = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
-                    if rowmap is not None:
-                        result = result[rowmap]
-                    result = self._transform_result(result)
+                if fd_count % num_par_fd == system._par_fd_id:
+                    # run the finite difference
+                    result = self._run_point(system, idx_info, data, results_array, total)
+                    if par_fd_w_serial_model or not is_parallel:
+                        rowmap = tmpJ['@row_idx_map'] if '@row_idx_map' in tmpJ else None
+                        if rowmap is not None:
+                            result = result[rowmap]
+                        result = self._transform_result(result)
 
-                    if nz_rows is None:  # uncolored column
-                        if do_rows_cols:
-                            nrows = tmpJ['@nrows']
-                            jrows.extend(range(nrows))
-                            jcols.extend(col_idxs * nrows)
-                        jdata.extend(result)
-                    else:
-                        for i, col in enumerate(col_idxs):
+                        if nz_rows is None:  # uncolored column
                             if do_rows_cols:
-                                jrows.extend(nz_rows[i])
-                                jcols.extend([col] * len(nz_rows[i]))
-                            jdata.extend(result[nz_rows[i]])
-                else:  # parallel model (some vars are remote)
-                    raise NotImplementedError("simul approx coloring with parallel FD/CS is "
-                                              "only supported currently when using "
-                                              "a serial model, i.e., when "
-                                              "num_par_fd == number of MPI procs.")
-            fd_count += 1
+                                nrows = tmpJ['@nrows']
+                                jrows.extend(range(nrows))
+                                jcols.extend(col_idxs * nrows)
+                            jdata.extend(result)
+                        else:
+                            for i, col in enumerate(col_idxs):
+                                if do_rows_cols:
+                                    jrows.extend(nz_rows[i])
+                                    jcols.extend([col] * len(nz_rows[i]))
+                                jdata.extend(result[nz_rows[i]])
+                    else:  # parallel model (some vars are remote)
+                        raise NotImplementedError("simul approx coloring with parallel FD/CS is "
+                                                  "only supported currently when using "
+                                                  "a serial model, i.e., when "
+                                                  "num_par_fd == number of MPI procs.")
+                fd_count += 1
 
         # now do uncolored solves
         for wrt, data, col_idxs, tmpJ, idx_info, nz_rows in approx_groups:
@@ -392,16 +400,17 @@ class ApproximationScheme(object):
         elif is_parallel:  # uncolored with parallel systems
             results = _gather_jac_results(mycomm, results)
 
-        for _, _, tmpJ, _, _ in colored_approx_groups:
-            # TODO: coloring when using parallel FD and/or FD with remote comps
-            for key in tmpJ['@approxs']:
-                slc = tmpJ['@jac_slices'][key]
-                if uses_voi_indices:
-                    jac._override_checks = True
-                    jac[key] = _from_dense(jacobian, key, Jcolored[slc])
-                    jac._override_checks = False
-                else:
-                    jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+        if colored_approx_groups is not None:
+            for _, _, tmpJ, _, _ in colored_approx_groups:
+                # TODO: coloring when using parallel FD and/or FD with remote comps
+                for key in tmpJ['@approxs']:
+                    slc = tmpJ['@jac_slices'][key]
+                    if uses_voi_indices:
+                        jac._override_checks = True
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
+                        jac._override_checks = False
+                    else:
+                        jac[key] = _from_dense(jacobian, key, Jcolored[slc])
 
         Jcolored = None  # clean up memory
 
