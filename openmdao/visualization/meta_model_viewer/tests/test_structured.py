@@ -202,9 +202,9 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         ])
         self.assertTrue(expected_output in output.replace('\r', ''))
 
-    def test_aligned_training_points_right(self):
+    def test_aligned_training_points(self):
 
-        known_points = np.array([[ 10.        ,   0.        ,   0.        ,  10.96088904],
+        known_points_right = np.array([[ 10.        ,   0.        ,   0.        ,  10.96088904],
                                 [ 10.        ,   1.66666667,   0.        ,   3.72881146],
                                 [ 10.        ,   3.33333333,   0.        ,   2.05228945],
                                 [ 10.        ,   5.        ,   0.        ,   5.93132298],
@@ -215,16 +215,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
                                 [ 10.        ,  13.33333333,   0.        , 108.65982401],
                                 [ 10.        ,  15.        ,   0.        , 145.87219088]])
 
-        adjusted_points = MetaModelVisualization(self.mm)
-        adjusted_points.input_point_list = [10, 0]
-        new_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
-
-        # Make sure that arrays equal each other to the 8th decimal place
-        assert_almost_equal(known_points, new_points, decimal=8)
-
-    def test_aligned_training_points_bottom(self):
-
-        known_points = np.array([[ -5.        ,  15.        ,   0.        ,  17.50829952],
+        known_points_bottom = np.array([[ -5.        ,  15.        ,   0.        ,  17.50829952],
                                 [ -3.33333333,  15.        ,   0.        ,   5.67897804],
                                 [ -1.66666667,  15.        ,   0.        ,  44.94384339],
                                 [  0.        ,  15.        ,   0.        , 100.60211264],
@@ -237,10 +228,12 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
         adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [10, 15]
-        new_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
+        right_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
+        bottom_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
 
         # Make sure that arrays equal each other to the 8th decimal place
-        assert_almost_equal(known_points, new_points, decimal=8)
+        assert_almost_equal(known_points_right, right_points, decimal=8)
+        assert_almost_equal(known_points_bottom, bottom_points, decimal=8)
 
     def test_in_between_training_points_right(self):
 
@@ -338,8 +331,10 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
     def test_updated_scatter_distance(self):
 
-        known_points_bottom = np.genfromtxt('./known_data_point_files/updated_scatter_distance.csv', delimiter=',', usecols=(5,6,7,8))
-        known_points_right = np.genfromtxt('./known_data_point_files/updated_scatter_distance.csv', delimiter=',', usecols=(0,1,2,3))
+        known_points_bottom = np.genfromtxt(
+            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/updated_scatter_distance.csv', delimiter=',', usecols=(5,6,7,8))
+        known_points_right = np.genfromtxt(
+            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/updated_scatter_distance.csv', delimiter=',', usecols=(0,1,2,3))
 
         adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
@@ -355,8 +350,10 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
     def test_five_alpha_points(self):
 
-        known_points_bottom = np.genfromtxt('known_data_point_files/test_five_alpha_points.csv', delimiter=',', usecols=(1))
-        known_points_right = np.genfromtxt('known_data_point_files/test_five_alpha_points.csv', delimiter=',', usecols=(0))
+        known_points_bottom = np.genfromtxt(
+            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/test_five_alpha_points.csv', delimiter=',', usecols=(1))
+        known_points_right = np.genfromtxt(
+            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/test_five_alpha_points.csv', delimiter=',', usecols=(0))
 
         adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
