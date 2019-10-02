@@ -155,6 +155,7 @@ setup(
     [console_scripts]
     wingproj=openmdao.devtools.wingproj:run_wing
     run_test=openmdao.devtools.run_test:run_test
+    webview=openmdao.utils.webview:webview_argv
     openmdao=openmdao.utils.om:openmdao_cmd
     """,
     extras_require=optional_dependencies,
