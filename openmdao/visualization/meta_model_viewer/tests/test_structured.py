@@ -17,6 +17,8 @@ import openmdao.test_suite.test_examples.meta_model_examples.structured_meta_mod
 @unittest.skipUnless(bokeh, "Bokeh is required")
 class StructuredMetaModelCompTests(unittest.TestCase):
 
+    csv_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'known_data_point_files')
+
     def setUp(self):
         self.grid_data = np.array([[308.12909601, 253.61567418, 204.6578079, 161.25549718, 123.40874201, 91.1175424,   64.38189835,  43.20180985,  27.5772769,   17.50829952],
                                   [162.89542418, 123.20470795,  89.06954726,  60.48994214,  37.46589257, 19.99739855,   8.08446009,   1.72707719,   0.92524984,   5.67897804,],
@@ -331,10 +333,12 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
     def test_updated_scatter_distance(self):
 
+        filename = os.path.join(self.csv_dir, 'updated_scatter_distance.csv')
+
         known_points_bottom = np.genfromtxt(
-            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/updated_scatter_distance.csv', delimiter=',', usecols=(5,6,7,8))
+            filename, delimiter=',', usecols=(5,6,7,8))
         known_points_right = np.genfromtxt(
-            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/updated_scatter_distance.csv', delimiter=',', usecols=(0,1,2,3))
+            filename, delimiter=',', usecols=(0,1,2,3))
 
         adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
@@ -349,11 +353,12 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         assert_almost_equal(known_points_bottom, bottom_points, decimal=6)
 
     def test_five_alpha_points(self):
+        filename = os.path.join(self.csv_dir, 'test_five_alpha_points.csv')
 
         known_points_bottom = np.genfromtxt(
-            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/test_five_alpha_points.csv', delimiter=',', usecols=(1))
+            filename, delimiter=',', usecols=(1))
         known_points_right = np.genfromtxt(
-            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/test_five_alpha_points.csv', delimiter=',', usecols=(0))
+            filename, delimiter=',', usecols=(0))
 
         adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [6.632653061224477, 3.36734693877551]
