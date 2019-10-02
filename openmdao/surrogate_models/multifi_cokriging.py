@@ -470,8 +470,8 @@ class MultiFiCoKriging(object):
             # Calculate matrix of distances D between samples
             self.D[lvl] = l1_cross_distances(X[lvl])
             if (np.min(np.sum(self.D[lvl], axis=1)) == 0.):
-                raise Exception("Multiple input features cannot have the same"
-                                " value.")
+                raise ValueError("Multiple input features cannot have the same"
+                                 " value.")
 
             # Regression matrix and parameters
             self.F[lvl] = self.regr(X[lvl])
@@ -489,15 +489,15 @@ class MultiFiCoKriging(object):
             n_samples_F_i = self.F[lvl].shape[0]
 
             if n_samples_F_i != n_samples[lvl]:
-                raise Exception("Number of rows in F and X do not match. Most "
-                                "likely something is going wrong with the "
-                                "regression model.")
+                raise ValueError("Number of rows in F and X do not match. Most "
+                                 "likely something is going wrong with the "
+                                 "regression model.")
 
             if int(self.p[lvl] + self.q[lvl]) >= n_samples_F_i:
-                raise Exception(("Ordinary least squares problem is undetermined "
-                                 "n_samples=%d must be greater than the regression"
-                                 " model size p+q=%d.")
-                                % (n_samples[i], self.p[lvl] + self.q[lvl]))
+                raise ValueError(("Ordinary least squares problem is undetermined "
+                                  "n_samples=%d must be greater than the regression"
+                                  " model size p+q=%d.")
+                                 % (n_samples[lvl], self.p[lvl] + self.q[lvl]))
 
         # Set attributes
         self.X = X
@@ -514,12 +514,12 @@ class MultiFiCoKriging(object):
                 self.rlf_value[lvl] = sol['rlf_value']
 
                 if np.isinf(self.rlf_value[lvl]):
-                    raise Exception("Bad parameter region. "
-                                    "Try increasing upper bound")
+                    raise ValueError("Bad parameter region. "
+                                     "Try increasing upper bound")
             else:
                 self.rlf_value[lvl] = self.rlf(lvl=lvl)
                 if np.isinf(self.rlf_value[lvl]):
-                    raise Exception("Bad point. Try increasing theta0.")
+                    raise ValueError("Bad point. Try increasing theta0.")
 
         return
 
@@ -803,7 +803,7 @@ class MultiFiCoKriging(object):
         n_samples_y = np.zeros(nlevel, dtype=int)
         for i in range(nlevel):
             n_samples[i], n_features[i] = X[i].shape
-            if i > 1 and n_features[i] != n_features[i - 1]:
+            if i > 0 and n_features[i] != n_features[i - 1]:
                 raise ValueError("All X must have the same number of columns.")
             y[i] = np.asarray(y[i]).ravel()[:, np.newaxis]
             n_samples_y[i] = y[i].shape[0]
@@ -820,17 +820,17 @@ class MultiFiCoKriging(object):
         if type(self.theta0) is not list:
             self.theta0 = nlevel * [self.theta0]
         elif len(self.theta0) != nlevel:
-            raise ValueError("theta0 must be a list of %d elements." % nlevel)
+            raise ValueError("theta0 must be a list of %d element(s)." % nlevel)
 
         if type(self.thetaL) is not list:
             self.thetaL = nlevel * [self.thetaL]
         elif len(self.thetaL) != nlevel:
-            raise ValueError("thetaL must be a list of %d elements." % nlevel)
+            raise ValueError("thetaL must be a list of %d element(s)." % nlevel)
 
         if type(self.thetaU) is not list:
             self.thetaU = nlevel * [self.thetaU]
         elif len(self.thetaU) != nlevel:
-            raise ValueError("thetaU must be a list of %d elements." % nlevel)
+            raise ValueError("thetaU must be a list of %d element(s)." % nlevel)
 
         self.nlevel = nlevel
         self.X = X[:]
@@ -866,7 +866,7 @@ class MultiFiCoKriging(object):
             if self.theta[i] is not None:
                 self.theta[i] = array2d(self.theta[i])
                 if np.any(self.theta[i] <= 0):
-                    raise ValueError("theta0 must be strictly positive.")
+                    raise ValueError("theta must be strictly positive.")
 
             if self.theta0[i] is not None:
                 self.theta0[i] = array2d(self.theta0[i])
@@ -915,6 +915,11 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
     def __init__(self, **kwargs):
         """
         Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : keyword args
+            Some implementations of record_derivatives need additional args.
         """
         super(MultiFiCoKrigingSurrogate, self).__init__(**kwargs)
         self.model = None
@@ -1053,8 +1058,3 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
         X = [np.array(x) for x in reversed(X)]
         Y = [np.array(y) for y in reversed(Y)]
         return (X, Y)
-
-
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()
