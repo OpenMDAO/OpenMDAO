@@ -265,7 +265,7 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         new_points = adjusted_points._unstructured_training_points(compute_distance=True, source='right')
 
         # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points, new_points, decimal=5)
+        assert_almost_equal(known_points, new_points, decimal=4)
 
     def test_in_between_training_points_bottom(self):
 
@@ -281,11 +281,9 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         new_points = adjusted_points._unstructured_training_points(compute_distance=True, source='bottom')
 
         # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points, new_points, decimal=5)
+        assert_almost_equal(known_points, new_points, decimal=4)
 
     def test_alpha_transparency(self):
-
-        # known_points = np.genfromtxt('known_data_point_files/unstructured_test_points_bottom.csv', delimiter=',', skip_header=1)
 
         adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [0.04203304, 2.043553874897959, 0.02435233]
@@ -301,15 +299,15 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
                                     0.0547412 , 0.04688812, 0.04670322, 0.01284644, 0.00901997,
                                     0.00842558, 0.00386698])
 
-        known_points_bottom = np.array([7.65526225e-01, 7.38928771e-01, 7.26005596e-01, 7.15400685e-01,
-                                        6.49085936e-01, 6.40394534e-01, 6.28033739e-01, 6.13040224e-01,
-                                        5.83063429e-01, 4.39487175e-01, 3.68150584e-01, 3.43219846e-01,
-                                        3.23457648e-01, 2.99935318e-01, 2.52810468e-01, 2.44806901e-01,
-                                        2.43472059e-01, 2.36658572e-01, 2.33785726e-01, 2.22517297e-01,
-                                        2.08587812e-01, 1.99369605e-01, 1.95640700e-01, 1.80272582e-01,
-                                        1.74355523e-01, 1.52993107e-01, 1.28729120e-01, 1.28385050e-01,
-                                        1.28254288e-01, 1.05788052e-01, 1.01550328e-01, 8.44650938e-02,
-                                        6.39579453e-02, 3.34477759e-02, 1.97405899e-02, 6.40993538e-04])
+        known_points_bottom = np.array([0.765526225, 0.738928771, 0.726005596, 0.715400685,
+                                        0.649085936, 0.640394534, 0.628033739, 0.613040224,
+                                        0.583063429, 0.439487175, 0.368150584, 0.343219846,
+                                        0.323457648, 0.299935318, 0.252810468, 0.244806901,
+                                        0.243472059, 0.236658572, 0.233785726, 0.222517297,
+                                        0.208587812, 0.199369605, 0.195640700, 0.180272582,
+                                        0.174355523, 0.152993107, 0.128729120, 0.128385050,
+                                        0.128254288, 0.105788052, 0.101550328, 0.0844650938,
+                                        0.0639579453, 0.0334477759, 0.0197405899, 0.000640993538])
 
         right_points = adjusted_points._unstructured_training_points(compute_distance=True, source='right')
         right_plot = adjusted_points._right_plot()
