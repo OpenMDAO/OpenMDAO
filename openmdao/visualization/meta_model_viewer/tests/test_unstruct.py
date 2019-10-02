@@ -1,4 +1,5 @@
 import unittest
+import os
 
 import numpy as np
 from numpy.testing import assert_almost_equal
@@ -14,16 +15,20 @@ import openmdao.api as om
 @unittest.skipUnless(bokeh, "Bokeh is required")
 class UnstructuredMetaModelCompTests(unittest.TestCase):
 
+    csv_dir = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'known_data_point_files')
+
     def setUp(self):
         self.mm = mm = om.MetaModelUnStructuredComp()
 
+        filename = os.path.join(self.csv_dir, 'unstructured_data_points.csv')
+
         # Training Data
         x_train1 = np.genfromtxt(
-            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/unstructured_data_points.csv', delimiter=',', usecols=0)
+            filename, delimiter=',', usecols=0)
         x_train2 = np.genfromtxt(
-            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/unstructured_data_points.csv', delimiter=',', usecols=1)
+            filename, delimiter=',', usecols=1)
         x_train3 = np.genfromtxt(
-            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/unstructured_data_points.csv', delimiter=',', usecols=2)
+            filename, delimiter=',', usecols=2)
         y = np.sin(x_train1 * x_train2 * x_train3)
 
         # Inputs
@@ -248,8 +253,10 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
 
     def test_in_between_training_points_right(self):
 
+        filename = os.path.join(self.csv_dir, 'unstructured_test_points_right.csv')
+
         known_points = np.genfromtxt(
-            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/unstructured_test_points_right.csv', delimiter=',', skip_header=1)
+            filename, delimiter=',', skip_header=1)
 
         adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [1.619333019591837, 0.01423411, 0.02435233]
@@ -262,8 +269,10 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
 
     def test_in_between_training_points_bottom(self):
 
+        filename = os.path.join(self.csv_dir, 'unstructured_test_points_bottom.csv')
+
         known_points = np.genfromtxt(
-            'openmdao/visualization/meta_model_viewer/tests/known_data_point_files/unstructured_test_points_bottom.csv', delimiter=',', skip_header=1)
+            filename, delimiter=',', skip_header=1)
 
         adjusted_points = MetaModelVisualization(self.mm)
         adjusted_points.input_point_list = [0.04203304, 2.043553874897959, 0.02435233]
