@@ -265,7 +265,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         new_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
 
         # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points, new_points, decimal=6)
+        assert_almost_equal(known_points, new_points, decimal=5)
 
     def test_in_between_training_points_bottom(self):
 
@@ -295,7 +295,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         new_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
 
         # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points, new_points, decimal=6)
+        assert_almost_equal(known_points, new_points, decimal=5)
 
     def test_flip_inputs_aligned_points(self):
 
@@ -328,8 +328,8 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
 
         # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points_right, right_points, decimal=6)
-        assert_almost_equal(known_points_bottom, bottom_points, decimal=6)
+        assert_almost_equal(known_points_right, right_points, decimal=5)
+        assert_almost_equal(known_points_bottom, bottom_points, decimal=5)
 
     def test_updated_scatter_distance(self):
 
@@ -349,8 +349,8 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
 
         # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points_right, right_points, decimal=6)
-        assert_almost_equal(known_points_bottom, bottom_points, decimal=6)
+        assert_almost_equal(known_points_right, right_points, decimal=5)
+        assert_almost_equal(known_points_bottom, bottom_points, decimal=5)
 
     def test_five_alpha_points(self):
         filename = os.path.join(self.csv_dir, 'test_five_alpha_points.csv')
@@ -374,8 +374,8 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
 
         # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points_right, right_transparency, decimal=6)
-        assert_almost_equal(known_points_bottom, bottom_transparency, decimal=6)
+        assert_almost_equal(known_points_right, right_transparency, decimal=5)
+        assert_almost_equal(known_points_bottom, bottom_transparency, decimal=5)
 
     def test_single_line_of_alpha_points(self):
 
