@@ -1917,6 +1917,8 @@ def _partial_coloring_setup_parser(parser):
                         'computing sparsity')
     parser.add_argument('--tol', action='store', dest='tol', default=1.e-15, type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
+    parser.add_argument('--per_instance', action='store', dest='per_instance',
+                        help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the colored jacobian.")
     parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
@@ -1932,10 +1934,13 @@ def _get_partial_coloring_kwargs(options):
     kwargs = {}
     names = ('method', 'form', 'step', 'num_full_jacs', 'perturb_size', 'tol')
     for name in names:
-        if getattr(options, name):
+        if getattr(options, name) is not None:
             kwargs[name] = getattr(options, name)
 
     kwargs['recurse'] = not options.norecurse
+    per_instance = getattr(options, 'per_instance')
+    kwargs['per_instance'] = (per_instance is None or
+                              per_instance.lower() not in ['false', '0', 'no'])
 
     return kwargs
 
