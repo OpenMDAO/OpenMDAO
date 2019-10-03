@@ -1,7 +1,7 @@
 let N2SVGLayout_statics = {
     'showLinearSolverNames': true,
     'rightTextMarginPx': 8,
-    'heightPx': 600,
+    'heightPx': HEIGHT_PX,
     'fontSizePx': 11,
     'minColumnWidthPx': 5,
     'parentNodeWidthPx': 40
@@ -30,6 +30,8 @@ class N2SVGLayout {
         this.setupTextRenderer();
         this.updateTextWidths();
         this.updateSolverTextWidths();
+        delete (this.textRenderer);
+
         this.computeLeaves();
         this.computeColumnWidths();
         this.computeSolverColumnWidths();
@@ -50,12 +52,12 @@ class N2SVGLayout {
         return N2SVGLayout.showLinearSolverNames;
     }
 
-    /** Create an off-screen area to render text */
+    /** Create an off-screen area to render text for getTextWidth() */
     setupTextRenderer() {
         let textGroup = this.svg.append("svg:g").attr("class", "partition_group");
         let textSVG = textGroup.append("svg:text")
             .text("")
-            .attr("x", -50); // Put text off screen to the left.
+            .attr("x", -100); // Put text off screen to the left.
 
         this.textRenderer = {
             'group': textGroup,
@@ -67,19 +69,24 @@ class N2SVGLayout {
 
     /** Insert text into an off-screen SVG text object to determine the width.
      * Cache the result so repeat calls with the same text can just do a lookup.
-     * @param {string} textToFind Text to render or find in cache.
+     * @param {string} text Text to render or find in cache.
      * @return {number} The SVG-computed width of the rendered string.
      */
-    getTextWidth(textToFind) {
+    getTextWidth(text) {
+        let width = 0.0;
+
         // Check cache first
-        if (exists(this.textRenderer.widthCache[textToFind]))
-            return this.textRenderer.widthCache[textToFind];
+        if (this.textRenderer.widthCache.propExists(text)) {
+            width = this.textRenderer.widthCache[text];
+        }
+        else {
+            // Not found, render and return new width.
+            this.textRenderer.textSvg.text(text);
+            width = this.textRenderer.node.getBoundingClientRect().width;
 
-        // Not found, render and return new width.
-        this.textRenderer.textSvg.text(textToFind);
-        let width = this.textRenderer.node.getBoundingClientRect().width;
+            this.textRenderer.widthCache[text] = width;
+        }
 
-        this.textRenderer.widthCache[textToFind] = width;
         return width;
     }
 
@@ -169,8 +176,6 @@ class N2SVGLayout {
         else {
             element.numLeaves = 1;
         }
-
-        element.numSolverLeaves = element.numLeaves;
     }
 
     /** For visible elements with children, choose a column width
@@ -244,7 +249,7 @@ class N2SVGLayout {
         let sum = 0;
         let lastColumnWidth = 0;
         for (let i = this.leafSolverWidthsPx.length - 1; i >= this.zoomedElement.depth; --i) {
-            sum += this.cols[i].width;
+            sum += this.solverCols[i].width;
             let lastWidthNeeded = this.leafSolverWidthsPx[i] - sum;
             lastColumnWidth = Math.max(lastWidthNeeded, lastColumnWidth);
         }
@@ -269,7 +274,24 @@ class N2SVGLayout {
         }
     }
 
-    computeNormalizedPositions(element, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
+    /**TODO: computeNormalizedPositions and computeSolverNormalizedPositions do almost
+     * identical things, just storing info in different variables, so they should be
+     * merged as much as possible.
+     */
+
+    /** TODO: Document what the *0 variables are for */
+
+    /** Recurse over the model tree and determine the coordinates and
+     * size of visible elements. If a parent is minimized, operations are
+     * performed on it instead.
+     * @param {Object} element The node to operate on.
+     * @param {number} leafCounter Tally of leaves encountered so far.
+     * @param {Boolean} isChildOfZoomed Whether element is a descendant of this.zoomedElement.
+     * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing
+     *   highest in the tree hierarchy. Null if none exist.
+     */
+    computeNormalizedPositions(element, leafCounter,
+        isChildOfZoomed, earliestMinimizedParent) {
         if (!isChildOfZoomed) {
             isChildOfZoomed = (element === this.zoomedElement);
         }
@@ -283,17 +305,17 @@ class N2SVGLayout {
         }
 
         let node = (earliestMinimizedParent) ? earliestMinimizedParent : element;
-        element.rootIndex0 = element.hasOwnProperty('rootIndex') ? element.rootIndex : leafCounter;
+        element.rootIndex0 = element.propExists('rootIndex') ? element.rootIndex : leafCounter;
         element.rootIndex = leafCounter;
-        element.x0 = element.hasOwnProperty('x') ? element.x : 1e-6;
-        element.y0 = element.hasOwnProperty('y') ? element.y : 1e-6;
-        element.width0 = element.hasOwnProperty('width') ? element.width : 1e-6;
-        element.height0 = element.hasOwnProperty('height') ? element.height : 1e-6;
+        ['x', 'y', 'width', 'height'].forEach(function (val) {
+            element[val + '0'] = element.hasOwnProperty(val) ? element[val] : 1e-6;
+        })
         element.x = this.cols[node.depth].location / this.widthPTreePx;
         element.y = leafCounter / this.model.root.numLeaves;
         element.width = (Array.isArray(element.children) && !element.isMinimized) ?
             (this.cols[node.depth].width / this.widthPTreePx) : 1 - node.x;
         element.height = node.numLeaves / this.model.root.numLeaves;
+
         if (element.varIsHidden) { //param or hidden leaf leaving
             element.x = this.cols[element.parentComponent.depth + 1].location / this.widthPTreePx;
             element.y = element.parentComponent.y;
@@ -312,7 +334,17 @@ class N2SVGLayout {
         }
     }
 
-    computeSolverNormalizedPositions(element, leafCounter, isChildOfZoomed, earliestMinimizedParent) {
+    /** Recurse over the model tree and determine the coordinates and
+     * size of visible solver elements. If a parent is minimized, operations are
+     * performed on it instead.
+     * @param {Object} element The node to operate on.
+     * @param {number} leafCounter Tally of leaves encountered so far.
+     * @param {Boolean} isChildOfZoomed Whether element is a descendant of this.zoomedElement.
+     * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing
+     *   highest in the tree hierarchy. Null if none exist.
+     */
+    computeSolverNormalizedPositions(element, leafCounter,
+        isChildOfZoomed, earliestMinimizedParent) {
         if (!isChildOfZoomed) {
             isChildOfZoomed = (element === this.zoomedElement);
         }
@@ -320,27 +352,28 @@ class N2SVGLayout {
         if (earliestMinimizedParent == null && isChildOfZoomed) {
             if (element.type.match(/^(subsystem|root)$/)) {
                 this.zoomedSolverNodes.push(element);
-            } 
+            }
             if (!Array.isArray(element.children) || element.isMinimized) { //at a "leaf" node
-                if (! element.type.match(/^(param|unconnected_param)$/) && !element.varIsHidden) {
+                if (!element.type.match(/^(param|unconnected_param)$/) && !element.varIsHidden) {
                     this.visibleSolverNodes.push(element);
                 }
                 earliestMinimizedParent = element;
             }
         }
+
         let node = (earliestMinimizedParent) ? earliestMinimizedParent : element;
         element.rootIndex0 = element.hasOwnProperty('rootIndex') ? element.rootIndex : leafCounter;
-        element.xSolver0 = element.hasOwnProperty('xSolver') ? element.xSolver : 1e-6;
-        element.ySolver0 = element.hasOwnProperty('ySolver') ? element.ySolver : 1e-6;
-        element.widthSolver0 = element.hasOwnProperty('widthSolver') ? element.widthSolver : 1e-6;
-        element.heightSolver0 = element.hasOwnProperty('heightSolver') ? element.heightSolver : 1e-6;
+        ['x', 'y', 'width', 'height'].forEach(function (val) {
+            val += 'Solver';
+            element[val + '0'] = element.hasOwnProperty(val) ? element[val] : 1e-6;
+        })
         element.xSolver = this.solverCols[node.depth].location / this.widthPSolverTreePx;
-        element.ySolver = leafCounter / this.model.root.numSolverLeaves;
+        element.ySolver = leafCounter / this.model.root.numLeaves;
         element.widthSolver = (element.subsystem_children && !element.isMinimized) ?
             (this.solverCols[node.depth].width / this.widthPSolverTreePx) :
             1 - node.xSolver; //1-d.x;
 
-        element.heightSolver = node.numSolverLeaves / this.model.root.numSolverLeaves; // 111
+        element.heightSolver = node.numLeaves / this.model.root.numLeaves;
 
         if (element.varIsHidden) { //param or hidden leaf leaving
             element.xSolver = this.cols[d.parentComponent.depth + 1].location / this.widthPTreePx;
@@ -351,10 +384,10 @@ class N2SVGLayout {
 
         if (Array.isArray(element.children)) {
             for (let i = 0; i < element.children.length; ++i) {
-                this.computeSolverNormalizedPositions(element.children[i], 
+                this.computeSolverNormalizedPositions(element.children[i],
                     leafCounter, isChildOfZoomed, earliestMinimizedParent);
                 if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
-                    leafCounter += element.children[i].numSolverLeaves;
+                    leafCounter += element.children[i].numLeaves;
                 }
             }
         }

@@ -3,6 +3,7 @@
  * operations with it.
  */
 class N2Matrix {
+    
     constructor(nodes) {
         this.nodes = nodes;
 

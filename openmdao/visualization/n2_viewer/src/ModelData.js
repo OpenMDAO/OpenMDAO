@@ -34,7 +34,9 @@ class ModelData {
         }
     }
 
-    /**  */
+    /** Called by expandColonVars when splitting an element into children.
+     * TODO: Document params and recursive functionality.
+     */
     addChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
         console.log("addChildren called");
         if (arrayOfNames.length == arrayOfNamesIndex) return;
@@ -142,7 +144,7 @@ class ModelData {
             element.absPathName += element.name;
         }
 
-        if (element.type.match(/^unknown$|^param$|^unconnected_param$/)) {
+        if (element.type.match(/^(unknown|param|unconnected_param)$/)) {
             let parentComponent = (element.originalParent) ? element.originalParent : element.parent;
             if (parentComponent.type === "subsystem" &&
                 parentComponent.subsystem_type === "component") {
