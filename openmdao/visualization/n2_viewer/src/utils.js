@@ -21,9 +21,9 @@ function indexFor(arr, obj) {
  * @returns The index of the first matching object or -1 if not found.
  */
 function indexForMember(arr, memName, val) {
-    for (let i = 0; i < array.length; i++) {
-        if (array[i].hasOwnProperty(memName) &&
-            array[i][memName] === obj) {
+    for (let i = 0; i < arr.length; i++) {
+        if (arr[i].hasOwnProperty(memName) &&
+            arr[i][memName] === val) {
             return i;
         }
     }

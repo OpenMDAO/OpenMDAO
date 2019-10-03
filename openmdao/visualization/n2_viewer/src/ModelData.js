@@ -106,12 +106,14 @@ class ModelData {
     flattenColonGroups(element) {
         if (!Array.isArray(element.children)) return;
 
-        while (element.splitByColon && exists(element.children) && element.children.length == 1 &&
+        while (element.splitByColon && exists(element.children) &&
+            element.children.length == 1 &&
             element.children[0].splitByColon) {
             let child = element.children[0];
-            element.name += ":" + chilelement.name;
-            element.children = (chilelement.hasOwnProperty("children") && chilelement.children.length >= 1) ?
-                chilelement.children : null; //absorb childs children
+            element.name += ":" + child.name;
+            element.children = (Array.isArray(child.children) &&
+                child.children.length >= 1) ?
+                child.children : null; //absorb childs children
             if (element.children == null) delete element.children;
         }
 

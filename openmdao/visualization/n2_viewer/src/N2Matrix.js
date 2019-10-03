@@ -3,7 +3,7 @@
  * operations with it.
  */
 class N2Matrix {
-    
+
     constructor(nodes) {
         this.nodes = nodes;
 
@@ -57,6 +57,8 @@ class N2Matrix {
      */
     buildStructure() {
         this.matrix = {};
+
+        if (this.nodes.length >= LEVEL_OF_DETAIL_THRESHOLD) return;
 
         for (let srcIdx = 0; srcIdx < this.nodes.length; ++srcIdx) {
             let srcObj = this.nodes[srcIdx];
