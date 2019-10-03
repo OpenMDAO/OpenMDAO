@@ -93,6 +93,10 @@ class MetaModelVisualization(object):
     scatter_distance : TextInput
         Text input for user to enter custom value to calculate distance of training points around
         slice line
+    right_alphas : array
+        Array of points containing alpha values for right plot
+    bottom_alphas : array
+        Array of points containing alpha values for bottom plot
     dist_range : float
         Value taken from scatter_distance used for calculating distance of training points around
         slice line
@@ -551,11 +555,11 @@ class MetaModelVisualization(object):
         else:
             data = self._unstructured_training_points(compute_distance=True, source='right')
 
-        alphas = 1.0 - data[:, 2] / self.dist_range
+        self.right_alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
         right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None, fill_color='#000000',
-                               fill_alpha=alphas.tolist())
+                               fill_alpha=self.right_alphas.tolist())
 
         # Set the right_plot data source to new values
         self.right_plot_scatter_source.data = dict(
@@ -618,11 +622,11 @@ class MetaModelVisualization(object):
         else:
             data = self._unstructured_training_points(compute_distance=True)
 
-        alphas = 1.0 - data[:, 2] / self.dist_range
+        self.bottom_alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
         bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
-                             fill_alpha=alphas.tolist())
+                             fill_alpha=self.bottom_alphas.tolist())
 
         # Set the right_plot data source to new values
         self.bottom_plot_scatter_source.data = dict(
@@ -690,7 +694,7 @@ class MetaModelVisualization(object):
             dists, idxs = self._multidimension_input(scaled_x0, points, source=source)
 
         # data contains:
-        # [x_value, y_value, ND-distance, func_value, alpha]
+        # [x_value, y_value, ND-distance, func_value]
 
         data = np.zeros((len(idxs), 4))
         for dist_index, j in enumerate(idxs):
