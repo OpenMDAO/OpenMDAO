@@ -287,7 +287,11 @@ def _meta_model_cmd(options):
 
         pathname = options.pathname
         port_number = options.port_number
-        resolution = int(options.resolution)
+        try:
+            resolution = int(options.resolution)
+        except ValueError:
+            print("Resolution must be an int")
+            exit()
 
         if pathname:
             comp = prob.model._get_subsystem(pathname)
