@@ -270,8 +270,6 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         new_points = np.delete(new_points, 2, 1)
         new_points = new_points[new_points[:,1].argsort()[::-1]]
 
-        # Make sure that arrays equal each other to the 6th decimal place
-        # assert_rel_error(self, known_points, new_points, 1e-5)
         assert_almost_equal(known_points, new_points, decimal=4)
 
     def test_in_between_training_points_bottom(self):
@@ -291,7 +289,6 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         new_points = np.delete(new_points, 2, 1)
         new_points = new_points[new_points[:,0].argsort()[::-1]]
 
-        # Make sure that arrays equal each other to the 6th decimal place
         assert_almost_equal(known_points, new_points, decimal=4)
 
     def test_alpha_transparency(self):
@@ -328,7 +325,6 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         bottom_plot = adjusted_points._bottom_plot()
         bottom_transparency = adjusted_points.bottom_alphas
 
-        # Make sure that arrays equal each other to the 6th decimal place
         assert_rel_error(self, right_transparency, known_points_right, 1.1e-02)
         assert_rel_error(self, bottom_transparency, known_points_bottom, 1.6e-02)
 
