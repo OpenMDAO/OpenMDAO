@@ -30,7 +30,7 @@ Simple Example
 The following example shows a `MultiFiMetaModelUnStructuredComp` used to model the 2D Branin
 function, where the output is a function of two inputs, and we have pre-computed the training
 point location and values at a variety of points using models with two different fidelity
-levels. Adding an input or output named 'x' spanws entries in the "options" dictionary where the
+levels. Adding an input or output named 'x' spawns entries in the "options" dictionary where the
 training data can be specified. The naming convention is 'train:y' for the highest fidelity, and
 'train:y_fi2' for the lowest fidelity level (or in the case of more than 2 fidelity levels, the
 next highest level.)
