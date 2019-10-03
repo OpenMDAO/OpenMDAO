@@ -18,7 +18,7 @@ class ViewMMCommandLineTest(unittest.TestCase):
         cmd = 'openmdao view_mm {}'.format(script)
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
         expected_output = "Metamodel not specified. Try one of the following: ['interp1', 'interp2']."
-        self.assertTrue(expected_output in output)
+        self.assertTrue(expected_output in output, msg='Metamodel was specified when it should not have been. Check example.')
 
     def test_invalid_metamodel(self):
         script = os.path.abspath(example.__file__).replace('.pyc', '.py') # PY2
@@ -28,11 +28,4 @@ class ViewMMCommandLineTest(unittest.TestCase):
             "Metamodel 'interp' not found.",
             " Try one of the following: ['mm']."
         ])
-        self.assertTrue(expected_output in output.replace('\r', ''))
-
-    def test_resolution_float_value(self):
-        script = os.path.join(os.path.dirname(__file__), 'example.py')
-        cmd = 'openmdao view_mm {} -r {}'.format(script, 50.234)
-        output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
-        expected_output = "Resolution must be an int"
-        self.assertTrue(expected_output in output)
+        self.assertTrue(expected_output in output.replace('\r', ''), msg='Metamodel was found when it should not have. Check example.')
