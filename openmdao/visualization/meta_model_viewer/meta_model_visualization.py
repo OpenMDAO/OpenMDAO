@@ -694,7 +694,7 @@ class MetaModelVisualization(object):
             dists, idxs = self._multidimension_input(scaled_x0, points, source=source)
 
         # data contains:
-        # [x_value, y_value, ND-distance, func_value, alpha]
+        # [x_value, y_value, ND-distance, func_value]
 
         data = np.zeros((len(idxs), 4))
         for dist_index, j in enumerate(idxs):

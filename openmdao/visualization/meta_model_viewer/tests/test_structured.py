@@ -1,3 +1,4 @@
+""" Unit tests for structured metamodels in view_mm. """
 import unittest
 import subprocess
 import os
@@ -264,8 +265,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         adjusted_points.input_point_list = [0.8163265306122387, 0.0]
         new_points = adjusted_points._structured_training_points(compute_distance=True, source='right')
 
-        # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points, new_points, decimal=6)
+        assert_almost_equal(known_points, new_points, decimal=5)
 
     def test_in_between_training_points_bottom(self):
 
@@ -294,8 +294,7 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         adjusted_points.input_point_list = [-5, 7.653061224489797]
         new_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
 
-        # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points, new_points, decimal=6)
+        assert_almost_equal(known_points, new_points, decimal=5)
 
     def test_flip_inputs_aligned_points(self):
 
@@ -327,9 +326,8 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         bottom_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
 
 
-        # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points_right, right_points, decimal=6)
-        assert_almost_equal(known_points_bottom, bottom_points, decimal=6)
+        assert_almost_equal(known_points_right, right_points, decimal=5)
+        assert_almost_equal(known_points_bottom, bottom_points, decimal=5)
 
     def test_updated_scatter_distance(self):
 
@@ -348,9 +346,8 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         bottom_points = adjusted_points._structured_training_points(compute_distance=True, source='bottom')
 
 
-        # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points_right, right_points, decimal=6)
-        assert_almost_equal(known_points_bottom, bottom_points, decimal=6)
+        assert_almost_equal(known_points_right, right_points, decimal=5)
+        assert_almost_equal(known_points_bottom, bottom_points, decimal=5)
 
     def test_five_alpha_points(self):
         filename = os.path.join(self.csv_dir, 'test_five_alpha_points.csv')
@@ -373,9 +370,8 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         bottom_transparency = adjusted_points.bottom_alphas
 
 
-        # Make sure that arrays equal each other to the 6th decimal place
-        assert_almost_equal(known_points_right, right_transparency, decimal=6)
-        assert_almost_equal(known_points_bottom, bottom_transparency, decimal=6)
+        assert_almost_equal(known_points_right, right_transparency, decimal=5)
+        assert_almost_equal(known_points_bottom, bottom_transparency, decimal=5)
 
     def test_single_line_of_alpha_points(self):
 
@@ -389,7 +385,6 @@ class StructuredMetaModelCompTests(unittest.TestCase):
         bottom_plot = adjusted_points._bottom_plot()
 
 
-        # Make sure that arrays equal each other to the 6th decimal place
         self.assertTrue(len(adjusted_points.right_alphas) == 10)
         self.assertTrue(len(adjusted_points.bottom_alphas) == 10)
 
