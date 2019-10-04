@@ -79,8 +79,6 @@ setSolverColorAndCSSClass( "other", "other", 11);
 var widthPTreePx = 1,
     kx = 0, ky = 0, kx0 = 0, ky0 = 0,
     HEIGHT_PX = 600,
-    PARENT_NODE_WIDTH_PX = 40,
-    MIN_COLUMN_WIDTH_PX = 5,
     SVG_MARGIN = 1,
     TRANSITION_DURATION_FAST = 1000,
     TRANSITION_DURATION_SLOW = 1500,
@@ -98,4 +96,6 @@ var widthPSolverTreePx = 1,
     xScalerPSolverTree0 = null,
     yScalerPSolverTree0 = null;
 
-var showLinearSolverNames = true;
+// var showLinearSolverNames = true;
+let paramRegex = /^(param|unconnected_param)$/;
+let paramOrUnknownRegex = /^(unknown|param|unconnected_param)$/;

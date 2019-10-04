@@ -9,6 +9,7 @@ class ModelData {
         this.sys_pathnames_list = modelJSON.sys_pathnames_list;
         this.conns = modelJSON.connections_list;
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
+        this.declarePartialsList = modelJSON.declare_partials_list;
         this.maxDepth = 1;
         this.idCounter = 0;
 
@@ -20,13 +21,14 @@ class ModelData {
         this.initSubSystemChildren(this.root);
     }
 
-    /** Solver names may be empty, so set them to "None" instead.
+    /**
+     * Solver names may be empty, so set them to "None" instead.
      * Recurses over children.
      * @param {Object} element The item with solver names to check.
      */
     changeBlankSolverNamesToNone(element) {
-        if (element.linear_solver === "") element.linear_solver = "None";
-        if (element.nonlinear_solver === "") element.nonlinear_solver = "None";
+        if (element.linear_solver == "") element.linear_solver = "None";
+        if (element.nonlinear_solver == "") element.nonlinear_solver = "None";
         if (element.children) {
             for (var i = 0; i < element.children.length; ++i) {
                 this.changeBlankSolverNamesToNone(element.children[i]);
@@ -57,7 +59,7 @@ class ModelData {
             };
 
             // Was originally && instead of ||, which wouldn't ever work?
-            if (type.match(/^param$|^unconnected_param$/)) {
+            if (type.match(paramRegex)) {
                 parent.children.splice(0, 0, newChild);
             }
             else {
@@ -70,7 +72,8 @@ class ModelData {
         }
     }
 
-    /** If an object has a child with colons in its name, split those the child
+    /**
+     * If an object has a child with colons in its name, split those the child
      * into multiple objects named from the tokens in the original name. Replace the
      * original child object with the new children. Recurse over the array of children.
      * @param {Object} element The object that may have children to check.
@@ -83,7 +86,7 @@ class ModelData {
             let splitArray = element.children[i].name.split(":");
             if (splitArray.length > 1) {
                 if (!element.hasOwnProperty("subsystem_type") ||
-                    element.subsystem_type !== "component") {
+                    element.subsystem_type != "component") {
                     console.error("There is a colon-named object whose parent is not a component.");
                     return;
                 }
@@ -98,7 +101,8 @@ class ModelData {
         }
     }
 
-    /** If an element formerly had a name with colons, but was split by expandColonVars()
+    /**
+     * If an element formerly had a name with colons, but was split by expandColonVars()
      * and only ended up with one child, recombine the element and its child. Operate
      * recursively on all children.
      * @param {Object} element The object to check.
@@ -124,7 +128,8 @@ class ModelData {
         }
     }
 
-    /** Sets parents and depth of all nodes, and determine max depth. Flags the
+    /**
+     * Sets parents and depth of all nodes, and determine max depth. Flags the
      * element as implicit if any children are implicit.
      * @param {Object} element Item to process.
      * @param {Object} parent Parent of element, null for root node.
@@ -139,17 +144,17 @@ class ModelData {
         element.absPathName = "";
 
         if (element.parent) { // not root node? element.parent.absPathName : "";
-            if (element.parent.absPathName !== "") {
+            if (element.parent.absPathName != "") {
                 element.absPathName += element.parent.absPathName;
                 element.absPathName += (element.parent.splitByColon) ? ":" : ".";
             }
             element.absPathName += element.name;
         }
 
-        if (element.type.match(/^(unknown|param|unconnected_param)$/)) {
+        if (element.type.match(paramOrUnknownRegex)) {
             let parentComponent = (element.originalParent) ? element.originalParent : element.parent;
-            if (parentComponent.type === "subsystem" &&
-                parentComponent.subsystem_type === "component") {
+            if (parentComponent.type == "subsystem" &&
+                parentComponent.subsystem_type == "component") {
                 element.parentComponent = parentComponent;
             }
             else {
@@ -166,7 +171,7 @@ class ModelData {
 
         this.maxDepth = Math.max(depth, this.maxDepth);
 
-        if (element.type === "subsystem") {
+        if (element.type == "subsystem") {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
         }
 
@@ -209,7 +214,8 @@ class ModelData {
         return false;
     }
 
-    /** If an element has no connection naming it as a source or target,
+    /**
+     * If an element has no connection naming it as a source or target,
      * relabel it as unconnected.
      */
     identifyUnconnectedParams() { // Formerly updateRootTypes
@@ -218,7 +224,7 @@ class ModelData {
 
         while (stack.length > 0) {
             let element = stack.pop();
-            if (element.type === "param") {
+            if (element.type == "param") {
                 if (!this.hasInputConnection(element.absPathName) &&
                     !this.hasOutputConnection(element.absPathName)) {
                     element.type = "unconnected_param";
@@ -233,7 +239,8 @@ class ModelData {
         }
     }
 
-    /** Create an array in each element containing references to its
+    /**
+    * Create an array in each element containing references to its
     * children that are subsystems. Runs recursively over the element's
     * children array.
     * @param {Object} element Element with children to check.
@@ -244,7 +251,7 @@ class ModelData {
         if (!Array.isArray(element.children)) { return; }
 
         element.children.forEach(function (child) {
-            if (child.type === 'subsystem') {
+            if (child.type == 'subsystem') {
                 if (!Array.isArray(element.subsystem_children)) {
                     element.subsystem_children = [];
                 }
@@ -254,4 +261,20 @@ class ModelData {
             }
         })
     }
+
+    /**
+     * Build a string from the absoluate path names of the two elements and
+     * try to find it in the declare partials list.
+     * @param {Object} srcObj The source element.
+     * @param {Object} tgtObj The target element.
+     * @return {Boolean} True if the string was found.
+     */
+    isDeclaredPartial(srcObj, tgtObj) {
+        let partialsString = tgtObj.absPathName + " > " + srcObj.absPathName;
+
+        if (this.declarePartialsList.includes(partialsString)) return true;
+
+        return false;
+    }
+
 }

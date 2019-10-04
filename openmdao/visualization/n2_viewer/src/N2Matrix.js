@@ -4,8 +4,8 @@
  */
 class N2Matrix {
 
-    constructor(nodes) {
-        this.nodes = nodes;
+    constructor(visibleNodes, model) {
+        this.nodes = visibleNodes;
 
         n2Dx0 = n2Dx;
         n2Dy0 = n2Dy;
@@ -13,8 +13,8 @@ class N2Matrix {
         n2Dx = WIDTH_N2_PX / this.nodes.length;
         n2Dy = HEIGHT_PX / this.nodes.length;
 
-        this.buildStructure();
-        this.determineSymbolTypes();
+        this.buildStructure(model);
+        this.setupSymbolArrays();
         this.drawingPrep();
     }
 
@@ -53,9 +53,8 @@ class N2Matrix {
      * Set up nested objects resembling a two-dimensional array as the
      * matrix, but not an actual two dimensional array because most of
      * it would be unused.
-     * @param {Object[]} nodes The pre-discovered leaves in the model.
      */
-    buildStructure() {
+    buildStructure(model) {
         this.matrix = {};
 
         if (this.nodes.length >= LEVEL_OF_DETAIL_THRESHOLD) return;
@@ -63,52 +62,41 @@ class N2Matrix {
         for (let srcIdx = 0; srcIdx < this.nodes.length; ++srcIdx) {
             let srcObj = this.nodes[srcIdx];
 
-            // These nodes are on the diagonal.
-            if (!this.exists(srcIdx)) { this.matrix[srcIdx] = {}; }
-            this.matrix[srcIdx][srcIdx] = {
-                "row": srcIdx,
-                "col": srcIdx,
-                "obj": srcObj,
-                "id": srcObj.id + "_" + srcObj.id
-            };
+            // New row
+            if (!this.exists(srcIdx)) this.matrix[srcIdx] = {};
+
+            // On the diagonal
+            this.matrix[srcIdx][srcIdx] = new N2Node(srcIdx, srcIdx, srcObj, srcObj, model);
 
             let targets = srcObj.targetsParamView;
 
             for (let tgtObj of targets) {
                 let tgtIdx = indexFor(this.nodes, tgtObj);
                 if (tgtIdx != -1) {
-                    this.matrix[srcIdx][tgtIdx] = {
-                        "row": srcIdx,
-                        "col": tgtIdx,
-                        "obj": srcObj,
-                        "id": srcObj.id + "_" + tgtObj.id
-                    };
+                    this.matrix[srcIdx][tgtIdx] = new N2Node(srcIdx, tgtIdx, srcObj, tgtObj, model);
                 }
             }
 
-            if (srcObj.type === "param" || srcObj.type === "unconnected_param") {
+            // Solver nodes
+            if (srcObj.type.match(paramRegex)) {
                 for (let j = srcIdx + 1; j < this.nodes.length; ++j) {
                     let tgtObj = this.nodes[j];
                     if (srcObj.parentComponent !== tgtObj.parentComponent) break;
 
-                    if (tgtObj.type === "unknown") {
+                    if (tgtObj.type == "unknown") {
                         let tgtIdx = j;
-                        this.matrix[srcIdx][tgtIdx] = {
-                            "row": srcIdx,
-                            "col": tgtIdx,
-                            "obj": srcObj,
-                            "id": srcObj.id + "_" + tgtObj.id
-                        };
+                        this.matrix[srcIdx][tgtIdx] = new N2Node(srcIdx, tgtIdx, srcObj, tgtObj, model);
                     }
                 }
             }
         }
     }
 
-    /** Decide what object ach node will be drawn as, based on its
+    /** Decide what object each node will be drawn as, based on its
      * location in the matrix, type, source, target, and/or other conditions.
+     * Add the node to the appropriate array for drawing later.
      */
-    determineSymbolTypes() {
+    setupSymbolArrays() {
         this.symbols = {
             'scalar': [],
             'vector': [],
@@ -130,85 +118,13 @@ class N2Matrix {
             }
         };
 
-        let regex = /^unknown$|^param$|^unconnected_param$/;
-
         for (let row in this.matrix) {
             for (let col in this.matrix[row]) {
-                let d = this.matrix[row][col];
-                let tgtObj = this.nodes[d.col],
-                    srcObj = this.nodes[d.row];
-
-                if (d.col == d.row) { // on diagonal
-                    if (srcObj.type === "subsystem") { // group
-                        this.symbols.group.push(d);
-                    } else if (srcObj.type.match(regex)) {
-                        if (srcObj.dtype === "ndarray") { // vector
-                            this.symbols.vector.push(d);
-                        } else { // scalar
-                            this.symbols.scalar.push(d);
-                        }
-                    }
-                }
-                else if (srcObj.type === "subsystem") {
-                    if (tgtObj.type === "subsystem") { // groupGroup
-                        this.symbols.groupGroup.push(d);
-                    }
-                    else if (tgtObj.type.match(regex)) {
-                        if (tgtObj.dtype === "ndarray") { // groupVector
-                            this.symbols.groupVector.push(d);
-                        }
-                        else { // groupScalar
-                            this.symbols.groupScalar.push(d);
-                        }
-                    }
-                }
-                else if (srcObj.type.match(regex)) {
-                    if (srcObj.dtype === "ndarray") {
-                        if (tgtObj.type.match(regex)) {
-                            if (tgtObj.dtype === "ndarray" ||
-                                tgtObj.type.match(/^param$|^unconnected_param$/)) { // vectorVector
-                                this.symbols.vectorVector.push(d);
-
-                                let partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                                if (modelData.declare_partials_list.includes(partials_string)) {
-                                    this.symbols.declaredPartials.vectorVector.push(d);
-                                }
-
-                            }
-                            else { // vectorScalar
-                                this.symbols.vectorScalar.push(d);
-                                let partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                                if (modelData.declare_partials_list.includes(partials_string)) {
-                                    this.symbols.declaredPartials.vectorScalar.push(d);
-                                }
-                            }
-                        }
-                        else if (tgtObj.type === "subsystem") { // vectorGroup
-                            this.symbols.vectorGroup.push(d);
-                        }
-                    }
-                    else {
-                        if (tgtObj.type.match(regex)) {
-                            if (tgtObj.dtype === "ndarray") { // scalarVector
-                                this.symbols.scalarVector.push(d);
-                                let partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                                if (modelData.declare_partials_list.includes(partials_string)) {
-                                    this.symbols.declaredPartials.scalarVector.push(d);
-                                }
-                            }
-                            else { // scalarScalar
-                                this.symbols.scalarScalar.push(d);
-                                let partials_string = tgtObj.absPathName + " > " + srcObj.absPathName;
-                                if (modelData.declare_partials_list.includes(partials_string)) {
-                                    this.symbols.declaredPartials.scalarScalar.push(d);
-                                }
-                            }
-                        }
-                        else if (tgtObj.type === "subsystem") { // scalarGroup
-                            this.symbols.scalarGroup.push(d);
-                        }
-                    }
-                }
+                let node = this.matrix[row][col];
+     
+                this.symbols[node.symbolType.name].push(node);
+                if (node.symbolType.declaredPartial)
+                    this.symbols.declaredPartials[node.symbolType.name].push(node);
             }
         }
     }
@@ -326,7 +242,7 @@ class N2Matrix {
                         var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
                         return "translate(" + (n2Dx0 * index0 + u0) + "," + (n2Dy0 * index0 + v0) + ")";
                     }
-                    alert("error: enter transform not found");
+                    throw("enter transform not found");
                 });
             drawFunctions[i](gEnter, u0, v0, (i < 3) ? getOnDiagonalCellColor : CONNECTION_COLOR, false)
                 .on("mouseover", (i < 3) ? mouseOverOnDiagN2 : mouseOverOffDiagN2)
@@ -349,7 +265,7 @@ class N2Matrix {
                         var index = roc.rootIndex - zoomedElement.rootIndex;
                         return "translate(" + (n2Dx * index + u) + "," + (n2Dy * index + v) + ")";
                     }
-                    alert("error: exit transform not found");
+                    throw("exit transform not found");
                 })
                 .remove();
             drawFunctions[i](nodeExit, u, v, (i < 3) ? getOnDiagonalCellColor : CONNECTION_COLOR, true);
@@ -370,7 +286,7 @@ class N2Matrix {
                         var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
                         return "translate(0," + (n2Dy0 * index0) + ")";
                     }
-                    alert("error: enter transform not found");
+                    throw("enter transform not found");
                 });
             gEnter.append("line")
                 .attr("x2", WIDTH_N2_PX);
@@ -390,7 +306,7 @@ class N2Matrix {
                         var index = roc.rootIndex - zoomedElement.rootIndex;
                         return "translate(0," + (n2Dy * index) + ")";
                     }
-                    alert("error: exit transform not found");
+                    throw("exit transform not found");
                 })
                 .remove();
         }
@@ -409,7 +325,7 @@ class N2Matrix {
                         var i0 = roc.rootIndex0 - zoomedElement.rootIndex0;
                         return "translate(" + (n2Dx0 * i0) + ")rotate(-90)";
                     }
-                    alert("error: enter transform not found");
+                    throw("enter transform not found");
                 });
             gEnter.append("line")
                 .attr("x1", -HEIGHT_PX);
@@ -429,7 +345,7 @@ class N2Matrix {
                         var i = roc.rootIndex - zoomedElement.rootIndex;
                         return "translate(" + (n2Dx * i) + ")rotate(-90)";
                     }
-                    alert("error: exit transform not found");
+                    throw("exit transform not found");
                 })
                 .remove();
         }
@@ -448,7 +364,7 @@ class N2Matrix {
                         var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
                         return "translate(" + (n2Dx0 * index0) + "," + (n2Dy0 * index0) + ")";
                     }
-                    alert("error: enter transform not found");
+                    throw("enter transform not found");
                 });
 
             gEnter.append("rect")
@@ -483,7 +399,7 @@ class N2Matrix {
                         var index = roc.rootIndex - zoomedElement.rootIndex;
                         return "translate(" + (n2Dx * index) + "," + (n2Dy * index) + ")";
                     }
-                    alert("error: exit transform not found");
+                    throw("exit transform not found");
                 })
                 .remove();
 

@@ -77,7 +77,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
     ComputeLayout();
     ComputeConnections();
 
-    matrix = new N2Matrix(layout.visibleNodes);
+    matrix = new N2Matrix(layout.visibleNodes, model);
 
     var collapseDepthElement = parentDiv.querySelector("#idCollapseDepthDiv");
     for (var i = 2; i <= model.maxDepth; ++i) {
@@ -118,7 +118,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
             ComputeLayout();
 
-            matrix = new N2Matrix(layout.visibleNodes);
+            matrix = new N2Matrix(layout.visibleNodes, model);
         }
 
         for (var i = 2; i <= model.maxDepth; ++i) {
