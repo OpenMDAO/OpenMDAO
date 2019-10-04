@@ -24,15 +24,6 @@ var lastLeftClickedElement = document.getElementById("ptN2ContentDivId"),
 var enterIndex = 0,
     exitIndex = 0;
 
-function setD3ContentDiv() {
-    d3ContentDiv = document.getElementById("ptN2ContentDivId").querySelector("#d3_content_div");
-    svgDiv = d3.select(d3ContentDiv).append("div")
-        .attr("class", "ptN2ChartClass");
-
-    svg = svgDiv.append("svg:svg")
-        .attr("id", "svgId");
-}
-
 function setN2Group() {
     n2Group = svg.append("g").attr('id', 'N2'); // id given just so it is easier to see in Chrome dev tools when debugging
 }

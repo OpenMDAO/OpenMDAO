@@ -1,8 +1,11 @@
 function PtN2Diagram(parentDiv, modelJSON) {
-    var model = new ModelData(modelJSON);
+    var n2Diag = new N2Diagram(modelJSON);
 
-    setD3ContentDiv();
-    var svg = d3.select("#svgId");
+    var model = n2Diag.model; ////
+
+    d3ContentDiv = n2Diag.d3ContentDiv; ////
+    svgDiv = n2Diag.svgDiv; ////
+    svg = n2Diag.svg; ////
 
     // TODO: Get rid of all these after refactoring ///////////////
     var root = model.root;
@@ -10,20 +13,19 @@ function PtN2Diagram(parentDiv, modelJSON) {
     var abs2prom = model.abs2prom;
     ///////////////////////////////////////////////////////////////
 
-    var svgStyleElement = document.createElement("style");
-    var showPath = false; //default off
+    var svgStyleElement = n2Diag.svgStyle; ////
+    var showPath = n2Diag.showPath; //default off ////
 
-    var DEFAULT_TRANSITION_START_DELAY = 100;
-    var transitionStartDelay = DEFAULT_TRANSITION_START_DELAY;
+    var DEFAULT_TRANSITION_START_DELAY = N2Diagram.defaultTransitionStartDelay; ////
+    var transitionStartDelay = DEFAULT_TRANSITION_START_DELAY; ////
 
     //N^2 vars
-    var backButtonHistory = [], forwardButtonHistory = [];
-    var chosenCollapseDepth = -1;
-    var updateRecomputesAutoComplete = true; //default
+    var backButtonHistory = n2Diag.backButtonHistory; ////
+    var forwardButtonHistory = n2Diag.forwardButtonHistory; ////
+    var chosenCollapseDepth = n2Diag.chosenCollapseDepth; ////
+    var updateRecomputesAutoComplete = n2Diag.updateRecomputesAutoComplete; ////
 
-    var tooltip = d3.select("body").append("div").attr("class", "tool-tip")
-        .style("position", "absolute")
-        .style("visibility", "hidden");
+    var tooltip = n2Diag.toolTip; ////
 
     mouseOverOnDiagN2 = MouseoverOnDiagN2;
     mouseOverOffDiagN2 = MouseoverOffDiagN2;
@@ -33,22 +35,8 @@ function PtN2Diagram(parentDiv, modelJSON) {
     CreateDomLayout();
     CreateToolbar();
 
-    parentDiv.querySelector("#svgId").appendChild(svgStyleElement);
     UpdateSvgCss(svgStyleElement, N2SVGLayout.fontSizePx);
-
-    arrowMarker = svg.append("svg:defs").append("svg:marker");
-
-    arrowMarker
-        .attr("id", "arrow")
-        .attr("viewBox", "0 -5 10 10")
-        .attr("refX", 5)
-        .attr("refY", 0)
-        .attr("markerWidth", 1)
-        .attr("markerHeight", 1)
-        .attr("orient", "auto")
-        .append("path")
-        .attr("d", "M0,-5L10,0L0,5")
-        .attr("class", "arrowHead");
+    arrowMarker = d3.select("#arrow");
 
     setN2Group();
     var pTreeGroup = svg.append("g").attr("id", "tree"); // id given just so it is easier to see in Chrome dev tools when debugging

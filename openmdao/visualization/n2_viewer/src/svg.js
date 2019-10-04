@@ -24,7 +24,7 @@ function SaveSvg(parentDiv) {
     document.body.removeChild(downloadLink);
 }
 
-function UpdateSvgCss(svgStyleElement, FONT_SIZE_PX){
+function UpdateSvgCss(svgStyleElement, fontSize){
         var myCssText =
         "rect { " +
         "    stroke: " + PT_STROKE_COLOR + "; " +
@@ -78,13 +78,13 @@ function UpdateSvgCss(svgStyleElement, FONT_SIZE_PX){
         "    text-anchor: end; " +
         "    pointer-events: none; " +
         "    font-family: helvetica, sans-serif; " +
-        "    font-size: " + FONT_SIZE_PX +"px; " +
+        "    font-size: " + fontSize +"px; " +
         "} " +
         "#svgId"+" g.solver_group > text { " +
         "    text-anchor: end; " +
         "    pointer-events: none; " +
         "    font-family: helvetica, sans-serif; " +
-        "    font-size: " + FONT_SIZE_PX +"px; " +
+        "    font-size: " + fontSize +"px; " +
         "} " +
         "/* n2 diagram*/  " +
         "g.component_box > rect { " +

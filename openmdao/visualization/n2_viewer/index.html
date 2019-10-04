@@ -1,6 +1,6 @@
 <div id="all_pt_n2_content_div">
     <div id="ptN2ContentDivId">
-        <!-- The Modal -->
+        <!-- The Model -->
         {{help}}
         <div id="toolbarLoc">
             {{toolbar}}
@@ -10,13 +10,24 @@
                 <label id="searchCountId" style="display:inline-block;width:120px"></label>
             </div>
         </div>
-        <!--<select id="outputNamingSelect" onchange="OutputNameSelectChange()" style="display:none">-->
         <div id="currentPathId" class="path_string" style="display:none"></div>
-        <div id="d3_content_div"></div>
+        <div id="d3_content_div">
+            <div class="ptN2ChartClass" id="svgDiv">
+                <svg id="svgId">
+                    <defs>
+                        <marker id="arrow" viewBox="0 -5 10 10" refX="5" refY="0" markerWidth="1" markerHeight="1" orient="auto">
+                            <path d="M0,-5L10,0L0,5" class="arrowHead"></path>
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+        </div>
         <div id="connectionId">
         </div>
     </div>
 </div>
+
+<div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
 
 <nav id="context-menu" class="context-menu">
     <ul class="context-menu__items">
@@ -52,4 +63,5 @@
 {n2node_lib}
 {n2matrix_lib}
 {n2arrow_lib}
+{n2diagram_lib}
 {ptn2_lib}

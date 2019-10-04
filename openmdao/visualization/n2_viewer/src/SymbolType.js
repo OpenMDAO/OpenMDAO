@@ -1,4 +1,5 @@
-/** @typedef {Object} SymbolType
+/**
+ * @typedef {Object} SymbolType
  * @property {string} name What the symbol is called.
  * @property {Boolean} declaredPartial Whether the symbol is a declared partial.
  */

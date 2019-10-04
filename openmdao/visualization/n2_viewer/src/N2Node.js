@@ -21,7 +21,7 @@ class N2Node {
     constructor(row, col, srcObj, tgtObj, model) {
         this.row = row;
         this.col = col;
-        this.srcObj = srcObj;
+        this.srcObj = this.obj = srcObj;
         this.tgtObj = tgtObj;
         this.id = srcObj.id + "_" + tgtObj.id;
 

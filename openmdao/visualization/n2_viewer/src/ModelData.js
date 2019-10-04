@@ -3,8 +3,7 @@ class ModelData {
 
     /** Do some discovery in the tree and rearrange & enhance where necessary. */
     constructor(modelJSON) {
-        this.root = modelJSON.tree;
-        this.tree = modelJSON.tree;
+        this.root = this.tree = modelJSON.tree;
         this.root.name = 'model'; // Change 'root' to 'model'
         this.sys_pathnames_list = modelJSON.sys_pathnames_list;
         this.conns = modelJSON.connections_list;
@@ -87,8 +86,7 @@ class ModelData {
             if (splitArray.length > 1) {
                 if (!element.hasOwnProperty("subsystem_type") ||
                     element.subsystem_type != "component") {
-                    console.error("There is a colon-named object whose parent is not a component.");
-                    return;
+                    throw("There is a colon-named object whose parent is not a component.");
                 }
                 let type = element.children[i].type;
                 element.children.splice(i--, 1);
@@ -158,7 +156,7 @@ class ModelData {
                 element.parentComponent = parentComponent;
             }
             else {
-                console.error("Param or unknown without a parent component!");
+                throw("Param or unknown without a parent component!");
             }
         }
 

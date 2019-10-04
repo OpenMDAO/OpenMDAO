@@ -15,9 +15,7 @@ var CONNECTION_COLOR = "black",
    UNCONNECTED_PARAM_COLOR = "#F42E0C",
    HIGHLIGHT_HOVERED_COLOR = "blue",
    RED_ARROW_COLOR = "salmon",
-   GREEN_ARROW_COLOR = "seagreen",
-   DEBUG_ARROW_RED = "purple",
-   DEBUG_ARROW_GREEN = 'blue';
+   GREEN_ARROW_COLOR = "seagreen";
 
 
 // This is how we want to map solvers to colors and CSS classes

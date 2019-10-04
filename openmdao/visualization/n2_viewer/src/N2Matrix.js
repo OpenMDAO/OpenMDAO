@@ -134,6 +134,7 @@ class N2Matrix {
 
         d3RightTextNodesArrayZoomedBoxInfo = [currentBox];
 
+        // Find which component box each of the parameters belong to
         for (let ri = 1; ri < this.nodes.length; ++ri) {
             //boxes
             let el = this.nodes[ri];
@@ -172,6 +173,10 @@ class N2Matrix {
                 gridLines.push(gl);
             }
         }
+        console.log("d3RightTextNodesArrayZoomedBoxInfo: ", d3RightTextNodesArrayZoomedBoxInfo);
+        console.log("currentBox:", currentBox);
+        console.log("drawableN2ComponentBoxes:", drawableN2ComponentBoxes);
+        console.log("gridLines:", gridLines);
     }
 
     draw() {
