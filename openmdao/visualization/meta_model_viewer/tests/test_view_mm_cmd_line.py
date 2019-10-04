@@ -5,7 +5,6 @@ import os
 
 try:
     import bokeh
-    from openmdao.visualization.meta_model_viewer.meta_model_visualization import MetaModelVisualization
 except ImportError:
     bokeh = None
 import openmdao.test_suite.test_examples.meta_model_examples.structured_meta_model_example as example
@@ -17,8 +16,11 @@ class ViewMMCommandLineTest(unittest.TestCase):
         script = os.path.join(os.path.dirname(__file__), 'example.py')
         cmd = 'openmdao view_mm {}'.format(script)
         output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
-        expected_output = "Metamodel not specified. Try one of the following: ['interp1', 'interp2']."
-        self.assertTrue(expected_output in output, msg='Metamodel was specified when it should not have been. Check example.')
+        expected_output = ("Metamodel not specified. "
+                           "Try one of the following: ['interp1', 'interp2'].")
+        self.assertTrue(
+            expected_output in output,
+            msg='Metamodel was specified when it should not have been. Check example.')
 
     def test_invalid_metamodel(self):
         script = os.path.abspath(example.__file__).replace('.pyc', '.py') # PY2
@@ -28,4 +30,6 @@ class ViewMMCommandLineTest(unittest.TestCase):
             "Metamodel 'interp' not found.",
             " Try one of the following: ['mm']."
         ])
-        self.assertTrue(expected_output in output.replace('\r', ''), msg='Metamodel was found when it should not have. Check example.')
+        self.assertTrue(
+            expected_output in output.replace('\r', ''),
+            msg='Metamodel was found when it should not have. Check example.')

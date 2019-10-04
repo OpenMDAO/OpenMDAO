@@ -255,7 +255,8 @@ def _meta_model_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-m', '--metamodel_pathname', action='store', dest='pathname',
                         help='pathname of the metamodel component.')
-    parser.add_argument('-r', '--resolution', default=50, type=int, action='store', dest='resolution',
+    parser.add_argument('-r', '--resolution', default=50, type=int,
+                        action='store', dest='resolution',
                         help='Number of points to create contour grid')
     parser.add_argument('-p', '--port_number', default=5007, action='store', dest='port_number',
                         help='Port number to open viewer')
