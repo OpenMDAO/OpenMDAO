@@ -188,23 +188,6 @@ class StructuredMetaModelCompTests(unittest.TestCase):
 
         MetaModelVisualization(interp)
 
-    def test_unspecified_metamodel(self):
-        script = os.path.join(os.path.dirname(__file__), 'example.py')
-        cmd = 'openmdao view_mm {}'.format(script)
-        output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
-        expected_output = "Metamodel not specified. Try one of the following: ['interp1', 'interp2']."
-        self.assertTrue(expected_output in output)
-
-    def test_invalid_metamodel(self):
-        script = os.path.abspath(example.__file__).replace('.pyc', '.py') # PY2
-        cmd = 'openmdao view_mm {} -m {}'.format(script, 'interp')
-        output = subprocess.check_output(cmd.split()).decode('utf-8', 'ignore')
-        expected_output = '\n'.join([
-            "Metamodel 'interp' not found.",
-            " Try one of the following: ['mm']."
-        ])
-        self.assertTrue(expected_output in output.replace('\r', ''))
-
     def test_aligned_training_points(self):
 
         known_points_right = np.array([[ 10.        ,   0.        ,   0.        ,  10.96088904],

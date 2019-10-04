@@ -255,6 +255,9 @@ def _meta_model_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('-m', '--metamodel_pathname', action='store', dest='pathname',
                         help='pathname of the metamodel component.')
+    parser.add_argument('-r', '--resolution', default=50, type=int,
+                        action='store', dest='resolution',
+                        help='Number of points to create contour grid')
     parser.add_argument('-p', '--port_number', default=5007, action='store', dest='port_number',
                         help='Port number to open viewer')
 
@@ -285,11 +288,12 @@ def _meta_model_cmd(options):
 
         pathname = options.pathname
         port_number = options.port_number
+        resolution = options.resolution
 
         if pathname:
             comp = prob.model._get_subsystem(pathname)
             if comp and isinstance(comp, mm_types):
-                view_metamodel(comp, port_number)
+                view_metamodel(comp, resolution, port_number)
                 exit()
         else:
             comp = None
@@ -305,8 +309,7 @@ def _meta_model_cmd(options):
 
         elif mm_count == 1 and not pathname:
             comp = metamodels[mm_names[0]]
-            view_metamodel(comp, port_number)
-            exit()
+            view_metamodel(comp, resolution, port_number)
 
         else:
             try_str = "Try one of the following: {}.".format(mm_names)
