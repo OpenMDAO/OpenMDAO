@@ -16,6 +16,7 @@ from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
     SellarProblem, SellarStateConnection, SellarProblemWithArrays
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.solvers.linesearch.tests.test_backtracking import ImplCompTwoStates
 
 from openmdao.recorders.tests.sqlite_recorder_test_utils import assertMetadataRecorded, \
     assertDriverIterDataRecorded, assertSystemIterDataRecorded, assertSolverIterDataRecorded, \
@@ -832,19 +833,24 @@ class TestSqliteRecorder(unittest.TestCase):
         assertSolverIterDataRecorded(self, expected_data, self.eps, prefix='run_again')
 
     def test_record_line_search_armijo_goldstein(self):
-        prob = SellarProblem()
+        prob = om.Problem()
+        prob.model.add_subsystem('px', om.IndepVarComp('x', 1.0))
+        prob.model.add_subsystem('comp', ImplCompTwoStates())
+        prob.model.connect('px.x', 'comp.x')
+
+        prob.model.nonlinear_solver = om.NewtonSolver()
+        prob.model.nonlinear_solver.options['maxiter'] = 10
+        prob.model.linear_solver = om.ScipyKrylov()
+
+        ls = prob.model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
+        ls.add_recorder(self.recorder)
+        ls.options['c'] = .1
+
         prob.setup()
 
-        model = prob.model
-        model.linear_solver = om.ScipyKrylov()
-
-        nl = model.nonlinear_solver = om.NewtonSolver()
-        nl.options['solve_subsystems'] = True
-        nl.options['max_sub_solves'] = 4
-
-        ls = nl.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
-        ls.options['c'] = 100.0  # This is bogus, but it ensures that we get a few LS iterations.
-        ls.add_recorder(self.recorder)
+        prob['px.x'] = 2.0
+        prob['comp.y'] = 0.
+        prob['comp.z'] = 1.6
 
         t0, t1 = run_driver(prob)
 
@@ -858,18 +864,14 @@ class TestSqliteRecorder(unittest.TestCase):
             'ArmijoGoldsteinLS', (2,)
         ]
 
-        expected_abs_error = 5.6736837450444e-12
-        expected_rel_error = 0.0047475363051265665
+        expected_abs_error = 3.2882366094914777
+        expected_rel_error = 0.9999999999999998
 
         expected_solver_output = {
-            "con_cmp1.con1": [-22.42830237],
-            "d1.y1": [25.58830237],
-            "con_cmp2.con2": [-11.941511849],
-            "pz.z": [5.0, 2.0],
-            "obj_cmp.obj": [28.58830816516],
-            "d2.y2": [12.058488150],
-            "px.x": [1.0]
-        }
+            "comp.z": [1.5],
+            "comp.y": [1.75],
+            "px.x": [2.0],
+            }
 
         expected_solver_residuals = None
 
@@ -937,7 +939,6 @@ class TestSqliteRecorder(unittest.TestCase):
         nl.options['max_sub_solves'] = 4
 
         ls = nl.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
-        ls.options['c'] = 100.0  # This is bogus, but it ensures that we get a few LS iterations.
         model.add_recorder(self.recorder)
 
         try:

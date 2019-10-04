@@ -287,8 +287,7 @@ class DirectSolver(LinearSolver):
                 if matrix is None:
                     # this happens if we're not rank 0
                     self._lu = self._lup = None
-                    sz = np.sum(system._owned_sizes)
-                    self._nodup_size = sz
+                    self._nodup_size = np.sum(system._owned_sizes)
 
                 # Perform dense or sparse lu factorization.
                 elif isinstance(matrix, csc_matrix):
@@ -323,7 +322,7 @@ class DirectSolver(LinearSolver):
                                        " in %s." % (type(self._assembled_jac._int_mtx),
                                                     system.msginfo))
         else:
-            if system.comm.size > 1:
+            if nproc > 1:
                 raise RuntimeError("DirectSolvers without an assembled jacobian are not supported "
                                    "when running under MPI if comm.size > 1.")
 
@@ -359,40 +358,51 @@ class DirectSolver(LinearSolver):
             Inverse Jacobian.
         """
         system = self._system
+        iproc = system.comm.rank
+        nproc = system.comm.size
 
         if self._assembled_jac is not None:
 
-            if system.comm.size == 1:
-                matrix = self._assembled_jac._int_mtx._matrix
-            else:
-                matrix = self._assembled_jac._int_mtx._get_assembled_matrix(system)
+            with multi_proc_exception_check(system.comm) if nproc > 1 else do_nothing_context():
 
-            # Dense and Sparse matrices have their own inverse method.
-            if isinstance(matrix, np.ndarray):
-                # Detect singularities and warn user.
-                with warnings.catch_warnings():
-                    if self.options['err_on_singular']:
-                        warnings.simplefilter('error', RuntimeWarning)
+                if nproc == 1:
+                    matrix = self._assembled_jac._int_mtx._matrix
+                else:
+                    matrix = self._assembled_jac._int_mtx._get_assembled_matrix(system)
+                    if self._owned_size_totals is None:
+                        self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
+
+                if matrix is None:
+                    # This happens if we're not rank 0
+                    sz = np.sum(system._owned_sizes)
+                    inv_jac = np.zeros((sz, sz))
+
+                # Dense and Sparse matrices have their own inverse method.
+                elif isinstance(matrix, np.ndarray):
+                    # Detect singularities and warn user.
+                    with warnings.catch_warnings():
+                        if self.options['err_on_singular']:
+                            warnings.simplefilter('error', RuntimeWarning)
+                        try:
+                            inv_jac = scipy.linalg.inv(matrix)
+                        except RuntimeWarning as err:
+                            raise RuntimeError(format_singular_error(err, system, matrix))
+
+                        # NaN in matrix.
+                        except ValueError as err:
+                            raise RuntimeError(format_nan_error(system, matrix))
+
+                elif isinstance(matrix, csc_matrix):
                     try:
-                        inv_jac = scipy.linalg.inv(matrix)
-                    except RuntimeWarning as err:
-                        raise RuntimeError(format_singular_error(err, system, matrix))
-
-                    # NaN in matrix.
-                    except ValueError as err:
-                        raise RuntimeError(format_nan_error(system, matrix))
-
-            elif isinstance(matrix, csc_matrix):
-                try:
-                    inv_jac = scipy.sparse.linalg.inv(matrix)
-                except RuntimeError as err:
-                    if 'exactly singular' in str(err):
-                        raise RuntimeError(format_singular_csc_error(system, matrix))
-                    else:
-                        reraise(*sys.exc_info())
-            else:
-                raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(matrix), system.msginfo))
+                        inv_jac = scipy.sparse.linalg.inv(matrix)
+                    except RuntimeError as err:
+                        if 'exactly singular' in str(err):
+                            raise RuntimeError(format_singular_csc_error(system, matrix))
+                        else:
+                            reraise(*sys.exc_info())
+                else:
+                    raise RuntimeError("Direct solver not implemented for matrix type %s"
+                                       " in %s." % (type(matrix), system.msginfo))
 
         else:
             mtx = self._build_mtx()
