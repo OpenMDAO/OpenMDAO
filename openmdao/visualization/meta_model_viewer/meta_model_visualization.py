@@ -10,7 +10,7 @@ from bokeh.io import curdoc
 from bokeh.layouts import row, column
 from bokeh.plotting import figure
 from bokeh.models import Slider, ColumnDataSource
-from bokeh.models import ColorBar, BasicTicker, LinearColorMapper, Range1d, DataRange1d
+from bokeh.models import ColorBar, BasicTicker, LinearColorMapper, Range1d
 from bokeh.models.widgets import TextInput, Select
 from bokeh.server.server import Server
 
