@@ -541,13 +541,13 @@ class MetaModelVisualization(object):
         # Create and format figure
         self.right_plot_fig = right_plot_fig = figure(
             plot_width=250, plot_height=500,
-            x_range=(min(x), max(x)),
-            y_range=(min(self.contour_y_range), max(self.contour_y_range)),
             title="{} vs {}".format(y_idx, self.output_select.value), tools="pan")
         right_plot_fig.xaxis.axis_label = self.output_select.value
         right_plot_fig.yaxis.axis_label = y_idx
         right_plot_fig.xaxis.major_label_orientation = math.pi / 9
         right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
+        right_plot_fig.x_range.range_padding = 0.1
+        right_plot_fig.y_range.range_padding = 0.02
 
         # Determine distance and alpha opacity of training points
         if self.is_structured_meta_model:
@@ -607,14 +607,14 @@ class MetaModelVisualization(object):
         self.bottom_plot_source.data = dict(x=x, y=y)
 
         # Create and format figure
-        self.bot_plot_fig = bot_plot_fig = figure(
+        self.bottom_plot_fig = bottom_plot_fig = figure(
             plot_width=550, plot_height=250,
-            x_range=(min(self.contour_x_range), max(self.contour_x_range)),
-            y_range=(min(y), max(y)),
             title="{} vs {}".format(x_idx, self.output_select.value), tools="")
-        bot_plot_fig.xaxis.axis_label = x_idx
-        bot_plot_fig.yaxis.axis_label = self.output_select.value
-        bot_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
+        bottom_plot_fig.xaxis.axis_label = x_idx
+        bottom_plot_fig.yaxis.axis_label = self.output_select.value
+        bottom_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
+        bottom_plot_fig.x_range.range_padding = 0.02
+        bottom_plot_fig.y_range.range_padding = 0.1
 
         # Determine distance and alpha opacity of training points
         if self.is_structured_meta_model:
@@ -625,8 +625,8 @@ class MetaModelVisualization(object):
         self.bottom_alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
-        bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
-                             fill_alpha=self.bottom_alphas.tolist())
+        bottom_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
+                                fill_alpha=self.bottom_alphas.tolist())
 
         # Set the right_plot data source to new values
         self.bottom_plot_scatter_source.data = dict(
@@ -637,7 +637,7 @@ class MetaModelVisualization(object):
             'bot_slice_x', 'bot_slice_y', source=self.bottom_plot_scatter_source, color='black',
             line_width=2)
 
-        return self.bot_plot_fig
+        return self.bottom_plot_fig
 
     def _unstructured_training_points(self, compute_distance=False, source='bottom'):
         """
