@@ -7,39 +7,62 @@ class ModelData {
         this.root.name = 'model'; // Change 'root' to 'model'
         this.sys_pathnames_list = modelJSON.sys_pathnames_list;
         this.conns = modelJSON.connections_list;
+        // console.log('conns: ', this.conns);
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
         this.declarePartialsList = modelJSON.declare_partials_list;
         this.maxDepth = 1;
         this.idCounter = 0;
 
-        this.changeBlankSolverNamesToNone(this.root);
+        let startTime = Date.now();
         this.expandColonVars(this.root);
+        console.log("ModelData.expandColonVars: ", Date.now() - startTime, "ms");
+
+        startTime = Date.now();
         this.flattenColonGroups(this.root);
+        console.log("ModelData.flattenColonGroups: ", Date.now() - startTime, "ms");
+
+        startTime = Date.now();
         this.setParentsAndDepth(this.root, null, 1);
-        this.identifyUnconnectedParams();
+        console.log("ModelData.setParentsAndDepth: ", Date.now() - startTime, "ms");
+
+        startTime = Date.now();
+        this.performHouseKeeping(this.root);
+        console.log("ModelData.performHouseKeeping: ", Date.now() - startTime, "ms");
+
+        startTime = Date.now();
         this.initSubSystemChildren(this.root);
+        console.log("ModelData.initSubSystemChildren: ", Date.now() - startTime, "ms");
+    }
+
+    /**
+     * Recursively perform independant actions on the entire model tree
+     * to prevent having to traverse it multiple times.
+     * @param {Object} element The current element being updated.
+     */
+    performHouseKeeping(element) {
+        this.changeBlankSolverNamesToNone(element);
+        this.identifyUnconnectedParams(element);
+
+        if (Array.isPopulatedArray(element.children)) {
+            for (let i = 0; i < element.children.length; ++i) {
+                this.performHouseKeeping(element.children[i]);
+            }
+        }
     }
 
     /**
      * Solver names may be empty, so set them to "None" instead.
-     * Recurses over children.
      * @param {Object} element The item with solver names to check.
      */
     changeBlankSolverNamesToNone(element) {
         if (element.linear_solver == "") element.linear_solver = "None";
         if (element.nonlinear_solver == "") element.nonlinear_solver = "None";
-        if (element.children) {
-            for (var i = 0; i < element.children.length; ++i) {
-                this.changeBlankSolverNamesToNone(element.children[i]);
-            }
-        }
     }
 
     /** Called by expandColonVars when splitting an element into children.
      * TODO: Document params and recursive functionality.
      */
     addChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
-        console.log("addChildren called");
         if (arrayOfNames.length == arrayOfNamesIndex) return;
 
         let name = arrayOfNames[arrayOfNamesIndex];
@@ -78,7 +101,7 @@ class ModelData {
      * @param {Object} element The object that may have children to check.
      */
     expandColonVars(element) {
-        if (!Array.isArray(element.children)) return;
+        if (!Array.isPopulatedArray(element.children)) return;
 
         for (let i = 0; i < element.children.length; ++i) {
 
@@ -86,7 +109,7 @@ class ModelData {
             if (splitArray.length > 1) {
                 if (!element.hasOwnProperty("subsystem_type") ||
                     element.subsystem_type != "component") {
-                    throw("There is a colon-named object whose parent is not a component.");
+                    throw ("There is a colon-named object whose parent is not a component.");
                 }
                 let type = element.children[i].type;
                 element.children.splice(i--, 1);
@@ -106,7 +129,7 @@ class ModelData {
      * @param {Object} element The object to check.
      */
     flattenColonGroups(element) {
-        if (!Array.isArray(element.children)) return;
+        if (!Array.isPopulatedArray(element.children)) return;
 
         while (element.splitByColon && exists(element.children) &&
             element.children.length == 1 &&
@@ -156,7 +179,7 @@ class ModelData {
                 element.parentComponent = parentComponent;
             }
             else {
-                throw("Param or unknown without a parent component!");
+                throw ("Param or unknown without a parent component!");
             }
         }
 
@@ -173,9 +196,9 @@ class ModelData {
             this.maxSystemDepth = Math.max(depth, this.maxSystemDepth);
         }
 
-        if (element.children) {
-            for (var i = 0; i < element.children.length; ++i) {
-                var implicit = this.setParentsAndDepth(element.children[i], element, depth + 1);
+        if (Array.isPopulatedArray(element.children)) {
+            for (let i = 0; i < element.children.length; ++i) {
+                let implicit = this.setParentsAndDepth(element.children[i], element, depth + 1);
                 if (implicit) {
                     element.implicit = true;
                 }
@@ -184,7 +207,6 @@ class ModelData {
 
         return (element.implicit) ? true : false;
     }
-
 
     /**
      * Check the entire array of model connections for any with a target matching
@@ -215,28 +237,27 @@ class ModelData {
     }
 
     /**
+     * Check the entire array of model connections for any with a source OR
+     * target matching the specified path.
+     * @param {string} elementPath The full path of the element to check.
+     * @return True if the path is found as a source in the connection list.
+     */
+    hasAnyConnection(elementPath) {
+        for (let conn of this.conns) {
+            if (conn.src == elementPath || conn.tgt == elementPath)
+                return true;
+        }
+
+        return false;
+    }
+
+    /**
      * If an element has no connection naming it as a source or target,
      * relabel it as unconnected.
      */
-    identifyUnconnectedParams() { // Formerly updateRootTypes
-        let stack = [];
-        this.root.children.forEach(function (child) { stack.push(child); })
-
-        while (stack.length > 0) {
-            let element = stack.pop();
-            if (element.type == "param") {
-                if (!this.hasInputConnection(element.absPathName) &&
-                    !this.hasOutputConnection(element.absPathName)) {
-                    element.type = "unconnected_param";
-                }
-            }
-
-            if (Array.isArray(element.children)) {
-                element.children.forEach(function (child) {
-                    stack.push(child);
-                });
-            }
-        }
+    identifyUnconnectedParams(element) { // Formerly updateRootTypes
+        if (element.type == "param" && !this.hasAnyConnection(element.absPathName))
+            element.type = "unconnected_param";
     }
 
     /**

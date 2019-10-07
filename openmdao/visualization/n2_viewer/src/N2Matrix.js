@@ -1,6 +1,8 @@
 /**
- * Use the model tree to build a matrix, display, and perform
- * operations with it.
+ * Use the model tree to build a matrix, display, and perform operations with it.
+ * @typedef N2Matrix
+ * @property {Object[]} nodes Reference to nodes that will be drawn.
+ * @property {number} levelOfDetailThreshold Don't draw elements below this size in pixels.
  */
 class N2Matrix {
 
@@ -11,8 +13,9 @@ class N2Matrix {
         n2Dy0 = n2Dy;
 
         n2Dx = WIDTH_N2_PX / this.nodes.length;
-        n2Dy = HEIGHT_PX / this.nodes.length;
+        n2Dy = N2Layout.heightPx / this.nodes.length;
 
+        this.updateLevelOfDetailThreshold(N2Layout.heightPx);
         this.buildStructure(model);
         this.setupSymbolArrays();
         this.drawingPrep();
@@ -50,6 +53,14 @@ class N2Matrix {
     }
 
     /**
+     * Compute the new minimum element size when the diagram height changes.
+     * @param {number} height In pixels.
+     */
+    updateLevelOfDetailThreshold(height) {
+        this.levelOfDetailThreshold = height / 3;
+    }
+
+    /**
      * Set up nested objects resembling a two-dimensional array as the
      * matrix, but not an actual two dimensional array because most of
      * it would be unused.
@@ -57,7 +68,7 @@ class N2Matrix {
     buildStructure(model) {
         this.matrix = {};
 
-        if (this.nodes.length >= LEVEL_OF_DETAIL_THRESHOLD) return;
+        if (this.nodes.length >= this.levelOfDetailThreshold) return;
 
         for (let srcIdx = 0; srcIdx < this.nodes.length; ++srcIdx) {
             let srcObj = this.nodes[srcIdx];
@@ -166,17 +177,19 @@ class N2Matrix {
 
         //do this so you save old index for the exit()
         gridLines = [];
-        if (this.nodes.length < LEVEL_OF_DETAIL_THRESHOLD) {
+        if (this.nodes.length < this.levelOfDetailThreshold) {
             for (let i = 0; i < this.nodes.length; ++i) {
                 let obj = this.nodes[i];
                 var gl = { "i": i, "obj": obj };
                 gridLines.push(gl);
             }
         }
+        /*
         console.log("d3RightTextNodesArrayZoomedBoxInfo: ", d3RightTextNodesArrayZoomedBoxInfo);
         console.log("currentBox:", currentBox);
         console.log("drawableN2ComponentBoxes:", drawableN2ComponentBoxes);
         console.log("gridLines:", gridLines);
+        */
     }
 
     draw() {

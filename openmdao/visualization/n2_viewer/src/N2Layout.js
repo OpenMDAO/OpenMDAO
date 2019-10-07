@@ -42,20 +42,40 @@ class N2Layout {
         this.svg = d3.select("#svgId");
 
         this.setupTextRenderer();
+        let startTime = Date.now();
         this.updateTextWidths();
+        console.log("N2Layout.updateTextWidths: ", Date.now() - startTime, "ms");
+
+        startTime = Date.now();
         this.updateSolverTextWidths();
+        console.log("N2Layout.updateSolverTextWidths: ", Date.now() - startTime, "ms");
         delete (this.textRenderer);
 
+        startTime = Date.now();
         this.computeLeaves();
-        this.computeColumnWidths();
-        this.computeSolverColumnWidths();
-        this.setColumnLocations();
+        console.log("N2Layout.computeLeaves: ", Date.now() - startTime, "ms");
 
+        startTime = Date.now();
+        this.computeColumnWidths();
+        console.log("N2Layout.computeColumnWidths: ", Date.now() - startTime, "ms");
+
+        startTime = Date.now();
+        this.computeSolverColumnWidths();
+        console.log("N2Layout.computeSolverColumnWidths: ", Date.now() - startTime, "ms");
+
+        startTime = Date.now();
+        this.setColumnLocations();
+        console.log("N2Layout.setColumnLocations: ", Date.now() - startTime, "ms");
+
+        startTime = Date.now();
         this.computeNormalizedPositions(this.model.root, 0, false, null);
+        console.log("N2Layout.computeNormalizedPositions: ", Date.now() - startTime, "ms");
         if (this.zoomedElement.parent)
             this.zoomedNodes.push(this.zoomedElement.parent);
 
+        startTime = Date.now();
         this.computeSolverNormalizedPositions(this.model.root, 0, false, null);
+        console.log("N2Layout.computeSolverNormalizedPositions: ", Date.now() - startTime, "ms");
         if (this.zoomedElement.parent)
             this.zoomedSolverNodes.push(this.zoomedElement.parent);
 

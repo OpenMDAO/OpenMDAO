@@ -60,8 +60,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
     d3SolverRightTextNodesArrayZoomed = layout.visibleSolverNodes;
     ///////////////////////////////////////////////////////////////
 
-    ComputeLayout();
-    console.log("autoCompleteSetNames: ", autoCompleteSetNames)
+    UpdateClickedIndexes();
     ComputeConnections();
 
     matrix = new N2Matrix(layout.visibleNodes, model);
@@ -103,7 +102,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             d3SolverRightTextNodesArrayZoomed = layout.visibleSolverNodes;
             ///////////////////////////////////////////////////////////////
 
-            ComputeLayout();
+            UpdateClickedIndexes();
 
             matrix = new N2Matrix(layout.visibleNodes, model);
         }
@@ -430,7 +429,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         // PrintConnects();
     }
 
-    function ComputeLayout() {
+    function UpdateClickedIndexes() {
  
         enterIndex = exitIndex = 0;
         if (lastClickWasLeft) { //left click
@@ -983,7 +982,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         ClearArrowsAndConnects();
         N2Layout.heightPx = height;
         HEIGHT_PX = height;
-        LEVEL_OF_DETAIL_THRESHOLD = height / 3;
+        matrix.updateLevelOfDetailThreshold(height);
         WIDTH_N2_PX = height;
         TRANSITION_DURATION = TRANSITION_DURATION_FAST;
         n2Diag.updateSvgStyle(N2Layout.fontSizePx);

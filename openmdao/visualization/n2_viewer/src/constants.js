@@ -84,8 +84,7 @@ var widthPTreePx = 1,
     xScalerPTree = d3.scaleLinear().range([0, widthPTreePx]),
     yScalerPTree = d3.scaleLinear().range([0, HEIGHT_PX]),
     xScalerPTree0 = null,
-    yScalerPTree0 = null,
-    LEVEL_OF_DETAIL_THRESHOLD = HEIGHT_PX / 3; //3 pixels
+    yScalerPTree0 = null;
 
 var widthPSolverTreePx = 1,
     kSolverx = 0, kSolvery = 0, kSolverx0 = 0, kSolvery0 = 0,
@@ -94,6 +93,5 @@ var widthPSolverTreePx = 1,
     xScalerPSolverTree0 = null,
     yScalerPSolverTree0 = null;
 
-// var showLinearSolverNames = true;
 let paramRegex = /^(param|unconnected_param)$/;
 let paramOrUnknownRegex = /^(unknown|param|unconnected_param)$/;
