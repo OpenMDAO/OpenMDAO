@@ -382,13 +382,14 @@ class System(object):
         self._var_promotes = {'input': [], 'output': [], 'any': []}
         self._var_allprocs_abs_names = {'input': [], 'output': []}
         self._var_abs_names = {'input': [], 'output': []}
-        self._var_allprocs_abs_names_discrete = {'input': [], 'output': []}
-        self._var_abs_names_discrete = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = None
         self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
         self._var_abs2meta = {}
+
+        self._var_allprocs_abs_names_discrete = {'input': [], 'output': []}
+        self._var_abs_names_discrete = {'input': [], 'output': []}
         self._var_discrete = {'input': {}, 'output': {}}
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
 
@@ -399,6 +400,7 @@ class System(object):
         self._var_offsets = None
         self._nodup_out_ranges = None
         self._nodup2local_out_inds = None
+        self._owning_rank = None
 
         self._full_comm = None
 
@@ -487,12 +489,12 @@ class System(object):
     @property
     def msginfo(self):
         """
-        Our instance pathname, if available, or our class name.  For use in error messages.
+        Our instance pathname, if available, and our class name.  For use in error messages.
 
         Returns
         -------
         str
-            Either our instance pathname or class name.
+            Our class name and our pathname if available.
         """
         if self.pathname == '':
             return '{} (<model>)'.format(type(self).__name__)
@@ -1498,11 +1500,15 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_allprocs_abs_names = {'input': [], 'output': []}
-        self._var_abs_names = {'input': [], 'output': []}
         self._var_allprocs_prom2abs_list = {'input': OrderedDict(), 'output': OrderedDict()}
-        self._var_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {}
+        self._var_allprocs_discrete = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
+
+        self._var_abs_names = {'input': [], 'output': []}
         self._var_abs2meta = {}
+        self._var_abs_names_discrete = {'input': [], 'output': []}
+        self._var_abs2prom = {'input': {}, 'output': {}}
 
     def _setup_var_index_maps(self, recurse=True):
         """
@@ -1542,6 +1548,7 @@ class System(object):
         """
         self._var_sizes = {}
         self._owned_sizes = None
+        self._var_offsets = None
         self._nodup_out_ranges = None
         self._nodup2local_out_inds = None
         self._owning_rank = defaultdict(int)

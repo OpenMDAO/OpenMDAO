@@ -185,6 +185,7 @@ class Component(System):
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
 
+        self._full_comm = None
         orig_comm = comm
         if self._num_par_fd > 1:
             if comm.size > 1:
@@ -198,6 +199,7 @@ class Component(System):
         self._mode = mode
         self._subsystems_proc_range = []
         self._first_call_to_linearize = True
+        self._scope_cache = {}
 
         # Clear out old variable information so that we can call setup on the component.
         self._var_rel_names = {'input': [], 'output': []}

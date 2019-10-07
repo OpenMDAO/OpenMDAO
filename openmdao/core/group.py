@@ -321,6 +321,8 @@ class Group(System):
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
 
+        self._full_comm = None
+
         if self._num_par_fd > 1:
             info = self._coloring_info
             if comm.size > 1:
@@ -345,8 +347,9 @@ class Group(System):
         self._responses = OrderedDict()
         self._first_call_to_linearize = True
         self._approx_subjac_keys = None
-
         self._static_mode = False
+        self._scope_cache = {}
+
         self._subsystems_allprocs.extend(self._static_subsystems_allprocs)
         self._manual_connections.update(self._static_manual_connections)
         self._design_vars.update(self._static_design_vars)
@@ -573,7 +576,7 @@ class Group(System):
         allprocs_abs_names = self._var_allprocs_abs_names
         allprocs_abs_names_discrete = self._var_allprocs_abs_names_discrete
 
-        var_discrete = self._var_discrete
+        var_discrete = self._var_discrete = {'input': {}, 'output': {}}
         allprocs_discrete = self._var_allprocs_discrete
 
         abs2meta = self._var_abs2meta
@@ -583,6 +586,9 @@ class Group(System):
         allprocs_abs2prom = self._var_allprocs_abs2prom
 
         allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
+
+        if recurse:
+            self._has_output_scaling = self._has_resid_scaling = False
 
         for subsys in self._subsystems_myproc:
             if recurse:
@@ -817,7 +823,7 @@ class Group(System):
         conns : dict
             Dictionary of connections passed down from parent group.
         """
-        global_abs_in2out = self._conn_global_abs_in2out
+        global_abs_in2out = self._conn_global_abs_in2out = {}
 
         allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
         allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
