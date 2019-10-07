@@ -186,7 +186,8 @@ class ModelData {
     }
 
 
-    /** Check the entire array of model connections for any with a target matching
+    /**
+     * Check the entire array of model connections for any with a target matching
      * the specified path.
      * @param {string} elementPath The full path of the element to check.
      * @return True if the path is found as a target in the connection list.
@@ -199,7 +200,8 @@ class ModelData {
         return false;
     }
 
-    /** Check the entire array of model connections for any with a source matching
+    /**
+     * Check the entire array of model connections for any with a source matching
      * the specified path.
      * @param {string} elementPath The full path of the element to check.
      * @return True if the path is found as a source in the connection list.

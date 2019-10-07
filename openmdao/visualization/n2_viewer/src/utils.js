@@ -39,7 +39,8 @@ function exists(testVar) {
     return (testVar !== undefined && testVar !== null);
 }
 
-/** Add a method to the Object prototype call propExists(),
+/**
+ * Add a method to the Object prototype call propExists(),
  * which is stronger than hasOwnProperty() in that it also checks
  * the property for undefined and null values.
  * @param {string} propName The name of the property to check.
@@ -54,3 +55,11 @@ Object.defineProperty(Object.prototype, 'propExists', {
     },
     enumerable: false,
 });
+
+/**
+ * Since checking for an Array's existance as well as 
+ * length > 0 is very common, combine the two.
+ */
+Array.isPopulatedArray = function (arr) {
+    return (Array.isArray(arr) && arr.length > 0);
+};

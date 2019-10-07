@@ -1,4 +1,4 @@
-let N2SVGLayout_statics = {
+let N2Layout_statics = {
     'showLinearSolverNames': true,
     'rightTextMarginPx': 8,
     'heightPx': HEIGHT_PX,
@@ -7,10 +7,21 @@ let N2SVGLayout_statics = {
     'parentNodeWidthPx': 40
 };
 
-/** Calculates and stores the size and positions of visible elements. */
-class N2SVGLayout {
+/**
+ * Calculates and stores the size and positions of visible elements.
+ * @typedef N2Layout
+ * @property {ModelData} model Reference to the preprocessed model.
+ * @property {Object} zoomedElement The element the diagram is currently based on.
+ * @property {Object[]} zoomedNodes  Child nodes of the current zoomed element.
+ * @property {Object[]} visibleNodes Zoomed nodes that are actually drawn.
+ * @property {Object[]} zoomedSolverNodes Child solver nodes of the current zoomed element.
+ * @property {Boolean} updateRecomputesAutoComplete Zoomed solver nodes that are actually drawn.
+ * @property {Object} svg Reference to the top-level SVG element in the document.
+ */
+class N2Layout {
 
-    /** Compute the new layout based on the model data and the zoomed element.
+    /**
+     * Compute the new layout based on the model data and the zoomed element.
      * @param {ModelData} model The pre-processed model object.
      * @param {Object} zoomedElement The element the new layout is based around.
      */
@@ -18,12 +29,15 @@ class N2SVGLayout {
         this.model = model;
         this.zoomedElement = zoomedElement;
 
-        this.outputNamingType = "Absolute";
-        this.zoomedNodes = []; // Child nodes of the current zoomed element
-        this.visibleNodes = []; // Zoomed nodes that are actually drawn
+        this.updateRecomputesAutoComplete = true;
+        this.updateAutoCompleteIfNecessary();
 
-        this.zoomedSolverNodes = []; // Child solver nodes of the current zoomed element
-        this.visibleSolverNodes = []; // Zoomed solver nodes that are actually drawn
+        this.outputNamingType = "Absolute";
+        this.zoomedNodes = [];
+        this.visibleNodes = [];
+
+        this.zoomedSolverNodes = [];
+        this.visibleSolverNodes = [];
 
         this.svg = d3.select("#svgId");
 
@@ -38,18 +52,21 @@ class N2SVGLayout {
         this.setColumnLocations();
 
         this.computeNormalizedPositions(this.model.root, 0, false, null);
-        if (this.zoomedElement.parent) this.zoomedNodes.push(this.zoomedElement.parent);
+        if (this.zoomedElement.parent)
+            this.zoomedNodes.push(this.zoomedElement.parent);
 
         this.computeSolverNormalizedPositions(this.model.root, 0, false, null);
-        if (this.zoomedElement.parent) this.zoomedSolverNodes.push(this.zoomedElement.parent);
+        if (this.zoomedElement.parent)
+            this.zoomedSolverNodes.push(this.zoomedElement.parent);
+
     }
 
     /** Switch back and forth between showing the linear or non-linear solver names. 
      * @return {Boolean} The new value.
      */
     static toggleSolverNameType() {
-        N2SVGLayout.showLinearSolverNames = !N2SVGLayout.showLinearSolverNames;
-        return N2SVGLayout.showLinearSolverNames;
+        N2Layout.showLinearSolverNames = !N2Layout.showLinearSolverNames;
+        return N2Layout.showLinearSolverNames;
     }
 
     /** Create an off-screen area to render text for getTextWidth() */
@@ -118,7 +135,7 @@ class N2SVGLayout {
      * @param {Object} element The item to get the solver text from.
      */
     getSolverText(element) {
-        return N2SVGLayout.showLinearSolverNames ?
+        return N2Layout.showLinearSolverNames ?
             element.linear_solver : element.nonlinear_solver;
     }
 
@@ -129,7 +146,7 @@ class N2SVGLayout {
         if (element.varIsHidden) return;
 
         element.nameWidthPx = this.getTextWidth(this.getText(element)) + 2 *
-            N2SVGLayout.rightTextMarginPx;
+            N2Layout.rightTextMarginPx;
 
         if (Array.isArray(element.children)) {
             for (var i = 0; i < element.children.length; ++i) {
@@ -147,7 +164,7 @@ class N2SVGLayout {
         }
 
         element.nameSolverWidthPx = this.getTextWidth(this.getSolverText(element)) + 2 *
-            N2SVGLayout.rightTextMarginPx;
+            N2Layout.rightTextMarginPx;
 
         if (Array.isArray(element.children)) {
             for (let i = 0; i < element.children.length; ++i) {
@@ -189,11 +206,11 @@ class N2SVGLayout {
     setColumnWidthsFromWidestText(element, childrenProp, colArr, leafArr, widthProp) {
         if (element.varIsHidden) return;
 
-        let height = N2SVGLayout.heightPx * element.numLeaves / this.zoomedElement.numLeaves;
+        let height = N2Layout.heightPx * element.numLeaves / this.zoomedElement.numLeaves;
         element.textOpacity0 = element.propExists('textOpacity') ? element.textOpacity : 0;
-        element.textOpacity = (height > N2SVGLayout.fontSizePx) ? 1 : 0;
+        element.textOpacity = (height > N2Layout.fontSizePx) ? 1 : 0;
         let hasVisibleDetail = (height >= 2.0);
-        let width = (hasVisibleDetail) ? N2SVGLayout.minColumnWidthPx : 1e-3;
+        let width = (hasVisibleDetail) ? N2Layout.minColumnWidthPx : 1e-3;
         if (element.textOpacity > 0.5) width = element[widthProp];
 
         this.greatestDepth = Math.max(this.greatestDepth, element.depth);
@@ -230,7 +247,7 @@ class N2SVGLayout {
             lastColumnWidth = Math.max(lastWidthNeeded, lastColumnWidth);
         }
 
-        this.cols[this.zoomedElement.depth - 1].width = N2SVGLayout.parentNodeWidthPx;
+        this.cols[this.zoomedElement.depth - 1].width = N2Layout.parentNodeWidthPx;
         this.cols[this.greatestDepth].width = lastColumnWidth;
     }
 
@@ -254,7 +271,7 @@ class N2SVGLayout {
             lastColumnWidth = Math.max(lastWidthNeeded, lastColumnWidth);
         }
 
-        this.solverCols[this.zoomedElement.depth - 1].width = N2SVGLayout.parentNodeWidthPx;
+        this.solverCols[this.zoomedElement.depth - 1].width = N2Layout.parentNodeWidthPx;
         this.solverCols[this.greatestDepth].width = lastColumnWidth;
     }
 
@@ -376,7 +393,7 @@ class N2SVGLayout {
         element.heightSolver = node.numLeaves / this.model.root.numLeaves;
 
         if (element.varIsHidden) { //param or hidden leaf leaving
-            element.xSolver = this.cols[d.parentComponent.depth + 1].location / this.widthPTreePx;
+            element.xSolver = this.cols[element.parentComponent.depth + 1].location / this.widthPTreePx;
             element.ySolver = element.parentComponent.y;
             element.widthSolver = 1e-6;
             element.heightSolver = 1e-6;
@@ -392,6 +409,70 @@ class N2SVGLayout {
             }
         }
     }
+
+    /**
+     * Recurse through the children of the element and add their names to the
+     * autocomplete list of names if they're not already in it.
+     * @param {Object} element The element to search from.
+     */
+    populateAutoCompleteList(element) {
+        // Depth first, don't go into minimized children
+        if (Array.isPopulatedArray(element.children) && !element.isMinimized) {
+            for (let i = 0; i < element.children.length; ++i) {
+                this.populateAutoCompleteList(element.children[i]);
+            }
+        }
+
+        if (element === this.zoomedElement) return;
+
+        let curName = element.name;
+        if (element.splitByColon && element.children &&
+            element.children.length > 0) curName += ":";
+
+        if (!element.type.match(paramOrUnknownRegex)) curName += ".";
+        let namesToAdd = [curName];
+
+        if (element.splitByColon)
+            namesToAdd.push(element.colonName +
+                ((Array.isPopulatedArray(element.children)) ? ":" : ""));
+
+        namesToAdd.forEach(function (name) {
+            if (!this.autoCompleteSetNames.hasOwnProperty(name)) {
+                this.autoCompleteSetNames[name] = true;
+                autoCompleteListNames.push(name);
+            }
+        }.bind(this));
+
+        let localPathName = (this.zoomedElement === this.modelroot) ?
+            element.absPathName :
+            element.absPathName.slice(zoomedElement.absPathName.length + 1);
+
+        if (!this.autoCompleteSetPathNames.hasOwnProperty(localPathName)) {
+            this.autoCompleteSetPathNames[localPathName] = true;
+            autoCompleteListPathNames.push(localPathName);
+        }
+    }
+
+    /**
+     * If this.updateRecomputesAutoComplete is true, update the autocomplete
+     * list. If false, set it to true and return.
+     */
+    updateAutoCompleteIfNecessary() {
+        if (!this.updateRecomputesAutoComplete) {
+            this.updateRecomputesAutoComplete = true;
+            return;
+        }
+        this.autoCompleteSetNames = {};
+        this.autoCompleteSetPathNames = {};
+
+        autoCompleteListNames = [];
+        autoCompleteListPathNames = [];
+
+        this.populateAutoCompleteList(this.zoomedElement);
+
+        delete this.autoCompleteSetNames;
+        delete this.autoCompleteSetPathNames;
+    }
 }
 
-Object.assign(N2SVGLayout, N2SVGLayout_statics);
+Object.assign(N2Layout, N2Layout_statics);

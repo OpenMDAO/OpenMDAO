@@ -12,7 +12,6 @@
  * @property {Array} backButtonHistory
  * @property {Array} forwardButtonHistory
  * @property {number} chosenCollapseDepth
- * @property {Boolean} updateRecomputesAutoComplete
  */
 class N2Diagram {
     constructor(modelJSON) {
@@ -25,9 +24,8 @@ class N2Diagram {
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
         this.chosenCollapseDepth = -1;
-        this.updateRecomputesAutoComplete = true;
 
-        this.updateSvgStyle(N2SVGLayout.fontSizePx);
+        this.updateSvgStyle(N2Layout.fontSizePx);
     }
 
     /**
@@ -154,6 +152,8 @@ class N2Diagram {
             };
         });
         
+        // Iterate over the JSON object just created and turn it into
+        // CSS style sheet text.
         let newCssText = '';
         Object.keys(newCssJson).forEach(function (selector) {
             newCssText += selector + ' {\n';
