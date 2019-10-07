@@ -5,6 +5,7 @@ from itertools import product
 
 from scipy.spatial import cKDTree
 import numpy as np
+import logging
 
 from bokeh.io import curdoc
 from bokeh.layouts import row, column
@@ -131,6 +132,7 @@ class MetaModelVisualization(object):
         """
         self.prob = Problem()
         self.resolution = resolution
+        logging.getLogger("bokeh").setLevel(logging.ERROR)
 
         # If the surrogate model coming in is structured
         if isinstance(model, MetaModelUnStructuredComp):
