@@ -1,31 +1,30 @@
 function PtN2Diagram(parentDiv, modelJSON) {
     var n2Diag = new N2Diagram(modelJSON);
 
+    // TODO: Get rid of all these after refactoring ///////////////
     var model = n2Diag.model; ////
 
     d3ContentDiv = n2Diag.d3ContentDiv; ////
     svgDiv = n2Diag.svgDiv; ////
     svg = n2Diag.svg; ////
 
-    // TODO: Get rid of all these after refactoring ///////////////
     var root = model.root;
     var conns = model.conns;
     var abs2prom = model.abs2prom;
-    ///////////////////////////////////////////////////////////////
 
     var svgStyleElement = n2Diag.svgStyle; ////
     var showPath = n2Diag.showPath; //default off ////
-
     var DEFAULT_TRANSITION_START_DELAY = N2Diagram.defaultTransitionStartDelay; ////
+
     var transitionStartDelay = DEFAULT_TRANSITION_START_DELAY; ////
 
-    //N^2 vars
     var backButtonHistory = n2Diag.backButtonHistory; ////
     var forwardButtonHistory = n2Diag.forwardButtonHistory; ////
     var chosenCollapseDepth = n2Diag.chosenCollapseDepth; ////
     var updateRecomputesAutoComplete = n2Diag.updateRecomputesAutoComplete; ////
 
     var tooltip = n2Diag.toolTip; ////
+    ///////////////////////////////////////////////////////////////
 
     mouseOverOnDiagN2 = MouseoverOnDiagN2;
     mouseOverOffDiagN2 = MouseoverOffDiagN2;
@@ -35,7 +34,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
     CreateDomLayout();
     CreateToolbar();
 
-    UpdateSvgCss(svgStyleElement, N2SVGLayout.fontSizePx);
+    // UpdateSvgCss(svgStyleElement, N2SVGLayout.fontSizePx);
     arrowMarker = d3.select("#arrow");
 
     setN2Group();
@@ -1009,7 +1008,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         }
         N2SVGLayout.fontSizePx = fontSize;
         TRANSITION_DURATION = TRANSITION_DURATION_FAST;
-        UpdateSvgCss(svgStyleElement, fontSize);
+        n2Diag.updateSvgStyle(fontSize);
         Update();
     }
 
@@ -1028,7 +1027,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         LEVEL_OF_DETAIL_THRESHOLD = height / 3;
         WIDTH_N2_PX = height;
         TRANSITION_DURATION = TRANSITION_DURATION_FAST;
-        UpdateSvgCss(svgStyleElement, N2SVGLayout.fontSizePx);
+        n2Diag.updateSvgStyle(N2SVGLayout.fontSizePx);
         Update();
     }
 
@@ -1092,7 +1091,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             div.querySelector("#idVerticalResize" + i + "px").onclick = f;
         }
 
-        div.querySelector("#saveSvgButtonId").onclick = function () { SaveSvg(parentDiv) };
+        div.querySelector("#saveSvgButtonId").onclick = n2Diag.saveSvg.bind(n2Diag);
         div.querySelector("#helpButtonId").onclick = DisplayModal;
     }
 
