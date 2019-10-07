@@ -51,6 +51,20 @@ run :code:`openmdao view_mm unstructured_meta_model_example.py` in the command l
     in depth overview of what :ref:`Unstructured <feature_MetaModelUnStructuredComp>` and :ref:`Structured <feature_MetaModelStructuredComp>`
     metamodels are.
 
+Multiple Meta Models in Script
+-------------------------------------
+If your model has multiple metamodels, you can specify which of them you want to visualize. For example, in this code
+there are two metamodels.
+
+.. embed-code::
+    ../visualization/meta_model_viewer/tests/multiple_metamodels.py
+
+To visualize only the first one, you would use the command:
+
+.. code::
+
+    openmdao view_mm -m cos_mm multiple_metamodels.py
+
 Command Line Interface
 ----------------------
 

@@ -9,7 +9,7 @@ import numpy as np
 from bokeh.io import curdoc
 from bokeh.layouts import row, column
 from bokeh.plotting import figure
-from bokeh.models import Slider, ColumnDataSource
+from bokeh.models import Slider, ColumnDataSource, HoverTool
 from bokeh.models import ColorBar, BasicTicker, LinearColorMapper, Range1d
 from bokeh.models.widgets import TextInput, Select
 from bokeh.server.server import Server
@@ -492,10 +492,22 @@ class MetaModelVisualization(object):
         if len(data):
             # Add training data points overlay to contour plot
             data = np.array(data)
-            self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1])
-            self.contour_plot.circle(
+            if self.is_structured_meta_model:
+                self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1],
+                    z=self.meta_model.training_outputs[self.output_select.value].flatten())
+            else:
+                self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1],
+                    z=self.meta_model._training_output[self.output_select.value])
+
+            training_data_renderer = self.contour_plot.circle(
                 x='x', y='y', source=self.contour_training_data_source,
                 size=5, color='white', alpha=0.50)
+
+            self.contour_plot.add_tools(HoverTool(renderers=[training_data_renderer], tooltips=[
+                ('x', '@x'),
+                ('y', '@y'),
+                ('f_train', '@z'),
+            ]))
 
         return self.contour_plot
 
@@ -554,8 +566,14 @@ class MetaModelVisualization(object):
         alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
-        right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None, fill_color='#000000',
-                               fill_alpha=alphas.tolist())
+        scatter_renderer = right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None,
+                                                  fill_color='#000000',
+                                                  fill_alpha=alphas.tolist())
+
+        right_plot_fig.add_tools(HoverTool(renderers=[scatter_renderer], tooltips=[
+            (self.output_select.value, '@x'),
+            (y_idx, '@y'),
+        ]))
 
         # Set the right_plot data source to new values
         self.right_plot_scatter_source.data = dict(
@@ -621,8 +639,13 @@ class MetaModelVisualization(object):
         alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
-        bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
+        scatter_renderer = bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
                              fill_alpha=alphas.tolist())
+
+        bot_plot_fig.add_tools(HoverTool(renderers=[scatter_renderer], tooltips=[
+            (x_idx, '@x'),
+            (self.output_select.value, '@y'),
+        ]))
 
         # Set the right_plot data source to new values
         self.bottom_plot_scatter_source.data = dict(
