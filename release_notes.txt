@@ -1,4 +1,26 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.9.1
+
+October 8, 2019
+
+2.9.1 is a quick patch release to correct a couple of issues:
+
+Bug Fixes: 
+----------
+- The previous release inadvertantly changed the default "bounds_enforce" option on the BoundsEnforce
+  line search to "vector".  This release restores the default to the originally intended "scalar".
+- The entry point for the `web_view` utility function was fixed. (Thank you Nicholas Bollweg)
+- Fixed a bug that prevented model reconfigurability in certain situations.
+- Fixed a missing `sqrt` in the documentation for the Hohmann example.
+- Fixed a bug that prevented proper fallback from bidirectional coloring to unidirectional coloring
+  in certain cases where the bidirectional coloring was worse than the unidirectional coloring.
+
+New Features: 
+-------------
+- Small improvements were made to the MetaModel viewer, along with some additional testing.
+
+
+################################################################################################
 Release Notes for OpenMDAO 2.9.0
 
 October 1, 2019
