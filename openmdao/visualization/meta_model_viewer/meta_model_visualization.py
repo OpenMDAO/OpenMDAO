@@ -494,10 +494,12 @@ class MetaModelVisualization(object):
             data = np.array(data)
             if self.is_structured_meta_model:
                 self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1],
-                    z=self.meta_model.training_outputs[self.output_select.value].flatten())
+                                                              z=self.meta_model.training_outputs[
+                                                              self.output_select.value].flatten())
             else:
                 self.contour_training_data_source.data = dict(x=data[:, 0], y=data[:, 1],
-                    z=self.meta_model._training_output[self.output_select.value])
+                                                              z=self.meta_model._training_output[
+                                                              self.output_select.value])
 
             training_data_renderer = self.contour_plot.circle(
                 x='x', y='y', source=self.contour_training_data_source,
@@ -639,8 +641,8 @@ class MetaModelVisualization(object):
         alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
-        scatter_renderer = bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None, fill_color='#000000',
-                             fill_alpha=alphas.tolist())
+        scatter_renderer = bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None,
+                                                fill_color='#000000', fill_alpha=alphas.tolist())
 
         bot_plot_fig.add_tools(HoverTool(renderers=[scatter_renderer], tooltips=[
             (x_idx, '@x'),
