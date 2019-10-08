@@ -5,6 +5,7 @@ from itertools import product
 
 from scipy.spatial import cKDTree
 import numpy as np
+import logging
 
 from bokeh.io import curdoc
 from bokeh.layouts import row, column
@@ -93,6 +94,10 @@ class MetaModelVisualization(object):
     scatter_distance : TextInput
         Text input for user to enter custom value to calculate distance of training points around
         slice line
+    right_alphas : array
+        Array of points containing alpha values for right plot
+    bottom_alphas : array
+        Array of points containing alpha values for bottom plot
     dist_range : float
         Value taken from scatter_distance used for calculating distance of training points around
         slice line
@@ -127,6 +132,7 @@ class MetaModelVisualization(object):
         """
         self.prob = Problem()
         self.resolution = resolution
+        logging.getLogger("bokeh").setLevel(logging.ERROR)
 
         # If the surrogate model coming in is structured
         if isinstance(model, MetaModelUnStructuredComp):
@@ -551,13 +557,13 @@ class MetaModelVisualization(object):
         # Create and format figure
         self.right_plot_fig = right_plot_fig = figure(
             plot_width=250, plot_height=500,
-            x_range=(min(x), max(x)),
-            y_range=(min(self.contour_y_range), max(self.contour_y_range)),
             title="{} vs {}".format(y_idx, self.output_select.value), tools="pan")
         right_plot_fig.xaxis.axis_label = self.output_select.value
         right_plot_fig.yaxis.axis_label = y_idx
         right_plot_fig.xaxis.major_label_orientation = math.pi / 9
         right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
+        right_plot_fig.x_range.range_padding = 0.1
+        right_plot_fig.y_range.range_padding = 0.02
 
         # Determine distance and alpha opacity of training points
         if self.is_structured_meta_model:
@@ -565,17 +571,19 @@ class MetaModelVisualization(object):
         else:
             data = self._unstructured_training_points(compute_distance=True, source='right')
 
-        alphas = 1.0 - data[:, 2] / self.dist_range
+        self.right_alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
         scatter_renderer = right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None,
                                                   fill_color='#000000',
-                                                  fill_alpha=alphas.tolist())
+                                                  fill_alpha=self.right_alphas.tolist())
 
         right_plot_fig.add_tools(HoverTool(renderers=[scatter_renderer], tooltips=[
             (self.output_select.value, '@x'),
             (y_idx, '@y'),
         ]))
+        right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None, fill_color='#000000',
+                               fill_alpha=self.right_alphas.tolist())
 
         # Set the right_plot data source to new values
         self.right_plot_scatter_source.data = dict(
@@ -623,14 +631,14 @@ class MetaModelVisualization(object):
         self.bottom_plot_source.data = dict(x=x, y=y)
 
         # Create and format figure
-        self.bot_plot_fig = bot_plot_fig = figure(
+        self.bottom_plot_fig = bottom_plot_fig = figure(
             plot_width=550, plot_height=250,
-            x_range=(min(self.contour_x_range), max(self.contour_x_range)),
-            y_range=(min(y), max(y)),
             title="{} vs {}".format(x_idx, self.output_select.value), tools="")
-        bot_plot_fig.xaxis.axis_label = x_idx
-        bot_plot_fig.yaxis.axis_label = self.output_select.value
-        bot_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
+        bottom_plot_fig.xaxis.axis_label = x_idx
+        bottom_plot_fig.yaxis.axis_label = self.output_select.value
+        bottom_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
+        bottom_plot_fig.x_range.range_padding = 0.02
+        bottom_plot_fig.y_range.range_padding = 0.1
 
         # Determine distance and alpha opacity of training points
         if self.is_structured_meta_model:
@@ -638,13 +646,14 @@ class MetaModelVisualization(object):
         else:
             data = self._unstructured_training_points(compute_distance=True)
 
-        alphas = 1.0 - data[:, 2] / self.dist_range
+        self.bottom_alphas = 1.0 - data[:, 2] / self.dist_range
 
         # Training data scatter plot
-        scatter_renderer = bot_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None,
-                                                fill_color='#000000', fill_alpha=alphas.tolist())
+        scatter_renderer = bottom_plot_fig.scatter(x=data[:, 0], y=data[:, 3], line_color=None,
+                                                   fill_color='#000000',
+                                                   fill_alpha=self.bottom_alphas.tolist())
 
-        bot_plot_fig.add_tools(HoverTool(renderers=[scatter_renderer], tooltips=[
+        bottom_plot_fig.add_tools(HoverTool(renderers=[scatter_renderer], tooltips=[
             (x_idx, '@x'),
             (self.output_select.value, '@y'),
         ]))
@@ -658,7 +667,7 @@ class MetaModelVisualization(object):
             'bot_slice_x', 'bot_slice_y', source=self.bottom_plot_scatter_source, color='black',
             line_width=2)
 
-        return self.bot_plot_fig
+        return self.bottom_plot_fig
 
     def _unstructured_training_points(self, compute_distance=False, source='bottom'):
         """
@@ -715,7 +724,7 @@ class MetaModelVisualization(object):
             dists, idxs = self._multidimension_input(scaled_x0, points, source=source)
 
         # data contains:
-        # [x_value, y_value, ND-distance, func_value, alpha]
+        # [x_value, y_value, ND-distance, func_value]
 
         data = np.zeros((len(idxs), 4))
         for dist_index, j in enumerate(idxs):
@@ -907,7 +916,7 @@ class MetaModelVisualization(object):
         self._update_all_plots()
 
 
-def view_metamodel(meta_model_comp, port_number):
+def view_metamodel(meta_model_comp, resolution, port_number):
     """
     Visualize a metamodel.
 
@@ -915,6 +924,8 @@ def view_metamodel(meta_model_comp, port_number):
     ----------
     meta_model_comp : MetaModelStructuredComp or MetaModelUnStructuredComp
         The metamodel component.
+    resolution : int
+        Number of points to control contour plot resolution.
     port_number : int
         Bokeh plot port number.
     """
@@ -922,7 +933,7 @@ def view_metamodel(meta_model_comp, port_number):
     from bokeh.application.handlers import FunctionHandler
 
     def make_doc(doc):
-        MetaModelVisualization(meta_model_comp, doc=doc)
+        MetaModelVisualization(meta_model_comp, resolution, doc=doc)
 
     # print('Opening Bokeh application on http://localhost:5006/')
     server = Server({'/': Application(FunctionHandler(make_doc))}, port=int(port_number))

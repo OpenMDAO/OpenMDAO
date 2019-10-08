@@ -187,6 +187,126 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         # training.
         krig.predict(0.5)
 
+    def test_error_messages(self):
+
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False)
+        x = [np.array([[2.5], [2.5]])]
+        y = [np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("Multiple input features cannot have the same"
+                    " value.")
+        self.assertEqual(str(cm.exception), expected)
+
+        x = [np.array([[2.5], [3.5]])]
+        y = [np.array([5.5, 5.5]), np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("X and y must have the same length.")
+        self.assertEqual(str(cm.exception), expected)
+
+        x = [np.array([[2.5], [3.5]]), np.array([[4.5, 4.6], [2.5, 2.6]])]
+        y = [np.array([3.5, 3.5]), np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("All X must have the same number of columns.")
+        self.assertEqual(str(cm.exception), expected)
+
+        x = [np.array([[2.5], [3.5]]), np.array([[4.5], [2.5]])]
+        y = [np.array([3.5, 3.5, 5.5]), np.array([3.5, 3.5, 5.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("X and y must have the same number of rows.")
+        self.assertEqual(str(cm.exception), expected)
+
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False, theta=[3, 4, 5])
+        x = [np.array([[2.5], [2.5]])]
+        y = [np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("theta must be a list of 1 element(s).")
+        self.assertEqual(str(cm.exception), expected)
+
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False, theta0=[3, 4, 5])
+        x = [np.array([[2.5], [2.5]])]
+        y = [np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("theta0 must be a list of 1 element(s).")
+        self.assertEqual(str(cm.exception), expected)
+
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False, thetaL=[3, 4, 5])
+        x = [np.array([[2.5], [2.5]])]
+        y = [np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("thetaL must be a list of 1 element(s).")
+        self.assertEqual(str(cm.exception), expected)
+
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False, thetaU=[3, 4, 5])
+        x = [np.array([[2.5], [2.5]])]
+        y = [np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("thetaU must be a list of 1 element(s).")
+        self.assertEqual(str(cm.exception), expected)
+
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False, thetaL=[-3])
+        x = [np.array([[2.5], [2.5]])]
+        y = [np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("The bounds must satisfy O < thetaL <= thetaU.")
+        self.assertEqual(str(cm.exception), expected)
+
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False, thetaL=[4], thetaU=[3])
+        x = [np.array([[2.5], [2.5]])]
+        y = [np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("The bounds must satisfy O < thetaL <= thetaU.")
+        self.assertEqual(str(cm.exception), expected)
+
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False, theta0=[-4])
+        x = [np.array([[2.5], [2.5]])]
+        y = [np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("theta0 must be strictly positive.")
+        self.assertEqual(str(cm.exception), expected)
+
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False, theta=[-4])
+        x = [np.array([[2.5], [2.5]])]
+        y = [np.array([3.5, 3.5])]
+
+        with self.assertRaises(ValueError) as cm:
+            cokrig.train_multifi(x, y)
+
+        expected = ("theta must be strictly positive.")
+        self.assertEqual(str(cm.exception), expected)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,12 +1,11 @@
 import numpy as np
 import unittest
 
-from openmdao.api import Group, Problem, MultiFiMetaModelUnStructuredComp, MultiFiSurrogateModel, \
-     MultiFiCoKrigingSurrogate
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
-class MockSurrogate(MultiFiSurrogateModel):
+class MockSurrogate(om.MultiFiSurrogateModel):
 
     def __init__(self):
         super(MockSurrogate, self).__init__()
@@ -25,12 +24,12 @@ class MockSurrogate(MultiFiSurrogateModel):
 class MultiFiMetaModelTestCase(unittest.TestCase):
 
     def test_error_messages(self):
-        mm = MultiFiMetaModelUnStructuredComp(nfi=3)
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=3)
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0.)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -49,13 +48,13 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         # Wrong number of input samples
 
-        mm = MultiFiMetaModelUnStructuredComp(nfi=3)
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=3)
 
         mm.add_input('x', 0.)
         mm.add_input('x2', 0.)
         mm.add_output('y', 0.)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -77,13 +76,13 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         # Wrong number of output samples
 
-        mm = MultiFiMetaModelUnStructuredComp(nfi=3)
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=3)
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0.)
         mm.add_output('y2', 0.)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -104,12 +103,12 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
     def test_inputs_wrt_nfidelity(self):
-        mm = MultiFiMetaModelUnStructuredComp(nfi=3)
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=3)
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0.)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -121,13 +120,13 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         self.assertEqual(mm.options['train:y_fi3'], None)
 
     def test_one_dim_one_fidelity_training(self):
-        mm = MultiFiMetaModelUnStructuredComp()
+        mm = om.MultiFiMetaModelUnStructuredComp()
         surr = MockSurrogate()
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0., surrogate=surr)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -148,13 +147,13 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
 
     def test_one_dim_one_fidelity_training_run_setup_twice(self):
-        mm = MultiFiMetaModelUnStructuredComp()
+        mm = om.MultiFiMetaModelUnStructuredComp()
         surr = MockSurrogate()
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0., surrogate=surr)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -181,15 +180,14 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.run_model()
         np.testing.assert_array_equal(surr.xpredict, expected_xpredict)
 
-
     def test_one_dim_bi_fidelity_training(self):
-        mm = MultiFiMetaModelUnStructuredComp(nfi=2)
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
         surr = MockSurrogate()
 
         mm.add_input('x', 0.)
         mm.add_output('y', 0., surrogate=surr)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -215,7 +213,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr.ytrain[1], expected_ytrain[1])
 
     def test_two_dim_bi_fidelity_training(self):
-        mm = MultiFiMetaModelUnStructuredComp(nfi=2)
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
         surr_y1 = MockSurrogate()
         surr_y2 = MockSurrogate()
 
@@ -224,7 +222,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.add_output('y1', 0., surrogate=surr_y1)
         mm.add_output('y2', 0., surrogate=surr_y2)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -265,13 +263,13 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         def branin_low_fidelity(x):
             return branin(x)+30.*x[1] + 10.
 
-        mm = MultiFiMetaModelUnStructuredComp(nfi=2)
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
         mm.add_input('x', np.zeros((1, 2)))
         mm.add_output('y', np.zeros((1, )))
 
-        mm.options['default_surrogate'] = MultiFiCoKrigingSurrogate(normalize=False)
+        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False)
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -326,13 +324,13 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
 
         # Now, vectorized model with both points predicted together.
 
-        mm = MultiFiMetaModelUnStructuredComp(nfi=2, vec_size=2)
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=2, vec_size=2)
         mm.add_input('x', np.zeros((2, 1, 2)))
         mm.add_output('y', np.zeros((2, 1, )))
 
-        mm.options['default_surrogate'] = MultiFiCoKrigingSurrogate(normalize=False)
+        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False)
 
-        prob = Problem()
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -360,7 +358,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.add_input('x', 0.)
         mm.add_output('y', 0.)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -385,7 +383,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.add_input('x', 0.)
         mm.add_output('y', 0.)
 
-        prob = Problem(Group())
+        prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
         prob.setup()
 
@@ -395,6 +393,100 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         self.assertEqual(mm.options['train:y'], None)
         self.assertEqual(mm.options['train:y_fi2'], None)
         self.assertEqual(mm.options['train:y_fi3'], None)
+
+
+class MultiFiMetaModelFeatureTestCase(unittest.TestCase):
+
+    def test_2_input_2_fidelity(self):
+        import numpy as np
+        import openmdao.api as om
+
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
+        mm.add_input('x', np.zeros((1, 2)))
+        mm.add_output('y', np.zeros((1, )))
+
+        # Surrrogate model that implements the multifidelity cokriging method.
+        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('mm', mm)
+
+        prob.setup()
+
+        x_hifi = np.array([[ 0.13073587,  0.24909577],  # expensive (hifi) doe
+                           [ 0.91915571,  0.4735261 ],
+                           [ 0.75830543,  0.13321705],
+                           [ 0.51760477,  0.34594101],
+                           [ 0.03531219,  0.77765831],
+                           [ 0.27249206,  0.5306115 ],
+                           [ 0.62762489,  0.65778471],
+                           [ 0.3914706 ,  0.09852519],
+                           [ 0.86565585,  0.85350002],
+                           [ 0.40806563,  0.91465314]])
+
+        y_hifi = np.array([69.22687251161716,
+                           28.427292491743817,
+                           20.36175030334259,
+                           7.840766670948326,
+                           23.950783505007422,
+                           16.0326610719367,
+                           77.32264403894713,
+                           26.625242780670835,
+                           135.85615334210993,
+                           101.43980212355875])
+
+        x_lofi = np.array([[ 0.91430235,  0.17029894],  # cheap (lowfi) doe
+                           [ 0.99329651,  0.76431519],
+                           [ 0.2012252 ,  0.35006032],
+                           [ 0.61707854,  0.90210676],
+                           [ 0.15113004,  0.0133355 ],
+                           [ 0.07108082,  0.55344447],
+                           [ 0.4483159 ,  0.52182902],
+                           [ 0.5926638 ,  0.06595122],
+                           [ 0.66305449,  0.48579608],
+                           [ 0.47965045,  0.7407793 ],
+                           [ 0.13073587,  0.24909577],  # notice hifi doe inclusion
+                           [ 0.91915571,  0.4735261 ],
+                           [ 0.75830543,  0.13321705],
+                           [ 0.51760477,  0.34594101],
+                           [ 0.03531219,  0.77765831],
+                           [ 0.27249206,  0.5306115 ],
+                           [ 0.62762489,  0.65778471],
+                           [ 0.3914706 ,  0.09852519],
+                           [ 0.86565585,  0.85350002],
+                           [ 0.40806563,  0.91465314]])
+
+        y_lofi = list([18.204898470295255,
+                       107.66640600958577,
+                       46.11717344625053,
+                       186.002239934648,
+                       135.12480249921992,
+                       65.3605467926758,
+                       51.72316385370553,
+                       15.541873662737451,
+                       72.77648156410065,
+                       100.33324800434931,
+                       86.69974561161716,
+                       52.63307549174382,
+                       34.358261803342586,
+                       28.218996970948325,
+                       57.280532805007425,
+                       41.9510060719367,
+                       107.05618533894713,
+                       39.580998480670836,
+                       171.46115394210995,
+                       138.87939632355875])
+
+        mm.options['train:x'] = x_hifi
+        mm.options['train:y'] = y_hifi
+        mm.options['train:x_fi2'] = x_lofi
+        mm.options['train:y_fi2'] = y_lofi
+
+        prob['mm.x'] = np.array([[2./3., 1./3.]])
+        prob.run_model()
+
+        assert_rel_error(self, prob['mm.y'], 26.26, tolerance=0.02)
+
 
 if __name__ == "__main__":
     unittest.main()

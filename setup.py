@@ -128,6 +128,9 @@ setup(
             'XDSMjs/test/*.html',
             'XDSMjs/examples/*.json',
         ],
+        'openmdao.visualization.meta_model_viewer': [
+            'tests/known_data_point_files/*.csv',
+        ],
         'openmdao.devtools.iprofile_app': [
             'static/*.html',
             'templates/*.html'
