@@ -1,5 +1,4 @@
 var d3ContentDiv, svgDiv, svg;
-var n2Group;
 
 var WIDTH_N2_PX = HEIGHT_PX;
 var PTREE_N2_GAP_PX = 10; //spacing between partition tree and n2 diagram
@@ -7,7 +6,6 @@ var n2Dx = 0, n2Dy = 0, n2Dx0 = 0, n2Dy0 = 0;
 var d3NodesArray, d3RightTextNodesArrayZoomed = []
 var d3RightTextNodesArrayZoomedBoxInfo
 var drawableN2ComponentBoxes;
-var matrix;
 
 var gridLines;
 
@@ -22,7 +20,7 @@ var enterIndex = 0,
     exitIndex = 0;
 
 function DrawRect(x, y, width, height, fill) {
-    n2Group.insert("rect")
+    n2Diag.n2TopGroup.insert("rect")
         .attr("class", "n2_hover_elements")
         .attr("y", y)
         .attr("x", x)
@@ -44,7 +42,7 @@ function DrawArrowsParamView(startIndex, endIndex) {
     var startIndices = [], endIndices = [];
     for (var startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
         for (var endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
-            if (matrix.node(startsI, endsI) !== undefined) {
+            if (n2Diag.matrix.node(startsI, endsI) !== undefined) {
                 startIndices.push(startsI);
                 endIndices.push(endsI);
             }

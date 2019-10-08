@@ -2,13 +2,11 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
     // TODO: Get rid of all these after refactoring ///////////////
     var model = n2Diag.model; ////
-    matrix = n2Diag.matrix; ////
 
     svgDiv = n2Diag.svgDiv; ////
     svg = n2Diag.svg; ////
 
     var root = model.root;
-    var conns = model.conns;
     var abs2prom = model.abs2prom;
 
     var showPath = n2Diag.showPath; //default off ////
@@ -16,8 +14,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
     var transitionStartDelay = DEFAULT_TRANSITION_START_DELAY; ////
 
-    var backButtonHistory = n2Diag.backButtonHistory; ////
-    var forwardButtonHistory = n2Diag.forwardButtonHistory; ////
     var chosenCollapseDepth = n2Diag.chosenCollapseDepth; ////
 
     var tooltip = n2Diag.toolTip; ////
@@ -27,8 +23,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
     mouseOverOffDiagN2 = MouseoverOffDiagN2;
     mouseClickN2 = MouseClickN2;
     mouseOutN2 = MouseoutN2;
-
-    n2Group = n2Diag.n2TopGroup; ////
 
     // TODO: Get rid of all these globals after refactoring ///////////////
     d3NodesArray = n2Diag.layout.zoomedNodes;
@@ -72,10 +66,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
         d3SolverRightTextNodesArrayZoomed = n2Diag.layout.visibleSolverNodes;
         ///////////////////////////////////////////////////////////////
 
-        for (var i = 2; i <= model.maxDepth; ++i) {
-            parentDiv.querySelector("#idCollapseDepthOption" + i + "").style.display = (i <= zoomedElement.depth) ? "none" : "block";
-        }
-
         if (xScalerPTree0 != null) {//not first run.. store previous
             kx0 = kx;
             ky0 = ky;
@@ -115,7 +105,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             svg.attr("width", n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + n2Diag.layout.widthPSolverTreePx + 2 * SVG_MARGIN + PTREE_N2_GAP_PX)
                 .attr("height", N2Layout.heightPx + 2 * SVG_MARGIN);
 
-            n2Group.attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
+            n2Diag.n2TopGroup.attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
             n2Diag.pTreeGroup.attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
 
             n2Diag.pSolverTreeGroup.attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + SVG_MARGIN + PTREE_N2_GAP_PX) + "," + SVG_MARGIN + ")");
@@ -130,7 +120,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         svg.transition(sharedTransition).attr("width", n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + n2Diag.layout.widthPSolverTreePx + 2 * SVG_MARGIN + PTREE_N2_GAP_PX)
             .attr("height", N2Layout.heightPx + 2 * SVG_MARGIN);
 
-        n2Group.transition(sharedTransition).attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
+        n2Diag.n2TopGroup.transition(sharedTransition).attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
         n2Diag.pTreeGroup.transition(sharedTransition).attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
         n2Diag.n2BackgroundRect.transition(sharedTransition).attr("width", WIDTH_N2_PX).attr("height", HEIGHT_PX);
 
@@ -385,7 +375,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
     updateFunc = Update;
 
     function ClearArrows() {
-        n2Group.selectAll("[class^=n2_hover_elements]").remove();
+        n2Diag.n2TopGroup.selectAll("[class^=n2_hover_elements]").remove();
     }
 
     function ClearArrowsAndConnects() {
@@ -444,8 +434,8 @@ function PtN2Diagram(parentDiv, modelJSON) {
     function LeftClick(d, ele) {
         if (!d.children) return;
         if (d3.event.button != 0) return;
-        backButtonHistory.push({ "el": zoomedElement });
-        forwardButtonHistory = [];
+        n2Diag.backButtonHistory.push({ "el": zoomedElement });
+        n2Diag.forwardButtonHistory = [];
         SetupLeftClick(d);
         Update();
         d3.event.preventDefault();
@@ -453,25 +443,25 @@ function PtN2Diagram(parentDiv, modelJSON) {
     }
 
     function BackButtonPressed() {
-        if (backButtonHistory.length == 0) return;
-        var d = backButtonHistory.pop().el;
-        parentDiv.querySelector("#backButtonId").disabled = (backButtonHistory.length == 0) ? "disabled" : false;
+        if (n2Diag.backButtonHistory.length == 0) return;
+        var d = n2Diag.backButtonHistory.pop().el;
+        parentDiv.querySelector("#backButtonId").disabled = (n2Diag.backButtonHistory.length == 0) ? "disabled" : false;
         for (var obj = d; obj != null; obj = obj.parent) { //make sure history item is not minimized
             if (obj.isMinimized) return;
         }
-        forwardButtonHistory.push({ "el": zoomedElement });
+        n2Diag.forwardButtonHistory.push({ "el": zoomedElement });
         SetupLeftClick(d);
         Update();
     }
 
     function ForwardButtonPressed() {
-        if (forwardButtonHistory.length == 0) return;
-        var d = forwardButtonHistory.pop().el;
-        parentDiv.querySelector("#forwardButtonId").disabled = (forwardButtonHistory.length == 0) ? "disabled" : false;
+        if (n2Diag.forwardButtonHistory.length == 0) return;
+        var d = n2Diag.forwardButtonHistory.pop().el;
+        parentDiv.querySelector("#forwardButtonId").disabled = (n2Diag.forwardButtonHistory.length == 0) ? "disabled" : false;
         for (var obj = d; obj != null; obj = obj.parent) { //make sure history item is not minimized
             if (obj.isMinimized) return;
         }
-        backButtonHistory.push({ "el": zoomedElement });
+        n2Diag.backButtonHistory.push({ "el": zoomedElement });
         SetupLeftClick(d);
         Update();
     }
@@ -649,7 +639,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         for (var i = 0; i < d3RightTextNodesArrayZoomed.length; ++i) {
             var leftTextWidthDependency = d3RightTextNodesArrayZoomed[i].nameWidthPx;
             var box = d3RightTextNodesArrayZoomedBoxInfo[i];
-            if (matrix.node(hoveredIndexRC, i) !== undefined) { //i is column here
+            if (n2Diag.matrix.node(hoveredIndexRC, i) !== undefined) { //i is column here
                 if (i != hoveredIndexRC) {
                     new N2Arrow({
                         end: { col: i, row: i },
@@ -661,7 +651,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
                 }
             }
 
-            if (matrix.node(i, hoveredIndexRC) !== undefined) { //i is row here
+            if (n2Diag.matrix.node(i, hoveredIndexRC) !== undefined) { //i is row here
                 if (i != hoveredIndexRC) {
                     new N2Arrow({
                         start: { col: i, row: i },
@@ -676,32 +666,32 @@ function PtN2Diagram(parentDiv, modelJSON) {
     }
 
     function MouseoutN2() {
-        n2Group.selectAll(".n2_hover_elements").remove();
+        n2Diag.n2TopGroup.selectAll(".n2_hover_elements").remove();
     }
 
     function MouseClickN2(d) {
         var newClassName = "n2_hover_elements_" + d.row + "_" + d.col;
-        var selection = n2Group.selectAll("." + newClassName);
+        var selection = n2Diag.n2TopGroup.selectAll("." + newClassName);
         if (selection.size() > 0) {
             selection.remove();
         }
         else {
-            n2Group.selectAll("path.n2_hover_elements, circle.n2_hover_elements")
+            n2Diag.n2TopGroup.selectAll("path.n2_hover_elements, circle.n2_hover_elements")
                 .attr("class", newClassName);
         }
     }
 
     function ReturnToRootButtonClick() {
-        backButtonHistory.push({ "el": zoomedElement });
-        forwardButtonHistory = [];
+        n2Diag.backButtonHistory.push({ "el": zoomedElement });
+        n2Diag.forwardButtonHistory = [];
         SetupLeftClick(root);
         Update();
     }
 
     function UpOneLevelButtonClick() {
         if (zoomedElement === root) return;
-        backButtonHistory.push({ "el": zoomedElement });
-        forwardButtonHistory = [];
+        n2Diag.backButtonHistory.push({ "el": zoomedElement });
+        n2Diag.forwardButtonHistory = [];
         SetupLeftClick(zoomedElement.parent);
         Update();
     }
@@ -793,7 +783,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         ClearArrowsAndConnects();
         N2Layout.heightPx = height;
         HEIGHT_PX = height;
-        matrix.updateLevelOfDetailThreshold(height);
+        n2Diag.matrix.updateLevelOfDetailThreshold(height);
         WIDTH_N2_PX = height;
         TRANSITION_DURATION = TRANSITION_DURATION_FAST;
         n2Diag.updateSvgStyle(N2Layout.fontSizePx);

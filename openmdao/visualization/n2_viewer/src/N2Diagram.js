@@ -263,23 +263,33 @@ class N2Diagram {
         }
     }
 
+    /** Make sure UI controls reflect history and current reality. */
+    updateUI() {
+        this.parentDiv.querySelector('#currentPathId').innerHTML =
+            'PATH: root' + ((this.zoomedElement.parent) ? '.' : '') +
+            this.zoomedElement.absPathName;
+        this.parentDiv.querySelector('#backButtonId').disabled =
+            (this.backButtonHistory.length == 0) ? 'disabled' : false;
+        this.parentDiv.querySelector('#forwardButtonId').disabled =
+            (this.forwardButtonHistory.length == 0) ? 'disabled' : false;
+        this.parentDiv.querySelector('#upOneLevelButtonId').disabled =
+            (this.zoomedElement === this.model.root) ? 'disabled' : false;
+        this.parentDiv.querySelector('#returnToRootButtonId').disabled =
+            (this.zoomedElement === this.model.root) ? 'disabled' : false;
+
+        for (let i = 2; i <= this.model.maxDepth; ++i) {
+            this.parentDiv.querySelector('#idCollapseDepthOption' + i).style.display =
+                (i <= this.zoomedElement.depth) ? 'none' : 'block';
+        }
+    }
+
     /**
      * Refresh the diagram when something has visually changed.
      * @param {Boolean} [computeNewTreeLayout = true] Whether to rebuild the layout and
      *  matrix objects.
      */
     update(computeNewTreeLayout = true) {
-        this.parentDiv.querySelector("#currentPathId").innerHTML =
-            "PATH: root" + ((this.zoomedElement.parent) ? "." : "") +
-            this.zoomedElement.absPathName;
-        this.parentDiv.querySelector("#backButtonId").disabled =
-            (this.backButtonHistory.length == 0) ? "disabled" : false;
-        this.parentDiv.querySelector("#forwardButtonId").disabled =
-            (this.forwardButtonHistory.length == 0) ? "disabled" : false;
-        this.parentDiv.querySelector("#upOneLevelButtonId").disabled =
-            (this.zoomedElement === this.model.root) ? "disabled" : false;
-        this.parentDiv.querySelector("#returnToRootButtonId").disabled =
-            (this.zoomedElement === this.model.root) ? "disabled" : false;
+        this.updateUI();
 
         // Compute the new tree layout.
         if (computeNewTreeLayout) {
