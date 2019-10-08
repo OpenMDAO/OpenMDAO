@@ -1585,7 +1585,7 @@ def _compute_coloring(J, mode):
         elif ncols <= nrows:
             mode = 'fwd'
         else:
-            mode == 'rev'
+            mode = 'rev'
 
     rev = mode == 'rev'
 
