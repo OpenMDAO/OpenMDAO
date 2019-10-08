@@ -72,7 +72,7 @@ class LinesearchSolver(NonlinearSolver):
         super(LinesearchSolver, self)._declare_options()
         opt = self.options
         opt.declare(
-            'bound_enforcement', default='vector', values=['vector', 'scalar', 'wall'],
+            'bound_enforcement', default='scalar', values=['vector', 'scalar', 'wall'],
             desc="If this is set to 'vector', the entire vector is backtracked together " +
                  "when a bound is violated. If this is set to 'scalar', only the violating " +
                  "entries are set to the bound and then the backtracking occurs on the vector " +
