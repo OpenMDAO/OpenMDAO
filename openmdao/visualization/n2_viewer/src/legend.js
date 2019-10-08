@@ -102,7 +102,7 @@ function SetupLegend(d3, d3ContentDiv) {
 
     //SOLVER COLORS
     {
-        if (showLinearSolverNames){
+        if (N2Layout.showLinearSolverNames){
             for (var i = 0; i < linearSolverNames.length; ++i) {
                 var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 2 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
                 var name = linearSolverNames[i];

@@ -69,7 +69,7 @@ function SearchButtonClicked() {
     FindRootOfChangeFunction = FindRootOfChangeForSearch;
     TRANSITION_DURATION = TRANSITION_DURATION_SLOW;
     lastClickWasLeft = false;
-    updateRecomputesAutoComplete = false;
+    n2Diag.updateRecomputesAutoComplete = false;
     updateFunc();
 }
 

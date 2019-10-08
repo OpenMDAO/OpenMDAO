@@ -2,6 +2,7 @@
  * The outermost N2 class.
  * @typedef N2Diagram
  * @property {ModelData} model Processed model data received from Python.
+ * @property {N2Layout} layout Sizes and positions of visible elements.
  * @property {Object} parentDiv
  * @property {Object} d3ContentDiv The div containing all of the diagram's content.
  * @property {Object} svgDiv The div containing the SVG element.
@@ -26,6 +27,8 @@ class N2Diagram {
         this.chosenCollapseDepth = -1;
 
         this.updateSvgStyle(N2Layout.fontSizePx);
+
+        this.layout = new N2Layout(this.model, this.model.root);
     }
 
     /**
@@ -43,6 +46,7 @@ class N2Diagram {
         this.parentDiv.querySelector("#svgId").appendChild(this.svgStyle);
 
         this.toolTip = d3.select(".tool-tip");
+        this.arrowMarker = d3.select("#arrow");
     }
 
     /**

@@ -2,7 +2,6 @@ var d3ContentDiv, svgDiv, svg;
 var n2ElementsGroup, n2GridLinesGroup, n2ComponentBoxesGroup, n2ArrowsGroup, n2DotsGroup;
 
 var n2Group;
-var arrowMarker;
 
 var WIDTH_N2_PX = HEIGHT_PX;
 var PTREE_N2_GAP_PX = 10; //spacing between partition tree and n2 diagram
@@ -49,7 +48,7 @@ function DrawRect(x, y, width, height, fill) {
 
 function DrawArrowsParamView(startIndex, endIndex) {
     var lineWidth = Math.min(5, n2Dx * .5, n2Dy * .5);
-    arrowMarker.attr("markerWidth", lineWidth * .4)
+    n2Diag.arrowMarker.attr("markerWidth", lineWidth * .4)
         .attr("markerHeight", lineWidth * .4);
 
     var boxStart = d3RightTextNodesArrayZoomedBoxInfo[startIndex];

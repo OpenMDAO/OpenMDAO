@@ -12,6 +12,7 @@ let N2Layout_statics = {
  * @typedef N2Layout
  * @property {ModelData} model Reference to the preprocessed model.
  * @property {Object} zoomedElement The element the diagram is currently based on.
+ * @property {Object} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object[]} zoomedNodes  Child nodes of the current zoomed element.
  * @property {Object[]} visibleNodes Zoomed nodes that are actually drawn.
  * @property {Object[]} zoomedSolverNodes Child solver nodes of the current zoomed element.
@@ -25,10 +26,12 @@ class N2Layout {
      * @param {ModelData} model The pre-processed model object.
      * @param {Object} zoomedElement The element the new layout is based around.
      */
-    constructor(model, zoomedElement) {
+    constructor(model, newZoomedElement) {
         this.model = model;
-        this.zoomedElement = zoomedElement;
 
+        // TODO: Remove global zoomedElement
+        this.zoomedElement = this.zoomedElementPrev = zoomedElement = newZoomedElement;
+        
         this.updateRecomputesAutoComplete = true;
         this.updateAutoCompleteIfNecessary();
 
@@ -81,12 +84,25 @@ class N2Layout {
 
     }
 
-    /** Switch back and forth between showing the linear or non-linear solver names. 
+    /**
+     * Switch back and forth between showing the linear or non-linear solver names. 
      * @return {Boolean} The new value.
      */
     static toggleSolverNameType() {
         N2Layout.showLinearSolverNames = !N2Layout.showLinearSolverNames;
         return N2Layout.showLinearSolverNames;
+    }
+
+    /**
+     * Replace the current zoomedElement, but preserve its value.
+     * @param {Object} newZoomedElement Replacement zoomed element.
+     */
+    updateZoomedElement(newZoomedElement) {
+        this.zoomedElementPrev = this.zoomedElement;
+
+        // TODO: Stop updating the global zoomedElement when we
+        // implement a different place to put it.
+        this.zoomedElement = zoomedElement = newZoomedElement;
     }
 
     /** Create an off-screen area to render text for getTextWidth() */
