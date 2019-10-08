@@ -60,7 +60,7 @@ class TestKrigingSurrogate(unittest.TestCase):
 
     def test_2d(self):
 
-        x = np.array([[-2., 0.], [-0.5, 1.5], [1., 3.], [8.5, 4.5], 
+        x = np.array([[-2., 0.], [-0.5, 1.5], [1., 3.], [8.5, 4.5],
                       [-3.5, 6.], [4., 7.5], [-5., 9.], [5.5, 10.5],
                       [10., 12.], [7., 13.5], [2.5, 15.]])
         y = np.array([[branin(case)] for case in x])
@@ -98,7 +98,7 @@ class TestKrigingSurrogate(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             surrogate.train(x, y)
 
-        self.assertEqual(str(cm.exception), 'KrigingSurrogate require at least'
+        self.assertEqual(str(cm.exception), 'KrigingSurrogate requires at least'
                                             ' 2 training points.')
 
     def test_vector_input(self):

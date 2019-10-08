@@ -394,6 +394,37 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         self.assertEqual(mm.options['train:y_fi2'], None)
         self.assertEqual(mm.options['train:y_fi3'], None)
 
+    def test_surrogate_message_format(self):
+        mm = om.MultiFiMetaModelUnStructuredComp(nfi=2)
+        mm.add_input('x', np.zeros((1, 2)))
+        mm.add_output('y', np.zeros((1, )))
+
+        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False)
+
+        prob = om.Problem()
+        prob.model.add_subsystem('mm', mm)
+        prob.setup()
+
+        x = [[[ 0.13073587,  0.24909577],  # expensive (hifi) doe
+              [ 0.13073587,  0.24909577],
+              [ 0.40806563,  0.91465314]],
+
+             [[ 0.91430235,  0.17029894],  # cheap (lowfi) doe
+              [ 0.40806563,  0.91465314]]]
+
+        mm.options['train:x'] = x[0]
+        mm.options['train:y'] = np.array([1, 2, 3])
+        mm.options['train:x_fi2'] = x[1]
+        mm.options['train:y_fi2'] = np.array([1, 2])
+
+        prob['mm.x'] = np.array([[2./3., 1./3.]])
+
+        with self.assertRaises(ValueError) as cm:
+            prob.run_model()
+
+        expected = ("mm: Multiple input features cannot have the same value.")
+        self.assertEqual(str(cm.exception), expected)
+
 
 class MultiFiMetaModelFeatureTestCase(unittest.TestCase):
 

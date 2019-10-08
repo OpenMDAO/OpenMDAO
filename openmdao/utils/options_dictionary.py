@@ -243,23 +243,23 @@ class OptionsDictionary(object):
                         typs = tuple([type_.__name__ for type_ in types])
                         self._raise("Value ({}) of option '{}' has type '{}', but one of "
                                     "types {} was expected.".format(value, name, vtype, typs),
-                                    TypeError)
+                                    exc_type=TypeError)
                     else:
                         self._raise("Value ({}) of option '{}' has type '{}', but type '{}' "
                                     "was expected.".format(value, name, vtype, types.__name__),
-                                    TypeError)
+                                    exc_type=TypeError)
 
             if upper is not None:
                 if value > upper:
                     self._raise("Value ({}) of option '{}' "
                                 "exceeds maximum allowed value of {}.".format(value, name, upper),
-                                ValueError)
+                                exc_type=ValueError)
             if lower is not None:
                 if value < lower:
                     self._raise("Value ({}) of option '{}' "
                                 "is less than minimum allowed value of {}.".format(value, name,
                                                                                    lower),
-                                ValueError)
+                                exc_type=ValueError)
 
         # General function test
         if meta['check_valid'] is not None:
@@ -306,11 +306,11 @@ class OptionsDictionary(object):
 
         if values is not None and not isinstance(values, (set, list, tuple)):
             self._raise("In declaration of option '%s', the 'values' arg must be of type None,"
-                        " list, or tuple - not %s." % (name, values), TypeError)
+                        " list, or tuple - not %s." % (name, values), exc_type=TypeError)
 
         if types is not None and not isinstance(types, (type, set, list, tuple)):
             self._raise("In declaration of option '%s', the 'types' arg must be None, a type "
-                        "or a tuple - not %s." % (name, types), TypeError)
+                        "or a tuple - not %s." % (name, types), exc_type=TypeError)
 
         if types is not None and values is not None:
             self._raise("'types' and 'values' were both specified for option '%s'." % name)
@@ -404,10 +404,10 @@ class OptionsDictionary(object):
         except KeyError:
             # The key must have been declared.
             msg = "Option '{}' cannot be set because it has not been declared."
-            self._raise(msg.format(name), KeyError)
+            self._raise(msg.format(name), exc_type=KeyError)
 
         if self._read_only:
-            self._raise("Tried to set read-only option '{}'.".format(name), KeyError)
+            self._raise("Tried to set read-only option '{}'.".format(name), exc_type=KeyError)
 
         self._assert_valid(name, value)
 
@@ -436,4 +436,4 @@ class OptionsDictionary(object):
             else:
                 self._raise("Option '{}' is required but has not been set.".format(name))
         except KeyError:
-            self._raise("Option '{}' cannot be found".format(name), KeyError)
+            self._raise("Option '{}' cannot be found".format(name), exc_type=KeyError)

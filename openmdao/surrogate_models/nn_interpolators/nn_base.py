@@ -40,9 +40,11 @@ class NNBase(object):
         KDTree used for finding the nearest neighbors.
     _pt_cache : tuple(ndarray, ndarray, ndarray)
         Internal cache of the last found neighbors.
+    _parent_name : str or None
+        Absolute pathname of metamodel component that owns this surrogate.
     """
 
-    def __init__(self, training_points, training_values, num_leaves=2):
+    def __init__(self, training_points, training_values, num_leaves=2, parent_name=''):
         """
         Initialize nearest neighbor interpolant by scaling input to the unit hypercube.
 
@@ -50,12 +52,12 @@ class NNBase(object):
         ----------
         training_points : ndarray
             ndarray of shape (num_points x independent dims) containing training input locations.
-
         training_values : ndarray
             ndarray of shape (num_points x dependent dims) containing training output values.
-
         num_leaves : int
             How many leaves the tree should have.
+        parent_name : str
+            Absolute pathname of metamodel component that owns this surrogate.
         """
         # training_points and training_values are the known points and their
         # respective values which will be interpolated against.
@@ -84,3 +86,22 @@ class NNBase(object):
 
         # Cache for gradients
         self._pt_cache = None
+
+        self._parent_name = parent_name
+
+    def _raise(self, msg, exc_type=RuntimeError):
+        """
+        Raise the given exception type, with parent's name prepended to the message.
+
+        Parameters
+        ----------
+        msg : str
+            The error message.
+        exc_type : class
+            The type of the exception to be raised.
+        """
+        if self._parent_name is None:
+            full_msg = msg
+        else:
+            full_msg = '{}: {}'.format(self._parent_name, msg)
+        raise exc_type(full_msg)
