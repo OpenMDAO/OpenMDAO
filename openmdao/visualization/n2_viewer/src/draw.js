@@ -1,6 +1,4 @@
 var d3ContentDiv, svgDiv, svg;
-var n2ElementsGroup, n2GridLinesGroup, n2ComponentBoxesGroup, n2ArrowsGroup, n2DotsGroup;
-
 var n2Group;
 
 var WIDTH_N2_PX = HEIGHT_PX;
@@ -22,18 +20,6 @@ var lastLeftClickedElement = document.getElementById("ptN2ContentDivId"),
 
 var enterIndex = 0,
     exitIndex = 0;
-
-function setN2Group() {
-    n2Group = svg.append("g").attr('id', 'N2'); // id given just so it is easier to see in Chrome dev tools when debugging
-}
-
-function setN2ElementsGroup() {
-    n2ElementsGroup = n2Group.append("g");
-    n2GridLinesGroup = n2Group.append("g");
-    n2ComponentBoxesGroup = n2Group.append("g");
-    n2ArrowsGroup = n2Group.append("g");
-    n2DotsGroup = n2Group.append("g");
-}
 
 function DrawRect(x, y, width, height, fill) {
     n2Group.insert("rect")
@@ -73,6 +59,6 @@ function DrawArrowsParamView(startIndex, endIndex) {
             end: { col: endI, row: endI },
             color: (startIndex < endIndex) ? GREEN_ARROW_COLOR : RED_ARROW_COLOR,
             width: lineWidth
-        });
+        }, n2Diag.n2Groups);
     }
 }

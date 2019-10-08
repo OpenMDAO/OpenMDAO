@@ -2,6 +2,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
     // TODO: Get rid of all these after refactoring ///////////////
     var model = n2Diag.model; ////
+    matrix = n2Diag.matrix; ////
 
     svgDiv = n2Diag.svgDiv; ////
     svg = n2Diag.svg; ////
@@ -27,25 +28,9 @@ function PtN2Diagram(parentDiv, modelJSON) {
     mouseClickN2 = MouseClickN2;
     mouseOutN2 = MouseoutN2;
 
-    CreateDomLayout();
-    CreateToolbar();
+    n2Group = n2Diag.n2TopGroup; ////
 
-    setN2Group();
-    var pTreeGroup = svg.append("g").attr("id", "tree"); // id given just so it is easier to see in Chrome dev tools when debugging
-    var pSolverTreeGroup = svg.append("g").attr("id", "solver_tree");
-
-    var n2BackgroundRect = n2Group.append("rect")
-        .attr("class", "background")
-        .attr("width", WIDTH_N2_PX)
-        .attr("height", N2Layout.heightPx);
-
-    setN2ElementsGroup();
-
-    var lastRightClickedElement = model.root;
-
-    // var layout = n2Diag.layout;
-    // TODO: Get rid of all these after refactoring ///////////////
-
+    // TODO: Get rid of all these globals after refactoring ///////////////
     d3NodesArray = n2Diag.layout.zoomedNodes;
     d3RightTextNodesArrayZoomed = n2Diag.layout.visibleNodes;
 
@@ -53,10 +38,10 @@ function PtN2Diagram(parentDiv, modelJSON) {
     d3SolverRightTextNodesArrayZoomed = n2Diag.layout.visibleSolverNodes;
     ///////////////////////////////////////////////////////////////
 
-    UpdateClickedIndices();
-    ComputeConnections();
+    CreateDomLayout();
+    CreateToolbar();
 
-    matrix = new N2Matrix(n2Diag.layout.visibleNodes, model);
+    var lastRightClickedElement = model.root;
 
     var collapseDepthElement = parentDiv.querySelector("#idCollapseDepthDiv");
     for (var i = 2; i <= model.maxDepth; ++i) {
@@ -77,28 +62,15 @@ function PtN2Diagram(parentDiv, modelJSON) {
     SetupLegend(d3, n2Diag.d3ContentDiv);
 
     function Update(computeNewTreeLayout = true) {
-        parentDiv.querySelector("#currentPathId").innerHTML = "PATH: root" + ((zoomedElement.parent) ? "." : "") + zoomedElement.absPathName;
+        n2Diag.update(computeNewTreeLayout);
 
-        parentDiv.querySelector("#backButtonId").disabled = (backButtonHistory.length == 0) ? "disabled" : false;
-        parentDiv.querySelector("#forwardButtonId").disabled = (forwardButtonHistory.length == 0) ? "disabled" : false;
-        parentDiv.querySelector("#upOneLevelButtonId").disabled = (zoomedElement === root) ? "disabled" : false;
-        parentDiv.querySelector("#returnToRootButtonId").disabled = (zoomedElement === root) ? "disabled" : false;
+        // TODO: Get rid of all these after refactoring ///////////////
+        d3NodesArray = n2Diag.layout.zoomedNodes;
+        d3RightTextNodesArrayZoomed = n2Diag.layout.visibleNodes;
 
-        // Compute the new tree layout.
-        if (computeNewTreeLayout) {
-            n2Diag.layout = new N2Layout(model, zoomedElement);
-            // TODO: Get rid of all these after refactoring ///////////////
-            d3NodesArray = n2Diag.layout.zoomedNodes;
-            d3RightTextNodesArrayZoomed = n2Diag.layout.visibleNodes;
-
-            d3SolverNodesArray = n2Diag.layout.zoomedSolverNodes;
-            d3SolverRightTextNodesArrayZoomed = n2Diag.layout.visibleSolverNodes;
-            ///////////////////////////////////////////////////////////////
-
-            UpdateClickedIndices();
-
-            matrix = new N2Matrix(n2Diag.layout.visibleNodes, model);
-        }
+        d3SolverNodesArray = n2Diag.layout.zoomedSolverNodes;
+        d3SolverRightTextNodesArrayZoomed = n2Diag.layout.visibleSolverNodes;
+        ///////////////////////////////////////////////////////////////
 
         for (var i = 2; i <= model.maxDepth; ++i) {
             parentDiv.querySelector("#idCollapseDepthOption" + i + "").style.display = (i <= zoomedElement.depth) ? "none" : "block";
@@ -144,9 +116,9 @@ function PtN2Diagram(parentDiv, modelJSON) {
                 .attr("height", N2Layout.heightPx + 2 * SVG_MARGIN);
 
             n2Group.attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
-            pTreeGroup.attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
+            n2Diag.pTreeGroup.attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
 
-            pSolverTreeGroup.attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + SVG_MARGIN + PTREE_N2_GAP_PX) + "," + SVG_MARGIN + ")");
+            n2Diag.pSolverTreeGroup.attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + SVG_MARGIN + PTREE_N2_GAP_PX) + "," + SVG_MARGIN + ")");
         }
 
         sharedTransition = d3.transition().duration(TRANSITION_DURATION).delay(transitionStartDelay); //do this after intense computation
@@ -159,12 +131,12 @@ function PtN2Diagram(parentDiv, modelJSON) {
             .attr("height", N2Layout.heightPx + 2 * SVG_MARGIN);
 
         n2Group.transition(sharedTransition).attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
-        pTreeGroup.transition(sharedTransition).attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
-        n2BackgroundRect.transition(sharedTransition).attr("width", WIDTH_N2_PX).attr("height", HEIGHT_PX);
+        n2Diag.pTreeGroup.transition(sharedTransition).attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
+        n2Diag.n2BackgroundRect.transition(sharedTransition).attr("width", WIDTH_N2_PX).attr("height", HEIGHT_PX);
 
-        pSolverTreeGroup.transition(sharedTransition).attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + SVG_MARGIN + PTREE_N2_GAP_PX) + "," + SVG_MARGIN + ")");
+        n2Diag.pSolverTreeGroup.transition(sharedTransition).attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + SVG_MARGIN + PTREE_N2_GAP_PX) + "," + SVG_MARGIN + ")");
 
-        var sel = pTreeGroup.selectAll(".partition_group")
+        var sel = n2Diag.pTreeGroup.selectAll(".partition_group")
             .data(d3NodesArray, function (d) {
                 return d.id;
             });
@@ -275,7 +247,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             .style("opacity", 0);
 
 
-        var selSolver = pSolverTreeGroup.selectAll(".solver_group")
+        var selSolver = n2Diag.pSolverTreeGroup.selectAll(".solver_group")
             .data(d3SolverNodesArray, function (d) {
                 return d.id;
             });
@@ -407,7 +379,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
 
         ClearArrowsAndConnects()
-        matrix.draw();
+        n2Diag.matrix.draw();
     }
 
     updateFunc = Update;
@@ -422,20 +394,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         // PrintConnects();
     }
 
-    function UpdateClickedIndices() {
- 
-        enterIndex = exitIndex = 0;
-        if (lastClickWasLeft) { //left click
-            if (leftClickIsForward) {
-                exitIndex = lastLeftClickedElement.rootIndex -
-                    n2Diag.layout.zoomedElementPrev.rootIndex;
-            }
-            else {
-                enterIndex = n2Diag.layout.zoomedElementPrev.rootIndex -
-                    lastLeftClickedElement.rootIndex;
-            }
-        }
-    }
+
 
     var lastLeftClickedEle;
     var lastRightClickedEle;
@@ -477,7 +436,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         else if (lastLeftClickedElement.depth < zoomedElement.depth) {
             leftClickIsForward = false; //backwards
         }
-        n2Diag.layout.updateZoomedElement(d);
+        n2Diag.updateZoomedElement(d);
         TRANSITION_DURATION = TRANSITION_DURATION_FAST;
     }
 
@@ -548,150 +507,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
             d.isMinimized = true;
     }
 
-    function ComputeConnections() {
-        function GetObjectInTree(d, nameArray, nameIndex) {
-            if (nameArray.length == nameIndex) {
-                return d;
-            }
-            if (!d.children) {
-                return null;
-            }
-
-            for (var i = 0; i < d.children.length; ++i) {
-                if (d.children[i].name === nameArray[nameIndex]) {
-                    return GetObjectInTree(d.children[i], nameArray, nameIndex + 1);
-                }
-                else {
-                    var numNames = d.children[i].name.split(":").length;
-                    if (numNames >= 2 && nameIndex + numNames <= nameArray.length) {
-                        var mergedName = nameArray[nameIndex];
-                        for (var j = 1; j < numNames; ++j) {
-                            mergedName += ":" + nameArray[nameIndex + j];
-                        }
-                        if (d.children[i].name === mergedName) {
-                            return GetObjectInTree(d.children[i], nameArray, nameIndex + numNames);
-                        }
-                    }
-                }
-            }
-            return null;
-        }
-
-        function AddLeaves(d, objArray) {
-            if (d.type !== "param" && d.type !== "unconnected_param") {
-                objArray.push(d);
-            }
-            if (d.children) {
-                for (var i = 0; i < d.children.length; ++i) {
-                    AddLeaves(d.children[i], objArray);
-                }
-            }
-        }
-
-        function ClearConnections(d) {
-            d.targetsParamView = new Set();
-            d.targetsHideParams = new Set();
-
-            if (d.children) {
-                for (var i = 0; i < d.children.length; ++i) {
-                    ClearConnections(d.children[i]);
-                }
-            }
-        }
-
-        ClearConnections(root);
-
-        var sys_pathnames = model.sys_pathnames_list;
-
-        for (var i = 0; i < conns.length; ++i) {
-            var srcSplitArray = conns[i].src.split(/\.|:/);
-            var srcObj = GetObjectInTree(root, srcSplitArray, 0);
-            if (srcObj == null) {
-                alert("error: cannot find connection source " + conns[i].src);
-                return;
-            }
-            var srcObjArray = [srcObj];
-            if (srcObj.type !== "unknown") { //source obj must be unknown
-                alert("error: there is a source that is not an unknown.");
-                return;
-            }
-            if (srcObj.children) { //source obj must be unknown
-                alert("error: there is a source that has children.");
-                return;
-            }
-            for (var obj = srcObj.parent; obj != null; obj = obj.parent) {
-                srcObjArray.push(obj);
-            }
-
-            var tgtSplitArray = conns[i].tgt.split(/\.|:/);
-            var tgtObj = GetObjectInTree(root, tgtSplitArray, 0);
-            if (tgtObj == null) {
-                alert("error: cannot find connection target " + conns[i].tgt);
-                return;
-            }
-            var tgtObjArrayParamView = [tgtObj];
-            var tgtObjArrayHideParams = [tgtObj];
-            if (tgtObj.type !== "param" && tgtObj.type !== "unconnected_param") { //target obj must be a param
-                alert("error: there is a target that is NOT a param.");
-                return;
-            }
-            if (tgtObj.children) {
-                alert("error: there is a target that has children.");
-                return;
-            }
-            AddLeaves(tgtObj.parentComponent, tgtObjArrayHideParams); //contaminate
-            for (var obj = tgtObj.parent; obj != null; obj = obj.parent) {
-                tgtObjArrayParamView.push(obj);
-                tgtObjArrayHideParams.push(obj);
-            }
-
-
-            for (var j = 0; j < srcObjArray.length; ++j) {
-                if (!srcObjArray[j].hasOwnProperty('targetsParamView')) srcObjArray[j].targetsParamView = new Set();
-                if (!srcObjArray[j].hasOwnProperty('targetsHideParams')) srcObjArray[j].targetsHideParams = new Set();
-
-                tgtObjArrayParamView.forEach(item => srcObjArray[j].targetsParamView.add(item));
-                tgtObjArrayHideParams.forEach(item => srcObjArray[j].targetsHideParams.add(item));
-            }
-
-            var cycleArrowsArray = [];
-            if (conns[i].cycle_arrows && conns[i].cycle_arrows.length > 0) {
-                var cycleArrows = conns[i].cycle_arrows;
-                for (var j = 0; j < cycleArrows.length; ++j) {
-                    if (cycleArrows[j].length != 2) {
-                        alert("error: cycleArrowsSplitArray length not 2, got " + cycleArrows[j].length +
-                            ": " + cycleArrows[j]);
-                        return;
-                    }
-
-                    var src_pathname = sys_pathnames[cycleArrows[j][0]];
-                    var tgt_pathname = sys_pathnames[cycleArrows[j][1]];
-
-                    var splitArray = src_pathname.split(/\.|:/);
-                    var arrowBeginObj = GetObjectInTree(root, splitArray, 0);
-                    if (arrowBeginObj == null) {
-                        alert("error: cannot find cycle arrows begin object " + src_pathname);
-                        return;
-                    }
-                    splitArray = tgt_pathname.split(/\.|:/);
-                    var arrowEndObj = GetObjectInTree(root, splitArray, 0);
-                    if (arrowEndObj == null) {
-                        alert("error: cannot find cycle arrows end object " + tgt_pathname);
-                        return;
-                    }
-                    cycleArrowsArray.push({ "begin": arrowBeginObj, "end": arrowEndObj });
-                }
-            }
-            if (cycleArrowsArray.length > 0) {
-                if (!tgtObj.parent.hasOwnProperty("cycleArrows")) {
-                    tgtObj.parent.cycleArrows = [];
-                }
-                tgtObj.parent.cycleArrows.push({ "src": srcObj, "arrows": cycleArrowsArray });
-            }
-
-        }
-    }
-
     function FindRootOfChangeForRightClick(d) {
         return lastRightClickedElement;
     }
@@ -742,7 +557,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         }
 
         function HasObject(d, toMatchObj) {
-            console.log("HasObject(", d, ", ", toMatchObj,")");
+            // console.log("HasObject(", d, ", ", toMatchObj, ")");
             for (var obj = d; obj != null; obj = obj.parent) {
                 if (obj === toMatchObj) {
                     return true;
@@ -763,7 +578,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             end: { col: d.col, row: d.col },
             color: RED_ARROW_COLOR,
             width: lineWidth
-        });
+        }, n2Diag.n2Groups);
 
         if (d.row > d.col) {
             var targetsWithCycleArrows = [];
@@ -841,7 +656,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
                         start: { col: hoveredIndexRC, row: hoveredIndexRC },
                         color: GREEN_ARROW_COLOR,
                         width: lineWidth
-                    });
+                    }, n2Diag.n2Groups);
                     DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, GREEN_ARROW_COLOR); //highlight var name
                 }
             }
@@ -853,7 +668,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
                         end: { col: hoveredIndexRC, row: hoveredIndexRC },
                         color: RED_ARROW_COLOR,
                         width: lineWidth
-                    });
+                    }, n2Diag.n2Groups);
                     DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, RED_ARROW_COLOR); //highlight var name
                 }
             }

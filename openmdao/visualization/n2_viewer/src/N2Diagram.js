@@ -3,6 +3,8 @@
  * @typedef N2Diagram
  * @property {ModelData} model Processed model data received from Python.
  * @property {N2Layout} layout Sizes and positions of visible elements.
+ * @property {Object} zoomedElement The element the diagram is currently based on.
+ * @property {Object} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} parentDiv
  * @property {Object} d3ContentDiv The div containing all of the diagram's content.
  * @property {Object} svgDiv The div containing the SVG element.
@@ -13,10 +15,14 @@
  * @property {Array} backButtonHistory
  * @property {Array} forwardButtonHistory
  * @property {number} chosenCollapseDepth
+ * @property {Object} n2TopGroup
+ * @property {Object} n2Groups References to <g> SVG elements.
  */
 class N2Diagram {
     constructor(modelJSON) {
         this.model = new ModelData(modelJSON);
+        this.zoomedElement = this.zoomedElementPrev = zoomedElement = this.model.root;
+
         this.showPath = false;
 
         this.setupContentDivs();
@@ -28,7 +34,13 @@ class N2Diagram {
 
         this.updateSvgStyle(N2Layout.fontSizePx);
 
-        this.layout = new N2Layout(this.model, this.model.root);
+        this.layout = new N2Layout(this.model, this.zoomedElement);
+
+        this.oldPtN2Initialize();
+
+        this.updateClickedIndices();
+
+        this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.n2Groups);
     }
 
     /**
@@ -140,7 +152,7 @@ class N2Diagram {
         }
 
         // TODO: Get rid of these globals
-        linearSolverNames.forEach(function(name) {
+        linearSolverNames.forEach(function (name) {
             newCssJson['g.' + linearSolverClasses[name] + ' > rect'] = {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
@@ -148,14 +160,14 @@ class N2Diagram {
             };
         });
 
-        nonLinearSolverNames.forEach(function(name) {
+        nonLinearSolverNames.forEach(function (name) {
             newCssJson['g.' + nonLinearSolverClasses[name] + ' > rect'] = {
                 'cursor': 'pointer',
                 'fill-opacity': '.8',
                 'fill': nonLinearSolverColors[name]
             };
         });
-        
+
         // Iterate over the JSON object just created and turn it into
         // CSS style sheet text.
         let newCssText = '';
@@ -176,7 +188,7 @@ class N2Diagram {
      */
     saveSvg() {
         let svgData = this.svg.node().outerHTML;
-    
+
         // Add name spaces.
         if (!svgData.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
             svgData = svgData.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
@@ -184,10 +196,10 @@ class N2Diagram {
         if (!svgData.match(/^<svg[^>]+"http\:\/\/www\.w3\.org\/1999\/xlink"/)) {
             svgData = svgData.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
         }
-    
+
         // Add XML declaration
         svgData = '<?xml version="1.0" standalone="no"?>\r\n' + svgData;
-    
+
         svgData = vkbeautify.xml(svgData);
         let svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
         let svgUrl = URL.createObjectURL(svgBlob);
@@ -198,6 +210,83 @@ class N2Diagram {
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
+    }
+
+    /**
+     * Replace the current zoomedElement, but preserve its value.
+     * @param {Object} newZoomedElement Replacement zoomed element.
+     */
+    updateZoomedElement(newZoomedElement) {
+        this.zoomedElementPrev = this.zoomedElement;
+
+        // TODO: Stop updating the global zoomedElement when we
+        // implement a different place to put it.
+        this.zoomedElement = zoomedElement = newZoomedElement;
+
+        this.layout.zoomedElement = this.zoomedElement;
+    }
+
+    /** Actions that still need to be integrated better, but currently grouped here so
+     * they can be called at the right time.
+     */
+    oldPtN2Initialize() {
+        // ids given just so it is easier to see in Chrome dev tools when debugging
+        this.n2TopGroup = this.svg.append('g').attr('id', 'N2');
+        this.pTreeGroup = this.svg.append('g').attr('id', 'tree');
+        this.pSolverTreeGroup = this.svg.append('g').attr('id', 'solver_tree');
+
+        this.n2BackgroundRect = this.n2TopGroup.append('rect')
+            .attr('class', 'background')
+            .attr('width', WIDTH_N2_PX)
+            .attr('height', N2Layout.heightPx);
+
+        this.n2Groups = {};
+        ['elements', 'gridlines', 'componentBoxes', 'arrows', 'dots'].forEach(function (gName) {
+            this.n2Groups[gName] = this.n2TopGroup.append('g').attr('id', 'n2' + gName);
+        }.bind(this));
+    }
+
+    /** Set up for an animated transition by setting and remembering where things were.
+     * TODO: Get rid of the globals
+     */
+    updateClickedIndices() {
+        enterIndex = exitIndex = 0;
+        if (lastClickWasLeft) { //left click
+            if (leftClickIsForward) {
+                exitIndex = lastLeftClickedElement.rootIndex -
+                    this.zoomedElementPrev.rootIndex;
+            }
+            else {
+                enterIndex = this.zoomedElementPrev.rootIndex -
+                    lastLeftClickedElement.rootIndex;
+            }
+        }
+    }
+
+    /**
+     * Refresh the diagram when something has visually changed.
+     * @param {Boolean} [computeNewTreeLayout = true] Whether to rebuild the layout and
+     *  matrix objects.
+     */
+    update(computeNewTreeLayout = true) {
+        this.parentDiv.querySelector("#currentPathId").innerHTML =
+            "PATH: root" + ((this.zoomedElement.parent) ? "." : "") +
+            this.zoomedElement.absPathName;
+        this.parentDiv.querySelector("#backButtonId").disabled =
+            (this.backButtonHistory.length == 0) ? "disabled" : false;
+        this.parentDiv.querySelector("#forwardButtonId").disabled =
+            (this.forwardButtonHistory.length == 0) ? "disabled" : false;
+        this.parentDiv.querySelector("#upOneLevelButtonId").disabled =
+            (this.zoomedElement === this.model.root) ? "disabled" : false;
+        this.parentDiv.querySelector("#returnToRootButtonId").disabled =
+            (this.zoomedElement === this.model.root) ? "disabled" : false;
+
+        // Compute the new tree layout.
+        if (computeNewTreeLayout) {
+            this.layout = new N2Layout(this.model, this.zoomedElement);
+            this.updateClickedIndices();
+            this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.n2Groups);
+        }
     }
 }
 

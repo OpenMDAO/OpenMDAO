@@ -3,11 +3,19 @@
  * @typedef N2Matrix
  * @property {Object[]} nodes Reference to nodes that will be drawn.
  * @property {number} levelOfDetailThreshold Don't draw elements below this size in pixels.
+ * @property {Object} n2Groups References to <g> SVG elements managed by N2Diagram.
  */
 class N2Matrix {
 
-    constructor(visibleNodes, model) {
+    /**
+     * Render the matrix of visible elements in the model.
+     * @param {Object} visibleNodes Nodes that will be drawn.
+     * @param {ModelData} model The pre-processed model data.
+     * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
+     */
+    constructor(visibleNodes, model, n2Groups) {
         this.nodes = visibleNodes;
+        this.n2Groups = n2Groups;
 
         n2Dx0 = n2Dx;
         n2Dy0 = n2Dy;
@@ -247,7 +255,7 @@ class N2Matrix {
         ];
 
         for (var i = 0; i < classes.length; ++i) {
-            var sel = n2ElementsGroup.selectAll("." + classes[i])
+            var sel = this.n2Groups.elements.selectAll("." + classes[i])
                 .data(datas[i], function (d) {
                     return d.id;
                 });
@@ -290,7 +298,7 @@ class N2Matrix {
         }
 
         {
-            var sel = n2GridLinesGroup.selectAll(".horiz_line")
+            var sel = this.n2Groups.gridlines.selectAll(".horiz_line")
                 .data(gridLines, function (d) {
                     return d.obj.id;
                 });
@@ -330,7 +338,7 @@ class N2Matrix {
         }
 
         {
-            var sel = n2GridLinesGroup.selectAll(".vert_line")
+            var sel = this.n2Groups.gridlines.selectAll(".vert_line")
                 .data(gridLines, function (d) {
                     return d.obj.id;
                 });
@@ -369,7 +377,7 @@ class N2Matrix {
         }
 
         {
-            var sel = n2ComponentBoxesGroup.selectAll(".component_box")
+            var sel = this.n2Groups.componentBoxes.selectAll(".component_box")
                 .data(drawableN2ComponentBoxes, function (d) {
                     return d.obj.id;
                 });
@@ -435,7 +443,7 @@ class N2Matrix {
 }
 
 function getOnDiagonalCellColor(d) {
-    let rt = matrix.nodes[d.col];
+    let rt = n2Diag.matrix.nodes[d.col];
     if (rt === undefined) { console.log(d); }
     if (rt.isMinimized) return COLLAPSED_COLOR;
     if (rt.type === "param") return PARAM_COLOR;

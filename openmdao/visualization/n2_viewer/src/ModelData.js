@@ -5,15 +5,18 @@ class ModelData {
     constructor(modelJSON) {
         this.root = this.tree = modelJSON.tree;
         this.root.name = 'model'; // Change 'root' to 'model'
-        this.sys_pathnames_list = modelJSON.sys_pathnames_list;
+        this.sysPathnamesList = modelJSON.sys_pathnames_list;
         this.conns = modelJSON.connections_list;
+
+        let startTime = 0;
+
         // console.log('conns: ', this.conns);
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
         this.declarePartialsList = modelJSON.declare_partials_list;
         this.maxDepth = 1;
         this.idCounter = 0;
 
-        let startTime = Date.now();
+        startTime = Date.now();
         this.expandColonVars(this.root);
         console.log("ModelData.expandColonVars: ", Date.now() - startTime, "ms");
 
@@ -32,6 +35,10 @@ class ModelData {
         startTime = Date.now();
         this.initSubSystemChildren(this.root);
         console.log("ModelData.initSubSystemChildren: ", Date.now() - startTime, "ms");
+
+        startTime = Date.now();
+        this.computeConnections();
+        console.log("ModelData.computeConnections: ", Date.now() - startTime, "ms");
     }
 
     /**
@@ -42,6 +49,10 @@ class ModelData {
     performHouseKeeping(element) {
         this.changeBlankSolverNamesToNone(element);
         this.identifyUnconnectedParams(element);
+
+        // From old ClearConnections():
+        element.targetsParamView = new Set();
+        element.targetsHideParams = new Set();
 
         if (Array.isPopulatedArray(element.children)) {
             for (let i = 0; i < element.children.length; ++i) {
@@ -298,4 +309,151 @@ class ModelData {
         return false;
     }
 
+    /**
+     * Traverse the tree trying to match a complete path to the element.
+     * @param {Object} element Starting point.
+     * @param {string[]} nameArray Path to element broken into components as array elements.
+     * @param {number} nameIndex Index of nameArray currently being searched for.
+     * @return {Object} Reference to element in the path.
+     */
+    getObjectInTree(element, nameArray, nameIndex) {
+        // Reached the last name:
+        if (nameArray.length == nameIndex) return element;
+
+        // No children:
+        if (!Array.isPopulatedArray(element.children)) return null;
+
+        for (let child of element.children) {
+            if (child.name == nameArray[nameIndex]) {
+                return this.getObjectInTree(child, nameArray, nameIndex + 1);
+            }
+            else {
+                let numNames = child.name.split(":").length;
+                if (numNames >= 2 && nameIndex + numNames <= nameArray.length) {
+                    let mergedName = nameArray[nameIndex];
+                    for (let j = 1; j < numNames; ++j) {
+                        mergedName += ":" + nameArray[nameIndex + j];
+                    }
+                    if (child.name == mergedName) {
+                        return this.getObjectInTree(child, nameArray, nameIndex + numNames);
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** 
+     * Add all leaf descendents of specified element to the array.
+     * @param {Object} element Current element to work on.
+     * @param {Object[]} objArray Array to add to.
+     */
+    addLeaves(element, objArray) {
+        if (!element.type.match(paramRegex)) {
+            objArray.push(element);
+        }
+
+        if (Array.isPopulatedArray(element.children)) {
+            for (let child of element.children) {
+                this.addLeaves(child, objArray);
+            }
+        }
+    }
+
+    /**
+     * Iterate over the connections list, and find the two objects that
+     * make up each connection.
+     */
+    computeConnections() {
+        let sysPathnames = this.sysPathnamesList;
+
+        for (let conn of this.conns) {
+            // Process sources
+            let srcSplitArray = conn.src.split(/\.|:/);
+            let srcObj = this.getObjectInTree(this.root, srcSplitArray, 0);
+
+            if (srcObj == null)
+                throw ("Cannot find connection source " + conn.src);
+
+            let srcObjArray = [srcObj];
+            if (srcObj.type !== "unknown") // source obj must be unknown
+                throw ("There is a source that is not an unknown.");
+
+            if (Array.isPopulatedArray(srcObj.children))
+                throw ("There is a source that has children.");
+
+            for (let obj = srcObj.parent; obj != null; obj = obj.parent) {
+                srcObjArray.push(obj);
+            }
+
+            // Process targets
+            let tgtSplitArray = conn.tgt.split(/\.|:/);
+            let tgtObj = this.getObjectInTree(this.root, tgtSplitArray, 0);
+
+            if (tgtObj == null)
+                throw ("Cannot find connection target " + conn.tgt);
+
+            let tgtObjArrayParamView = [tgtObj];
+            let tgtObjArrayHideParams = [tgtObj];
+
+            // Target obj must be a param
+            if (!tgtObj.type.match(paramRegex))
+                throw ("There is a target that is NOT a param.");
+
+            if (Array.isPopulatedArray(tgtObj.children))
+                throw ("There is a target that has children.");
+
+            if (! tgtObj.parentComponent)
+                throw ("Target object " + conn.tgt + " has missing parentComponent.");
+
+            this.addLeaves(tgtObj.parentComponent, tgtObjArrayHideParams); //contaminate
+            for (let obj = tgtObj.parent; obj != null; obj = obj.parent) {
+                tgtObjArrayParamView.push(obj);
+                tgtObjArrayHideParams.push(obj);
+            }
+
+            for (let srcObj of srcObjArray) {
+                if (!srcObj.hasOwnProperty('targetsParamView'))
+                    srcObj.targetsParamView = new Set();
+                if (!srcObj.hasOwnProperty('targetsHideParams'))
+                    srcObj.targetsHideParams = new Set();
+
+                tgtObjArrayParamView.forEach(item => srcObj.targetsParamView.add(item));
+                tgtObjArrayHideParams.forEach(item => srcObj.targetsHideParams.add(item));
+            }
+
+            let cycleArrowsArray = [];
+            if (Array.isPopulatedArray(conn.cycle_arrows)) {
+                let cycleArrows = conn.cycle_arrows;
+                for (let cycleArrow of cycleArrows) {
+                    if (cycleArrow.length != 2)
+                        throw ("cycleArrowsSplitArray length not 2, got " +
+                            cycleArrow.length + ": " + cycleArrow);
+
+                    let srcPathname = sysPathnames[cycleArrow[0]];
+                    let tgtPathname = sysPathnames[cycleArrow[1]];
+
+                    let splitArray = srcPathname.split(/\.|:/);
+                    let arrowBeginObj = this.getObjectInTree(this.root, splitArray, 0);
+                    if (arrowBeginObj == null)
+                        throw ("Cannot find cycle arrows begin object " + srcPathname);
+
+                    splitArray = tgtPathname.split(/\.|:/);
+                    let arrowEndObj = this.getObjectInTree(this.root, splitArray, 0);
+                    if (arrowEndObj == null)
+                        throw ("Cannot find cycle arrows end object " + tgtPathname);
+
+                    cycleArrowsArray.push({ "begin": arrowBeginObj, "end": arrowEndObj });
+                }
+            }
+
+            if (cycleArrowsArray.length > 0) {
+                if (!tgtObj.parent.hasOwnProperty("cycleArrows")) {
+                    tgtObj.parent.cycleArrows = [];
+                }
+                tgtObj.parent.cycleArrows.push({ "src": srcObj, "arrows": cycleArrowsArray });
+            }
+        }
+    }
 }

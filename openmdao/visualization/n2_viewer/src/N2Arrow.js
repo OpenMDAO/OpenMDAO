@@ -14,8 +14,9 @@ class N2Arrow {
      * @param {number} attribs.end.col
      * @param {string} attribs.color Color of the line/circle (arrow is black)
      * @param {number} attribs.width Width of the line
+     * @param {Object} n2Groups References to <g> SVG elements.
      */
-    constructor(attribs) {
+    constructor(attribs, n2Groups) {
         this.start = attribs.start;
         this.end = attribs.end;
         this.color = attribs.color;
@@ -28,7 +29,7 @@ class N2Arrow {
         this.endPt = { x: -1, y: -1 };
 
         this.computePts();
-        this.draw();
+        this.draw(n2Groups);
     }
 
     /**
@@ -55,9 +56,10 @@ class N2Arrow {
     /**
      * Use SVG to draw the line segments, add a circle at the "middle",
      * and an arrow at the end-point.
+     * @param {Object} n2Groups References to <g> SVG elements.
      */
-    draw() {
-        this.path = n2ArrowsGroup.insert("path")
+    draw(n2Groups) {
+        this.path = n2Groups.arrows.insert("path")
             .attr("class", "n2_hover_elements")
             .attr("d", "M" + this.startPt.x + " " + this.startPt.y +
                 " L" + this.midPt.x + " " + this.midPt.y +
@@ -66,7 +68,7 @@ class N2Arrow {
             .style("stroke-width", this.width)
             .style("stroke", this.color);
 
-        n2DotsGroup.append("circle")
+        n2Groups.dots.append("circle")
             .attr("class", "n2_hover_elements")
             .attr("cx", this.midPt.x)
             .attr("cy", this.midPt.y)
@@ -75,7 +77,7 @@ class N2Arrow {
             .style("fill-opacity", 1)
             .style("fill", "black");
 
-        n2DotsGroup.append("circle")
+        n2Groups.dots.append("circle")
             .attr("class", "n2_hover_elements")
             .attr("cx", this.midPt.x)
             .attr("cy", this.midPt.y)
