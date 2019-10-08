@@ -166,7 +166,6 @@ def l1_cross_distances(X, Y=None):
         n_samples_Y, n_features_Y = Y.shape
         if n_features_X != n_features_Y:
             raise ValueError("X and Y must have the same dimensions.")
-
         n_features = n_features_X
 
         n_nonzero_cross_dist = n_samples_X * n_samples_Y
