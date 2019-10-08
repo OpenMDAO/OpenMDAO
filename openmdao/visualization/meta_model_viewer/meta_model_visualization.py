@@ -512,10 +512,9 @@ class MetaModelVisualization(object):
                 size=5, color='white', alpha=0.50)
 
             self.contour_plot.add_tools(HoverTool(renderers=[training_data_renderer], tooltips=[
-                ('x', '@x'),
-                ('y', '@y'),
-                ('f_train', '@z'),
-            ]))
+                (self.x_input_select.value + " (train)", '@x'),
+                (self.y_input_select.value + " (train)", '@y'),
+                (self.output_select.value + " (train)", '@z'), ]))
 
         return self.contour_plot
 
@@ -579,8 +578,8 @@ class MetaModelVisualization(object):
                                                   fill_alpha=self.right_alphas.tolist())
 
         right_plot_fig.add_tools(HoverTool(renderers=[scatter_renderer], tooltips=[
-            (self.output_select.value, '@x'),
-            (y_idx, '@y'),
+            (self.output_select.value + " (train)", '@x'),
+            (y_idx + " (train)", '@y'),
         ]))
         right_plot_fig.scatter(x=data[:, 3], y=data[:, 1], line_color=None, fill_color='#000000',
                                fill_alpha=self.right_alphas.tolist())
@@ -654,8 +653,8 @@ class MetaModelVisualization(object):
                                                    fill_alpha=self.bottom_alphas.tolist())
 
         bottom_plot_fig.add_tools(HoverTool(renderers=[scatter_renderer], tooltips=[
-            (x_idx, '@x'),
-            (self.output_select.value, '@y'),
+            (x_idx + " (train)", '@x'),
+            (self.output_select.value + " (train)", '@y'),
         ]))
 
         # Set the right_plot data source to new values
