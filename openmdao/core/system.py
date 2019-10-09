@@ -2836,6 +2836,8 @@ class System(object):
         The response can be scaled using ref and ref0.
         The argument :code:`ref0` represents the physical value when the scaled value is 0.
         The argument :code:`ref` represents the physical value when the scaled value is 1.
+        The arguments (:code:`lower`, :code:`upper`, :code:`equals`) can not be strings or variable
+        names.
         """
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
