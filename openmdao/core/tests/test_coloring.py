@@ -821,11 +821,11 @@ class BidirectionalTestCase(unittest.TestCase):
                              "%d" % (n, tot_colors, n))
 
     def test_arrowhead(self):
-        for n in [55, 50, 5]:
+        for n in [5, 50, 55]:
             builder = TotJacBuilder(n, n)
-            builder.add_row(0)
-            builder.add_col(0)
-            builder.add_block_diag([(1,1)] * (n-1), 1, 1)
+            builder.add_row(n-1)
+            builder.add_col(n-1)
+            builder.add_block_diag([(1,1)] * (n-1), 0, 0)
             builder.color('auto')
             tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
             self.assertEqual(tot_colors, 3)
@@ -841,6 +841,7 @@ class BidirectionalTestCase(unittest.TestCase):
         mat = load_npz(os.path.join(matdir, 'can_715.npz')).toarray()
         mat = np.asarray(mat, dtype=bool)
         coloring = _compute_coloring(mat, 'auto')
+        coloring.summary()
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
 

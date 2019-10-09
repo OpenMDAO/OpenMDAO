@@ -1150,6 +1150,8 @@ def MNCO_bidir(J):
 
     # partition J into Jc and Jr
     # We build Jc from bottom up and Jr from right to left.
+
+    # get index of row with fewest nonzeros and col with fewest nonzeros
     r = M_row_nonzeros.argmin()
     c = M_col_nonzeros.argmin()
 
@@ -1216,6 +1218,117 @@ def MNCO_bidir(J):
 
     if np.count_nonzero(J) != nnz_Jc + nnz_Jr:
         raise RuntimeError("Nonzero mismatch for J vs. Jc and Jr")
+
+    # check_coloring(J, coloring)
+
+    coloring._meta['coloring_time'] = time.time() - start_time
+
+    return coloring
+
+
+def CDC_bidir(J):
+    """
+    Compute bidirectional coloring using a Complete Direct Cover.
+
+    Based on the algorithm found in Computing a Sparse Jacobian Matrix By Rows and Comumns,
+    by A.K.M. Shahadat Hossain and Trond Steihaug.
+
+    Parameters
+    ----------
+    J : ndarray
+        Dense Jacobian sparsity matrix (boolean)
+
+    Returns
+    -------
+    Coloring
+        See docstring for Coloring class.
+    """
+    start_time = time.time()
+
+    nrows, ncols = J.shape
+
+    coloring = Coloring(sparsity=J)
+
+    row_degrees = _count_nonzeros(J, axis=1)
+    col_degrees = _count_nonzeros(J, axis=0)
+
+    rsorted = np.argsort(row_degrees)[::-1]
+    csorted = np.argsort(col_degrees)[::-1]
+
+    # An edge in the bipartite graph is a nonzero entry in J
+    # A vertex in the bipartite graph is a row or column of J
+    nedges = _count_nonzeros(J)
+
+    all_nzs = np.empty((coloring._nzrows.size, 2), dtype=int)
+    all_nzs[:, 0] = coloring._nzrows
+    all_nzs[:, 1] = coloring._nzcols
+    uncolored_nzs = all_nzs
+
+    # from the paper, V1 is nzrows,  V2 is nzcols
+
+    row_color_groups = []
+    col_color_groups = []
+    col2rows = [None] * ncols
+    row2cols = [None] * nrows
+
+    while uncolored_nzs.size > 0:
+        conn_set = set()
+        color_group = []
+        row = rsorted[0]
+        col = csorted[0]
+        if row_degrees[row] > col_degrees[col]:
+            # collect rows
+
+            for row in rsorted:
+                # verts are sorted, so once we hit 0, all the rest will be 0
+                if row_degrees[row] <= 0:
+                    break
+
+                cols = uncolored_nzs[:, 1][uncolored_nzs[:, 0] == row]
+                if conn_set.intersection(cols):
+                    continue
+
+                conn_set.update(cols)
+                col_degrees[cols] -= 1   # remove this row's nonzero entries
+                row2cols[row] = cols
+                color_group.append(row)
+
+                row_degrees[row] = 0  # make sure we don't use row again
+                uncolored_nzs = uncolored_nzs[uncolored_nzs[:, 0] != row]
+
+            row_color_groups.append(color_group)
+
+        else:
+            # collect cols
+
+            for col in csorted:
+                # verts are sorted, so once we hit 0, all the rest will be 0
+                if col_degrees[col] <= 0:
+                    break
+
+                rows = uncolored_nzs[:, 0][uncolored_nzs[:, 1] == col]
+                if conn_set.intersection(rows):
+                    continue
+
+                conn_set.update(rows)
+                row_degrees[rows] -= 1   # remove this col's nonzero entries
+                col2rows[col] = rows
+                color_group.append(col)
+
+                col_degrees[col] = 0  # make sure we don't use col again
+                uncolored_nzs = uncolored_nzs[uncolored_nzs[:, 1] != col]
+
+            col_color_groups.append(color_group)
+
+        # TODO: fix this so we don't have to sort the full sized row/col arrays
+        rsorted = np.argsort(row_degrees)[::-1]
+        csorted = np.argsort(col_degrees)[::-1]
+
+    if col_color_groups:
+        coloring._fwd = [col_color_groups, col2rows]
+
+    if row_color_groups:
+        coloring._rev = [row_color_groups, row2cols]
 
     # check_coloring(J, coloring)
 
@@ -1580,6 +1693,7 @@ def _compute_coloring(J, mode):
 
     if mode == 'auto':  # use bidirectional coloring
         coloring = MNCO_bidir(J)
+        # coloring = CDC_bidir(J)
         if coloring.total_solves() < best_nocolor:
             return coloring
         elif ncols <= nrows:
@@ -1587,6 +1701,7 @@ def _compute_coloring(J, mode):
         else:
             mode = 'rev'
 
+    print("FALLBACK")
     rev = mode == 'rev'
 
     coloring = Coloring(sparsity=J)
