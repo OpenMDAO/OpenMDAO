@@ -1028,8 +1028,8 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 2
 
-        prob.setup(check=False)
-        prob.set_solver_print(level=2)
+        prob.setup()
+        prob.set_solver_print(level=0)
 
         prob.run_driver()
 
