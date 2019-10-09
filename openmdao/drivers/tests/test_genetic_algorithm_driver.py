@@ -823,7 +823,6 @@ class D1(om.ExplicitComponent):
         comm = self.comm
         rank = comm.rank
 
-        # results in 8 entries for proc 0 and 7 entries for proc 1 when using 2 processes.
         if rank == 1:
             start = 1
             end = 2
@@ -867,7 +866,6 @@ class D2(om.ExplicitComponent):
         comm = self.comm
         rank = comm.rank
 
-        # results in 8 entries for proc 0 and 7 entries for proc 1 when using 2 processes.
         if rank == 1:
             start = 1
             end = 2
