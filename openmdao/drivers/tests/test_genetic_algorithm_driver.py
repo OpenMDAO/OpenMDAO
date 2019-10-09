@@ -6,9 +6,11 @@ import os
 import numpy as np
 
 import openmdao.api as om
+from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 from openmdao.drivers.genetic_algorithm_driver import GeneticAlgorithm
 from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
@@ -648,6 +650,27 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         self.assertAlmostEqual(prob['radius'], 0.5, 1)  # it is going to the unconstrained optimum
         self.assertAlmostEqual(prob['height'], 0.5, 1)  # it is going to the unconstrained optimum
 
+    def test_proc_per_model(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p', IndepVarComp('x', 3.0))
+
+        model.add_subsystem('d1', DistribExecComp(['y1 = 28 - 0.2*y2 + x', 'y1 = 18 - 0.2*y2 + 2*x']))
+        model.add_subsystem('d2', DistribExecComp(['y2 = y1**.5 + 7', 'y2 = y1**.5 - 3']))
+
+        model.add_sub
+        model.nonlinear_solver = om.Newton()
+        model.linear_solver = om.DirectSolver()
+
+        model.add_design_var('p.x', lower=-10.0, upper=10.0)
+        model.add_objective('Area')
+
+        prob.setup(check=False)
+        prob.set_solver_print(level=2)
+
+        prob.run_model()
+
 
 @unittest.skipUnless(om.PETScVector, "PETSc is required.")
 class MPITestSimpleGA(unittest.TestCase):
@@ -791,6 +814,27 @@ class MPITestSimpleGA(unittest.TestCase):
         assert_rel_error(self, prob['mat1'], 3, 1e-5)
         assert_rel_error(self, prob['mat2'], 3, 1e-5)
         # Material 3 can be anything
+
+    def test_mpi_bug_solver(self):
+        # This test verifies that mpi doesn't hang due to collective calls in the solver.
+
+        prob = om.Problem()
+        prob.model = SellarMDA()
+
+        prob.model.add_design_var('x', lower=0, upper=10)
+        prob.model.add_design_var('z', lower=0, upper=10)
+        prob.model.add_objective('obj')
+
+        prob.driver = om.SimpleGADriver(run_parallel=True)
+
+        # Set these low because we don't need to run long.
+        prob.driver.options['max_gen'] = 2
+        prob.driver.options['pop_size'] = 5
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        prob.run_driver()
 
 
 @unittest.skipUnless(om.PETScVector, "PETSc is required.")
