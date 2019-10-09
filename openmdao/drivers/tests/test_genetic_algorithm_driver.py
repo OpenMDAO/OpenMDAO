@@ -6,7 +6,6 @@ import os
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 from openmdao.drivers.genetic_algorithm_driver import GeneticAlgorithm
 from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.paraboloid import Paraboloid
