@@ -7,7 +7,8 @@ import unittest
 
 import numpy as np
 
-from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp, ExecComp, ScipyKrylov
+from openmdao.api import Problem, NonlinearBlockGS, Group, IndepVarComp, ExecComp, ScipyKrylov,  \
+    IndepVarComp, ScipyOptimizeDriver
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 
@@ -494,25 +495,77 @@ class TestConstraintOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception), 'SellarDerivatives: The name argument should '
                                                  'be a string, got 42')
 
-    def test_constraint_invalid_bounds(self):
+    def test_constraint_invalid_lower(self):
 
         prob = Problem()
 
-        prob.model = SellarDerivatives()
-        prob.model.nonlinear_solver = NonlinearBlockGS()
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
 
         with self.assertRaises(TypeError) as context:
             prob.model.add_constraint('con1', lower='foo', upper=[0, 100],
                                       ref0=-100.0, ref=100)
 
-        self.assertEqual(str(context.exception), 'Expected values of lower to be an '
-                                                 'Iterable of numeric values, '
-                                                 'or a scalar numeric value. '
-                                                 'Got foo instead.')
-
-        with self.assertRaises(ValueError) as context:
-            prob.model.add_constraint('con1', lower=0.0, upper=['a', 'b'],
+        with self.assertRaises(TypeError) as context2:
+            prob.model.add_constraint('con1', lower=['zero', 5], upper=[0, 100],
                                       ref0=-100.0, ref=100)
+
+        msg = ("Argument 'lower' can not be a string ('foo' given). You can not "
+        "specify a variable as lower bound. You can only provide constant "
+        "float values")
+        self.assertEqual(str(context.exception), msg)
+
+        msg2 = ("Argument 'lower' can not be a string ('['zero', 5]' given). You can not "
+        "specify a variable as lower bound. You can only provide constant "
+        "float values")
+        self.assertEqual(str(context2.exception), msg2)
+
+    def test_constraint_invalid_upper(self):
+
+        prob = Problem()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_constraint('con1', lower=0, upper='foo',
+                                      ref0=-100.0, ref=100)
+
+        with self.assertRaises(TypeError) as context2:
+            prob.model.add_constraint('con1', lower=0, upper=[1, 'foo'],
+                                      ref0=-100.0, ref=100)
+
+        msg = ("Argument 'upper' can not be a string ('foo' given). You can not "
+        "specify a variable as upper bound. You can only provide constant "
+        "float values")
+        self.assertEqual(str(context.exception), msg)
+
+        msg2 = ("Argument 'upper' can not be a string ('[1, 'foo']' given). You can not "
+        "specify a variable as upper bound. You can only provide constant "
+        "float values")
+        self.assertEqual(str(context2.exception), msg2)
+
+    def test_constraint_invalid_equals(self):
+        prob = Problem()
+
+        prob.driver = ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+        with self.assertRaises(TypeError) as context:
+            prob.model.add_constraint('con1', equals='foo')
+
+        with self.assertRaises(TypeError) as context2:
+            prob.model.add_constraint('con1', equals=[1, 'two'])
+
+        msg = ("Argument 'equals' can not be a string ('foo' given). You can "
+               "not specify a variable as equals bound. You can only provide "
+               "constant float values")
+        self.assertEqual(str(context.exception), msg)
+
+        msg2 = ("Argument 'equals' can not be a string ('[1, 'two']' given). You can "
+               "not specify a variable as equals bound. You can only provide "
+               "constant float values")
+        self.assertEqual(str(context2.exception), msg2)
 
     def test_constraint_invalid_indices(self):
 

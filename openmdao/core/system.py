@@ -2691,17 +2691,32 @@ class System(object):
         resp = OrderedDict()
 
         if type_ == 'con':
+
             # Convert lower to ndarray/float as necessary
-            lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
-                                             flatten=True)
+            try:
+                lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
+                                                 flatten=True)
+            except (TypeError, ValueError):
+                raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
+                                "specify a variable as lower bound. You can only provide constant "
+                                "float values".format(lower))
 
             # Convert upper to ndarray/float as necessary
-            upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
-                                             flatten=True)
-
+            try:
+                upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
+                                                 flatten=True)
+            except (TypeError, ValueError):
+                raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
+                                "specify a variable as upper bound. You can only provide constant "
+                                "float values".format(upper))
             # Convert equals to ndarray/float as necessary
             if equals is not None:
-                equals = format_as_float_or_array('equals', equals, flatten=True)
+                try:
+                    equals = format_as_float_or_array('equals', equals, flatten=True)
+                except (TypeError, ValueError):
+                    raise TypeError("Argument 'equals' can not be a string ('{}' given). You can "
+                                    "not specify a variable as equals bound. You can only provide "
+                                    "constant float values".format(equals))
 
             # Scale the bounds
             if lower is not None:
