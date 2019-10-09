@@ -209,15 +209,18 @@ class MetaModelUnStructuredComp(ExplicitComponent):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        # Create an instance of the default surrogate for outputs that did not have a surrogate
-        # specified.
         default_surrogate = self.options['default_surrogate']
-        if default_surrogate is not None:
-            for name, shape in self._surrogate_output_names:
-                metadata = self._metadata(name)
-                if metadata.get('default_surrogate'):
-                    surrogate = deepcopy(default_surrogate)
-                    metadata['surrogate'] = surrogate
+        for name, shape in self._surrogate_output_names:
+            metadata = self._metadata(name)
+            if default_surrogate is not None and metadata.get('default_surrogate'):
+
+                # Create an instance of the default surrogate for outputs that did not have a
+                # surrogate specified.
+                surrogate = deepcopy(default_surrogate)
+                metadata['surrogate'] = surrogate
+
+            if 'surrogate' in metadata:
+                metadata['surrogate']._setup_var_data(self.pathname)
 
         # training will occur on first execution after setup
         self.train = True

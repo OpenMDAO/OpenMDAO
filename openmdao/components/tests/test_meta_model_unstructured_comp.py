@@ -1246,6 +1246,33 @@ class MetaModelTestCase(unittest.TestCase):
         output = str_err.getvalue()
         self.assertTrue('finite difference' not in output)
 
+    def test_surrogate_message_format(self):
+        prob = om.Problem()
+
+        prob.model.add_subsystem('p', om.IndepVarComp('x', 2.1))
+
+        sin_mm = om.MetaModelUnStructuredComp()
+        sin_mm.add_input('x', 0.)
+        sin_mm.add_output('f_x', 0., surrogate=om.KrigingSurrogate())
+
+        prob.model.add_subsystem('sin_mm', sin_mm)
+
+        prob.model.connect('p.x', 'sin_mm.x')
+
+        prob.setup(check=True)
+
+        # train the surrogate and check predicted value
+        sin_mm.options['train:x'] = np.linspace(0,10,1)
+        sin_mm.options['train:f_x'] = .5*np.sin(sin_mm.options['train:x'])
+
+        prob['sin_mm.x'] = 2.1
+
+        with self.assertRaises(ValueError) as cm:
+            prob.run_model()
+
+        self.assertEqual(str(cm.exception), 'sin_mm: KrigingSurrogate requires at least'
+                                            ' 2 training points.')
+
 
 class MetaModelUnstructuredSurrogatesFeatureTestCase(unittest.TestCase):
 
