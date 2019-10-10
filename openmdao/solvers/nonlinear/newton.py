@@ -101,6 +101,18 @@ class NewtonSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
 
+        else:
+            # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
+            # This deprecation warning is to prepare users for the change.
+            pathname = self._system.pathname
+            if not pathname:
+                pathname = ''
+            else:
+                pathname += ': '
+            msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
+                  'to use the BoundsEnforceLS line search.'
+            warn_deprecation(pathname + msg)
+
     def _assembled_jac_solver_iter(self):
         """
         Return a generator of linear solvers using assembled jacs.
