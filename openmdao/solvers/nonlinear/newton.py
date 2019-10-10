@@ -105,9 +105,7 @@ class NewtonSolver(NonlinearSolver):
             # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
             # This deprecation warning is to prepare users for the change.
             pathname = self._system.pathname
-            if not pathname:
-                pathname = ''
-            else:
+            if pathname:
                 pathname += ': '
             msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
                   'to use the BoundsEnforceLS line search.'
