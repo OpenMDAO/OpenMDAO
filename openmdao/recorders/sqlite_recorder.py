@@ -217,6 +217,9 @@ class SqliteRecorder(CaseRecorder):
                 c.execute("CREATE TABLE solver_metadata(id TEXT PRIMARY KEY, "
                           "solver_options BLOB, solver_class TEXT)")
 
+                # commit changes to db
+                self.connection.commit()
+
         self._database_initialized = True
 
     def _cleanup_abs2meta(self):
@@ -370,6 +373,9 @@ class SqliteRecorder(CaseRecorder):
                 c.execute("UPDATE metadata SET abs2prom=?, prom2abs=?, abs2meta=?, var_settings=?",
                           (abs2prom, prom2abs, abs2meta, var_settings_json))
 
+                # commit changes to db
+                self.connection.commit()
+
     def record_iteration_driver(self, recording_requester, data, metadata):
         """
         Record data and metadata from a Driver.
@@ -409,6 +415,9 @@ class SqliteRecorder(CaseRecorder):
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('driver', c.lastrowid, recording_requester._get_name()))
 
+                # commit changes to db
+                self.connection.commit()
+
     def record_iteration_problem(self, recording_requester, data, metadata):
         """
         Record data and metadata from a Problem.
@@ -440,6 +449,8 @@ class SqliteRecorder(CaseRecorder):
                           (self._counter, metadata['name'],
                            metadata['timestamp'], metadata['success'], metadata['msg'],
                            outputs_text))
+                # commit changes to db
+                self.connection.commit()
 
     def record_iteration_system(self, recording_requester, data, metadata):
         """
@@ -487,6 +498,8 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('system', c.lastrowid, source_system))
+                # commit changes to db
+                self.connection.commit()
 
     def record_iteration_solver(self, recording_requester, data, metadata):
         """
@@ -547,6 +560,8 @@ class SqliteRecorder(CaseRecorder):
 
                 c.execute("INSERT INTO global_iterations(record_type, rowid, source) VALUES(?,?,?)",
                           ('solver', c.lastrowid, source_solver))
+                # commit changes to db
+                self.connection.commit()
 
     def record_viewer_data(self, model_viewer_data, key='Driver'):
         """
@@ -567,6 +582,8 @@ class SqliteRecorder(CaseRecorder):
                 with self.connection as c:
                     c.execute("INSERT INTO driver_metadata(id, model_viewer_data) VALUES(?,?)",
                               (key, json_data))
+                    # commit changes to db
+                    self.connection.commit()
             except sqlite3.IntegrityError:
                 print("Model viewer data has already has already been recorded for %s." % key)
 
@@ -614,6 +631,8 @@ class SqliteRecorder(CaseRecorder):
                 c.execute("INSERT OR IGNORE INTO system_metadata"
                           "(id, scaling_factors, component_metadata) "
                           "VALUES(?,?,?)", (path, scaling_factors, pickled_metadata))
+                # commit changes to db
+                self.connection.commit()
 
     def record_metadata_solver(self, recording_requester):
         """
@@ -636,6 +655,8 @@ class SqliteRecorder(CaseRecorder):
             with self.connection as c:
                 c.execute("INSERT INTO solver_metadata(id, solver_options, solver_class) "
                           "VALUES(?,?,?)", (id, sqlite3.Binary(solver_options), solver_class))
+                # commit changes to db
+                self.connection.commit()
 
     def record_derivatives_driver(self, recording_requester, data, metadata):
         """
@@ -663,6 +684,8 @@ class SqliteRecorder(CaseRecorder):
                           (self._counter, self._iteration_coordinate,
                            metadata['timestamp'], metadata['success'], metadata['msg'],
                            data_blob))
+                # commit changes to db
+                self.connection.commit()
 
     def shutdown(self):
         """
