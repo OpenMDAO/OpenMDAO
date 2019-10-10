@@ -719,7 +719,7 @@ class TestBryoden(unittest.TestCase):
     def test_linsearch_3_deprecation(self):
         prob = om.Problem()
         model = prob.model = SellarStateConnection(nonlinear_solver=om.BroydenSolver(),
-                                           linear_solver=om.LinearRunOnce())
+                                                   linear_solver=om.LinearRunOnce())
         prob.setup()
 
         model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
