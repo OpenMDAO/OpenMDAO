@@ -716,6 +716,21 @@ class TestBryoden(unittest.TestCase):
         for key, val in iteritems(totals):
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-7)
 
+    def test_linsearch_3_deprecation(self):
+        prob = om.Problem()
+        model = prob.model = SellarStateConnection(nonlinear_solver=om.BroydenSolver(),
+                                           linear_solver=om.LinearRunOnce())
+        prob.setup()
+
+        model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
+        model.nonlinear_solver.options['compute_jacobian'] = False
+
+        msg = 'Deprecation warning: In V 3.0, the default Broyden solver setup will change ' + \
+              'to use the BoundsEnforceLS line search.'
+
+        with assert_warning(DeprecationWarning, msg):
+            prob.final_setup()
+
 
 class TestBryodenFeature(unittest.TestCase):
 
