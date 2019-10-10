@@ -26,6 +26,7 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'pycodestyle==2.3.1',
         'pydocstyle==2.0.0',
+        'pytest',
         'testflo>=1.3.4',
     ],
 }
