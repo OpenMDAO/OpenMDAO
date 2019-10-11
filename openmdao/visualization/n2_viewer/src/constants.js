@@ -1,5 +1,5 @@
 // From Isaias Reyes
-var CONNECTION_COLOR = "black",
+const CONNECTION_COLOR = "black",
    UNKNOWN_IMPLICIT_COLOR = "#c7d06d",
    UNKNOWN_EXPLICIT_COLOR = "#9ec4c7",
    N2_COMPONENT_BOX_COLOR = "#555",
@@ -39,7 +39,7 @@ var CONNECTION_COLOR = "black",
 // LS: BCHK
 
 // From https://colorbrewer.org
-var colors = ['#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffed6f'];
+const colors = ['#8dd3c7','#ffffb3','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffed6f'];
 
 var linearSolverColors = {};
 var linearSolverClasses = {} ;
@@ -74,24 +74,14 @@ setSolverColorAndCSSClass( "", "BROYDEN", 9);
 setSolverColorAndCSSClass( "solve_linear", "solve_nonlinear", 10);
 setSolverColorAndCSSClass( "other", "other", 11);
 
-var widthPTreePx = 1,
-    kx = 0, ky = 0, kx0 = 0, ky0 = 0,
-    HEIGHT_PX = 600,
+var HEIGHT_PX = 600,
     SVG_MARGIN = 1,
     TRANSITION_DURATION_FAST = 1000,
     TRANSITION_DURATION_SLOW = 1500,
-    TRANSITION_DURATION = TRANSITION_DURATION_FAST,
-    xScalerPTree = d3.scaleLinear().range([0, widthPTreePx]),
-    yScalerPTree = d3.scaleLinear().range([0, HEIGHT_PX]),
-    xScalerPTree0 = null,
-    yScalerPTree0 = null;
+    TRANSITION_DURATION = TRANSITION_DURATION_FAST;
 
-var widthPSolverTreePx = 1,
-    kSolverx = 0, kSolvery = 0, kSolverx0 = 0, kSolvery0 = 0,
-    xScalerPSolverTree = d3.scaleLinear().range([0, widthPSolverTreePx]),
-    yScalerPSolverTree = d3.scaleLinear().range([0, HEIGHT_PX]),
-    xScalerPSolverTree0 = null,
-    yScalerPSolverTree0 = null;
+
+var widthPSolverTreePx = 1;
 
 let paramRegex = /^(param|unconnected_param)$/;
 let paramOrUnknownRegex = /^(unknown|param|unconnected_param)$/;

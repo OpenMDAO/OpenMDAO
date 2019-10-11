@@ -12,7 +12,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
     var showPath = n2Diag.showPath; //default off ////
     var DEFAULT_TRANSITION_START_DELAY = N2Diagram.defaultTransitionStartDelay; ////
 
-    var transitionStartDelay = DEFAULT_TRANSITION_START_DELAY; ////
 
     var chosenCollapseDepth = n2Diag.chosenCollapseDepth; ////
 
@@ -66,66 +65,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
         d3SolverRightTextNodesArrayZoomed = n2Diag.layout.visibleSolverNodes;
         ///////////////////////////////////////////////////////////////
 
-        if (xScalerPTree0 != null) {//not first run.. store previous
-            kx0 = kx;
-            ky0 = ky;
-            xScalerPTree0 = xScalerPTree.copy();
-            yScalerPTree0 = yScalerPTree.copy();
-
-            kxSolver0 = kxSolver;
-            kySolver0 = kySolver;
-            xScalerPSolverTree0 = xScalerPSolverTree.copy();
-            yScalerPSolverTree0 = yScalerPSolverTree.copy();
-        }
-
-        kx = (zoomedElement.x ? n2Diag.layout.widthPTreePx - N2Layout.parentNodeWidthPx : n2Diag.layout.widthPTreePx) / (1 - zoomedElement.x);
-        ky = N2Layout.heightPx / zoomedElement.height;
-        xScalerPTree.domain([zoomedElement.x, 1]).range([zoomedElement.x ? N2Layout.parentNodeWidthPx : 0, n2Diag.layout.widthPTreePx]);
-        yScalerPTree.domain([zoomedElement.y, zoomedElement.y + zoomedElement.height]).range([0, N2Layout.heightPx]);
-
-        kxSolver = (zoomedElement.xSolver ? n2Diag.layout.widthPSolverTreePx - N2Layout.parentNodeWidthPx : n2Diag.layout.widthPSolverTreePx) / (1 - zoomedElement.xSolver);
-        kySolver = N2Layout.heightPx / zoomedElement.heightSolver;
-        xScalerPSolverTree.domain([zoomedElement.xSolver, 1]).range([zoomedElement.xSolver ? N2Layout.parentNodeWidthPx : 0, n2Diag.layout.widthPSolverTreePx]);
-        yScalerPSolverTree.domain([zoomedElement.ySolver, zoomedElement.ySolver + zoomedElement.heightSolver]).range([0, N2Layout.heightPx]);
-
-        if (xScalerPTree0 == null) { //first run.. duplicate
-            kx0 = kx;
-            ky0 = ky;
-            xScalerPTree0 = xScalerPTree.copy();
-            yScalerPTree0 = yScalerPTree.copy();
-
-            kxSolver0 = kxSolver;
-            kySolver0 = kySolver;
-            xScalerPSolverTree0 = xScalerPSolverTree.copy();
-            yScalerPSolverTree0 = yScalerPSolverTree.copy();
-
-            //Update svg dimensions before ComputeLayout() changes layout.widthPTreePx
-            svgDiv.style("width", (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + n2Diag.layout.widthPSolverTreePx + 2 * SVG_MARGIN + PTREE_N2_GAP_PX) + "px")
-                .style("height", (N2Layout.heightPx + 2 * SVG_MARGIN) + "px");
-            svg.attr("width", n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + n2Diag.layout.widthPSolverTreePx + 2 * SVG_MARGIN + PTREE_N2_GAP_PX)
-                .attr("height", N2Layout.heightPx + 2 * SVG_MARGIN);
-
-            n2Diag.n2TopGroup.attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
-            n2Diag.pTreeGroup.attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
-
-            n2Diag.pSolverTreeGroup.attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + SVG_MARGIN + PTREE_N2_GAP_PX) + "," + SVG_MARGIN + ")");
-        }
-
-        sharedTransition = d3.transition().duration(TRANSITION_DURATION).delay(transitionStartDelay); //do this after intense computation
-        transitionStartDelay = DEFAULT_TRANSITION_START_DELAY;
-
-        //Update svg dimensions with transition after ComputeLayout() changes layout.widthPTreePx
-        svgDiv.transition(sharedTransition).style("width", (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + n2Diag.layout.widthPSolverTreePx + 2 * SVG_MARGIN + PTREE_N2_GAP_PX) + "px")
-            .style("height", (N2Layout.heightPx + 2 * SVG_MARGIN) + "px");
-        svg.transition(sharedTransition).attr("width", n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + n2Diag.layout.widthPSolverTreePx + 2 * SVG_MARGIN + PTREE_N2_GAP_PX)
-            .attr("height", N2Layout.heightPx + 2 * SVG_MARGIN);
-
-        n2Diag.n2TopGroup.transition(sharedTransition).attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
-        n2Diag.pTreeGroup.transition(sharedTransition).attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
-        n2Diag.n2BackgroundRect.transition(sharedTransition).attr("width", WIDTH_N2_PX).attr("height", HEIGHT_PX);
-
-        n2Diag.pSolverTreeGroup.transition(sharedTransition).attr("transform", "translate(" + (n2Diag.layout.widthPTreePx + PTREE_N2_GAP_PX + WIDTH_N2_PX + SVG_MARGIN + PTREE_N2_GAP_PX) + "," + SVG_MARGIN + ")");
-
         var sel = n2Diag.pTreeGroup.selectAll(".partition_group")
             .data(d3NodesArray, function (d) {
                 return d.id;
@@ -136,7 +75,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
                 return "partition_group " + GetClass(d);
             })
             .attr("transform", function (d) {
-                return "translate(" + xScalerPTree0(d.x0) + "," + yScalerPTree0(d.y0) + ")";
+                return "translate(" + n2Diag.scales.previous.model.x(d.x0) + "," + n2Diag.scales.previous.model.y(d.y0) + ")";
             })
             .on("click", function (d) { LeftClick(d, this); })
             .on("contextmenu", function (d) { RightClick(d, this); })
@@ -166,18 +105,18 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
         nodeEnter.append("svg:rect")
             .attr("width", function (d) {
-                return d.width0 * kx0;//0;//
+                return d.width0 * n2Diag.transitCoords.previous.model.x;
             })
             .attr("height", function (d) {
-                return d.height0 * ky0;
+                return d.height0 * n2Diag.transitCoords.previous.model.y;
             });
 
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
             //.attr("text-anchor", "end")
             .attr("transform", function (d) {
-                var anchorX = d.width0 * kx0 - N2Layout.rightTextMarginPx;
-                return "translate(" + anchorX + "," + d.height0 * ky0 / 2 + ")";
+                var anchorX = d.width0 * n2Diag.transitCoords.previous.model.x - N2Layout.rightTextMarginPx;
+                return "translate(" + anchorX + "," + d.height0 * n2Diag.transitCoords.previous.model.y / 2 + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < zoomedElement.depth) return 0;
@@ -190,21 +129,21 @@ function PtN2Diagram(parentDiv, modelJSON) {
                 return "partition_group " + GetClass(d);
             })
             .attr("transform", function (d) {
-                return "translate(" + xScalerPTree(d.x) + "," + yScalerPTree(d.y) + ")";
+                return "translate(" + n2Diag.scales.model.x(d.x) + "," + n2Diag.scales.model.y(d.y) + ")";
             });
 
         nodeUpdate.select("rect")
             .attr("width", function (d) {
-                return d.width * kx;
+                return d.width * n2Diag.transitCoords.model.x;
             })
             .attr("height", function (d) {
-                return d.height * ky;
+                return d.height * n2Diag.transitCoords.model.y;
             });
 
         nodeUpdate.select("text")
             .attr("transform", function (d) {
-                var anchorX = d.width * kx - N2Layout.rightTextMarginPx;
-                return "translate(" + anchorX + "," + d.height * ky / 2 + ")";
+                var anchorX = d.width * n2Diag.transitCoords.model.x - N2Layout.rightTextMarginPx;
+                return "translate(" + anchorX + "," + d.height * n2Diag.transitCoords.model.y / 2 + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < zoomedElement.depth) return 0;
@@ -216,23 +155,23 @@ function PtN2Diagram(parentDiv, modelJSON) {
         // Transition exiting nodes to the parent's new position.
         var nodeExit = sel.exit().transition(sharedTransition)
             .attr("transform", function (d) {
-                return "translate(" + xScalerPTree(d.x) + "," + yScalerPTree(d.y) + ")";
+                return "translate(" + n2Diag.scales.model.x(d.x) + "," + n2Diag.scales.model.y(d.y) + ")";
             })
             .remove();
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                return d.width * kx;//0;//
+                return d.width * n2Diag.transitCoords.model.x;//0;//
             })
             .attr("height", function (d) {
-                return d.height * ky;
+                return d.height * n2Diag.transitCoords.model.y;
             });
 
         nodeExit.select("text")
             .attr("transform", function (d) {
-                var anchorX = d.width * kx - N2Layout.rightTextMarginPx;
-                return "translate(" + anchorX + "," + d.height * ky / 2 + ")";
-                //return "translate(8," + d.height * ky / 2 + ")";
+                var anchorX = d.width * n2Diag.transitCoords.model.x - N2Layout.rightTextMarginPx;
+                return "translate(" + anchorX + "," + d.height * n2Diag.transitCoords.model.y / 2 + ")";
+                //return "translate(8," + d.height * n2Diag.transitCoords.model.y / 2 + ")";
             })
             .style("opacity", 0);
 
@@ -267,7 +206,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             .attr("transform", function (d) {
                 x = 1.0 - d.xSolver0 - d.widthSolver0; // The magic for reversing the blocks on the right side
                 // The solver tree goes from the root on the right and expands to the left
-                return "translate(" + xScalerPSolverTree0(x) + "," + yScalerPSolverTree0(d.ySolver0) + ")";
+                return "translate(" + n2Diag.scales.previous.solver.x(x) + "," + n2Diag.scales.previous.solver.y(d.ySolver0) + ")";
             })
             .on("click", function (d) { LeftClick(d, this); })
             .on("contextmenu", function (d) { RightClick(d, this); })
@@ -297,17 +236,17 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
         nodeSolverEnter.append("svg:rect")
             .attr("width", function (d) {
-                return d.widthSolver0 * kxSolver0;//0;//
+                return d.widthSolver0 * n2Diag.transitCoords.previous.solver.x;//0;//
             })
             .attr("height", function (d) {
-                return d.heightSolver0 * kySolver0;
+                return d.heightSolver0 * n2Diag.transitCoords.previous.solver.y;
             });
 
         nodeSolverEnter.append("svg:text")
             .attr("dy", ".35em")
             .attr("transform", function (d) {
-                var anchorX = d.widthSolver0 * kxSolver0 - N2Layout.rightTextMarginPx;
-                return "translate(" + anchorX + "," + d.heightSolver0 * kySolver0 / 2 + ")";
+                var anchorX = d.widthSolver0 * n2Diag.transitCoords.previous.solver.x - N2Layout.rightTextMarginPx;
+                return "translate(" + anchorX + "," + d.heightSolver0 * n2Diag.transitCoords.previous.solver.y / 2 + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < zoomedElement.depth) return 0;
@@ -322,21 +261,21 @@ function PtN2Diagram(parentDiv, modelJSON) {
             })
             .attr("transform", function (d) {
                 x = 1.0 - d.xSolver - d.widthSolver; // The magic for reversing the blocks on the right side
-                return "translate(" + xScalerPSolverTree(x) + "," + yScalerPSolverTree(d.ySolver) + ")";
+                return "translate(" + n2Diag.scales.solver.x(x) + "," + n2Diag.scales.solver.y(d.ySolver) + ")";
             });
 
         nodeSolverUpdate.select("rect")
             .attr("width", function (d) {
-                return d.widthSolver * kxSolver;
+                return d.widthSolver * n2Diag.transitCoords.solver.x;
             })
             .attr("height", function (d) {
-                return d.heightSolver * kySolver;
+                return d.heightSolver * n2Diag.transitCoords.solver.y;
             });
 
         nodeSolverUpdate.select("text")
             .attr("transform", function (d) {
-                var anchorX = d.widthSolver * kxSolver - N2Layout.rightTextMarginPx;
-                return "translate(" + anchorX + "," + d.heightSolver * kySolver / 2 + ")";
+                var anchorX = d.widthSolver * n2Diag.transitCoords.solver.x - N2Layout.rightTextMarginPx;
+                return "translate(" + anchorX + "," + d.heightSolver * n2Diag.transitCoords.solver.y / 2 + ")";
             })
             .style("opacity", function (d) {
                 if (d.depth < zoomedElement.depth) return 0;
@@ -348,22 +287,22 @@ function PtN2Diagram(parentDiv, modelJSON) {
         // Transition exiting nodes to the parent's new position.
         var nodeSolverExit = selSolver.exit().transition(sharedTransition)
             .attr("transform", function (d) {
-                return "translate(" + xScalerPSolverTree(d.xSolver) + "," + yScalerPSolverTree(d.ySolver) + ")";
+                return "translate(" + n2Diag.scales.solver.x(d.xSolver) + "," + n2Diag.scales.solver.y(d.ySolver) + ")";
             })
             .remove();
 
         nodeSolverExit.select("rect")
             .attr("width", function (d) {
-                return d.widthSolver * kxSolver;//0;//
+                return d.widthSolver * n2Diag.transitCoords.solver.x;//0;//
             })
             .attr("height", function (d) {
-                return d.heightSolver * kySolver;
+                return d.heightSolver * n2Diag.transitCoords.solver.y;
             });
 
         nodeSolverExit.select("text")
             .attr("transform", function (d) {
-                var anchorX = d.widthSolver * kxSolver - N2Layout.rightTextMarginPx;
-                return "translate(" + anchorX + "," + d.heightSolver * kySolver / 2 + ")";
+                var anchorX = d.widthSolver * n2Diag.transitCoords.solver.x - N2Layout.rightTextMarginPx;
+                return "translate(" + anchorX + "," + d.heightSolver * n2Diag.transitCoords.solver.y / 2 + ")";
             })
             .style("opacity", 0);
 
