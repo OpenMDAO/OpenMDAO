@@ -1010,6 +1010,10 @@ class Problem(object):
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
         self._solver_print_cache = []
 
+        if self._setup_status < 2:
+            self._setup_status = 2
+            self._set_initial_conditions()
+
         if self._check:
             if self._check is True:
                 checks = _default_checks
@@ -1020,10 +1024,6 @@ class Problem(object):
             else:
                 logger = TestLogger()
             self.check_config(logger, checks=checks)
-
-        if self._setup_status < 2:
-            self._setup_status = 2
-            self._set_initial_conditions()
 
         # check for post-setup hook
         if Problem._post_setup_func is not None:
