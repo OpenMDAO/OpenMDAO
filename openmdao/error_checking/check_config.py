@@ -483,11 +483,11 @@ def _check_config_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', action='store', dest='outfile', help='output file.')
+    parser.add_argument('file', nargs=1, help='python file containing the model')
+    parser.add_argument('-o', action='store', dest='outfile', help='output file')
     parser.add_argument('-c', action='append', dest='checks', default=[],
                         help='Only perform specific check(s). Default checks are: %s. '
-                        'Other available checks are: %s.' %
+                        'Other available checks are: %s' %
                         (sorted(_default_checks), sorted(set(_all_checks) - set(_default_checks))))
 
 
