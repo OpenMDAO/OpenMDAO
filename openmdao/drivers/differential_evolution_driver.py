@@ -12,8 +12,10 @@ from six import iteritems, itervalues, next
 try:
     from tqdm import tqdm
 except ModuleNotFoundError:
-    def tqdm(i, totals):
+
+    def tqdm(i, _):
         return i
+
 
 from differential_evolution import DifferentialEvolution, EvolutionStrategy
 
@@ -33,7 +35,7 @@ class DifferentialEvolutionDriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        super().__init__(**kwargs)
+        super(DifferentialEvolutionDriver).__init__(**kwargs)
 
         # What we support
         self.supports["integer_design_vars"] = True
@@ -122,7 +124,7 @@ class DifferentialEvolutionDriver(Driver):
         self.options.declare(
             "multi_obj_weights",
             default={},
-            types=(dict),
+            types=dict,
             desc="Weights of objectives for multi-objective optimization."
             "Weights are specified as a dictionary with the absolute names"
             "of the objectives. The same weights for all objectives are assumed, "
@@ -151,7 +153,7 @@ class DifferentialEvolutionDriver(Driver):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        super()._setup_driver(problem)
+        super(DifferentialEvolutionDriver)._setup_driver(problem)
 
         model_mpi = None
         comm = self._problem.comm
@@ -301,25 +303,23 @@ class DifferentialEvolutionDriver(Driver):
         if rank == 0 and self.options["show_progress"] and tqdm is not None:
             gen_iter = tqdm(gen_iter, total=self.options["max_gen"])
 
-        last_generation = None
         for generation in gen_iter:
             if rank == 0:
                 s = " "
                 if tqdm is None:
-                    s += f"gen: {generation.generation:>5g} / {generation.max_gen}, "
-                s += (
-                    f"f*: {generation.best_fit:> 10.4g}, "
-                    f"dx: {generation.dx:> 10.4g} "
-                    f"df: {generation.df:> 10.4g}".replace("\n", "")
+                    s += "gen: {:>5g} / {}, ".format(
+                        generation.generation, generation.max_gen
+                    )
+                s += "f*: {:> 10.4g}, " "dx: {:> 10.4g} " "df: {:> 10.4g}".format(
+                    generation.best_fit, generation.dx, generation.df
                 )
                 print(s.replace("\n", ""))
-            last_generation = generation
 
             # Pull optimal parameters back into framework and re-run, so that
             # framework is left in the right final state
             for name in desvars:
                 i, j = self._desvar_idx[name]
-                val = last_generation.best[i:j]
+                val = generation.best[i:j]
                 self.set_design_var(name, val)
 
             # Record once per generation
@@ -390,8 +390,6 @@ class DifferentialEvolutionDriver(Driver):
         ----------
         x : ndarray
             Value of design variables.
-        icase : int
-            Case number, used for identification when run in parallel.
 
         Returns
         -------
@@ -403,7 +401,6 @@ class DifferentialEvolutionDriver(Driver):
             Case number, used for identification when run in parallel.
         """
         model = self._problem.model
-        success = 1
 
         objs = self.get_objective_values()
         nr_objectives = len(objs)
@@ -435,7 +432,6 @@ class DifferentialEvolutionDriver(Driver):
         # Tell the optimizer that this is a bad point.
         except AnalysisError:
             model._clear_iprint()
-            success = 0
 
         obj_values = self.get_objective_values()
         if is_single_objective:  # Single objective optimization
@@ -464,6 +460,7 @@ class DifferentialEvolutionDriver(Driver):
         if penalty == 0:
             fun = obj
         else:
+            violation = None
             constraint_violations = np.array([])
             for name, val in iteritems(self.get_constraint_values()):
                 con = self._cons[name]

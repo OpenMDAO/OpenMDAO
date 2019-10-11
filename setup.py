@@ -153,7 +153,8 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'six'
+        'six',
+        'tqdm',
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""
