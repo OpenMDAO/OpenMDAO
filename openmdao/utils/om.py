@@ -568,57 +568,58 @@ def _post_setup_exec(options):
     exec(code, globals_dict)
 
 
-# NOTE: any post_setup functions must handle their own exit behavior. If you want them
-# to exit after running, exit() must be called from within your function.  This also gives
-# you the option of controlling the exit behavior via a command line argument.
+# NOTE: any commands using _post_setup_exec as their executor must handle their own exit behavior.
+# If you want them to exit after running, exit() must be called from within your function.  This
+# also gives you the option of controlling the exit behavior via a command line argument.
 
-# All post-setup functions go here.
 # this dict should contain names mapped to tuples of the form:
-#   (setup_parser_func, func, description)
-_post_setup_map = {
-    'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
+#   (setup_parser_func, executor, func, description)
+# 'func' will typically be None unless 'executor' is _post_setup_exec.
+_command_map = {
+    'view_connections': (_view_connections_setup_parser, _post_setup_exec, _view_connections_cmd,
                          'Connection viewer showing values and source/target units.'),
-    'summary': (_config_summary_setup_parser, _config_summary_cmd,
+    'summary': (_config_summary_setup_parser, _post_setup_exec, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
-    'tree': (_tree_setup_parser, _tree_cmd, 'Print the system tree.'),
-    'dump_idxs': (_dump_dist_idxs_setup_parser, _dump_dist_idxs_cmd,
-                  'Show distributed index information.'),
-    'total_coloring': (_total_coloring_setup_parser, _total_coloring_cmd,
+    'tree': (_tree_setup_parser, _post_setup_exec, _tree_cmd, 'Print the system tree.'),
+    'total_coloring': (_total_coloring_setup_parser, _post_setup_exec, _total_coloring_cmd,
                        'Compute a coloring for the total jacobian.'),
-    'partial_coloring': (_partial_coloring_setup_parser, _partial_coloring_cmd,
+    'partial_coloring': (_partial_coloring_setup_parser, _post_setup_exec, _partial_coloring_cmd,
                          'Compute coloring(s) for specified partial jacobians.'),
-    'total_sparsity': (_sparsity_setup_parser, _sparsity_cmd,
+    'total_sparsity': (_sparsity_setup_parser, _post_setup_exec, _sparsity_cmd,
                        'Compute the sparsity pattern of the total jacobian.'),
-    'cite': (_cite_setup_parser, _cite_cmd,
+    'cite': (_cite_setup_parser, _post_setup_exec, _cite_cmd,
              'Print citations referenced by problem'),
-    'check': (_check_config_setup_parser, _check_config_cmd,
+    'check': (_check_config_setup_parser, _post_setup_exec, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
-    'view_mm': (_meta_model_parser, _meta_model_cmd, "Meta Model Viewer.")
-}
-
-
-# Other non-post-setup functions go here
-_non_post_setup_map = {
-    'n2': (_n2_setup_parser, _n2_cmd, 'Display an interactive N2 diagram of the problem.'),
-    'view_model': (_n2_setup_parser, _view_model_cmd,
+    'view_mm': (_meta_model_parser, _post_setup_exec, _meta_model_cmd, "Meta Model Viewer."),
+    'n2': (_n2_setup_parser, _n2_cmd, None, 'Display an interactive N2 diagram of the problem.'),
+    'view_model': (_n2_setup_parser, _view_model_cmd, None,
                    'Display an interactive N2 diagram of the problem. '
                    '(Deprecated, please use n2 instead.)'),
-    'trace': (_itrace_setup_parser, _itrace_exec, 'Dump trace output.'),
-    'call_tree': (_calltree_setup_parser, _calltree_exec,
+    'trace': (_itrace_setup_parser, _itrace_exec, None, 'Dump trace output.'),
+    'call_tree': (_calltree_setup_parser, _calltree_exec, None,
                   "Display the call tree for the specified class method and all 'self' class "
                   "methods it calls."),
-    'iprof': (_iprof_setup_parser, _iprof_exec,
+    'iprof': (_iprof_setup_parser, _iprof_exec, None,
               'Profiling of calls to particular object instances.'),
-    'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
+    'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec, None,
                      'Total timings of calls to particular object instances.'),
-    'mem': (_mem_prof_setup_parser, _mem_prof_exec, 'Memory profiler.'),
-    'mempost': (_mempost_setup_parser, _mempost_exec, 'Post-processor for memory profile output.'),
-    'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec,
+    'mem': (_mem_prof_setup_parser, _mem_prof_exec, None, 'Memory profiler.'),
+    'mempost': (_mempost_setup_parser, _mempost_exec, None,
+                'Post-processor for memory profile output.'),
+    'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, None,
                       'Colored jacobian viewer.'),
-    'xdsm': (_xdsm_setup_parser, _xdsm_cmd, 'XDSM viewer.'),
-    'scaffold': (_scaffold_setup_parser, _scaffold_exec,
+    'xdsm': (_xdsm_setup_parser, _xdsm_cmd, None, 'XDSM viewer.'),
+    'scaffold': (_scaffold_setup_parser, _scaffold_exec, None,
                  'Generate a simple scaffold for a component.'),
 }
+
+
+# add any dev specific command here that users probably don't want to see
+if os.environ.get('OPENMDAO_DEV', '').lower() in {'1', 'true', 'yes'}:
+    _command_map['dump_idxs'] = (_dump_dist_idxs_setup_parser, _post_setup_exec,
+                                 _dump_dist_idxs_cmd,
+                                 'Show distributed index information.')
 
 
 def openmdao_cmd():
@@ -629,14 +630,10 @@ def openmdao_cmd():
                                      epilog='Use -h after any sub-command for sub-command help.')
 
     subs = parser.add_subparsers(title='Tools', metavar='')
-    for p, (parser_setup_func, cmd, help_str) in sorted(chain(_post_setup_map.items(),
-                                                              _non_post_setup_map.items())):
+    for p, (parser_setup_func, executor, func, help_str) in sorted(_command_map.items()):
         subp = subs.add_parser(p, help=help_str)
         parser_setup_func(subp)
-        if p in _post_setup_map:
-            subp.set_defaults(func=cmd, executor=_post_setup_exec)
-        else:
-            subp.set_defaults(executor=cmd)
+        subp.set_defaults(executor=executor, func=func)
 
     # handle case where someone just runs `openmdao <script>`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
@@ -648,7 +645,6 @@ def openmdao_cmd():
             options.executor(options)
         else:
             print("\nNothing to do.")
-
 
 if __name__ == '__main__':
     openmdao_cmd()
