@@ -236,8 +236,6 @@ def _process_1_profile(fname):
     tree_nodes = {}
     tree_parts = []
 
-    empty = [None, 0., 0]
-
     for funcpath, count, t in _iter_raw_prof_file(fname):
         parts = funcpath.split('|')
 
