@@ -3,6 +3,7 @@
 import copy
 import numpy as np
 import openmdao
+import os
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -52,6 +53,12 @@ class DifferentialEvolutionDriver(Driver):
         self._desvar_idx = {}
         self._es = None
         self._de = None
+
+        # random state can be set for predictability during testing
+        if 'DifferentialEvolutionDriver_seed' in os.environ:
+            self._seed = int(os.environ['DifferentialEvolutionDriver_seed'])
+        else:
+            self._seed = None
 
         # Support for Parallel models.
         self._concurrent_pop_size = 0
@@ -172,7 +179,7 @@ class DifferentialEvolutionDriver(Driver):
             tolx=self.options["tolx"],
             tolf=self.options["tolf"],
             n_pop=self.options["pop_size"],
-            seed=None,
+            seed=self._seed,
             comm=comm,
             model_mpi=model_mpi,
         )

@@ -3,6 +3,7 @@
 import itertools
 import numpy as np
 import openmdao.api as om
+import os
 import unittest
 
 from differential_evolution import EvolutionStrategy
@@ -113,6 +114,28 @@ class TestDifferentialEvolutionDriver(unittest.TestCase):
         self.problem.driver.add_recorder(MyRecorder())
         self.problem.setup()
         self.problem.run_driver()
+
+    def test_differential_evolution_driver_seed(self):
+        x = [None, None]
+        f = [None, None]
+
+        for i in range(2):
+            self.tearDown()
+            os.environ["DifferentialEvolutionDriver_seed"] = "1"
+            self.setUp()
+            self.assertEqual(self.problem.driver._seed, 1)
+
+            self.problem.driver.options["max_gen"] = 10
+            self.problem.setup()
+            self.problem.run_driver()
+
+            x[i] = self.problem["x"]
+            f[i] = self.problem["f"][0]
+
+        self.assertTrue(np.all(x[0] == x[1]))
+        self.assertEqual(f[0], f[1])
+
+
 
 
 if __name__ == "__main__":
