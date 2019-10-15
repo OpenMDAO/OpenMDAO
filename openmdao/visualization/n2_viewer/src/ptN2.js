@@ -72,7 +72,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
         var nodeEnter = sel.enter().append("svg:g")
             .attr("class", function (d) {
-                return "partition_group " + n2Diag.getStyleClass(d);
+                return "partition_group " + n2Diag.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
                 return "translate(" + n2Diag.scales.previous.model.x(d.x0) + "," + n2Diag.scales.previous.model.y(d.y0) + ")";
@@ -126,7 +126,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
         var nodeUpdate = nodeEnter.merge(sel).transition(sharedTransition)
             .attr("class", function (d) {
-                return "partition_group " + n2Diag.getStyleClass(d);
+                return "partition_group " + n2Diag.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
                 return "translate(" + n2Diag.scales.model.x(d.x) + "," + n2Diag.scales.model.y(d.y) + ")";
@@ -201,7 +201,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         var nodeSolverEnter = selSolver.enter().append("svg:g")
             .attr("class", function (d) {
                 solver_class = n2Diag.style.getSolverClass(N2Layout.showLinearSolverNames, { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver})
-                return solver_class + " " + "solver_group " + n2Diag.getStyleClass(d);
+                return solver_class + " " + "solver_group " + n2Diag.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
                 x = 1.0 - d.xSolver0 - d.widthSolver0; // The magic for reversing the blocks on the right side
@@ -257,7 +257,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         var nodeSolverUpdate = nodeSolverEnter.merge(selSolver).transition(sharedTransition)
             .attr("class", function (d) {
                 solver_class = n2Diag.style.getSolverClass(N2Layout.showLinearSolverNames, { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver});
-                return solver_class + " " + "solver_group " + n2Diag.getStyleClass(d);
+                return solver_class + " " + "solver_group " + n2Diag.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
                 x = 1.0 - d.xSolver - d.widthSolver; // The magic for reversing the blocks on the right side

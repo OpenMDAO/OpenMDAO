@@ -157,6 +157,41 @@ class N2Style {
         let solverName = showLinearSolverNames? solverNames.linear : solverNames.nonLinear;
         return this.solvers[solverName]? this.solvers[solverName].class : this.solvers.other.class;
     }
+
+    /**
+     * Based on the element's type and conditionally other info, determine
+     * what CSS style is associated.
+     * @return {string} The name of an existing CSS class.
+     */
+    getNodeClass(element) {
+        if (element.isMinimized) return 'minimized';
+
+        switch (element.type) {
+            case 'param':
+                if (Array.isPopulatedArray(element.children)) return 'param_group';
+                return 'param';
+
+            case 'unconnected_param':
+                if (Array.isPopulatedArray(element.children)) return 'param_group';
+                return 'unconnected_param';
+
+            case 'unknown':
+                if (Array.isPopulatedArray(element.children)) return 'unknown_group';
+                if (element.implicit) return 'unknown_implicit';
+                return 'unknown';
+
+            case 'root':
+                return 'subsystem';
+
+            case 'subsystem':
+                if (element.subsystem_type == 'component') return 'component';
+                return 'subsystem';
+
+            default:
+                throw ('CSS class not found for element ' + element);
+        }
+
+    }
 }
 
 // From Isaias Reyes
