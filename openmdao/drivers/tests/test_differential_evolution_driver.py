@@ -14,6 +14,7 @@ from openmdao.drivers.differential_evolution_driver import DifferentialEvolution
 
 class TestDifferentialEvolutionDriver(unittest.TestCase):
     def setUp(self):
+        os.environ["DifferentialEvolutionDriver_seed"] = "11"
         dim = 2
 
         prob = om.Problem()
@@ -120,10 +121,7 @@ class TestDifferentialEvolutionDriver(unittest.TestCase):
         f = [None, None]
 
         for i in range(2):
-            self.tearDown()
-            os.environ["DifferentialEvolutionDriver_seed"] = "1"
-            self.setUp()
-            self.assertEqual(self.problem.driver._seed, 1)
+            self.assertEqual(self.problem.driver._seed, 11)
 
             self.problem.driver.options["max_gen"] = 10
             self.problem.setup()
@@ -131,6 +129,9 @@ class TestDifferentialEvolutionDriver(unittest.TestCase):
 
             x[i] = self.problem["x"]
             f[i] = self.problem["f"][0]
+
+            self.tearDown()
+            self.setUp()
 
         self.assertTrue(np.all(x[0] == x[1]))
         self.assertEqual(f[0], f[1])
