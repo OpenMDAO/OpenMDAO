@@ -136,7 +136,5 @@ class TestDifferentialEvolutionDriver(unittest.TestCase):
         self.assertEqual(f[0], f[1])
 
 
-
-
 if __name__ == "__main__":
     unittest.main()

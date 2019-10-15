@@ -55,8 +55,8 @@ class DifferentialEvolutionDriver(Driver):
         self._de = None
 
         # random state can be set for predictability during testing
-        if 'DifferentialEvolutionDriver_seed' in os.environ:
-            self._seed = int(os.environ['DifferentialEvolutionDriver_seed'])
+        if "DifferentialEvolutionDriver_seed" in os.environ:
+            self._seed = int(os.environ["DifferentialEvolutionDriver_seed"])
         else:
             self._seed = None
 
@@ -317,8 +317,12 @@ class DifferentialEvolutionDriver(Driver):
                     s += "gen: {:>5g} / {}, ".format(
                         generation.generation, generation.max_gen
                     )
-                s += "f*: {:> 10.4g}, " "dx: {:> 10.4g} " "df: {:> 10.4g}".format(
-                    generation.best_fit, generation.dx, generation.df
+                s += (
+                    "f*: {:> 10.4g}, "
+                    "dx: {:> 10.4g} "
+                    "df: {:> 10.4g}".format(
+                        generation.best_fit, generation.dx, generation.df
+                    )
                 )
                 print(s.replace("\n", ""))
 
