@@ -55,7 +55,7 @@ function DrawArrowsParamView(startIndex, endIndex) {
         new N2Arrow({
             start: { col: startI, row: startI },
             end: { col: endI, row: endI },
-            color: (startIndex < endIndex) ? GREEN_ARROW_COLOR : RED_ARROW_COLOR,
+            color: (startIndex < endIndex) ? N2Style.color.greenArrow : N2Style.color.redArrow,
             width: lineWidth
         }, n2Diag.n2Groups);
     }

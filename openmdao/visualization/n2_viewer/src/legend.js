@@ -75,11 +75,11 @@ function SetupLegend(d3, d3ContentDiv) {
     //COLORS
     {
         var text = ["Group", "Component", "Output Explicit", "Output Implicit", "Collapsed", "Connection"];
-        var colors = [GROUP_COLOR, COMPONENT_COLOR, UNKNOWN_EXPLICIT_COLOR, UNKNOWN_IMPLICIT_COLOR, COLLAPSED_COLOR, CONNECTION_COLOR];
+        var colors = [N2Style.color.group, N2Style.color.component, N2Style.color.unknownExplicit, N2Style.color.unknownImplicit, N2Style.color.collapsed, N2Style.color.connection];
         text.splice(2, 0, "Input");
-        colors.splice(2, 0, PARAM_COLOR);
+        colors.splice(2, 0, N2Style.color.param);
         text.splice(3, 0, "Unconnected Input")
-        colors.splice(3, 0, UNCONNECTED_PARAM_COLOR)
+        colors.splice(3, 0, N2Style.color.unconnectedParam)
         for (var i = 0; i < text.length; ++i) {
             var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 0 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
             DrawLegendColor(el, u, v, colors[i], false);
@@ -90,7 +90,7 @@ function SetupLegend(d3, d3ContentDiv) {
     //N2 SYMBOLS
     {
         var text = ["Scalar", "Vector", "Collapsed variables"];
-        var colors = [UNKNOWN_EXPLICIT_COLOR, UNKNOWN_EXPLICIT_COLOR, UNKNOWN_EXPLICIT_COLOR];
+        var colors = [N2Style.color.unknownExplicit, N2Style.color.unknownExplicit, N2Style.color.unknownExplicit];
         var shapeFunctions = [DrawScalar, DrawVector, DrawGroup];
         for (var i = 0; i < text.length; ++i) {
             var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 1 + xOffset + u) + "," + (80 + 40 * i + v) + ")");

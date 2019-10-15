@@ -270,7 +270,7 @@ class N2Matrix {
                     }
                     throw("enter transform not found");
                 });
-            drawFunctions[i](gEnter, u0, v0, (i < 3) ? getOnDiagonalCellColor : CONNECTION_COLOR, false)
+            drawFunctions[i](gEnter, u0, v0, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, false)
                 .on("mouseover", (i < 3) ? mouseOverOnDiagN2 : mouseOverOffDiagN2)
                 .on("mouseleave", mouseOutN2)
                 .on("click", mouseClickN2);
@@ -280,7 +280,7 @@ class N2Matrix {
                 .attr("transform", function (d) {
                     return "translate(" + (n2Dx * (d.col) + u) + "," + (n2Dy * (d.row) + v) + ")";
                 });
-            drawFunctions[i](gUpdate, u, v, (i < 3) ? getOnDiagonalCellColor : CONNECTION_COLOR, true);
+            drawFunctions[i](gUpdate, u, v, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, true);
 
 
             var nodeExit = sel.exit().transition(sharedTransition)
@@ -294,7 +294,7 @@ class N2Matrix {
                     throw("exit transform not found");
                 })
                 .remove();
-            drawFunctions[i](nodeExit, u, v, (i < 3) ? getOnDiagonalCellColor : CONNECTION_COLOR, true);
+            drawFunctions[i](nodeExit, u, v, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, true);
         }
 
         {
@@ -445,8 +445,8 @@ class N2Matrix {
 function getOnDiagonalCellColor(d) {
     let rt = n2Diag.matrix.nodes[d.col];
     if (rt === undefined) { console.log(d); }
-    if (rt.isMinimized) return COLLAPSED_COLOR;
-    if (rt.type === "param") return PARAM_COLOR;
-    if (rt.type === "unconnected_param") return UNCONNECTED_PARAM_COLOR
-    return (rt.implicit) ? UNKNOWN_IMPLICIT_COLOR : UNKNOWN_EXPLICIT_COLOR;
+    if (rt.isMinimized) return N2Style.color.collapsed;
+    if (rt.type === "param") return N2Style.color.param;
+    if (rt.type === "unconnected_param") return N2Style.color.unconnectedParam;
+    return (rt.implicit) ? N2Style.color.unknownImplicit : N2Style.color.unknownExplicit;
 }

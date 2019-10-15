@@ -72,7 +72,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
         var nodeEnter = sel.enter().append("svg:g")
             .attr("class", function (d) {
-                return "partition_group " + GetClass(d);
+                return "partition_group " + n2Diag.getStyleClass(d);
             })
             .attr("transform", function (d) {
                 return "translate(" + n2Diag.scales.previous.model.x(d.x0) + "," + n2Diag.scales.previous.model.y(d.y0) + ")";
@@ -126,7 +126,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
         var nodeUpdate = nodeEnter.merge(sel).transition(sharedTransition)
             .attr("class", function (d) {
-                return "partition_group " + GetClass(d);
+                return "partition_group " + n2Diag.getStyleClass(d);
             })
             .attr("transform", function (d) {
                 return "translate(" + n2Diag.scales.model.x(d.x) + "," + n2Diag.scales.model.y(d.y) + ")";
@@ -180,7 +180,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             .data(d3SolverNodesArray, function (d) {
                 return d.id;
             });
-
+/*
         function getSolverClass(showLinearSolverNames, linear_solver_name, nonlinear_solver_name) {
             if (showLinearSolverNames) {
                 if (linearSolverNames.indexOf(linear_solver_name) >= 0) {
@@ -197,11 +197,11 @@ function PtN2Diagram(parentDiv, modelJSON) {
             }
             return solver_class;
         }
-
+*/
         var nodeSolverEnter = selSolver.enter().append("svg:g")
             .attr("class", function (d) {
-                solver_class = getSolverClass(N2Layout.showLinearSolverNames, d.linear_solver, d.nonlinear_solver);
-                return solver_class + " " + "solver_group " + GetClass(d);
+                solver_class = n2Diag.style.getSolverClass(N2Layout.showLinearSolverNames, { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver})
+                return solver_class + " " + "solver_group " + n2Diag.getStyleClass(d);
             })
             .attr("transform", function (d) {
                 x = 1.0 - d.xSolver0 - d.widthSolver0; // The magic for reversing the blocks on the right side
@@ -256,8 +256,8 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
         var nodeSolverUpdate = nodeSolverEnter.merge(selSolver).transition(sharedTransition)
             .attr("class", function (d) {
-                solver_class = getSolverClass(N2Layout.showLinearSolverNames, d.linear_solver, d.nonlinear_solver);
-                return solver_class + " " + "solver_group " + GetClass(d);
+                solver_class = n2Diag.style.getSolverClass(N2Layout.showLinearSolverNames, { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver});
+                return solver_class + " " + "solver_group " + n2Diag.getStyleClass(d);
             })
             .attr("transform", function (d) {
                 x = 1.0 - d.xSolver - d.widthSolver; // The magic for reversing the blocks on the right side
@@ -405,29 +405,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
         Update();
     }
 
-    function GetClass(d) {
-        if (d.isMinimized) return "minimized";
-        if (d.type === "param") {
-            if (d.children && d.children.length > 0) return "param_group";
-            return "param";
-        }
-        if (d.type === "unconnected_param") {
-            if (d.children && d.children.length > 0) return "param_group";
-            return "unconnected_param"
-        }
-        if (d.type === "unknown") {
-            if (d.children && d.children.length > 0) return "unknown_group";
-            if (d.implicit) return "unknown_implicit";
-            return "unknown";
-        }
-        if (d.type === "root") return "subsystem";
-        if (d.type === "subsystem") {
-            if (d.subsystem_type === "component") return "component";
-            return "subsystem";
-        }
-        alert("class not found");
-    }
-
     function Toggle(d) {
 
         if (d.isMinimized)
@@ -505,7 +482,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         new N2Arrow({
             start: { col: d.row, row: d.row },
             end: { col: d.col, row: d.col },
-            color: RED_ARROW_COLOR,
+            color: N2Style.color.redArrow,
             width: lineWidth
         }, n2Diag.n2Groups);
 
@@ -560,8 +537,8 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
         var leftTextWidthR = d3RightTextNodesArrayZoomed[d.row].nameWidthPx,
             leftTextWidthC = d3RightTextNodesArrayZoomed[d.col].nameWidthPx;
-        DrawRect(-leftTextWidthR - PTREE_N2_GAP_PX, n2Dy * d.row, leftTextWidthR, n2Dy, RED_ARROW_COLOR); //highlight var name
-        DrawRect(-leftTextWidthC - PTREE_N2_GAP_PX, n2Dy * d.col, leftTextWidthC, n2Dy, GREEN_ARROW_COLOR); //highlight var name
+        DrawRect(-leftTextWidthR - PTREE_N2_GAP_PX, n2Dy * d.row, leftTextWidthR, n2Dy, N2Style.color.redArrow); //highlight var name
+        DrawRect(-leftTextWidthC - PTREE_N2_GAP_PX, n2Dy * d.col, leftTextWidthC, n2Dy, N2Style.color.greenArrow); //highlight var name
     }
 
     function MouseoverOnDiagN2(d) {
@@ -574,7 +551,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         var lineWidth = Math.min(5, n2Dx * .5, n2Dy * .5);
         n2Diag.arrowMarker.attr("markerWidth", lineWidth * .4)
             .attr("markerHeight", lineWidth * .4);
-        DrawRect(-leftTextWidthHovered - PTREE_N2_GAP_PX, n2Dy * hoveredIndexRC, leftTextWidthHovered, n2Dy, HIGHLIGHT_HOVERED_COLOR); //highlight hovered
+        DrawRect(-leftTextWidthHovered - PTREE_N2_GAP_PX, n2Dy * hoveredIndexRC, leftTextWidthHovered, n2Dy, N2Style.color.highlightHovered); //highlight hovered
         for (var i = 0; i < d3RightTextNodesArrayZoomed.length; ++i) {
             var leftTextWidthDependency = d3RightTextNodesArrayZoomed[i].nameWidthPx;
             var box = d3RightTextNodesArrayZoomedBoxInfo[i];
@@ -583,10 +560,10 @@ function PtN2Diagram(parentDiv, modelJSON) {
                     new N2Arrow({
                         end: { col: i, row: i },
                         start: { col: hoveredIndexRC, row: hoveredIndexRC },
-                        color: GREEN_ARROW_COLOR,
+                        color: N2Style.color.greenArrow,
                         width: lineWidth
                     }, n2Diag.n2Groups);
-                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, GREEN_ARROW_COLOR); //highlight var name
+                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, N2Style.color.greenArrow); //highlight var name
                 }
             }
 
@@ -595,10 +572,10 @@ function PtN2Diagram(parentDiv, modelJSON) {
                     new N2Arrow({
                         start: { col: i, row: i },
                         end: { col: hoveredIndexRC, row: hoveredIndexRC },
-                        color: RED_ARROW_COLOR,
+                        color: N2Style.color.redArrow,
                         width: lineWidth
                     }, n2Diag.n2Groups);
-                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, RED_ARROW_COLOR); //highlight var name
+                    DrawRect(-leftTextWidthDependency - PTREE_N2_GAP_PX, n2Dy * i, leftTextWidthDependency, n2Dy, N2Style.color.redArrow); //highlight var name
                 }
             }
         }
@@ -706,7 +683,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         }
         N2Layout.fontSizePx = fontSize;
         TRANSITION_DURATION = TRANSITION_DURATION_FAST;
-        n2Diag.updateSvgStyle(fontSize);
+        n2Diag.style.updateSvgStyle(fontSize);
         Update();
     }
 
@@ -725,7 +702,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         n2Diag.matrix.updateLevelOfDetailThreshold(height);
         WIDTH_N2_PX = height;
         TRANSITION_DURATION = TRANSITION_DURATION_FAST;
-        n2Diag.updateSvgStyle(N2Layout.fontSizePx);
+        n2Diag.style.updateSvgStyle(N2Layout.fontSizePx);
         Update();
     }
 

@@ -2,7 +2,9 @@
  * The outermost N2 class.
  * @typedef N2Diagram
  * @property {ModelData} model Processed model data received from Python.
+ * @property {N2Style} style Manages N2-related styles and functions.
  * @property {N2Layout} layout Sizes and positions of visible elements.
+ * @property {N2Matrix} matrix Manages the grid of model elements.
  * @property {Object} zoomedElement The element the diagram is currently based on.
  * @property {Object} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} parentDiv
@@ -17,7 +19,8 @@
  * @property {number} chosenCollapseDepth
  * @property {Object} n2TopGroup
  * @property {Object} n2Groups References to <g> SVG elements.
- * @property {Object} scales
+ * @property {Object} scales Scalers in the X and Y directions to associate the relative
+ *   position of an element to actual pixel coordinates.
  * @property {Object} transitCoords
  */
 class N2Diagram {
@@ -34,8 +37,7 @@ class N2Diagram {
         this.forwardButtonHistory = [];
         this.chosenCollapseDepth = -1;
 
-        this.updateSvgStyle(N2Layout.fontSizePx);
-
+        this.style = new N2Style(this.svgStyle, N2Layout.fontSizePx);
         this.layout = new N2Layout(this.model, this.zoomedElement);
 
         this.oldPtN2Initialize();
@@ -96,126 +98,6 @@ class N2Diagram {
         this.arrowMarker = d3.select("#arrow");
     }
 
-    /**
-     * Replace the entire content of the SVG style section with new styles.
-     * Doing a wholesale replace is easier than finding each style element,
-     * deleting, and inserting a new one.
-     * @param {number} fontSize In pixel units.
-     */
-    updateSvgStyle(fontSize) {
-        // Define as JSON first
-        let newCssJson = {
-            'rect': {
-                'stroke': PT_STROKE_COLOR
-            },
-            'g.unknown > rect': {
-                'fill': UNKNOWN_EXPLICIT_COLOR,
-                'fill-opacity': '.8'
-            },
-            'g.unknown_implicit > rect': {
-                'fill': UNKNOWN_IMPLICIT_COLOR,
-                'fill-opacity': '.8'
-            },
-            'g.param > rect': {
-                'fill': PARAM_COLOR,
-                'fill-opacity': '.8'
-            },
-            'g.unconnected_param > rect': {
-                'fill': UNCONNECTED_PARAM_COLOR,
-                'fill-opacity': '.8'
-            },
-            'g.subsystem > rect': {
-                'cursor': 'pointer',
-                'fill-opacity': '.8',
-                'fill': GROUP_COLOR
-            },
-            'g.component > rect': {
-                'cursor': 'pointer',
-                'fill-opacity': '.8',
-                'fill': COMPONENT_COLOR
-            },
-            'g.param_group > rect': {
-                'cursor': 'pointer',
-                'fill-opacity': '.8',
-                'fill': PARAM_GROUP_COLOR
-            },
-            'g.unknown_group > rect': {
-                'cursor': 'pointer',
-                'fill-opacity': '.8',
-                'fill': UNKNOWN_GROUP_COLOR
-            },
-            'g.minimized > rect': {
-                'cursor': 'pointer',
-                'fill-opacity': '.8',
-                'fill': COLLAPSED_COLOR
-            },
-            'text': {
-                //'dominant-baseline: middle',
-                //'dy: .35em',
-            },
-            '#svgId g.partition_group > text': {
-                'text-anchor': 'end',
-                'pointer-events': 'none',
-                'font-family': 'helvetica, sans-serif',
-                'font-size': fontSize + 'px',
-            },
-            '#svgId g.solver_group > text': {
-                'text-anchor': 'end',
-                'pointer-events': 'none',
-                'font-family': 'helvetica, sans-serif',
-                'font-size': fontSize + 'px',
-            },
-            'g.component_box > rect': {
-                'stroke': N2_COMPONENT_BOX_COLOR,
-                'stroke-width': '2',
-                'fill': 'none',
-            },
-            '.bordR1, .bordR2, .bordR3, .bordR4, .ssMid, .grpMid, .svMid, .vsMid, .vMid, .sgrpMid, .grpsMid': {
-                'stroke': 'none',
-                'stroke-width': '0',
-                'fill-opacity': '1',
-            },
-            '[class^=n2_hover_elements]': {
-                'pointer-events': 'none',
-            },
-            '.background': {
-                'fill': N2_BACKGROUND_COLOR,
-            },
-            '.horiz_line, .vert_line': {
-                'stroke': N2_GRIDLINE_COLOR,
-            }
-        }
-
-        // TODO: Get rid of these globals
-        linearSolverNames.forEach(function (name) {
-            newCssJson['g.' + linearSolverClasses[name] + ' > rect'] = {
-                'cursor': 'pointer',
-                'fill-opacity': '.8',
-                'fill': linearSolverColors[name]
-            };
-        });
-
-        nonLinearSolverNames.forEach(function (name) {
-            newCssJson['g.' + nonLinearSolverClasses[name] + ' > rect'] = {
-                'cursor': 'pointer',
-                'fill-opacity': '.8',
-                'fill': nonLinearSolverColors[name]
-            };
-        });
-
-        // Iterate over the JSON object just created and turn it into
-        // CSS style sheet text.
-        let newCssText = '';
-        Object.keys(newCssJson).forEach(function (selector) {
-            newCssText += selector + ' {\n';
-            Object.keys(newCssJson[selector]).forEach(function (attrib) {
-                newCssText += '    ' + attrib + ': ' + newCssJson[selector][attrib] + ';\n';
-            })
-            newCssText += '}\n\n';
-        });
-
-        this.svgStyle.innerHTML = newCssText;
-    }
 
     /**
      * Save the SVG to a filename selected by the user.
@@ -318,6 +200,10 @@ class N2Diagram {
         }
     }
 
+    /**
+     * Make a copy of the previous transit coordinates and linear scalers before
+     * setting new ones.
+     */
     preservePreviousScale() {
         // Preserve previous coordinates
         Object.assign(this.transitCoords.previous.model, this.transitCoords.model);
@@ -335,28 +221,28 @@ class N2Diagram {
             this.preservePreviousScale();
         }
 
-        this.transitCoords.model.x = (this.zoomedElement.x ? n2Diag.layout.size.model.width -
-            N2Layout.parentNodeWidthPx : n2Diag.layout.size.model.width) /
+        this.transitCoords.model.x = (this.zoomedElement.x ? this.layout.size.model.width -
+            N2Layout.parentNodeWidthPx : this.layout.size.model.width) /
             (1 - this.zoomedElement.x);
         this.transitCoords.model.y = N2Layout.heightPx / this.zoomedElement.height;
 
         this.scales.model.x
             .domain([this.zoomedElement.x, 1])
             .range([this.zoomedElement.x ? N2Layout.parentNodeWidthPx : 0,
-            n2Diag.layout.size.model.width]);
+            this.layout.size.model.width]);
         this.scales.model.y
             .domain([this.zoomedElement.y, this.zoomedElement.y + this.zoomedElement.height])
             .range([0, N2Layout.heightPx]);
 
         this.transitCoords.solver.x = (this.zoomedElement.xSolver ?
-            n2Diag.layout.size.solver.width - N2Layout.parentNodeWidthPx :
-            n2Diag.layout.size.solver.width) / (1 - this.zoomedElement.xSolver);
+            this.layout.size.solver.width - N2Layout.parentNodeWidthPx :
+            this.layout.size.solver.width) / (1 - this.zoomedElement.xSolver);
         this.transitCoords.solver.y = N2Layout.heightPx / this.zoomedElement.heightSolver;
 
         this.scales.solver.x
             .domain([this.zoomedElement.xSolver, 1])
             .range([this.zoomedElement.xSolver ? N2Layout.parentNodeWidthPx :
-                0, n2Diag.layout.size.solver.width]);
+                0, this.layout.size.solver.width]);
         this.scales.solver.y
             .domain([this.zoomedElement.ySolver,
             this.zoomedElement.ySolver + this.zoomedElement.heightSolver])
@@ -392,7 +278,7 @@ class N2Diagram {
     /** Update svg dimensions with transition after a new N2Layout changes
      * layout.size.model.width
      */
-    updateTransitions() {
+    updateTransitionInfo() {
         sharedTransition = d3.transition()
             .duration(TRANSITION_DURATION)
             .delay(this.transitionStartDelay); // do this after intense computation
@@ -429,6 +315,41 @@ class N2Diagram {
     }
 
     /**
+     * Based on the element's type and conditionally other info, determine
+     * what CSS style is associated.
+     * @return {string} The name of an existing CSS class.
+     */
+    getStyleClass(element) {
+        if (element.isMinimized) return 'minimized';
+
+        switch (element.type) {
+            case 'param':
+                if (Array.isPopulatedArray(element.children)) return 'param_group';
+                return 'param';
+
+            case 'unconnected_param':
+                if (Array.isPopulatedArray(element.children)) return 'param_group';
+                return 'unconnected_param';
+
+            case 'unknown':
+                if (Array.isPopulatedArray(element.children)) return 'unknown_group';
+                if (element.implicit) return 'unknown_implicit';
+                return 'unknown';
+
+            case 'root':
+                return 'subsystem';
+
+            case 'subsystem':
+                if (element.subsystem_type == 'component') return 'component';
+                return 'subsystem';
+
+            default:
+                throw ('CSS class not found for element ' + element);
+        }
+
+    }
+
+    /**
      * Refresh the diagram when something has visually changed.
      * @param {Boolean} [computeNewTreeLayout = true] Whether to rebuild the layout and
      *  matrix objects.
@@ -436,7 +357,7 @@ class N2Diagram {
     update(computeNewTreeLayout = true) {
         this.updateUI();
 
-        // Compute the new tree layout.
+        // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {
             this.layout = new N2Layout(this.model, this.zoomedElement);
             this.updateClickedIndices();
@@ -444,7 +365,7 @@ class N2Diagram {
         }
 
         this.updateScale();
-        this.updateTransitions();
+        this.updateTransitionInfo();
     }
 }
 

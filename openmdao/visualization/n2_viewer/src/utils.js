@@ -63,3 +63,6 @@ Object.defineProperty(Object.prototype, 'propExists', {
 Array.isPopulatedArray = function (arr) {
     return (Array.isArray(arr) && arr.length > 0);
 };
+
+const paramRegex = /^(param|unconnected_param)$/;
+const paramOrUnknownRegex = /^(unknown|param|unconnected_param)$/;
