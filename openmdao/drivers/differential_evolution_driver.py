@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import copy
+import itertools
 import numpy as np
 import openmdao
 import os
@@ -71,7 +72,23 @@ class DifferentialEvolutionDriver(Driver):
         self.options.declare(
             "strategy",
             default="rand-to-best/1/exp/random",
-            desc="Evolution strategy to use for the differential evolution.",
+            values=[
+                "/".join(strategy)
+                for strategy in itertools.product(
+                    list(EvolutionStrategy.__mutation_strategies__.keys()),
+                    ["1", "2", "3"],
+                    list(EvolutionStrategy.__crossover_strategies__.keys()),
+                    list(EvolutionStrategy.__repair_strategies__.keys()),
+                )
+            ],
+            desc="Evolution strategy to use for the differential evolution. "
+            "An evolution strategy is made up of four parts in fixed order, separated by '/':"
+            " mutation strategy ('rand', 'best', or 'rand-to-best'),"
+            " number of individuals to involve in the mutation (1, 2, or 3),"
+            " crossover strategy ('exp' or 'bin'), and"
+            " repair strategy ('random' or 'clip'). "
+            "A good introduction of these topics can be found here: "
+            "https://pablormier.github.io/2017/09/05/a-tutorial-on-differential-evolution-with-python/",
         )
         self.options.declare(
             "Pm",
