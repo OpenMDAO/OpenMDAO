@@ -5,8 +5,10 @@ import numpy as np
 import openmdao.api as om
 import unittest
 
-from differential_evolution import *
+from differential_evolution import EvolutionStrategy
 from parameterized import parameterized
+
+from openmdao.drivers.differential_evolution_driver import DifferentialEvolutionDriver
 
 
 class TestDifferentialEvolutionDriver(unittest.TestCase):
