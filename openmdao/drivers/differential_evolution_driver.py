@@ -107,7 +107,13 @@ class DifferentialEvolutionDriver(Driver):
             desc="Crossover rate.",
         )
         self.options.declare(
-            "adaptivity", default=2, values=[0, 1, 2], desc="Self-adaptivity setting."
+            "adaptivity",
+            default=2,
+            values=[0, 1, 2],
+            desc="Self-adaptivity setting:"
+            " 0: mutation and crossover rates are fixed (no self-adaptivity);"
+            " 1: mutation and crossover rates are optimized using Monte-Carlo approach; "
+            " 2: mutation and crossover rates are optimized using evolutionary algorithm. ",
         )
         self.options.declare(
             "max_gen", default=1000, desc="Number of generations before termination."
