@@ -127,8 +127,8 @@ class DifferentialEvolutionDriver(Driver):
         self.options.declare(
             "pop_size",
             default=0,
-            desc="Number of points in the GA. Set to 0 and it will be computed "
-            "as four times the number of bits.",
+            desc="Number of individuals (points) to use for the optimization. "
+                 "If set to 0, it will be calculated automatically as 5 x dimensionality.",
         )
         self.options.declare(
             "run_parallel",
@@ -429,10 +429,6 @@ class DifferentialEvolutionDriver(Driver):
         -------
         float
             Objective value
-        bool
-            Success flag, True if successful
-        int
-            Case number, used for identification when run in parallel.
         """
         model = self._problem.model
 
