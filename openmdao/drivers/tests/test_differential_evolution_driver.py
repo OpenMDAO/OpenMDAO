@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+""" Unit tests for the DifferentialEvolution Driver."""
 import itertools
 import numpy as np
 import openmdao.api as om

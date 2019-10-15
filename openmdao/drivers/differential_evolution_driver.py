@@ -1,5 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+"""
+Driver for a differential evolution algorithm.
+
+This driver uses the differential_evolution Python package to provide the logic of the main
+differential evolution algorithms, developed by D. de Vries.
+
+The following reference is only for the penalty function:
+Smith, A. E., Coit, D. W. (1995) Penalty functions. In: Handbook of Evolutionary Computation, 97(1).
+
+The following reference is only for weighted sum multi-objective optimization:
+Sobieszczanski-Sobieski, J., Morris, A. J., van Tooren, M. J. L. (2015)
+Multidisciplinary Design Optimization Supported by Knowledge Based Engineering.
+John Wiley & Sons, Ltd.
+"""
 import copy
 import itertools
 import numpy as np
@@ -28,6 +42,26 @@ else:
 
 
 class DifferentialEvolutionDriver(Driver):
+    """
+    Driver for a differential evolution algorithm.
+
+    Attributes
+    ----------
+    _concurrent_pop_size : int
+        Number of points to run concurrently when model is a parallel one.
+    _concurrent_color : int
+        Color of current rank when running a parallel model.
+    _de : DifferentialEvolution
+        Differential evolution algorithm.
+    _desvar_idx : dict
+        Keeps track of the indices for each desvar, since GeneticAlgorithm sees an array of
+        design variables.
+    _es : EvolutionStrategy
+        Evolution strategy to use when evolving the population of the differential evolution algorithm.
+    _seed : int
+         Seed number which controls the seed and random draws.
+    """
+
     def __init__(self, **kwargs):
         """
         Initialize the DifferentialEvolution driver.
@@ -128,7 +162,7 @@ class DifferentialEvolutionDriver(Driver):
             "pop_size",
             default=0,
             desc="Number of individuals (points) to use for the optimization. "
-                 "If set to 0, it will be calculated automatically as 5 x dimensionality.",
+            "If set to 0, it will be calculated automatically as 5 x dimensionality.",
         )
         self.options.declare(
             "run_parallel",
