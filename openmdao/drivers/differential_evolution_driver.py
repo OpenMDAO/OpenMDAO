@@ -35,7 +35,7 @@ class DifferentialEvolutionDriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        super(DifferentialEvolutionDriver).__init__(**kwargs)
+        super(DifferentialEvolutionDriver, self).__init__(**kwargs)
 
         # What we support
         self.supports["integer_design_vars"] = True
@@ -153,7 +153,7 @@ class DifferentialEvolutionDriver(Driver):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        super(DifferentialEvolutionDriver)._setup_driver(problem)
+        super(DifferentialEvolutionDriver, self)._setup_driver(problem)
 
         model_mpi = None
         comm = self._problem.comm
