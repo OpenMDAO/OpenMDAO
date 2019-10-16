@@ -117,7 +117,7 @@ class TestDifferentialEvolutionDriver(unittest.TestCase):
         self.problem.setup()
         self.problem.run_driver()
 
-    def test_differential_evolution_driver_seed(self):
+    def test_seed_specified_repeatability(self):
         x = [None, None]
         f = [None, None]
 
@@ -136,6 +136,14 @@ class TestDifferentialEvolutionDriver(unittest.TestCase):
 
         self.assertTrue(np.all(x[0] == x[1]))
         self.assertEqual(f[0], f[1])
+
+    def test_custom_population_size(self):
+        n_pop = 11
+        self.problem.driver.options["pop_size"] = n_pop
+        self.problem.setup()
+        self.problem.run_driver()
+        self.assertEqual(self.problem.driver._de.n_pop, n_pop)
+        self.assertEqual(self.problem.driver._de.pop.shape[0], n_pop)
 
 
 if __name__ == "__main__":
