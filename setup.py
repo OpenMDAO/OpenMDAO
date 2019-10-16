@@ -147,7 +147,7 @@ setup(
         'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
     },
     install_requires=[
-        'differential_evolution>=1.9.1',
+        'differential_evolution>=1.9.2',
         'networkx>=2.0',
         'numpy',
         'pyDOE2',
