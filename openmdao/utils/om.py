@@ -9,7 +9,7 @@ import argparse
 from itertools import chain
 from six import iteritems
 
-from openmdao.core.problem import Problem
+import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
@@ -82,7 +82,7 @@ def _n2_cmd(options):
             exit()  # could make this command line selectable later
 
         options.func = lambda options: _viewmod
-        _post_setup_exec(options)
+        _simple_exec(options)
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title,
@@ -187,7 +187,7 @@ def _xdsm_cmd(options):
 
         options.func = lambda options: _xdsm
 
-        _post_setup_exec(options)
+        _simple_exec(options)
     else:
         # assume the file is a recording, run standalone
         write_xdsm(filename, filename=options.outfile, model_path=options.model_path,
@@ -216,6 +216,9 @@ def _view_connections_setup_parser(parser):
                         help='title of web page.')
     parser.add_argument('--no_browser', action='store_true', dest='no_browser',
                         help="don't display in a browser.")
+    parser.add_argument('--show_values', action='store_true', dest='show_values',
+                        help="Display values.")
+    parser.add_argument('--pname', action='store', dest='pname', help='Problem name')
 
 
 def _view_connections_cmd(options):
@@ -238,8 +241,17 @@ def _view_connections_cmd(options):
         else:
             title = "Connections for %s" % os.path.basename(options.file[0])
         view_connections(prob, outfile=options.outfile, show_browser=not options.no_browser,
-                         title=title)
+                         show_values=options.show_values, title=title)
         exit()
+
+    # register the hook
+    if options.show_values:
+        loc = 'final_setup'
+    else:
+        loc = 'setup'
+    hooks._register_hook(_viewconns, loc, class_name='Problem', inst_id=options.pname,
+                         post=True)
+
     return _viewconns
 
 
@@ -282,7 +294,7 @@ def _meta_model_cmd(options):
                   "    pip install bokeh")
             exit()
 
-        Problem._post_setup_func = None
+        hooks._unregister_hook('final_setup', 'Problem', post=True)
 
         mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp)
 
@@ -321,6 +333,8 @@ def _meta_model_cmd(options):
             else:
                 print("\n'{}' is not a Metamodel.\n {}".format(pathname, try_str))
         exit()
+
+    hooks._register_hook(_view_metamodel, 'final_setup', 'Problem', post=True)
 
     return _view_metamodel
 
@@ -380,6 +394,9 @@ def _tree_setup_parser(parser):
                         help='Add a variable to search for in vectors of tree systems.')
     parser.add_argument('-r', '--rank', action='store', type=int, dest='rank',
                         default=0, help="Display the tree on this rank (if MPI is active).")
+    parser.add_argument('--pname', action='store', dest='pname', help='Problem name')
+    parser.add_argument('-s', '--sizes', action='store_true', dest='show_sizes',
+                        help="Display input and output sizes.")
 
 
 def _get_tree_filter(attrs, vecvars):
@@ -446,9 +463,18 @@ def _tree_cmd(options):
         filt = None
 
     def _tree(prob):
-        tree(prob, show_colors=options.show_colors,
+        tree(prob, show_colors=options.show_colors, show_sizes=options.show_sizes,
              filter=filt, max_depth=options.depth, rank=options.rank, stream=out)
         exit()
+
+    # register the hook
+    if options.vecvars or options.show_sizes:
+        location = 'final_setup'
+    else:
+        location = 'setup'
+    hooks._register_hook(_tree, location, class_name='Problem', inst_id=options.pname,
+                         post=True)
+
     return _tree
 
 
@@ -539,7 +565,7 @@ def _cite_cmd(options):
     return _cite
 
 
-def _post_setup_exec(options):
+def _simple_exec(options):
     """
     Use this as executor for commands that run as Problem post-setup commands.
 
@@ -563,43 +589,27 @@ def _post_setup_exec(options):
     }
 
     if options.func is not None:
-        Problem._post_setup_func = options.func(options)
+        # calling this func sets up the hook(s)
+        options.func(options)
 
     exec(code, globals_dict)
 
 
-# NOTE: any commands using _post_setup_exec as their executor must handle their own exit behavior.
+# NOTE: any commands using _simple_exec as their executor must handle their own exit behavior.
 # If you want them to exit after running, exit() must be called from within your function.  This
 # also gives you the option of controlling the exit behavior via a command line argument.
 
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, func, description)
-# 'func' will typically be None unless 'executor' is _post_setup_exec.
+# 'func' will typically be None unless 'executor' is _simple_exec.
 _command_map = {
-    'view_connections': (_view_connections_setup_parser, _post_setup_exec, _view_connections_cmd,
-                         'Connection viewer showing values and source/target units.'),
-    'summary': (_config_summary_setup_parser, _post_setup_exec, _config_summary_cmd,
-                'Print a short top-level summary of the problem.'),
-    'tree': (_tree_setup_parser, _post_setup_exec, _tree_cmd, 'Print the system tree.'),
-    'total_coloring': (_total_coloring_setup_parser, _post_setup_exec, _total_coloring_cmd,
-                       'Compute a coloring for the total jacobian.'),
-    'partial_coloring': (_partial_coloring_setup_parser, _post_setup_exec, _partial_coloring_cmd,
-                         'Compute coloring(s) for specified partial jacobians.'),
-    'total_sparsity': (_sparsity_setup_parser, _post_setup_exec, _sparsity_cmd,
-                       'Compute the sparsity pattern of the total jacobian.'),
-    'cite': (_cite_setup_parser, _post_setup_exec, _cite_cmd,
-             'Print citations referenced by problem'),
-    'check': (_check_config_setup_parser, _post_setup_exec, _check_config_cmd,
-              'Perform a number of configuration checks on the problem.'),
-    'view_mm': (_meta_model_parser, _post_setup_exec, _meta_model_cmd, "Meta Model Viewer."),
-    'n2': (_n2_setup_parser, _n2_cmd, None, 'Display an interactive N2 diagram of the problem.'),
-    'view_model': (_n2_setup_parser, _view_model_cmd, None,
-                   'Display an interactive N2 diagram of the problem. '
-                   '(Deprecated, please use n2 instead.)'),
-    'trace': (_itrace_setup_parser, _itrace_exec, None, 'Dump trace output.'),
     'call_tree': (_calltree_setup_parser, _calltree_exec, None,
                   "Display the call tree for the specified class method and all 'self' class "
                   "methods it calls."),
+    'check': (_check_config_setup_parser, _simple_exec, _check_config_cmd,
+              'Perform a number of configuration checks on the problem.'),
+    'cite': (_cite_setup_parser, _simple_exec, _cite_cmd,
+             'Print citations referenced by problem'),
     'iprof': (_iprof_setup_parser, _iprof_exec, None,
               'Profiling of calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec, None,
@@ -607,17 +617,34 @@ _command_map = {
     'mem': (_mem_prof_setup_parser, _mem_prof_exec, None, 'Memory profiler.'),
     'mempost': (_mempost_setup_parser, _mempost_exec, None,
                 'Post-processor for memory profile output.'),
-    'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, None,
-                      'Colored jacobian viewer.'),
-    'xdsm': (_xdsm_setup_parser, _xdsm_cmd, None, 'XDSM viewer.'),
+    'n2': (_n2_setup_parser, _n2_cmd, None, 'Display an interactive N2 diagram of the problem.'),
+    'partial_coloring': (_partial_coloring_setup_parser, _simple_exec, _partial_coloring_cmd,
+                         'Compute coloring(s) for specified partial jacobians.'),
     'scaffold': (_scaffold_setup_parser, _scaffold_exec, None,
                  'Generate a simple scaffold for a component.'),
+    'summary': (_config_summary_setup_parser, _simple_exec, _config_summary_cmd,
+                'Print a short top-level summary of the problem.'),
+    'total_coloring': (_total_coloring_setup_parser, _simple_exec, _total_coloring_cmd,
+                       'Compute a coloring for the total jacobian.'),
+    'total_sparsity': (_sparsity_setup_parser, _simple_exec, _sparsity_cmd,
+                       'Compute the sparsity pattern of the total jacobian.'),
+    'trace': (_itrace_setup_parser, _itrace_exec, None, 'Dump trace output.'),
+    'tree': (_tree_setup_parser, _simple_exec, _tree_cmd, 'Print the system tree.'),
+    'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, None,
+                      'Colored jacobian viewer.'),
+    'view_connections': (_view_connections_setup_parser, _simple_exec, _view_connections_cmd,
+                         'Connection viewer showing values and source/target units.'),
+    'view_mm': (_meta_model_parser, _simple_exec, _meta_model_cmd, "Meta Model Viewer."),
+    'view_model': (_n2_setup_parser, _view_model_cmd, None,
+                   'Display an interactive N2 diagram of the problem. '
+                   '(Deprecated, please use n2 instead.)'),
+    'xdsm': (_xdsm_setup_parser, _xdsm_cmd, None, 'XDSM viewer.'),
 }
 
 
 # add any dev specific command here that users probably don't want to see
 if os.environ.get('OPENMDAO_DEV', '').lower() in {'1', 'true', 'yes'}:
-    _command_map['dump_idxs'] = (_dump_dist_idxs_setup_parser, _post_setup_exec,
+    _command_map['dump_idxs'] = (_dump_dist_idxs_setup_parser, _simple_exec,
                                  _dump_dist_idxs_cmd,
                                  'Show distributed index information.')
 
@@ -638,13 +665,15 @@ def openmdao_cmd():
     # handle case where someone just runs `openmdao <script>`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
     if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(args[0]):
-        _post_setup_exec(_Options(file=[args[0]], func=None))
+        _simple_exec(_Options(file=[args[0]], func=None))
     else:
+        hooks.use_hooks = True
         options = parser.parse_args()
         if hasattr(options, 'executor'):
             options.executor(options)
         else:
             print("\nNothing to do.")
+
 
 if __name__ == '__main__':
     openmdao_cmd()

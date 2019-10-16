@@ -12,6 +12,7 @@ import openmdao.api as om
 from openmdao.core.system import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+import openmdao.utils.hooks as hooks
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -1606,11 +1607,12 @@ class TestProblem(unittest.TestCase):
         def hook_func(prob):
             prob['p2.y'] = 5.0
 
-        prob = om.Problem()
-        model = prob.model
-        om.Problem._post_setup_func = hook_func
-
+        hooks.use_hooks = True
+        hooks._register_hook(hook_func, 'final_setup', class_name='Problem', post=True)
         try:
+            prob = om.Problem()
+            model = prob.model
+
             model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
             model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
             model.add_subsystem('comp', om.ExecComp("f_xy=2.0*x+3.0*y"))
@@ -1624,7 +1626,8 @@ class TestProblem(unittest.TestCase):
             assert_rel_error(self, prob['p2.y'], 5.0)
             assert_rel_error(self, prob['comp.f_xy'], 21.0)
         finally:
-            om.Problem._post_setup_func = None
+            hooks._unregister_hook('final_setup', class_name='Problem', post=True)
+            hooks.use_hooks = False
 
     def test_list_problem_vars(self):
         model = SellarDerivatives()

@@ -42,6 +42,7 @@ from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.hooks import _setup_hooks
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -127,15 +128,13 @@ class Problem(object):
         Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
         detect when you need to do this, but in some cases (e.g., complex step is used
         after a reconfiguration) you may need to set this to True.
-    _color_dir_hash : str
-        Hash used to detect collisions of coloring files.
+    _name : str
+        Problem name.
     __get_remote : bool
         Flag used to determine when __getitem__ will retrieve remote variables.
     """
 
-    _post_setup_func = None
-
-    def __init__(self, model=None, driver=None, comm=None, root=None, **options):
+    def __init__(self, model=None, driver=None, comm=None, root=None, name=None, **options):
         """
         Initialize attributes.
 
@@ -149,6 +148,9 @@ class Problem(object):
             The global communicator.
         root : <System> or None
             Deprecated kwarg for `model`.
+        name : str
+            Problem name. Can be used to specify a Problem instance when multiple Problems
+            exist.
         **options : named args
             All remaining named args are converted to options.
         """
@@ -156,6 +158,7 @@ class Problem(object):
         self.__get_remote = False
 
         self.cite = CITATION
+        self._name = name
 
         if comm is None:
             try:
@@ -228,6 +231,8 @@ class Problem(object):
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes)')
 
+        _setup_hooks(self)
+
     def _get_var_abs_name(self, name):
         if name in self.model._var_allprocs_abs2meta:
             return name
@@ -243,6 +248,9 @@ class Problem(object):
                                                                                       abs_names))
 
         raise KeyError("Variable '{}' not found.".format(name))
+
+    def _get_inst_id(self):
+        return self._name
 
     def is_local(self, name):
         """
@@ -1024,10 +1032,6 @@ class Problem(object):
         if self._setup_status < 2:
             self._setup_status = 2
             self._set_initial_conditions()
-
-        # check for post-setup hook
-        if Problem._post_setup_func is not None:
-            Problem._post_setup_func(self)
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,

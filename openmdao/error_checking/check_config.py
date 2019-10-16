@@ -14,6 +14,7 @@ from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
+from openmdao.utils.hooks import _register_hook
 
 
 def _check_cycles(group, infos=None):
@@ -485,6 +486,7 @@ def _check_config_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='python file containing the model')
     parser.add_argument('-o', action='store', dest='outfile', help='output file')
+    parser.add_argument('--pname', action='store', dest='pname', help='Problem name')
     parser.add_argument('-c', action='append', dest='checks', default=[],
                         help='Only perform specific check(s). Default checks are: %s. '
                         'Other available checks are: %s' %
@@ -521,6 +523,10 @@ def _check_config_cmd(options):
             prob.check_config(logger, options.checks)
 
         exit()
+
+    # register the hook
+    _register_hook(_check_config, 'final_setup', class_name='Problem', inst_id=options.pname,
+                   post=True)
 
     return _check_config
 
