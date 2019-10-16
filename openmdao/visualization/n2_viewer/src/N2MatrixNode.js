@@ -1,6 +1,6 @@
 /**
  * A visible node that is part of the matrix.
- * @typedef {Object} N2Node
+ * @typedef {Object} N2MatrixNode
  * @property {number} row Vertical coordinate of the node in the matrix.
  * @property {number} col Horizontal coordinate of the node in the matrix.
  * @property {Object} srcObj The node in the model tree this node is associated with.
@@ -8,7 +8,7 @@
  * @property {string} id The srcObj id appended with the tgtObj id.
  * @property {SymbolType} symbolType Info about the type of symbol represented by the node.
 */
-class N2Node {
+class N2MatrixNode {
 
     /**
      * Initialize the node.

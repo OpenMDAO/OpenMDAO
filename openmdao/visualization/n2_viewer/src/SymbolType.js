@@ -8,7 +8,7 @@ class SymbolType {
     /**
      * Determine the name and whether it's a declared partial based on info
      * from the provided node.
-     * @param {N2Node} node The object to select the type from.
+     * @param {N2MatrixNode} node The object to select the type from.
      * @param {ModelData} model Reference to the model to get some info from it.
      */
     constructor(node, model) {

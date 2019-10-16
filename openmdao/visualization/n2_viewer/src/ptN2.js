@@ -2,19 +2,13 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
     // TODO: Get rid of all these after refactoring ///////////////
     var model = n2Diag.model; ////
-
     svgDiv = n2Diag.svgDiv; ////
     svg = n2Diag.svg; ////
-
     var root = model.root;
     var abs2prom = model.abs2prom;
-
     var showPath = n2Diag.showPath; //default off ////
     var DEFAULT_TRANSITION_START_DELAY = N2Diagram.defaultTransitionStartDelay; ////
-
-
     var chosenCollapseDepth = n2Diag.chosenCollapseDepth; ////
-
     var tooltip = n2Diag.toolTip; ////
     ///////////////////////////////////////////////////////////////
 
@@ -26,7 +20,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
     // TODO: Get rid of all these globals after refactoring ///////////////
     d3NodesArray = n2Diag.layout.zoomedNodes;
     d3RightTextNodesArrayZoomed = n2Diag.layout.visibleNodes;
-
     d3SolverNodesArray = n2Diag.layout.zoomedSolverNodes;
     d3SolverRightTextNodesArrayZoomed = n2Diag.layout.visibleSolverNodes;
     ///////////////////////////////////////////////////////////////
@@ -180,24 +173,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             .data(d3SolverNodesArray, function (d) {
                 return d.id;
             });
-/*
-        function getSolverClass(showLinearSolverNames, linear_solver_name, nonlinear_solver_name) {
-            if (showLinearSolverNames) {
-                if (linearSolverNames.indexOf(linear_solver_name) >= 0) {
-                    solver_class = linearSolverClasses[linear_solver_name]
-                } else {
-                    solver_class = linearSolverClasses["other"]; // user must have defined their own solver that we do not know about
-                }
-            } else {
-                if (nonLinearSolverNames.indexOf(nonlinear_solver_name) >= 0) {
-                    solver_class = nonLinearSolverClasses[nonlinear_solver_name]
-                } else {
-                    solver_class = nonLinearSolverClasses["other"]; // user must have defined their own solver that we do not know about
-                }
-            }
-            return solver_class;
-        }
-*/
+
         var nodeSolverEnter = selSolver.enter().append("svg:g")
             .attr("class", function (d) {
                 solver_class = n2Diag.style.getSolverClass(N2Layout.showLinearSolverNames, { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver})
@@ -345,7 +321,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
     function collapse() {
         var d = lastLeftClickedEle;
-        if (!d.children) return;
+        if (!d.hasChildren()) return;
         if (d.depth > zoomedElement.depth) { //dont allow minimizing on root node
             lastRightClickedElement = d;
             FindRootOfChangeFunction = FindRootOfChangeForRightClick;
@@ -371,7 +347,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
     //left click => navigate
     function LeftClick(d, ele) {
-        if (!d.children) return;
+        if (!d.hasChildren()) return;
         if (d3.event.button != 0) return;
         n2Diag.backButtonHistory.push({ "el": zoomedElement });
         n2Diag.forwardButtonHistory = [];
@@ -406,11 +382,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
     }
 
     function Toggle(d) {
-
-        if (d.isMinimized)
-            d.isMinimized = false;
-        else
-            d.isMinimized = true;
+        d.isMinimized = ! d.isMinimized;
     }
 
     function FindRootOfChangeForRightClick(d) {
@@ -433,7 +405,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             if (d.cycleArrows) {
                 arr.push(d);
             }
-            if (d.children) {
+            if (d.hasChildren()) {
                 for (var i = 0; i < d.children.length; ++i) {
                     GetObjectsInChildrenWithCycleArrows(d.children[i], arr);
                 }
@@ -452,7 +424,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             if (d === toMatchObj) {
                 return true;
             }
-            if (d.children) {
+            if (d.hasChildren()) {
                 for (var i = 0; i < d.children.length; ++i) {
                     if (HasObjectInChildren(d.children[i], toMatchObj)) {
                         return true;
@@ -617,7 +589,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             if (d.subsystem_type && d.subsystem_type === "component") {
                 d.isMinimized = true;
             }
-            if (d.children) {
+            if (d.hasChildren()) {
                 for (var i = 0; i < d.children.length; ++i) {
                     CollapseOutputs(d.children[i]);
                 }
@@ -635,7 +607,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             if (d.type !== "param" && d.type !== "unconnected_param") {
                 d.isMinimized = false;
             }
-            if (d.children) {
+            if (d.hasChildren()) {
                 for (var i = 0; i < d.children.length; ++i) {
                     Uncollapse(d.children[i]);
                 }
@@ -659,7 +631,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             else {
                 d.isMinimized = true;
             }
-            if (d.children) {
+            if (d.hasChildren()) {
                 for (var i = 0; i < d.children.length; ++i) {
                     CollapseToDepth(d.children[i], depth);
                 }
@@ -777,7 +749,6 @@ function PtN2Diagram(parentDiv, modelJSON) {
     };
 }
 
-var zoomedElement = modelData.tree;
 var updateFunc;
 var mouseOverOffDiagN2;
 var mouseOverOnDiagN2;
@@ -786,4 +757,5 @@ var mouseClickN2;
 var treeData, connectionList;
 
 let n2Diag = new N2Diagram(modelData);
+var zoomedElement = n2Diag.zoomedElement;
 var app = PtN2Diagram(document.getElementById("ptN2ContentDivId"), modelData);

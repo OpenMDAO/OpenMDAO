@@ -284,7 +284,6 @@ class N2Diagram {
             .delay(this.transitionStartDelay); // do this after intense computation
         this.transitionStartDelay = N2Diagram.defaultTransitionStartDelay;
 
-
         this.svgDiv.transition(sharedTransition)
             .style("width", (this.layout.size.model.width + PTREE_N2_GAP_PX +
                 WIDTH_N2_PX + this.layout.size.solver.width + 2 * SVG_MARGIN + PTREE_N2_GAP_PX) +

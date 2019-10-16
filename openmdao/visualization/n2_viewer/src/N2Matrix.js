@@ -85,26 +85,26 @@ class N2Matrix {
             if (!this.exists(srcIdx)) this.matrix[srcIdx] = {};
 
             // On the diagonal
-            this.matrix[srcIdx][srcIdx] = new N2Node(srcIdx, srcIdx, srcObj, srcObj, model);
+            this.matrix[srcIdx][srcIdx] = new N2MatrixNode(srcIdx, srcIdx, srcObj, srcObj, model);
 
             let targets = srcObj.targetsParamView;
 
             for (let tgtObj of targets) {
                 let tgtIdx = indexFor(this.nodes, tgtObj);
                 if (tgtIdx != -1) {
-                    this.matrix[srcIdx][tgtIdx] = new N2Node(srcIdx, tgtIdx, srcObj, tgtObj, model);
+                    this.matrix[srcIdx][tgtIdx] = new N2MatrixNode(srcIdx, tgtIdx, srcObj, tgtObj, model);
                 }
             }
 
             // Solver nodes
-            if (srcObj.type.match(paramRegex)) {
+            if (srcObj.isParam()) {
                 for (let j = srcIdx + 1; j < this.nodes.length; ++j) {
                     let tgtObj = this.nodes[j];
                     if (srcObj.parentComponent !== tgtObj.parentComponent) break;
 
                     if (tgtObj.type == "unknown") {
                         let tgtIdx = j;
-                        this.matrix[srcIdx][tgtIdx] = new N2Node(srcIdx, tgtIdx, srcObj, tgtObj, model);
+                        this.matrix[srcIdx][tgtIdx] = new N2MatrixNode(srcIdx, tgtIdx, srcObj, tgtObj, model);
                     }
                 }
             }
