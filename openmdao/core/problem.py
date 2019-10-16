@@ -1788,7 +1788,6 @@ class Problem(object):
         elif checks == 'all':
             checks = sorted(_all_checks)
 
-        print("Logger:", logger)
         for c in checks:
             if c not in _all_checks:
                 print("WARNING: '%s' is not a recognized check.  Available checks are: %s" %

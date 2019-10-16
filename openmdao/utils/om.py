@@ -82,6 +82,9 @@ def _n2_cmd(options):
             exit()  # could make this command line selectable later
 
         options.func = lambda options: _viewmod
+
+        hooks._register_hook(_viewmod, 'final_setup', 'Problem', pre=True)
+
         _simple_exec(options)
     else:
         # assume the file is a recording, run standalone
@@ -186,6 +189,8 @@ def _xdsm_cmd(options):
             exit()
 
         options.func = lambda options: _xdsm
+
+        hooks._register_hook(_xdsm, 'setup', 'Problem', post=True)
 
         _simple_exec(options)
     else:
@@ -368,6 +373,9 @@ def _config_summary_cmd(options):
     def summary(prob):
         config_summary(prob)
         exit()
+
+    hooks._register_hook(summary, 'final_setup', 'Problem', post=True)
+
     return summary
 
 
@@ -516,6 +524,9 @@ def _dump_dist_idxs_cmd(options):
     def _dumpdist(prob):
         dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
         exit()
+
+    hooks._register_hook(_dumpdist, 'final_setup', 'Problem', post=True)
+
     return _dumpdist
 
 
@@ -561,6 +572,8 @@ def _cite_cmd(options):
         if not MPI or MPI.COMM_WORLD.rank == 0:
             print_citations(prob, classes=options.classes, out_stream=out)
         exit()
+
+    hooks._register_hook(_cite, 'setup', 'Problem', post=True)
 
     return _cite
 

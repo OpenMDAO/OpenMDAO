@@ -1849,7 +1849,7 @@ def _total_coloring_cmd(options):
 
     def _total_coloring(prob):
         if prob.model._use_derivatives:
-            Problem._post_setup_func = None  # avoid recursive loop
+            hooks._unregister_hook('final_setup', 'Problem', post=True)  # avoid recursive loop
             if options.outfile:
                 outfile = os.path.abspath(options.outfile)
             else:
@@ -1991,7 +1991,7 @@ def _partial_coloring_cmd(options):
 
     def _partial_coloring(prob):
         if prob.model._use_derivatives:
-            Problem._post_setup_func = None  # avoid recursive loop
+            hooks._unregister_hook('final_setup', 'Problem', post=True)  # avoid recursive loop
 
             prob.run_model()  # get a consistent starting values for inputs and outputs
 
@@ -2091,7 +2091,7 @@ def _sparsity_cmd(options):
     _use_total_sparsity = False
 
     def _sparsity(prob):
-        Problem._post_setup_func = None  # avoid recursive loop
+        hooks._unregister_hook('final_setup', 'Problem', post=True)  # avoid recursive loop
         sparsity, J = get_tot_jac_sparsity(prob, num_full_jacs=options.num_jacs,
                                            tol=options.tolerance,
                                            mode=prob._mode, setup=True, run_model=True)

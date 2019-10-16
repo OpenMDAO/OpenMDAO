@@ -119,7 +119,7 @@ def _list_package_pyfiles(package):
 
 def _mem_prof_setup_parser(parser):
     parser.add_argument('-o', '--outfile', action='store', dest='outfile', default='mem_trace.raw',
-                        help='Name of file containing memory dump.')
+                        help='Name of file containing memory dump. Default is mem_trace.raw.')
     parser.add_argument('--min', action='store', dest='min_mem', type=float, default=1.0,
                         help='Dump function trace with memory usage in MB above min_mem to the '
                         'given file. Default is 1.0.')
@@ -211,7 +211,7 @@ def memtrace(**kwargs):
 
 def _mempost_setup_parser(parser):
     parser.add_argument('--out', action='store', dest='outfile', default=None,
-                        help='Dump memory tree to given file.')
+                        help='Dump memory report to given file.')
     parser.add_argument('--min', action='store', dest='min_mem', type=float, default=1.0,
                         help='Dump function trace with memory usage to given file.')
     parser.add_argument('-c', '--colors', action='store_true', dest='show_colors',
