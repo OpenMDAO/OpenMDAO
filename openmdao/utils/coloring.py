@@ -806,7 +806,7 @@ class Coloring(object):
         Returns
         -------
         dict or None
-            Mapping of (of, wrt) keys to thier corresponding (nzrows, nzcols, shape).
+            Mapping of (of, wrt) keys to their corresponding (nzrows, nzcols, shape).
         """
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
             J = self.get_dense_sparsity()
