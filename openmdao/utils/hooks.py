@@ -9,13 +9,12 @@ from functools import wraps
 import inspect
 import warnings
 
+from six import iteritems
+
 
 # global dict of hooks
 # {fname : { class_name: { inst_id: {}}}}
 _hooks = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: None))))
-
-# ids of objects that have already had their methods wrapped
-_hooks_done = set()
 
 # classes found here are known to contain no hooks
 _hook_skip_classes = set()
@@ -36,7 +35,7 @@ def _setup_hooks(obj):
     obj : object
         The object whose methods may be wrapped.
     """
-    if use_hooks and obj.__class__ not in _hook_skip_classes and id(obj) not in _hooks_done:
+    if use_hooks and obj.__class__ not in _hook_skip_classes:
 
         classes = inspect.getmro(obj.__class__)
         for c in classes:
@@ -48,7 +47,9 @@ def _setup_hooks(obj):
             _hook_skip_classes.update(classes)
             return
 
+        # any object where we register hooks must define the '_get_inst_id' method.
         ident = obj._get_inst_id()
+
         if ident in hk:
             hk = hk[ident]
         elif None in hk:
@@ -56,12 +57,13 @@ def _setup_hooks(obj):
         else:
             return
 
-        for name, method in inspect.getmembers(obj, inspect.ismethod):
-            if name in hk:
-                hk = hk[name]
-                setattr(obj, name, _hook_decorator(method, obj, hk))
-
-        _hooks_done.add(id(obj))
+        for name, hook in iteritems(hk):
+            method = getattr(obj, name, None)
+            if method is not None:
+                # if _hook_ attr is present, we've already wrapped this method
+                if hasattr(method, '_hook_'):
+                    method = method.f  # unwrap the method prior to re-wrapping
+                setattr(obj, name, _hook_decorator(method, obj, hook))
 
 
 def _hook_decorator(f, inst, hookmeta):
@@ -77,21 +79,22 @@ def _hook_decorator(f, inst, hookmeta):
     hookmeta : dict
         A dict with information about the hooks.
     """
-    cond = hookmeta.get('cond')
-
-    @wraps(f)
     def check_hooks(*args, **kwargs):
         if hookmeta['pre']:
+            cond = hookmeta['cond']
             if cond is None or cond(inst):
                 hookmeta['hookfunc'](inst)
 
         f(*args, **kwargs)
 
         if hookmeta['post']:
+            cond = hookmeta['cond']
             if cond is None or cond(inst):
                 hookmeta['hookfunc'](inst)
 
-    return check_hooks
+    check_hooks._hook_ = True
+
+    return wraps(f)(check_hooks)
 
 
 def _register_hook(hookfunc, fname, class_name, inst_id=None, pre=False, post=False, cond=None):

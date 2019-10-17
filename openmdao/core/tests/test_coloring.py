@@ -86,7 +86,7 @@ class DynPartialsComp(om.ExplicitComponent):
 
 
 
-def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=None, derivs=True,
+def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
             **options):
 
@@ -172,8 +172,6 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, sparsity=No
     # # setup coloring
     if color_info is not None:
         p.driver.use_fixed_coloring(color_info)
-    elif sparsity is not None:
-        p.driver.set_total_jac_sparsity(sparsity)
 
     if recorder:
         p.driver.add_recorder(recorder)
@@ -753,49 +751,6 @@ class SparsityTestCase(unittest.TestCase):
                "indeps.r": [[], [], [1, 1]]
             }
         }
-
-    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
-    def test_sparsity_snopt(self):
-        # first, run without sparsity
-        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
-
-        # run with dynamic sparsity
-        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_derivs_sparsity=True,
-                            optimizer='SNOPT', print_results=False)
-
-        # run with provided sparsity
-        p_sparsity = run_opt(pyOptSparseDriver, 'fwd', sparsity=self.sparsity,
-                             optimizer='SNOPT', print_results=False)
-
-        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
-        assert_almost_equal(p_dynamic['circle.area'], np.pi, decimal=7)
-        assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
-
-    def test_sparsity_pyoptsparse_slsqp(self):
-        try:
-            from pyoptsparse import OPT
-        except ImportError:
-            raise unittest.SkipTest("This test requires pyoptsparse.")
-
-        try:
-            OPT('SLSQP')
-        except:
-            raise unittest.SkipTest("This test requires pyoptsparse SLSQP.")
-
-        # first, run without sparsity
-        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SLSQP', print_results=False)
-
-        # run with dynamic sparsity
-        p_dynamic = run_opt(pyOptSparseDriver, 'fwd', dynamic_derivs_sparsity=True,
-                            optimizer='SLSQP', print_results=False)
-
-        # run with provided sparsity
-        p_sparsity = run_opt(pyOptSparseDriver, 'fwd', sparsity=self.sparsity,
-                             optimizer='SLSQP', print_results=False)
-
-        assert_almost_equal(p['circle.area'], np.pi, decimal=7)
-        assert_almost_equal(p_dynamic['circle.area'], np.pi, decimal=7)
-        assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
 
 
 class BidirectionalTestCase(unittest.TestCase):

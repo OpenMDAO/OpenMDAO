@@ -33,7 +33,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
 from openmdao.utils.coloring import _total_coloring_setup_parser, _total_coloring_cmd, \
-    _sparsity_setup_parser, _sparsity_cmd, _partial_coloring_setup_parser, _partial_coloring_cmd, \
+    _partial_coloring_setup_parser, _partial_coloring_cmd, \
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.general_utils import warn_deprecation
@@ -238,7 +238,7 @@ def _view_connections_cmd(options):
     Returns
     -------
     function
-        The post-setup hook function.
+        The hook function.
     """
     def _viewconns(prob):
         if options.title:
@@ -291,7 +291,7 @@ def _meta_model_cmd(options):
     Returns
     -------
     function
-        The post-setup hook function.
+        The hook function.
     """
     def _view_metamodel(prob):
         if bokeh is None:
@@ -368,7 +368,7 @@ def _config_summary_cmd(options):
     Returns
     -------
     function
-        The post-setup hook function.
+        The hook function.
     """
     def summary(prob):
         config_summary(prob)
@@ -405,6 +405,8 @@ def _tree_setup_parser(parser):
     parser.add_argument('--pname', action='store', dest='pname', help='Problem name')
     parser.add_argument('-s', '--sizes', action='store_true', dest='show_sizes',
                         help="Display input and output sizes.")
+    parser.add_argument('--approx', action='store_true', dest='show_approx',
+                        help="Show which components compute approximations.")
 
 
 def _get_tree_filter(attrs, vecvars):
@@ -458,7 +460,7 @@ def _tree_cmd(options):
     Returns
     -------
     function
-        The post-setup hook function.
+        The hook function.
     """
     if options.outfile is None:
         out = sys.stdout
@@ -472,11 +474,12 @@ def _tree_cmd(options):
 
     def _tree(prob):
         tree(prob, show_colors=options.show_colors, show_sizes=options.show_sizes,
-             filter=filt, max_depth=options.depth, rank=options.rank, stream=out)
+             show_approx=options.show_approx, filter=filt, max_depth=options.depth,
+             rank=options.rank, stream=out)
         exit()
 
     # register the hook
-    if options.vecvars or options.show_sizes:
+    if options.vecvars or options.show_sizes or options.show_approx:
         location = 'final_setup'
     else:
         location = 'setup'
@@ -514,7 +517,7 @@ def _dump_dist_idxs_cmd(options):
     Returns
     -------
     function
-        The post-setup hook function.
+        The hook function.
     """
     if options.outfile is None:
         out = sys.stdout
@@ -558,7 +561,7 @@ def _cite_cmd(options):
     Returns
     -------
     function
-        The post-setup hook function.
+        The hook function.
     """
     if options.outfile is None:
         out = sys.stdout
@@ -580,7 +583,7 @@ def _cite_cmd(options):
 
 def _simple_exec(options):
     """
-    Use this as executor for commands that run as Problem post-setup commands.
+    Use this as executor for commands that run as Problem commands.
 
     Parameters
     ----------
@@ -639,8 +642,6 @@ _command_map = {
                 'Print a short top-level summary of the problem.'),
     'total_coloring': (_total_coloring_setup_parser, _simple_exec, _total_coloring_cmd,
                        'Compute a coloring for the total jacobian.'),
-    'total_sparsity': (_sparsity_setup_parser, _simple_exec, _sparsity_cmd,
-                       'Compute the sparsity pattern of the total jacobian.'),
     'trace': (_itrace_setup_parser, _itrace_exec, None, 'Dump trace output.'),
     'tree': (_tree_setup_parser, _simple_exec, _tree_cmd, 'Print the system tree.'),
     'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, None,
