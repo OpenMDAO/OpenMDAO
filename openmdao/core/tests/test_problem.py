@@ -1007,7 +1007,7 @@ class TestProblem(unittest.TestCase):
         with assertRaisesRegex(self, TypeError, msg):
             prob.get_val('comp.x', 'degK')
 
-        msg = "Can't set variable 'comp.x' with units of 'cm' to value with units of 'degK'."
+        msg = "Can't set variable 'comp.x' with units 'cm' to value with units 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.set_val('comp.x', 55.0, 'degK')
 
@@ -1015,7 +1015,7 @@ class TestProblem(unittest.TestCase):
         with assertRaisesRegex(self, TypeError, msg):
             prob.get_val('no_unit.x', 'degK')
 
-        msg = "Can't set variable 'no_unit.x' with units of 'None' to value with units of 'degK'."
+        msg = "Can't set variable 'no_unit.x' with units 'None' to value with units 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
@@ -1140,7 +1140,7 @@ class TestProblem(unittest.TestCase):
         try:
             prob.setup(mode='junk')
         except ValueError as err:
-            msg = "Unsupported mode: 'junk'. Use either 'fwd' or 'rev'."
+            msg = "Problem: Unsupported mode: 'junk'. Use either 'fwd' or 'rev'."
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting ValueError')
@@ -1195,7 +1195,7 @@ class TestProblem(unittest.TestCase):
         try:
             prob.run_model()
         except RuntimeError as err:
-            msg = "The `setup` method must be called before `run_model`."
+            msg = "Problem: The `setup` method must be called before `run_model`."
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting RuntimeError')
@@ -1203,7 +1203,7 @@ class TestProblem(unittest.TestCase):
         try:
             prob.run_driver()
         except RuntimeError as err:
-            msg = "The `setup` method must be called before `run_driver`."
+            msg = "Problem: The `setup` method must be called before `run_driver`."
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting RuntimeError')
@@ -1211,7 +1211,7 @@ class TestProblem(unittest.TestCase):
     def test_run_with_invalid_prefix(self):
         # Test error message when running with invalid prefix.
 
-        msg = "The 'case_prefix' argument should be a string."
+        msg = "Problem: The 'case_prefix' argument should be a string."
 
         prob = om.Problem()
 
@@ -1250,7 +1250,7 @@ class TestProblem(unittest.TestCase):
             prob = om.Problem(root=om.Group(), model=om.Group())
 
         self.assertEqual(str(cm.exception),
-                         "Cannot specify both 'root' and 'model'. "
+                         "Problem: Cannot specify both 'root' and 'model'. "
                          "'root' has been deprecated, please use 'model'.")
 
         msg = "The 'root' argument provides backwards " \
@@ -1285,14 +1285,14 @@ class TestProblem(unittest.TestCase):
             prob = om.Problem(om.ScipyOptimizeDriver())
 
         self.assertEqual(str(cm.exception),
-                         "The value provided for 'model' is not a valid System.")
+                         "Problem: The value provided for 'model' is not a valid System.")
 
         # invalid driver
         with self.assertRaises(TypeError) as cm:
             prob = om.Problem(driver=SellarDerivatives())
 
         self.assertEqual(str(cm.exception),
-                         "The value provided for 'driver' is not a valid Driver.")
+                         "Problem: The value provided for 'driver' is not a valid Driver.")
 
     def test_relevance(self):
         p = om.Problem()

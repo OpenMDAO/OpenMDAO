@@ -169,7 +169,7 @@ class Problem(object):
 
         if root is not None:
             if model is not None:
-                raise ValueError("Cannot specify both 'root' and 'model'. "
+                raise ValueError(self.msginfo + ": Cannot specify both 'root' and 'model'. "
                                  "'root' has been deprecated, please use 'model'.")
 
             warn_deprecation("The 'root' argument provides backwards compatibility "
@@ -182,14 +182,16 @@ class Problem(object):
         elif isinstance(model, System):
             self.model = model
         else:
-            raise TypeError("The value provided for 'model' is not a valid System.")
+            raise TypeError(self.msginfo +
+                            ": The value provided for 'model' is not a valid System.")
 
         if driver is None:
             self.driver = Driver()
         elif isinstance(driver, Driver):
             self.driver = driver
         else:
-            raise TypeError("The value provided for 'driver' is not a valid Driver.")
+            raise TypeError(self.msginfo +
+                            ": The value provided for 'driver' is not a valid Driver.")
 
         self.comm = comm
 
@@ -243,11 +245,26 @@ class Problem(object):
             if len(abs_names) == 1:
                 return abs_names[0]
             else:
-                raise KeyError("Using promoted name `{}' is ambiguous and matches unconnected "
-                               "inputs %s. Use absolute name to disambiguate.".format(name,
+                raise KeyError("{}: Using promoted name `{}' is ambiguous and matches unconnected "
+                               "inputs %s. Use absolute name to disambiguate.".format(self.msginfo,
+                                                                                      name,
                                                                                       abs_names))
 
-        raise KeyError("Variable '{}' not found.".format(name))
+        raise KeyError("{}: Variable '{}' not found.".format(self.msginfo, name))
+
+    @property
+    def msginfo(self):
+        """
+        Return info to prepend to messages.
+
+        Returns
+        -------
+        str
+            Info to prepend to messages.
+        """
+        if self._name is None:
+            return type(self).__name__
+        return '{} {}'.format(type(self).__name__, self._name)
 
     def _get_inst_id(self):
         return self._name
@@ -267,7 +284,8 @@ class Problem(object):
             True if the named system or variable is local to this process.
         """
         if self._setup_status < 1:
-            raise RuntimeError("is_local('{}') was called before setup() completed.".format(name))
+            raise RuntimeError("{}: is_local('{}') was called before setup() "
+                               "completed.".format(self.msginfo, name))
 
         try:
             abs_name = self._get_var_abs_name(name)
@@ -379,8 +397,8 @@ class Problem(object):
             if abs_name in self._remote_var_set:
                 if self.__get_remote:
                     if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
-                        raise RuntimeError("Retrieval of the full distributed variable '%s' is not "
-                                           "supported." % abs_name)
+                        raise RuntimeError("%s: Retrieval of the full distributed variable '%s' "
+                                           "is not supported." % (self.msginfo, abs_name))
                     loc_val = val
                     owner = self.model._owning_rank[abs_name]
                     if owner != self.model.comm.rank:
@@ -396,12 +414,13 @@ class Problem(object):
                         val = new_val
                 elif val is _undefined:
                     raise RuntimeError(
-                        "Variable '{}' is not local to rank {}. You can retrieve values from "
+                        "{}: Variable '{}' is not local to rank {}. You can retrieve values from "
                         "other processes using "
-                        "`problem.get_val(<name>, get_remote=True)`.".format(name, self.comm.rank))
+                        "`problem.get_val(<name>, get_remote=True)`.".format(self.msginfo, name,
+                                                                             self.comm.rank))
 
         if val is _undefined:
-            raise KeyError('Variable name "{}" not found.'.format(name))
+            raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
 
         return val
 
@@ -445,14 +464,14 @@ class Problem(object):
             base_units = self._get_units(name)
 
             if base_units is None:
-                msg = "Can't express variable '{}' with units of 'None' in units of '{}'."
-                raise TypeError(msg.format(name, units))
+                msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
+                raise TypeError(msg.format(self.msginfo, name, units))
 
             try:
                 scale, offset = get_conversion(base_units, units)
             except TypeError:
-                msg = "Can't express variable '{}' with units of '{}' in units of '{}'."
-                raise TypeError(msg.format(name, base_units, units))
+                msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
+                raise TypeError(msg.format(self.msginfo, name, base_units, units))
 
             val = (val + offset) * scale
 
@@ -488,7 +507,7 @@ class Problem(object):
                 abs_name = prom_name2abs_name(self.model, name, 'input')
                 return meta[abs_name]['units']
 
-        raise KeyError('Variable name "{}" not found.'.format(name))
+        raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
 
     def __setitem__(self, name, value):
         """
@@ -528,7 +547,7 @@ class Problem(object):
                     print("Variable '{}' is remote on rank {}.  "
                           "Local assignment ignored.".format(name, self.comm.rank))
                 else:
-                    raise KeyError('Variable name "{}" not found.'.format(name))
+                    raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
 
     def set_val(self, name, value, units=None, indices=None):
         """
@@ -551,14 +570,14 @@ class Problem(object):
             base_units = self._get_units(name)
 
             if base_units is None:
-                msg = "Can't set variable '{}' with units of 'None' to value with units of '{}'."
-                raise TypeError(msg.format(name, units))
+                msg = "{}: Can't set variable '{}' with units 'None' to value with units '{}'."
+                raise TypeError(msg.format(self.msginfo, name, units))
 
             try:
                 scale, offset = get_conversion(units, base_units)
             except TypeError:
-                msg = "Can't set variable '{}' with units of '{}' to value with units of '{}'."
-                raise TypeError(msg.format(name, base_units, units))
+                msg = "{}: Can't set variable '{}' with units '{}' to value with units '{}'."
+                raise TypeError(msg.format(self.msginfo, name, base_units, units))
 
             value = (value + offset) * scale
 
@@ -618,11 +637,12 @@ class Problem(object):
             If True and model has been run previously, reset all iteration counters.
         """
         if self._mode is None:
-            raise RuntimeError("The `setup` method must be called before `run_model`.")
+            raise RuntimeError(self.msginfo +
+                               ": The `setup` method must be called before `run_model`.")
 
         if case_prefix:
             if not isinstance(case_prefix, str):
-                raise TypeError("The 'case_prefix' argument should be a string.")
+                raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
         else:
             self._recording_iter.prefix = None
@@ -653,11 +673,12 @@ class Problem(object):
             Failure flag; True if failed to converge, False is successful.
         """
         if self._mode is None:
-            raise RuntimeError("The `setup` method must be called before `run_driver`.")
+            raise RuntimeError(self.msginfo +
+                               ": The `setup` method must be called before `run_driver`.")
 
         if case_prefix:
             if not isinstance(case_prefix, str):
-                raise TypeError("The 'case_prefix' argument should be a string.")
+                raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
         else:
             self._recording_iter.prefix = None
@@ -694,12 +715,14 @@ class Problem(object):
         """
         if mode == 'fwd':
             if len(wrt) != len(seed):
-                raise RuntimeError("seed and 'wrt' list must be the same length in fwd mode.")
+                raise RuntimeError(self.msginfo +
+                                   ": seed and 'wrt' list must be the same length in fwd mode.")
             lnames, rnames = of, wrt
             lkind, rkind = 'output', 'residual'
         else:  # rev
             if len(of) != len(seed):
-                raise RuntimeError("seed and 'of' list must be the same length in rev mode.")
+                raise RuntimeError(self.msginfo +
+                                   ": seed and 'of' list must be the same length in rev mode.")
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
@@ -898,15 +921,16 @@ class Problem(object):
         # PETScVector is required for MPI
         if comm.size > 1:
             if PETScVector is None:
-                raise ValueError("Attempting to run in parallel under MPI but PETScVector could not"
-                                 "be imported.")
+                raise ValueError(self.msginfo +
+                                 ": Attempting to run in parallel under MPI but PETScVector "
+                                 "could not be imported.")
             elif distributed_vector_class is not PETScVector:
-                raise ValueError("The `distributed_vector_class` argument must be `PETScVector` "
-                                 "when running in parallel under MPI but '%s' was specified."
-                                 % distributed_vector_class.__name__)
+                raise ValueError("%s: The `distributed_vector_class` argument must be "
+                                 "`PETScVector` when running in parallel under MPI but '%s' was "
+                                 "specified." % (self.msginfo, distributed_vector_class.__name__))
 
         if mode not in ['fwd', 'rev', 'auto']:
-            msg = "Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % mode
+            msg = "%s: Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % (self.msginfo, mode)
             raise ValueError(msg)
 
         self._mode = self._orig_mode = mode
@@ -1097,7 +1121,8 @@ class Problem(object):
         model = self.model
 
         if not model._use_derivatives:
-            raise RuntimeError("Can't check partials.  Derivative support has been turned off.")
+            raise RuntimeError(self.msginfo +
+                               ": Can't check partials.  Derivative support has been turned off.")
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -1455,12 +1480,14 @@ class Problem(object):
                 forward - fd, adjoint - fd, forward - adjoint.
         """
         if self._setup_status < 2:
-            raise RuntimeError("run_model must be called before total derivatives can be checked.")
+            raise RuntimeError(self.msginfo + ": run_model must be called before total "
+                               "derivatives can be checked.")
 
         model = self.model
 
         if method == 'cs' and not model._outputs._alloc_complex:
-            msg = "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
+            msg = "\n" + self.msginfo + ": To enable complex step, specify "\
+                  "'force_alloc_complex=True' when calling " + \
                   "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
             raise RuntimeError(msg)
 
@@ -1753,16 +1780,16 @@ class Problem(object):
         if inputs:
             for name in inputs.absolute_names():
                 if name not in self.model._var_abs_names['input']:
-                    raise KeyError("Input variable, '{}', recorded in the case is not "
-                                   "found in the model".format(name))
+                    raise KeyError("{}: Input variable, '{}', recorded in the case is not "
+                                   "found in the model".format(self.msginfo, name))
                 self[name] = inputs[name]
 
         outputs = case.outputs if case.outputs is not None else None
         if outputs:
             for name in outputs.absolute_names():
                 if name not in self.model._var_abs_names['output']:
-                    raise KeyError("Output variable, '{}', recorded in the case is not "
-                                   "found in the model".format(name))
+                    raise KeyError("{}: Output variable, '{}', recorded in the case is not "
+                                   "found in the model".format(self.msginfo, name))
                 self[name] = outputs[name]
 
         return
