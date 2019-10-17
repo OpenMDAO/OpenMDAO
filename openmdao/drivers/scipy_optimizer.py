@@ -166,7 +166,6 @@ class ScipyOptimizeDriver(Driver):
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically if True '
                              '(deprecated)')
-
     def _get_name(self):
         """
         Get name of current optimizer.

@@ -2,14 +2,20 @@
 Functions for handling runtime function hooks.
 """
 
-import sys
-import os
 from collections import defaultdict
 from functools import wraps
 import inspect
 import warnings
 
 from six import iteritems
+
+
+def _reset_all_hooks():
+    global _hooks, _hook_skip_classes
+    _hooks = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: None)))
+    )
+    _hook_skip_classes = set()
 
 
 # global dict of hooks
@@ -22,7 +28,8 @@ from six import iteritems
 #    'pre': funct or None,   # hook function for pre-execution
 #    'post': funct or None,  # hook function for post-execution
 # }
-_hooks = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: None))))
+_hooks = None
+_reset_all_hooks()
 
 # classes found here are known to contain no hooks within themselves or their ancestors
 _hook_skip_classes = set()

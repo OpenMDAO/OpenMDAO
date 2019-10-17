@@ -805,7 +805,7 @@ class Coloring(object):
         Returns
         -------
         dict or None
-            Mapping of (of, wrt) keys to thier corresponding (nzrows, nzcols, shape).
+            Mapping of (of, wrt) keys to their corresponding (nzrows, nzcols, shape).
         """
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
             J = self.get_dense_sparsity()
@@ -2014,8 +2014,6 @@ def _partial_coloring_cmd(options):
                                                sorted(to_find - found))
                 else:
                     colorings = system._compute_approx_coloring(**kwargs)
-                    print("colorings", colorings)
-                    print("kwargs", kwargs)
                     if not colorings:
                         print("No coloring found.")
                     else:

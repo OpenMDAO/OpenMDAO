@@ -223,7 +223,7 @@ def _view_connections_setup_parser(parser):
                         help="don't display in a browser.")
     parser.add_argument('--show_values', action='store_true', dest='show_values',
                         help="Display values.")
-    parser.add_argument('--pname', action='store', dest='pname', help='Problem name')
+    parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
 
 
 def _view_connections_cmd(options):
@@ -254,7 +254,7 @@ def _view_connections_cmd(options):
         funcname = 'final_setup'
     else:
         funcname = 'setup'
-    hooks._register_hook(funcname, class_name='Problem', inst_id=options.pname, post=_viewconns)
+    hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns)
 
     return _viewconns
 
@@ -401,7 +401,7 @@ def _tree_setup_parser(parser):
                         help='Add a variable to search for in vectors of tree systems.')
     parser.add_argument('-r', '--rank', action='store', type=int, dest='rank',
                         default=0, help="Display the tree on this rank (if MPI is active).")
-    parser.add_argument('--pname', action='store', dest='pname', help='Problem name')
+    parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
     parser.add_argument('-s', '--sizes', action='store_true', dest='show_sizes',
                         help="Display input and output sizes.")
     parser.add_argument('--approx', action='store_true', dest='show_approx',
@@ -482,7 +482,7 @@ def _tree_cmd(options):
         funcname = 'final_setup'
     else:
         funcname = 'setup'
-    hooks._register_hook(funcname, class_name='Problem', inst_id=options.pname, post=_tree)
+    hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_tree)
 
     return _tree
 

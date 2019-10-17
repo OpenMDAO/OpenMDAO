@@ -486,7 +486,7 @@ def _check_config_setup_parser(parser):
     """
     parser.add_argument('file', nargs=1, help='python file containing the model')
     parser.add_argument('-o', action='store', dest='outfile', help='output file')
-    parser.add_argument('--pname', action='store', dest='pname', help='Problem name')
+    parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
     parser.add_argument('-c', action='append', dest='checks', default=[],
                         help='Only perform specific check(s). Default checks are: %s. '
                         'Other available checks are: %s' %
@@ -525,7 +525,7 @@ def _check_config_cmd(options):
         exit()
 
     # register the hook
-    _register_hook('final_setup', class_name='Problem', inst_id=options.pname, post=_check_config)
+    _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config)
 
     return _check_config
 

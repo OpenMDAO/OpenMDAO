@@ -1603,7 +1603,7 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
-    def test_post_setup_hook(self):
+    def test_post_final_setup_hook(self):
         def hook_func(prob):
             prob['p2.y'] = 5.0
 
