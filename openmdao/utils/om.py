@@ -83,7 +83,7 @@ def _n2_cmd(options):
 
         options.func = lambda options: _viewmod
 
-        hooks._register_hook(_viewmod, 'final_setup', 'Problem', pre=True)
+        hooks._register_hook('final_setup', 'Problem', pre=_viewmod)
 
         _simple_exec(options)
     else:
@@ -190,7 +190,7 @@ def _xdsm_cmd(options):
 
         options.func = lambda options: _xdsm
 
-        hooks._register_hook(_xdsm, 'setup', 'Problem', post=True)
+        hooks._register_hook('setup', 'Problem', post=_xdsm)
 
         _simple_exec(options)
     else:
@@ -251,11 +251,10 @@ def _view_connections_cmd(options):
 
     # register the hook
     if options.show_values:
-        loc = 'final_setup'
+        funcname = 'final_setup'
     else:
-        loc = 'setup'
-    hooks._register_hook(_viewconns, loc, class_name='Problem', inst_id=options.pname,
-                         post=True)
+        funcname = 'setup'
+    hooks._register_hook(funcname, class_name='Problem', inst_id=options.pname, post=_viewconns)
 
     return _viewconns
 
@@ -299,7 +298,7 @@ def _meta_model_cmd(options):
                   "    pip install bokeh")
             exit()
 
-        hooks._unregister_hook('final_setup', 'Problem', post=True)
+        hooks._unregister_hook('final_setup', 'Problem')
 
         mm_types = (MetaModelStructuredComp, MetaModelUnStructuredComp)
 
@@ -339,7 +338,7 @@ def _meta_model_cmd(options):
                 print("\n'{}' is not a Metamodel.\n {}".format(pathname, try_str))
         exit()
 
-    hooks._register_hook(_view_metamodel, 'final_setup', 'Problem', post=True)
+    hooks._register_hook('final_setup', 'Problem', post=_view_metamodel)
 
     return _view_metamodel
 
@@ -374,7 +373,7 @@ def _config_summary_cmd(options):
         config_summary(prob)
         exit()
 
-    hooks._register_hook(summary, 'final_setup', 'Problem', post=True)
+    hooks._register_hook('final_setup', 'Problem', post=summary)
 
     return summary
 
@@ -480,11 +479,10 @@ def _tree_cmd(options):
 
     # register the hook
     if options.vecvars or options.show_sizes or options.show_approx:
-        location = 'final_setup'
+        funcname = 'final_setup'
     else:
-        location = 'setup'
-    hooks._register_hook(_tree, location, class_name='Problem', inst_id=options.pname,
-                         post=True)
+        funcname = 'setup'
+    hooks._register_hook(funcname, class_name='Problem', inst_id=options.pname, post=_tree)
 
     return _tree
 
@@ -528,7 +526,7 @@ def _dump_dist_idxs_cmd(options):
         dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
         exit()
 
-    hooks._register_hook(_dumpdist, 'final_setup', 'Problem', post=True)
+    hooks._register_hook('final_setup', 'Problem', post=_dumpdist)
 
     return _dumpdist
 
@@ -576,7 +574,7 @@ def _cite_cmd(options):
             print_citations(prob, classes=options.classes, out_stream=out)
         exit()
 
-    hooks._register_hook(_cite, 'setup', 'Problem', post=True)
+    hooks._register_hook('setup', 'Problem', post=_cite)
 
     return _cite
 

@@ -1821,7 +1821,7 @@ def _total_coloring_cmd(options):
 
     def _total_coloring(prob):
         if prob.model._use_derivatives:
-            hooks._unregister_hook('final_setup', 'Problem', post=True)  # avoid recursive loop
+            hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
             if options.outfile:
                 outfile = os.path.abspath(options.outfile)
             else:
@@ -1852,7 +1852,7 @@ def _total_coloring_cmd(options):
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
 
-    hooks._register_hook(_total_coloring, 'final_setup', 'Problem', post=True)
+    hooks._register_hook('final_setup', 'Problem', post=_total_coloring)
 
     return _total_coloring
 
@@ -1971,7 +1971,7 @@ def _partial_coloring_cmd(options):
 
     def _partial_coloring(prob):
         if prob.model._use_derivatives:
-            hooks._unregister_hook('final_setup', 'Problem', post=True)  # avoid recursive loop
+            hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
 
             prob.run_model()  # get a consistent starting values for inputs and outputs
 
@@ -2028,7 +2028,7 @@ def _partial_coloring_cmd(options):
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
 
-    hooks._register_hook(_partial_coloring, 'final_setup', 'Problem', post=True)
+    hooks._register_hook('final_setup', 'Problem', post=_partial_coloring)
 
     return _partial_coloring
 

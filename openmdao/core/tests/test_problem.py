@@ -1608,7 +1608,7 @@ class TestProblem(unittest.TestCase):
             prob['p2.y'] = 5.0
 
         hooks.use_hooks = True
-        hooks._register_hook(hook_func, 'final_setup', class_name='Problem', post=True)
+        hooks._register_hook('final_setup', class_name='Problem', post=hook_func)
         try:
             prob = om.Problem()
             model = prob.model
@@ -1626,7 +1626,7 @@ class TestProblem(unittest.TestCase):
             assert_rel_error(self, prob['p2.y'], 5.0)
             assert_rel_error(self, prob['comp.f_xy'], 21.0)
         finally:
-            hooks._unregister_hook('final_setup', class_name='Problem', post=True)
+            hooks._unregister_hook('final_setup', class_name='Problem')
             hooks.use_hooks = False
 
     def test_list_problem_vars(self):

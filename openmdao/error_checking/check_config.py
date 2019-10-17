@@ -525,8 +525,7 @@ def _check_config_cmd(options):
         exit()
 
     # register the hook
-    _register_hook(_check_config, 'final_setup', class_name='Problem', inst_id=options.pname,
-                   post=True)
+    _register_hook('final_setup', class_name='Problem', inst_id=options.pname, post=_check_config)
 
     return _check_config
 
