@@ -31,30 +31,30 @@ class N2Diagram {
         this.showPath = false;
 
         this.setupContentDivs();
-        this.transitionStartDelay = N2Diagram.defaultTransitionStartDelay;
+        this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
         this.chosenCollapseDepth = -1;
 
-        this.style = new N2Style(this.svgStyle, N2Layout.fontSizePx);
+        this.style = new N2Style(this.svgStyle, N2Layout.defaults.size.font);
         this.layout = new N2Layout(this.model, this.zoomedElement);
 
         this.oldPtN2Initialize();
 
         this.updateClickedIndices();
 
-        this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.n2Groups);
+        this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout, this.n2Groups);
 
         this.scales = {
             'unit': 'px',
             'model': {
-                'x': d3.scaleLinear().range([0, this.layout.size.model.width]),
-                'y': d3.scaleLinear().range([0, this.layout.size.model.height])
+                'x': d3.scaleLinear().range([0, this.layout.size.partitionTree.width]),
+                'y': d3.scaleLinear().range([0, this.layout.size.partitionTree.height])
             },
             'solver': {
-                'x': d3.scaleLinear().range([0, this.layout.size.solver.width]),
-                'y': d3.scaleLinear().range([0, this.layout.size.solver.height])
+                'x': d3.scaleLinear().range([0, this.layout.size.solverTree.width]),
+                'y': d3.scaleLinear().range([0, this.layout.size.solverTree.height])
             },
             'previous': {
                 'model': {
@@ -154,8 +154,8 @@ class N2Diagram {
 
         this.n2BackgroundRect = this.n2TopGroup.append('rect')
             .attr('class', 'background')
-            .attr('width', WIDTH_N2_PX)
-            .attr('height', N2Layout.heightPx);
+            .attr('width', this.layout.size.diagram.width)
+            .attr('height', this.layout.size.diagram.height);
 
         this.n2Groups = {};
         ['elements', 'gridlines', 'componentBoxes', 'arrows', 'dots'].forEach(function (gName) {
@@ -221,96 +221,96 @@ class N2Diagram {
             this.preservePreviousScale();
         }
 
-        this.transitCoords.model.x = (this.zoomedElement.x ? this.layout.size.model.width -
-            N2Layout.parentNodeWidthPx : this.layout.size.model.width) /
+        this.transitCoords.model.x = (this.zoomedElement.x ? this.layout.size.partitionTree.width -
+            this.layout.size.parentNodeWidth : this.layout.size.partitionTree.width) /
             (1 - this.zoomedElement.x);
-        this.transitCoords.model.y = N2Layout.heightPx / this.zoomedElement.height;
+        this.transitCoords.model.y = this.layout.size.diagram.height / this.zoomedElement.height;
 
         this.scales.model.x
             .domain([this.zoomedElement.x, 1])
-            .range([this.zoomedElement.x ? N2Layout.parentNodeWidthPx : 0,
-            this.layout.size.model.width]);
+            .range([this.zoomedElement.x ? this.layout.size.parentNodeWidth : 0,
+            this.layout.size.partitionTree.width]);
         this.scales.model.y
             .domain([this.zoomedElement.y, this.zoomedElement.y + this.zoomedElement.height])
-            .range([0, N2Layout.heightPx]);
+            .range([0, this.layout.size.diagram.height]);
 
         this.transitCoords.solver.x = (this.zoomedElement.xSolver ?
-            this.layout.size.solver.width - N2Layout.parentNodeWidthPx :
-            this.layout.size.solver.width) / (1 - this.zoomedElement.xSolver);
-        this.transitCoords.solver.y = N2Layout.heightPx / this.zoomedElement.heightSolver;
+            this.layout.size.solverTree.width - this.layout.size.parentNodeWidth :
+            this.layout.size.solverTree.width) / (1 - this.zoomedElement.xSolver);
+        this.transitCoords.solver.y = this.layout.size.diagram.height / this.zoomedElement.heightSolver;
 
         this.scales.solver.x
             .domain([this.zoomedElement.xSolver, 1])
-            .range([this.zoomedElement.xSolver ? N2Layout.parentNodeWidthPx :
-                0, this.layout.size.solver.width]);
+            .range([this.zoomedElement.xSolver ? this.layout.size.parentNodeWidth :
+                0, this.layout.size.solverTree.width]);
         this.scales.solver.y
             .domain([this.zoomedElement.ySolver,
             this.zoomedElement.ySolver + this.zoomedElement.heightSolver])
-            .range([0, N2Layout.heightPx]);
+            .range([0, this.layout.size.diagram.height]);
 
         if (this.scales.firstRun) { // first run, duplicate what we just calculated
             this.scales.firstRun = false;
             this.preservePreviousScale();
 
-            //Update svg dimensions before ComputeLayout() changes layout.size.model.width
+            //Update svg dimensions before ComputeLayout() changes layout.size.partitionTree.width
             this.svgDiv.style("width",
-                (this.layout.size.model.width + PTREE_N2_GAP_PX + WIDTH_N2_PX +
-                    this.layout.size.solver.width + 2 * SVG_MARGIN + PTREE_N2_GAP_PX) +
+                (this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap + this.layout.size.diagram.width +
+                    this.layout.size.solverTree.width + 2 * this.layout.size.svgMargin + this.layout.size.partitionTreeGap) +
                 this.layout.size.unit)
-                .style("height", (this.layout.size.model.height + 2 * SVG_MARGIN) +
+                .style("height", (this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin) +
                     this.layout.size.unit);
-            this.svg.attr("width", this.layout.size.model.width + PTREE_N2_GAP_PX +
-                WIDTH_N2_PX + this.layout.size.solver.width + 2 * SVG_MARGIN + PTREE_N2_GAP_PX)
-                .attr("height", this.layout.size.model.height + 2 * SVG_MARGIN);
+            this.svg.attr("width", this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap +
+                this.layout.size.diagram.width + this.layout.size.solverTree.width + 2 * this.layout.size.svgMargin + this.layout.size.partitionTreeGap)
+                .attr("height", this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin);
 
             this.n2TopGroup.attr("transform", "translate(" +
-                (this.layout.size.model.width + PTREE_N2_GAP_PX + SVG_MARGIN) +
-                "," + SVG_MARGIN + ")");
+                (this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap + this.layout.size.svgMargin) +
+                "," + this.layout.size.svgMargin + ")");
             this.pTreeGroup.attr("transform", "translate(" +
-                SVG_MARGIN + "," + SVG_MARGIN + ")");
+                this.layout.size.svgMargin + "," + this.layout.size.svgMargin + ")");
 
             this.pSolverTreeGroup.attr("transform", "translate(" +
-                (this.layout.size.model.width + PTREE_N2_GAP_PX + WIDTH_N2_PX +
-                    SVG_MARGIN + PTREE_N2_GAP_PX) + "," + SVG_MARGIN + ")");
+                (this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap + this.layout.size.diagram.width +
+                    this.layout.size.svgMargin + this.layout.size.partitionTreeGap) + "," + this.layout.size.svgMargin + ")");
         }
     }
 
     /** Update svg dimensions with transition after a new N2Layout changes
-     * layout.size.model.width
+     * layout.size.partitionTree.width
      */
     updateTransitionInfo() {
         sharedTransition = d3.transition()
-            .duration(TRANSITION_DURATION)
+            .duration(N2TransitionDefaults.duration)
             .delay(this.transitionStartDelay); // do this after intense computation
-        this.transitionStartDelay = N2Diagram.defaultTransitionStartDelay;
+        this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
         this.svgDiv.transition(sharedTransition)
-            .style("width", (this.layout.size.model.width + PTREE_N2_GAP_PX +
-                WIDTH_N2_PX + this.layout.size.solver.width + 2 * SVG_MARGIN + PTREE_N2_GAP_PX) +
+            .style("width", (this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap +
+                this.layout.size.diagram.width + this.layout.size.solverTree.width + 2 * this.layout.size.svgMargin + this.layout.size.partitionTreeGap) +
                 this.layout.size.unit)
-            .style("height", (this.layout.size.model.height + 2 * SVG_MARGIN) +
+            .style("height", (this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin) +
                 this.layout.size.unit);
 
         this.svg.transition(sharedTransition)
-            .attr("width", this.layout.size.model.width +
-                PTREE_N2_GAP_PX + WIDTH_N2_PX + this.layout.size.solver.width + 2 *
-                SVG_MARGIN + PTREE_N2_GAP_PX)
-            .attr("height", this.layout.size.model.height + 2 * SVG_MARGIN);
+            .attr("width", this.layout.size.partitionTree.width +
+                this.layout.size.partitionTreeGap + this.layout.size.diagram.width + this.layout.size.solverTree.width + 2 *
+                this.layout.size.svgMargin + this.layout.size.partitionTreeGap)
+            .attr("height", this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin);
 
         this.n2TopGroup.transition(sharedTransition)
-            .attr("transform", "translate(" + (this.layout.size.model.width +
-                PTREE_N2_GAP_PX + SVG_MARGIN) + "," + SVG_MARGIN + ")");
+            .attr("transform", "translate(" + (this.layout.size.partitionTree.width +
+                this.layout.size.partitionTreeGap + this.layout.size.svgMargin) + "," + this.layout.size.svgMargin + ")");
 
         this.pTreeGroup.transition(sharedTransition)
-            .attr("transform", "translate(" + SVG_MARGIN + "," + SVG_MARGIN + ")");
+            .attr("transform", "translate(" + this.layout.size.svgMargin + "," + this.layout.size.svgMargin + ")");
 
         this.n2BackgroundRect.transition(sharedTransition)
-            .attr("width", WIDTH_N2_PX).attr("height", this.layout.size.model.height);
+            .attr("width", this.layout.size.diagram.width).attr("height", this.layout.size.partitionTree.height);
 
         this.pSolverTreeGroup.transition(sharedTransition)
-            .attr("transform", "translate(" + (this.layout.size.model.width +
-                PTREE_N2_GAP_PX + WIDTH_N2_PX + SVG_MARGIN + PTREE_N2_GAP_PX) + "," +
-                SVG_MARGIN + ")");
+            .attr("transform", "translate(" + (this.layout.size.partitionTree.width +
+                this.layout.size.partitionTreeGap + this.layout.size.diagram.width + this.layout.size.svgMargin + this.layout.size.partitionTreeGap) + "," +
+                this.layout.size.svgMargin + ")");
     }
 
     /**
@@ -325,12 +325,10 @@ class N2Diagram {
         if (computeNewTreeLayout) {
             this.layout = new N2Layout(this.model, this.zoomedElement);
             this.updateClickedIndices();
-            this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.n2Groups);
+            this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout, this.n2Groups);
         }
 
         this.updateScale();
         this.updateTransitionInfo();
     }
 }
-
-N2Diagram.defaultTransitionStartDelay = 100;

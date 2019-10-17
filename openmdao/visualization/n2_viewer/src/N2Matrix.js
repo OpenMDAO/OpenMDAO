@@ -1,29 +1,30 @@
 /**
  * Use the model tree to build a matrix, display, and perform operations with it.
  * @typedef N2Matrix
- * @property {Object[]} nodes Reference to nodes that will be drawn.
+ * @property {N2TreeNodes[]} nodes Reference to nodes that will be drawn.
  * @property {number} levelOfDetailThreshold Don't draw elements below this size in pixels.
  * @property {Object} n2Groups References to <g> SVG elements managed by N2Diagram.
  */
 class N2Matrix {
-
     /**
      * Render the matrix of visible elements in the model.
-     * @param {Object} visibleNodes Nodes that will be drawn.
+     * @param {N2TreeNodes[]} visibleNodes Nodes that will be drawn.
      * @param {ModelData} model The pre-processed model data.
+     * @param {N2Layout} layout Pre-computed layout of the diagram.
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
      */
-    constructor(visibleNodes, model, n2Groups) {
+    constructor(visibleNodes, model, layout, n2Groups) {
         this.nodes = visibleNodes;
+        this.layout = layout;
         this.n2Groups = n2Groups;
 
         n2Dx0 = n2Dx;
         n2Dy0 = n2Dy;
 
-        n2Dx = WIDTH_N2_PX / this.nodes.length;
-        n2Dy = N2Layout.heightPx / this.nodes.length;
+        n2Dx = layout.size.diagram.width / this.nodes.length;
+        n2Dy = layout.size.diagram.height / this.nodes.length;
 
-        this.updateLevelOfDetailThreshold(N2Layout.heightPx);
+        this.updateLevelOfDetailThreshold(layout.size.diagram.height);
         this.buildStructure(model);
         this.setupSymbolArrays();
         this.drawingPrep();
@@ -37,8 +38,7 @@ class N2Matrix {
      *  in the row; true otherwise.
      */
     exists(row, col) {
-        if (this.matrix[row] !== undefined &&
-            this.matrix[row][col] !== undefined) { return true; }
+        if (this.matrix[row] && this.matrix[row][col]) { return true; }
         return false;
     }
 
@@ -315,14 +315,14 @@ class N2Matrix {
                     throw("enter transform not found");
                 });
             gEnter.append("line")
-                .attr("x2", WIDTH_N2_PX);
+                .attr("x2", this.layout.size.diagram.width);
 
             var gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
                     return "translate(0," + (n2Dy * d.i) + ")";
                 });
             gUpdate.select("line")
-                .attr("x2", WIDTH_N2_PX);
+                .attr("x2", this.layout.size.diagram.width);
 
             var nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {
@@ -354,14 +354,14 @@ class N2Matrix {
                     throw("enter transform not found");
                 });
             gEnter.append("line")
-                .attr("x1", -HEIGHT_PX);
+                .attr("x1", -this.layout.size.diagram.height);
 
             var gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
                     return "translate(" + (n2Dx * d.i) + ")rotate(-90)";
                 });
             gUpdate.select("line")
-                .attr("x1", -HEIGHT_PX);
+                .attr("x1", -this.layout.size.diagram.height);
 
             var nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {

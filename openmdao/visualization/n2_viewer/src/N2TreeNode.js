@@ -48,6 +48,7 @@ class N2TreeNode {
         return this.type.match(paramOrUnknownRegex);
     }
 
+    /** True is this.type is 'subsystem' */
     isSubsystem() {
         return (this.type == 'subsystem');
     }

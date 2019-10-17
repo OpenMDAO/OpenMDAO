@@ -1,7 +1,5 @@
 var d3ContentDiv, svgDiv, svg;
 
-var WIDTH_N2_PX = HEIGHT_PX;
-var PTREE_N2_GAP_PX = 10; //spacing between partition tree and n2 diagram
 var n2Dx = 0, n2Dy = 0, n2Dx0 = 0, n2Dy0 = 0;
 var d3NodesArray, d3RightTextNodesArrayZoomed = []
 var d3RightTextNodesArrayZoomedBoxInfo

@@ -1,10 +1,12 @@
 /**
- * @typedef N2Style Manage CSS styles for various N2 elements.
+ * Manage CSS styles for various elements.
+ * @typedef N2Style
  */
 class N2Style {
 
     constructor(svgStyle, fontSize) {
         this.svgStyle = svgStyle;
+
         this.setupSolverStyles();
         this.updateSvgStyle(fontSize);
     }

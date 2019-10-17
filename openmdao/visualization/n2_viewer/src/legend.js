@@ -60,7 +60,7 @@ function SetupLegend(d3, d3ContentDiv) {
 
     //COLUMN TITLES
     {
-        var text = ["Systems & Variables", "N^2 Symbols", N2Layout.showLinearSolverNames? " Linear Solvers" : "Nonlinear Solvers"];
+        var text = ["Systems & Variables", "N^2 Symbols", n2Diag.layout.showLinearSolverNames? " Linear Solvers" : "Nonlinear Solvers"];
         for (var i = 0; i < text.length; ++i) {
             var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * i + xOffset) + "," + (60) + ")");
             el.append("svg:text")
@@ -102,7 +102,7 @@ function SetupLegend(d3, d3ContentDiv) {
 
     //SOLVER COLORS
     {
-        if (N2Layout.showLinearSolverNames){
+        if (n2Diag.layout.showLinearSolverNames){
             for (var i = 0; i < linearSolverNames.length; ++i) {
                 var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 2 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
                 var name = linearSolverNames[i];

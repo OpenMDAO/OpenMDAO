@@ -1,20 +1,11 @@
-let N2Layout_statics = {
-    'showLinearSolverNames': true,
-    'rightTextMarginPx': 8,
-    'heightPx': HEIGHT_PX,
-    'fontSizePx': 11,
-    'minColumnWidthPx': 5,
-    'parentNodeWidthPx': 40
-};
-
 /**
  * Calculates and stores the size and positions of visible elements.
  * @typedef N2Layout
  * @property {ModelData} model Reference to the preprocessed model.
- * @property {Object} zoomedElement Reference to zoomedElement managed by N2Diagram.
- * @property {Object[]} zoomedNodes  Child nodes of the current zoomed element.
- * @property {Object[]} visibleNodes Zoomed nodes that are actually drawn.
- * @property {Object[]} zoomedSolverNodes Child solver nodes of the current zoomed element.
+ * @property {N2TreeNode} zoomedElement Reference to zoomedElement managed by N2Diagram.
+ * @property {N2TreeNode[]} zoomedNodes  Child nodes of the current zoomed element.
+ * @property {N2TreeNode[]} visibleNodes Zoomed nodes that are actually drawn.
+ * @property {N2TreeNode[]} zoomedSolverNodes Child solver nodes of the current zoomed element.
  * @property {Boolean} updateRecomputesAutoComplete Zoomed solver nodes that are actually drawn.
  * @property {Object} svg Reference to the top-level SVG element in the document.
  * @property {Object} size The dimensions of the model and solver trees.
@@ -42,17 +33,9 @@ class N2Layout {
         this.zoomedSolverNodes = [];
         this.visibleSolverNodes = [];
 
-        this.size = {
-            'unit': 'px',
-            'model': {
-                'width': 0,
-                'height': N2Layout.heightPx // Shouldn't change
-            },
-            'solver': {
-                'width': 0,
-                'height': N2Layout.heightPx // Shouldn't change
-            }
-        }
+        // Initial size values derived from read-only defaults
+        this.size = JSON.parse(JSON.stringify(N2Layout.defaults.size));
+        this.showLinearSolverNames = N2Layout.defaults.showLinearSolverNames;
 
         this.svg = d3.select("#svgId");
 
@@ -100,9 +83,9 @@ class N2Layout {
      * Switch back and forth between showing the linear or non-linear solver names. 
      * @return {Boolean} The new value.
      */
-    static toggleSolverNameType() {
-        N2Layout.showLinearSolverNames = !N2Layout.showLinearSolverNames;
-        return N2Layout.showLinearSolverNames;
+    toggleSolverNameType() {
+        this.showLinearSolverNames = !this.showLinearSolverNames;
+        return this.showLinearSolverNames;
     }
 
     /** Create an off-screen area to render text for getTextWidth() */
@@ -170,7 +153,7 @@ class N2Layout {
      * @param {N2TreeNode} element The item to get the solver text from.
      */
     getSolverText(element) {
-        return N2Layout.showLinearSolverNames ?
+        return this.showLinearSolverNames ?
             element.linear_solver : element.nonlinear_solver;
     }
 
@@ -181,7 +164,7 @@ class N2Layout {
         if (element.varIsHidden) return;
 
         element.nameWidthPx = this.getTextWidth(this.getText(element)) + 2 *
-            N2Layout.rightTextMarginPx;
+            this.size.rightTextMargin;
 
         if (element.hasChildren()) {
             for (let child of element.children) {
@@ -199,7 +182,7 @@ class N2Layout {
         }
 
         element.nameSolverWidthPx = this.getTextWidth(this.getSolverText(element)) + 2 *
-            N2Layout.rightTextMarginPx;
+            this.size.rightTextMargin;
 
         if (element.hasChildren()) {
             for (let child of element.children) {
@@ -239,11 +222,11 @@ class N2Layout {
     setColumnWidthsFromWidestText(element, childrenProp, colArr, leafArr, widthProp) {
         if (element.varIsHidden) return;
 
-        let height = N2Layout.heightPx * element.numLeaves / this.zoomedElement.numLeaves;
+        let height = this.size.diagram.height * element.numLeaves / this.zoomedElement.numLeaves;
         element.textOpacity0 = element.propExists('textOpacity') ? element.textOpacity : 0;
-        element.textOpacity = (height > N2Layout.fontSizePx) ? 1 : 0;
+        element.textOpacity = (height > this.size.font) ? 1 : 0;
         let hasVisibleDetail = (height >= 2.0);
-        let width = (hasVisibleDetail) ? N2Layout.minColumnWidthPx : 1e-3;
+        let width = (hasVisibleDetail) ? this.size.minColumnWidth : 1e-3;
         if (element.textOpacity > 0.5) width = element[widthProp];
 
         this.greatestDepth = Math.max(this.greatestDepth, element.depth);
@@ -279,7 +262,7 @@ class N2Layout {
             lastColumnWidth = Math.max(lastWidthNeeded, lastColumnWidth);
         }
 
-        this.cols[this.zoomedElement.depth - 1].width = N2Layout.parentNodeWidthPx;
+        this.cols[this.zoomedElement.depth - 1].width = this.size.parentNodeWidth;
         this.cols[this.greatestDepth].width = lastColumnWidth;
     }
 
@@ -303,7 +286,7 @@ class N2Layout {
             lastColumnWidth = Math.max(lastWidthNeeded, lastColumnWidth);
         }
 
-        this.solverCols[this.zoomedElement.depth - 1].width = N2Layout.parentNodeWidthPx;
+        this.solverCols[this.zoomedElement.depth - 1].width = this.size.parentNodeWidth;
         this.solverCols[this.greatestDepth].width = lastColumnWidth;
     }
 
@@ -311,15 +294,15 @@ class N2Layout {
      * to the left.
      */
     setColumnLocations() {
-        this.size.model.width = 0;
-        this.size.solver.width = 0;
+        this.size.partitionTree.width = 0;
+        this.size.solverTree.width = 0;
 
         for (let depth = 1; depth <= this.model.maxDepth; ++depth) {
-            this.cols[depth].location = this.size.model.width;
-            this.size.model.width += this.cols[depth].width;
+            this.cols[depth].location = this.size.partitionTree.width;
+            this.size.partitionTree.width += this.cols[depth].width;
 
-            this.solverCols[depth].location = this.size.solver.width;
-            this.size.solver.width += this.solverCols[depth].width;
+            this.solverCols[depth].location = this.size.solverTree.width;
+            this.size.solverTree.width += this.solverCols[depth].width;
         }
     }
 
@@ -359,14 +342,14 @@ class N2Layout {
         ['x', 'y', 'width', 'height'].forEach(function (val) {
             element[val + '0'] = element.hasOwnProperty(val) ? element[val] : 1e-6;
         })
-        element.x = this.cols[node.depth].location / this.size.model.width;
+        element.x = this.cols[node.depth].location / this.size.partitionTree.width;
         element.y = leafCounter / this.model.root.numLeaves;
         element.width = (element.hasChildren() && !element.isMinimized) ?
-            (this.cols[node.depth].width / this.size.model.width) : 1 - node.x;
+            (this.cols[node.depth].width / this.size.partitionTree.width) : 1 - node.x;
         element.height = node.numLeaves / this.model.root.numLeaves;
 
         if (element.varIsHidden) { //param or hidden leaf leaving
-            element.x = this.cols[element.parentComponent.depth + 1].location / this.size.model.width;
+            element.x = this.cols[element.parentComponent.depth + 1].location / this.size.partitionTree.width;
             element.y = element.parentComponent.y;
             element.width = 1e-6;
             element.height = 1e-6;
@@ -416,16 +399,16 @@ class N2Layout {
             val += 'Solver';
             element[val + '0'] = element.hasOwnProperty(val) ? element[val] : 1e-6;
         })
-        element.xSolver = this.solverCols[node.depth].location / this.size.solver.width;
+        element.xSolver = this.solverCols[node.depth].location / this.size.solverTree.width;
         element.ySolver = leafCounter / this.model.root.numLeaves;
         element.widthSolver = (element.subsystem_children && !element.isMinimized) ?
-            (this.solverCols[node.depth].width / this.size.solver.width) :
+            (this.solverCols[node.depth].width / this.size.solverTree.width) :
             1 - node.xSolver; //1-d.x;
 
         element.heightSolver = node.numLeaves / this.model.root.numLeaves;
 
         if (element.varIsHidden) { //param or hidden leaf leaving
-            element.xSolver = this.cols[element.parentComponent.depth + 1].location / this.size.model.width;
+            element.xSolver = this.cols[element.parentComponent.depth + 1].location / this.size.partitionTree.width;
             element.ySolver = element.parentComponent.y;
             element.widthSolver = 1e-6;
             element.heightSolver = 1e-6;
@@ -505,5 +488,3 @@ class N2Layout {
         delete this.autoCompleteSetPathNames;
     }
 }
-
-Object.assign(N2Layout, N2Layout_statics);

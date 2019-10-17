@@ -67,7 +67,7 @@ function SearchButtonClicked() {
     if (searchVals0.length != 0) DoSearch(zoomedElement, GetSearchRegExp(searchVals0), searchCollapsedUndo);
 
     FindRootOfChangeFunction = FindRootOfChangeForSearch;
-    TRANSITION_DURATION = TRANSITION_DURATION_SLOW;
+    N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
     lastClickWasLeft = false;
     n2Diag.updateRecomputesAutoComplete = false;
     updateFunc();
