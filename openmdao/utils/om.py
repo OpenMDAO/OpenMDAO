@@ -37,6 +37,7 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.core.component import Component
 
 
 def _n2_setup_parser(parser):
@@ -398,7 +399,8 @@ def _tree_setup_parser(parser):
     parser.add_argument('-a', '--attr', action='append', default=[], dest='attrs',
                         help='Add an attribute to search for in tree systems.')
     parser.add_argument('-v', '--var', action='append', default=[], dest='vecvars',
-                        help='Add a variable to search for in vectors of tree systems.')
+                        help='Add a variable to search for in vectors of tree components. '
+                             'Use component relative names.')
     parser.add_argument('-r', '--rank', action='store', type=int, dest='rank',
                         default=0, help="Display the tree on this rank (if MPI is active).")
     parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
@@ -417,7 +419,8 @@ def _get_tree_filter(attrs, vecvars):
     attrs : list of str
         Names of attributes (may contain dots).
     vecvars : list of str
-        Names of variables contained in the input or output vectors.
+        Names of variables contained in the input or output vectors.  Use component relative
+        names.
 
     Returns
     -------
@@ -436,11 +439,13 @@ def _get_tree_filter(attrs, vecvars):
             except AttributeError:
                 pass
 
-        for var in vecvars:
-            if var in system._outputs:
-                found.append((var, system._outputs[var]))
-            elif var in system._inputs:
-                found.append((var, system._inputs[var]))
+        if isinstance(system, Component):
+            for var in vecvars:
+                if var in system._var_rel2meta:
+                    if var in system._outputs:
+                        found.append((var, system._outputs[var]))
+                    elif var in system._inputs:
+                        found.append((var, system._inputs[var]))
 
         return found
 

@@ -25,6 +25,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     warn_deprecation, find_matches, simple_warning, make_set
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.hooks import _setup_hooks
 
 
 # the following metadata will be accessible for vars on all procs
@@ -181,6 +182,8 @@ class Component(System):
         """
         self.pathname = pathname
         self._problem_options = prob_options
+
+        _setup_hooks(self)
 
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo

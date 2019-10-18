@@ -42,14 +42,15 @@ def _setup_hooks(obj):
     """
     Wrap object's methods with a hook checking function if hooks are defined for any of them.
 
-    This is typically called from the __init__ method, because otherwise it will be too early
-    to apply the decorator (the hooks may not be defined yet).
-
     Parameters
     ----------
     obj : object
         The object whose methods may be wrapped.
     """
+    # _setup_hooks should be called after 'obj' can return a valid name from _get_inst_id().
+    # For example, in Problem, it can happen in __init__, but in Component and Group it shouldn't
+    # happen until _setup_procs because that's the earliest point where the component/group has a
+    # valid pathname.
     if use_hooks and obj.__class__ not in _hook_skip_classes:
 
         classes = inspect.getmro(obj.__class__)
