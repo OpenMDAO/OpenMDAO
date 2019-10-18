@@ -12,17 +12,20 @@ class N2Matrix {
      * @param {ModelData} model The pre-processed model data.
      * @param {N2Layout} layout Pre-computed layout of the diagram.
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
+     * @param {Object} [prevNodeSize = {'width': 0, 'height': 0}] Previous node
+     *  width & height for transition purposes.
      */
-    constructor(visibleNodes, model, layout, n2Groups) {
+    constructor(visibleNodes, model, layout, n2Groups,
+        prevNodeSize = {'width': 0, 'height': 0}) {
         this.nodes = visibleNodes;
         this.layout = layout;
         this.n2Groups = n2Groups;
 
-        n2Dx0 = n2Dx;
-        n2Dy0 = n2Dy;
-
-        n2Dx = layout.size.diagram.width / this.nodes.length;
-        n2Dy = layout.size.diagram.height / this.nodes.length;
+        this.previousNodeSize = prevNodeSize;
+        this.nodeSize = {
+            'width': layout.size.diagram.width / this.nodes.length,
+            'height': layout.size.diagram.height / this.nodes.length,
+        }
 
         this.updateLevelOfDetailThreshold(layout.size.diagram.height);
         this.buildStructure(model);
@@ -201,10 +204,10 @@ class N2Matrix {
     }
 
     draw() {
-        let u0 = n2Dx0 * .5,
-            v0 = n2Dy0 * .5,
-            u = n2Dx * .5,
-            v = n2Dy * .5; //(0,0) = center of cell... (u,v) = bottom right of cell... (-u,-v) = top left of cell
+        let u0 = this.previousNodeSize.width * .5,
+            v0 = this.previousNodeSize.height * .5,
+            u = this.nodeSize.width * .5,
+            v = this.nodeSize.height * .5; //(0,0) = center of cell... (u,v) = bottom right of cell... (-u,-v) = top left of cell
 
         let classes = [
             "cell_scalar",
@@ -262,14 +265,14 @@ class N2Matrix {
             var gEnter = sel.enter().append("g")
                 .attr("class", classes[i])
                 .attr("transform", function (d) {
-                    if (lastClickWasLeft) return "translate(" + (n2Dx0 * (d.col - enterIndex) + u0) + "," + (n2Dy0 * (d.row - enterIndex) + v0) + ")";
+                    if (lastClickWasLeft) return "translate(" + (this.previousNodeSize.width * (d.col - enterIndex) + u0) + "," + (this.previousNodeSize.height * (d.row - enterIndex) + v0) + ")";
                     var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
                         var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
-                        return "translate(" + (n2Dx0 * index0 + u0) + "," + (n2Dy0 * index0 + v0) + ")";
+                        return "translate(" + (this.previousNodeSize.width * index0 + u0) + "," + (this.previousNodeSize.height * index0 + v0) + ")";
                     }
                     throw("enter transform not found");
-                });
+                }.bind(this));
             drawFunctions[i](gEnter, u0, v0, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, false)
                 .on("mouseover", (i < 3) ? mouseOverOnDiagN2 : mouseOverOffDiagN2)
                 .on("mouseleave", mouseOutN2)
@@ -278,21 +281,21 @@ class N2Matrix {
 
             var gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
-                    return "translate(" + (n2Dx * (d.col) + u) + "," + (n2Dy * (d.row) + v) + ")";
-                });
+                    return "translate(" + (this.nodeSize.width * (d.col) + u) + "," + (this.nodeSize.height * (d.row) + v) + ")";
+                }.bind(this));
             drawFunctions[i](gUpdate, u, v, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, true);
 
 
             var nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {
-                    if (lastClickWasLeft) return "translate(" + (n2Dx * (d.col - exitIndex) + u) + "," + (n2Dy * (d.row - exitIndex) + v) + ")";
+                    if (lastClickWasLeft) return "translate(" + (this.nodeSize.width * (d.col - exitIndex) + u) + "," + (this.nodeSize.height * (d.row - exitIndex) + v) + ")";
                     var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
                         var index = roc.rootIndex - zoomedElement.rootIndex;
-                        return "translate(" + (n2Dx * index + u) + "," + (n2Dy * index + v) + ")";
+                        return "translate(" + (this.nodeSize.width * index + u) + "," + (this.nodeSize.height * index + v) + ")";
                     }
                     throw("exit transform not found");
-                })
+                }.bind(this))
                 .remove();
             drawFunctions[i](nodeExit, u, v, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, true);
         }
@@ -306,34 +309,34 @@ class N2Matrix {
             var gEnter = sel.enter().append("g")
                 .attr("class", "horiz_line")
                 .attr("transform", function (d) {
-                    if (lastClickWasLeft) return "translate(0," + (n2Dy0 * (d.i - enterIndex)) + ")";
+                    if (lastClickWasLeft) return "translate(0," + (this.previousNodeSize.height * (d.i - enterIndex)) + ")";
                     var roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
                         var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
-                        return "translate(0," + (n2Dy0 * index0) + ")";
+                        return "translate(0," + (this.previousNodeSize.height * index0) + ")";
                     }
                     throw("enter transform not found");
-                });
+                }.bind(this));
             gEnter.append("line")
                 .attr("x2", this.layout.size.diagram.width);
 
             var gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
-                    return "translate(0," + (n2Dy * d.i) + ")";
-                });
+                    return "translate(0," + (this.nodeSize.height * d.i) + ")";
+                }.bind(this));
             gUpdate.select("line")
                 .attr("x2", this.layout.size.diagram.width);
 
             var nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {
-                    if (lastClickWasLeft) return "translate(0," + (n2Dy * (d.i - exitIndex)) + ")";
+                    if (lastClickWasLeft) return "translate(0," + (this.nodeSize.height * (d.i - exitIndex)) + ")";
                     var roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
                         var index = roc.rootIndex - zoomedElement.rootIndex;
-                        return "translate(0," + (n2Dy * index) + ")";
+                        return "translate(0," + (this.nodeSize.height * index) + ")";
                     }
                     throw("exit transform not found");
-                })
+                }.bind(this))
                 .remove();
         }
 
@@ -345,34 +348,34 @@ class N2Matrix {
             var gEnter = sel.enter().append("g")
                 .attr("class", "vert_line")
                 .attr("transform", function (d) {
-                    if (lastClickWasLeft) return "translate(" + (n2Dx0 * (d.i - enterIndex)) + ")rotate(-90)";
+                    if (lastClickWasLeft) return "translate(" + (this.previousNodeSize.width * (d.i - enterIndex)) + ")rotate(-90)";
                     var roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
                         var i0 = roc.rootIndex0 - zoomedElement.rootIndex0;
-                        return "translate(" + (n2Dx0 * i0) + ")rotate(-90)";
+                        return "translate(" + (this.previousNodeSize.width * i0) + ")rotate(-90)";
                     }
                     throw("enter transform not found");
-                });
+                }.bind(this));
             gEnter.append("line")
                 .attr("x1", -this.layout.size.diagram.height);
 
             var gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
-                    return "translate(" + (n2Dx * d.i) + ")rotate(-90)";
-                });
+                    return "translate(" + (this.nodeSize.width * d.i) + ")rotate(-90)";
+                }.bind(this));
             gUpdate.select("line")
                 .attr("x1", -this.layout.size.diagram.height);
 
             var nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {
-                    if (lastClickWasLeft) return "translate(" + (n2Dx * (d.i - exitIndex)) + ")rotate(-90)";
+                    if (lastClickWasLeft) return "translate(" + (this.nodeSize.width * (d.i - exitIndex)) + ")rotate(-90)";
                     var roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
                         var i = roc.rootIndex - zoomedElement.rootIndex;
-                        return "translate(" + (n2Dx * i) + ")rotate(-90)";
+                        return "translate(" + (this.nodeSize.width * i) + ")rotate(-90)";
                     }
                     throw("exit transform not found");
-                })
+                }.bind(this))
                 .remove();
         }
 
@@ -384,60 +387,60 @@ class N2Matrix {
             var gEnter = sel.enter().append("g")
                 .attr("class", "component_box")
                 .attr("transform", function (d) {
-                    if (lastClickWasLeft) return "translate(" + (n2Dx0 * (d.startI - enterIndex)) + "," + (n2Dy0 * (d.startI - enterIndex)) + ")";
+                    if (lastClickWasLeft) return "translate(" + (this.previousNodeSize.width * (d.startI - enterIndex)) + "," + (this.previousNodeSize.height * (d.startI - enterIndex)) + ")";
                     var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
                         var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
-                        return "translate(" + (n2Dx0 * index0) + "," + (n2Dy0 * index0) + ")";
+                        return "translate(" + (this.previousNodeSize.width * index0) + "," + (this.previousNodeSize.height * index0) + ")";
                     }
                     throw("enter transform not found");
-                });
+                }.bind(this));
 
             gEnter.append("rect")
                 .attr("width", function (d) {
-                    if (lastClickWasLeft) return n2Dx0 * (1 + d.stopI - d.startI);
-                    return n2Dx0;
-                })
+                    if (lastClickWasLeft) return this.previousNodeSize.width * (1 + d.stopI - d.startI);
+                    return this.previousNodeSize.width;
+                }.bind(this))
                 .attr("height", function (d) {
-                    if (lastClickWasLeft) return n2Dy0 * (1 + d.stopI - d.startI);
-                    return n2Dy0;
-                });
+                    if (lastClickWasLeft) return this.previousNodeSize.height * (1 + d.stopI - d.startI);
+                    return this.previousNodeSize.height;
+                }.bind(this));
 
             var gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
-                    return "translate(" + (n2Dx * d.startI) + "," + (n2Dy * d.startI) + ")";
-                });
+                    return "translate(" + (this.nodeSize.width * d.startI) + "," + (this.nodeSize.height * d.startI) + ")";
+                }.bind(this));
 
             gUpdate.select("rect")
                 .attr("width", function (d) {
-                    return n2Dx * (1 + d.stopI - d.startI);
-                })
+                    return this.nodeSize.width * (1 + d.stopI - d.startI);
+                }.bind(this))
                 .attr("height", function (d) {
-                    return n2Dy * (1 + d.stopI - d.startI);
-                });
+                    return this.nodeSize.height * (1 + d.stopI - d.startI);
+                }.bind(this));
 
 
             var nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {
-                    if (lastClickWasLeft) return "translate(" + (n2Dx * (d.startI - exitIndex)) + "," + (n2Dy * (d.startI - exitIndex)) + ")";
+                    if (lastClickWasLeft) return "translate(" + (this.nodeSize.width * (d.startI - exitIndex)) + "," + (this.nodeSize.height * (d.startI - exitIndex)) + ")";
                     var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
                         var index = roc.rootIndex - zoomedElement.rootIndex;
-                        return "translate(" + (n2Dx * index) + "," + (n2Dy * index) + ")";
+                        return "translate(" + (this.nodeSize.width * index) + "," + (this.nodeSize.height * index) + ")";
                     }
                     throw("exit transform not found");
-                })
+                }.bind(this))
                 .remove();
 
             nodeExit.select("rect")
                 .attr("width", function (d) {
-                    if (lastClickWasLeft) return n2Dx * (1 + d.stopI - d.startI);
-                    return n2Dx;
-                })
+                    if (lastClickWasLeft) return this.nodeSize.width * (1 + d.stopI - d.startI);
+                    return this.nodeSize.width;
+                }.bind(this))
                 .attr("height", function (d) {
-                    if (lastClickWasLeft) return n2Dy * (1 + d.stopI - d.startI);
-                    return n2Dy;
-                });
+                    if (lastClickWasLeft) return this.nodeSize.height * (1 + d.stopI - d.startI);
+                    return this.nodeSize.height;
+                }.bind(this));
         }
     }
 }

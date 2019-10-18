@@ -1,6 +1,5 @@
 var d3ContentDiv, svgDiv, svg;
 
-var n2Dx = 0, n2Dy = 0, n2Dx0 = 0, n2Dy0 = 0;
 var d3NodesArray, d3RightTextNodesArrayZoomed = []
 var d3RightTextNodesArrayZoomedBoxInfo
 var drawableN2ComponentBoxes;
@@ -18,7 +17,7 @@ var enterIndex = 0,
     exitIndex = 0;
 
 function DrawRect(x, y, width, height, fill) {
-    n2Diag.n2TopGroup.insert("rect")
+    n2Diag.dom.n2TopGroup.insert("rect")
         .attr("class", "n2_hover_elements")
         .attr("y", y)
         .attr("x", x)
@@ -28,9 +27,9 @@ function DrawRect(x, y, width, height, fill) {
         .attr("fill-opacity", "1");
 }
 
-function DrawArrowsParamView(startIndex, endIndex) {
-    var lineWidth = Math.min(5, n2Dx * .5, n2Dy * .5);
-    n2Diag.arrowMarker.attr("markerWidth", lineWidth * .4)
+function DrawArrowsParamView(startIndex, endIndex, nodeSize) {
+    var lineWidth = Math.min(5, nodeSize.width * .5, nodeSize.height * .5);
+    n2Diag.dom.arrowMarker.attr("markerWidth", lineWidth * .4)
         .attr("markerHeight", lineWidth * .4);
 
     var boxStart = d3RightTextNodesArrayZoomedBoxInfo[startIndex];
@@ -54,7 +53,8 @@ function DrawArrowsParamView(startIndex, endIndex) {
             start: { col: startI, row: startI },
             end: { col: endI, row: endI },
             color: (startIndex < endIndex) ? N2Style.color.greenArrow : N2Style.color.redArrow,
-            width: lineWidth
-        }, n2Diag.n2Groups);
+            width: lineWidth,
+            nodeSize
+        }, n2Diag.dom.n2Groups);
     }
 }

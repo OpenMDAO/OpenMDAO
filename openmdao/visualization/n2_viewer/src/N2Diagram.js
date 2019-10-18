@@ -7,18 +7,19 @@
  * @property {N2Matrix} matrix Manages the grid of model elements.
  * @property {Object} zoomedElement The element the diagram is currently based on.
  * @property {Object} zoomedElementPrev Reference to last zoomedElement.
- * @property {Object} parentDiv
- * @property {Object} d3ContentDiv The div containing all of the diagram's content.
- * @property {Object} svgDiv The div containing the SVG element.
- * @property {Object} svg The SVG element.
- * @property {Object} svgStyle Object where SVG style changes can be made.
- * @property {Object} toolTip Div to display tooltips.
+ * @property {Object} dom Container for references to web page elements.
+ * @property {Object} dom.parentDiv
+ * @property {Object} dom.d3ContentDiv The div containing all of the diagram's content.
+ * @property {Object} dom.svgDiv The div containing the SVG element.
+ * @property {Object} dom.svg The SVG element.
+ * @property {Object} dom.svgStyle Object where SVG style changes can be made.
+ * @property {Object} dom.toolTip Div to display tooltips.
+ * @property {Object} dom.n2TopGroup
+ * @property {Object} dom.n2Groups References to <g> SVG elements.
  * @property {Boolean} showPath
  * @property {Array} backButtonHistory
  * @property {Array} forwardButtonHistory
  * @property {number} chosenCollapseDepth
- * @property {Object} n2TopGroup
- * @property {Object} n2Groups References to <g> SVG elements.
  * @property {Object} scales Scalers in the X and Y directions to associate the relative
  *   position of an element to actual pixel coordinates.
  * @property {Object} transitCoords
@@ -30,21 +31,35 @@ class N2Diagram {
 
         this.showPath = false;
 
-        this.setupContentDivs();
+        // Find the divs for D3 content in the existing document, and add a style section.
+        let parentDiv = document.getElementById("ptN2ContentDivId");
+        this.dom = {
+            'parentDiv': parentDiv,
+            'd3ContentDiv': parentDiv.querySelector("#d3_content_div"),
+            'svgDiv': d3.select("#svgDiv"),
+            'svg': d3.select("#svgId"),
+            'svgStyle': document.createElement("style"),
+            'toolTip': d3.select(".tool-tip"),
+            'arrowMarker': d3.select("#arrow")
+        };
+
+        // Append the new style section.
+        this.dom.svgStyle.setAttribute('title', 'svgStyle');
+        this.dom.parentDiv.querySelector("#svgId").appendChild(this.dom.svgStyle);
+
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
         this.backButtonHistory = [];
         this.forwardButtonHistory = [];
         this.chosenCollapseDepth = -1;
 
-        this.style = new N2Style(this.svgStyle, N2Layout.defaults.size.font);
+        this.style = new N2Style(this.dom.svgStyle, N2Layout.defaults.size.font);
         this.layout = new N2Layout(this.model, this.zoomedElement);
 
         this.oldPtN2Initialize();
-
         this.updateClickedIndices();
 
-        this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout, this.n2Groups);
+        this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout, this.dom.n2Groups);
 
         this.scales = {
             'unit': 'px',
@@ -81,30 +96,11 @@ class N2Diagram {
     }
 
     /**
-     * Find the divs for D3 content in the existing document, and add a style section.
-     */
-    setupContentDivs() {
-        this.parentDiv = document.getElementById("ptN2ContentDivId");
-
-        this.d3ContentDiv = this.parentDiv.querySelector("#d3_content_div");
-        this.svgDiv = d3.select("#svgDiv");
-        this.svg = d3.select("#svgId");
-
-        this.svgStyle = document.createElement("style");
-        this.svgStyle.setAttribute('title', 'svgStyle');
-        this.parentDiv.querySelector("#svgId").appendChild(this.svgStyle);
-
-        this.toolTip = d3.select(".tool-tip");
-        this.arrowMarker = d3.select("#arrow");
-    }
-
-
-    /**
      * Save the SVG to a filename selected by the user.
      * TODO: Use a proper file dialog instead of a simple prompt.
      */
     saveSvg() {
-        let svgData = this.svg.node().outerHTML;
+        let svgData = this.dom.svg.node().outerHTML;
 
         // Add name spaces.
         if (!svgData.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
@@ -148,19 +144,19 @@ class N2Diagram {
      */
     oldPtN2Initialize() {
         // ids given just so it is easier to see in Chrome dev tools when debugging
-        this.n2TopGroup = this.svg.append('g').attr('id', 'N2');
-        this.pTreeGroup = this.svg.append('g').attr('id', 'tree');
-        this.pSolverTreeGroup = this.svg.append('g').attr('id', 'solver_tree');
+        this.dom.n2TopGroup = this.dom.svg.append('g').attr('id', 'N2');
+        this.dom.pTreeGroup = this.dom.svg.append('g').attr('id', 'tree');
+        this.dom.pSolverTreeGroup = this.dom.svg.append('g').attr('id', 'solver_tree');
 
-        this.n2BackgroundRect = this.n2TopGroup.append('rect')
+        this.dom.n2BackgroundRect = this.dom.n2TopGroup.append('rect')
             .attr('class', 'background')
             .attr('width', this.layout.size.diagram.width)
             .attr('height', this.layout.size.diagram.height);
 
-        this.n2Groups = {};
-        ['elements', 'gridlines', 'componentBoxes', 'arrows', 'dots'].forEach(function (gName) {
-            this.n2Groups[gName] = this.n2TopGroup.append('g').attr('id', 'n2' + gName);
-        }.bind(this));
+        this.dom.n2Groups = {};
+        for (let gName of ['elements', 'gridlines', 'componentBoxes', 'arrows', 'dots']) {
+            this.dom.n2Groups[gName] = this.dom.n2TopGroup.append('g').attr('id', 'n2' + gName);
+        };
     }
 
     /** Set up for an animated transition by setting and remembering where things were.
@@ -182,20 +178,20 @@ class N2Diagram {
 
     /** Make sure UI controls reflect history and current reality. */
     updateUI() {
-        this.parentDiv.querySelector('#currentPathId').innerHTML =
+        this.dom.parentDiv.querySelector('#currentPathId').innerHTML =
             'PATH: root' + ((this.zoomedElement.parent) ? '.' : '') +
             this.zoomedElement.absPathName;
-        this.parentDiv.querySelector('#backButtonId').disabled =
+        this.dom.parentDiv.querySelector('#backButtonId').disabled =
             (this.backButtonHistory.length == 0) ? 'disabled' : false;
-        this.parentDiv.querySelector('#forwardButtonId').disabled =
+        this.dom.parentDiv.querySelector('#forwardButtonId').disabled =
             (this.forwardButtonHistory.length == 0) ? 'disabled' : false;
-        this.parentDiv.querySelector('#upOneLevelButtonId').disabled =
+        this.dom.parentDiv.querySelector('#upOneLevelButtonId').disabled =
             (this.zoomedElement === this.model.root) ? 'disabled' : false;
-        this.parentDiv.querySelector('#returnToRootButtonId').disabled =
+        this.dom.parentDiv.querySelector('#returnToRootButtonId').disabled =
             (this.zoomedElement === this.model.root) ? 'disabled' : false;
 
         for (let i = 2; i <= this.model.maxDepth; ++i) {
-            this.parentDiv.querySelector('#idCollapseDepthOption' + i).style.display =
+            this.dom.parentDiv.querySelector('#idCollapseDepthOption' + i).style.display =
                 (i <= this.zoomedElement.depth) ? 'none' : 'block';
         }
     }
@@ -217,9 +213,7 @@ class N2Diagram {
     }
 
     updateScale() {
-        if (!this.scales.firstRun) {
-            this.preservePreviousScale();
-        }
+        if (!this.scales.firstRun) this.preservePreviousScale();
 
         this.transitCoords.model.x = (this.zoomedElement.x ? this.layout.size.partitionTree.width -
             this.layout.size.parentNodeWidth : this.layout.size.partitionTree.width) /
@@ -253,23 +247,23 @@ class N2Diagram {
             this.preservePreviousScale();
 
             //Update svg dimensions before ComputeLayout() changes layout.size.partitionTree.width
-            this.svgDiv.style("width",
+            this.dom.svgDiv.style("width",
                 (this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap + this.layout.size.diagram.width +
                     this.layout.size.solverTree.width + 2 * this.layout.size.svgMargin + this.layout.size.partitionTreeGap) +
                 this.layout.size.unit)
                 .style("height", (this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin) +
                     this.layout.size.unit);
-            this.svg.attr("width", this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap +
+            this.dom.svg.attr("width", this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap +
                 this.layout.size.diagram.width + this.layout.size.solverTree.width + 2 * this.layout.size.svgMargin + this.layout.size.partitionTreeGap)
                 .attr("height", this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin);
 
-            this.n2TopGroup.attr("transform", "translate(" +
+            this.dom.n2TopGroup.attr("transform", "translate(" +
                 (this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap + this.layout.size.svgMargin) +
                 "," + this.layout.size.svgMargin + ")");
-            this.pTreeGroup.attr("transform", "translate(" +
+            this.dom.pTreeGroup.attr("transform", "translate(" +
                 this.layout.size.svgMargin + "," + this.layout.size.svgMargin + ")");
 
-            this.pSolverTreeGroup.attr("transform", "translate(" +
+            this.dom.pSolverTreeGroup.attr("transform", "translate(" +
                 (this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap + this.layout.size.diagram.width +
                     this.layout.size.svgMargin + this.layout.size.partitionTreeGap) + "," + this.layout.size.svgMargin + ")");
         }
@@ -284,30 +278,30 @@ class N2Diagram {
             .delay(this.transitionStartDelay); // do this after intense computation
         this.transitionStartDelay = N2TransitionDefaults.startDelay;
 
-        this.svgDiv.transition(sharedTransition)
+        this.dom.svgDiv.transition(sharedTransition)
             .style("width", (this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap +
                 this.layout.size.diagram.width + this.layout.size.solverTree.width + 2 * this.layout.size.svgMargin + this.layout.size.partitionTreeGap) +
                 this.layout.size.unit)
             .style("height", (this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin) +
                 this.layout.size.unit);
 
-        this.svg.transition(sharedTransition)
+        this.dom.svg.transition(sharedTransition)
             .attr("width", this.layout.size.partitionTree.width +
                 this.layout.size.partitionTreeGap + this.layout.size.diagram.width + this.layout.size.solverTree.width + 2 *
                 this.layout.size.svgMargin + this.layout.size.partitionTreeGap)
             .attr("height", this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin);
 
-        this.n2TopGroup.transition(sharedTransition)
+        this.dom.n2TopGroup.transition(sharedTransition)
             .attr("transform", "translate(" + (this.layout.size.partitionTree.width +
                 this.layout.size.partitionTreeGap + this.layout.size.svgMargin) + "," + this.layout.size.svgMargin + ")");
 
-        this.pTreeGroup.transition(sharedTransition)
+        this.dom.pTreeGroup.transition(sharedTransition)
             .attr("transform", "translate(" + this.layout.size.svgMargin + "," + this.layout.size.svgMargin + ")");
 
-        this.n2BackgroundRect.transition(sharedTransition)
+        this.dom.n2BackgroundRect.transition(sharedTransition)
             .attr("width", this.layout.size.diagram.width).attr("height", this.layout.size.partitionTree.height);
 
-        this.pSolverTreeGroup.transition(sharedTransition)
+        this.dom.pSolverTreeGroup.transition(sharedTransition)
             .attr("transform", "translate(" + (this.layout.size.partitionTree.width +
                 this.layout.size.partitionTreeGap + this.layout.size.diagram.width + this.layout.size.svgMargin + this.layout.size.partitionTreeGap) + "," +
                 this.layout.size.svgMargin + ")");
@@ -325,7 +319,8 @@ class N2Diagram {
         if (computeNewTreeLayout) {
             this.layout = new N2Layout(this.model, this.zoomedElement);
             this.updateClickedIndices();
-            this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout, this.n2Groups);
+            this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout,
+                this.dom.n2Groups, this.matrix.nodeSize);
         }
 
         this.updateScale();

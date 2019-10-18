@@ -2,13 +2,13 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
     // TODO: Get rid of all these after refactoring ///////////////
     var model = n2Diag.model; ////
-    svgDiv = n2Diag.svgDiv; ////
-    svg = n2Diag.svg; ////
+    svgDiv = n2Diag.dom.svgDiv; ////
+    svg = n2Diag.dom.svg; ////
     var root = model.root;
     var abs2prom = model.abs2prom;
     var showPath = n2Diag.showPath; //default off ////
     var chosenCollapseDepth = n2Diag.chosenCollapseDepth; ////
-    var tooltip = n2Diag.toolTip; ////
+    var tooltip = n2Diag.dom.toolTip; ////
     ///////////////////////////////////////////////////////////////
 
     mouseOverOnDiagN2 = MouseoverOnDiagN2;
@@ -44,7 +44,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
     }
 
     Update(false);
-    SetupLegend(d3, n2Diag.d3ContentDiv);
+    SetupLegend(d3, n2Diag.dom.d3ContentDiv);
 
     function Update(computeNewTreeLayout = true) {
         n2Diag.update(computeNewTreeLayout);
@@ -57,7 +57,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         d3SolverRightTextNodesArrayZoomed = n2Diag.layout.visibleSolverNodes;
         ///////////////////////////////////////////////////////////////
 
-        var sel = n2Diag.pTreeGroup.selectAll(".partition_group")
+        var sel = n2Diag.dom.pTreeGroup.selectAll(".partition_group")
             .data(d3NodesArray, function (d) {
                 return d.id;
             });
@@ -168,7 +168,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             .style("opacity", 0);
 
 
-        var selSolver = n2Diag.pSolverTreeGroup.selectAll(".solver_group")
+        var selSolver = n2Diag.dom.pSolverTreeGroup.selectAll(".solver_group")
             .data(d3SolverNodesArray, function (d) {
                 return d.id;
             });
@@ -289,7 +289,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
     updateFunc = Update;
 
     function ClearArrows() {
-        n2Diag.n2TopGroup.selectAll("[class^=n2_hover_elements]").remove();
+        n2Diag.dom.n2TopGroup.selectAll("[class^=n2_hover_elements]").remove();
     }
 
     function ClearArrowsAndConnects() {
@@ -443,8 +443,8 @@ function PtN2Diagram(parentDiv, modelJSON) {
             return HasObjectInChildren(d, toMatchObj);
         }
 
-        var lineWidth = Math.min(5, n2Dx * .5, n2Dy * .5);
-        n2Diag.arrowMarker.attr("markerWidth", lineWidth * .4)
+        var lineWidth = Math.min(5, n2Diag.matrix.nodeSize.width * .5, n2Diag.matrix.nodeSize.height * .5);
+        n2Diag.dom.arrowMarker.attr("markerWidth", lineWidth * .4)
             .attr("markerHeight", lineWidth * .4);
         var src = d3RightTextNodesArrayZoomed[d.row];
         var tgt = d3RightTextNodesArrayZoomed[d.col];
@@ -455,7 +455,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
             end: { col: d.col, row: d.col },
             color: N2Style.color.redArrow,
             width: lineWidth
-        }, n2Diag.n2Groups);
+        }, n2Diag.dom.n2Groups, n2Diag.matrix.nodeSize);
 
         if (d.row > d.col) {
             var targetsWithCycleArrows = [];
@@ -498,7 +498,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
                             }
 
                             if (firstBeginIndex != firstEndIndex) {
-                                DrawArrowsParamView(firstBeginIndex, firstEndIndex);
+                                DrawArrowsParamView(firstBeginIndex, firstEndIndex, n2Diag.matrix.nodeSize);
                             }
                         }
                     }
@@ -508,8 +508,8 @@ function PtN2Diagram(parentDiv, modelJSON) {
 
         var leftTextWidthR = d3RightTextNodesArrayZoomed[d.row].nameWidthPx,
             leftTextWidthC = d3RightTextNodesArrayZoomed[d.col].nameWidthPx;
-        DrawRect(-leftTextWidthR - n2Diag.layout.size.partitionTreeGap, n2Dy * d.row, leftTextWidthR, n2Dy, N2Style.color.redArrow); //highlight var name
-        DrawRect(-leftTextWidthC - n2Diag.layout.size.partitionTreeGap, n2Dy * d.col, leftTextWidthC, n2Dy, N2Style.color.greenArrow); //highlight var name
+        DrawRect(-leftTextWidthR - n2Diag.layout.size.partitionTreeGap, n2Diag.matrix.nodeSize.height * d.row, leftTextWidthR, n2Diag.matrix.nodeSize.height, N2Style.color.redArrow); //highlight var name
+        DrawRect(-leftTextWidthC - n2Diag.layout.size.partitionTreeGap, n2Diag.matrix.nodeSize.height * d.col, leftTextWidthC, n2Diag.matrix.nodeSize.height, N2Style.color.greenArrow); //highlight var name
     }
 
     function MouseoverOnDiagN2(d) {
@@ -519,22 +519,22 @@ function PtN2Diagram(parentDiv, modelJSON) {
         var leftTextWidthHovered = d3RightTextNodesArrayZoomed[hoveredIndexRC].nameWidthPx;
 
         // Loop over all elements in the matrix looking for other cells in the same column as
-        var lineWidth = Math.min(5, n2Dx * .5, n2Dy * .5);
-        n2Diag.arrowMarker.attr("markerWidth", lineWidth * .4)
+        var lineWidth = Math.min(5, n2Diag.matrix.nodeSize.width * .5, n2Diag.matrix.nodeSize.height * .5);
+        n2Diag.dom.arrowMarker.attr("markerWidth", lineWidth * .4)
             .attr("markerHeight", lineWidth * .4);
-        DrawRect(-leftTextWidthHovered - n2Diag.layout.size.partitionTreeGap, n2Dy * hoveredIndexRC, leftTextWidthHovered, n2Dy, N2Style.color.highlightHovered); //highlight hovered
+        DrawRect(-leftTextWidthHovered - n2Diag.layout.size.partitionTreeGap, n2Diag.matrix.nodeSize.height * hoveredIndexRC, leftTextWidthHovered, n2Diag.matrix.nodeSize.height, N2Style.color.highlightHovered); //highlight hovered
         for (var i = 0; i < d3RightTextNodesArrayZoomed.length; ++i) {
             var leftTextWidthDependency = d3RightTextNodesArrayZoomed[i].nameWidthPx;
             var box = d3RightTextNodesArrayZoomedBoxInfo[i];
-            if (n2Diag.matrix.node(hoveredIndexRC, i) !== undefined) { //i is column here
+            if (n2Diag.matrix.exists(hoveredIndexRC, i)) { //i is column here
                 if (i != hoveredIndexRC) {
                     new N2Arrow({
                         end: { col: i, row: i },
                         start: { col: hoveredIndexRC, row: hoveredIndexRC },
                         color: N2Style.color.greenArrow,
                         width: lineWidth
-                    }, n2Diag.n2Groups);
-                    DrawRect(-leftTextWidthDependency - n2Diag.layout.size.partitionTreeGap, n2Dy * i, leftTextWidthDependency, n2Dy, N2Style.color.greenArrow); //highlight var name
+                    }, n2Diag.dom.n2Groups, n2Diag.matrix.nodeSize);
+                    DrawRect(-leftTextWidthDependency - n2Diag.layout.size.partitionTreeGap, n2Diag.matrix.nodeSize.height * i, leftTextWidthDependency, n2Diag.matrix.nodeSize.height, N2Style.color.greenArrow); //highlight var name
                 }
             }
 
@@ -545,25 +545,25 @@ function PtN2Diagram(parentDiv, modelJSON) {
                         end: { col: hoveredIndexRC, row: hoveredIndexRC },
                         color: N2Style.color.redArrow,
                         width: lineWidth
-                    }, n2Diag.n2Groups);
-                    DrawRect(-leftTextWidthDependency - n2Diag.layout.size.partitionTreeGap, n2Dy * i, leftTextWidthDependency, n2Dy, N2Style.color.redArrow); //highlight var name
+                    }, n2Diag.dom.n2Groups, n2Diag.matrix.nodeSize);
+                    DrawRect(-leftTextWidthDependency - n2Diag.layout.size.partitionTreeGap, n2Diag.matrix.nodeSize.height * i, leftTextWidthDependency, n2Diag.matrix.nodeSize.height, N2Style.color.redArrow); //highlight var name
                 }
             }
         }
     }
 
     function MouseoutN2() {
-        n2Diag.n2TopGroup.selectAll(".n2_hover_elements").remove();
+        n2Diag.dom.n2TopGroup.selectAll(".n2_hover_elements").remove();
     }
 
     function MouseClickN2(d) {
         var newClassName = "n2_hover_elements_" + d.row + "_" + d.col;
-        var selection = n2Diag.n2TopGroup.selectAll("." + newClassName);
+        var selection = n2Diag.dom.n2TopGroup.selectAll("." + newClassName);
         if (selection.size() > 0) {
             selection.remove();
         }
         else {
-            n2Diag.n2TopGroup.selectAll("path.n2_hover_elements, circle.n2_hover_elements")
+            n2Diag.dom.n2TopGroup.selectAll("path.n2_hover_elements, circle.n2_hover_elements")
                 .attr("class", newClassName);
         }
     }
@@ -680,7 +680,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
         n2Diag.layout.toggleSolverNameType();
         // showLinearSolverNames = !showLinearSolverNames;
         parentDiv.querySelector("#toggleSolverNamesButtonId").className = !n2Diag.layout.showLinearSolverNames ? "myButton myButtonToggledOn" : "myButton";
-        SetupLegend(d3, n2Diag.d3ContentDiv);
+        SetupLegend(d3, n2Diag.dom.d3ContentDiv);
         Update();
     }
 
@@ -693,7 +693,7 @@ function PtN2Diagram(parentDiv, modelJSON) {
     function ToggleLegend() {
         showLegend = !showLegend;
         parentDiv.querySelector("#showLegendButtonId").className = showLegend ? "myButton myButtonToggledOn" : "myButton";
-        SetupLegend(d3, n2Diag.d3ContentDiv);
+        SetupLegend(d3, n2Diag.dom.d3ContentDiv);
     }
 
     function CreateDomLayout() {
