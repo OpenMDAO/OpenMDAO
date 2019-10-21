@@ -269,8 +269,8 @@ class Coloring(object):
         float
             Percent improvment.
         """
-        rev_size = self._shape[0] if self._shape else -1  # nrows
-        fwd_size = self._shape[1] if self._shape else -1  # ncols
+        rev_size = self._shape[0]  # nrows
+        fwd_size = self._shape[1]  # ncols
 
         tot_solves = self.total_solves()
 
@@ -282,7 +282,9 @@ class Coloring(object):
             fwd_lists = self._fwd[0] if self._fwd else []
             rev_lists = self._rev[0] if self._rev else []
 
-            if fwd_lists and not rev_lists:
+            if self._meta.get('bidirectional'):
+                tot_size = min(fwd_size, rev_size)
+            elif fwd_lists and not rev_lists:
                 tot_size = fwd_size
             elif rev_lists and not fwd_lists:
                 tot_size = rev_size
@@ -1150,7 +1152,11 @@ def MNCO_bidir(J):
     row_i = col_i = 0
 
     # partition J into Jc and Jr
-    # We build Jc from bottom up and Jr from right to left.
+    # Jc is colored by column and those columns will be solved in fwd mode
+    # Jr is colored by row and those rows will be solved in reverse mode
+    # We build Jc from bottom up (by row) and Jr from right to left (by column).
+
+    # get index of row with fewest nonzeros and col with fewest nonzeros
     r = M_row_nonzeros.argmin()
     c = M_col_nonzeros.argmin()
 
@@ -1161,7 +1167,14 @@ def MNCO_bidir(J):
     Jr_nz_max = 0   # max col nonzeros in Jr
 
     while M_rows.size + M_cols.size > 0:
-        if Jr_nz_max + max(Jc_nz_max, nnz_r) < (Jc_nz_max + max(Jr_nz_max, nnz_c)):
+        # what the algorithm is doing is basically minimizing the total of the max number of nonzero
+        # columns in Jc + the max number of nonzero rows in Jr, so it's basically minimizing
+        # the upper bound of the number of colors that will be needed.
+
+        # we differ from the algorithm in the paper here slightly because we add ncols and nrows to
+        # different sides of the inequality in order to prevent bad colorings when we have
+        # matrices that have many more rows than columns or many more columns than rows.
+        if ncols + Jr_nz_max + max(Jc_nz_max, nnz_r) < (nrows + Jc_nz_max + max(Jr_nz_max, nnz_c)):
             Jc_rows[r] = M_cols[M_rows == r]
             Jc_nz_max = max(nnz_r, Jc_nz_max)
 
@@ -1221,6 +1234,7 @@ def MNCO_bidir(J):
     # check_coloring(J, coloring)
 
     coloring._meta['coloring_time'] = time.time() - start_time
+    coloring._meta['bidirectional'] = True
 
     return coloring
 
@@ -1579,6 +1593,7 @@ def _compute_coloring(J, mode):
     nrows, ncols = J.shape
     best_nocolor = min(nrows, ncols)  # lowest number of solves possible if we don't use coloring
 
+    fallback = False
     if mode == 'auto':  # use bidirectional coloring
         coloring = MNCO_bidir(J)
         if coloring.total_solves() < best_nocolor:
@@ -1587,6 +1602,7 @@ def _compute_coloring(J, mode):
             mode = 'fwd'
         else:
             mode = 'rev'
+        fallback = True
 
     rev = mode == 'rev'
 
@@ -1609,6 +1625,8 @@ def _compute_coloring(J, mode):
         coloring._fwd = (col_groups, col2rows)
 
     coloring._meta['coloring_time'] = time.time() - start_time
+    if fallback:
+        coloring._meta['fallback'] = True
 
     return coloring
 

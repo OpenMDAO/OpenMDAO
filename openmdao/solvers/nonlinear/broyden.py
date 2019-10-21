@@ -12,7 +12,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import simple_warning
+from openmdao.utils.general_utils import simple_warning, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.vectors.vector import INT_DTYPE
 
@@ -171,6 +171,16 @@ class BroydenSolver(NonlinearSolver):
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system, self._depth + 1)
             self.linesearch._do_subsolve = True
+
+        else:
+            # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
+            # This deprecation warning is to prepare users for the change.
+            pathname = self._system.pathname
+            if pathname:
+                pathname += ': '
+            msg = 'Deprecation warning: In V 3.0, the default Broyden solver setup will change ' + \
+                  'to use the BoundsEnforceLS line search.'
+            warn_deprecation(pathname + msg)
 
         states = self.options['state_vars']
         prom2abs = system._var_allprocs_prom2abs_list['output']
