@@ -673,19 +673,33 @@ def openmdao_cmd():
     parser = argparse.ArgumentParser(description='OpenMDAO Command Line Tools',
                                      epilog='Use -h after any sub-command for sub-command help.')
 
-    subs = parser.add_subparsers(title='Tools', metavar='')
+    # setting 'dest' here will populate the Namespace with the active subparser name
+    subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
     for p, (parser_setup_func, executor, func, help_str) in sorted(_command_map.items()):
         subp = subs.add_parser(p, help=help_str)
         parser_setup_func(subp)
         subp.set_defaults(executor=executor, func=func)
 
-    # handle case where someone just runs `openmdao <script>`
+    # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
     if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(args[0]):
         _simple_exec(_Options(file=[args[0]], func=None))
     else:
         hooks.use_hooks = True
-        options = parser.parse_args()
+        # we do a parse_known_args here instead of parse_args so that we can associate errors with
+        # the correct subparser.  Otherwise we would just get a top level error message without any
+        # sub-command usage info.
+        options, unknown = parser.parse_known_args()
+        if unknown:
+            msg = 'unrecognized arguments: ' + ', '.join(unknown)
+            try:
+                sub = subs.choices[options.subparser_name]
+            except KeyError:
+                parser.error(msg)
+            else:
+                print(sub.format_usage(), file=sys.stderr)
+                print(msg, file=sys.stderr)
+            parser.exit(2)
         if hasattr(options, 'executor'):
             options.executor(options)
         else:
