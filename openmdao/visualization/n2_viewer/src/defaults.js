@@ -23,8 +23,7 @@ N2Layout.defaults = {
         'parentNodeWidth': 40,
         'partitionTreeGap': 10, // Pixels between partition tree and N2 matrix
         'svgMargin': 1,
-    },
-    'showLinearSolverNames': true,
+    }
 };
 
 Object.freeze(N2Layout.defaults);

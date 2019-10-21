@@ -16,12 +16,14 @@ class N2Layout {
      * Compute the new layout based on the model data and the zoomed element.
      * @param {ModelData} model The pre-processed model object.
      * @param {Object} newZoomedElement The element the new layout is based around.
+     * @param {boolean} showLinearSolverNames Whether to show linear or non-linear solver names.
      */
-    constructor(model, newZoomedElement) {
+    constructor(model, newZoomedElement, showLinearSolverNames) {
         this.model = model;
 
         // TODO: Remove global zoomedElement
         this.zoomedElement = newZoomedElement;
+        this.showLinearSolverNames = showLinearSolverNames;
 
         this.updateRecomputesAutoComplete = true;
         this.updateAutoCompleteIfNecessary();
@@ -35,8 +37,6 @@ class N2Layout {
 
         // Initial size values derived from read-only defaults
         this.size = JSON.parse(JSON.stringify(N2Layout.defaults.size));
-        this.showLinearSolverNames = N2Layout.defaults.showLinearSolverNames;
-
         this.svg = d3.select("#svgId");
 
         this.setupTextRenderer();
@@ -77,15 +77,6 @@ class N2Layout {
         if (this.zoomedElement.parent)
             this.zoomedSolverNodes.push(this.zoomedElement.parent);
 
-    }
-
-    /**
-     * Switch back and forth between showing the linear or non-linear solver names. 
-     * @return {Boolean} The new value.
-     */
-    toggleSolverNameType() {
-        this.showLinearSolverNames = !this.showLinearSolverNames;
-        return this.showLinearSolverNames;
     }
 
     /** Create an off-screen area to render text for getTextWidth() */

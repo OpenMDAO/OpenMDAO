@@ -14,8 +14,7 @@ class N2Style {
     /** Make the data in N2Style.solverStyleData more readable */
     setupSolverStyles() {
         this.solvers = {};
-
-        let solverTypes = ['linear', 'non-linear'];
+        let solverTypes = ['linear', 'nonLinear'];
 
         for (let sdata of N2Style.solverStyleData) {
             for (let i = 0; i < 2; ++i) {
@@ -30,12 +29,11 @@ class N2Style {
                             'fill-opacity': '.8'
                         }
                     }
-                    // console.log('solver.class: ', this.solvers[sdata[i]].class)
                 }
             }
         }
 
-        Object.freeze(this.solvers);
+        // Object.freeze(this.solvers);
     }
 
     /**
@@ -149,15 +147,16 @@ class N2Style {
 
     /**
      * Determine the name of the CSS class based on the name of the solver.
-     * @property {boolean} showLinearSolverNames Whether to use the linear or non-linear solver name.
-     * @property {Object} solverNames
-     * @property {string} solverNames.linear The linear solver name.
-     * @property {string} solverNames.nonLinear The non-linear solver name.
+     * @param {boolean} showLinearSolverNames Whether to use the linear or non-linear solver name.
+     * @param {Object} solverNames
+     * @param {string} solverNames.linear The linear solver name.
+     * @param {string} solverNames.nonLinear The non-linear solver name.
      * @return {string} The CSS class of the solver, or for "other" if not found.
      */
     getSolverClass(showLinearSolverNames, solverNames) {
         let solverName = showLinearSolverNames? solverNames.linear : solverNames.nonLinear;
-        return this.solvers[solverName]? this.solvers[solverName].class : this.solvers.other.class;
+        return this.solvers[solverName]? this.solvers[solverName].class :
+            this.solvers.other.class;
     }
 
     /**

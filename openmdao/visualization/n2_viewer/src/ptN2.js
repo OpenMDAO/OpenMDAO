@@ -443,12 +443,11 @@ function VerticalResize(height) {
 }
 
 function ToggleSolverNamesCheckboxChange() {
-    n2Diag.layout.toggleSolverNameType();
-    // showLinearSolverNames = !showLinearSolverNames;
-    parentDiv.querySelector("#toggleSolverNamesButtonId").className = !n2Diag.layout.showLinearSolverNames ? "myButton myButtonToggledOn" : "myButton";
+    n2Diag.toggleSolverNameType();
+    parentDiv.querySelector("#toggleSolverNamesButtonId").className = !n2Diag.showLinearSolverNames ? "myButton myButtonToggledOn" : "myButton";
     SetupLegend(d3, n2Diag.dom.d3ContentDiv);
     Update();
-}
+};
 
 function ShowPathCheckboxChange() {
     showPath = !showPath;

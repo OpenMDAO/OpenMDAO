@@ -60,7 +60,7 @@ function SetupLegend(d3, d3ContentDiv) {
 
     //COLUMN TITLES
     {
-        var text = ["Systems & Variables", "N^2 Symbols", n2Diag.layout.showLinearSolverNames? " Linear Solvers" : "Nonlinear Solvers"];
+        var text = ["Systems & Variables", "N^2 Symbols", n2Diag.showLinearSolverNames? " Linear Solvers" : "Nonlinear Solvers"];
         for (var i = 0; i < text.length; ++i) {
             var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * i + xOffset) + "," + (60) + ")");
             el.append("svg:text")
@@ -102,23 +102,18 @@ function SetupLegend(d3, d3ContentDiv) {
 
     //SOLVER COLORS
     {
-        if (n2Diag.layout.showLinearSolverNames){
-            for (var i = 0; i < linearSolverNames.length; ++i) {
-                var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 2 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
-                var name = linearSolverNames[i];
-                DrawLegendColor(el, u, v, linearSolverColors[name], false);
-                CreateText(el, name);
-            }
-        } else {
-            for (var i = 0; i < nonLinearSolverNames.length; ++i) {
-                var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 2 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
-                var name = nonLinearSolverNames[i];
-                DrawLegendColor(el, u, v, nonLinearSolverColors[name], false);
-                CreateText(el, name);
+        let i = 0;
+        for (let solverName in n2Diag.style.solvers) {
+            solver = n2Diag.style.solvers[solverName];
+            if ((solver.type == 'linear' && n2Diag.showLinearSolverNames) ||
+                (solver.type == 'nonLinear' && ! n2Diag.showLinearSolverNames)) {
+                let el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 2 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
+                DrawLegendColor(el, u, v, solver.style.fill, false);
+                CreateText(el, solverName);
+                ++i;
             }
         }
     }
-
 }
 
 function DrawLegendColor(g, u, v, color, justUpdate) {

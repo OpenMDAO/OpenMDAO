@@ -53,6 +53,8 @@ class N2Diagram {
         this.forwardButtonHistory = [];
         this.chosenCollapseDepth = -1;
 
+        this.showLinearSolverNames = true;
+
         this.style = new N2Style(this.dom.svgStyle, N2Layout.defaults.size.font);
         this.layout = new N2Layout(this.model, this.zoomedElement);
 
@@ -96,6 +98,13 @@ class N2Diagram {
             'model': { 'x': 0, 'y': 0 },
             'solver': { 'x': 0, 'y': 0 }
         };
+    }
+
+    /**
+    * Switch back and forth between showing the linear or non-linear solver names. 
+    */
+    toggleSolverNameType() {
+        this.showLinearSolverNames = !this.showLinearSolverNames;
     }
 
     /**
@@ -451,7 +460,7 @@ class N2Diagram {
 
         let nodeEnter = selection.enter().append("svg:g")
             .attr("class", function (d) {
-                let solver_class = this.style.getSolverClass(this.layout.showLinearSolverNames,
+                let solver_class = this.style.getSolverClass(this.showLinearSolverNames,
                     { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver })
                 return solver_class + " " + "solver_group " + this.style.getNodeClass(d);
             }.bind(this))
@@ -508,7 +517,7 @@ class N2Diagram {
                 if (d.depth < this.zoomedElement.depth) return 0;
                 return d.textOpacity;
             }.bind(this))
-            .text(this.layout.getSolverText);
+            .text(this.layout.getSolverText.bind(this));
 
         return ({ 'selection': selection, 'nodeEnter': nodeEnter });
     }
@@ -516,7 +525,7 @@ class N2Diagram {
     _setupSolverTransition(d3Refs) {
         let nodeUpdate = d3Refs.nodeEnter.merge(d3Refs.selection).transition(sharedTransition)
             .attr("class", function (d) {
-                let solver_class = this.style.getSolverClass(this.layout.showLinearSolverNames,
+                let solver_class = this.style.getSolverClass(this.showLinearSolverNames,
                     { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
                 return solver_class + " " + "solver_group " + this.style.getNodeClass(d);
             }.bind(this))
@@ -547,7 +556,7 @@ class N2Diagram {
                 if (d.depth < this.zoomedElement.depth) return 0;
                 return d.textOpacity;
             }.bind(this))
-            .text(this.layout.getSolverText);
+            .text(this.layout.getSolverText.bind(this));
     }
 
     _runSolverTransition(selection) {
@@ -593,7 +602,7 @@ class N2Diagram {
         if (computeNewTreeLayout) {
             this.clearArrows();
 
-            this.layout = new N2Layout(this.model, this.zoomedElement);
+            this.layout = new N2Layout(this.model, this.zoomedElement, this.showLinearSolverNames);
             this._updateClickedIndices();
             this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout,
                 this.dom.n2Groups, this.matrix.nodeSize);
