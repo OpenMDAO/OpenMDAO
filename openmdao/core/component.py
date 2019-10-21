@@ -183,8 +183,6 @@ class Component(System):
         self.pathname = pathname
         self._problem_options = prob_options
 
-        _setup_hooks(self)
-
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
 
