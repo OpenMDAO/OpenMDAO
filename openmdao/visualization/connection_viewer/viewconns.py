@@ -203,7 +203,7 @@ def _get_input(show_values, system, name):
     Return the named value if it's local to the process, else "<on remote proc>".
     """
     if not show_values:
-        return None
+        return ''
 
     if name in system._inputs:
         return system._inputs[name]
@@ -215,7 +215,7 @@ def _get_output(show_values, system, name, idxs=None):
     Return the named value if it's local to the process, else "<on remote proc>".
     """
     if not show_values:
-        return None
+        return ''
 
     if name in system._outputs:
         val = system._outputs[name]
