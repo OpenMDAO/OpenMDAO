@@ -1,6 +1,6 @@
 var d3ContentDiv, svgDiv, svg;
 
-var d3NodesArray, d3RightTextNodesArrayZoomed = []
+var d3RightTextNodesArrayZoomed = []
 var d3RightTextNodesArrayZoomedBoxInfo
 var drawableN2ComponentBoxes;
 
@@ -53,8 +53,7 @@ function DrawArrowsParamView(startIndex, endIndex, nodeSize) {
             start: { col: startI, row: startI },
             end: { col: endI, row: endI },
             color: (startIndex < endIndex) ? N2Style.color.greenArrow : N2Style.color.redArrow,
-            width: lineWidth,
-            nodeSize
-        }, n2Diag.dom.n2Groups);
+            width: lineWidth
+        }, n2Diag.dom.n2Groups, n2Diag.matrix.nodeSize);
     }
 }

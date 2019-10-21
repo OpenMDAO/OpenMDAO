@@ -3,10 +3,10 @@
  * @typedef N2Layout
  * @property {ModelData} model Reference to the preprocessed model.
  * @property {N2TreeNode} zoomedElement Reference to zoomedElement managed by N2Diagram.
- * @property {N2TreeNode[]} zoomedNodes  Child nodes of the current zoomed element.
- * @property {N2TreeNode[]} visibleNodes Zoomed nodes that are actually drawn.
- * @property {N2TreeNode[]} zoomedSolverNodes Child solver nodes of the current zoomed element.
- * @property {Boolean} updateRecomputesAutoComplete Zoomed solver nodes that are actually drawn.
+ * @property {N2TreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
+ * @property {N2TreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
+ * @property {N2TreeNode[]} zoomedSolverNodes Child solver workNodes of the current zoomed element.
+ * @property {Boolean} updateRecomputesAutoComplete Zoomed solver workNodes that are actually drawn.
  * @property {Object} svg Reference to the top-level SVG element in the document.
  * @property {Object} size The dimensions of the model and solver trees.
  */
@@ -22,7 +22,7 @@ class N2Layout {
 
         // TODO: Remove global zoomedElement
         this.zoomedElement = newZoomedElement;
-        
+
         this.updateRecomputesAutoComplete = true;
         this.updateAutoCompleteIfNecessary();
 
@@ -98,7 +98,7 @@ class N2Layout {
         this.textRenderer = {
             'group': textGroup,
             'textSvg': textSVG,
-            'node': textSVG.node(),
+            'workNode': textSVG.node(),
             'widthCache': {}
         };
     }
@@ -118,7 +118,7 @@ class N2Layout {
         else {
             // Not found, render and return new width.
             this.textRenderer.textSvg.text(text);
-            width = this.textRenderer.node.getBoundingClientRect().width;
+            width = this.textRenderer.workNode.getBoundingClientRect().width;
 
             this.textRenderer.widthCache[text] = width;
         }
@@ -223,7 +223,7 @@ class N2Layout {
         if (element.varIsHidden) return;
 
         let height = this.size.diagram.height * element.numLeaves / this.zoomedElement.numLeaves;
-        element.textOpacity0 = element.propExists('textOpacity') ? element.textOpacity : 0;
+        element.prevTextOpacity = element.propExists('textOpacity') ? element.textOpacity : 0;
         element.textOpacity = (height > this.size.font) ? 1 : 0;
         let hasVisibleDetail = (height >= 2.0);
         let width = (hasVisibleDetail) ? this.size.minColumnWidth : 1e-3;
@@ -314,49 +314,45 @@ class N2Layout {
     /** TODO: Document what the *0 variables are for */
 
     /** Recurse over the model tree and determine the coordinates and
-     * size of visible elements. If a parent is minimized, operations are
+     * size of visible nodes. If a parent is minimized, operations are
      * performed on it instead.
-     * @param {N2TreeNode} element The node to operate on.
+     * @param {N2TreeNode} node The node to operate on.
      * @param {number} leafCounter Tally of leaves encountered so far.
-     * @param {Boolean} isChildOfZoomed Whether element is a descendant of this.zoomedElement.
+     * @param {Boolean} isChildOfZoomed Whether node is a descendant of this.zoomedElement.
      * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing
      *   highest in the tree hierarchy. Null if none exist.
      */
-    computeNormalizedPositions(element, leafCounter,
+    computeNormalizedPositions(node, leafCounter,
         isChildOfZoomed, earliestMinimizedParent) {
         if (!isChildOfZoomed) {
-            isChildOfZoomed = (element === this.zoomedElement);
+            isChildOfZoomed = (node === this.zoomedElement);
         }
 
         if (earliestMinimizedParent == null && isChildOfZoomed) {
-            if (!element.varIsHidden) this.zoomedNodes.push(element);
-            if (!element.hasChildren() || element.isMinimized) { //at a "leaf" node
-                if (!element.varIsHidden) this.visibleNodes.push(element);
-                earliestMinimizedParent = element;
+            if (!node.varIsHidden) this.zoomedNodes.push(node);
+            if (!node.hasChildren() || node.isMinimized) { //at a "leaf" node
+                if (!node.varIsHidden) this.visibleNodes.push(node);
+                earliestMinimizedParent = node;
             }
         }
 
-        let node = (earliestMinimizedParent) ? earliestMinimizedParent : element;
-        element.rootIndex0 = element.propExists('rootIndex') ? element.rootIndex : leafCounter;
-        element.rootIndex = leafCounter;
-        ['x', 'y', 'width', 'height'].forEach(function (val) {
-            element[val + '0'] = element.hasOwnProperty(val) ? element[val] : 1e-6;
-        })
-        element.x = this.cols[node.depth].location / this.size.partitionTree.width;
-        element.y = leafCounter / this.model.root.numLeaves;
-        element.width = (element.hasChildren() && !element.isMinimized) ?
-            (this.cols[node.depth].width / this.size.partitionTree.width) : 1 - node.x;
-        element.height = node.numLeaves / this.model.root.numLeaves;
+        let workNode = (earliestMinimizedParent) ? earliestMinimizedParent : node;
+        node.preserveDims(false, leafCounter);
 
-        if (element.varIsHidden) { //param or hidden leaf leaving
-            element.x = this.cols[element.parentComponent.depth + 1].location / this.size.partitionTree.width;
-            element.y = element.parentComponent.y;
-            element.width = 1e-6;
-            element.height = 1e-6;
+        node.dims.x = this.cols[workNode.depth].location / this.size.partitionTree.width;
+        node.dims.y = leafCounter / this.model.root.numLeaves;
+        node.dims.width = (node.hasChildren() && !node.isMinimized) ?
+            (this.cols[workNode.depth].width / this.size.partitionTree.width) : 1 - workNode.dims.x;
+        node.dims.height = workNode.numLeaves / this.model.root.numLeaves;
+
+        if (node.varIsHidden) { // param or hidden leaf leaving
+            node.dims.x = this.cols[node.parentComponent.depth + 1].location / this.size.partitionTree.width;
+            node.dims.y = node.parentComponent.dims.y;
+            node.dims.width = node.dims.height = 1e-6;
         }
 
-        if (element.hasChildren()) {
-            for (let child of element.children) {
+        if (node.hasChildren()) {
+            for (let child of node.children) {
                 this.computeNormalizedPositions(child, leafCounter,
                     isChildOfZoomed, earliestMinimizedParent);
                 if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
@@ -368,54 +364,51 @@ class N2Layout {
 
     /**
      * Recurse over the model tree and determine the coordinates and size of visible
-     * solver elements. If a parent is minimized, operations are performed on it instead.
-     * @param {N2TreeNode} element The node to operate on.
+     * solver nodes. If a parent is minimized, operations are performed on it instead.
+     * @param {N2TreeNode} node The node to operate on.
      * @param {number} leafCounter Tally of leaves encountered so far.
-     * @param {Boolean} isChildOfZoomed Whether element is a descendant of this.zoomedElement.
+     * @param {Boolean} isChildOfZoomed Whether node is a descendant of this.zoomedElement.
      * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing
      *   highest in the tree hierarchy. Null if none exist.
      */
-    computeSolverNormalizedPositions(element, leafCounter,
+    computeSolverNormalizedPositions(node, leafCounter,
         isChildOfZoomed, earliestMinimizedParent) {
         if (!isChildOfZoomed) {
-            isChildOfZoomed = (element === this.zoomedElement);
+            isChildOfZoomed = (node === this.zoomedElement);
         }
 
         if (earliestMinimizedParent == null && isChildOfZoomed) {
-            if (element.type.match(/^(subsystem|root)$/)) {
-                this.zoomedSolverNodes.push(element);
+            if (node.type.match(/^(subsystem|root)$/)) {
+                this.zoomedSolverNodes.push(node);
             }
-            if (!element.hasChildren() || element.isMinimized) { //at a "leaf" node
-                if (!element.isParam() && !element.varIsHidden) {
-                    this.visibleSolverNodes.push(element);
+            if (!node.hasChildren() || node.isMinimized) { //at a "leaf" workNode
+                if (!node.isParam() && !node.varIsHidden) {
+                    this.visibleSolverNodes.push(node);
                 }
-                earliestMinimizedParent = element;
+                earliestMinimizedParent = node;
             }
         }
 
-        let node = (earliestMinimizedParent) ? earliestMinimizedParent : element;
-        element.rootIndex0 = element.hasOwnProperty('rootIndex') ? element.rootIndex : leafCounter;
-        ['x', 'y', 'width', 'height'].forEach(function (val) {
-            val += 'Solver';
-            element[val + '0'] = element.hasOwnProperty(val) ? element[val] : 1e-6;
-        })
-        element.xSolver = this.solverCols[node.depth].location / this.size.solverTree.width;
-        element.ySolver = leafCounter / this.model.root.numLeaves;
-        element.widthSolver = (element.subsystem_children && !element.isMinimized) ?
-            (this.solverCols[node.depth].width / this.size.solverTree.width) :
-            1 - node.xSolver; //1-d.x;
+        let workNode = (earliestMinimizedParent) ? earliestMinimizedParent : node;
+        node.preserveDims(true, leafCounter);
 
-        element.heightSolver = node.numLeaves / this.model.root.numLeaves;
+        node.solverDims.x = this.solverCols[workNode.depth].location / this.size.solverTree.width;
+        node.solverDims.y = leafCounter / this.model.root.numLeaves;
+        node.solverDims.width = (node.subsystem_children && !node.isMinimized) ?
+            (this.solverCols[workNode.depth].width / this.size.solverTree.width) :
+            1 - workNode.solverDims.x;
 
-        if (element.varIsHidden) { //param or hidden leaf leaving
-            element.xSolver = this.cols[element.parentComponent.depth + 1].location / this.size.partitionTree.width;
-            element.ySolver = element.parentComponent.y;
-            element.widthSolver = 1e-6;
-            element.heightSolver = 1e-6;
+        node.solverDims.height = workNode.numLeaves / this.model.root.numLeaves;
+
+        if (node.varIsHidden) { //param or hidden leaf leaving
+            node.solverDims.x = this.cols[node.parentComponent.depth + 1].location /
+                this.size.partitionTree.width;
+            node.solverDims.y = node.parentComponent.dims.y;
+            node.solverDims.width = node.solverDims.height = 1e-6;
         }
 
-        if (element.hasChildren()) {
-            for (let child of element.children) {
+        if (node.hasChildren()) {
+            for (let child of node.children) {
                 this.computeSolverNormalizedPositions(child,
                     leafCounter, isChildOfZoomed, earliestMinimizedParent);
                 if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
@@ -487,4 +480,35 @@ class N2Layout {
         delete this.autoCompleteSetNames;
         delete this.autoCompleteSetPathNames;
     }
+
+    newSvgDivDimAttribs() {
+        let width = (this.size.partitionTree.width +
+            this.size.partitionTreeGap +
+            this.size.diagram.width +
+            this.size.solverTree.width +
+            this.size.svgMargin * 2 +
+            this.size.partitionTreeGap) +
+            this.size.unit;
+
+        let height = (this.size.partitionTree.height +
+            this.size.svgMargin * 2) +
+            this.size.unit;
+
+        return ({ 'width': width, 'height': height });
+    }
+
+    newSvgElemDimAttribs() {
+        let width = this.size.partitionTree.width +
+            this.size.partitionTreeGap +
+            this.size.diagram.width +
+            this.size.solverTree.width +
+            this.size.svgMargin * 2 +
+            this.size.partitionTreeGap;
+
+        let height = this.size.partitionTree.height +
+            this.size.svgMargin * 2;
+
+        return ({ 'width': width, 'height': height });
+    }
+
 }

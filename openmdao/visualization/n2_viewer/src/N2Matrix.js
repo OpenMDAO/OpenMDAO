@@ -1,9 +1,15 @@
 /**
- * Use the model tree to build a matrix, display, and perform operations with it.
+ * Use the model tree to build the matrix of parameters and connections, display, and
+ * perform operations with it.
  * @typedef N2Matrix
  * @property {N2TreeNodes[]} nodes Reference to nodes that will be drawn.
+ * @property {ModelData} model Reference to the pre-processed model.
+ * @property {N2Layout} layout Reference to object managing columns widths and such.
+ * @property {Object} n2Groups References to <g> SVG elements created by N2Diagram.
  * @property {number} levelOfDetailThreshold Don't draw elements below this size in pixels.
  * @property {Object} n2Groups References to <g> SVG elements managed by N2Diagram.
+ * @property {Object} nodeSize Width and height of each node in the matrix.
+ * @property {Object} previousNodeSize Width and height of each node in the previous matrix.
  */
 class N2Matrix {
     /**
@@ -16,7 +22,8 @@ class N2Matrix {
      *  width & height for transition purposes.
      */
     constructor(visibleNodes, model, layout, n2Groups,
-        prevNodeSize = {'width': 0, 'height': 0}) {
+        prevNodeSize = { 'width': 0, 'height': 0 }) {
+
         this.nodes = visibleNodes;
         this.layout = layout;
         this.n2Groups = n2Groups;
@@ -28,8 +35,8 @@ class N2Matrix {
         }
 
         this.updateLevelOfDetailThreshold(layout.size.diagram.height);
-        this.buildStructure(model);
-        this.setupSymbolArrays();
+        this._buildGrid(model);
+        this._setupSymbolArrays();
         this.drawingPrep();
     }
 
@@ -41,7 +48,7 @@ class N2Matrix {
      *  in the row; true otherwise.
      */
     exists(row, col) {
-        if (this.matrix[row] && this.matrix[row][col]) { return true; }
+        if (this.grid[row] && this.grid[row][col]) { return true; }
         return false;
     }
 
@@ -54,7 +61,7 @@ class N2Matrix {
      */
     node(row, col, doThrow = false) {
         if (this.exists(row, col)) {
-            return this.matrix[row][col];
+            return this.grid[row][col];
         }
         else if (doThrow) {
             throw "No node in matrix at (" + row + ", " + col + ").";
@@ -72,12 +79,12 @@ class N2Matrix {
     }
 
     /**
-     * Set up nested objects resembling a two-dimensional array as the
+     * Set up N2MatrixNode arrays resembling a two-dimensional grid as the
      * matrix, but not an actual two dimensional array because most of
      * it would be unused.
      */
-    buildStructure(model) {
-        this.matrix = {};
+    _buildGrid(model) {
+        this.grid = {};
 
         if (this.nodes.length >= this.levelOfDetailThreshold) return;
 
@@ -85,17 +92,17 @@ class N2Matrix {
             let srcObj = this.nodes[srcIdx];
 
             // New row
-            if (!this.exists(srcIdx)) this.matrix[srcIdx] = {};
+            if (!this.exists(srcIdx)) this.grid[srcIdx] = {};
 
             // On the diagonal
-            this.matrix[srcIdx][srcIdx] = new N2MatrixNode(srcIdx, srcIdx, srcObj, srcObj, model);
+            this.grid[srcIdx][srcIdx] = new N2MatrixNode(srcIdx, srcIdx, srcObj, srcObj, model);
 
             let targets = srcObj.targetsParamView;
 
             for (let tgtObj of targets) {
                 let tgtIdx = indexFor(this.nodes, tgtObj);
                 if (tgtIdx != -1) {
-                    this.matrix[srcIdx][tgtIdx] = new N2MatrixNode(srcIdx, tgtIdx, srcObj, tgtObj, model);
+                    this.grid[srcIdx][tgtIdx] = new N2MatrixNode(srcIdx, tgtIdx, srcObj, tgtObj, model);
                 }
             }
 
@@ -105,9 +112,9 @@ class N2Matrix {
                     let tgtObj = this.nodes[j];
                     if (srcObj.parentComponent !== tgtObj.parentComponent) break;
 
-                    if (tgtObj.type == "unknown") {
+                    if (tgtObj.isUnknown()) {
                         let tgtIdx = j;
-                        this.matrix[srcIdx][tgtIdx] = new N2MatrixNode(srcIdx, tgtIdx, srcObj, tgtObj, model);
+                        this.grid[srcIdx][tgtIdx] = new N2MatrixNode(srcIdx, tgtIdx, srcObj, tgtObj, model);
                     }
                 }
             }
@@ -118,7 +125,7 @@ class N2Matrix {
      * location in the matrix, type, source, target, and/or other conditions.
      * Add the node to the appropriate array for drawing later.
      */
-    setupSymbolArrays() {
+    _setupSymbolArrays() {
         this.symbols = {
             'scalar': [],
             'vector': [],
@@ -140,10 +147,10 @@ class N2Matrix {
             }
         };
 
-        for (let row in this.matrix) {
-            for (let col in this.matrix[row]) {
-                let node = this.matrix[row][col];
-     
+        for (let row in this.grid) {
+            for (let col in this.grid[row]) {
+                let node = this.grid[row][col];
+
                 this.symbols[node.symbolType.name].push(node);
                 if (node.symbolType.declaredPartial)
                     this.symbols.declaredPartials[node.symbolType.name].push(node);
@@ -151,6 +158,9 @@ class N2Matrix {
         }
     }
 
+    /**
+     * Determine the size of the boxes that will border the parameters of each component.
+     */
     drawingPrep() {
         let currentBox = { "startI": 0, "stopI": 0 };
 
@@ -202,6 +212,8 @@ class N2Matrix {
         console.log("gridLines:", gridLines);
         */
     }
+
+
 
     draw() {
         let u0 = this.previousNodeSize.width * .5,
@@ -262,6 +274,7 @@ class N2Matrix {
                 .data(datas[i], function (d) {
                     return d.id;
                 });
+
             var gEnter = sel.enter().append("g")
                 .attr("class", classes[i])
                 .attr("transform", function (d) {
@@ -271,18 +284,19 @@ class N2Matrix {
                         var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
                         return "translate(" + (this.previousNodeSize.width * index0 + u0) + "," + (this.previousNodeSize.height * index0 + v0) + ")";
                     }
-                    throw("enter transform not found");
+                    throw ("enter transform not found");
                 }.bind(this));
+
             drawFunctions[i](gEnter, u0, v0, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, false)
                 .on("mouseover", (i < 3) ? mouseOverOnDiagN2 : mouseOverOffDiagN2)
                 .on("mouseleave", mouseOutN2)
                 .on("click", mouseClickN2);
 
-
             var gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
                     return "translate(" + (this.nodeSize.width * (d.col) + u) + "," + (this.nodeSize.height * (d.row) + v) + ")";
                 }.bind(this));
+
             drawFunctions[i](gUpdate, u, v, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, true);
 
 
@@ -294,7 +308,7 @@ class N2Matrix {
                         var index = roc.rootIndex - zoomedElement.rootIndex;
                         return "translate(" + (this.nodeSize.width * index + u) + "," + (this.nodeSize.height * index + v) + ")";
                     }
-                    throw("exit transform not found");
+                    throw ("exit transform not found");
                 }.bind(this))
                 .remove();
             drawFunctions[i](nodeExit, u, v, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, true);
@@ -315,7 +329,7 @@ class N2Matrix {
                         var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
                         return "translate(0," + (this.previousNodeSize.height * index0) + ")";
                     }
-                    throw("enter transform not found");
+                    throw ("enter transform not found");
                 }.bind(this));
             gEnter.append("line")
                 .attr("x2", this.layout.size.diagram.width);
@@ -335,7 +349,7 @@ class N2Matrix {
                         var index = roc.rootIndex - zoomedElement.rootIndex;
                         return "translate(0," + (this.nodeSize.height * index) + ")";
                     }
-                    throw("exit transform not found");
+                    throw ("exit transform not found");
                 }.bind(this))
                 .remove();
         }
@@ -354,7 +368,7 @@ class N2Matrix {
                         var i0 = roc.rootIndex0 - zoomedElement.rootIndex0;
                         return "translate(" + (this.previousNodeSize.width * i0) + ")rotate(-90)";
                     }
-                    throw("enter transform not found");
+                    throw ("enter transform not found");
                 }.bind(this));
             gEnter.append("line")
                 .attr("x1", -this.layout.size.diagram.height);
@@ -374,7 +388,7 @@ class N2Matrix {
                         var i = roc.rootIndex - zoomedElement.rootIndex;
                         return "translate(" + (this.nodeSize.width * i) + ")rotate(-90)";
                     }
-                    throw("exit transform not found");
+                    throw ("exit transform not found");
                 }.bind(this))
                 .remove();
         }
@@ -393,7 +407,7 @@ class N2Matrix {
                         var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
                         return "translate(" + (this.previousNodeSize.width * index0) + "," + (this.previousNodeSize.height * index0) + ")";
                     }
-                    throw("enter transform not found");
+                    throw ("enter transform not found");
                 }.bind(this));
 
             gEnter.append("rect")
@@ -428,7 +442,7 @@ class N2Matrix {
                         var index = roc.rootIndex - zoomedElement.rootIndex;
                         return "translate(" + (this.nodeSize.width * index) + "," + (this.nodeSize.height * index) + ")";
                     }
-                    throw("exit transform not found");
+                    throw ("exit transform not found");
                 }.bind(this))
                 .remove();
 

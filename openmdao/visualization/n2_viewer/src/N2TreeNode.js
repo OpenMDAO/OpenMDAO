@@ -17,7 +17,30 @@ class N2TreeNode {
         this.targetsParamView = new Set();
         this.targetsHideParams = new Set();
 
-        this.changeBlankSolverNamesToNone();
+        // Solver names may be empty, so set them to "None" instead.
+        if (this.linear_solver == "") this.linear_solver = "None";
+        if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
+
+        this.rootIndex = -1;
+        this.dims = { 'x': 0, 'y': 0, 'width': 1, 'height': 1 };
+        this.prevDims = { 'x': 1e-6, 'y': 1e-6, 'width': 1e-6, 'height': 1e-6 };
+        this.solverDims = { 'x': 0, 'y': 0, 'width': 1, 'height': 1 };
+        this.prevSolverDims = { 'x': 1e-6, 'y': 1e-6, 'width': 1e-6, 'height': 1e-6 };
+    }
+
+    /**
+     * Create a backup of our position and other info.
+     * @param {boolean} solver Whether to use .dims or .solverDims.
+     * @param {number} leafNum Identify this as the nth leaf of the tree
+     */
+    preserveDims(solver, leafNum) {
+        let dimProp = solver ? 'dims' : 'solverDims';
+        let prevDimProp = solver ? 'prevDims' : 'prevSolverDims';
+
+        Object.assign(this[prevDimProp], this[dimProp]);
+
+        if (this.rootIndex < 0) this.rootIndex = leafNum;
+        this.prevRootIndex = this.rootIndex;
     }
 
     /** 
@@ -30,17 +53,14 @@ class N2TreeNode {
         return (Array.isPopulatedArray(this[childrenPropName]));
     }
 
-    /**
-     * Solver names may be empty, so set them to "None" instead.
-     */
-    changeBlankSolverNamesToNone() {
-        if (this.linear_solver == "") this.linear_solver = "None";
-        if (this.nonlinear_solver == "") this.nonlinear_solver = "None";
-    }
-
     /** True if this.type is 'param' or 'unconnected_param'. */
     isParam() {
         return this.type.match(paramRegex);
+    }
+
+    /** True if this.type is 'unknown'. */
+    isUnknown() {
+        return (this.type == 'unknown');
     }
 
     /** True if this.type is 'param', 'unconnected_param', or 'unknown'. */
