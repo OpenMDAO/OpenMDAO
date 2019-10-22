@@ -4,6 +4,7 @@ import os
 import sys
 import shutil
 import tempfile
+import itertools
 
 import unittest
 import numpy as np
@@ -28,6 +29,11 @@ from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
 
 import openmdao.test_suite
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -673,7 +679,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
             sys.stdout = save_out
 
         self.assertTrue('Jacobian shape: (50, 50)  (100.00% nonzero)' in summary)
-        self.assertTrue('FWD solves: 0   REV solves: 50' in summary)
+        self.assertTrue('FWD solves: 50   REV solves: 0' in summary)
         self.assertTrue('Total colors vs. total size: 50 vs 50  (0.0% improvement)' in summary)
         self.assertFalse('Time to compute sparsity:' in summary)
         self.assertTrue('Time to compute coloring:' in summary)
@@ -687,7 +693,7 @@ class SimulColoringRevScipyTestCase(unittest.TestCase):
         dense_J = np.ones((50, 50), dtype=bool)
         coloring = _compute_coloring(dense_J, 'auto')
         rep = repr(coloring)
-        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: rev, ncolors: 50, shape: (50, 50)')
+        self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 50, shape: (50, 50)')
 
     def test_bad_mode(self):
         p_color_rev = run_opt(om.ScipyOptimizeDriver, 'rev', optimizer='SLSQP', disp=False, dynamic_total_coloring=True)
@@ -798,6 +804,17 @@ class SparsityTestCase(unittest.TestCase):
         assert_almost_equal(p_sparsity['circle.area'], np.pi, decimal=7)
 
 
+def _test_func_name(func, num, param):
+    args = []
+    for p in param.args:
+        try:
+            arg = p.__name__
+        except:
+            arg = str(p)
+        args.append(arg)
+    return func.__name__ + '_'.join(args)
+
+
 class BidirectionalTestCase(unittest.TestCase):
     def test_eisenstat(self):
         for n in range(6, 20, 2):
@@ -821,46 +838,41 @@ class BidirectionalTestCase(unittest.TestCase):
                              "%d" % (n, tot_colors, n))
 
     def test_arrowhead(self):
-        for n in [55, 50, 5]:
+        for n in [5, 50, 55]:
             builder = TotJacBuilder(n, n)
-            builder.add_row(0)
-            builder.add_col(0)
-            builder.add_block_diag([(1,1)] * (n-1), 1, 1)
+            builder.add_row(n-1)
+            builder.add_col(n-1)
+            builder.add_block_diag([(1,1)] * (n-1), 0, 0)
             builder.color('auto')
             tot_size, tot_colors, fwd_solves, rev_solves, pct = builder.coloring._solves_info()
             self.assertEqual(tot_colors, 3)
 
-    @unittest.skipIf(LooseVersion(scipy.__version__) < LooseVersion("0.19.1"), "scipy version too old")
-    def test_can_715(self):
-        # this test is just to show the superiority of bicoloring vs. single coloring in
-        # either direction.  Bicoloring gives only 21 colors in this case vs. 105 for either
-        # fwd or rev.
+    @parameterized.expand(itertools.product(
+        [('n4c6-b15', 3), ('can_715', 21), ('lp_finnis', 14), ('ash608', 6), ('ash331', 6),
+         ('D_6', 28), ('Harvard500', 26), ('illc1033', 5)],
+        ), name_func=_test_func_name
+    )
+    @unittest.skipIf(load_npz is None, "scipy version too old")
+    def test_bidir_coloring(self, tup):
+        matname, expected_colors = tup
         matdir = os.path.join(os.path.dirname(openmdao.test_suite.__file__), 'matrices')
 
-        # uses matrix can_715 from the sparse matrix collection website
-        mat = load_npz(os.path.join(matdir, 'can_715.npz')).toarray()
+        # uses matrices from the sparse matrix collection website (sparse.tamu.edu)
+        matfile = os.path.join(matdir, matname + '.npz')
+        if not os.path.exists(matfile):
+            raise unittest.SkipTest("Matrix test file were not included.")
+
+        mat = load_npz(matfile).toarray()
         mat = np.asarray(mat, dtype=bool)
         coloring = _compute_coloring(mat, 'auto')
+        mat = None
 
         tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
 
-        self.assertEqual(tot_colors, 21)
-
-        # verify that unidirectional colorings are much worse (105 vs 21 for bidirectional)
-        coloring = _compute_coloring(mat, 'fwd')
-
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
-
-        self.assertEqual(tot_colors, 105)
-
-        coloring = _compute_coloring(mat, 'rev')
-
-        tot_size, tot_colors, fwd_solves, rev_solves, pct = coloring._solves_info()
-
-        self.assertEqual(tot_colors, 105)
+        self.assertEqual(tot_colors, expected_colors)
 
 
-def _get_mat(rows, cols):
+def _get_random_mat(rows, cols):
     if MPI:
         if MPI.COMM_WORLD.rank == 0:
             mat = np.random.random(rows * cols).reshape((rows, cols)) - 0.5
@@ -900,13 +912,13 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         par1 = model.add_subsystem('par1', om.ParallelGroup())
         for i in range(num_pts):
-            mat = _get_mat(5, size)
+            mat = _get_random_mat(5, size)
             par1.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
             model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
 
         par2 = model.add_subsystem('par2', om.ParallelGroup())
         for i in range(num_pts):
-            mat = _get_mat(size, 5)
+            mat = _get_random_mat(size, 5)
             par2.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
             model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
             par2.add_constraint('comp%d.y' % i, lower=-1.)
@@ -1049,6 +1061,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
                               sizes=[3, 4, 5], color='partial', fixed=False)
         p.run_driver()
 
+        print('++++++++++++')
         p = self._build_model(ofnames=['w', 'x', 'y', 'z'], wrtnames=['a', 'b', 'c', 'd'],
                                 sizes=[3, 4, 5, 6], color='partial', fixed=True)
 
@@ -1056,7 +1069,7 @@ class SimulColoringConfigCheckTestCase(unittest.TestCase):
             p.run_driver()
 
         self.assertEqual(str(ctx.exception), "DumbComp (comp): Current coloring configuration does not match the configuration of the current model.\n   The following row vars were added: ['z'].\n   The following column vars were added: ['z_in'].\nMake sure you don't have different problems that have the same coloring directory. Set the coloring directory by setting the value of problem.options['coloring_dir'].")
-                         
+
     def test_removed_name_total(self):
         p = self._build_model(ofnames=['w', 'x', 'y'], wrtnames=['a', 'b', 'c'],
                               sizes=[3, 4, 5], color='total', fixed=False)

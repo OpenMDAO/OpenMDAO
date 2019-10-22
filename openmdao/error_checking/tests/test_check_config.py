@@ -323,6 +323,32 @@ class TestCheckConfig(unittest.TestCase):
 
         self.assertTrue(testlogger.contains('warning', expected))
 
+    def test_initial_condition_order(self):
+        # Makes sure we set vars to their initial condition before running checks.
+
+        class TestComp(ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 37.0)
+                self.add_output('y', 45.0)
+
+            def check_config(self, logger):
+                x = self._vectors['input']['nonlinear']['x']
+                if x != 75.0:
+                    raise ValueError('Check config is being called before initial conditions are set.')
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                outputs['y'] = inputs['x']
+
+        prob = Problem()
+        prob.model.add_subsystem('comp', TestComp())
+
+        prob.setup(check='all')
+
+        prob['comp.x'] = 75.0
+
+        prob.final_setup()
+
 
 class TestRecorderCheckConfig(unittest.TestCase):
 

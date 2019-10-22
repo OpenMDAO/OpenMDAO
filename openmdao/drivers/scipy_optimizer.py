@@ -17,7 +17,7 @@ from six.moves import range
 import openmdao
 import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.general_utils import warn_deprecation, simple_warning
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -416,14 +416,23 @@ class ScipyOptimizeDriver(Driver):
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_total_sparsity:
-            if self._coloring_info['coloring'] is coloring_mod._DYN_COLORING:
+            if ((self._coloring_info['coloring'] is None and self._coloring_info['dynamic']) or
+                    self.options['dynamic_simul_derivs']):
+                if self.options['dynamic_simul_derivs']:
+                    warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
+                                     "the 'declare_coloring' function instead.")
                 coloring_mod.dynamic_total_coloring(self, run_model=False,
                                                     fname=self._get_total_coloring_fname())
-            elif self.options['dynamic_simul_derivs']:
-                warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
-                                 "the 'declare_coloring' function instead.")
-                coloring_mod.dynamic_total_coloring(self, run_model=False,
-                                                    fname=self._get_total_coloring_fname())
+
+                # if the improvement wasn't large enough, turn coloring off
+                info = self._coloring_info
+                if info['coloring'] is not None:
+                    pct = info['coloring']._solves_info()[-1]
+                    if info['min_improve_pct'] > pct:
+                        info['coloring'] = info['static'] = info['dynamic'] = None
+                        simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was "
+                                       "less than min allowed (%.1f%%)." %
+                                       (self.msginfo, pct, info['min_improve_pct']))
 
         # optimize
         try:

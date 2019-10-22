@@ -856,8 +856,9 @@ class TestGroupCSMPI(unittest.TestCase):
             raise unittest.SkipTest("PETSc is not installed")
 
         prob = om.Problem()
+
         model = prob.model
-        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
+        sub = model.add_subsystem('sub', om.ParallelGroup(), promotes=['*'])
 
         model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
@@ -872,8 +873,9 @@ class TestGroupCSMPI(unittest.TestCase):
         model.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'), promotes=['con1', 'y1'])
         model.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'), promotes=['con2', 'y2'])
 
+
         sub.nonlinear_solver = om.NewtonSolver()
-        sub.linear_solver = om.DirectSolver(assemble_jac=False)
+        sub.linear_solver = om.DirectSolver()
         sub.nonlinear_solver.options['atol'] = 1e-10
         sub.nonlinear_solver.options['rtol'] = 1e-10
 
@@ -883,8 +885,8 @@ class TestGroupCSMPI(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        assert_rel_error(self, prob['y1'], 25.58830273, .00001)
-        assert_rel_error(self, prob['y2'], 12.05848819, .00001)
+        assert_rel_error(self, prob.get_val('y1', get_remote=True), 25.58830273, .00001)
+        assert_rel_error(self, prob.get_val('y2', get_remote=True), 12.05848819, .00001)
 
         wrt = ['z', 'x']
         of = ['obj', 'con1', 'con2']

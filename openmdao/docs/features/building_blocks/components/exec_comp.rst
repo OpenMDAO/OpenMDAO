@@ -56,7 +56,7 @@ lower             Lower bound of variable                                float, 
 upper             Lower bound of variable                                float, list, tuple, ndarray, Iterable, None                   output          None
 src_indices       Global indices of the variable                         int, list of ints, tuple of ints, int ndarray, Iterable, None input           None
 flat_src_indices  If True, src_indices are indices into flattened source bool                                                          input           None
-tags              Used to tag variables for later filtering              str, list of strs                                             input & ouput   None
+tags              Used to tag variables for later filtering              str, list of strs                                             input & output  None
 ================  ====================================================== ============================================================= ==============  ========
 
 These metadata are passed to the :code:`Component` methods :code:`add_input` and :code:`add_output`.

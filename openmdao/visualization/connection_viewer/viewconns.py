@@ -18,8 +18,18 @@ from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import printoptions
 
 
+def _val2str(val):
+    if isinstance(val, np.ndarray):
+        if val.size > 5:
+            return 'array %s' % str(val.shape)
+        else:
+            return np.array2string(val)
+
+    return str(val)
+
+
 def view_connections(root, outfile='connections.html', show_browser=True,
-                     src_filter='', tgt_filter='', precision=6):
+                     precision=6, title=None):
     """
     Generate a self-contained html file containing a detailed connection viewer.
 
@@ -37,14 +47,11 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         If True, pop up a browser to view the generated html file.
         Defaults to True.
 
-    src_filter : str, optional
-        If defined, use this as the initial value for the source system filter.
-
-    tgt_filter : str, optional
-        If defined, use this as the initial value for the target system filter.
-
     precision : int, optional
         Sets the precision for displaying array values.
+
+    title : str, optional
+        Sets the title of the web page.
     """
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
@@ -63,8 +70,13 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     }
 
     src2tgts = defaultdict(list)
-    units = {n: data.get('units', '')
-             for n, data in iteritems(system._var_allprocs_abs2meta)}
+    units = {}
+    for n, data in iteritems(system._var_allprocs_abs2meta):
+        u = data.get('units', '')
+        if u is None:
+            u = ''
+        units[n] = u
+
     vals = {}
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
@@ -79,26 +91,17 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
                 # if there's a unit conversion, express the value in the
                 # units of the target
-                if units[t] and val != "<on remote_proc>":
+                if units[t] and s in system._outputs:
                     val = convert_units(val, units[s], units[t])
 
                 src2tgts[s].append(t)
             else:  # unconnected param
-                val = _get_input(system, t, None)
-
-            if isinstance(val, np.ndarray):
-                val = np.array2string(val)
-            else:
-                val = str(val)
+                val = _get_input(system, t)
 
             vals[t] = val
 
-        noconn_srcs = sorted((n for n in system._var_abs_names['output']
-                              if n not in src2tgts), reverse=True)
-        for s in noconn_srcs:
-            vals[s] = str(system._outputs[s])
-
-    vals['NO CONNECTION'] = ''
+    NOCONN = '[NO CONNECTION]'
+    vals[NOCONN] = ''
 
     src_systems = set()
     tgt_systems = set()
@@ -112,53 +115,88 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         for i in range(len(parts)):
             tgt_systems.add('.'.join(parts[:i]))
 
-    # reverse sort so that "NO CONNECTION" shows up at the bottom
-    src2tgts['NO CONNECTION'] = sorted([t for t in system._var_abs_names['input']
-                                       if t not in connections], reverse=True)
-
     src_systems = [{'name': n} for n in sorted(src_systems)]
-    src_systems.insert(1, {'name': "NO CONNECTION"})
+    src_systems.insert(1, {'name': NOCONN})
     tgt_systems = [{'name': n} for n in sorted(tgt_systems)]
-    tgt_systems.insert(1, {'name': "NO CONNECTION"})
+    tgt_systems.insert(1, {'name': NOCONN})
+
+    tprom = system._var_allprocs_abs2prom['input']
+    sprom = system._var_allprocs_abs2prom['output']
+
+    table = []
+    idx = 1  # unique ID for use by Tabulator
+    for tgt, src in iteritems(connections):
+        usrc = units[src]
+        utgt = units[tgt]
+        if usrc != utgt:
+            # prepend these with '!' so they'll be colored red
+            if usrc:
+                usrc = '!' + units[src]
+            if utgt:
+                utgt = '!' + units[tgt]
+
+        row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': usrc,
+               'val': _val2str(vals[tgt]), 'tunits': utgt,
+               'tprom': tprom[tgt], 'tgt': tgt}
+        table.append(row)
+        idx += 1
+
+    for t in system._var_abs_names['input']:
+        if t not in connections:
+            row = {'id': idx, 'src': NOCONN, 'sprom': NOCONN, 'sunits': '',
+                   'val': _val2str(vals[t]), 'tunits': units[t], 'tprom': tprom[t], 'tgt': t}
+            table.append(row)
+            idx += 1
+
+    for src in system._var_abs_names['output']:
+        if src not in src2tgts:
+            row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': units[src],
+                   'val': _val2str(system._outputs[src]),
+                   'tunits': '', 'tprom': NOCONN, 'tgt': NOCONN}
+            table.append(row)
+            idx += 1
+
+    if title is None:
+        title = ''
 
     data = {
-        'src2tgts': sorted(iteritems(src2tgts)),
-        'proms': None,
-        'units': units,
-        'vals': vals,
-        'src_systems': src_systems,
-        'tgt_systems': tgt_systems,
-        'noconn_srcs': noconn_srcs,
-        'src_filter': src_filter,
-        'tgt_filter': tgt_filter,
+        'title': title,
+        'table': table,
     }
 
     viewer = 'connect_table.html'
 
     code_dir = os.path.dirname(os.path.abspath(__file__))
+    libs_dir = os.path.join(code_dir, 'libs')
+    style_dir = os.path.join(code_dir, 'style')
 
     with open(os.path.join(code_dir, viewer), "r") as f:
         template = f.read()
 
-    graphjson = json.dumps(data)
+    with open(os.path.join(libs_dir, 'tabulator.min.js'), "r") as f:
+        tabulator_src = f.read()
+
+    with open(os.path.join(style_dir, 'tabulator.min.css'), "r") as f:
+        tabulator_style = f.read()
+
+    jsontxt = json.dumps(data)
 
     with open(outfile, 'w') as f:
-        s = template.replace("<connection_data>", graphjson)
+        s = template.replace("<connection_data>", jsontxt)
+        s = s.replace("<tabulator_src>", tabulator_src)
+        s = s.replace("<tabulator_style>", tabulator_style)
         f.write(s)
 
     if show_browser:
         webview(outfile)
 
 
-def _get_input(system, name, idxs=None):
+def _get_input(system, name):
     """
     Return the named value if it's local to the process, else "<on remote proc>".
     """
     if name in system._inputs:
-        val = system._inputs[name]
-        if idxs is not None and isinstance(val, np.ndarray):
-            val = val.flatten()[idxs]
-        return val
+        return system._inputs[name]
     return "<on remote proc>"
 
 

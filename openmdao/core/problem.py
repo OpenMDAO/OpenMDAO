@@ -662,6 +662,62 @@ class Problem(object):
         self.model._clear_iprint()
         return self.driver.run()
 
+    def compute_jacvec_product(self, of, wrt, mode, seed):
+        """
+        Given a seed and 'of' and 'wrt' variables, compute the total jacobian vector product.
+
+        Parameters
+        ----------
+        of : list of str
+            Variables whose derivatives will be computed.
+        wrt : list of str
+            Derivatives will be computed with respect to these variables.
+        mode : str
+            Derivative direction ('fwd' or 'rev').
+        seed : dict or list
+            Either a dict keyed by 'wrt' varnames (fwd) or 'of' varnames (rev), containing
+            dresidual (fwd) or doutput (rev) values, OR a list of dresidual or doutput
+            values that matches the corresponding 'wrt' (fwd) or 'of' (rev) varname list.
+
+        Returns
+        -------
+        dict
+            The total jacobian vector product, keyed by variable name.
+        """
+        if mode == 'fwd':
+            if len(wrt) != len(seed):
+                raise RuntimeError("seed and 'wrt' list must be the same length in fwd mode.")
+            lnames, rnames = of, wrt
+            lkind, rkind = 'output', 'residual'
+        else:  # rev
+            if len(of) != len(seed):
+                raise RuntimeError("seed and 'of' list must be the same length in rev mode.")
+            lnames, rnames = wrt, of
+            lkind, rkind = 'residual', 'output'
+
+        rvec = self.model._vectors[rkind]['linear']
+        lvec = self.model._vectors[lkind]['linear']
+
+        rvec._data[:] = 0.
+
+        # set seed values into dresids (fwd) or doutputs (rev)
+        try:
+            seed[rnames[0]]
+        except (IndexError, TypeError):
+            for i, name in enumerate(rnames):
+                rvec[name] = seed[i]
+        else:
+            for name in rnames:
+                rvec[name] = seed[name]
+
+        # We apply a -1 here because the derivative of the output is minus the derivative of
+        # the residual in openmdao.
+        rvec._data *= -1.
+
+        self.model.run_solve_linear(['linear'], mode)
+
+        return {n: lvec[n].copy() for n in lnames}
+
     def run_once(self):
         """
         Backward compatible call for run_model.
@@ -921,11 +977,12 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        coloring = driver._coloring_info['coloring']
-        if coloring is coloring_mod._STD_COLORING_FNAME:
+        info = driver._coloring_info
+        coloring = info['coloring']
+        if coloring is None and info['static'] is not None:
             coloring = driver._get_static_coloring()
-        if (coloring and coloring is not coloring_mod._DYN_COLORING and
-                coloring_mod._use_total_sparsity):
+
+        if coloring and coloring_mod._use_total_sparsity:
             # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
             if coloring._fwd and coloring._rev:
@@ -953,6 +1010,10 @@ class Problem(object):
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
         self._solver_print_cache = []
 
+        if self._setup_status < 2:
+            self._setup_status = 2
+            self._set_initial_conditions()
+
         if self._check:
             if self._check is True:
                 checks = _default_checks
@@ -963,10 +1024,6 @@ class Problem(object):
             else:
                 logger = TestLogger()
             self.check_config(logger, checks=checks)
-
-        if self._setup_status < 2:
-            self._setup_status = 2
-            self._set_initial_conditions()
 
         # check for post-setup hook
         if Problem._post_setup_func is not None:
@@ -1468,7 +1525,7 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Format to return the derivatives. Can be 'dict', 'flat_dict', or 'array'.
             Default is a 'flat_dict', which returns them in a dictionary whose keys are
             tuples of form (of, wrt).
         debug_print : bool
@@ -2161,3 +2218,29 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
+
+
+class Slicer(object):
+    """
+    Helper class that can be used with the indices argument for Problem set_val and get_val.
+    """
+
+    def __getitem__(self, val):
+        """
+        Pass through indices or slice.
+
+        Parameters
+        ----------
+        val : int or slice object or tuples of slice objects
+            Indices or slice to return.
+
+        Returns
+        -------
+        indices : int or slice object or tuples of slice objects
+            Indices or slice to return.
+        """
+        return val
+
+
+# instance of the Slicer class to be used by users for the set_val and get_val methods of Problem
+slicer = Slicer()

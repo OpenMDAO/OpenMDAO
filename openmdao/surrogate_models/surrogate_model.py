@@ -14,6 +14,8 @@ class SurrogateModel(object):
         Dictionary with general pyoptsparse options.
     trained : bool
         True when surrogate has been trained.
+    _parent_name : str or None
+        Absolute pathname of metamodel component that owns this surrogate.
     """
 
     def __init__(self, **kwargs):
@@ -30,6 +32,7 @@ class SurrogateModel(object):
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self._declare_options()
         self.options.update(kwargs)
+        self._parent_name = None
 
     def train(self, x, y):
         """
@@ -85,6 +88,34 @@ class SurrogateModel(object):
         Declare options before kwargs are processed in the init method.
         """
         pass
+
+    def _setup_var_data(self, parent_name=None):
+        """
+        Set up surrogate to create valid informative error messages.
+
+        Parameters
+        ----------
+        parent_name : str
+            Absolute pathname of metamodel component that owns this surrogate.
+        """
+        self._parent_name = parent_name
+
+    def _raise(self, msg, exc_type=RuntimeError):
+        """
+        Raise the given exception type, with parent's name prepended to the message.
+
+        Parameters
+        ----------
+        msg : str
+            The error message.
+        exc_type : class
+            The type of the exception to be raised.
+        """
+        if self._parent_name is None:
+            full_msg = msg
+        else:
+            full_msg = '{}: {}'.format(self._parent_name, msg)
+        raise exc_type(full_msg)
 
 
 class MultiFiSurrogateModel(SurrogateModel):

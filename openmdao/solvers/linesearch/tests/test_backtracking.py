@@ -13,6 +13,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch \
     import ImplCompTwoStates, ImplCompTwoStatesArrays
+from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2withDerivatives
 from openmdao.utils.assert_utils import assert_rel_error
 
 
@@ -285,7 +286,7 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         ls.options['maxiter'] = 5
         ls.options['alpha'] = 10.0
         ls.options['retry_on_analysis_error'] = True
-        ls.options['c'] = 10000.0
+        ls.options['c'] = 1.0
 
         top.setup()
         top.set_solver_print(level=2)
@@ -334,7 +335,7 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         ls.options['maxiter'] = 5
         ls.options['alpha'] = 10.0
         ls.options['retry_on_analysis_error'] = True
-        ls.options['c'] = 10000.0
+        ls.options['c'] = 1.0
 
         top.setup()
         top.set_solver_print(level=2)
@@ -543,6 +544,46 @@ class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
                                                  "has not been declared.\"")
 
 
+class SellarDis1withDerivativesMod(SellarDis1):
+    # Version of Sellar discipline 1 with a slightly incorrect x derivative.
+    # This will still solve, but will require some backtracking at times.
+
+    def _do_declares(self):
+        self.declare_partials(of='*', wrt='*')
+
+    def compute_partials(self, inputs, partials):
+        partials['y1', 'y2'] = -0.2
+        partials['y1', 'z'] = np.array([[2.0 * inputs['z'][0], 1.0]])
+        partials['y1', 'x'] = 1.5
+
+
+class SubSellarMod(om.Group):
+
+    def __init__(self, units=None, scaling=None, **kwargs):
+        super(SubSellarMod, self).__init__(**kwargs)
+
+        self.add_subsystem('d1', SellarDis1withDerivativesMod(units=units, scaling=scaling),
+                           promotes=['x', 'z', 'y1', 'y2'])
+        self.add_subsystem('d2', SellarDis2withDerivatives(units=units, scaling=scaling),
+                           promotes=['z', 'y1', 'y2'])
+
+
+class DoubleSellarMod(om.Group):
+
+    def __init__(self, units=None, scaling=None, **kwargs):
+        super(DoubleSellarMod, self).__init__(**kwargs)
+
+        self.add_subsystem('g1', SubSellarMod(units=units, scaling=scaling))
+        self.add_subsystem('g2', SubSellarMod(units=units, scaling=scaling))
+
+        self.connect('g1.y2', 'g2.x')
+        self.connect('g2.y2', 'g1.x')
+
+        # Converge the outer loop with Gauss Seidel, with a looser tolerance.
+        self.nonlinear_solver = om.NewtonSolver()
+        self.linear_solver = om.DirectSolver()
+
+
 class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
 
     def setUp(self):
@@ -635,8 +676,9 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
     def test_with_subsolves(self):
+
         prob = om.Problem()
-        model = prob.model = DoubleSellar()
+        model = prob.model = DoubleSellarMod()
 
         g1 = model.g1
         g1.nonlinear_solver = om.NewtonSolver()
@@ -654,9 +696,6 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         model.nonlinear_solver.options['solve_subsystems'] = True
         model.nonlinear_solver.options['max_sub_solves'] = 4
         ls = model.nonlinear_solver.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='vector')
-
-        # This is pretty bogus, but it ensures that we get a few LS iterations.
-        ls.options['c'] = 100.0  # FIXME c should be 0 <= c <= 1
 
         prob.set_solver_print(level=0)
 
