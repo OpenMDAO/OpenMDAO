@@ -21,7 +21,6 @@ class N2Layout {
     constructor(model, newZoomedElement, showLinearSolverNames) {
         this.model = model;
 
-        // TODO: Remove global zoomedElement
         this.zoomedElement = newZoomedElement;
         this.showLinearSolverNames = showLinearSolverNames;
 
@@ -441,9 +440,9 @@ class N2Layout {
             }
         };
 
-        let localPathName = (this.zoomedElement === this.modelroot) ?
+        let localPathName = (this.zoomedElement === this.model.root) ?
             element.absPathName :
-            element.absPathName.slice(zoomedElement.absPathName.length + 1);
+            element.absPathName.slice(this.zoomedElement.absPathName.length + 1);
 
         if (!this.autoCompleteSetPathNames.hasOwnProperty(localPathName)) {
             this.autoCompleteSetPathNames[localPathName] = true;

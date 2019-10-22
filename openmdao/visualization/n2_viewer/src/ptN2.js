@@ -1,41 +1,24 @@
-
-var updateFunc;
-var mouseOverOffDiagN2;
-var mouseOverOnDiagN2;
-var mouseOutN2;
-var mouseClickN2;
-var treeData, connectionList;
-
+// The modelData object is generated and populated by n2_viewer.py
 let n2Diag = new N2Diagram(modelData);
-var zoomedElement = n2Diag.zoomedElement;
 
-// TODO: Get rid of all these after refactoring ///////////////
-var model = n2Diag.model; ////
-svgDiv = n2Diag.dom.svgDiv; ////
-svg = n2Diag.dom.svg; ////
-var root = model.root;
-var showPath = n2Diag.showPath; //default off ////
-var chosenCollapseDepth = n2Diag.chosenCollapseDepth; ////
-///////////////////////////////////////////////////////////////
+// GLOBAL VARIABLES /////
+// TODO: Get rid of all these while refactoring ///////////////
+var mouseOverOffDiagN2 = MouseoverOffDiagN2;
+var mouseOverOnDiagN2 = MouseoverOnDiagN2;
+var mouseOutN2 = MouseoutN2;
+var mouseClickN2 = MouseClickN2;
 
-mouseOverOnDiagN2 = MouseoverOnDiagN2;
-mouseOverOffDiagN2 = MouseoverOffDiagN2;
-mouseClickN2 = MouseClickN2;
-mouseOutN2 = MouseoutN2;
-
-// TODO: Get rid of all these globals after refactoring ///////////////
-d3RightTextNodesArrayZoomed = n2Diag.layout.visibleNodes;
-d3SolverNodesArray = n2Diag.layout.zoomedSolverNodes;
-d3SolverRightTextNodesArrayZoomed = n2Diag.layout.visibleSolverNodes;
+var lastLeftClickedEle;
+var lastRightClickedEle;
+var lastRightClickedObj;
+var lastRightClickedElement = n2Diag.model.root;
 ///////////////////////////////////////////////////////////////
 
 CreateDomLayout();
 CreateToolbar();
 
-var lastRightClickedElement = model.root;
-
 var collapseDepthElement = parentDiv.querySelector("#idCollapseDepthDiv");
-for (var i = 2; i <= model.maxDepth; ++i) {
+for (var i = 2; i <= n2Diag.model.maxDepth; ++i) {
     var option = document.createElement("span");
     option.className = "fakeLink";
     option.id = "idCollapseDepthOption" + i + "";
@@ -49,26 +32,8 @@ for (var i = 2; i <= model.maxDepth; ++i) {
     collapseDepthElement.appendChild(option);
 }
 
-Update(false);
+n2Diag.update(false);
 SetupLegend(d3, n2Diag.dom.d3ContentDiv);
-
-function Update(computeNewTreeLayout = true) {
-    n2Diag.update(computeNewTreeLayout);
-
-    // TODO: Get rid of all these after refactoring ///////////////
-    d3RightTextNodesArrayZoomed = n2Diag.layout.visibleNodes;
-
-    d3SolverNodesArray = n2Diag.layout.zoomedSolverNodes;
-    d3SolverRightTextNodesArrayZoomed = n2Diag.layout.visibleSolverNodes;
-    ///////////////////////////////////////////////////////////////
-
-}
-
-updateFunc = Update;
-
-var lastLeftClickedEle;
-var lastRightClickedEle;
-var lastRightClickedObj;
 
 //right click => collapse
 function RightClick(d, ele) {
@@ -80,10 +45,6 @@ function RightClick(d, ele) {
     collapse();
 }
 
-var menu = document.querySelector('#context-menu');
-var menuState = 0;
-var contextMenuActive = "context-menu--active";
-
 function collapse() {
     var d = lastLeftClickedEle;
     if (!d.hasChildren()) return;
@@ -93,7 +54,7 @@ function collapse() {
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
         lastClickWasLeft = false;
         Toggle(d);
-        Update();
+        n2Diag.update();
     }
 }
 
@@ -117,7 +78,7 @@ function LeftClick(d, ele) {
     n2Diag.backButtonHistory.push({ "el": n2Diag.zoomedElement });
     n2Diag.forwardButtonHistory = [];
     SetupLeftClick(d);
-    Update();
+    n2Diag.update();
     d3.event.preventDefault();
     d3.event.stopPropagation();
 }
@@ -131,7 +92,7 @@ function BackButtonPressed() {
     }
     n2Diag.forwardButtonHistory.push({ "el": n2Diag.zoomedElement });
     SetupLeftClick(d);
-    Update();
+    n2Diag.update();
 }
 
 function ForwardButtonPressed() {
@@ -143,7 +104,7 @@ function ForwardButtonPressed() {
     }
     n2Diag.backButtonHistory.push({ "el": n2Diag.zoomedElement });
     SetupLeftClick(d);
-    Update();
+    n2Diag.update();
 }
 
 function Toggle(d) {
@@ -156,7 +117,7 @@ function FindRootOfChangeForRightClick(d) {
 
 function FindRootOfChangeForCollapseDepth(d) {
     for (var obj = d; obj != null; obj = obj.parent) { //make sure history item is not minimized
-        if (obj.depth == chosenCollapseDepth) return obj;
+        if (obj.depth == n2Diag.chosenCollapseDepth) return obj;
     }
     return d;
 }
@@ -212,9 +173,9 @@ function MouseoverOffDiagN2(d) {
     var lineWidth = Math.min(5, n2Diag.matrix.nodeSize.width * .5, n2Diag.matrix.nodeSize.height * .5);
     n2Diag.dom.arrowMarker.attr("markerWidth", lineWidth * .4)
         .attr("markerHeight", lineWidth * .4);
-    var src = d3RightTextNodesArrayZoomed[d.row];
-    var tgt = d3RightTextNodesArrayZoomed[d.col];
-    var boxEnd = d3RightTextNodesArrayZoomedBoxInfo[d.col];
+    var src = n2Diag.layout.visibleNodes[d.row];
+    var tgt = n2Diag.layout.visibleNodes[d.col];
+    var boxEnd = n2Diag.matrix.boxInfo[d.col];
 
     new N2Arrow({
         start: { col: d.row, row: d.row },
@@ -238,8 +199,8 @@ function MouseoverOffDiagN2(d) {
                         var firstBeginIndex = -1, firstEndIndex = -1;
 
                         //find first begin index
-                        for (var mi = 0; mi < d3RightTextNodesArrayZoomed.length; ++mi) {
-                            var rtNode = d3RightTextNodesArrayZoomed[mi];
+                        for (var mi = 0; mi < n2Diag.layout.visibleNodes.length; ++mi) {
+                            var rtNode = n2Diag.layout.visibleNodes[mi];
                             if (HasObject(rtNode, beginObj)) {
                                 firstBeginIndex = mi;
                                 break;
@@ -251,8 +212,8 @@ function MouseoverOffDiagN2(d) {
                         }
 
                         //find first end index
-                        for (var mi = 0; mi < d3RightTextNodesArrayZoomed.length; ++mi) {
-                            var rtNode = d3RightTextNodesArrayZoomed[mi];
+                        for (var mi = 0; mi < n2Diag.layout.visibleNodes.length; ++mi) {
+                            var rtNode = n2Diag.layout.visibleNodes[mi];
                             if (HasObject(rtNode, endObj)) {
                                 firstEndIndex = mi;
                                 break;
@@ -272,8 +233,8 @@ function MouseoverOffDiagN2(d) {
         }
     }
 
-    var leftTextWidthR = d3RightTextNodesArrayZoomed[d.row].nameWidthPx,
-        leftTextWidthC = d3RightTextNodesArrayZoomed[d.col].nameWidthPx;
+    var leftTextWidthR = n2Diag.layout.visibleNodes[d.row].nameWidthPx,
+        leftTextWidthC = n2Diag.layout.visibleNodes[d.col].nameWidthPx;
     DrawRect(-leftTextWidthR - n2Diag.layout.size.partitionTreeGap, n2Diag.matrix.nodeSize.height * d.row, leftTextWidthR, n2Diag.matrix.nodeSize.height, N2Style.color.redArrow); //highlight var name
     DrawRect(-leftTextWidthC - n2Diag.layout.size.partitionTreeGap, n2Diag.matrix.nodeSize.height * d.col, leftTextWidthC, n2Diag.matrix.nodeSize.height, N2Style.color.greenArrow); //highlight var name
 }
@@ -282,16 +243,16 @@ function MouseoverOnDiagN2(d) {
     //d=hovered element
     // console.log('MouseoverOnDiagN2:'); console.log(d);
     var hoveredIndexRC = d.col; //d.dims.x == d.dims.y == row == col
-    var leftTextWidthHovered = d3RightTextNodesArrayZoomed[hoveredIndexRC].nameWidthPx;
+    var leftTextWidthHovered = n2Diag.layout.visibleNodes[hoveredIndexRC].nameWidthPx;
 
     // Loop over all elements in the matrix looking for other cells in the same column as
     var lineWidth = Math.min(5, n2Diag.matrix.nodeSize.width * .5, n2Diag.matrix.nodeSize.height * .5);
     n2Diag.dom.arrowMarker.attr("markerWidth", lineWidth * .4)
         .attr("markerHeight", lineWidth * .4);
     DrawRect(-leftTextWidthHovered - n2Diag.layout.size.partitionTreeGap, n2Diag.matrix.nodeSize.height * hoveredIndexRC, leftTextWidthHovered, n2Diag.matrix.nodeSize.height, N2Style.color.highlightHovered); //highlight hovered
-    for (var i = 0; i < d3RightTextNodesArrayZoomed.length; ++i) {
-        var leftTextWidthDependency = d3RightTextNodesArrayZoomed[i].nameWidthPx;
-        var box = d3RightTextNodesArrayZoomedBoxInfo[i];
+    for (var i = 0; i < n2Diag.layout.visibleNodes.length; ++i) {
+        var leftTextWidthDependency = n2Diag.layout.visibleNodes[i].nameWidthPx;
+        var box = n2Diag.matrix.boxInfo[i];
         if (n2Diag.matrix.exists(hoveredIndexRC, i)) { //i is column here
             if (i != hoveredIndexRC) {
                 new N2Arrow({
@@ -304,7 +265,7 @@ function MouseoverOnDiagN2(d) {
             }
         }
 
-        if (n2Diag.matrix.node(i, hoveredIndexRC) !== undefined) { //i is row here
+        if (n2Diag.matrix.cell(i, hoveredIndexRC) !== undefined) { //i is row here
             if (i != hoveredIndexRC) {
                 new N2Arrow({
                     start: { col: i, row: i },
@@ -337,8 +298,8 @@ function MouseClickN2(d) {
 function ReturnToRootButtonClick() {
     n2Diag.backButtonHistory.push({ "el": n2Diag.zoomedElement });
     n2Diag.forwardButtonHistory = [];
-    SetupLeftClick(root);
-    Update();
+    SetupLeftClick(n2Diag.model.root);
+    n2Diag.update();
 }
 
 function UpOneLevelButtonClick() {
@@ -346,7 +307,7 @@ function UpOneLevelButtonClick() {
     n2Diag.backButtonHistory.push({ "el": n2Diag.zoomedElement });
     n2Diag.forwardButtonHistory = [];
     SetupLeftClick(n2Diag.zoomedElement.parent);
-    Update();
+    n2Diag.update();
 }
 
 function CollapseOutputsButtonClick(startNode) {
@@ -364,7 +325,7 @@ function CollapseOutputsButtonClick(startNode) {
     N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
     lastClickWasLeft = false;
     CollapseOutputs(startNode);
-    Update();
+    n2Diag.update();
 }
 
 function UncollapseButtonClick(startNode) {
@@ -382,7 +343,7 @@ function UncollapseButtonClick(startNode) {
     N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
     lastClickWasLeft = false;
     Uncollapse(startNode);
-    Update();
+    n2Diag.update();
 }
 
 function CollapseToDepthSelectChange(newChosenCollapseDepth) {
@@ -403,14 +364,14 @@ function CollapseToDepthSelectChange(newChosenCollapseDepth) {
         }
     }
 
-    chosenCollapseDepth = newChosenCollapseDepth;
-    if (chosenCollapseDepth > n2Diag.zoomedElement.depth) {
-        CollapseToDepth(root, chosenCollapseDepth);
+    n2Diag.chosenCollapseDepth = newChosenCollapseDepth;
+    if (n2Diag.chosenCollapseDepth > n2Diag.zoomedElement.depth) {
+        CollapseToDepth(n2Diag.model.root, n2Diag.chosenCollapseDepth);
     }
     FindRootOfChangeFunction = FindRootOfChangeForCollapseDepth;
     N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
     lastClickWasLeft = false;
-    Update();
+    n2Diag.update();
 }
 
 function FontSizeSelectChange(fontSize) {
@@ -421,7 +382,7 @@ function FontSizeSelectChange(fontSize) {
     n2Diag.layout.size.font = fontSize;
     N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
     n2Diag.style.updateSvgStyle(fontSize);
-    Update();
+    n2Diag.update();
 }
 
 function VerticalResize(height) {
@@ -439,20 +400,20 @@ function VerticalResize(height) {
     n2Diag.layout.size.diagram.width = height; // Makes it square
     N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
     n2Diag.style.updateSvgStyle(n2Diag.layout.size.font);
-    Update();
+    n2Diag.update();
 }
 
 function ToggleSolverNamesCheckboxChange() {
     n2Diag.toggleSolverNameType();
     parentDiv.querySelector("#toggleSolverNamesButtonId").className = !n2Diag.showLinearSolverNames ? "myButton myButtonToggledOn" : "myButton";
     SetupLegend(d3, n2Diag.dom.d3ContentDiv);
-    Update();
+    n2Diag.update();
 };
 
 function ShowPathCheckboxChange() {
-    showPath = !showPath;
-    parentDiv.querySelector("#currentPathId").style.display = showPath ? "block" : "none";
-    parentDiv.querySelector("#showCurrentPathButtonId").className = showPath ? "myButton myButtonToggledOn" : "myButton";
+    n2Diag.showPath = !n2Diag.showPath;
+    parentDiv.querySelector("#currentPathId").style.display = n2Diag.showPath ? "block" : "none";
+    parentDiv.querySelector("#showCurrentPathButtonId").className = n2Diag.showPath ? "myButton myButtonToggledOn" : "myButton";
 }
 
 function ToggleLegend() {
@@ -472,9 +433,9 @@ function CreateToolbar() {
     div.querySelector("#forwardButtonId").onclick = ForwardButtonPressed;
     div.querySelector("#upOneLevelButtonId").onclick = UpOneLevelButtonClick;
     div.querySelector("#uncollapseInViewButtonId").onclick = function () { UncollapseButtonClick(n2Diag.zoomedElement); };
-    div.querySelector("#uncollapseAllButtonId").onclick = function () { UncollapseButtonClick(root); };
+    div.querySelector("#uncollapseAllButtonId").onclick = function () { UncollapseButtonClick(n2Diag.model.root); };
     div.querySelector("#collapseInViewButtonId").onclick = function () { CollapseOutputsButtonClick(n2Diag.zoomedElement); };
-    div.querySelector("#collapseAllButtonId").onclick = function () { CollapseOutputsButtonClick(root); };
+    div.querySelector("#collapseAllButtonId").onclick = function () { CollapseOutputsButtonClick(n2Diag.model.root); };
     div.querySelector("#clearArrowsAndConnectsButtonId").onclick = n2Diag.clearArrows;
     div.querySelector("#showCurrentPathButtonId").onclick = ShowPathCheckboxChange;
     div.querySelector("#showLegendButtonId").onclick = ToggleLegend;
@@ -504,9 +465,3 @@ function CreateToolbar() {
     div.querySelector("#saveSvgButtonId").onclick = n2Diag.saveSvg.bind(n2Diag);
     div.querySelector("#helpButtonId").onclick = DisplayModal;
 }
-
-var app = {
-    GetFontSize: function () { return n2Diag.layout.size.font; },
-    ResizeHeight: function (h) { VerticalResize(h); },
-    Redraw: function () { Update(); }
-};

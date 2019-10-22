@@ -1,11 +1,3 @@
-var d3ContentDiv, svgDiv, svg;
-
-var d3RightTextNodesArrayZoomed = []
-var d3RightTextNodesArrayZoomedBoxInfo
-var drawableN2ComponentBoxes;
-
-var gridLines;
-
 var sharedTransition;
 var FindRootOfChangeFunction = null;
 
@@ -32,14 +24,14 @@ function DrawArrowsParamView(startIndex, endIndex, nodeSize) {
     n2Diag.dom.arrowMarker.attr("markerWidth", lineWidth * .4)
         .attr("markerHeight", lineWidth * .4);
 
-    var boxStart = d3RightTextNodesArrayZoomedBoxInfo[startIndex];
-    var boxEnd = d3RightTextNodesArrayZoomedBoxInfo[endIndex];
+    var boxStart = n2Diag.matrix.boxInfo[startIndex];
+    var boxEnd = n2Diag.matrix.boxInfo[endIndex];
 
     //draw multiple horizontal lines but no more than one vertical line for box to box connections
     var startIndices = [], endIndices = [];
     for (var startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
         for (var endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
-            if (n2Diag.matrix.node(startsI, endsI) !== undefined) {
+            if (n2Diag.matrix.cell(startsI, endsI) !== undefined) {
                 startIndices.push(startsI);
                 endIndices.push(endsI);
             }

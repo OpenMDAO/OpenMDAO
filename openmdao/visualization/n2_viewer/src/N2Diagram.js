@@ -27,7 +27,7 @@
 class N2Diagram {
     constructor(modelJSON) {
         this.model = new ModelData(modelJSON);
-        this.zoomedElement = this.zoomedElementPrev = zoomedElement = this.model.root;
+        this.zoomedElement = this.zoomedElementPrev = this.model.root;
 
         this.showPath = false;
 
@@ -146,7 +146,7 @@ class N2Diagram {
 
         // TODO: Stop updating the global zoomedElement when we
         // implement a different place to put it.
-        this.zoomedElement = zoomedElement = newZoomedElement;
+        this.zoomedElement = newZoomedElement;
 
         this.layout.zoomedElement = this.zoomedElement;
     }
@@ -419,7 +419,7 @@ class N2Diagram {
                 return "translate(" + anchorX + "," + d.dims.height * this.transitCoords.model.y / 2 + ")";
             }.bind(this))
             .style("opacity", function (d) {
-                if (d.depth < zoomedElement.depth) return 0;
+                if (d.depth < this.zoomedElement.depth) return 0;
                 return d.textOpacity;
             }.bind(this))
             .text(this.layout.getText);

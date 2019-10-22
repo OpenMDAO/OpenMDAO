@@ -17,6 +17,7 @@ class N2Matrix {
      * @param {N2TreeNodes[]} visibleNodes Nodes that will be drawn.
      * @param {ModelData} model The pre-processed model data.
      * @param {N2Layout} layout Pre-computed layout of the diagram.
+     * @param {N2MatrixNode[][]} grid N2MatrixNode objects in row,col order.
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
      * @param {Object} [prevNodeSize = {'width': 0, 'height': 0}] Previous node
      *  width & height for transition purposes.
@@ -53,13 +54,14 @@ class N2Matrix {
     }
 
     /**
-     * Safe method to access a node at the specified location.
+     * Safe method to access a node cell at the specified location.
+     * Renamed from node() which is confusing with D3.
      * @param {number} row Row number of the node
      * @param {number} col Column number of the node
      * @param {boolean} doThrow Whether to throw an exception if node undefined.
-     * @returns The node if it exists, undefined otherwise.
+     * @returns {N2MatrixNode} The node if it exists, undefined otherwise.
      */
-    node(row, col, doThrow = false) {
+    cell(row, col, doThrow = false) {
         if (this.exists(row, col)) {
             return this.grid[row][col];
         }
@@ -164,7 +166,7 @@ class N2Matrix {
     drawingPrep() {
         let currentBox = { "startI": 0, "stopI": 0 };
 
-        d3RightTextNodesArrayZoomedBoxInfo = [currentBox];
+        this.boxInfo = [currentBox];
 
         // Find which component box each of the parameters belong to
         for (let ri = 1; ri < this.nodes.length; ++ri) {
@@ -179,13 +181,13 @@ class N2Matrix {
             else {
                 currentBox = { "startI": ri, "stopI": ri };
             }
-            d3RightTextNodesArrayZoomedBoxInfo.push(currentBox);
+            this.boxInfo.push(currentBox);
         }
 
-        drawableN2ComponentBoxes = [];
+        this.drawableN2ComponentBoxes = [];
         // draw grid lines last so that they will always be visible
-        for (let i = 0; i < d3RightTextNodesArrayZoomedBoxInfo.length; ++i) {
-            let box = d3RightTextNodesArrayZoomedBoxInfo[i];
+        for (let i = 0; i < this.boxInfo.length; ++i) {
+            let box = this.boxInfo[i];
             if (box.startI == box.stopI) continue;
             let el = this.nodes[box.startI];
             if (!el.parentComponent) {
@@ -193,23 +195,23 @@ class N2Matrix {
             }
             box.obj = el.parentComponent;
             i = box.stopI;
-            drawableN2ComponentBoxes.push(box);
+            this.drawableN2ComponentBoxes.push(box);
         }
 
         //do this so you save old index for the exit()
-        gridLines = [];
+        this.gridLines = [];
         if (this.nodes.length < this.levelOfDetailThreshold) {
             for (let i = 0; i < this.nodes.length; ++i) {
                 let obj = this.nodes[i];
-                var gl = { "i": i, "obj": obj };
-                gridLines.push(gl);
+                let gl = { "i": i, "obj": obj };
+                this.gridLines.push(gl);
             }
         }
         /*
-        console.log("d3RightTextNodesArrayZoomedBoxInfo: ", d3RightTextNodesArrayZoomedBoxInfo);
+        console.log("this.boxInfo: ", this.boxInfo);
         console.log("currentBox:", currentBox);
-        console.log("drawableN2ComponentBoxes:", drawableN2ComponentBoxes);
-        console.log("gridLines:", gridLines);
+        console.log("this.drawableN2ComponentBoxes:", this.drawableN2ComponentBoxes);
+        console.log("this.gridLines:", this.gridLines);
         */
     }
 
@@ -269,19 +271,19 @@ class N2Matrix {
             DrawGroup
         ];
 
-        for (var i = 0; i < classes.length; ++i) {
-            var sel = this.n2Groups.elements.selectAll("." + classes[i])
+        for (let i = 0; i < classes.length; ++i) {
+            let sel = this.n2Groups.elements.selectAll("." + classes[i])
                 .data(datas[i], function (d) {
                     return d.id;
                 });
 
-            var gEnter = sel.enter().append("g")
+            let gEnter = sel.enter().append("g")
                 .attr("class", classes[i])
                 .attr("transform", function (d) {
                     if (lastClickWasLeft) return "translate(" + (this.previousNodeSize.width * (d.col - enterIndex) + u0) + "," + (this.previousNodeSize.height * (d.row - enterIndex) + v0) + ")";
-                    var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                    let roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
-                        var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
+                        let index0 = roc.prevRootIndex - this.layout.zoomedElement.prevRootIndex;
                         return "translate(" + (this.previousNodeSize.width * index0 + u0) + "," + (this.previousNodeSize.height * index0 + v0) + ")";
                     }
                     throw ("enter transform not found");
@@ -292,7 +294,7 @@ class N2Matrix {
                 .on("mouseleave", mouseOutN2)
                 .on("click", mouseClickN2);
 
-            var gUpdate = gEnter.merge(sel).transition(sharedTransition)
+            let gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
                     return "translate(" + (this.nodeSize.width * (d.col) + u) + "," + (this.nodeSize.height * (d.row) + v) + ")";
                 }.bind(this));
@@ -300,12 +302,12 @@ class N2Matrix {
             drawFunctions[i](gUpdate, u, v, (i < 3) ? getOnDiagonalCellColor : N2Style.color.connection, true);
 
 
-            var nodeExit = sel.exit().transition(sharedTransition)
+            let nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {
                     if (lastClickWasLeft) return "translate(" + (this.nodeSize.width * (d.col - exitIndex) + u) + "," + (this.nodeSize.height * (d.row - exitIndex) + v) + ")";
-                    var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                    let roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
-                        var index = roc.rootIndex - zoomedElement.rootIndex;
+                        let index = roc.rootIndex - this.layout.zoomedElement.rootIndex;
                         return "translate(" + (this.nodeSize.width * index + u) + "," + (this.nodeSize.height * index + v) + ")";
                     }
                     throw ("exit transform not found");
@@ -315,18 +317,18 @@ class N2Matrix {
         }
 
         {
-            var sel = this.n2Groups.gridlines.selectAll(".horiz_line")
-                .data(gridLines, function (d) {
+            let sel = this.n2Groups.gridlines.selectAll(".horiz_line")
+                .data(this.gridLines, function (d) {
                     return d.obj.id;
                 });
 
-            var gEnter = sel.enter().append("g")
+            let gEnter = sel.enter().append("g")
                 .attr("class", "horiz_line")
                 .attr("transform", function (d) {
                     if (lastClickWasLeft) return "translate(0," + (this.previousNodeSize.height * (d.i - enterIndex)) + ")";
-                    var roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                    let roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
-                        var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
+                        let index0 = roc.prevRootIndex - this.layout.zoomedElement.prevRootIndex;
                         return "translate(0," + (this.previousNodeSize.height * index0) + ")";
                     }
                     throw ("enter transform not found");
@@ -334,19 +336,19 @@ class N2Matrix {
             gEnter.append("line")
                 .attr("x2", this.layout.size.diagram.width);
 
-            var gUpdate = gEnter.merge(sel).transition(sharedTransition)
+            let gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
                     return "translate(0," + (this.nodeSize.height * d.i) + ")";
                 }.bind(this));
             gUpdate.select("line")
                 .attr("x2", this.layout.size.diagram.width);
 
-            var nodeExit = sel.exit().transition(sharedTransition)
+            let nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {
                     if (lastClickWasLeft) return "translate(0," + (this.nodeSize.height * (d.i - exitIndex)) + ")";
-                    var roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                    let roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
-                        var index = roc.rootIndex - zoomedElement.rootIndex;
+                        let index = roc.rootIndex - this.layout.zoomedElement.rootIndex;
                         return "translate(0," + (this.nodeSize.height * index) + ")";
                     }
                     throw ("exit transform not found");
@@ -355,17 +357,17 @@ class N2Matrix {
         }
 
         {
-            var sel = this.n2Groups.gridlines.selectAll(".vert_line")
-                .data(gridLines, function (d) {
+            let sel = this.n2Groups.gridlines.selectAll(".vert_line")
+                .data(this.gridLines, function (d) {
                     return d.obj.id;
                 });
-            var gEnter = sel.enter().append("g")
+            let gEnter = sel.enter().append("g")
                 .attr("class", "vert_line")
                 .attr("transform", function (d) {
                     if (lastClickWasLeft) return "translate(" + (this.previousNodeSize.width * (d.i - enterIndex)) + ")rotate(-90)";
-                    var roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                    let roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
-                        var i0 = roc.rootIndex0 - zoomedElement.rootIndex0;
+                        let i0 = roc.prevRootIndex - this.layout.zoomedElement.prevRootIndex;
                         return "translate(" + (this.previousNodeSize.width * i0) + ")rotate(-90)";
                     }
                     throw ("enter transform not found");
@@ -373,19 +375,19 @@ class N2Matrix {
             gEnter.append("line")
                 .attr("x1", -this.layout.size.diagram.height);
 
-            var gUpdate = gEnter.merge(sel).transition(sharedTransition)
+            let gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
                     return "translate(" + (this.nodeSize.width * d.i) + ")rotate(-90)";
                 }.bind(this));
             gUpdate.select("line")
                 .attr("x1", -this.layout.size.diagram.height);
 
-            var nodeExit = sel.exit().transition(sharedTransition)
+            let nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {
                     if (lastClickWasLeft) return "translate(" + (this.nodeSize.width * (d.i - exitIndex)) + ")rotate(-90)";
-                    var roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                    let roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
-                        var i = roc.rootIndex - zoomedElement.rootIndex;
+                        let i = roc.rootIndex - this.layout.zoomedElement.rootIndex;
                         return "translate(" + (this.nodeSize.width * i) + ")rotate(-90)";
                     }
                     throw ("exit transform not found");
@@ -394,17 +396,17 @@ class N2Matrix {
         }
 
         {
-            var sel = this.n2Groups.componentBoxes.selectAll(".component_box")
-                .data(drawableN2ComponentBoxes, function (d) {
+            let sel = this.n2Groups.componentBoxes.selectAll(".component_box")
+                .data(this.drawableN2ComponentBoxes, function (d) {
                     return d.obj.id;
                 });
-            var gEnter = sel.enter().append("g")
+            let gEnter = sel.enter().append("g")
                 .attr("class", "component_box")
                 .attr("transform", function (d) {
                     if (lastClickWasLeft) return "translate(" + (this.previousNodeSize.width * (d.startI - enterIndex)) + "," + (this.previousNodeSize.height * (d.startI - enterIndex)) + ")";
-                    var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                    let roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
-                        var index0 = roc.rootIndex0 - zoomedElement.rootIndex0;
+                        let index0 = roc.prevRootIndex - this.layout.zoomedElement.prevRootIndex;
                         return "translate(" + (this.previousNodeSize.width * index0) + "," + (this.previousNodeSize.height * index0) + ")";
                     }
                     throw ("enter transform not found");
@@ -420,7 +422,7 @@ class N2Matrix {
                     return this.previousNodeSize.height;
                 }.bind(this));
 
-            var gUpdate = gEnter.merge(sel).transition(sharedTransition)
+            let gUpdate = gEnter.merge(sel).transition(sharedTransition)
                 .attr("transform", function (d) {
                     return "translate(" + (this.nodeSize.width * d.startI) + "," + (this.nodeSize.height * d.startI) + ")";
                 }.bind(this));
@@ -434,12 +436,12 @@ class N2Matrix {
                 }.bind(this));
 
 
-            var nodeExit = sel.exit().transition(sharedTransition)
+            let nodeExit = sel.exit().transition(sharedTransition)
                 .attr("transform", function (d) {
                     if (lastClickWasLeft) return "translate(" + (this.nodeSize.width * (d.startI - exitIndex)) + "," + (this.nodeSize.height * (d.startI - exitIndex)) + ")";
-                    var roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                    let roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
                     if (roc) {
-                        var index = roc.rootIndex - zoomedElement.rootIndex;
+                        let index = roc.rootIndex - this.layout.zoomedElement.rootIndex;
                         return "translate(" + (this.nodeSize.width * index) + "," + (this.nodeSize.height * index) + ")";
                     }
                     throw ("exit transform not found");
