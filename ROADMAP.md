@@ -19,41 +19,41 @@ also makes it available after a model was run.
 Feature Proposals:
 ******************
 
-#1) Metamodel viewer   
+# 1) Metamodel viewer   
 
-##Goal:
+## Goal:
     - Allow users to inspect their MetaModel to check its accuracy/smoothness/etc 
     - Encourage greater use of OM MetaModel components 
 
-##Potential Challenges:
+## Potential Challenges:
     - Current implementation based on Bokeh, and performance isn't as fast as we'd like yet 
     - Some functionality requires live prediction from MetaModel instance, 
       so we require a server process running in background. 
       This means the functionality can't be built into the CaseRecorder
 
-##Notes: 
+## Notes: 
     - initial capability was released in OpenMDAO V2.9.0
 
 
-#2) Improved n2 model viz tool  
-##Goal:
+# 2) Improved n2 model viz tool  
+## Goal:
     - Make the tool more intuitive for new users 
     - Make the tool more useful for navigating models with deep hierarchies 
       and large number of components/variables 
 
-##Potential Challenges:
+## Potential Challenges:
     - Current user interface is stretched to its limit, and can't 
       integrate any expanded navigational features. We'll need a new concept 
       for the UI 
 
-##Notes:
+## Notes:
     - two different proposals for new UI concept are outlines in POE-001 and POE-002
 
-#3) OVIS application for quickly plotting data from CaseRecorder data bases
-##Goal: 
+# 3) OVIS application for quickly plotting data from CaseRecorder data bases
+## Goal: 
     - Make it simpler for users to inspect, navigate, and plot data from the case recorder 
 
-##Potential Challenges: 
+## Potential Challenges: 
     - Going to be a separate stand-alone application. Will users be willing to download separate app? 
     - Separate application brings large development overhead for dev-team, 
       which may not be sustainable long term
@@ -72,14 +72,14 @@ offering a spectrum of options that can potentially trade required user effort w
 Feature Proposals: 
 ******************
 
-#1) Coloring applied to approximated partial derivatives 
-##Goal: 
+# 1) Coloring applied to approximated partial derivatives 
+## Goal: 
     - usable for FD and CS approximations 
     - offers much higher performance for components with very sparse partial derivative Jacobians 
       (e.g. vectorized components with no interaction between vector elements)
     - When used with CS, effectively offers a fast-forward mode AD
 
-##Potential Challenges: 
+## Potential Challenges: 
     - computational cost of coloring may be excessive for models with lots of instances 
     - coloring algorithms are not perfect, and may result in invalid Jacobian, 
       so we need an effective way for users to check their colored partials. 
@@ -87,18 +87,18 @@ Feature Proposals:
     - in some cases, sparsity may not be high enough to offer meaningful performance gain. 
       how can user check this? 
 
-##Notes: 
+## Notes: 
     - prototype implementation already available in experimental features 
     - partial coloring algorithm will also be useful for AD partials
 
 
-#2) Algorithmic differentiation for component partials derivatives
+# 2) Algorithmic differentiation for component partials derivatives
     
-##Goal: 
+## Goal: 
 - forward and reverse mode AD that works for a wide variety of general use cases including many numpy functions 
 - Relatively good performance compared to hand differentiation
 
-##Potential Challenges: 
+## Potential Challenges: 
 - AD tools will struggle with current OpenMDAO syntax for `compute` and `apply_nonlinear` methods, 
   so some kind of translation layer will be needed
 - Python AD libraries are not as well developed as other languages (e.g. C, Fortran, Julia)
@@ -108,15 +108,15 @@ Feature Proposals:
 Establishing A Community Contribution Process
 ----------------------------------------------
 
-#1) Dev team is committing to host an annual OpenMDAO workshop! 
+# 1) Dev team is committing to host an annual OpenMDAO workshop! 
 
-#2) POEMs: **p**roposal for **O**penMDAO **e**nhance**m**en
+# 2) POEMs: **p**roposal for **O**penMDAO **e**nhance**m**en
 - loosely based on the model used by cPython project (PEP process)
 - A new repo has been created for tracking POEMs: 
   http://github.com/openmdao/POEMs
 - Notes: We are planning to work the POEM process on PR 1086 (https://github.com/OpenMDAO/OpenMDAO/pull/1086)
 
-#3) Provide better communication to community on new feature development by publishing POEMs for review before merging features to main codebase. 
+# 3) Provide better communication to community on new feature development by publishing POEMs for review before merging features to main codebase. 
 
 
 
