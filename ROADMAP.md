@@ -7,9 +7,27 @@ It is not intended to be all encompassing or a binding development plan,
 but should be regarded as an very strong indication of the focus of the core development team. 
 
 There are three main topic areas that will be focused on: 
+- Releasing OpenMDAO 3.0! 
 - Model & Data Visualization 
 - New Differentiation Tools that Reduce User Effort
 - Establishing A Community Contribution Process
+
+----------------------------------------------
+----------------------------------------------
+----------------------------------------------
+# Releasing OpenMDAO 3.0
+
+In January 2020, we plan to release V3.0 of the framework. 
+This update will **NOT** represent significant change to the codebase or functionality, 
+but will include several key changes: 
+
+## 1) Droping support for Python 2.0, and supporting only python 3.6 and greater
+- Scipy and Numpy have already dropped Python 2 support for future releases. 
+- Will allow us to modestly simplify our codebase 
+
+## 2) Removing all current deprecations 
+- We've made a strong attempt not to break backwards compatibility through deprecations where possible, 
+but V3.0 will solidify the current primary (re: non deprecated) APIs as the only ones. 
 
 
 ----------------------------------------------
@@ -114,7 +132,6 @@ offering a spectrum of options that can potentially trade required user effort w
 # Establishing A Community Contribution Process
 
 ## 1) Planning for the 2020 OpenMDAO workshop 
-
 
 ## 2) POEMs: **p**roposal for **O**penMDAO **e**nhance**m**en
 - loosely based on the model used by cPython project (PEP process)
