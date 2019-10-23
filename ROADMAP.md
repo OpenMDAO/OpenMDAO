@@ -1,4 +1,4 @@
-OpenMDAO Development RoadMap V0 - 10/28/2019
+OpenMDAO 2020 Development RoadMap - 10/28/2019
 =============================================
 
 This roadmap represents the current plans of the OpenMDAO development team at the NASA Glenn Research Center. 
@@ -19,43 +19,43 @@ also makes it available after a model was run.
 Feature Proposals:
 ******************
 
-1) Metamodel viewer 
-    Goal: 
-        - Allow users to inspect their MetaModel to check its accuracy/smoothness/etc 
-        - Encourage greater use of OM MetaModel components 
+1) Metamodel viewer   
+**Goal: **
+    - Allow users to inspect their MetaModel to check its accuracy/smoothness/etc 
+    - Encourage greater use of OM MetaModel components 
 
-    Potential Challenges: 
-        - Current implementation based on Bokeh, and performance isn't as fast as we'd like yet 
-        - Some functionality requires live prediction from MetaModel instance, 
-          so we require a server process running in background. 
-          This means the functionality can't be built into the CaseRecorder
+**Potential Challenges: **
+    - Current implementation based on Bokeh, and performance isn't as fast as we'd like yet 
+    - Some functionality requires live prediction from MetaModel instance, 
+      so we require a server process running in background. 
+      This means the functionality can't be built into the CaseRecorder
 
-    Notes: 
-        - initial capability was released in OpenMDAO V2.9.0
+**Notes:** 
+    - initial capability was released in OpenMDAO V2.9.0
 
 
 2) Improved n2 model viz tool 
-    Goal: 
-        - Make the tool more intuitive for new users 
-        - Make the tool more useful for navigating models with deep hierarchies 
-          and large number of components/variables 
+**Goal:**
+    - Make the tool more intuitive for new users 
+    - Make the tool more useful for navigating models with deep hierarchies 
+      and large number of components/variables 
 
-    Potential Challenges: 
-        - Current user interface is stretched to its limit, and can't 
-          integrate any expanded navigational features. We'll need a new concept 
-          for the UI 
+**Potential Challenges:**
+    - Current user interface is stretched to its limit, and can't 
+      integrate any expanded navigational features. We'll need a new concept 
+      for the UI 
 
-    Notes: 
-        - two different proposals for new UI concept are outlines in POE-001 and POE-002
+**Notes:**
+    - two different proposals for new UI concept are outlines in POE-001 and POE-002
 
 3) OVIS application for quickly plotting data from CaseRecorder data bases
-    Goal: 
-        - Make it simpler for users to inspect, navigate, and plot data from the case recorder 
+**Goal:** 
+    - Make it simpler for users to inspect, navigate, and plot data from the case recorder 
 
-    Potential Challenges: 
-        - Going to be a separate stand-alone application. Will users be willing to download separate app? 
-        - Separate application brings large development overhead for dev-team, 
-          which may not be sustainable long term
+**Potential Challenges:** 
+    - Going to be a separate stand-alone application. Will users be willing to download separate app? 
+    - Separate application brings large development overhead for dev-team, 
+      which may not be sustainable long term
 
 
 New Differentiation Tools that Reduce User Effort
