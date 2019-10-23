@@ -113,7 +113,8 @@ offering a spectrum of options that can potentially trade required user effort w
 ----------------------------------------------
 # Establishing A Community Contribution Process
 
-## 1) Dev team is committing to host an annual OpenMDAO workshop! 
+## 1) Planning for the 2020 OpenMDAO workshop 
+
 
 ## 2) POEMs: **p**roposal for **O**penMDAO **e**nhance**m**en
 - loosely based on the model used by cPython project (PEP process)
@@ -121,7 +122,9 @@ offering a spectrum of options that can potentially trade required user effort w
   http://github.com/openmdao/POEMs
 - Notes: We are planning to work the POEM process on PR 1086 (https://github.com/OpenMDAO/OpenMDAO/pull/1086)
 
-## 3) Provide better communication to community on new feature development by publishing POEMs for review before merging features to main codebase. 
+## 3) Establishing a formal OpenMDAO plugin system
+
+ 
 
 
 
