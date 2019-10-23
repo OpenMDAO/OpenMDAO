@@ -7,7 +7,7 @@ It is not intended to be all encompassing or a binding development plan,
 but should be regarded as an very strong indication of the focus of the core development team. 
 
 There are three main topic areas that will be focused on: 
-- Releasing OpenMDAO 3.0! 
+- Releasing OpenMDAO V3.0! 
 - Model & Data Visualization 
 - New Differentiation Tools that Reduce User Effort
 - Establishing A Community Contribution Process
@@ -140,6 +140,8 @@ offering a spectrum of options that can potentially trade required user effort w
 - Notes: We are planning to work the POEM process on PR 1086 (https://github.com/OpenMDAO/OpenMDAO/pull/1086)
 
 ## 3) Establishing a formal OpenMDAO plugin system
+- To go alone with the POEM process, 
+we need a manner for users to add functionality without merging their code to core codebase. 
 
  
 
