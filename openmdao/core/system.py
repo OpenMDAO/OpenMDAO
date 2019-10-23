@@ -2020,6 +2020,10 @@ class System(object):
                             pmap[name] = gname + name if gname else name
 
             not_found = (set(names).union(renames).union(patterns)) - found
+            if self._var_promotes['any']:
+                if not self._var_abs2meta and isinstance(self, openmdao.core.group.Group):
+                    raise RuntimeError('No inputs or outputs found. Check %s '
+                                       'to make sure it is not empty' % (self.msginfo))
             if not_found:
                 if len(io_types) == 2:
                     call = 'promotes'

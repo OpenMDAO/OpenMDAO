@@ -687,6 +687,16 @@ class TestGroup(unittest.TestCase):
                          "ExecComp (C2): 'promotes' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
 
+    def test_empty_group(self):
+        p = om.Problem()
+        g1 = p.model.add_subsystem('G1', om.Group(), promotes=['*'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup()
+        self.assertEqual(str(context.exception),
+                         "No inputs or outputs found. Check Group (G1) "
+                         "to make sure it is not empty")
+
     def test_missing_promote_var(self):
         p = om.Problem()
 
