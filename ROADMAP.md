@@ -7,7 +7,7 @@ It is not intended to be all encompassing or a binding development plan,
 but should be regarded as an very strong indication of the focus of the core development team. 
 
 There are four main topic areas that will be focused on: 
-- Releasing OpenMDAO V3.0! 
+- Releasing OpenMDAO V3.0
 - Model & Data Visualization 
 - New Differentiation Tools that Reduce User Effort
 - Establishing A Community Contribution Process
@@ -15,7 +15,7 @@ There are four main topic areas that will be focused on:
 ----------------------------------------------
 ----------------------------------------------
 ----------------------------------------------
-# Releasing OpenMDAO 3.0
+# Releasing OpenMDAO V3.0
 
 In January 2020, we plan to release V3.0 of the framework. 
 This update will **NOT** represent significant change to the codebase or functionality, 
