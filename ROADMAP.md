@@ -7,18 +7,15 @@ It is not intended to be all encompassing or a binding development plan,
 but should be regarded as an very strong indication of the focus of the core development team. 
 
 ---------------------------
+# Model & Data Visualization 
 ---------------------------
 
-# Model & Data Visualization 
 Motivation: Provide tools that make it easier to quickly build and debug complex 
 models with 100's of components organized into 10's of groups in 10's of hierarchy layers
 
 Overall Goal: Rely heavily on data stored in the CaseRecorder for all visualization. 
 This makes the visualization more portable (i.e. can share case db with other) and 
 also makes it available after a model was run. 
-
-Feature Proposals:
-******************
 
 ## 1) Metamodel viewer   
 
@@ -60,9 +57,9 @@ Feature Proposals:
       which may not be sustainable long term
 
 ---------------------------
+# New Differentiation Tools that Reduce User Effort
 ---------------------------
 
-New Differentiation Tools that Reduce User Effort
 
 Motivation: While analytic derivatives provide massive performance gains, 
 they also require significant user effort to implement. 
@@ -70,9 +67,6 @@ This creates a high activation energy that prevents many users from taking advan
 
 Overall Goal: Lower the effort required to implement analytic partial derivatives for components, 
 offering a spectrum of options that can potentially trade required user effort with computational efficiency. 
-
-Feature Proposals: 
-******************
 
 ## 1) Coloring applied to approximated partial derivatives 
 ### Goal: 
@@ -108,10 +102,10 @@ Feature Proposals:
 
 
 ----------------------------------------------
+# Establishing A Community Contribution Process
 ----------------------------------------------
 
 
-# Establishing A Community Contribution Process
 
 
 ## 1) Dev team is committing to host an annual OpenMDAO workshop! 
