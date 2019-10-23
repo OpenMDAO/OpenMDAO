@@ -133,7 +133,7 @@ def _get_color_printer(stream=sys.stdout, colors=True, rank=0):
 
 
 def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=True,
-         filter=None, max_depth=0, rank=0, stream=sys.stdout):
+         filter=None, show_sizes=False, max_depth=0, rank=0, stream=sys.stdout):
     """
     Dump the model tree structure to the given stream.
 
@@ -156,6 +156,8 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
         A function taking a System arg and returning None or an iter of (name, value) tuples.
         If None is returned, that system will not be displayed.  Otherwise, the system will
         be displayed along with any name, value pairs returned from the filter.
+    show_sizes : bool
+        If True, show input and output sizes for each System.
     max_depth : int
         Maximum depth for display.
     rank : int
@@ -202,8 +204,9 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
             cprint("%s" % s.name)
 
         # FIXME: these sizes could be wrong under MPI
-        cprint(" (%d / %d)" % (s._inputs._data.size, s._outputs._data.size),
-               color=Fore.RED + Style.BRIGHT)
+        if show_sizes:
+            cprint(" (%d / %d)" % (s._inputs._data.size, s._outputs._data.size),
+                color=Fore.RED + Style.BRIGHT)
 
         if show_solvers:
             lnsolver = type(s.linear_solver).__name__

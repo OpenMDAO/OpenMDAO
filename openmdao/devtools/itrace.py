@@ -212,7 +212,6 @@ def _setup(options):
         method_counts = defaultdict(int)
         class_counts = defaultdict(lambda: -1)
         id2count = {}
-        do_ret = _trace_return
 
         if memory:
             if psutil is None:
@@ -241,7 +240,7 @@ def _setup(options):
 
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
-                                                do_ret=do_ret,
+                                                do_ret=_trace_return,
                                                 context=(qual_cache, method_counts,
                                                          class_counts, id2count, verbose, memory,
                                                          leaks, stream, options.show_ptrs),

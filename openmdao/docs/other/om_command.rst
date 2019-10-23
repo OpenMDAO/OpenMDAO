@@ -20,7 +20,7 @@ All available :code:`openmdao` sub-commands can be shown using the following com
     :cmd: openmdao -h
 
 
-All sub-commands are shown under 'positional arguments'.  To get further info on any sub-command,
+To get further info on any sub-command,
 for example, for :code:`tree`, follow the command with a *-h*.  For example:
 
 .. embed-shell-cmd::
@@ -143,19 +143,23 @@ openmdao tree
 #############
 
 The :code:`openmdao tree` command prints an indented list of all systems in the model tree.  Each system's
-type and name are shown, along with size of their inputs and outputs, and their linear and nonlinear solvers if
+type and name are shown, along with their linear and nonlinear solvers if
 they differ from the defaults, which are LinearRunOnce and NonlinearRunOnce respectively.
 If the `-c` option is used, the tree will print in color if the terminal supports it and
 the *colorama* package is installed. If colors are used, implicit and explicit components will be
 displayed using different colors.
 
+The input and output sizes can also be displayed using the `--sizes` arg, and the `--approx` arg
+will display the approximation method and the number of approximated partials for systems that use
+approximated derivatives.
+
 The tree command also allows specific attributes and/or vector variables to be printed out along with their
-corresponding system in the tree.
+corresponding system in the tree using the `--attr` and `--var` args respectively.
 
 Here's an example of the tree output for a simple circuit model:
 
 .. embed-shell-cmd::
-    :cmd: openmdao tree circuit.py
+    :cmd: openmdao tree --sizes --approx circuit.py
     :dir: ../test_suite/scripts
 
 .. _om-command-summary:

@@ -48,18 +48,25 @@ var tabledata = data.table;
 document.title = data.title;
 document.getElementById("conn_title").innerHTML = data.title
 
+if(data.show_values == true) {
+    valstr = "<span class='toggle'><input type='checkbox' checked='true' onclick='values_toggle(this)'>Values</input></span>";
+}
+else {
+    valstr = "<span class='toggle'><input type='checkbox' onclick='values_toggle(this)'>Values</input></span>";
+}
+
 var table =
     new Tabulator("#connection-table", {
         // set height of table (in CSS or here), this enables the Virtual DOM and
         // improves render speed dramatically (can be any valid css height value)
-        height: 500,
+        height: 650,
         data:tabledata, //assign data to table
         layout:"fitColumns", //"fitDataFill",
         footerElement:"<p class='middle'>" +
                             "<span class='toggle'><input type='checkbox' onclick='src_abs_toggle(this)'>Absolute Outputs</input></span>" +
                             "<span class='toggle'><input type='checkbox' checked='true' onclick='src_prom_toggle(this)'>Promoted Outputs</input></span>" +
                             "<span class='toggle'><input type='checkbox' checked='true' onclick='sunits_toggle(this)'>Output Units</input></span>" +
-                            "<span class='toggle'><input type='checkbox' checked='true' onclick='values_toggle(this)'>Values</input></span>" +
+                            valstr +
                             "<span class='toggle'><input type='checkbox' checked='true' onclick='tunits_toggle(this)'>Input Units</input></span>" +
                             "<span class='toggle'><input type='checkbox' onclick='tgt_abs_toggle(this)'>Absolute Inputs</input></span>" +
                             "<span class='toggle'><input type='checkbox' checked='true' onclick='tgt_prom_toggle(this)'>Promoted Inputs</input></span></p>",
@@ -91,7 +98,7 @@ var table =
                         return value;
                     }
                     }},
-                {title: "Value", field:"val", align:"center", headerFilter:true},
+                {title: "Value", visible:data.show_values, field:"val", align:"center", headerFilter:true},
                 {title: "Units", field:"tunits", align:"center", headerFilter:true,
                     formatter:function(cell, formatterParams){
                         var value = cell.getValue();
@@ -159,7 +166,6 @@ function tunits_toggle(tbutton) {
     table.toggleColumn("tunits");
     table.redraw();
 }
-
 
 </script>
 </body>

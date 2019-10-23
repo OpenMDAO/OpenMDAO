@@ -173,13 +173,13 @@ Be careful when setting the tolerance, however, because if you make it too large
 zeroing out Jacobian entries that should not be ignored and your optimization may not converge.
 
 
-If you want to examine the sparsity structure of your total jacobian, you can use the *-j*
+If you want to examine the sparsity structure of your total jacobian, you can use the *--view*
 option as follows:
 
 
 .. code-block:: none
 
-    openmdao total_coloring <your_script_name> -j
+    openmdao total_coloring <your_script_name> --view
 
 
 which will display a visualization of the sparsity
@@ -187,12 +187,12 @@ structure with rows and columns labelled with the response and design variable n
 See the figure :ref:`here <fig-coloring-view>`.
 
 
-A text-based view is also available using the `--jtext` arg.  For example:
+A text-based view is also available using the `--textview` arg.  For example:
 
 
 .. code-block:: none
 
-    openmdao total_coloring <your_script_name> --jtext
+    openmdao total_coloring <your_script_name> --textview
 
 
 will display something like the following:
@@ -275,7 +275,7 @@ For example:
     Time to compute coloring: 0.001076 sec.
 
 
-Adding a `-j` arg will pop up an interactive plot showing the coloring of the jacobian. Forward
+Adding a `--view` arg will pop up an interactive plot showing the coloring of the jacobian. Forward
 colors will be colored blue/green and reverse colors will be colored red/yellow.  Clicking on
 a particular cell of the jacobian will display the location, the color number, the coloring direction,
 and the particular 'of' and 'wrt' variables for that particular sub-jacobian.  Note that this
@@ -291,7 +291,7 @@ viewer requires the installation of matplotlib. See the figure below.
 
 
 If matplotlib is not available, a text-based version of the jacobian can be printed using the
-`--jtext` arg.
+`--textview` arg.
 
 
 .. note::
