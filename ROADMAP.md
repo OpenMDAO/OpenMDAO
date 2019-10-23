@@ -6,9 +6,14 @@ It is intended as a reference for the external community as to what the major de
 It is not intended to be all encompassing or a binding development plan, 
 but should be regarded as an very strong indication of the focus of the core development team. 
 
+There are three main topic areas that will be focused on: 
+- Model & Data Visualization 
+- New Differentiation Tools that Reduce User Effort
+- Establishing A Community Contribution Process
+
+
 ---------------------------
 # Model & Data Visualization 
----------------------------
 
 Motivation: Provide tools that make it easier to quickly build and debug complex 
 models with 100's of components organized into 10's of groups in 10's of hierarchy layers
@@ -58,8 +63,6 @@ also makes it available after a model was run.
 
 ---------------------------
 # New Differentiation Tools that Reduce User Effort
----------------------------
-
 
 Motivation: While analytic derivatives provide massive performance gains, 
 they also require significant user effort to implement. 
@@ -103,10 +106,6 @@ offering a spectrum of options that can potentially trade required user effort w
 
 ----------------------------------------------
 # Establishing A Community Contribution Process
-----------------------------------------------
-
-
-
 
 ## 1) Dev team is committing to host an annual OpenMDAO workshop! 
 
