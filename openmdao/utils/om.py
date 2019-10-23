@@ -634,7 +634,7 @@ _command_map = {
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec, None,
                      'Generate total timings of calls to particular object instances.'),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec, None,
-            'Profile memory used by OpenMDAO related funtions.'),
+            'Profile memory used by OpenMDAO related functions.'),
     'mempost': (_mempost_setup_parser, _mempost_exec, None,
                 'Post-process memory profile output.'),
     'n2': (_n2_setup_parser, _n2_cmd, None, 'Display an interactive N2 diagram of the problem.'),
@@ -657,7 +657,7 @@ _command_map = {
                    'Display an interactive N2 diagram of the problem. '
                    '(Deprecated, please use n2 instead.)'),
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd, None,
-             'Generate an XDSM diagram of a model and view it.'),
+             'Generate an XDSM diagram of a model.'),
 }
 
 
