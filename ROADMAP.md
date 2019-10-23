@@ -1,4 +1,4 @@
-OpenMDAO 2020 Development RoadMap - 10/28/2019
+OpenMDAO 2020 Development Roadmap - 10/28/2019
 =============================================
 
 This roadmap represents the current plans of the OpenMDAO development team at the NASA Glenn Research Center. 
