@@ -63,6 +63,7 @@ class N2Diagram {
 
         this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout, this.dom.n2Groups);
 
+        // TODO: Move to N2Layout
         this.scales = {
             'unit': 'px',
             'model': {
@@ -76,6 +77,7 @@ class N2Diagram {
             'firstRun': true
         }
 
+        // TODO: Move to N2Layout
         this.prevScales = {
             'model': {
                 'x': null,
@@ -212,6 +214,7 @@ class N2Diagram {
     /**
      * Make a copy of the previous transit coordinates and linear scalers before
      * setting new ones.
+     * TODO: Move to N2Layout
      */
     _preservePreviousScale() {
         // Preserve previous coordinates
@@ -225,6 +228,7 @@ class N2Diagram {
         this.prevScales.solver.y = this.scales.solver.y.copy();
     }
 
+    // TODO: Move to N2Layout
     _updateScale() {
         if (!this.scales.firstRun) this._preservePreviousScale();
 
@@ -290,44 +294,6 @@ class N2Diagram {
                     this.layout.size.partitionTreeGap) + "," +
                 this.layout.size.svgMargin + ")");
         }
-    }
-
-    /** Update svg dimensions with transition after a new N2Layout changes
-     * layout.size.partitionTree.width
-     */
-    _updateTransitionInfo() {
-        sharedTransition = d3.transition()
-            .duration(N2TransitionDefaults.duration)
-            .delay(this.transitionStartDelay); // do this after intense computation
-        this.transitionStartDelay = N2TransitionDefaults.startDelay;
-
-        this.dom.svgDiv.transition(sharedTransition)
-            .style("width", (this.layout.size.partitionTree.width + this.layout.size.partitionTreeGap +
-                this.layout.size.diagram.width + this.layout.size.solverTree.width + 2 * this.layout.size.svgMargin + this.layout.size.partitionTreeGap) +
-                this.layout.size.unit)
-            .style("height", (this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin) +
-                this.layout.size.unit);
-
-        this.dom.svg.transition(sharedTransition)
-            .attr("width", this.layout.size.partitionTree.width +
-                this.layout.size.partitionTreeGap + this.layout.size.diagram.width + this.layout.size.solverTree.width + 2 *
-                this.layout.size.svgMargin + this.layout.size.partitionTreeGap)
-            .attr("height", this.layout.size.partitionTree.height + 2 * this.layout.size.svgMargin);
-
-        this.dom.n2TopGroup.transition(sharedTransition)
-            .attr("transform", "translate(" + (this.layout.size.partitionTree.width +
-                this.layout.size.partitionTreeGap + this.layout.size.svgMargin) + "," + this.layout.size.svgMargin + ")");
-
-        this.dom.pTreeGroup.transition(sharedTransition)
-            .attr("transform", "translate(" + this.layout.size.svgMargin + "," + this.layout.size.svgMargin + ")");
-
-        this.dom.n2BackgroundRect.transition(sharedTransition)
-            .attr("width", this.layout.size.diagram.width).attr("height", this.layout.size.partitionTree.height);
-
-        this.dom.pSolverTreeGroup.transition(sharedTransition)
-            .attr("transform", "translate(" + (this.layout.size.partitionTree.width +
-                this.layout.size.partitionTreeGap + this.layout.size.diagram.width + this.layout.size.svgMargin + this.layout.size.partitionTreeGap) + "," +
-                this.layout.size.svgMargin + ")");
     }
 
     _createPartitionCells() {
@@ -609,7 +575,7 @@ class N2Diagram {
         }
 
         this._updateScale();
-        this._updateTransitionInfo();
+        this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay);
 
         let d3Refs = this._createPartitionCells();
         this._setupPartitionTransition(d3Refs);

@@ -54,7 +54,7 @@ class N2Matrix {
     }
 
     /**
-     * Safe method to access a node cell at the specified location.
+     * Safe method to access a node/cell at the specified location.
      * Renamed from node() which is confusing with D3.
      * @param {number} row Row number of the node
      * @param {number} col Column number of the node

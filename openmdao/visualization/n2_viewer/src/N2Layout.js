@@ -471,6 +471,10 @@ class N2Layout {
         delete this.autoCompleteSetPathNames;
     }
 
+    /**
+     * Calculate new dimensions for the div element enclosing the main SVG element.
+     * @returns {Object} Members width and height as strings with the unit appended.
+     */
     newSvgDivDimAttribs() {
         let width = (this.size.partitionTree.width +
             this.size.partitionTreeGap +
@@ -487,6 +491,10 @@ class N2Layout {
         return ({ 'width': width, 'height': height });
     }
 
+    /**
+     * Calculate new dimensions for the main SVG element.
+     * @returns {Object} Members width and height as numbers.
+     */
     newSvgElemDimAttribs() {
         let width = this.size.partitionTree.width +
             this.size.partitionTreeGap +
@@ -501,4 +509,48 @@ class N2Layout {
         return ({ 'width': width, 'height': height });
     }
 
+    /**
+     * Update container element dimensions when a new layout is calculated,
+     * and set up transitions.
+     * @param {Object} dom References to HTML elements.
+     * @param {number} transitionStartDelay ms to wait before performing transition
+     */
+    updateTransitionInfo(dom, transitionStartDelay) {
+        sharedTransition = d3.transition()
+            .duration(N2TransitionDefaults.duration)
+            .delay(transitionStartDelay); // do this after intense computation
+        this.transitionStartDelay = N2TransitionDefaults.startDelay;
+
+        let svgDivSize = this.newSvgDivDimAttribs();
+        dom.svgDiv.transition(sharedTransition)
+            .style("width", svgDivSize.width)
+            .style("height", svgDivSize.height);
+
+        let svgSize = this.newSvgElemDimAttribs();
+        dom.svg.transition(sharedTransition)
+            .attr("width", svgSize.width)
+            .attr("height", svgSize.height);
+
+        dom.n2TopGroup.transition(sharedTransition)
+            .attr("transform", "translate(" + (this.size.partitionTree.width +
+                this.size.partitionTreeGap +
+                this.size.svgMargin) + "," +
+                this.size.svgMargin + ")");
+
+        dom.pTreeGroup.transition(sharedTransition)
+            .attr("transform", "translate(" + this.size.svgMargin + "," +
+                this.size.svgMargin + ")");
+
+        dom.n2BackgroundRect.transition(sharedTransition)
+            .attr("width", this.size.diagram.width)
+            .attr("height", this.size.partitionTree.height);
+
+        dom.pSolverTreeGroup.transition(sharedTransition)
+            .attr("transform", "translate(" + (this.size.partitionTree.width +
+                this.size.partitionTreeGap +
+                this.size.diagram.width +
+                this.size.svgMargin +
+                this.size.partitionTreeGap) + "," +
+                this.size.svgMargin + ")");
+    }
 }
