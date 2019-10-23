@@ -1,6 +1,5 @@
-##############################################
 OpenMDAO Development RoadMap V0 - 10/28/2019
-##############################################
+=============================================
 
 This roadmap represents the current plans of the OpenMDAO development team at the NASA Glenn Research Center. 
 It is intended as a reference for the external community as to what the major development focus will be in the near and medium term.
