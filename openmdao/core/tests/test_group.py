@@ -408,7 +408,8 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "IndepVarComp (comp1): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['xx'].")
+                         "the following names or patterns: ['xx']. "
+                         "Check to make sure it is not empty")
 
     def test_group_renames_errors_bad_tuple(self):
         p = om.Problem()
@@ -473,7 +474,8 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "SellarDis2 (d1): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['foo'].")
+                         "the following names or patterns: ['foo']. "
+                         "Check to make sure it is not empty")
 
     def test_group_nested_conn(self):
         """Example of adding subsystems and issuing connections with nested groups."""
@@ -659,7 +661,8 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (C2): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['x*'].")
+                         "the following names or patterns: ['x*']. "
+                         "Check to make sure it is not empty")
 
     def test_promote_not_found2(self):
         p = om.Problem()
@@ -672,7 +675,8 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (C2): 'promotes_inputs' failed to find any matches for "
-                         "the following names or patterns: ['xx'].")
+                         "the following names or patterns: ['xx']. "
+                         "Check to make sure it is not empty")
 
     def test_promote_not_found3(self):
         p = om.Problem()
@@ -685,7 +689,8 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (C2): 'promotes' failed to find any matches for "
-                         "the following names or patterns: ['xx'].")
+                         "the following names or patterns: ['xx']. "
+                         "Check to make sure it is not empty")
 
     def test_empty_group(self):
         p = om.Problem()
@@ -694,8 +699,9 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "No inputs or outputs found. Check Group (G1) "
-                         "to make sure it is not empty")
+                         "Group (G1): 'promotes' failed to find any matches for "
+                         "the following names or patterns: ['*']. "
+                         "Check to make sure it is not empty")
 
     def test_missing_promote_var(self):
         p = om.Problem()
@@ -710,7 +716,8 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (d1): 'promotes_inputs' failed to find any matches for "
-                         "the following names or patterns: ['foo'].")
+                         "the following names or patterns: ['foo']. "
+                         "Check to make sure it is not empty")
 
     def test_missing_promote_var2(self):
         p = om.Problem()
@@ -725,7 +732,8 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (d1): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['bar', 'blammo'].")
+                         "the following names or patterns: ['bar', 'blammo']. "
+                         "Check to make sure it is not empty")
 
     def test_promote_src_indices(self):
         import numpy as np
