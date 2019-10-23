@@ -12,7 +12,9 @@ There are three main topic areas that will be focused on:
 - Establishing A Community Contribution Process
 
 
----------------------------
+----------------------------------------------
+----------------------------------------------
+----------------------------------------------
 # Model & Data Visualization 
 
 Motivation: Provide tools that make it easier to quickly build and debug complex 
@@ -61,7 +63,9 @@ also makes it available after a model was run.
     - Separate application brings large development overhead for dev-team, 
       which may not be sustainable long term
 
----------------------------
+----------------------------------------------
+----------------------------------------------
+----------------------------------------------
 # New Differentiation Tools that Reduce User Effort
 
 Motivation: While analytic derivatives provide massive performance gains, 
@@ -104,6 +108,8 @@ offering a spectrum of options that can potentially trade required user effort w
 - Certain coding practices are not compatible with AD, and will need to be avoided (e.g. modification of instance attributes, functions with side-effects)
 
 
+----------------------------------------------
+----------------------------------------------
 ----------------------------------------------
 # Establishing A Community Contribution Process
 
