@@ -6,7 +6,7 @@ It is intended as a reference for the external community as to what the major de
 It is not intended to be all encompassing or a binding development plan, 
 but should be regarded as an very strong indication of the focus of the core development team. 
 
-There are three main topic areas that will be focused on: 
+There are four main topic areas that will be focused on: 
 - Releasing OpenMDAO V3.0! 
 - Model & Data Visualization 
 - New Differentiation Tools that Reduce User Effort
