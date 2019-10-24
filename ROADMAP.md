@@ -1,8 +1,10 @@
-OpenMDAO 2020 Development Roadmap - 10/28/2019
+OpenMDAO 2020 Development Roadmap
 =============================================
+Author: Justin S. Gray   
+Date: 10/24/2019  
 
-This roadmap represents the current plans of the OpenMDAO development team at the NASA Glenn Research Center. 
-It is intended as a reference for the external community as to what the major development focus will be in the near and medium term.
+This document represents the OpenMDAO development team's perspective on what we feel are the most important areas to focus on for framework development in 2020. 
+It is intended to communicate our current perspective to the OpenMDAO user community, and to provide a basis for their feedback. 
 It is not intended to be all encompassing or a binding development plan, 
 but should be regarded as an very strong indication of the focus of the core development team. 
 
