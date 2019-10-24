@@ -376,7 +376,7 @@ def _config_summary_cmd(options):
     """
     def summary(prob):
         config_summary(prob)
-        exit()
+        sys.exit(0)
 
     hooks._register_hook('final_setup', 'Problem', post=summary)
 
