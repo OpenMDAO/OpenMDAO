@@ -29,7 +29,7 @@ def _val2str(val):
 
 
 def view_connections(root, outfile='connections.html', show_browser=True,
-                     precision=6, title=None):
+                     show_values=True, precision=6, title=None):
     """
     Generate a self-contained html file containing a detailed connection viewer.
 
@@ -46,6 +46,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     show_browser : bool, optional
         If True, pop up a browser to view the generated html file.
         Defaults to True.
+
+    show_values : bool, optional
+        If True, retrieve the values and display them.
 
     precision : int, optional
         Sets the precision for displaying array values.
@@ -87,16 +90,16 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
             if t in connections:
                 s = connections[t]
-                val = _get_output(system, s, idxs)
+                val = _get_output(show_values, system, s, idxs)
 
                 # if there's a unit conversion, express the value in the
                 # units of the target
-                if units[t] and s in system._outputs:
+                if show_values and units[t] and s in system._outputs:
                     val = convert_units(val, units[s], units[t])
 
                 src2tgts[s].append(t)
             else:  # unconnected param
-                val = _get_input(system, t)
+                val = _get_input(show_values, system, t)
 
             vals[t] = val
 
@@ -150,9 +153,12 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     for src in system._var_abs_names['output']:
         if src not in src2tgts:
+            if show_values:
+                v = _val2str(system._outputs[src])
+            else:
+                v = ''
             row = {'id': idx, 'src': src, 'sprom': sprom[src], 'sunits': units[src],
-                   'val': _val2str(system._outputs[src]),
-                   'tunits': '', 'tprom': NOCONN, 'tgt': NOCONN}
+                   'val': v, 'tunits': '', 'tprom': NOCONN, 'tgt': NOCONN}
             table.append(row)
             idx += 1
 
@@ -162,6 +168,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
     data = {
         'title': title,
         'table': table,
+        'show_values': show_values,
     }
 
     viewer = 'connect_table.html'
@@ -191,19 +198,25 @@ def view_connections(root, outfile='connections.html', show_browser=True,
         webview(outfile)
 
 
-def _get_input(system, name):
+def _get_input(show_values, system, name):
     """
     Return the named value if it's local to the process, else "<on remote proc>".
     """
+    if not show_values:
+        return ''
+
     if name in system._inputs:
         return system._inputs[name]
     return "<on remote proc>"
 
 
-def _get_output(system, name, idxs=None):
+def _get_output(show_values, system, name, idxs=None):
     """
     Return the named value if it's local to the process, else "<on remote proc>".
     """
+    if not show_values:
+        return ''
+
     if name in system._outputs:
         val = system._outputs[name]
         if idxs is not None and isinstance(val, np.ndarray):

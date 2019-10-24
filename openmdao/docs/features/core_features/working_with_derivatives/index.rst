@@ -61,7 +61,6 @@ of these features, or how to restructure your problem to make use of them in the
     :maxdepth: 1
 
     assembled_jacobian.rst
-    sparse_totals.rst
     simul_derivs.rst
     parallel_derivs.rst
     vectorized_derivs.rst

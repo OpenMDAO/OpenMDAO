@@ -1857,7 +1857,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['type'], 'optimization')
         self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP",
                                                "tol": 1e-03, "maxiter": 200, "disp": True,
-                                               "dynamic_simul_derivs": False, "dynamic_derivs_repeats": 3})
+                                               "dynamic_simul_derivs": False})
         self.assertEqual(metadata['opt_settings'], {"ACC": 1e-06})
 
     def test_feature_solver_metadata(self):
@@ -1907,9 +1907,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         # declare two options
         d1 = prob.model.d1
         d1.options.declare('options value 1', 1)
-
-        # don't record the dynamic_derivs_repeats option on d1
-        d1.recording_options['options_excludes'] = ['dynamic_derivs_repeats']
 
         # create recorder and attach to driver and d1
         recorder = om.SqliteRecorder("cases.sql")
