@@ -218,20 +218,27 @@ def _check_hanging_inputs(problem, logger):
         input_srcs = problem.model._conn_global_abs_in2out
 
     prom_ins = problem.model._var_allprocs_prom2abs_list['input']
+    abs2meta = problem.model._var_allprocs_abs2meta
     unconns = []
+    nwid = 0
+
     for prom, abslist in iteritems(prom_ins):
         unconn = [a for a in abslist if a not in input_srcs or len(input_srcs[a]) == 0]
         if unconn:
-            unconns.append(prom)
+            w = max([len(u) for u in unconn])
+            if w > nwid:
+                nwid = w
+            unconns.append((prom, unconn))
 
     if unconns:
+        template = "{:<{c1wid}} {:<6} {:<5} {:<5} {:<4} {:<4} {:<4} {:.2f} {}"
         msg = ["The following inputs are not connected:\n"]
-        for prom in sorted(unconns):
-            absnames = prom_ins[prom]
+        for prom, absnames in sorted(unconns, key=lambda x: x[0]):
             if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
-                msg.append("   %s\n" % prom)
+                msg.append("   {}\n".format(prom))
             else:  # promoted
-                msg.append("   %s: %s\n" % (prom, prom_ins[prom]))
+                lines = []
+                msg.append("   {}: {}\n".format(prom, absnames))
         logger.warning(''.join(msg))
 
 
