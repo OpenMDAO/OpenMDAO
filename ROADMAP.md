@@ -19,7 +19,7 @@ There are four main topic areas that will be focused on:
 
 In January 2020, we plan to release V3.0 of the framework. 
 This update will **NOT** represent significant change to the codebase or functionality, 
-but will include several key changes: 
+but will include several small but important practical changes: 
 
 ## 1) Droping support for Python 2.0, and supporting only python 3.6 and greater
 - Scipy and Numpy have already dropped Python 2 support for future releases. 
@@ -113,7 +113,7 @@ offering a spectrum of options that can potentially trade required user effort w
     - partial coloring algorithm will also be useful for AD partials
 
 
-## 2) Algorithmic differentiation for component partials derivatives
+## 2) Algorithmic differentiation for component partial derivatives
     
 ### Goal: 
 - forward and reverse mode AD that works for a wide variety of general use cases including many numpy functions 
@@ -133,7 +133,7 @@ offering a spectrum of options that can potentially trade required user effort w
 
 ## 1) Planning for the 2020 OpenMDAO workshop 
 
-## 2) POEMs: **p**roposal for **O**penMDAO **e**nhance**m**en
+## 2) POEMs: **p**roposal for **O**penMDAO **e**nhance**m**ent
 - loosely based on the model used by cPython project (PEP process)
 - A new repo has been created for tracking POEMs: 
   http://github.com/openmdao/POEMs
