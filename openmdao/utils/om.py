@@ -147,7 +147,7 @@ def _xdsm_setup_parser(parser):
                              '"optimization", "doe" or "default".')
     parser.add_argument('--legend', action='store_true', dest='legend',
                         help='If True, show legend.')
-    parser.add_argument('--class_names', action='store_false', dest='class_names',
+    parser.add_argument('--class_names', action='store_true', dest='class_names',
                         help='If true, appends class name of the groups/components to the '
                              'component blocks of the diagram..')
 
