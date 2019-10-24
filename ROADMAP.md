@@ -1,14 +1,16 @@
 OpenMDAO 2020 Development Roadmap
-=============================================
+=================================
+
 Author: Justin S. Gray   
 Date: 10/24/2019  
 
-This document represents the OpenMDAO development team's perspective on what we feel are the most important areas to focus on for framework development in 2020. 
-It is intended to communicate our current perspective to the OpenMDAO user community, and to provide a basis for their feedback. 
-It is not intended to be all encompassing or a binding development plan, 
-but should be regarded as an indication of the focus of the core development team. 
+This document represents the perspective of the OpenMDAO development team on what we feel are 
+the most important areas to focus on for framework development in 2020. It is intended to 
+communicate this perspective to the OpenMDAO user community, and to provide a basis for
+feedback. It is not intended to be all-encompassing or a binding development plan,
+but should be regarded as an indication of the current direction of the core development team. 
 
-There are four main topic areas that will be focused on: 
+There are four main areas of focus: 
 - Releasing OpenMDAO V3.0
 - Model & Data Visualization 
 - New Differentiation Tools that Reduce User Effort
@@ -21,15 +23,15 @@ There are four main topic areas that will be focused on:
 
 In January 2020, we plan to release V3.0 of the framework. 
 This update will **NOT** represent significant change to the codebase or functionality, 
-but will include several small but important practical changes: 
+but will include some important practical changes: 
 
 ## 1) Dropping support for Python 2.0 and supporting only Python 3.6 and greater
 - Scipy and Numpy have already dropped Python 2 support for future releases. 
-- Will allow us to modestly simplify our codebase 
+- This will allow for a modest simplification of the codebase.
 
 ## 2) Removing all current deprecations 
-- We've made a strong attempt not to break backwards compatibility through deprecations where possible, 
-but V3.0 will solidify the current primary (i.e. non deprecated) APIs as the only ones. 
+- We have been making an earnest attempt not to break backwards compatibility through
+  deprecations, but V3.0 will solidify the current non-deprecated APIs as the only APIs. 
 
 
 ----------------------------------------------
@@ -37,96 +39,96 @@ but V3.0 will solidify the current primary (i.e. non deprecated) APIs as the onl
 ----------------------------------------------
 # Model & Data Visualization 
 
-Motivation: Provide tools that make it easier to quickly build and debug complex 
-models with 100's of components organized into 10's of groups in 10's of hierarchy layers
+**Motivation:** Provide tools that make it easier to quickly build and debug complex 
+models with 100's of components organized into 10's of groups in 10's of hierarchy layers.
 
-Overall Goal: Rely heavily on data stored in the CaseRecorder for all visualization. 
-This makes the visualization more portable 
-(i.e. a case database can be easily shared with others who could not necessarily run your model) 
-and also makes it available after a model was run. 
+**Overall Goal:** Rely heavily on data stored by the CaseRecorder for all visualization. 
+This makes the visualization more portable, as a case database can be easily shared with others
+who could not necessarily run your model. It also makes visualization available after a
+model has been run. 
 
 ## 1) Metamodel viewer   
 
 ### Goal:
-    - Allow users to inspect their MetaModel to check its accuracy/smoothness/etc 
-    - Encourage greater use of OpenMDAO MetaModel components 
+- Allow users to inspect their MetaModel to check its accuracy, smoothness, etc.
+- Encourage greater use of OpenMDAO MetaModel components.
 
 ### Potential Challenges:
-    - Current implementation is based on Bokeh, and performance isn't as fast as we'd like yet 
-    - Some functionality requires live prediction from MetaModel instance, 
-      so we require a server process running in background. 
-      This means the functionality can't be built into the CaseRecorder
+- The current implementation is based on Bokeh, and performance isn't as fast as we'd like yet.
+- Some functionality requires live prediction from a MetaModel instance, so we require a server
+  process running in background. This means the functionality can't be built into the CaseRecorder.
 
 ### Notes: 
-    - initial capability was released in OpenMDAO V2.9.0
+- An initial capability was released in OpenMDAO V2.9.0.
 
 
-## 2) Improved n2 model viz tool  
+## 2) Improved N<sup>2</sup> model visualization tool  
 ### Goal:
-    - Make the tool more intuitive for new users 
-    - Make the tool more useful for navigating models with deep hierarchies 
-      and large number of components/variables 
+- Make the tool more intuitive for new users.
+- Make the tool more useful for navigating models with deep hierarchies and large number of 
+  components/variables.
 
 ### Potential Challenges:
-    - Current user interface is stretched to its limit, and can't 
-      integrate any expanded navigational features. We'll need a new concept 
-      for the UI 
+- The current user interface is stretched to its limit, and can't integrate any expanded 
+  navigational features. We'll need a new concept for the UI.
 
 ### Notes:
-    - Two different proposals for new UI concept are outlines in POE-001 and POE-002
+- Two different proposals for a new UI are outlined in POEM-001 and POEM-002.
 
-## 3) OVIS application for quickly plotting data from CaseRecorder data bases
+## 3) OVIS application for quickly plotting data from CaseRecorder databases
 ### Goal: 
-    - Make it simpler for users to inspect, navigate, and plot data from the case recorder 
+- Make it simpler for users to inspect, navigate, and plot data from the case recorder.
 
 ### Potential Challenges: 
-    - Going to be a separate stand-alone application. Will users be willing to download separate app? 
-    - Separate application brings large development overhead for dev-team, 
-      which may not be sustainable long term
+- OVIS is a stand-alone application. Will users be willing to download and install it?
+- A separate application brings significant overhead for the development team, which may not be 
+  sustainable in the long term.
 
 ----------------------------------------------
 ----------------------------------------------
 ----------------------------------------------
 # New Differentiation Tools that Reduce User Effort
 
-Motivation: While analytic derivatives provide massive performance gains, 
-they also require significant user effort to implement. 
-This creates a high activation energy that prevents many users from taking advantage of the most powerful feature of OpenMDAO. 
+**Motivation:** While analytic derivatives provide massive performance gains, they also require 
+significant user effort to implement. This creates a high activation energy that prevents many 
+users from taking advantage of the most powerful feature of OpenMDAO. 
 
-Overall Goal: Lower the effort required to implement analytic partial derivatives for components, 
+**Overall Goal:** Lower the effort required to implement analytic partial derivatives for components, 
 offering a spectrum of options that can potentially trade required user effort with computational efficiency. 
 
 ## 1) Coloring applied to approximated partial derivatives 
 ### Goal: 
-    - Usable for FD and CS approximations 
-    - Offers much higher performance for components with very sparse partial derivative Jacobians 
-      (e.g. vectorized components with no interaction between vector elements)
-    - When used with CS, effectively offers a fast-forward mode AD
+- Make coloring usable for FD and CS approximations.
+- Offer much higher performance for components with very sparse partial derivative Jacobians 
+  (e.g. vectorized components with no interaction between vector elements).
+- When used with CS, this effectively offers a fast-forward mode AD.
 
 ### Potential Challenges: 
-    - Computational cost of coloring may be excessive for models with a lot of of instances 
-    - Coloring algorithms are not perfect, and may result in an invalid Jacobian, 
-      so we need an effective way for users to check their colored partials. 
-      (the existing check_partials functionality can be leveraged, but may need some updates)
-    - In some cases, sparsity may not be high enough to offer meaningful performance gains. 
-      How can a user check this? 
+- The computational cost of coloring may be excessive for models with a lot of instances.
+- Coloring algorithms are not perfect and may result in an invalid Jacobian, 
+  so we need an effective way for users to check their colored partials. 
+  The existing `check_partials` functionality can be leveraged, but may need some updates.
+- In some cases, sparsity may not be high enough to offer meaningful performance gains. 
+  We need to provide a means for the user to check this.
 
 ### Notes: 
-    - Prototype implementation already available in experimental features 
-    - Partial coloring algorithm will also be useful for AD partials
+- A prototype implementation is already available as an experimental feature.
+- The partial coloring algorithm will also be useful for AD partials.
 
 
 ## 2) Algorithmic differentiation for component partial derivatives
     
 ### Goal: 
-- Forward and reverse mode AD that works for a wide variety of general use cases including many numpy functions 
-- Relatively good performance compared to hand differentiation
+- Provide forward and reverse mode AD that works for a wide variety of general use cases including
+  with many numpy functions.
+- AD should have relatively good performance compared to hand differentiation.
 
 ### Potential Challenges: 
 - AD tools will struggle with current OpenMDAO syntax for `compute` and `apply_nonlinear` methods, 
-  so some kind of translation layer will be needed
-- Python AD libraries are not as well developed as other languages (e.g. C, Fortran, Julia)
-- Certain coding practices are not compatible with AD, and will need to be avoided (e.g. modification of instance attributes, functions with side-effects)
+  so some kind of translation layer will be needed.
+- Python AD libraries are not as well developed as those for other languages (e.g. C, Fortran, Julia).
+- Certain coding practices are not compatible with AD, and will need to be avoided
+  (e.g. modification of instance attributes, functions with side-effects).
 
 
 ----------------------------------------------
@@ -136,22 +138,12 @@ offering a spectrum of options that can potentially trade required user effort w
 
 ## 1) Planning for the 2020 OpenMDAO workshop 
 
-## 2) POEMs: **p**roposal for **O**penMDAO **e**nhance**m**ent
-- Loosely based on the model used by cPython project (PEP process)
-- A new repo has been created for tracking POEMs: 
-  http://github.com/openmdao/POEMs
-- Notes: We are planning to work the POEM process on PR 1086 (https://github.com/OpenMDAO/OpenMDAO/pull/1086)
+## 2) POEMs
+- A POEM is a **p**roposal for **O**penMDAO **e**nhance**m**ent.
+- This process is loosely based on the model used by cPython project (the PEP process).
+- A new repository has been created for tracking POEMs (http://github.com/openmdao/POEMs).
+- We are planning to work the POEM process on PR 1086 (https://github.com/OpenMDAO/OpenMDAO/pull/1086).
 
 ## 3) Establishing a formal OpenMDAO plugin system
-- To go alone with the POEM process, 
-we need a method for users to add functionality without merging their code to core codebase. 
-
- 
-
-
-
-
-
-
-
-
+- To go along with the POEM process, we need a method for users to add functionality without
+  merging their code to the core codebase.
