@@ -385,7 +385,7 @@ def _itrace_setup_parser(parser):
                              'expression can be added for each class.')
 
 
-def _itrace_exec(options):
+def _itrace_exec(options, user_args):
     """
     Process command line args and perform tracing on a specified python file.
     """
@@ -405,4 +405,5 @@ def _itrace_exec(options):
     _setup(options)
     start()
 
+    sys.argv[:] = [progname] + user_args
     exec (code, globals_dict)

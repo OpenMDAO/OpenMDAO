@@ -216,7 +216,7 @@ def _calltree_setup_parser(parser):
                         default='stdout', help='Output file.  Defaults to stdout.')
 
 
-def _calltree_exec(options):
+def _calltree_exec(options, user_args):
     """
     Process command line args and call get_nested_calls on the specified class method.
     """

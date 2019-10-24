@@ -7,11 +7,17 @@ Command Line Tools
 OpenMDAO has a number of debugging/viewing command line tools that are available via the `openmdao`
 command.  There are two types of commands available, those that perform some sort of viewing or
 configuration checking on the Problem after its setup is complete, and those that are used to
-collect information about the entire run of the Problem, things like profilers and tracers.
+collect information about the entire run of the Problem, like profilers and tracers.
 
 .. note::
     The `openmdao` sub-commands, as well as any other console scripts associated with OpenMDAO, will
     only be available if you have installed OpenMDAO using *pip*. See :ref:`Getting Started <GettingStarted>`
+
+
+.. note::
+    When using a command line tool on a script that takes its own command line arguments, those
+    arguments must be placed after a :code:`--` on the command line.  Anything to the right of the
+    :code:`--` will be ignored by the openmdao command line parser and passed on to the user script.
 
 
 All available :code:`openmdao` sub-commands can be shown using the following command:
@@ -20,25 +26,23 @@ All available :code:`openmdao` sub-commands can be shown using the following com
     :cmd: openmdao -h
 
 
-To get further info on any sub-command,
-for example, for :code:`tree`, follow the command with a *-h*.  For example:
+To get further info on any sub-command, follow the command with a *-h*.  For example:
 
 .. embed-shell-cmd::
-    :cmd: openmdao tree -h
+    :cmd: openmdao n2 -h
 
 .. note::
-    Several of the example commands below make use of a file :code:`circuit.py`. This file is located in the
-    openmdao/test_suite/scripts directory.
+    Several of the example commands below make use of a files :code:`circuit.py` and
+    :code:`circle_opt.py`. These files are located in the openmdao/test_suite/scripts directory.
 
 
-Post-setup Commands
--------------------
+Viewing and Checking Commands
+-----------------------------
 
-The following commands all register a function that will run at the end of a Problem's
-:code:`final_setup` function.  After the registered function completes, the program will exit, rather than
-continuing to the end of the user's run script. This makes it convenient to view or check the
-configuration of a model in any run script without having to wait around for the entire script
-to run.
+Usually these commands will exit after executing, rather than continuing to the end of the user's
+run script. This makes it convenient to view or check the configuration of a model in any
+run script without having to wait around for the entire script to run.
+
 
 .. _om-command-check:
 
@@ -109,7 +113,7 @@ Below is an example of a connection viewer for a pycycle propulsor model obtaine
 
 .. code-block:: none
 
-    openmdao view_connections propulsor.py
+    openmdao view_connections -v propulsor.py
 
 
 .. figure:: view_connections.png
@@ -170,7 +174,7 @@ openmdao summary
 The :code:`openmdao summary` command prints a high level summary of the model.  For example:
 
 .. embed-shell-cmd::
-    :cmd: openmdao summary circuit.py
+    :cmd: openmdao summary circle_opt.py
     :dir: ../test_suite/scripts
 
 
