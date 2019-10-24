@@ -2022,7 +2022,7 @@ class System(object):
             not_found = (set(names).union(renames).union(patterns)) - found
             if not_found:
                 if not self._var_abs2meta and isinstance(self, openmdao.core.group.Group):
-                    empty_group_msg = 'Group is empty'
+                    empty_group_msg = ' Group contains no variables.'
                 else:
                     empty_group_msg = ''
                 if len(io_types) == 2:
@@ -2030,7 +2030,7 @@ class System(object):
                 else:
                     call = 'promotes_%ss' % io_types[0]
                 raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                   "names or patterns: %s. %s" %
+                                   "names or patterns: %s.%s" %
                                    (self.msginfo, call, sorted(not_found), empty_group_msg))
 
         maps = {'input': {}, 'output': {}}

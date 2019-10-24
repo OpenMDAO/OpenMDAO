@@ -408,7 +408,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "IndepVarComp (comp1): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['xx']. ")
+                         "the following names or patterns: ['xx'].")
     def test_group_renames_errors_bad_tuple(self):
         p = om.Problem()
         p.model.add_subsystem('comp1', om.IndepVarComp('x', 5.0),
@@ -472,7 +472,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(err.exception),
                          "SellarDis2 (d1): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['foo']. ")
+                         "the following names or patterns: ['foo'].")
     def test_group_nested_conn(self):
         """Example of adding subsystems and issuing connections with nested groups."""
         g1 = om.Group()
@@ -657,7 +657,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (C2): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['x*']. ")
+                         "the following names or patterns: ['x*'].")
     def test_promote_not_found2(self):
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
@@ -669,7 +669,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (C2): 'promotes_inputs' failed to find any matches for "
-                         "the following names or patterns: ['xx']. ")
+                         "the following names or patterns: ['xx'].")
     def test_promote_not_found3(self):
         p = om.Problem()
         p.model.add_subsystem('indep', om.IndepVarComp('x', np.ones(5)),
@@ -681,7 +681,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (C2): 'promotes' failed to find any matches for "
-                         "the following names or patterns: ['xx']. ")
+                         "the following names or patterns: ['xx'].")
     def test_empty_group(self):
         p = om.Problem()
         g1 = p.model.add_subsystem('G1', om.Group(), promotes=['*'])
@@ -691,7 +691,7 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          "Group (G1): 'promotes' failed to find any matches for "
                          "the following names or patterns: ['*']. "
-                         "Group is empty")
+                         "Group contains no variables.")
 
     def test_missing_promote_var(self):
         p = om.Problem()
@@ -706,7 +706,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (d1): 'promotes_inputs' failed to find any matches for "
-                         "the following names or patterns: ['foo']. ")
+                         "the following names or patterns: ['foo'].")
     def test_missing_promote_var2(self):
         p = om.Problem()
 
@@ -720,7 +720,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (d1): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['bar', 'blammo']. ")
+                         "the following names or patterns: ['bar', 'blammo'].")
     def test_promote_src_indices(self):
         import numpy as np
 
