@@ -40,11 +40,14 @@ class TestCheckConfig(unittest.TestCase):
 
         expected = (
             "The following inputs are not connected:\n"
-            "   G3.G4.C4.v\n"
-            "   G3.G4.C4.x\n"
-            "   G3.G4.u: ['G3.G4.C3.u']\n"
-            "   G3.G4.x: ['G3.G4.C3.x']\n"
-            "   w: ['G1.G2.C1.w']\n"
+            "   G3.G4.C4.v     [1.]\n"
+            "   G3.G4.C4.x     [1.]\n"
+            "   G3.G4.u  (p):\n"
+            "      G3.G4.C3.u  [1.]\n"
+            "   G3.G4.x  (p):\n"
+            "      G3.G4.C3.x  [1.]\n"
+            "   w  (p):\n"
+            "      G1.G2.C1.w  [1.]\n"
         )
 
         self.assertTrue(testlogger.contains('warning', expected))
@@ -285,16 +288,16 @@ class TestCheckConfig(unittest.TestCase):
         )
 
         expected_warning_2 = (
-            "The following inputs are not connected:\n"
-            "   G1.C1.b\n"
-            "   G1.C11.b\n"
-            "   G1.C13.b\n"
-            "   G1.C22.b\n"
-            "   G1.C23.b\n"
-            "   G1.N1.a\n"
-            "   G1.N1.b\n"
-            "   G1.N2.a\n"
-            "   G1.N3.a\n"
+            'The following inputs are not connected:\n'
+            '   G1.C1.b      [1.]\n'
+            '   G1.C11.b     [1.]\n'
+            '   G1.C13.b     [1.]\n'
+            '   G1.C22.b     [1.]\n'
+            '   G1.C23.b     [1.]\n'
+            '   G1.N1.a      [1.]\n'
+            '   G1.N1.b      [1.]\n'
+            '   G1.N2.a      [1.]\n'
+            '   G1.N3.a      [1.]\n'
         )
 
         self.assertTrue(testlogger.contains('info', expected_info))

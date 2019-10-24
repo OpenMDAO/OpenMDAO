@@ -15,6 +15,11 @@ from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
+from openmdao.utils.general_utils import printoptions
+from openmdao.utils.units import convert_units
+
+
+_UNSET = object()
 
 
 def _check_cycles(group, infos=None):
@@ -199,6 +204,40 @@ def _check_dup_comp_inputs(problem, logger):
         logger.warning(''.join(msg))
 
 
+def _fixed_str(obj, size):
+    s = str(obj)
+    if len(s) > size:
+        s = s[:size - 4] + ' ...'
+    return s
+
+
+def _has_val_mismatch(discretes, names, units, vals):
+    if len(names) < 2:
+        return False
+
+    uset = set(units)
+    if '' in uset and len(uset) > 1:
+        # at least one case has no units and at least one does, so there must be a mismatch
+        return True
+
+    u0 = v0 = _UNSET
+    for n, u, v in zip(names, units, vals):
+        if n in discretes:
+            continue
+        if u0 is _UNSET:
+            u0 = u
+            v0 = v
+        else:
+            if u != u0:
+                # convert units
+                v = convert_units(v, u, new_units=u0)
+
+            if np.linalg.norm(v - v0) > 1e-25:
+                return True
+
+    return False
+
+
 def _check_hanging_inputs(problem, logger):
     """
     Issue a logger warning if any inputs are not connected.
@@ -217,10 +256,11 @@ def _check_hanging_inputs(problem, logger):
     else:
         input_srcs = problem.model._conn_global_abs_in2out
 
+    invec = problem.model._inputs
     prom_ins = problem.model._var_allprocs_prom2abs_list['input']
     abs2meta = problem.model._var_allprocs_abs2meta
     unconns = []
-    nwid = 0
+    nwid = uwid = 0
 
     for prom, abslist in iteritems(prom_ins):
         unconn = [a for a in abslist if a not in input_srcs or len(input_srcs[a]) == 0]
@@ -228,17 +268,45 @@ def _check_hanging_inputs(problem, logger):
             w = max([len(u) for u in unconn])
             if w > nwid:
                 nwid = w
-            unconns.append((prom, unconn))
+            units = [abs2meta[a]['units'] for a in unconn]
+            units = [u if u is not None else '' for u in units]
+            lens = [len(u) for u in units]
+            if lens:
+                u = max(lens)
+                if u > uwid:
+                    uwid = u
+            unconns.append((prom, unconn, units))
 
     if unconns:
-        template = "{:<{c1wid}} {:<6} {:<5} {:<5} {:<4} {:<4} {:<4} {:.2f} {}"
+        template_abs = "{:<{nwid}} {:<{uwid}} {}\n"
+        template_prom = "{:<{nwid}} {:<{uwid}} {}\n"
         msg = ["The following inputs are not connected:\n"]
-        for prom, absnames in sorted(unconns, key=lambda x: x[0]):
-            if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
-                msg.append("   {}\n".format(prom))
-            else:  # promoted
-                lines = []
-                msg.append("   {}: {}\n".format(prom, absnames))
+        with printoptions(precision=3):
+            for prom, absnames, units in sorted(unconns, key=lambda x: x[0]):
+                if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
+                    a = absnames[0]
+                    msg.append("   " +
+                               template_abs.format(a, units[0],
+                                                   _fixed_str(problem.get_val(a, get_remote=True),
+                                                              15),
+                                                   nwid=nwid + 3, uwid=uwid))
+                else:  # promoted
+                    vals = [problem.get_val(a, get_remote=True) for a in absnames]
+                    mismatch = _has_val_mismatch(problem.model._var_allprocs_discrete['input'],
+                                                 absnames, units, vals)
+                    if mismatch:
+                        msg.append("\n   ----- WARNING: inconsistent units and/or values!! -----\n")
+                    msg.append("   {}  (p):\n".format(prom))
+                    for a, u, v in zip(absnames, units, vals):
+                        msg.append("      " +
+                                   template_prom.format(a, u,
+                                                        _fixed_str(problem.get_val(a,
+                                                                                   get_remote=True),
+                                                                   15),
+                                                        nwid=nwid, uwid=uwid))
+                    if mismatch:
+                        msg.append("   -------------------------------------------------------\n\n")
+
         logger.warning(''.join(msg))
 
 

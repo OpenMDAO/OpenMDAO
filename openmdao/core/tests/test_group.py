@@ -244,7 +244,7 @@ class TestGroup(unittest.TestCase):
         _check_hanging_inputs(p, logger)
         for w in logger.get('warning'):
             if 'The following inputs are not connected:' in w:
-                if "gouter.couter.a" in w and "gouter.xx: ['gouter.g.c0.x']" in w:
+                if "gouter.couter.a" in w and "gouter.xx" in w and 'gouter.g.c0.x':
                     break
         else:
             self.fail("Expected warning not found.")
