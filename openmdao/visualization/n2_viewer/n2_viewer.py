@@ -35,7 +35,8 @@ from openmdao.drivers.doe_driver import DOEDriver
 
 # Toolbar settings
 _FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
-_MODEL_HEIGHTS = [600, 650, 700, 750, 800, 850, 900, 950, 1000, 2000, 3000, 4000]
+_MODEL_HEIGHTS = [600, 650, 700, 750, 800,
+                  850, 900, 950, 1000, 2000, 3000, 4000]
 
 _IND = 4  # HTML indentation (spaces)
 
@@ -200,12 +201,14 @@ def _get_viewer_data(data_source):
         root_group = data_source.model
 
         if not isinstance(root_group, Group):
-            simple_warning("The model is not a Group, viewer data is unavailable.")
+            simple_warning(
+                "The model is not a Group, viewer data is unavailable.")
             return {}
 
         driver = data_source.driver
         driver_name = driver.__class__.__name__
-        driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
+        driver_type = 'doe' if isinstance(
+            driver, DOEDriver) else 'optimization'
         driver_options = {k: driver.options[k] for k in driver.options}
         driver_opt_settings = None
         if driver_type is 'optimization' and 'opt_settings' in dir(driver):
@@ -226,7 +229,8 @@ def _get_viewer_data(data_source):
         return CaseReader(data_source, pre_load=False).problem_metadata
 
     else:
-        raise TypeError('_get_viewer_data only accepts Problems, Groups or filenames')
+        raise TypeError(
+            '_get_viewer_data only accepts Problems, Groups or filenames')
 
     data_dict = {}
     comp_exec_idx = [0]  # list so pass by ref
@@ -270,8 +274,8 @@ def _get_viewer_data(data_source):
                 edges_list = [
                     (sys_pathnames_dict[s], sys_pathnames_dict[t]) for s, t in G.edges(strong_comp)
                     if s in orders and exe_low <= orders[s] <= exe_high and t in orders and
-                        exe_low <= orders[t] <= exe_high and
-                        not (s == src and t == tgt) and t in sys_pathnames_dict
+                    exe_low <= orders[t] <= exe_high and
+                    not (s == src and t == tgt) and t in sys_pathnames_dict
                 ]
                 for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
                     for vtgt in vtgtlist:
@@ -368,7 +372,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     options['use_declare_partial_info'] = use_declare_partial_info
     model_data['options'] = options
 
-    model_data = 'var modelData = %s' % json.dumps(model_data, default=make_serializable)
+    model_data = 'var modelData = %s' % json.dumps(
+        model_data, default=make_serializable)
 
     import openmdao
     openmdao_dir = os.path.dirname(inspect.getfile(openmdao))
@@ -378,9 +383,27 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     style_dir = os.path.join(vis_dir, "style")
 
     # grab the libraries, src and style
-    lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete', 'vk_beautify': 'vkBeautify'}
+    lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete',
+               'vk_beautify': 'vkBeautify'}
     libs = read_files(itervalues(lib_dct), libs_dir, 'js')
-    src_names = 'draw', 'legend', 'modal', 'utils', 'SymbolType', 'N2TreeNode', 'ModelData', 'N2Style', 'N2Layout', 'N2MatrixCell', 'N2Matrix', 'N2Arrow', 'N2Diagram', 'N2UserInterface', 'defaults', 'ptN2', 'search'
+    src_names = \
+        'draw', \
+        'legend', \
+        'modal', \
+        'utils', \
+        'SymbolType', \
+        'N2TreeNode', \
+        'ModelData', \
+        'N2Style', \
+        'N2Layout', \
+        'N2MatrixCell', \
+        'N2Matrix', \
+        'N2Arrow', \
+        'N2Diagram', \
+        'N2UserInterface', \
+        'defaults', \
+        'ptN2', \
+        'search'
     srcs = read_files(src_names, src_dir, 'js')
     styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
 
@@ -403,7 +426,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
 
     for name, code in iteritems(srcs):
-        h.insert('{{{}_lib}}'.format(name.lower()), write_script(code, indent=_IND))
+        h.insert('{{{}_lib}}'.format(name.lower()),
+                 write_script(code, indent=_IND))
 
     h.insert('{{model_data}}', write_script(model_data, indent=_IND))
 
@@ -412,7 +436,8 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     group1 = toolbar.add_button_group()
     group1.add_button("Return To Root", uid="returnToRootButtonId", disabled="disabled",
                       content="icon-home")
-    group1.add_button("Back", uid="backButtonId", disabled="disabled", content="icon-left-big")
+    group1.add_button("Back", uid="backButtonId",
+                      disabled="disabled", content="icon-left-big")
     group1.add_button("Forward", uid="forwardButtonId", disabled="disabled",
                       content="icon-right-big")
     group1.add_button("Up One Level", uid="upOneLevelButtonId", disabled="disabled",
@@ -433,14 +458,18 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     group3 = toolbar.add_button_group()
     group3.add_button("Clear Arrows and Connections", uid="clearArrowsAndConnectsButtonId",
                       content="icon-eraser")
-    group3.add_button("Show Path", uid="showCurrentPathButtonId", content="icon-terminal")
-    group3.add_button("Show Legend", uid="showLegendButtonId", content="icon-map-signs")
-    group3.add_button("Toggle Solver Names", uid="toggleSolverNamesButtonId", content="icon-minus")
+    group3.add_button(
+        "Show Path", uid="showCurrentPathButtonId", content="icon-terminal")
+    group3.add_button("Show Legend", uid="showLegendButtonId",
+                      content="icon-map-signs")
+    group3.add_button("Toggle Solver Names",
+                      uid="toggleSolverNamesButtonId", content="icon-minus")
     group3.add_dropdown("Font Size", id_naming="idFontSize", options=_FONT_SIZES,
                         option_formatter=lambda x: '{}px'.format(x),
                         button_content="icon-text-height")
     group3.add_dropdown("Vertically Resize", id_naming="idVerticalResize",
-                        options=_MODEL_HEIGHTS, option_formatter=lambda x: '{}px'.format(x),
+                        options=_MODEL_HEIGHTS, option_formatter=lambda x: '{}px'.format(
+                            x),
                         button_content="icon-resize-vertical", header="Model Height")
 
     group4 = toolbar.add_button_group()
