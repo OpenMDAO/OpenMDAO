@@ -268,7 +268,7 @@ def _check_hanging_inputs(problem, logger):
             w = max([len(u) for u in unconn])
             if w > nwid:
                 nwid = w
-            units = [abs2meta[a]['units'] for a in unconn]
+            units = [abs2meta[a]['units'] if a in abs2meta else '' for a in unconn]
             units = [u if u is not None else '' for u in units]
             lens = [len(u) for u in units]
             if lens:
