@@ -66,7 +66,8 @@ class N2ScalarBase extends N2CellRendererBase {
      * @param {selection} [d3Elem = null ] The selection created in render().
      */
     update(svgGroup, dims, d3Elem = null) {
-        if (!d3Elem) d3Elem = d3.select(svgGroup).select('.' + this.className);
+        if (!d3Elem) d3Elem = d3.select(svgGroup).select('.' + this.className)
+            .transition(sharedTransition);
         return d3Elem
             .attr("rx", dims.bottomRight.x * .6)
             .attr("ry", dims.bottomRight.y * .6);
