@@ -86,4 +86,47 @@ class N2TreeNode {
     isSubsystem() {
         return (this.type == 'subsystem');
     }
+
+
+    _hasObjectInChildren(node, toMatchObj) {
+        if (node === toMatchObj) {
+            return true;
+        }
+
+        if (node.hasChildren()) {
+            for (let child of node.children) {
+                if (node._hasObjectInChildren(child, toMatchObj)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    hasObject(toMatchObj) {
+        for (let obj = this; obj != null; obj = obj.parent) {
+            if (obj === toMatchObj) {
+                return true;
+            }
+        }
+        return this._hasObjectInChildren(this, toMatchObj);
+    }
+
+    _getObjectsInChildrenWithCycleArrows(node, arr) {
+        if (node.cycleArrows) { arr.push(node); }
+        if (node.hasChildren()) {
+            for (let child of node.children) {
+                this._getObjectsInChildrenWithCycleArrows(child, arr);
+            }
+        }
+    }
+
+    getObjectsWithCycleArrows(arr) {
+        //start with parent.. the children will get the current object to avoid duplicates
+        for (let obj = this.parent; obj != null; obj = obj.parent) {
+            if (obj.cycleArrows) { arr.push(obj); }
+        }
+        this._getObjectsInChildrenWithCycleArrows(this, arr);
+    }
 }

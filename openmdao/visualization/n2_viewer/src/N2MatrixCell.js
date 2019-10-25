@@ -352,7 +352,8 @@ class N2MatrixCell {
      * TODO: Remove these globals
      */
     mouseover() {
-        return (this.onDiagonal() ? mouseOverOnDiagN2 : mouseOverOffDiagN2);
+        return (this.onDiagonal() ? n2MouseFuncs.overOnDiag :
+            n2MouseFuncs.overOffDiag);
     }
 
     /**

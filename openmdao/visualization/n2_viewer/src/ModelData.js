@@ -5,12 +5,14 @@ class ModelData {
     constructor(modelJSON) {
         modelJSON.tree.name = 'model'; // Change 'root' to 'model'
         this.conns = modelJSON.connections_list;
+        console.log(this.conns);
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
         this.declarePartialsList = modelJSON.declare_partials_list;
         this.sysPathnamesList = modelJSON.sys_pathnames_list;
 
         this.maxDepth = 1;
         this.idCounter = 0;
+        this.unconnectedParams = 0;
 
         let startTime = Date.now();
         this.root = this.tree = modelJSON.tree = this.convertToN2TreeNodes(modelJSON.tree);
@@ -27,6 +29,9 @@ class ModelData {
         startTime = Date.now();
         this.setParentsAndDepth(this.root, null, 1);
         console.log("ModelData.setParentsAndDepth: ", Date.now() - startTime, "ms");
+
+        if (this.unconnectedParams > 0)
+            console.log("Unconnected nodes: ", this.unconnectedParams);
 
         startTime = Date.now();
         this.initSubSystemChildren(this.root);
@@ -45,11 +50,11 @@ class ModelData {
      * @param {N2TreeNode} [node = this.root] The node to start with.
      */
     errorCheck(node = this.root) {
-        if (! (node instanceof N2TreeNode))
+        if (!(node instanceof N2TreeNode))
             console.log('Node with problem: ', node);
 
         for (let prop of ['parent', 'originalParent', 'parentComponent']) {
-            if (node[prop] && ! (node[prop] instanceof N2TreeNode))
+            if (node[prop] && !(node[prop] instanceof N2TreeNode))
                 console.log('Node with problem ' + prop + ': ', node);
         }
 
@@ -265,10 +270,13 @@ class ModelData {
      * @return True if the path is found as a source in the connection list.
      */
     hasAnyConnection(elementPath) {
+
         for (let conn of this.conns) {
             if (conn.src == elementPath || conn.tgt == elementPath)
                 return true;
         }
+
+        this.unconnectedParams++;
 
         return false;
     }
@@ -454,13 +462,13 @@ class ModelData {
     /**
      * If an element has no connection naming it as a source or target,
      * relabel it as unconnected.
-     * @param {N2TreeNode} element The tree node to work on.
+     * @param {N2TreeNode} node The tree node to work on.
      */
-    identifyUnconnectedParam(element) { // Formerly updateRootTypes
-        if (!element.hasOwnProperty('absPathName'))
-            throw("identifyUnconnectedParam error: element.absPathName not set for ", element);
+    identifyUnconnectedParam(node) { // Formerly updateRootTypes
+        if (!node.hasOwnProperty('absPathName'))
+            throw ("identifyUnconnectedParam error: absPathName not set for ", node);
 
-        if (element.type == "param" && !this.hasAnyConnection(element.absPathName))
-            element.type = "unconnected_param";
+        if (node.isParam() && !this.hasAnyConnection(node.absPathName))
+            node.type = "unconnected_param";
     }
 }

@@ -275,8 +275,8 @@ class N2Matrix {
             .each(function (d) {
                 d.renderer.renderPrevious(this)
                     .on('mouseover', d.mouseover())
-                    .on('mouseleave', mouseOutN2)
-                    .on('click', mouseClickN2);
+                    .on('mouseleave', n2MouseFuncs.out)
+                    .on('click', n2MouseFuncs.click);
             });
 
         gEnter.merge(selection)
@@ -468,8 +468,139 @@ class N2Matrix {
         this._drawHorizontalLines();
         this._drawVerticalLines();
         this._drawComponentBoxes();
- 
+
         console.log("N2Matrix.draw: ", Date.now() - startTime, "ms");
 
+    }
+
+    /**
+     * When the mouse goes over a cell that's on the diagonal, look for and
+     * draw connection arrows, and highlight variable names.
+     * @param {N2MatrixCell} cell The cell the event occured on.
+     * TODO: move DrawRect() someplace non-global
+     */
+    mouseOverOnDiagonal(cell) {
+        let leftTextWidthHovered = this.layout.visibleNodes[cell.row].nameWidthPx;
+
+        // Loop over all elements in the matrix looking for other cells in the same column as
+        let lineWidth = Math.min(5, this.nodeSize.width * .5,
+            this.nodeSize.height * .5);
+
+        DrawRect(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
+            this.nodeSize.height * cell.row, leftTextWidthHovered,
+            this.nodeSize.height, N2Style.color.highlightHovered); //highlight hovered
+
+        for (let col = 0; col < this.layout.visibleNodes.length; ++col) {
+            let leftTextWidthDependency = this.layout.visibleNodes[col].nameWidthPx;
+            if (this.exists(cell.row, col)) {
+                if (col != cell.row) {
+                    new N2Arrow({
+                        'end': { 'col': col, 'row': col },
+                        'start': { 'col': cell.row, 'row': cell.row },
+                        'color': N2Style.color.greenArrow,
+                        'width': lineWidth
+                    }, this.n2Groups, this.nodeSize);
+
+                    //highlight var name
+                    DrawRect(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
+                        this.nodeSize.height * col, leftTextWidthDependency,
+                        this.nodeSize.height, N2Style.color.greenArrow);
+                }
+            }
+
+            // Now swap row and col
+            if (this.exists(col, cell.row)) {
+                if (col != cell.row) {
+                    new N2Arrow({
+                        'start': { 'col': col, 'row': col },
+                        'end': { 'col': cell.row, 'row': cell.row },
+                        'color': N2Style.color.redArrow,
+                        'width': lineWidth
+                    }, this.n2Groups, this.nodeSize);
+
+                    //highlight var name
+                    DrawRect(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
+                        this.nodeSize.height * col, leftTextWidthDependency,
+                        this.nodeSize.height, N2Style.color.redArrow);
+                }
+            }
+        }
+    }
+
+    /**
+     * When the mouse goes over a cell that's not on the diagonal, look for and
+     * draw cycle arrows, and highlight variable names.
+     * @param {N2MatrixCell} cell The cell the event occured on.
+     */
+    mouseOverOffDiagonal(cell) {
+        let lineWidth = Math.min(5, this.nodeSize.width * .5, this.nodeSize.height * .5);
+        let src = this.layout.visibleNodes[cell.row];
+        let tgt = this.layout.visibleNodes[cell.col];
+        // let boxEnd = this.boxInfo[cell.col]; // not used?
+
+        new N2Arrow({
+            'start': { 'col': cell.row, 'row': cell.row },
+            'end': { 'col': cell.col, 'row': cell.col },
+            'color': N2Style.color.redArrow,
+            'width': lineWidth
+        }, this.n2Groups, this.nodeSize);
+
+        if (cell.row > cell.col) {
+            let targetsWithCycleArrows = [];
+            tgt.getObjectsWithCycleArrows(targetsWithCycleArrows);
+
+            for (let twca of targetsWithCycleArrows) {
+                for (let ai of twca.cycleArrows) {
+                    if (src.hasObject(ai.src)) {
+                        for (let si of ai.arrows) {
+                            let beginObj = si.begin;
+                            let endObj = si.end;
+                            let firstBeginIndex = -1, firstEndIndex = -1;
+
+                            // find first begin index
+                            for (let mi in this.layout.visibleNodes) {
+                                let rtNode = n2Diag.layout.visibleNodes[mi];
+                                if (rtNode.hasObject(beginObj)) {
+                                    firstBeginIndex = mi;
+                                    break;
+                                }
+                            }
+                            if (firstBeginIndex == -1) {
+                                throw("Error: first begin index not found");
+                            }
+
+                            // find first end index
+                            for (let mi in this.layout.visibleNodes) {
+                                let rtNode = this.layout.visibleNodes[mi];
+                                if (rtNode.hasObject(endObj)) {
+                                    firstEndIndex = mi;
+                                    break;
+                                }
+                            }
+                            if (firstEndIndex == -1) {
+                                throw("Error: first end index not found");
+                            }
+
+                            if (firstBeginIndex != firstEndIndex) {
+                                DrawArrowsParamView(firstBeginIndex, firstEndIndex, n2Diag.matrix.nodeSize);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let leftTextWidthR = this.layout.visibleNodes[cell.row].nameWidthPx,
+            leftTextWidthC = this.layout.visibleNodes[cell.col].nameWidthPx;
+
+        // highlight var name
+        DrawRect(-leftTextWidthR - this.layout.size.partitionTreeGap,
+            this.nodeSize.height * cell.row, leftTextWidthR, this.nodeSize.height,
+            N2Style.color.redArrow);
+
+        // highlight var name
+        DrawRect(-leftTextWidthC - this.layout.size.partitionTreeGap,
+            this.nodeSize.height * cell.col, leftTextWidthC, this.nodeSize.height,
+            N2Style.color.greenArrow);
     }
 }

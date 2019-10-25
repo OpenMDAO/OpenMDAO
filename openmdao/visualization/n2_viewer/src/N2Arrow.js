@@ -17,17 +17,19 @@ class N2Arrow {
      * @param {Object} n2Groups References to <g> SVG elements.
      * @param {Object} nodeSize The size of each cell in the matrix
      */
-    constructor(attribs, n2Groups, nodeSize) {
+    constructor(attribs, n2Groups, nodeSize, markerSize = null) {
+
         this.start = attribs.start;
         this.end = attribs.end;
         this.color = attribs.color;
         this.width = attribs.width;
+        this.markerSize = (markerSize)? markerSize : attribs.width * .4;
+        
+        this.middle = { 'row': -1, 'col': -1 };
 
-        this.middle = { row: -1, col: -1 };
-
-        this.startPt = { x: -1, y: -1 };
-        this.midPt = { x: -1, y: -1 };
-        this.endPt = { x: -1, y: -1 };
+        this.startPt = { 'x': -1, 'y': -1 };
+        this.midPt = { 'x': -1, 'y': -1 };
+        this.endPt = { 'x': -1, 'y': -1 };
 
         this.computePts(nodeSize);
         this.draw(n2Groups);
@@ -87,6 +89,8 @@ class N2Arrow {
             .style("fill-opacity", .75)
             .style("fill", this.color);
 
-        this.path.attr("marker-end", "url(#arrow)");
+        this.path.attr("marker-end", "url(#arrow)")
+            .attr("markerWidth", this.markerSize)
+            .attr("markerHeight", this.markerSize);
     }
 }

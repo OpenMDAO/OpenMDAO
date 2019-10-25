@@ -571,7 +571,7 @@ class N2Diagram {
             this.clearArrows();
 
             this.layout = new N2Layout(this.model, this.zoomedElement,
-                    this.showLinearSolverNames, this.dims);
+                this.showLinearSolverNames, this.dims);
             this._updateClickedIndices();
             this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout,
                 this.dom.n2Groups, this.matrix.nodeSize);
@@ -607,9 +607,9 @@ class N2Diagram {
         this.clearArrows();
 
         this.dims.size.diagram.height =
-        this.dims.size.diagram.width =
-        this.dims.size.partitionTree.height =
-        this.dims.size.solverTree.height = height;
+            this.dims.size.diagram.width =
+            this.dims.size.partitionTree.height =
+            this.dims.size.solverTree.height = height;
 
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
         this.style.updateSvgStyle(this.layout.size.font);
@@ -629,5 +629,60 @@ class N2Diagram {
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
         this.style.updateSvgStyle(fontSize);
         this.update();
+    }
+
+    /**
+     * Since the matrix can be destroyed and recreated, use this to invoke the callback
+     * rather than setting one up that points directly to a specific matrix.
+     * @param {N2MatrixCell} cell The cell the event occured on.
+     */
+    mouseOverOnDiagonal(cell) {
+        this.matrix.mouseOverOnDiagonal(cell);
+    }
+
+    /**
+     * Since the matrix can be destroyed and recreated, use this to invoke the callback
+     * rather than setting one up that points directly to a specific matrix.
+     */
+    mouseOverOffDiagonal(cell) {
+        this.matrix.mouseOverOffDiagonal(cell);
+    }
+
+    /** When the mouse leaves a cell, remove all temporary arrows. */
+    mouseOut() {
+        this.dom.n2TopGroup.selectAll(".n2_hover_elements").remove();
+    }
+
+    /**
+     * When the mouse if left-clicked on a cell, change their CSS class
+     * so they're not removed when the mouse moves out.
+     * @param {N2MatrixCell} cell The cell the event occured on.
+     */
+    mouseClick(cell) {
+        let newClassName = "n2_hover_elements_" + cell.row + "_" + cell.col;
+        let selection = this.dom.n2TopGroup.selectAll("." + newClassName);
+        if (selection.size() > 0) {
+            selection.remove();
+        }
+        else {
+            this.dom.n2TopGroup
+                .selectAll("path.n2_hover_elements, circle.n2_hover_elements")
+                .attr("class", newClassName);
+        }
+    }
+
+    /**
+     * Place member mouse callbacks in an object for easy reference.
+     * @returns {Object} Object containing each of the functions.
+    */
+    getMouseFuncs() {
+        let mf = {
+            'overOffDiag': this.mouseOverOffDiagonal.bind(this),
+            'overOnDiag': this.mouseOverOnDiagonal.bind(this),
+            'out': this.mouseOut.bind(this),
+            'click': this.mouseClick.bind(this)
+        }
+
+        return mf;
     }
 }
