@@ -26,6 +26,12 @@ class N2TreeNode {
         this.prevDims = { 'x': 1e-6, 'y': 1e-6, 'width': 1e-6, 'height': 1e-6 };
         this.solverDims = { 'x': 0, 'y': 0, 'width': 1, 'height': 1 };
         this.prevSolverDims = { 'x': 1e-6, 'y': 1e-6, 'width': 1e-6, 'height': 1e-6 };
+        this.isMinimized = false;
+    }
+
+    toggleMinimize() {
+        this.isMinimized = !this.isMinimized;
+        return this.isMinimized;
     }
 
     /**
@@ -56,6 +62,14 @@ class N2TreeNode {
     /** True if this.type is 'param' or 'unconnected_param'. */
     isParam() {
         return this.type.match(paramRegex);
+    }
+
+    isConnectedParam() {
+        return (this.type == 'param');
+    }
+
+    isUnconnectedParam() {
+        return (this.type == 'unconnected_param');
     }
 
     /** True if this.type is 'unknown'. */

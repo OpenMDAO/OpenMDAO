@@ -8,30 +8,31 @@ class SymbolType {
     /**
      * Determine the name and whether it's a declared partial based on info
      * from the provided node.
-     * @param {N2MatrixNode} node The object to select the type from.
+     * @param {N2MatrixCell} cell The object to select the type from.
      * @param {ModelData} model Reference to the model to get some info from it.
      */
-    constructor(node, model) {
+    constructor(cell, model) {
         this.name = null;
+        this.potentialDeclaredPartial = false;
         this.declaredPartial = false;
 
         // Update properties based on the the referenced node.
-        this.getType(node, model);
+        this.getType(cell, model);
     }
 
     /** 
-     * Decide what object the node will be drawn as, based on its position
+     * Decide what object the cell will be drawn as, based on its position
      * in the matrix, type, source, target, and/or other conditions.
     */
-    getType(node, model) {
-        if (node.onDiagonal()) {
-            if (node.srcObj.type == "subsystem") {
+    getType(cell, model) {
+        if (cell.onDiagonal()) {
+            if (cell.srcObj.isSubsystem()) {
                 this.name = 'group';
                 return;
             }
 
-            if (node.srcObj.type.match(paramOrUnknownRegex)) {
-                if (node.srcObj.dtype == "ndarray") {
+            if (cell.srcObj.isParamOrUnknown()) {
+                if (cell.srcObj.dtype == "ndarray") {
                     this.name = 'vector';
                     return;
                 }
@@ -40,17 +41,17 @@ class SymbolType {
                 return;
             }
 
-            throw ("Unknown symbol type for node on diagonal.");
+            throw ("Unknown symbol type for cell on diagonal.");
         }
 
-        if (node.srcObj.type == "subsystem") {
-            if (node.tgtObj.type == "subsystem") {
+        if (cell.srcObj.isSubsystem()) {
+            if (cell.tgtObj.isSubsystem()) {
                 this.name = 'groupGroup';
                 return;
             }
 
-            if (node.tgtObj.type.match(paramOrUnknownRegex)) {
-                if (node.tgtObj.dtype == "ndarray") {
+            if (cell.tgtObj.isParamOrUnknown()) {
+                if (cell.tgtObj.dtype == "ndarray") {
                     this.name = 'groupVector';
                     return;
                 }
@@ -62,25 +63,26 @@ class SymbolType {
             throw ("Unknown group symbol type.");
         }
 
-        if (node.srcObj.type.match(paramOrUnknownRegex)) {
-
-            if (node.srcObj.dtype == "ndarray") {
-                if (node.tgtObj.type.match(paramOrUnknownRegex)) {
-                    if (node.tgtObj.dtype == "ndarray" ||
-                        node.tgtObj.type.match(paramRegex)) {
-
+        if (cell.srcObj.isParamOrUnknown()) {
+            if (cell.srcObj.dtype == "ndarray") {
+                if (cell.tgtObj.isParamOrUnknown()) {
+                    if (cell.tgtObj.dtype == "ndarray" || cell.tgtObj.isParam()) {
                         this.name = 'vectorVector';
-                        this.declaredPartial = model.isDeclaredPartial(node.srcObj, node.tgtObj);
+                        this.potentialDeclaredPartial = true;
+                        this.declaredPartial =
+                            model.isDeclaredPartial(cell.srcObj, cell.tgtObj);
 
                         return;
                     }
 
                     this.name = 'vectorScalar';
-                    this.declaredPartial = model.isDeclaredPartial(node.srcObj, node.tgtObj);
+                    this.potentialDeclaredPartial = true;
+                    this.declaredPartial =
+                        model.isDeclaredPartial(cell.srcObj, cell.tgtObj);
                     return;
                 }
 
-                if (node.tgtObj.type === "subsystem") {
+                if (cell.tgtObj.isSubsystem()) {
                     this.name = 'vectorGroup';
                     return;
                 }
@@ -88,21 +90,25 @@ class SymbolType {
                 throw ("Unknown vector symbol type.");
             }
 
-            if (node.tgtObj.type.match(paramOrUnknownRegex)) {
-                if (node.tgtObj.dtype == "ndarray") {
+            if (cell.tgtObj.isParamOrUnknown()) {
+                if (cell.tgtObj.dtype == "ndarray") {
                     this.name = 'scalarVector';
-                    this.declaredPartial = model.isDeclaredPartial(node.srcObj, node.tgtObj);
+                    this.potentialDeclaredPartial = true;
+                    this.declaredPartial =
+                        model.isDeclaredPartial(cell.srcObj, cell.tgtObj);
 
                     return;
                 }
 
                 this.name = 'scalarScalar';
-                this.declaredPartial = model.isDeclaredPartial(node.srcObj, node.tgtObj);
+                this.potentialDeclaredPartial = true;
+                this.declaredPartial =
+                    model.isDeclaredPartial(cell.srcObj, cell.tgtObj);
 
                 return;
             }
 
-            if (node.tgtObj.type == "subsystem") {
+            if (cell.tgtObj.isSubsystem()) {
                 this.name = 'scalarGroup';
                 return;
             }

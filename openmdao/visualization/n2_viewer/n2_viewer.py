@@ -378,9 +378,9 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     style_dir = os.path.join(vis_dir, "style")
 
     # grab the libraries, src and style
-    lib_dct = {'d3': 'd3.v4.min', 'awesomplete': 'awesomplete', 'vk_beautify': 'vkBeautify'}
+    lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete', 'vk_beautify': 'vkBeautify'}
     libs = read_files(itervalues(lib_dct), libs_dir, 'js')
-    src_names = 'draw', 'legend', 'modal', 'utils', 'SymbolType', 'N2TreeNode', 'ModelData', 'N2Style', 'N2Layout', 'N2MatrixNode', 'N2Matrix', 'N2Arrow', 'N2Diagram', 'defaults', 'ptN2', 'search'
+    src_names = 'draw', 'legend', 'modal', 'utils', 'SymbolType', 'N2TreeNode', 'ModelData', 'N2Style', 'N2Layout', 'N2MatrixCell', 'N2Matrix', 'N2Arrow', 'N2Diagram', 'defaults', 'ptN2', 'search'
     srcs = read_files(src_names, src_dir, 'js')
     styles = read_files(('awesomplete', 'partition_tree'), style_dir, 'css')
 

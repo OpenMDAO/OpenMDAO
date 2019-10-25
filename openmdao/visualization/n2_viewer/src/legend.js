@@ -121,7 +121,7 @@ function DrawLegendColor(g, u, v, color, justUpdate) {
     return shape.attr("x", -u).attr("y", -v).attr("width", u * 2).attr("height", v * 2)
         .style("stroke-width", 0).style("fill-opacity", 1);
 }
-
+/*
 function DrawScalar(g, u, v, color, justUpdate) {
     var shape = justUpdate ? g.select(".sMid") : g.append("ellipse").attr("class", "sMid").style("fill", color);
     return shape.attr("rx", u * .6).attr("ry", v * .6);
@@ -149,3 +149,4 @@ function DrawBorder(g, u, v, color, justUpdate) {
     shape3.attr("x", u * .8).attr("y", -v).attr("width", u * .2).attr("height", v * 2);
     shape4.attr("x", -u).attr("y", v * .8).attr("width", u * 2).attr("height", v * .2);
 }
+*/

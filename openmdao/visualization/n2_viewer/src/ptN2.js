@@ -37,23 +37,22 @@ SetupLegend(d3, n2Diag.dom.d3ContentDiv);
 
 //right click => collapse
 function RightClick(d, ele) {
-    var e = d3.event;
     lastLeftClickedEle = d;
     lastRightClickedObj = d;
     lastRightClickedEle = ele;
-    e.preventDefault();
+    d3.event.preventDefault();
     collapse();
 }
 
 function collapse() {
-    var d = lastLeftClickedEle;
+    let d = lastLeftClickedEle;
     if (!d.hasChildren()) return;
     if (d.depth > n2Diag.zoomedElement.depth) { //dont allow minimizing on root node
         lastRightClickedElement = d;
         FindRootOfChangeFunction = FindRootOfChangeForRightClick;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
         lastClickWasLeft = false;
-        Toggle(d);
+        d.toggleMinimize();
         n2Diag.update();
     }
 }
