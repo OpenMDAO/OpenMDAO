@@ -256,7 +256,6 @@ def _check_hanging_inputs(problem, logger):
     else:
         input_srcs = problem.model._conn_global_abs_in2out
 
-    invec = problem.model._inputs
     prom_ins = problem.model._var_allprocs_prom2abs_list['input']
     abs2meta = problem.model._var_allprocs_abs2meta
     unconns = []
@@ -288,7 +287,7 @@ def _check_hanging_inputs(problem, logger):
                     msg.append("   " +
                                template_abs.format(a, units[0],
                                                    _fixed_str(problem.get_val(a, get_remote=True),
-                                                              15),
+                                                              25),
                                                    nwid=nwid + 3, uwid=uwid))
                 else:  # promoted
                     vals = [problem.get_val(a, get_remote=True) for a in absnames]
@@ -302,7 +301,7 @@ def _check_hanging_inputs(problem, logger):
                                    template_prom.format(a, u,
                                                         _fixed_str(problem.get_val(a,
                                                                                    get_remote=True),
-                                                                   15),
+                                                                   25),
                                                         nwid=nwid, uwid=uwid))
                     if mismatch:
                         msg.append("   -------------------------------------------------------\n\n")
