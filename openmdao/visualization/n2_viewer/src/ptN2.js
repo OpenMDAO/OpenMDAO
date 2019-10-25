@@ -106,16 +106,12 @@ function ForwardButtonPressed() {
     n2Diag.update();
 }
 
-function Toggle(d) {
-    d.isMinimized = !d.isMinimized;
-}
-
 function FindRootOfChangeForRightClick(d) {
     return lastRightClickedElement;
 }
 
 function FindRootOfChangeForCollapseDepth(d) {
-    for (var obj = d; obj != null; obj = obj.parent) { //make sure history item is not minimized
+    for (let obj = d; obj != null; obj = obj.parent) { //make sure history item is not minimized
         if (obj.depth == n2Diag.chosenCollapseDepth) return obj;
     }
     return d;
@@ -329,7 +325,7 @@ function CollapseOutputsButtonClick(startNode) {
 
 function UncollapseButtonClick(startNode) {
     function Uncollapse(d) {
-        if (d.type !== "param" && d.type !== "unconnected_param") {
+        if (! d.isParam()) {
             d.isMinimized = false;
         }
         if (d.hasChildren()) {
@@ -347,18 +343,15 @@ function UncollapseButtonClick(startNode) {
 
 function CollapseToDepthSelectChange(newChosenCollapseDepth) {
     function CollapseToDepth(d, depth) {
-        if (d.type === "param" || d.type === "unknown" || d.type === "unconnected_param") {
+        if (d.isParamOrUnknown()) {
             return;
         }
-        if (d.depth < depth) {
-            d.isMinimized = false;
-        }
-        else {
-            d.isMinimized = true;
-        }
+
+        d.isMinimized = (d.depth < depth)? false : true;
+
         if (d.hasChildren()) {
-            for (var i = 0; i < d.children.length; ++i) {
-                CollapseToDepth(d.children[i], depth);
+            for (let child of d.children) {
+                CollapseToDepth(child, depth);
             }
         }
     }
@@ -370,35 +363,6 @@ function CollapseToDepthSelectChange(newChosenCollapseDepth) {
     FindRootOfChangeFunction = FindRootOfChangeForCollapseDepth;
     N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
     lastClickWasLeft = false;
-    n2Diag.update();
-}
-
-function FontSizeSelectChange(fontSize) {
-    for (var i = 8; i <= 14; ++i) {
-        var newText = (i == fontSize) ? ("<b>" + i + "px</b>") : (i + "px");
-        parentDiv.querySelector("#idFontSize" + i + "px").innerHTML = newText;
-    }
-    n2Diag.layout.size.font = fontSize;
-    N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
-    n2Diag.style.updateSvgStyle(fontSize);
-    n2Diag.update();
-}
-
-function VerticalResize(height) {
-    for (let i = 600; i <= 1000; i += 50) {
-        let newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
-        parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
-    }
-    for (let i = 2000; i <= 4000; i += 1000) {
-        let newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
-        parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
-    }
-    n2Diag.clearArrows();
-    n2Diag.layout.size.diagram.height = height;
-    n2Diag.matrix.updateLevelOfDetailThreshold(height);
-    n2Diag.layout.size.diagram.width = height; // Makes it square
-    N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
-    n2Diag.style.updateSvgStyle(n2Diag.layout.size.font);
     n2Diag.update();
 }
 
@@ -443,20 +407,20 @@ function CreateToolbar() {
 
     for (var i = 8; i <= 14; ++i) {
         var f = function (idx) {
-            return function () { FontSizeSelectChange(idx); };
+            return function () { n2Diag.fontSizeSelectChange(idx); };
         }(i);
         div.querySelector("#idFontSize" + i + "px").onclick = f;
     }
 
     for (var i = 600; i <= 1000; i += 50) {
         var f = function (idx) {
-            return function () { VerticalResize(idx); };
+            return function () { n2Diag.verticalResize(idx); };
         }(i);
         div.querySelector("#idVerticalResize" + i + "px").onclick = f;
     }
     for (var i = 2000; i <= 4000; i += 1000) {
         var f = function (idx) {
-            return function () { VerticalResize(idx); };
+            return function () { n2Diag.verticalResize(idx); };
         }(i);
         div.querySelector("#idVerticalResize" + i + "px").onclick = f;
     }

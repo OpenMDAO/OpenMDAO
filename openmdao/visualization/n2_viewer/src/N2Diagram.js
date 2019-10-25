@@ -31,6 +31,8 @@ class N2Diagram {
 
         this.showPath = false;
 
+        this.dims = JSON.parse(JSON.stringify(defaultDims));
+
         // Find the divs for D3 content in the existing document, and add a style section.
         let parentDiv = document.getElementById("ptN2ContentDivId");
         this.dom = {
@@ -55,8 +57,8 @@ class N2Diagram {
 
         this.showLinearSolverNames = true;
 
-        this.style = new N2Style(this.dom.svgStyle, N2Layout.defaults.size.font);
-        this.layout = new N2Layout(this.model, this.zoomedElement);
+        this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
+        this.layout = new N2Layout(this.model, this.zoomedElement, true, this.dims);
 
         this._setupSvgElements();
         this._updateClickedIndices();
@@ -568,7 +570,8 @@ class N2Diagram {
         if (computeNewTreeLayout) {
             this.clearArrows();
 
-            this.layout = new N2Layout(this.model, this.zoomedElement, this.showLinearSolverNames);
+            this.layout = new N2Layout(this.model, this.zoomedElement,
+                    this.showLinearSolverNames, this.dims);
             this._updateClickedIndices();
             this.matrix = new N2Matrix(this.layout.visibleNodes, this.model, this.layout,
                 this.dom.n2Groups, this.matrix.nodeSize);
@@ -586,5 +589,45 @@ class N2Diagram {
         this._runSolverTransition(d3Refs.selection);
 
         this.matrix.draw();
+    }
+
+    /**
+     * Adjust the height and corresponding width of the diagram based on user input.
+     * @param {number} height The new height in pixels.
+     */
+    verticalResize(height) {
+        for (let i = 600; i <= 1000; i += 50) {
+            let newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
+            this.dom.parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
+        }
+        for (let i = 2000; i <= 4000; i += 1000) {
+            let newText = (i == height) ? ("<b>" + i + "px</b>") : (i + "px");
+            this.dom.parentDiv.querySelector("#idVerticalResize" + i + "px").innerHTML = newText;
+        }
+        this.clearArrows();
+
+        this.dims.size.diagram.height =
+        this.dims.size.diagram.width =
+        this.dims.size.partitionTree.height =
+        this.dims.size.solverTree.height = height;
+
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        this.style.updateSvgStyle(this.layout.size.font);
+        this.update();
+    }
+
+    /**
+     * Adjust the font size of all text in the diagram based on user input.
+     * @param {number} fontSize The new font size in pixels.
+     */
+    fontSizeSelectChange(fontSize) {
+        for (let i = 8; i <= 14; ++i) {
+            let newText = (i == fontSize) ? ("<b>" + i + "px</b>") : (i + "px");
+            this.dom.parentDiv.querySelector("#idFontSize" + i + "px").innerHTML = newText;
+        }
+        this.dims.size.font = fontSize;
+        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+        this.style.updateSvgStyle(fontSize);
+        this.update();
     }
 }

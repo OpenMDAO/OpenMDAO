@@ -17,8 +17,10 @@ class N2Layout {
      * @param {ModelData} model The pre-processed model object.
      * @param {Object} newZoomedElement The element the new layout is based around.
      * @param {boolean} showLinearSolverNames Whether to show linear or non-linear solver names.
+     * @param {Object} dims The initial sizes for multiple tree elements.
      */
-    constructor(model, newZoomedElement, showLinearSolverNames) {
+    constructor(model, newZoomedElement,
+            showLinearSolverNames, dims) {
         this.model = model;
 
         this.zoomedElement = newZoomedElement;
@@ -35,7 +37,7 @@ class N2Layout {
         this.visibleSolverNodes = [];
 
         // Initial size values derived from read-only defaults
-        this.size = JSON.parse(JSON.stringify(N2Layout.defaults.size));
+        this.size = dims.size;
         this.svg = d3.select("#svgId");
 
         this.setupTextRenderer();

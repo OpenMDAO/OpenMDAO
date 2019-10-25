@@ -2,7 +2,7 @@
 const _DEFAULT_N2_DIAGRAM_UNIT = 'px';
 const _DEFAULT_N2_DIAGRAM_HEIGHT = 600;
 
-N2Layout.defaults = {
+defaultDims = {
     'size': {
         'unit': _DEFAULT_N2_DIAGRAM_UNIT,
         'diagram': { // Overall dimensions of diagram
@@ -26,7 +26,7 @@ N2Layout.defaults = {
     }
 };
 
-Object.freeze(N2Layout.defaults);
+Object.freeze(defaultDims);
 
 // TODO: Probably move this into N2Diagram or other class
 let N2TransitionDefaults = {
