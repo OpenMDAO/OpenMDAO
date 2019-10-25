@@ -198,7 +198,7 @@ class N2Style {
 // From Isaias Reyes
 N2Style.color = {
     'connection': 'black',
-    'unknownImplicit': 'c7d06d',
+    'unknownImplicit': '#c7d06d',
     'unknownExplicit': '#9ec4c7',
     'componentBox': '#555',
     'background': '#eee',

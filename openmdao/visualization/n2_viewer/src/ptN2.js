@@ -399,7 +399,7 @@ function CreateToolbar() {
     div.querySelector("#uncollapseAllButtonId").onclick = function () { UncollapseButtonClick(n2Diag.model.root); };
     div.querySelector("#collapseInViewButtonId").onclick = function () { CollapseOutputsButtonClick(n2Diag.zoomedElement); };
     div.querySelector("#collapseAllButtonId").onclick = function () { CollapseOutputsButtonClick(n2Diag.model.root); };
-    div.querySelector("#clearArrowsAndConnectsButtonId").onclick = n2Diag.clearArrows;
+    div.querySelector("#clearArrowsAndConnectsButtonId").onclick = n2Diag.clearArrows.bind(n2Diag);
     div.querySelector("#showCurrentPathButtonId").onclick = ShowPathCheckboxChange;
     div.querySelector("#showLegendButtonId").onclick = ToggleLegend;
 
