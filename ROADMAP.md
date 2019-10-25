@@ -2,7 +2,7 @@ OpenMDAO 2020 Development Roadmap
 =================================
 
 Author: Justin S. Gray   
-Date: 10/24/2019  
+Date: 2019-10-24
 
 This document represents the perspective of the OpenMDAO development team on what we feel are 
 the most important areas to focus on for framework development in 2020. It is intended to 
