@@ -25,7 +25,7 @@ In January 2020, we plan to release V3.0 of the framework.
 This update will **NOT** represent significant change to the codebase or functionality, 
 but will include some important practical changes: 
 
-## 1) Dropping support for Python 2.0 and supporting only Python 3.6 and greater
+## 1) Dropping support for Python 2.X and supporting only Python 3.6 and greater
 - Scipy and Numpy have already dropped Python 2 support for future releases. 
 - This will allow for a modest simplification of the codebase.
 
