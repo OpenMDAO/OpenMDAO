@@ -316,29 +316,26 @@ def _check_hanging_inputs(problem, logger):
             unconns.append((prom, unconn, units))
 
     if unconns:
-        template_abs = "{:<{nwid}} {:<{uwid}} {}\n"
-        template_prom = "{:<{nwid}} {:<{uwid}} {}\n"
+        template_abs = "   {:<{nwid}} {:<{uwid}} {}\n"
+        template_prom = "      {:<{nwid}} {:<{uwid}} {}\n"
         msg = ["The following inputs are not connected:\n"]
-        with printoptions(precision=3):
-            for prom, absnames, units in sorted(unconns, key=lambda x: x[0]):
-                if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
-                    a = absnames[0]
+        for prom, absnames, units in sorted(unconns, key=lambda x: x[0]):
+            if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
+                a = absnames[0]
+                valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
+                msg.append(template_abs.format(a, units[0], valstr, nwid=nwid + 3, uwid=uwid))
+            else:  # promoted
+                vals = [problem.get_val(a, get_remote=True) for a in absnames]
+                mismatch = _has_val_mismatch(problem.model._var_allprocs_discrete['input'],
+                                             absnames, units, vals)
+                if mismatch:
+                    msg.append("\n   ----- WARNING: inconsistent units and/or values!! -----\n")
+                msg.append("   {}  (p):\n".format(prom))
+                for a, u, v in zip(absnames, units, vals):
                     valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
-                    msg.append("   " +
-                               template_abs.format(a, units[0], valstr, nwid=nwid + 3, uwid=uwid))
-                else:  # promoted
-                    vals = [problem.get_val(a, get_remote=True) for a in absnames]
-                    mismatch = _has_val_mismatch(problem.model._var_allprocs_discrete['input'],
-                                                 absnames, units, vals)
-                    if mismatch:
-                        msg.append("\n   ----- WARNING: inconsistent units and/or values!! -----\n")
-                    msg.append("   {}  (p):\n".format(prom))
-                    for a, u, v in zip(absnames, units, vals):
-                        valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
-                        msg.append("      " +
-                                   template_prom.format(a, u, valstr, nwid=nwid, uwid=uwid))
-                    if mismatch:
-                        msg.append("   -------------------------------------------------------\n\n")
+                    msg.append(template_prom.format(a, u, valstr, nwid=nwid, uwid=uwid))
+                if mismatch:
+                    msg.append("   -------------------------------------------------------\n\n")
 
         logger.warning(''.join(msg))
 
