@@ -20,14 +20,14 @@ class N2Layout {
      * @param {Object} dims The initial sizes for multiple tree elements.
      */
     constructor(model, newZoomedElement,
-            showLinearSolverNames, dims) {
+        showLinearSolverNames, dims) {
         this.model = model;
 
         this.zoomedElement = newZoomedElement;
         this.showLinearSolverNames = showLinearSolverNames;
 
         this.updateRecomputesAutoComplete = true;
-        this.updateAutoCompleteIfNecessary();
+        this._updateAutoCompleteIfNecessary();
 
         this.outputNamingType = "Absolute";
         this.zoomedNodes = [];
@@ -40,48 +40,48 @@ class N2Layout {
         this.size = dims.size;
         this.svg = d3.select("#svgId");
 
-        this.setupTextRenderer();
-        let startTime = Date.now();
-        this.updateTextWidths();
-        console.log("N2Layout.updateTextWidths: ", Date.now() - startTime, "ms");
+        this._setupTextRenderer();
+        console.time('N2Layout._updateTextWidths');
+        this._updateTextWidths();
+        console.timeEnd('N2Layout._updateTextWidths');
 
-        startTime = Date.now();
-        this.updateSolverTextWidths();
-        console.log("N2Layout.updateSolverTextWidths: ", Date.now() - startTime, "ms");
+        console.time('N2Layout._updateSolverTextWidths');
+        this._updateSolverTextWidths();
+        console.timeEnd('N2Layout._updateSolverTextWidths');
         delete (this.textRenderer);
 
-        startTime = Date.now();
-        this.computeLeaves();
-        console.log("N2Layout.computeLeaves: ", Date.now() - startTime, "ms");
+        console.time('N2Layout._computeLeaves');
+        this._computeLeaves();
+        console.timeEnd('N2Layout._computeLeaves');
 
-        startTime = Date.now();
-        this.computeColumnWidths();
-        console.log("N2Layout.computeColumnWidths: ", Date.now() - startTime, "ms");
+        console.time('N2Layout._computeColumnWidths');
+        this._computeColumnWidths();
+        console.timeEnd('N2Layout._computeColumnWidths');
 
-        startTime = Date.now();
-        this.computeSolverColumnWidths();
-        console.log("N2Layout.computeSolverColumnWidths: ", Date.now() - startTime, "ms");
+        console.time('N2Layout._computeSolverColumnWidths');
+        this._computeSolverColumnWidths();
+        console.timeEnd('N2Layout._computeSolverColumnWidths');
 
-        startTime = Date.now();
-        this.setColumnLocations();
-        console.log("N2Layout.setColumnLocations: ", Date.now() - startTime, "ms");
+        console.time('N2Layout._setColumnLocations');
+        this._setColumnLocations();
+        console.timeEnd('N2Layout._setColumnLocations');
 
-        startTime = Date.now();
-        this.computeNormalizedPositions(this.model.root, 0, false, null);
-        console.log("N2Layout.computeNormalizedPositions: ", Date.now() - startTime, "ms");
+        console.time('N2Layout._computeNormalizedPositions');
+        this._computeNormalizedPositions(this.model.root, 0, false, null);
+        console.timeEnd('N2Layout._computeNormalizedPositions');
         if (this.zoomedElement.parent)
             this.zoomedNodes.push(this.zoomedElement.parent);
 
-        startTime = Date.now();
-        this.computeSolverNormalizedPositions(this.model.root, 0, false, null);
-        console.log("N2Layout.computeSolverNormalizedPositions: ", Date.now() - startTime, "ms");
+        console.time('N2Layout._computeSolverNormalizedPositions');
+        this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
+        console.timeEnd('N2Layout._computeSolverNormalizedPositions');
         if (this.zoomedElement.parent)
             this.zoomedSolverNodes.push(this.zoomedElement.parent);
 
     }
 
-    /** Create an off-screen area to render text for getTextWidth() */
-    setupTextRenderer() {
+    /** Create an off-screen area to render text for _getTextWidth() */
+    _setupTextRenderer() {
         let textGroup = this.svg.append("svg:g").attr("class", "partition_group");
         let textSVG = textGroup.append("svg:text")
             .text("")
@@ -100,7 +100,7 @@ class N2Layout {
      * @param {string} text Text to render or find in cache.
      * @return {number} The SVG-computed width of the rendered string.
      */
-    getTextWidth(text) {
+    _getTextWidth(text) {
         let width = 0.0;
 
         // Check cache first
@@ -118,132 +118,135 @@ class N2Layout {
         return width;
     }
 
-    /** Determine the text associated with the element. Normally its name,
+    /** Determine the text associated with the node. Normally its name,
      * but can be changed if promoted or originally contained a colon.
-     * @param {N2TreeNode} element The item to operate on.
+     * @param {N2TreeNode} node The item to operate on.
      * @return {string} The selected text.
      */
-    getText(element) {
-        let retVal = element.name;
+    getText(node) {
+        let retVal = node.name;
 
         if (this.outputNamingType == "Promoted" &&
-            element.isParamOrUnknown() &&
+            node.isParamOrUnknown() &&
             this.zoomedElement.propExists('promotions') &&
-            this.zoomedElement.promotions.propExists(element.absPathName)) {
-            retVal = this.zoomedElement.promotions[element.absPathName];
+            this.zoomedElement.promotions.propExists(node.absPathName)) {
+            retVal = this.zoomedElement.promotions[node.absPathName];
         }
 
-        if (element.splitByColon && element.hasChildren()) {
+        if (node.splitByColon && node.hasChildren()) {
             retVal += ":";
         }
 
         return retVal;
     }
 
-    /** Return a the name of the linear or non-linear solver depending
+    /**
+     * Return the name of the linear or non-linear solver depending
      * on the current setting.
-     * @param {N2TreeNode} element The item to get the solver text from.
+     * @param {N2TreeNode} node The item to get the solver text from.
      */
-    getSolverText(element) {
+    getSolverText(node) {
         return this.showLinearSolverNames ?
-            element.linear_solver : element.nonlinear_solver;
+            node.linear_solver : node.nonlinear_solver;
     }
 
-    /** Determine text widths for all descendents of the specified element.
-     * @param {N2TreeNode} [element = this.zoomedElement] Item to begin looking from.
+    /**
+     * Determine text widths for all descendents of the specified node.
+     * @param {N2TreeNode} [node = this.zoomedElement] Item to begin looking from.
      */
-    updateTextWidths(element = this.zoomedElement) {
-        if (element.varIsHidden) return;
+    _updateTextWidths(node = this.zoomedElement) {
+        if (node.varIsHidden) return;
 
-        element.nameWidthPx = this.getTextWidth(this.getText(element)) + 2 *
+        node.nameWidthPx = this._getTextWidth(this.getText(node)) + 2 *
             this.size.rightTextMargin;
 
-        if (element.hasChildren()) {
-            for (let child of element.children) {
-                this.updateTextWidths(child);
+        if (node.hasChildren()) {
+            for (let child of node.children) {
+                this._updateTextWidths(child);
             }
         }
     }
 
-    /** Determine text width for this and all decendents if element is a solver.
-     * @param {N2TreeNode} [element = this.zoomedElement] Item to begin looking from.
+    /**
+     * Determine text width for this and all decendents if node is a solver.
+     * @param {N2TreeNode} [node = this.zoomedElement] Item to begin looking from.
      */
-    updateSolverTextWidths(element = this.zoomedElement) {
-        if (element.isParam() || element.varIsHidden) {
+    _updateSolverTextWidths(node = this.zoomedElement) {
+        if (node.isParam() || node.varIsHidden) {
             return;
         }
 
-        element.nameSolverWidthPx = this.getTextWidth(this.getSolverText(element)) + 2 *
+        node.nameSolverWidthPx = this._getTextWidth(this.getSolverText(node)) + 2 *
             this.size.rightTextMargin;
 
-        if (element.hasChildren()) {
-            for (let child of element.children) {
-                this.updateSolverTextWidths(child);
+        if (node.hasChildren()) {
+            for (let child of node.children) {
+                this._updateSolverTextWidths(child);
             }
         }
     }
 
     /** Recurse through the tree and add up the number of leaves that each
      * node has, based on their array of children.
-     * @param {N2TreeNode} [element = this.model.root] The starting node.
+     * @param {N2TreeNode} [node = this.model.root] The starting node.
      */
-    computeLeaves(element = this.model.root) {
-        if (element.varIsHidden) {
-            element.numLeaves = 0;
+    _computeLeaves(node = this.model.root) {
+        if (node.varIsHidden) {
+            node.numLeaves = 0;
         }
-        else if (element.hasChildren() && !element.isMinimized) {
-            element.numLeaves = 0;
-            for (let child of element.children) {
-                this.computeLeaves(child);
-                element.numLeaves += child.numLeaves;
+        else if (node.hasChildren() && !node.isMinimized) {
+            node.numLeaves = 0;
+            for (let child of node.children) {
+                this._computeLeaves(child);
+                node.numLeaves += child.numLeaves;
             }
         }
         else {
-            element.numLeaves = 1;
+            node.numLeaves = 1;
         }
     }
 
-    /** For visible elements with children, choose a column width
+    /** For visible nodes with children, choose a column width
      * large enough to accomodate the widest label in their column.
-     * @param {N2TreeNode} element The item to operate on.
+     * @param {N2TreeNode} node The item to operate on.
      * @param {string} childrenProp Either 'children' or 'subsystem_children'.
      * @param {Object[]} colArr The array of column info.
      * @param {number[]} leafArr The array of leaf width info.
      * @param {string} widthProp Either 'nameWidthPx' or 'nameSolverWidthPx'.
      */
-    setColumnWidthsFromWidestText(element, childrenProp, colArr, leafArr, widthProp) {
-        if (element.varIsHidden) return;
+    _setColumnWidthsFromWidestText(node, childrenProp, colArr, leafArr, widthProp) {
+        if (node.varIsHidden) return;
 
-        let height = this.size.diagram.height * element.numLeaves / this.zoomedElement.numLeaves;
-        element.prevTextOpacity = element.propExists('textOpacity') ? element.textOpacity : 0;
-        element.textOpacity = (height > this.size.font) ? 1 : 0;
+        let height = this.size.diagram.height * node.numLeaves / this.zoomedElement.numLeaves;
+        node.prevTextOpacity = node.propExists('textOpacity') ? node.textOpacity : 0;
+        node.textOpacity = (height > this.size.font) ? 1 : 0;
         let hasVisibleDetail = (height >= 2.0);
         let width = (hasVisibleDetail) ? this.size.minColumnWidth : 1e-3;
-        if (element.textOpacity > 0.5) width = element[widthProp];
+        if (node.textOpacity > 0.5) width = node[widthProp];
 
-        this.greatestDepth = Math.max(this.greatestDepth, element.depth);
+        this.greatestDepth = Math.max(this.greatestDepth, node.depth);
 
-        if (element.hasChildren(childrenProp) && !element.isMinimized) { //not leaf
-            colArr[element.depth].width = Math.max(colArr[element.depth].width, width)
-            for (let child of element[childrenProp]) {
-                this.setColumnWidthsFromWidestText(child, childrenProp, colArr, leafArr, widthProp);
+        if (node.hasChildren(childrenProp) && !node.isMinimized) { //not leaf
+            colArr[node.depth].width = Math.max(colArr[node.depth].width, width)
+            for (let child of node[childrenProp]) {
+                this._setColumnWidthsFromWidestText(child, childrenProp, colArr, leafArr, widthProp);
             }
         }
         else { //leaf
-            leafArr[element.depth] = Math.max(leafArr[element.depth], width);
+            leafArr[node.depth] = Math.max(leafArr[node.depth], width);
         }
     }
 
     /** Compute column widths across the model, then adjust ends as needed.
-     * @param {N2TreeNode} [element = this.zoomedElement] Item to operate on.
+     * @param {N2TreeNode} [node = this.zoomedElement] Item to operate on.
      */
-    computeColumnWidths(element = this.zoomedElement) {
+    _computeColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
         this.leafWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
         this.cols = Array.from({ length: this.model.maxDepth + 1 }, () =>
             ({ 'width': 0.0, 'location': 0.0 }));
 
-        this.setColumnWidthsFromWidestText(element, 'children', this.cols,
+        this._setColumnWidthsFromWidestText(node, 'children', this.cols,
             this.leafWidthsPx, 'nameWidthPx');
 
         let sum = 0;
@@ -259,15 +262,15 @@ class N2Layout {
     }
 
     /** Compute solver column widths across the model, then adjust ends as needed.
-     * @param {N2TreeNode} [element = this.zoomedElement] Item to operate on.
+     * @param {N2TreeNode} [node = this.zoomedElement] Item to operate on.
      */
-    computeSolverColumnWidths(element = this.zoomedElement) {
+    _computeSolverColumnWidths(node = this.zoomedElement) {
         this.greatestDepth = 0;
         this.leafSolverWidthsPx = new Array(this.model.maxDepth + 1).fill(0.0);
         this.solverCols = Array.from({ length: this.model.maxDepth + 1 }, () =>
             ({ 'width': 0.0, 'location': 0.0 }));
 
-        this.setColumnWidthsFromWidestText(element, 'subsystem_children', this.solverCols,
+        this._setColumnWidthsFromWidestText(node, 'subsystem_children', this.solverCols,
             this.leafSolverWidthsPx, 'nameSolverWidthPx');
 
         let sum = 0;
@@ -285,7 +288,7 @@ class N2Layout {
     /** Set the location of the columns based on the width of the columns
      * to the left.
      */
-    setColumnLocations() {
+    _setColumnLocations() {
         this.size.partitionTree.width = 0;
         this.size.solverTree.width = 0;
 
@@ -298,7 +301,7 @@ class N2Layout {
         }
     }
 
-    /**TODO: computeNormalizedPositions and computeSolverNormalizedPositions do almost
+    /**TODO: _computeNormalizedPositions and _computeSolverNormalizedPositions do almost
      * identical things, just storing info in different variables, so they should be
      * merged as much as possible.
      */
@@ -314,7 +317,7 @@ class N2Layout {
      * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing
      *   highest in the tree hierarchy. Null if none exist.
      */
-    computeNormalizedPositions(node, leafCounter,
+    _computeNormalizedPositions(node, leafCounter,
         isChildOfZoomed, earliestMinimizedParent) {
         if (!isChildOfZoomed) {
             isChildOfZoomed = (node === this.zoomedElement);
@@ -345,7 +348,7 @@ class N2Layout {
 
         if (node.hasChildren()) {
             for (let child of node.children) {
-                this.computeNormalizedPositions(child, leafCounter,
+                this._computeNormalizedPositions(child, leafCounter,
                     isChildOfZoomed, earliestMinimizedParent);
                 if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
                     leafCounter += child.numLeaves;
@@ -363,7 +366,7 @@ class N2Layout {
      * @param {Object} earliestMinimizedParent The minimized parent, if any, appearing
      *   highest in the tree hierarchy. Null if none exist.
      */
-    computeSolverNormalizedPositions(node, leafCounter,
+    _computeSolverNormalizedPositions(node, leafCounter,
         isChildOfZoomed, earliestMinimizedParent) {
         if (!isChildOfZoomed) {
             isChildOfZoomed = (node === this.zoomedElement);
@@ -401,7 +404,7 @@ class N2Layout {
 
         if (node.hasChildren()) {
             for (let child of node.children) {
-                this.computeSolverNormalizedPositions(child,
+                this._computeSolverNormalizedPositions(child,
                     leafCounter, isChildOfZoomed, earliestMinimizedParent);
                 if (earliestMinimizedParent == null) { //numleaves is only valid passed nonminimized nodes
                     leafCounter += child.numLeaves;
@@ -411,29 +414,29 @@ class N2Layout {
     }
 
     /**
-     * Recurse through the children of the element and add their names to the
+     * Recurse through the children of the node and add their names to the
      * autocomplete list of names if they're not already in it.
-     * @param {N2TreeNode} element The element to search from.
+     * @param {N2TreeNode} node The node to search from.
      */
-    populateAutoCompleteList(element) {
+    _populateAutoCompleteList(node) {
         // Depth first, don't go into minimized children
-        if (element.hasChildren() && !element.isMinimized) {
-            for (let child of element.children) {
-                this.populateAutoCompleteList(child);
+        if (node.hasChildren() && !node.isMinimized) {
+            for (let child of node.children) {
+                this._populateAutoCompleteList(child);
             }
         }
 
-        if (element === this.zoomedElement) return;
+        if (node === this.zoomedElement) return;
 
-        let curName = element.name;
-        if (element.splitByColon && element.hasChildren()) curName += ":";
+        let curName = node.name;
+        if (node.splitByColon && node.hasChildren()) curName += ":";
 
-        if (!element.isParamOrUnknown()) curName += ".";
+        if (!node.isParamOrUnknown()) curName += ".";
         let namesToAdd = [curName];
 
-        if (element.splitByColon)
-            namesToAdd.push(element.colonName +
-                ((element.hasChildren()) ? ":" : ""));
+        if (node.splitByColon)
+            namesToAdd.push(node.colonName +
+                ((node.hasChildren()) ? ":" : ""));
 
         for (let name of namesToAdd) {
             if (!this.autoCompleteSetNames.hasOwnProperty(name)) {
@@ -443,8 +446,8 @@ class N2Layout {
         };
 
         let localPathName = (this.zoomedElement === this.model.root) ?
-            element.absPathName :
-            element.absPathName.slice(this.zoomedElement.absPathName.length + 1);
+            node.absPathName :
+            node.absPathName.slice(this.zoomedElement.absPathName.length + 1);
 
         if (!this.autoCompleteSetPathNames.hasOwnProperty(localPathName)) {
             this.autoCompleteSetPathNames[localPathName] = true;
@@ -456,7 +459,7 @@ class N2Layout {
      * If this.updateRecomputesAutoComplete is true, update the autocomplete
      * list. If false, set it to true and return.
      */
-    updateAutoCompleteIfNecessary() {
+    _updateAutoCompleteIfNecessary() {
         if (!this.updateRecomputesAutoComplete) {
             this.updateRecomputesAutoComplete = true;
             return;
@@ -467,7 +470,7 @@ class N2Layout {
         autoCompleteListNames = [];
         autoCompleteListPathNames = [];
 
-        this.populateAutoCompleteList(this.zoomedElement);
+        this._populateAutoCompleteList(this.zoomedElement);
 
         delete this.autoCompleteSetNames;
         delete this.autoCompleteSetPathNames;

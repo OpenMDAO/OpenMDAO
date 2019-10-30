@@ -5,7 +5,6 @@ class ModelData {
     constructor(modelJSON) {
         modelJSON.tree.name = 'model'; // Change 'root' to 'model'
         this.conns = modelJSON.connections_list;
-        console.log(this.conns);
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
         this.declarePartialsList = modelJSON.declare_partials_list;
         this.sysPathnamesList = modelJSON.sys_pathnames_list;
@@ -14,32 +13,32 @@ class ModelData {
         this.idCounter = 0;
         this.unconnectedParams = 0;
 
-        let startTime = Date.now();
-        this.root = this.tree = modelJSON.tree = this.convertToN2TreeNodes(modelJSON.tree);
-        console.log("ModelData.convertToN2TreeNodes: ", Date.now() - startTime, "ms");
+        console.time('ModelData._convertToN2TreeNodes');
+        this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
+        console.timeEnd('ModelData._convertToN2TreeNodes');
 
-        startTime = Date.now();
-        this.expandColonVars(this.root);
-        console.log("ModelData.expandColonVars: ", Date.now() - startTime, "ms");
+        console.time('ModelData._expandColonVars');
+        this._expandColonVars(this.root);
+        console.timeEnd('ModelData._expandColonVars');
 
-        startTime = Date.now();
-        this.flattenColonGroups(this.root);
-        console.log("ModelData.flattenColonGroups: ", Date.now() - startTime, "ms");
+        console.time('ModelData._flattenColonGroups');
+        this._flattenColonGroups(this.root);
+        console.timeEnd('ModelData._flattenColonGroups');
 
-        startTime = Date.now();
-        this.setParentsAndDepth(this.root, null, 1);
-        console.log("ModelData.setParentsAndDepth: ", Date.now() - startTime, "ms");
+        console.time('ModelData._setParentsAndDepth');
+        this._setParentsAndDepth(this.root, null, 1);
+        console.timeEnd('ModelData._setParentsAndDepth');
 
         if (this.unconnectedParams > 0)
-            console.log("Unconnected nodes: ", this.unconnectedParams);
+            console.info("Unconnected nodes: ", this.unconnectedParams);
 
-        startTime = Date.now();
-        this.initSubSystemChildren(this.root);
-        console.log("ModelData.initSubSystemChildren: ", Date.now() - startTime, "ms");
+        console.time('ModelData._initSubSystemChildren');
+        this._initSubSystemChildren(this.root);
+        console.timeEnd('ModelData._initSubSystemChildren');
 
-        startTime = Date.now();
-        this.computeConnections();
-        console.log("ModelData.computeConnections: ", Date.now() - startTime, "ms");
+        console.time('ModelData._computeConnections');
+        this._computeConnections();
+        console.timeEnd('ModelData._computeConnections');
 
         // console.log("New model: ", modelJSON);
         // this.errorCheck();
@@ -70,12 +69,12 @@ class ModelData {
      * provided by n2_viewer.py with N2TreeNodes.
      * @param {Object} element The current element being updated.
      */
-    convertToN2TreeNodes(element) {
+    _convertToN2TreeNodes(element) {
         let newNode = new N2TreeNode(element);
 
         if (newNode.hasChildren()) {
             for (let i = 0; i < newNode.children.length; ++i) {
-                newNode.children[i] = this.convertToN2TreeNodes(newNode.children[i]);
+                newNode.children[i] = this._convertToN2TreeNodes(newNode.children[i]);
                 newNode.children[i].parent = newNode;
                 if (exists(newNode.children[i].parentComponent)) newNode.children[i].parentComponent = newNode;
             }
@@ -84,10 +83,10 @@ class ModelData {
         return newNode;
     }
 
-    /** Called by expandColonVars when splitting an element into children.
+    /** Called by _expandColonVars when splitting an element into children.
      * TODO: Document params and recursive functionality.
      */
-    addChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
+    _addChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
         if (arrayOfNames.length == arrayOfNamesIndex) return;
 
         let name = arrayOfNames[arrayOfNamesIndex];
@@ -112,24 +111,25 @@ class ModelData {
             else {
                 parent.children.push(newChild);
             }
-            this.addChildren(originalParent, newChild, arrayOfNames,
+            this._addChildren(originalParent, newChild, arrayOfNames,
                 arrayOfNamesIndex + 1, type);
         }
         else { // new name already found in parent, keep traversing
-            this.addChildren(originalParent, parent.children[parentIdx],
+            this._addChildren(originalParent, parent.children[parentIdx],
                 arrayOfNames, arrayOfNamesIndex + 1, type);
         }
     }
 
     /**
-     * If an object has a child with colons in its name, split those the child
+     * If an object has a child with colons in its name, split that child
      * into multiple objects named from the tokens in the original name. Replace the
      * original child object with the new children. Recurse over the array of children.
      * @param {N2TreeNode} node The object that may have children to check.
      */
-    expandColonVars(node) {
+    _expandColonVars(node) {
         if (!node.hasChildren()) return;
 
+        // Don't use an iterator here because we may modify the array
         for (let i = 0; i < node.children.length; ++i) {
 
             let splitArray = node.children[i].name.split(":");
@@ -140,22 +140,22 @@ class ModelData {
                 }
                 let type = node.children[i].type;
                 node.children.splice(i--, 1);
-                this.addChildren(node, node, splitArray, 0, type);
+                this._addChildren(node, node, splitArray, 0, type);
             }
         }
 
         for (let child of node.children) {
-            this.expandColonVars(child);
+            this._expandColonVars(child);
         }
     }
 
     /**
-     * If an node formerly had a name with colons, but was split by expandColonVars()
+     * If an node formerly had a name with colons, but was split by _expandColonVars()
      * and only ended up with one child, recombine the node and its child. Operate
      * recursively on all children.
      * @param {N2TreeNode} node The object to check.
      */
-    flattenColonGroups(node) {
+    _flattenColonGroups(node) {
         if (!Array.isPopulatedArray(node.children)) return;
 
         while (node.splitByColon && exists(node.children) &&
@@ -172,7 +172,7 @@ class ModelData {
         if (!Array.isArray(node.children)) return;
 
         for (let child of node.children) {
-            this.flattenColonGroups(child);
+            this._flattenColonGroups(child);
         }
     }
 
@@ -184,7 +184,7 @@ class ModelData {
      * @param {number} depth Numerical level of ancestry.
      * @return True is node is implicit, false otherwise.
      */
-    setParentsAndDepth(node, parent, depth) { // Formerly InitTree()
+    _setParentsAndDepth(node, parent, depth) { // Formerly InitTree()
         node.numLeaves = 0; // for nested params
         node.depth = depth;
         node.parent = parent;
@@ -227,7 +227,7 @@ class ModelData {
 
         if (node.hasChildren()) {
             for (let child of node.children) {
-                let implicit = this.setParentsAndDepth(child, node, depth + 1);
+                let implicit = this._setParentsAndDepth(child, node, depth + 1);
                 if (implicit) node.implicit = true;
             }
         }
@@ -287,7 +287,7 @@ class ModelData {
     * children array.
     * @param {N2TreeNode} node Node with children to check.
     */
-    initSubSystemChildren(node) {
+    _initSubSystemChildren(node) {
         if (!node.hasChildren()) { return; }
 
         for (let child of node.children) {
@@ -296,7 +296,7 @@ class ModelData {
                     node.subsystem_children = [];
 
                 node.subsystem_children.push(child);
-                this.initSubSystemChildren(child);
+                this._initSubSystemChildren(child);
             }
         }
     }
@@ -323,7 +323,7 @@ class ModelData {
      * @param {number} nameIndex Index of nameArray currently being searched for.
      * @return {N2TreeNode} Reference to node in the path.
      */
-    getObjectInTree(node, nameArray, nameIndex) {
+    _getObjectInTree(node, nameArray, nameIndex) {
         // Reached the last name:
         if (nameArray.length == nameIndex) return node;
 
@@ -331,7 +331,7 @@ class ModelData {
 
         for (let child of node.children) {
             if (child.name == nameArray[nameIndex]) {
-                return this.getObjectInTree(child, nameArray, nameIndex + 1);
+                return this._getObjectInTree(child, nameArray, nameIndex + 1);
             }
             else {
                 let numNames = child.name.split(":").length;
@@ -341,7 +341,7 @@ class ModelData {
                         mergedName += ":" + nameArray[nameIndex + j];
                     }
                     if (child.name == mergedName) {
-                        return this.getObjectInTree(child, nameArray, nameIndex + numNames);
+                        return this._getObjectInTree(child, nameArray, nameIndex + numNames);
                     }
                 }
             }
@@ -355,14 +355,14 @@ class ModelData {
      * @param {N2TreeNode} node Current node to work on.
      * @param {N2TreeNode[]} objArray Array to add to.
      */
-    addLeaves(node, objArray) {
+    _addLeaves(node, objArray) {
         if (!node.isParam()) {
             objArray.push(node);
         }
 
         if (node.hasChildren()) {
             for (let child of node.children) {
-                this.addLeaves(child, objArray);
+                this._addLeaves(child, objArray);
             }
         }
     }
@@ -371,13 +371,13 @@ class ModelData {
      * Iterate over the connections list, and find the two objects that
      * make up each connection.
      */
-    computeConnections() {
+    _computeConnections() {
         let sysPathnames = this.sysPathnamesList;
 
         for (let conn of this.conns) {
             // Process sources
             let srcSplitArray = conn.src.split(/\.|:/);
-            let srcObj = this.getObjectInTree(this.root, srcSplitArray, 0);
+            let srcObj = this._getObjectInTree(this.root, srcSplitArray, 0);
 
             if (srcObj == null)
                 throw ("Cannot find connection source " + conn.src);
@@ -394,7 +394,7 @@ class ModelData {
 
             // Process targets
             let tgtSplitArray = conn.tgt.split(/\.|:/);
-            let tgtObj = this.getObjectInTree(this.root, tgtSplitArray, 0);
+            let tgtObj = this._getObjectInTree(this.root, tgtSplitArray, 0);
 
             if (tgtObj == null) throw ("Cannot find connection target " + conn.tgt);
 
@@ -409,7 +409,7 @@ class ModelData {
             if (!tgtObj.parentComponent)
                 throw ("Target object " + conn.tgt + " has missing parentComponent.");
 
-            this.addLeaves(tgtObj.parentComponent, tgtObjArrayHideParams); //contaminate
+            this._addLeaves(tgtObj.parentComponent, tgtObjArrayHideParams); //contaminate
             for (let obj = tgtObj.parent; obj != null; obj = obj.parent) {
                 tgtObjArrayParamView.push(obj);
                 tgtObjArrayHideParams.push(obj);
@@ -437,12 +437,12 @@ class ModelData {
                     let tgtPathname = sysPathnames[cycleArrow[1]];
 
                     let splitArray = srcPathname.split(/\.|:/);
-                    let arrowBeginObj = this.getObjectInTree(this.root, splitArray, 0);
+                    let arrowBeginObj = this._getObjectInTree(this.root, splitArray, 0);
                     if (arrowBeginObj == null)
                         throw ("Cannot find cycle arrows begin object " + srcPathname);
 
                     splitArray = tgtPathname.split(/\.|:/);
-                    let arrowEndObj = this.getObjectInTree(this.root, splitArray, 0);
+                    let arrowEndObj = this._getObjectInTree(this.root, splitArray, 0);
                     if (arrowEndObj == null)
                         throw ("Cannot find cycle arrows end object " + tgtPathname);
 

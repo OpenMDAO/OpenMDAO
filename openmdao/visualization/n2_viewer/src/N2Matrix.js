@@ -7,7 +7,6 @@
  * @property {N2Layout} layout Reference to object managing columns widths and such.
  * @property {Object} n2Groups References to <g> SVG elements created by N2Diagram.
  * @property {number} levelOfDetailThreshold Don't draw elements below this size in pixels.
- * @property {Object} n2Groups References to <g> SVG elements managed by N2Diagram.
  * @property {Object} nodeSize Width and height of each node in the matrix.
  * @property {Object} prevNodeSize Width and height of each node in the previous matrix.
  * @property {Object} cellDims nodeSize with computed coordinates.
@@ -66,13 +65,13 @@ class N2Matrix {
 
         this.updateLevelOfDetailThreshold(layout.size.diagram.height);
 
-        let startTime = Date.now();
+        console.time('N2Matrix._buildGrid');
         this._buildGrid(model);
-        console.log("N2Matrix._buildGrid: ", Date.now() - startTime, "ms");
+        console.timeEnd('N2Matrix._buildGrid');
 
-        startTime = Date.now();
+        console.time('N2Matrix._setupComponentBoxesAndGridLines');
         this._setupComponentBoxesAndGridLines();
-        console.log("N2Matrix._setupComponentBoxesAndGridLines: ", Date.now() - startTime, "ms");
+        console.timeEnd('N2Matrix._setupComponentBoxesAndGridLines');
 
     }
 
@@ -462,14 +461,14 @@ class N2Matrix {
 
     /** Add all the visible elements to the matrix. */
     draw() {
-        let startTime = Date.now();
+        console.time('N2Matrix.draw');
 
         this._drawCells();
         this._drawHorizontalLines();
         this._drawVerticalLines();
         this._drawComponentBoxes();
 
-        console.log("N2Matrix.draw: ", Date.now() - startTime, "ms");
+        console.timeEnd('N2Matrix.draw');
 
     }
 
