@@ -204,7 +204,22 @@ def _check_dup_comp_inputs(problem, logger):
         logger.warning(''.join(msg))
 
 
-def _fixed_str(obj, size):
+def _trim_str(obj, size):
+    """
+    Truncate given string if it's longer than the given size.
+
+    Parameters
+    ----------
+    obj : object
+        Object to be stringified and trimmed.
+    size : int
+        Max allowable size of the returned string.
+
+    Returns
+    -------
+    str
+        The trimmed string.
+    """
     s = str(obj)
     if len(s) > size:
         s = s[:size - 4] + ' ...'
@@ -212,6 +227,25 @@ def _fixed_str(obj, size):
 
 
 def _has_val_mismatch(discretes, names, units, vals):
+    """
+    Return True if any of the given values don't match, subject to unit conversion.
+
+    Parameters
+    ----------
+    discretes : set-like
+        Set of discrete variable names.
+    names : list
+        List of variable names.
+    units : list
+        List of units corresponding to names.
+    vals : list
+        List of values corresponding to names.
+
+    Returns
+    -------
+    bool
+        True if a mismatch was found, otherwise False.
+    """
     if len(names) < 2:
         return False
 
@@ -286,7 +320,7 @@ def _check_hanging_inputs(problem, logger):
                     a = absnames[0]
                     msg.append("   " +
                                template_abs.format(a, units[0],
-                                                   _fixed_str(problem.get_val(a, get_remote=True),
+                                                   _trim_str(problem.get_val(a, get_remote=True),
                                                               25),
                                                    nwid=nwid + 3, uwid=uwid))
                 else:  # promoted
@@ -299,7 +333,7 @@ def _check_hanging_inputs(problem, logger):
                     for a, u, v in zip(absnames, units, vals):
                         msg.append("      " +
                                    template_prom.format(a, u,
-                                                        _fixed_str(problem.get_val(a,
+                                                        _trim_str(problem.get_val(a,
                                                                                    get_remote=True),
                                                                    25),
                                                         nwid=nwid, uwid=uwid))
