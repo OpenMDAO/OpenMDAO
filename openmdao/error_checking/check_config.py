@@ -208,6 +208,8 @@ def _trim_str(obj, size):
     """
     Truncate given string if it's longer than the given size.
 
+    For arrays, use the norm if the size is exceeded.
+
     Parameters
     ----------
     obj : object
@@ -222,7 +224,10 @@ def _trim_str(obj, size):
     """
     s = str(obj)
     if len(s) > size:
-        s = s[:size - 4] + ' ...'
+        if isinstance(obj, np.ndarray) and np.issubdtype(obj.dtype, np.floating):
+            s = 'shape={}, norm={:<.3}'.format(obj.shape, np.linalg.norm(obj))
+        else:
+            s = s[:size - 4] + ' ...'
     return s
 
 
@@ -266,7 +271,7 @@ def _has_val_mismatch(discretes, names, units, vals):
                 # convert units
                 v = convert_units(v, u, new_units=u0)
 
-            if np.linalg.norm(v - v0) > 1e-25:
+            if np.linalg.norm(v - v0) > 1e-10:
                 return True
 
     return False
@@ -318,11 +323,9 @@ def _check_hanging_inputs(problem, logger):
             for prom, absnames, units in sorted(unconns, key=lambda x: x[0]):
                 if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
                     a = absnames[0]
+                    valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
                     msg.append("   " +
-                               template_abs.format(a, units[0],
-                                                   _trim_str(problem.get_val(a, get_remote=True),
-                                                              25),
-                                                   nwid=nwid + 3, uwid=uwid))
+                               template_abs.format(a, units[0], valstr, nwid=nwid + 3, uwid=uwid))
                 else:  # promoted
                     vals = [problem.get_val(a, get_remote=True) for a in absnames]
                     mismatch = _has_val_mismatch(problem.model._var_allprocs_discrete['input'],
@@ -331,12 +334,9 @@ def _check_hanging_inputs(problem, logger):
                         msg.append("\n   ----- WARNING: inconsistent units and/or values!! -----\n")
                     msg.append("   {}  (p):\n".format(prom))
                     for a, u, v in zip(absnames, units, vals):
+                        valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
                         msg.append("      " +
-                                   template_prom.format(a, u,
-                                                        _trim_str(problem.get_val(a,
-                                                                                   get_remote=True),
-                                                                   25),
-                                                        nwid=nwid, uwid=uwid))
+                                   template_prom.format(a, u, valstr, nwid=nwid, uwid=uwid))
                     if mismatch:
                         msg.append("   -------------------------------------------------------\n\n")
 
