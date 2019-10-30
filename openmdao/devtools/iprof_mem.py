@@ -137,13 +137,14 @@ def _mem_prof_setup_parser(parser):
     parser.add_argument('file', metavar='file', nargs=1, help='Python file to profile.')
 
 
-def _mem_prof_exec(options):
+def _mem_prof_exec(options, user_args):
     """
     Process command line args and perform memory profiling on a specified python file.
     """
 
     progname = options.file[0]
     sys.path.insert(0, os.path.dirname(progname))
+
 
     globals_dict = {
         '__file__': progname,
@@ -163,6 +164,9 @@ def _mem_prof_exec(options):
 
     if options.nogc:
         gc.disable()
+
+    # update sys.argv in case python script takes cmd line args
+    sys.argv[:] = [progname] + user_args
 
     exec (code, globals_dict)
 
@@ -224,7 +228,7 @@ def _mempost_setup_parser(parser):
     parser.add_argument('file', metavar='file', nargs=1, help='Memory dump file to process.')
 
 
-def _mempost_exec(options):
+def _mempost_exec(options, user_args):
     """
     Process command line args and perform postprocessing on the specified memory dump file.
     """
