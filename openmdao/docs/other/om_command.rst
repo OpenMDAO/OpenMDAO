@@ -18,6 +18,8 @@ collect information about the entire run of the Problem, like profilers and trac
     When using a command line tool on a script that takes its own command line arguments, those
     arguments must be placed after a :code:`--` on the command line.  Anything to the right of the
     :code:`--` will be ignored by the openmdao command line parser and passed on to the user script.
+    For example: :code:`openmdao n2 -o foo.html myscript.py -- -x --myarg=bar` would pass
+    :code:`-x` and :code:`--myarg=bar` as args to :code:`myscript.py`.
 
 
 All available :code:`openmdao` sub-commands can be shown using the following command:
@@ -32,7 +34,7 @@ To get further info on any sub-command, follow the command with a *-h*.  For exa
     :cmd: openmdao n2 -h
 
 .. note::
-    Several of the example commands below make use of a files :code:`circuit.py` and
+    Several of the example commands below make use of the files :code:`circuit.py` and
     :code:`circle_opt.py`. These files are located in the openmdao/test_suite/scripts directory.
 
 
