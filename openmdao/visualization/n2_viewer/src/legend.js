@@ -60,7 +60,7 @@ function SetupLegend(d3, d3ContentDiv) {
 
     //COLUMN TITLES
     {
-        var text = ["Systems & Variables", "N^2 Symbols", showLinearSolverNames? " Linear Solvers" : "Nonlinear Solvers"];
+        var text = ["Systems & Variables", "N^2 Symbols", n2Diag.showLinearSolverNames? " Linear Solvers" : "Nonlinear Solvers"];
         for (var i = 0; i < text.length; ++i) {
             var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * i + xOffset) + "," + (60) + ")");
             el.append("svg:text")
@@ -75,11 +75,11 @@ function SetupLegend(d3, d3ContentDiv) {
     //COLORS
     {
         var text = ["Group", "Component", "Output Explicit", "Output Implicit", "Collapsed", "Connection"];
-        var colors = [GROUP_COLOR, COMPONENT_COLOR, UNKNOWN_EXPLICIT_COLOR, UNKNOWN_IMPLICIT_COLOR, COLLAPSED_COLOR, CONNECTION_COLOR];
+        var colors = [N2Style.color.group, N2Style.color.component, N2Style.color.unknownExplicit, N2Style.color.unknownImplicit, N2Style.color.collapsed, N2Style.color.connection];
         text.splice(2, 0, "Input");
-        colors.splice(2, 0, PARAM_COLOR);
+        colors.splice(2, 0, N2Style.color.param);
         text.splice(3, 0, "Unconnected Input")
-        colors.splice(3, 0, UNCONNECTED_PARAM_COLOR)
+        colors.splice(3, 0, N2Style.color.unconnectedParam)
         for (var i = 0; i < text.length; ++i) {
             var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 0 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
             DrawLegendColor(el, u, v, colors[i], false);
@@ -90,7 +90,7 @@ function SetupLegend(d3, d3ContentDiv) {
     //N2 SYMBOLS
     {
         var text = ["Scalar", "Vector", "Collapsed variables"];
-        var colors = [UNKNOWN_EXPLICIT_COLOR, UNKNOWN_EXPLICIT_COLOR, UNKNOWN_EXPLICIT_COLOR];
+        var colors = [N2Style.color.unknownExplicit, N2Style.color.unknownExplicit, N2Style.color.unknownExplicit];
         var shapeFunctions = [DrawScalar, DrawVector, DrawGroup];
         for (var i = 0; i < text.length; ++i) {
             var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 1 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
@@ -102,23 +102,18 @@ function SetupLegend(d3, d3ContentDiv) {
 
     //SOLVER COLORS
     {
-        if (showLinearSolverNames){
-            for (var i = 0; i < linearSolverNames.length; ++i) {
-                var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 2 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
-                var name = linearSolverNames[i];
-                DrawLegendColor(el, u, v, linearSolverColors[name], false);
-                CreateText(el, name);
-            }
-        } else {
-            for (var i = 0; i < nonLinearSolverNames.length; ++i) {
-                var el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 2 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
-                var name = nonLinearSolverNames[i];
-                DrawLegendColor(el, u, v, nonLinearSolverColors[name], false);
-                CreateText(el, name);
+        let i = 0;
+        for (let solverName in n2Diag.style.solvers) {
+            solver = n2Diag.style.solvers[solverName];
+            if ((solver.type == 'linear' && n2Diag.showLinearSolverNames) ||
+                (solver.type == 'nonLinear' && ! n2Diag.showLinearSolverNames)) {
+                let el = svg_legend.append("g").attr("transform", "translate(" + (columnWidth * 2 + xOffset + u) + "," + (80 + 40 * i + v) + ")");
+                DrawLegendColor(el, u, v, solver.style.fill, false);
+                CreateText(el, solverName);
+                ++i;
             }
         }
     }
-
 }
 
 function DrawLegendColor(g, u, v, color, justUpdate) {
