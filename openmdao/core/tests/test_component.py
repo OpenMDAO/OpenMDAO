@@ -148,7 +148,8 @@ class TestExplicitComponent(unittest.TestCase):
         nostr_names = [3, None, object, object()]
         nostr_error = "ExplicitComponent: The name argument should be a string."
 
-        empty_error = "ExplicitComponent: The name argument should be a non-empty string."
+        empty_in_error = "ExplicitComponent: '' is not a valid input name."
+        empty_out_error = "ExplicitComponent: '' is not a valid output name."
 
         for func in add_input_methods:
             for name in invalid_names:
@@ -163,7 +164,7 @@ class TestExplicitComponent(unittest.TestCase):
 
             with self.assertRaises(NameError) as cm:
                 func('', val=5.0)
-            self.assertEqual(str(cm.exception), empty_error)
+            self.assertEqual(str(cm.exception), empty_in_error)
 
         for func in add_output_methods:
             for name in invalid_names:
@@ -178,7 +179,7 @@ class TestExplicitComponent(unittest.TestCase):
 
             with self.assertRaises(NameError) as cm:
                 func('', val=5.0)
-            self.assertEqual(str(cm.exception), empty_error)
+            self.assertEqual(str(cm.exception), empty_out_error)
 
 
         # Stuff we allow.

@@ -7,11 +7,19 @@ Command Line Tools
 OpenMDAO has a number of debugging/viewing command line tools that are available via the `openmdao`
 command.  There are two types of commands available, those that perform some sort of viewing or
 configuration checking on the Problem after its setup is complete, and those that are used to
-collect information about the entire run of the Problem, things like profilers and tracers.
+collect information about the entire run of the Problem, like profilers and tracers.
 
 .. note::
     The `openmdao` sub-commands, as well as any other console scripts associated with OpenMDAO, will
     only be available if you have installed OpenMDAO using *pip*. See :ref:`Getting Started <GettingStarted>`
+
+
+.. note::
+    When using a command line tool on a script that takes its own command line arguments, those
+    arguments must be placed after a :code:`--` on the command line.  Anything to the right of the
+    :code:`--` will be ignored by the openmdao command line parser and passed on to the user script.
+    For example: :code:`openmdao n2 -o foo.html myscript.py -- -x --myarg=bar` would pass
+    :code:`-x` and :code:`--myarg=bar` as args to :code:`myscript.py`.
 
 
 All available :code:`openmdao` sub-commands can be shown using the following command:
@@ -20,25 +28,23 @@ All available :code:`openmdao` sub-commands can be shown using the following com
     :cmd: openmdao -h
 
 
-All sub-commands are shown under 'positional arguments'.  To get further info on any sub-command,
-for example, for :code:`tree`, follow the command with a *-h*.  For example:
+To get further info on any sub-command, follow the command with a *-h*.  For example:
 
 .. embed-shell-cmd::
-    :cmd: openmdao tree -h
+    :cmd: openmdao n2 -h
 
 .. note::
-    Several of the example commands below make use of a file :code:`circuit.py`. This file is located in the
-    openmdao/test_suite/scripts directory.
+    Several of the example commands below make use of the files :code:`circuit.py` and
+    :code:`circle_opt.py`. These files are located in the openmdao/test_suite/scripts directory.
 
 
-Post-setup Commands
--------------------
+Viewing and Checking Commands
+-----------------------------
 
-The following commands all register a function that will run at the end of a Problem's
-:code:`final_setup` function.  After the registered function completes, the program will exit, rather than
-continuing to the end of the user's run script. This makes it convenient to view or check the
-configuration of a model in any run script without having to wait around for the entire script
-to run.
+Usually these commands will exit after executing, rather than continuing to the end of the user's
+run script. This makes it convenient to view or check the configuration of a model in any
+run script without having to wait around for the entire script to run.
+
 
 .. _om-command-check:
 
@@ -89,19 +95,27 @@ openmdao view_connections
 #########################
 
 The :code:`openmdao view_connections` command generates a table of connection information for all input and
-output variables in the model.  Units can be compared for each connection, and unconnected inputs
-and outputs can be easily identified.  The displayed variables can be filtered by source system
-and/or target system.  They can also be filtered by NO CONNECTION, which will show all of the
-unconnected inputs or outputs, depending on whether the NO CONNECTION filter is active for the
-source or target side.  When units differ between a source and a target, they are highlighted in
-red, and when inputs are connected to outputs outside of the currently-selected, top-level system,
-they are highlighted in purple.  This highlighting can be used to easily identify variables that are connected
-across group boundaries.  Below is an example of a connection viewer for a pycycle propulsor
-model obtained using the command:
+output variables in the model.  Its primary purpose is to help debug a model by making the following
+things easier:
+
+
+    - Identifying unconnected inputs
+    - Highlighting unit conversions or missing units
+    - Identifying missing or unwanted implicit connections
+
+
+The table can be sorted by any column by clicking on the
+column header, and a column can be filtered by typing text into the 'filter column' field found
+at the top of each column.  Also, any column can be shown or hidden using the toggle buttons at
+the bottom of the table.  When input and output units differ, they are highlighted in
+red.  In the promoted input and output columns, variables that are promoted at some level in
+the model are shown in blue, while variables that are never promoted are shown in black.
+
+Below is an example of a connection viewer for a pycycle propulsor model obtained using the command:
 
 .. code-block:: none
 
-    openmdao view_connections propulsor.py
+    openmdao view_connections -v propulsor.py
 
 
 .. figure:: view_connections.png
@@ -110,22 +124,48 @@ model obtained using the command:
 
    An example of a connection viewer.
 
+
+By default the promoted names columns of both inputs and outputs are shown, but in the example
+above, the absolute input names are shown and the promoted input names are hidden.
+
+Unconnected inputs can easily be identified by typing '[NO CONNECTION]' or '[', into
+the filter field of either the absolute or promoted *output* column.  Unconnected outputs can
+be shown similarly by typing '[NO CONNECTION]' or '[' into the filter field of either the absolute
+or promoted *input* column.
+
+When showing promoted output and promoted input columns, if the promoted output name equals the
+promoted input name, that means the connection is an implicit connection.  Otherwise the
+connection is explicit, meaning somewhere in the model there is an explicit call to `connect`
+that producted the connection.
+
+In OpenMDAO, multiple inputs can be promoted to the same name, and by sorting the promoted inputs
+column, all such inputs will be grouped together.  This can make it much easier to spot either
+missing or unwanted implicit connections.
+
+
 .. _om-command-tree:
 
 openmdao tree
 #############
 
 The :code:`openmdao tree` command prints an indented list of all systems in the model tree.  Each system's
-type and name are shown, along with linear and nonlinear solvers if they differ from the defaults,
-which are LinearRunOnce and NonlinearRunOnce respectively.  If the `-c` option is used, the tree will print
-in color if the terminal supports it and the *colorama* package is installed.  The tree Command
-also allows specific attributes and/or vector variables to be printed out along with their
-corresponding system in the tree.
+type and name are shown, along with their linear and nonlinear solvers if
+they differ from the defaults, which are LinearRunOnce and NonlinearRunOnce respectively.
+If the `-c` option is used, the tree will print in color if the terminal supports it and
+the *colorama* package is installed. If colors are used, implicit and explicit components will be
+displayed using different colors.
+
+The input and output sizes can also be displayed using the `--sizes` arg, and the `--approx` arg
+will display the approximation method and the number of approximated partials for systems that use
+approximated derivatives.
+
+The tree command also allows specific attributes and/or vector variables to be printed out along with their
+corresponding system in the tree using the `--attr` and `--var` args respectively.
 
 Here's an example of the tree output for a simple circuit model:
 
 .. embed-shell-cmd::
-    :cmd: openmdao tree circuit.py
+    :cmd: openmdao tree --sizes --approx circuit.py
     :dir: ../test_suite/scripts
 
 .. _om-command-summary:
@@ -136,8 +176,9 @@ openmdao summary
 The :code:`openmdao summary` command prints a high level summary of the model.  For example:
 
 .. embed-shell-cmd::
-    :cmd: openmdao summary circuit.py
+    :cmd: openmdao summary circle_opt.py
     :dir: ../test_suite/scripts
+
 
 .. _om-command-cite:
 

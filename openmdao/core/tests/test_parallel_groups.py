@@ -3,10 +3,17 @@
 from __future__ import division, print_function
 
 import unittest
+import itertools
+
 import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -29,16 +36,33 @@ class Noisy(ConvergeDiverge):
         logger.info(msg)
 
 
+def _test_func_name(func, num, param):
+    args = []
+    for p in param.args:
+        try:
+            arg = p.__name__
+        except:
+            arg = str(p)
+        args.append(arg)
+    return func.__name__ + '_' + '_'.join(args)
+
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
 
-    def test_fan_out_grouped(self):
+    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+                                            [om.NonlinearBlockGS, om.NonLinearRunOnce]),
+                          name_func=_test_func_name)
+    def test_fan_out_grouped(self, solver, nlsolver):
         prob = om.Problem(FanOutGrouped())
 
         of=['c2.y', "c3.y"]
         wrt=['iv.x']
+
+        prob.model.linear_solver = solver()
+        prob.model.nonlinear_solver = nlsolver()
 
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
@@ -63,20 +87,31 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
-    def test_fan_in_grouped(self):
+    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+                                            [om.NonlinearBlockGS, om.NonLinearRunOnce]),
+                          name_func=_test_func_name)
+    def test_fan_in_grouped(self, solver, nlsolver):
 
         prob = om.Problem()
         prob.model = FanInGrouped2()
+
+        prob.model.linear_solver = solver()
+        prob.model.nonlinear_solver = nlsolver()
+
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
-
 
         indep_list = ['p1.x', 'p2.x']
         unknown_list = ['c3.y']
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
+
+        # do this a second time to test caching of dist rows/cols
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
@@ -88,6 +123,11 @@ class TestParallelGroups(unittest.TestCase):
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
+        J = prob.compute_totals(of=unknown_list, wrt=indep_list)
+        assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
+        assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
+
+        # do this a second time to test caching of dist rows/cols
         J = prob.compute_totals(of=unknown_list, wrt=indep_list)
         assert_rel_error(self, J['c3.y', 'p1.x'][0][0], -6.0, 1e-6)
         assert_rel_error(self, J['c3.y', 'p2.x'][0][0], 35.0, 1e-6)
@@ -121,10 +161,17 @@ class TestParallelGroups(unittest.TestCase):
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
-    def test_diamond(self):
+    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+                                            [om.NonlinearBlockGS, om.NonLinearRunOnce]),
+                          name_func=_test_func_name)
+    def test_diamond(self, solver, nlsolver):
 
         prob = om.Problem()
         prob.model = Diamond()
+
+        prob.model.linear_solver = solver()
+        prob.model.nonlinear_solver = nlsolver()
+
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -149,10 +196,17 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
-    def test_converge_diverge(self):
+    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+                                            [om.NonlinearBlockGS, om.NonLinearRunOnce]),
+                          name_func=_test_func_name)
+    def test_converge_diverge(self, solver, nlsolver):
 
         prob = om.Problem()
         prob.model = ConvergeDiverge()
+
+        prob.model.linear_solver = solver()
+        prob.model.nonlinear_solver = nlsolver()
+
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
         prob.run_model()
@@ -249,7 +303,7 @@ class TestParallelGroups(unittest.TestCase):
 
         # check that error is thrown if not using PETScVector
         if MPI:
-            msg = ("The `distributed_vector_class` argument must be `PETScVector` when "
+            msg = ("Problem: The `distributed_vector_class` argument must be `PETScVector` when "
                    "running in parallel under MPI but 'DefaultVector' was specified.")
             with self.assertRaises(ValueError) as cm:
                 prob.setup(check=False, mode='fwd', distributed_vector_class=om.DefaultVector)

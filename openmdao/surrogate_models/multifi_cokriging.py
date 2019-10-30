@@ -149,8 +149,9 @@ def l1_cross_distances(X, Y=None):
         The array of componentwise L1 cross-distances.
 
     """
+    X = array2d(X)
+
     if Y is None:
-        X = array2d(X)
         n_samples, n_features = X.shape
         n_nonzero_cross_dist = n_samples * (n_samples - 1) // 2
         D = np.zeros((n_nonzero_cross_dist, n_features))
@@ -160,7 +161,6 @@ def l1_cross_distances(X, Y=None):
             ll_1 = ll_0 + n_samples - k - 1
             D[ll_0:ll_1] = np.abs(X[k] - X[(k + 1):])
     else:
-        X = array2d(X)
         Y = array2d(Y)
         n_samples_X, n_features_X = X.shape
         n_samples_Y, n_features_Y = Y.shape
@@ -187,6 +187,12 @@ class MultiFiCoKriging(object):
     ----------
     corr : Object
         Correlation function to use, default is squared_exponential_correlation.
+    n_features : ndarry
+        Number of features for each fidelity level.
+    n_samples : ndarry
+        Number of samples for each fidelity level.
+    nlevel : int
+        Number of fidelity levels.
     normalize : bool, optional
         When true, normalize X and Y so that the mean is at zero.
     regr : string or callable
@@ -245,6 +251,8 @@ class MultiFiCoKriging(object):
         Standard deviation of the low fidelity training data for y.
     _nfev : int
         Number of function evaluations.
+    _parent_name : str or None
+        Absolute pathname of metamodel component that owns this surrogate.
 
     Examples
     --------
@@ -298,7 +306,7 @@ class MultiFiCoKriging(object):
     }
 
     def __init__(self, regr='constant', rho_regr='constant', normalize=True,
-                 theta=None, theta0=None, thetaL=None, thetaU=None):
+                 theta=None, theta0=None, thetaL=None, thetaU=None, parent_name=''):
         """
         Initialize all attributes.
 
@@ -352,6 +360,8 @@ class MultiFiCoKriging(object):
             if list: a list of nlevel arrays specifying value for each level
         normalize : bool, optional
             When true, normalize X and Y so that the mean is at zero.
+        parent_name : str
+            Absolute pathname of metamodel component that owns this surrogate.
         """
         self.corr = squared_exponential_correlation
         self.regr = regr
@@ -361,10 +371,15 @@ class MultiFiCoKriging(object):
         self.thetaL = thetaL
         self.thetaU = thetaU
         self.normalize = normalize
+        self._parent_name = parent_name
         self.X_mean = 0
         self.X_std = 1
         self.y_mean = 0
         self.y_std = 1
+
+        self.n_features = None
+        self.n_samples = None
+        self.nlevel = None
 
         self._nfev = 0
 
@@ -459,8 +474,8 @@ class MultiFiCoKriging(object):
             # Calculate matrix of distances D between samples
             self.D[lvl] = l1_cross_distances(X[lvl])
             if (np.min(np.sum(self.D[lvl], axis=1)) == 0.):
-                raise Exception("Multiple input features cannot have the same"
-                                " value.")
+                self._raise("Multiple input features cannot have the same value.",
+                            exc_type=ValueError)
 
             # Regression matrix and parameters
             self.F[lvl] = self.regr(X[lvl])
@@ -478,15 +493,15 @@ class MultiFiCoKriging(object):
             n_samples_F_i = self.F[lvl].shape[0]
 
             if n_samples_F_i != n_samples[lvl]:
-                raise Exception("Number of rows in F and X do not match. Most "
-                                "likely something is going wrong with the "
-                                "regression model.")
+                self._raise("Number of rows in F and X do not match. Most "
+                            "likely something is going wrong with the "
+                            "regression model.", exc_type=ValueError)
 
             if int(self.p[lvl] + self.q[lvl]) >= n_samples_F_i:
-                raise Exception(("Ordinary least squares problem is undetermined "
-                                 "n_samples=%d must be greater than the regression"
-                                 " model size p+q=%d.")
-                                % (n_samples[i], self.p[lvl] + self.q[lvl]))
+                self._raise("Ordinary least squares problem is undetermined "
+                            "n_samples=%d must be greater than the regression"
+                            " model size p+q=%d." % (n_samples[lvl], self.p[lvl] + self.q[lvl]),
+                            exc_type=ValueError)
 
         # Set attributes
         self.X = X
@@ -498,18 +513,17 @@ class MultiFiCoKriging(object):
             # Determine Gaussian Process model parameters
             if self.theta[lvl] is None:
                 # Maximum Likelihood Estimation of the parameters
-                sol = self._max_rlf(
-                    lvl=lvl, initial_range=initial_range, tol=tol)
+                sol = self._max_rlf(lvl=lvl, initial_range=initial_range, tol=tol)
                 self.theta[lvl] = sol['theta']
                 self.rlf_value[lvl] = sol['rlf_value']
 
                 if np.isinf(self.rlf_value[lvl]):
-                    raise Exception("Bad parameter region. "
-                                    "Try increasing upper bound")
+                    self._raise("Bad parameter region. Try increasing upper bound",
+                                exc_type=ValueError)
             else:
                 self.rlf_value[lvl] = self.rlf(lvl=lvl)
                 if np.isinf(self.rlf_value[lvl]):
-                    raise Exception("Bad point. Try increasing theta0.")
+                    self._raise("Bad point. Try increasing theta0.", exc_type=ValueError)
 
         return
 
@@ -708,7 +722,6 @@ class MultiFiCoKriging(object):
         mu[:, 0] = (np.dot(f, beta) + np.dot(r_, gamma)).ravel()
 
         if eval_MSE:
-            self.sigma2_rho = nlevel * [None]
             MSE = np.zeros((n_eval, nlevel))
             r_t = solve_triangular(C, r_.T, lower=True)
             G = self.G[0]
@@ -787,41 +800,41 @@ class MultiFiCoKriging(object):
             y = [y]
 
         if len(X) != len(y):
-            raise ValueError("X and y must have the same length.")
+            self._raise("X and y must have the same length.", exc_type=ValueError)
 
         n_samples = np.zeros(nlevel, dtype=int)
         n_features = np.zeros(nlevel, dtype=int)
         n_samples_y = np.zeros(nlevel, dtype=int)
         for i in range(nlevel):
             n_samples[i], n_features[i] = X[i].shape
-            if i > 1 and n_features[i] != n_features[i - 1]:
-                raise ValueError("All X must have the same number of columns.")
+            if i > 0 and n_features[i] != n_features[i - 1]:
+                self._raise("All X must have the same number of columns.", exc_type=ValueError)
             y[i] = np.asarray(y[i]).ravel()[:, np.newaxis]
             n_samples_y[i] = y[i].shape[0]
             if n_samples[i] != n_samples_y[i]:
-                raise ValueError("X and y must have the same number of rows.")
+                self._raise("X and y must have the same number of rows.", exc_type=ValueError)
 
         self.n_features = n_features[0]
 
         if type(self.theta) is not list:
             self.theta = nlevel * [self.theta]
         elif len(self.theta) != nlevel:
-            raise ValueError("theta must be a list of %d element(s)." % nlevel)
+            self._raise("theta must be a list of %d element(s)." % nlevel, exc_type=ValueError)
 
         if type(self.theta0) is not list:
             self.theta0 = nlevel * [self.theta0]
         elif len(self.theta0) != nlevel:
-            raise ValueError("theta0 must be a list of %d elements." % nlevel)
+            self._raise("theta0 must be a list of %d element(s)." % nlevel, exc_type=ValueError)
 
         if type(self.thetaL) is not list:
             self.thetaL = nlevel * [self.thetaL]
         elif len(self.thetaL) != nlevel:
-            raise ValueError("thetaL must be a list of %d elements." % nlevel)
+            self._raise("thetaL must be a list of %d element(s)." % nlevel, exc_type=ValueError)
 
         if type(self.thetaU) is not list:
             self.thetaU = nlevel * [self.thetaU]
         elif len(self.thetaU) != nlevel:
-            raise ValueError("thetaU must be a list of %d elements." % nlevel)
+            self._raise("thetaU must be a list of %d element(s)." % nlevel, exc_type=ValueError)
 
         self.nlevel = nlevel
         self.X = X[:]
@@ -839,30 +852,28 @@ class MultiFiCoKriging(object):
             if self.regr in self._regression_types:
                 self.regr = self._regression_types[self.regr]
             else:
-                raise ValueError("regr should be one of %s or callable, "
-                                 "%s was given."
-                                 % (self._regression_types.keys(), self.regr))
+                self._raise("regr should be one of %s or callable, %s was given."
+                            % (self._regression_types.keys(), self.regr), exc_type=ValueError)
 
         # Check rho regression model
         if not callable(self.rho_regr):
             if self.rho_regr in self._regression_types:
                 self.rho_regr = self._regression_types[self.rho_regr]
             else:
-                raise ValueError("rho_regr should be one of %s or callable, "
-                                 "%s was given."
-                                 % (self._regression_types.keys(), self.rho_regr))
+                self._raise("rho_regr should be one of %s or callable, %s was given."
+                            % (self._regression_types.keys(), self.rho_regr), exc_type=ValueError)
 
         for i in range(self.nlevel):
             # Check correlation parameters
             if self.theta[i] is not None:
                 self.theta[i] = array2d(self.theta[i])
                 if np.any(self.theta[i] <= 0):
-                    raise ValueError("theta0 must be strictly positive.")
+                    self._raise("theta must be strictly positive.", exc_type=ValueError)
 
             if self.theta0[i] is not None:
                 self.theta0[i] = array2d(self.theta0[i])
                 if np.any(self.theta0[i] <= 0):
-                    raise ValueError("theta0 must be strictly positive.")
+                    self._raise("theta0 must be strictly positive.", exc_type=ValueError)
             else:
                 self.theta0[i] = array2d(self.n_features * [THETA0_DEFAULT])
 
@@ -871,24 +882,40 @@ class MultiFiCoKriging(object):
             if self.thetaL[i] is not None:
                 self.thetaL[i] = array2d(self.thetaL[i])
                 if self.thetaL[i].size != lth:
-                    raise ValueError("theta0 and thetaL must have the "
-                                     "same length.")
+                    self._raise("theta0 and thetaL must have the same length.",
+                                exc_type=ValueError)
             else:
                 self.thetaL[i] = array2d(self.n_features * [THETAL_DEFAULT])
 
             if self.thetaU[i] is not None:
                 self.thetaU[i] = array2d(self.thetaU[i])
                 if self.thetaU[i].size != lth:
-                    raise ValueError("theta0 and thetaU must have the "
-                                     "same length.")
+                    self._raise("theta0 and thetaU must have the same length.",
+                                exc_type=ValueError)
             else:
                 self.thetaU[i] = array2d(self.n_features * [THETAU_DEFAULT])
 
             if np.any(self.thetaL[i] <= 0) or np.any(self.thetaU[i] < self.thetaL[i]):
-                raise ValueError("The bounds must satisfy O < thetaL <= "
-                                 "thetaU.")
+                self._raise("The bounds must satisfy O < thetaL <= thetaU.", exc_type=ValueError)
 
         return
+
+    def _raise(self, msg, exc_type=RuntimeError):
+        """
+        Raise the given exception type, with parent's name prepended to the message.
+
+        Parameters
+        ----------
+        msg : str
+            The error message.
+        exc_type : class
+            The type of the exception to be raised.
+        """
+        if self._parent_name is None:
+            full_msg = msg
+        else:
+            full_msg = '{}: {}'.format(self._parent_name, msg)
+        raise exc_type(full_msg)
 
 
 class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
@@ -899,82 +926,77 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
 
     Attributes
     ----------
-    initial_range : float
-        Initial range for the optimizer.
     model : MultiFiCoKriging
         Contains MultiFiCoKriging surrogate.
-    tolerance : float
-        Optimizer terminates when the tolerance tol is reached.
     """
 
-    def __init__(self, regr='constant', rho_regr='constant', normalize=True,
-                 theta=None, theta0=None, thetaL=None, thetaU=None,
-                 tolerance=TOLERANCE_DEFAULT, initial_range=INITIAL_RANGE_DEFAULT):
+    def __init__(self, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
-        normalize : bool, optional
-            When true, normalize X and Y so that the mean is at zero.
-        regr : string or callable, optional
-            A regression function returning an array of outputs of the linear
-            regression functional basis for Universal Kriging purpose.
-            regr is assumed to be the same for all levels of code.
-            Default assumes a simple constant regression trend.
-            Available built-in regression models are:
-            'constant', 'linear'
-        rho_regr : string or callable, optional
-            A regression function returning an array of outputs of the linear
-            regression functional basis. Defines the regression function for the
-            autoregressive parameter rho.
-            rho_regr is assumed to be the same for all levels of code.
-            Default assumes a simple constant regression trend.
-            Available built-in regression models are:
-            'constant', 'linear'
-        theta : double, array_like or list, optional
-            Value of correlation parameters if they are known; no optimization is run.
-            Default is None, so that optimization is run.
-            if double: value is replicated for all features and all levels.
-            if array_like: an array with shape (n_features, ) for
-            isotropic calculation. It is replicated for all levels.
-            if list: a list of nlevel arrays specifying value for each level
-        theta0 : double, array_like or list, optional
-            Starting point for the maximum likelihood estimation of the
-            best set of parameters.
-            Default is None and meaning use of the default 0.5*np.ones(n_features)
-            if double: value is replicated for all features and all levels.
-            if array_like: an array with shape (n_features, ) for
-            isotropic calculation. It is replicated for all levels.
-            if list: a list of nlevel arrays specifying value for each level
-        thetaL : double, array_like or list, optional
-            Lower bound on the autocorrelation parameters for maximum
-            likelihood estimation.
-            Default is None meaning use of the default 1e-5*np.ones(n_features).
-            if double: value is replicated for all features and all levels.
-            if array_like: An array with shape matching theta0's. It is replicated
-            for all levels of code.
-            if list: a list of nlevel arrays specifying value for each level
-        thetaU : double, array_like or list, optional
-            Upper bound on the autocorrelation parameters for maximum
-            likelihood estimation.
-            Default is None meaning use of default value 50*np.ones(n_features).
-            if double: value is replicated for all features and all levels.
-            if array_like: An array with shape matching theta0's. It is replicated
-            for all levels of code.
-            if list: a list of nlevel arrays specifying value for each level
-        tolerance : float
-            Optimizer terminates when the tolerance tol is reached.
-        initial_range : float
-            Initial range for the optimizer.
+        **kwargs : keyword args
+            Some implementations of record_derivatives need additional args.
         """
-        super(MultiFiCoKrigingSurrogate, self).__init__()
+        super(MultiFiCoKrigingSurrogate, self).__init__(**kwargs)
+        self.model = None
 
-        self.tolerance = tolerance
-        self.initial_range = initial_range
-        self.model = MultiFiCoKriging(regr=regr, rho_regr=rho_regr, theta=theta,
-                                      theta0=theta0, thetaL=thetaL, thetaU=thetaU,
-                                      normalize=normalize)
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        opt = self.options
+        opt.declare('normalize', default=True, types=bool,
+                    desc="When true, normalize X and Y so that the mean is at zero.")
+        opt.declare('regr', default='constant', types=(object, ),
+                    desc="A regression function returning an array of outputs of the linear "
+                    "regression functional basis for Universal Kriging purpose. regr is assumed "
+                    "to be the same for all levels of code. Default assumes a simple constant "
+                    "regression trend. Available built-in regression models can be accessed by "
+                    "setting this option to the strings 'constant' or 'linear'")
+        opt.declare('rho_regr', default='constant', types=(object, ),
+                    desc="A regression function returning an array of outputs of the linear "
+                    "regression functional basis. Defines the regression function for the "
+                    "autoregressive parameter rho.. regr is assumed to be the same for all levels "
+                    "of code. Default assumes a simple constant regression trend. Available "
+                    "built-in regression models can be accessed by setting this option to the "
+                    "strings 'constant' or 'linear'")
+        opt.declare('theta', default=None, allow_none=True,
+                    desc="Value of correlation parameters. If they are known, then no "
+                    "optimization is run. Default is None, so that optimization is run. if double, "
+                    "then value is replicated for all features and all levels. if array_like, "
+                    "then an array with shape (n_features, ) for isotropic calculation. It is "
+                    "replicated for all levels. if list, then a list of nlevel arrays specifying "
+                    "value for each level")
+        opt.declare('theta0', default=None, allow_none=True,
+                    desc="Starting point for the maximum likelihood estimation of the best set "
+                    "of parameters. "
+                    "Default is None and meaning use of the default 0.5*np.ones(n_features) "
+                    "if double: value is replicated for all features and all levels. "
+                    "if array_like: an array with shape (n_features, ) for "
+                    "isotropic calculation. It is replicated for all levels. "
+                    "if list: a list of nlevel arrays specifying value for each level")
+        opt.declare('thetaL', default=None, allow_none=True,
+                    desc="Lower bound on the autocorrelation parameters for maximum "
+                    "likelihood estimation."
+                    "Default is None meaning use of the default 1e-5*np.ones(n_features). "
+                    "if double: value is replicated for all features and all levels. "
+                    "if array_like: An array with shape matching theta0s. It is replicate "
+                    "for all levels of code. "
+                    "if list: a list of nlevel arrays specifying value for each level")
+        opt.declare('thetaU', default=None, allow_none=True,
+                    desc="Upper bound on the autocorrelation parameters for maximum "
+                    "likelihood estimation. "
+                    "Default is None meaning use of default value 50*np.ones(n_features). "
+                    "if double: value is replicated for all features and all levels. "
+                    "if array_like: An array with shape matching theta0's. It is replicated "
+                    "for all levels of code. "
+                    "if list: a list of nlevel arrays specifying value for each level")
+        opt.declare('tolerance', default=TOLERANCE_DEFAULT,
+                    desc='Optimizer terminates when the tolerance tol is reached.')
+        opt.declare('initial_range', default=INITIAL_RANGE_DEFAULT,
+                    desc='Initial range for the optimizer.')
 
     def predict(self, new_x):
         """
@@ -1012,9 +1034,17 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
             An array with shape (n_samples_X, n_features) with the observations of the scalar
             output to be predicted.
         """
+        opt = self.options
+        if not self.model:
+            self.model = MultiFiCoKriging(regr=opt['regr'], rho_regr=opt['rho_regr'],
+                                          theta=opt['theta'], theta0=opt['theta0'],
+                                          thetaL=opt['thetaL'], thetaU=opt['thetaU'],
+                                          normalize=opt['normalize'],
+                                          parent_name=self._parent_name)
+
         X, Y = self._fit_adapter(X, Y)
-        self.model.fit(X, Y, tol=self.tolerance,
-                       initial_range=self.initial_range)
+        self.model.fit(X, Y, tol=opt['tolerance'],
+                       initial_range=opt['initial_range'])
 
     def _fit_adapter(self, X, Y):
         """
@@ -1047,8 +1077,3 @@ class MultiFiCoKrigingSurrogate(MultiFiSurrogateModel):
         X = [np.array(x) for x in reversed(X)]
         Y = [np.array(y) for y in reversed(Y)]
         return (X, Y)
-
-
-if __name__ == "__main__":
-    import doctest
-    doctest.testmod()

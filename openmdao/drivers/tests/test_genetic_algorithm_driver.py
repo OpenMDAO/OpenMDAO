@@ -9,6 +9,7 @@ import openmdao.api as om
 from openmdao.drivers.genetic_algorithm_driver import GeneticAlgorithm
 from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
@@ -792,6 +793,118 @@ class MPITestSimpleGA(unittest.TestCase):
         assert_rel_error(self, prob['mat2'], 3, 1e-5)
         # Material 3 can be anything
 
+    def test_mpi_bug_solver(self):
+        # This test verifies that mpi doesn't hang due to collective calls in the solver.
+
+        prob = om.Problem()
+        prob.model = SellarMDA()
+
+        prob.model.add_design_var('x', lower=0, upper=10)
+        prob.model.add_design_var('z', lower=0, upper=10)
+        prob.model.add_objective('obj')
+
+        prob.driver = om.SimpleGADriver(run_parallel=True)
+
+        # Set these low because we don't need to run long.
+        prob.driver.options['max_gen'] = 2
+        prob.driver.options['pop_size'] = 5
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        prob.run_driver()
+
+
+class D1(om.ExplicitComponent):
+    def initialize(self):
+        self.options['distributed'] = True
+
+    def setup(self):
+        comm = self.comm
+        rank = comm.rank
+
+        if rank == 1:
+            start = 1
+            end = 2
+        else:
+            start = 0
+            end = 1
+
+        self.add_input('y2', np.ones((1, ), float),
+                       src_indices=np.arange(start, end, dtype=int))
+        self.add_input('x', np.ones((1, ), float))
+
+        self.add_output('y1', np.ones((1, ), float))
+
+        self.declare_partials('y1', ['y2', 'x'])
+
+    def compute(self, inputs, outputs):
+        y2 = inputs['y2']
+        x = inputs['x']
+
+        if self.comm.rank == 1:
+            outputs['y1'] = 18.0 - 0.2*y2 + 2*x
+        else:
+            outputs['y1'] = 28.0 - 0.2*y2 + x
+
+    def compute_partials(self, inputs, partials, discrete_inputs=None):
+        y2 = inputs['y2']
+        x = inputs['x']
+
+        partials['y1', 'y2'] = -0.2
+        if self.comm.rank == 1:
+            partials['y1', 'x'] = 2.0
+        else:
+            partials['y1', 'x'] = 1.0
+
+
+class D2(om.ExplicitComponent):
+    def initialize(self):
+        self.options['distributed'] = True
+
+    def setup(self):
+        comm = self.comm
+        rank = comm.rank
+
+        if rank == 1:
+            start = 1
+            end = 2
+        else:
+            start = 0
+            end = 1
+
+        self.add_input('y1', np.ones((1, ), float),
+                       src_indices=np.arange(start, end, dtype=int))
+
+        self.add_output('y2', np.ones((1, ), float))
+
+        self.declare_partials('y2', ['y1'])
+
+    def compute(self, inputs, outputs):
+        y1 = inputs['y1']
+
+        if self.comm.rank == 1:
+            outputs['y2'] = y2 = y1**.5 - 3
+        else:
+            outputs['y2'] = y1**.5 + 7
+
+    def compute_partials(self, inputs, partials, discrete_inputs=None):
+        y1 = inputs['y1']
+
+        partials['y2', 'y1'] = 0.5 / y1**.5
+
+
+class Summer(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('y1', val=np.zeros((2, )))
+        self.add_input('y2', val=np.zeros((2, )))
+        self.add_output('obj', 0.0, shape=1)
+
+        self.declare_partials('obj', 'y1', rows=np.array([0, 0]), cols=np.array([0, 1]), val=np.ones((2, )))
+
+    def compute(self, inputs, outputs):
+        outputs['obj'] = np.sum(inputs['y1']) + np.sum(inputs['y2'])
+
 
 @unittest.skipUnless(om.PETScVector, "PETSc is required.")
 class MPITestSimpleGA4Procs(unittest.TestCase):
@@ -890,6 +1003,34 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         prob.setup()
 
         # No meaningful result from a short run; just make sure we don't hang.
+        prob.run_driver()
+
+    def test_proc_per_model(self):
+        # Test that we can run a GA on a distributed component without lockups.
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p', om.IndepVarComp('x', 3.0), promotes=['x'])
+
+        model.add_subsystem('d1', D1(), promotes=['*'])
+        model.add_subsystem('d2', D2(), promotes=['*'])
+
+        model.add_subsystem('obj_comp', Summer(), promotes=['*'])
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.DirectSolver()
+
+        model.add_design_var('x', lower=-0.5, upper=0.5)
+        model.add_objective('obj')
+
+        driver = prob.driver = om.SimpleGADriver()
+        prob.driver.options['pop_size'] = 4
+        prob.driver.options['max_gen'] = 3
+        prob.driver.options['run_parallel'] = True
+        prob.driver.options['procs_per_model'] = 2
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
         prob.run_driver()
 
 

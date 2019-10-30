@@ -62,24 +62,32 @@ For example:
 
 If you want to change the number of `compute_totals` calls that the coloring algorithm uses to
 compute the jacobian sparsity (default is 3), the tolerance used to determine nonzeros
-(default is 1e-15), or the number of orders to use for the tolerance sweep (default is 15),
-you can pass the `num_full_jacs`, `tol`, and `orders` args. For example:
+(default is 1e-25), you can pass the `num_full_jacs`, and `tol` args.
+You can also pass the `min_improve_pct` arg, which specifies how much the coloring must
+reduce the number of linear solves required to generate the total jacobian else coloring will
+be deactivated.
+
+For example:
 
 .. code-block:: python
 
-    prob.driver.declare_coloring(num_full_jacs=2, tol=1e-20, orders=20)
+    prob.driver.declare_coloring(num_full_jacs=2, tol=1e-20, min_improve_pct=10.)
 
 
-If you want to set a specific tolerance and skip the tolerance sweep, you can set
-:code:`orders=None`.  This can be useful if you have a very noisy jacobian that contains lots
-of small numbers and the tolerance sweep is unable to pick a tolerance.  You can set the
-tolerance to a small enough value that you're sure that you're not missing any entries that
-should be treated as nonzero.  Here's an example:
+If you want to perform a tolerance sweep, trying out a range of tolerances when determining
+what values of the sparsity matrix should be considered zero, then you can set the `orders`
+arg.  OpenMDAO will then sweep over tolerances from the given `tol` plus and minus `orders`
+orders of magnitude.  For each tolerance, it checks the number of nonzero values, and chooses
+a tolerance from the largest group of tolerances that share the same number of nonzeros. If
+it can't find at least two tolerances that result in the same number of nonzeros, an exception
+is raised.
+
+Here's an example:
 
 
 .. code-block:: python
 
-    prob.driver.declare_coloring(tol=1e-35, orders=None)
+    prob.driver.declare_coloring(tol=1e-35, orders=20)
 
 
 Whenever a dynamic coloring is computed, the coloring is written to a file called
@@ -165,13 +173,13 @@ Be careful when setting the tolerance, however, because if you make it too large
 zeroing out Jacobian entries that should not be ignored and your optimization may not converge.
 
 
-If you want to examine the sparsity structure of your total jacobian, you can use the *-j*
+If you want to examine the sparsity structure of your total jacobian, you can use the *--view*
 option as follows:
 
 
 .. code-block:: none
 
-    openmdao total_coloring <your_script_name> -j
+    openmdao total_coloring <your_script_name> --view
 
 
 which will display a visualization of the sparsity
@@ -179,12 +187,12 @@ structure with rows and columns labelled with the response and design variable n
 See the figure :ref:`here <fig-coloring-view>`.
 
 
-A text-based view is also available using the `--jtext` arg.  For example:
+A text-based view is also available using the `--textview` arg.  For example:
 
 
 .. code-block:: none
 
-    openmdao total_coloring <your_script_name> --jtext
+    openmdao total_coloring <your_script_name> --textview
 
 
 will display something like the following:
@@ -267,7 +275,7 @@ For example:
     Time to compute coloring: 0.001076 sec.
 
 
-Adding a `-j` arg will pop up an interactive plot showing the coloring of the jacobian. Forward
+Adding a `--view` arg will pop up an interactive plot showing the coloring of the jacobian. Forward
 colors will be colored blue/green and reverse colors will be colored red/yellow.  Clicking on
 a particular cell of the jacobian will display the location, the color number, the coloring direction,
 and the particular 'of' and 'wrt' variables for that particular sub-jacobian.  Note that this
@@ -283,7 +291,7 @@ viewer requires the installation of matplotlib. See the figure below.
 
 
 If matplotlib is not available, a text-based version of the jacobian can be printed using the
-`--jtext` arg.
+`--textview` arg.
 
 
 .. note::

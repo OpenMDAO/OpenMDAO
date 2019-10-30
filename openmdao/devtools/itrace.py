@@ -9,7 +9,7 @@ import warnings
 from contextlib import contextmanager
 from collections import defaultdict, OrderedDict
 
-from six import string_types
+from six import string_types, PY2
 from six.moves import cStringIO
 from numpy import ndarray
 try:
@@ -81,8 +81,12 @@ def _get_printer(stream, rank=-1):
 
     # rank < 0 means output on all ranks
     if not MPI or rank < 0 or MPI.COMM_WORLD.rank == rank:
-        def prt(*args, **kwargs):
-            print(*args, file=stream, **kwargs)
+        if PY2:  # python 2 doesn't like the flush arg
+            def prt(*args, **kwargs):
+                print(*args, file=stream, **kwargs)
+        else:
+            def prt(*args, **kwargs):
+                print(*args, file=stream, flush=True, **kwargs)
     else:
         def prt(*args, **kwargs):
             pass
@@ -139,8 +143,6 @@ def _trace_call(frame, arg, stack, context):
         stats['list'] += 1
         leaks.append(stats)
 
-    stream.flush()
-
 
 def _trace_return(frame, arg, stack, context):
     """
@@ -195,8 +197,6 @@ def _trace_return(frame, arg, stack, context):
         for name, _, delta_objs in objgraph.growth(peak_stats=last_objs):
             _printer("%s   %s %+d" % (indent, name, delta_objs))
 
-    stream.flush()
-
 
 def _setup(options):
     if not func_group:
@@ -216,7 +216,6 @@ def _setup(options):
         method_counts = defaultdict(int)
         class_counts = defaultdict(lambda: -1)
         id2count = {}
-        do_ret = _trace_return
 
         if memory:
             if psutil is None:
@@ -245,7 +244,7 @@ def _setup(options):
 
         _trace_calls = _create_profile_callback(call_stack, _collect_methods(methods),
                                                 do_call=_trace_call,
-                                                do_ret=do_ret,
+                                                do_ret=_trace_return,
                                                 context=(qual_cache, method_counts,
                                                          class_counts, id2count, verbose, memory,
                                                          leaks, stream, options.show_ptrs),
@@ -390,7 +389,7 @@ def _itrace_setup_parser(parser):
                              'expression can be added for each class.')
 
 
-def _itrace_exec(options):
+def _itrace_exec(options, user_args):
     """
     Process command line args and perform tracing on a specified python file.
     """
@@ -410,4 +409,5 @@ def _itrace_exec(options):
     _setup(options)
     start()
 
+    sys.argv[:] = [progname] + user_args
     exec (code, globals_dict)

@@ -71,7 +71,7 @@ class DefaultAllocator(ProcAllocator):
 
             # Result
             sub_comm = comm.Split(iproc)
-            return isubs_list[iproc], sub_comm, [comm.rank, comm.rank + sub_comm.size]
+            return sorted(isubs_list[iproc]), sub_comm, [comm.rank, comm.rank + sub_comm.size]
 
         num_procs = min_procs.copy()
 

@@ -2,17 +2,24 @@
 
 import sys
 import unittest
+import itertools
 
-from six import assertRaisesRegex, StringIO, assertRegex, iteritems
+from six import assertRaisesRegex, StringIO, assertRegex
 
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.group import get_relevant_vars
+from openmdao.core.system import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+import openmdao.utils.hooks as hooks
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivatives
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 
 class SellarOneComp(om.ImplicitComponent):
@@ -469,6 +476,51 @@ class TestProblem(unittest.TestCase):
         derivs = p.compute_totals()
 
         assert_rel_error(self, derivs['calc.y', 'des_vars.x'], [[2.0]], 1e-6)
+
+    @parameterized.expand(itertools.product(['fwd', 'rev']))
+    def test_compute_jacvec_product(self, mode):
+
+        prob = om.Problem()
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob.setup(mode=mode)
+        prob.run_model()
+
+        of = ['obj', 'con1']
+        wrt = ['x', 'z']
+
+        if mode == 'fwd':
+            seed_names = wrt
+            result_names = of
+            rvec = prob.model._vectors['output']['linear']
+            lvec = prob.model._vectors['residual']['linear']
+        else:
+            seed_names = of
+            result_names = wrt
+            rvec = prob.model._vectors['residual']['linear']
+            lvec = prob.model._vectors['output']['linear']
+
+        J = prob.compute_totals(of, wrt, return_format='array')
+
+        seed = []
+        for name in seed_names:
+            seed.append(np.random.random(rvec[name].size))
+
+        resdict = prob.compute_jacvec_product(of, wrt, mode, seed)
+        result = []
+        for name in result_names:
+            result.append(resdict[name].flat)
+        result = np.hstack(result)
+
+        testvec = np.hstack(seed)
+
+        if mode == 'fwd':
+            checkvec = J.dot(testvec)
+        else:
+            checkvec = J.T.dot(testvec)
+
+        np.testing.assert_allclose(checkvec, result)
 
     def test_feature_set_indeps(self):
         import openmdao.api as om
@@ -955,7 +1007,7 @@ class TestProblem(unittest.TestCase):
         with assertRaisesRegex(self, TypeError, msg):
             prob.get_val('comp.x', 'degK')
 
-        msg = "Can't set variable 'comp.x' with units of 'cm' to value with units of 'degK'."
+        msg = "Can't set variable 'comp.x' with units 'cm' to value with units 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.set_val('comp.x', 55.0, 'degK')
 
@@ -963,7 +1015,7 @@ class TestProblem(unittest.TestCase):
         with assertRaisesRegex(self, TypeError, msg):
             prob.get_val('no_unit.x', 'degK')
 
-        msg = "Can't set variable 'no_unit.x' with units of 'None' to value with units of 'degK'."
+        msg = "Can't set variable 'no_unit.x' with units 'None' to value with units 'degK'."
         with assertRaisesRegex(self, TypeError, msg):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
@@ -1007,6 +1059,27 @@ class TestProblem(unittest.TestCase):
         prob.set_val('comp.x', 50.0, 'mm', indices=[1])
         assert_rel_error(self, prob.get_val('comp.x'), np.array([1.0, 5.0]), 1e-6)
         assert_rel_error(self, prob.get_val('comp.x', 'm', indices=1), 5.0e-2, 1e-6)
+
+    def test_feature_get_set_array_with_slicer(self):
+        import numpy as np
+        import openmdao.api as om
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('y=x+1.',
+                                                     x={'value': np.array([[1., 2.], [3., 4.]]), },
+                                                     y={'shape': (2, 2), }))
+
+        prob.setup()
+        prob.run_model()
+
+        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[:, 0]), [1., 3.], 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[0, 1]), 2., 1e-6)
+        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[1, -1]), 4., 1e-6)
+
+        prob.set_val('comp.x', [5., 6.], indices=om.slicer[:,0])
+        assert_rel_error(self, prob.get_val('comp.x', indices=om.slicer[:, 0]), [5., 6.], 1e-6)
+        prob.run_model()
+        assert_rel_error(self, prob.get_val('comp.y', indices=om.slicer[:, 0]), [6., 7.], 1e-6)
 
     def test_feature_set_get_array(self):
         import numpy as np
@@ -1062,12 +1135,12 @@ class TestProblem(unittest.TestCase):
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.
 
-        prob = om.Problem()
+        prob = om.Problem(name='foo')
 
         try:
             prob.setup(mode='junk')
         except ValueError as err:
-            msg = "Unsupported mode: 'junk'. Use either 'fwd' or 'rev'."
+            msg = "Problem foo: Unsupported mode: 'junk'. Use either 'fwd' or 'rev'."
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting ValueError')
@@ -1122,7 +1195,7 @@ class TestProblem(unittest.TestCase):
         try:
             prob.run_model()
         except RuntimeError as err:
-            msg = "The `setup` method must be called before `run_model`."
+            msg = "Problem: The `setup` method must be called before `run_model`."
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting RuntimeError')
@@ -1130,7 +1203,7 @@ class TestProblem(unittest.TestCase):
         try:
             prob.run_driver()
         except RuntimeError as err:
-            msg = "The `setup` method must be called before `run_driver`."
+            msg = "Problem: The `setup` method must be called before `run_driver`."
             self.assertEqual(str(err), msg)
         else:
             self.fail('Expecting RuntimeError')
@@ -1138,7 +1211,7 @@ class TestProblem(unittest.TestCase):
     def test_run_with_invalid_prefix(self):
         # Test error message when running with invalid prefix.
 
-        msg = "The 'case_prefix' argument should be a string."
+        msg = "Problem: The 'case_prefix' argument should be a string."
 
         prob = om.Problem()
 
@@ -1177,7 +1250,7 @@ class TestProblem(unittest.TestCase):
             prob = om.Problem(root=om.Group(), model=om.Group())
 
         self.assertEqual(str(cm.exception),
-                         "Cannot specify both 'root' and 'model'. "
+                         "Problem: Cannot specify both 'root' and 'model'. "
                          "'root' has been deprecated, please use 'model'.")
 
         msg = "The 'root' argument provides backwards " \
@@ -1212,14 +1285,14 @@ class TestProblem(unittest.TestCase):
             prob = om.Problem(om.ScipyOptimizeDriver())
 
         self.assertEqual(str(cm.exception),
-                         "The value provided for 'model' is not a valid System.")
+                         "Problem: The value provided for 'model' is not a valid System.")
 
         # invalid driver
         with self.assertRaises(TypeError) as cm:
             prob = om.Problem(driver=SellarDerivatives())
 
         self.assertEqual(str(cm.exception),
-                         "The value provided for 'driver' is not a valid Driver.")
+                         "Problem: The value provided for 'driver' is not a valid Driver.")
 
     def test_relevance(self):
         p = om.Problem()
@@ -1530,15 +1603,16 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
-    def test_post_setup_hook(self):
+    def test_post_final_setup_hook(self):
         def hook_func(prob):
             prob['p2.y'] = 5.0
 
-        prob = om.Problem()
-        model = prob.model
-        om.Problem._post_setup_func = hook_func
-
+        hooks.use_hooks = True
+        hooks._register_hook('final_setup', class_name='Problem', post=hook_func)
         try:
+            prob = om.Problem()
+            model = prob.model
+
             model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
             model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
             model.add_subsystem('comp', om.ExecComp("f_xy=2.0*x+3.0*y"))
@@ -1552,7 +1626,8 @@ class TestProblem(unittest.TestCase):
             assert_rel_error(self, prob['p2.y'], 5.0)
             assert_rel_error(self, prob['comp.f_xy'], 21.0)
         finally:
-            om.Problem._post_setup_func = None
+            hooks._unregister_hook('final_setup', class_name='Problem')
+            hooks.use_hooks = False
 
     def test_list_problem_vars(self):
         model = SellarDerivatives()

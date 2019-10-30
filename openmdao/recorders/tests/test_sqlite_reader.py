@@ -25,7 +25,9 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, SellarProblem
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import set_pyoptsparse_opt, determine_adder_scaler, printoptions
+from openmdao.utils.general_utils import remove_whitespace
 from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.core.tests.test_discrete import ModCompEx, ModCompIm
 
 # check that pyoptsparse is installed
 OPT, OPTIMIZER = set_pyoptsparse_opt('SLSQP')
@@ -610,7 +612,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_list_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
-        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         prob.driver.add_recorder(self.recorder)
         prob.setup()
 
@@ -734,7 +736,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_list_cases_nested_model(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
-        prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
 
         model = prob.model
@@ -776,7 +778,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_list_cases_nested_no_source(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
-        prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=True)
+        prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
         prob.setup()
 
         model = prob.model
@@ -821,7 +823,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
     def test_get_cases_recurse(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce)
-        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=True)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         prob.driver.add_recorder(self.recorder)
         prob.setup()
 
@@ -958,7 +960,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check the system case for 'd1' (there should be only one output, 'd1.y1')
         system_cases = cr.list_cases('root.d1')
-        case = cr.get_case(system_cases[1])
+        case = cr.get_case(system_cases[-1])
 
         outputs = case.list_outputs(explicit=True, implicit=True, values=True,
                                     residuals=True, residuals_tol=None,
@@ -973,7 +975,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 'ref': 1.0,
                 'resids': [1.318e-10],
                 'shape': (1,),
-                'values': [25.5454859]
+                'values': [25.5883024]
             }
         }
 
@@ -988,11 +990,23 @@ class TestSqliteCaseReader(unittest.TestCase):
         np.testing.assert_almost_equal(vals['resids'], expected['resids'])
         np.testing.assert_almost_equal(vals['value'], expected['values'])
 
-        # check implicit outputs
-        # there should not be any
+        # check implicit outputs, there should not be any
         impl_outputs_case = case.list_outputs(explicit=False, implicit=True,
                                               out_stream=None)
         self.assertEqual(len(impl_outputs_case), 0)
+
+        # check that output from the Case method matches output from the System method
+        # the system for the case should be properly identified as 'd1'
+        stream = StringIO()
+        d1.list_outputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_outputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
 
     def test_list_inputs(self):
         prob = SellarProblem()
@@ -1014,18 +1028,394 @@ class TestSqliteCaseReader(unittest.TestCase):
         expected_inputs_case = {
             'd1.z': {'value': [5., 2.]},
             'd1.x': {'value': [1.]},
-            'd1.y2': {'value': [12.27257053]}
+            'd1.y2': {'value': [12.0584882]}
         }
 
         system_cases = cr.list_cases('root.d1')
 
-        case = cr.get_case(system_cases[1])
+        case = cr.get_case(system_cases[-1])
 
         inputs = case.list_inputs(values=True, out_stream=None)
 
         for name, meta in inputs:
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['value'], expected['value'])
+
+        # check that output from the Case method matches output from the System method
+        # the system for the case should be properly identified as 'd1'
+        stream = StringIO()
+        d1.list_inputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
+
+    def test_list_inputs_outputs_solver_case(self):
+        prob = SellarProblem(SellarDerivativesGrouped)
+        prob.setup()
+
+        mda = prob.model.mda
+        mda.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
+        mda.nonlinear_solver.add_recorder(self.recorder)
+
+        prob.set_solver_print(-1)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(-1)
+
+        # check that output from the Case methods match output from the System methods
+        # the system for the solver case should be properly identified as 'mda'
+        stream = StringIO()
+        mda.list_inputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
+
+        stream = StringIO()
+        mda.list_outputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_outputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
+
+    def test_list_input_and_outputs_with_tags(self):
+        from openmdao.core.tests.test_expl_comp import RectangleCompWithTags
+        prob = om.Problem(RectangleCompWithTags())
+
+        recorder = om.SqliteRecorder("cases.sql")
+        prob.model.add_recorder(recorder)
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.get_cases()
+        case = cases[0]
+
+        # Inputs no tags
+        inputs = case.list_inputs(out_stream=None)
+        self.assertEqual(sorted([inp[0] for inp in inputs]), ['length', 'width'])
+
+        # Inputs with tag that matches
+        inputs = case.list_inputs(out_stream=None, tags="tag2")
+        self.assertEqual([inp[0] for inp in inputs], ['width',])
+
+        # Inputs with tag that does not match
+        inputs = case.list_inputs(out_stream=None, tags="tag3")
+        self.assertEqual([inp[0] for inp in inputs], [])
+
+        # Inputs with multiple tags
+        inputs = case.list_inputs(out_stream=None, tags=["tag2", "tag3"])
+        self.assertEqual([inp[0] for inp in inputs], ['width',])
+
+        # Outputs no tags
+        outputs = case.list_outputs(out_stream=None)
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+
+        # Outputs with tag that does match
+        outputs = case.list_outputs(out_stream=None, tags="tag1")
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+
+        # Outputs with tag that do not match any vars
+        outputs = case.list_outputs(out_stream=None, tags="tag3")
+        self.assertEqual(sorted([outp[0] for outp in outputs]), [])
+
+        # Outputs with multiple tags
+        outputs = case.list_outputs(out_stream=None, tags=["tag1", "tag3"])
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['area',])
+
+    def test_list_inputs_with_includes_excludes(self):
+        prob = SellarProblem()
+
+        prob.model.add_recorder(self.recorder)
+
+        prob.setup()
+
+        d1 = prob.model.d1  # SellarDis1withDerivatives (an ExplicitComp)
+        d1.nonlinear_solver = om.NonlinearBlockGS(maxiter=5)
+        d1.add_recorder(self.recorder)
+
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+
+        system_cases = cr.list_cases('root.d1')
+        case = cr.get_case(system_cases[-1])
+
+        # inputs with no includes or excludes. Should get d1.z, d1.x, and d1.y2
+        inputs = case.list_inputs(out_stream=None)
+        self.assertEqual( len(inputs), 3)
+
+        # inputs with includes
+        inputs = case.list_inputs(includes = ['*z'], out_stream=None)
+        self.assertEqual(len(inputs), 1)
+
+        # inputs with excludes
+        inputs = case.list_inputs(excludes = ['*z'], out_stream=None)
+        self.assertEqual(len(inputs), 2)
+
+        # inputs with includes and excludes
+        inputs = case.list_inputs(includes = ['*z'], excludes = ['d1*'], out_stream=None)
+        self.assertEqual(len(inputs), 0)
+
+        # outputs with no includes or excludes. Should get d1.y1
+        outputs = case.list_outputs(out_stream=None)
+        self.assertEqual( len(outputs), 1)
+
+        # outputs with includes
+        outputs = case.list_outputs(includes = ['*z'], out_stream=None)
+        self.assertEqual( len(outputs), 0)
+
+        # outputs with excludes
+        outputs = case.list_outputs(excludes = ['*z'], out_stream=None)
+        self.assertEqual( len(outputs), 1)
+
+        # outputs with includes and excludes
+        outputs = case.list_outputs(includes = ['d1*'], excludes = ['*z'], out_stream=None)
+        self.assertEqual( len(outputs), 1)
+
+    def test_list_discrete(self):
+        model = om.Group()
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_discrete_output('x', 11)
+
+        model.add_subsystem('expl', ModCompEx(3))
+        model.add_subsystem('impl', ModCompIm(3))
+
+        model.connect('indep.x', ['expl.x', 'impl.x'])
+
+        model.add_recorder(self.recorder)
+
+        prob = om.Problem(model)
+
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        #
+        # list inputs, not hierarchical
+        #
+        stream = StringIO()
+        model.list_inputs(hierarchical=False, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(text[i], line)
+
+        #
+        # list inputs, hierarchical
+        #
+        stream = StringIO()
+        model.list_inputs(hierarchical=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(text[i], line)
+
+        #
+        # list outputs, not hierarchical, with residuals
+        #
+        expected = [
+            "3 Explicit Output(s) in 'model'",
+            "-------------------------------",
+            "",
+            "varname  value  resids      ",
+            "-------  -----  ------------",
+            "indep.x  11     Not Recorded",
+            "expl.b   [20.]  [0.]        ",
+            "expl.y   2      Not Recorded",
+        ]
+
+        stream = StringIO()
+        case.list_outputs(residuals=True, hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        #
+        # list outputs, hierarchical
+        #
+        stream = StringIO()
+        model.list_outputs(hierarchical=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_outputs(hierarchical=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(text[i], line)
+
+    def test_list_discrete_filtered(self):
+        model = om.Group()
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_discrete_output('x', 11)
+
+        sub = model.add_subsystem('sub', om.Group())
+        sub.add_subsystem('expl', ModCompEx(3))
+        sub.add_subsystem('impl', ModCompIm(3))
+
+        model.connect('indep.x', 'sub.expl.x')
+        model.connect('indep.x', 'sub.impl.x')
+
+        sub.add_recorder(self.recorder)
+
+        # exclude one discrete input (abs_name) and one discrete output (prom_name)
+        sub.recording_options['excludes'] = ['sub.impl.x', 'expl.y']
+
+        prob = om.Problem(model)
+
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        #
+        # list inputs
+        #
+        expected = [
+            "2 Input(s) in 'sub'",
+            "-------------------",
+            "",
+            "varname     value",
+            "----------  -----",
+            "sub.expl.a  [10.]",
+            "sub.expl.x  11   ",
+            # sub.impl.x is not recorded (excluded)
+        ]
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+        #
+        # list outputs
+        #
+        expected = [
+            "1 Explicit Output(s) in 'sub'",
+            "-----------------------------",
+            "",
+            "varname   value",
+            "--------  -----",
+            "top",
+            "  sub",
+            "    expl",
+            "      b   [20.]",
+            #      y is not recorded (excluded)
+            "",
+            "",
+            "1 Implicit Output(s) in 'sub'",
+            "-----------------------------",
+            "",
+            "varname   value",
+            "-------   -----",
+            "top",
+            "  sub",
+            "    impl",
+            "      y   2    ",
+        ]
+
+        stream = StringIO()
+        case.list_outputs(out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+    def test_list_discrete_promoted(self):
+        model = om.Group()
+
+        indep = om.IndepVarComp()
+        indep.add_discrete_output('x', 11)
+
+        model.add_subsystem('indep', indep, promotes_outputs=['x'])
+
+        model.add_subsystem('expl', ModCompEx(3), promotes_inputs=['x'])
+        model.add_subsystem('impl', ModCompIm(3), promotes_inputs=['x'])
+
+        model.add_recorder(self.recorder)
+
+        prob = om.Problem(model)
+
+        prob.setup()
+        prob.run_model()
+        prob.cleanup()
+
+        cr = om.CaseReader(self.filename)
+        case = cr.get_case(0)
+
+        #
+        # list inputs
+        #
+        stream = StringIO()
+        model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(text[i], line)
+
+        #
+        # list outputs
+        #
+        stream = StringIO()
+        model.list_outputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_outputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            if line and not line.startswith('-'):
+                self.assertEqual(text[i], line)
 
     def test_getitem(self):
         prob = SellarProblem()
@@ -1701,9 +2091,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         SIZE = 10
         prob = om.Problem()
 
-        driver = prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['disp'] = False
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False)
 
         prob.driver.add_recorder(self.recorder)
         driver.recording_options['includes'] = ['*']
@@ -2059,6 +2447,19 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
 
+        # check that output from the Case method matches output from the System method
+        # the system for the case should be properly identified as 'd1'
+        stream = StringIO()
+        prob.model.mda.list_inputs(prom_name=True, out_stream=stream)
+        expected = stream.getvalue().split('\n')
+
+        stream = StringIO()
+        case.list_inputs(prom_name=True, out_stream=stream)
+        text = stream.getvalue().split('\n')
+
+        for i, line in enumerate(expected):
+            self.assertEqual(text[i], line)
+
         for key in expected_inputs_abs:
             np.testing.assert_almost_equal(case.inputs[key], prob[key])
 
@@ -2168,6 +2569,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         model.add_recorder(self.recorder)
 
         prob.setup()
+        prob.set_solver_print(0)
 
         prob['px.x'] = 2.0
         prob['comp.y'] = 0.0
@@ -2786,6 +3188,98 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         assert_rel_error(self, case_outputs[0][1]['value'], [25.545485893882876], tolerance=1e-10) # d1.y1
 
+    def test_feature_list_inputs_and_outputs_with_tags(self):
+        import openmdao.api as om
+
+        class RectangleCompWithTags(om.ExplicitComponent):
+            """
+            A simple Explicit Component that also has input and output with tags.
+            """
+
+            def setup(self):
+                self.add_input('length', val=1., tags=["tag1", "tag2"])
+                self.add_input('width', val=1., tags=["tag2"])
+                self.add_output('area', val=1., tags="tag1")
+
+                self.declare_partials('*', '*')
+
+            def compute(self, inputs, outputs):
+                outputs['area'] = inputs['length'] * inputs['width']
+
+        model = om.Group()
+        prob = om.Problem(model)
+        model.add_recorder(om.SqliteRecorder('cases.sql'))
+
+        indep = om.IndepVarComp()
+        indep.add_output('length', val=100.)
+        indep.add_output('width', val=60.)
+
+        model.add_subsystem('rect', RectangleCompWithTags(), promotes=['length', 'width', 'area'])
+        model.add_subsystem('indep', indep, promotes=['length', 'width'])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+
+        cases = cr.get_cases()
+        case = cases[0]
+
+        # Inputs with tag that matches
+        inputs = case.list_inputs(out_stream=None, tags="tag1")
+        self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.length',]))
+
+        # Inputs with multiple tags
+        inputs = case.list_inputs(out_stream=None, tags=["tag2", "tag3"])
+        self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.width', 'rect.length']))
+
+        # Outputs with tag that does match
+        outputs = case.list_outputs(tags="tag1")
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
+
+    def test_feature_list_inputs_and_outputs_with_includes_excludes(self):
+        import openmdao.api as om
+        from openmdao.core.tests.test_expl_comp import RectangleComp
+
+        model = om.Group()
+        prob = om.Problem(model)
+        model.add_recorder(om.SqliteRecorder('cases.sql'))
+
+        indep = om.IndepVarComp()
+        indep.add_output('length', val=100.)
+        indep.add_output('width', val=60.)
+
+        model.add_subsystem('rect', RectangleComp(), promotes=['length', 'width', 'area'])
+        model.add_subsystem('indep', indep, promotes=['length', 'width'])
+
+        prob.setup(check=False)
+        prob.run_model()
+
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+
+        cases = cr.get_cases()
+        case = cases[0]
+
+        # Inputs with includes
+        inputs = case.list_inputs(includes=['*length'], out_stream=None)
+        self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.length',]))
+
+        # Inputs with multiple tags
+        inputs = case.list_inputs(excludes=['*length'], out_stream=None)
+        self.assertEqual(sorted([inp[0] for inp in inputs]), sorted(['rect.width',]))
+
+        # Outputs with includes
+        outputs = case.list_outputs(includes=['*area'], out_stream=None)
+        self.assertEqual(sorted([outp[0] for outp in outputs]), ['rect.area',])
+
+        # Outputs with excludes
+        outputs = case.list_outputs(excludes=['*area'], out_stream=None)
+        self.assertEqual(sorted([outp[0] for outp in outputs]), sorted(['indep.width', 'indep.length']))
+
     def test_feature_get_val(self):
         import openmdao.api as om
 
@@ -2821,7 +3315,7 @@ class TestPromAbsDict(unittest.TestCase):
 
     def test_dict_functionality(self):
         prob = SellarProblem(SellarDerivativesGrouped)
-        driver = prob.driver = om.ScipyOptimizeDriver()
+        driver = prob.driver = om.ScipyOptimizeDriver(disp=False)
 
         recorder = om.SqliteRecorder("cases.sql")
 
@@ -2909,7 +3403,7 @@ class TestPromAbsDict(unittest.TestCase):
 
 
 def _assert_model_matches_case(case, system):
-    '''
+    """
     Check to see if the values in the case match those in the model.
 
     Parameters
@@ -2918,7 +3412,7 @@ def _assert_model_matches_case(case, system):
         Case to be used for the comparison.
     system : System object
         System to be used for the comparison.
-    '''
+    """
     case_inputs = case.inputs
     model_inputs = system._inputs
     for name, model_input in iteritems(model_inputs._views):
@@ -3046,6 +3540,52 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         self.assertEqual(sorted(case.inputs.keys()), expected_inputs)
         self.assertEqual(sorted(case.outputs.keys()), expected_outputs)
         self.assertEqual(sorted(case.residuals.keys()), expected_outputs)
+
+        # check that inputs & outputs are in sorted order, since exec/setup order is not available
+        expected = [
+            "5 Input(s) in 'mda'",
+            "-------------------",
+            "",
+            "varname    value               ",
+            "---------  --------------------",
+            "mda.d1.x   [3.43977636e-15]    ",
+            "mda.d1.y2  [3.75527777]        ",
+            "mda.d1.z   |1.9776388835080063|",
+            "mda.d2.y1  [3.16]              ",
+            "mda.d2.z   |1.9776388835080063|",
+         ]
+
+        stream = StringIO()
+        case.list_inputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+        for i, line in enumerate(expected):
+            if i == 0:
+                self.assertEqual(text[i], line)
+            elif line and not line.startswith('-'):
+                self.assertTrue(text[i].startswith(line.split()[0]))
+
+        expected = [
+            "2 Explicit Output(s) in 'mda'",
+            "-----------------------------",
+            "",
+            "varname    value       ",
+            "---------  ------------",
+            "mda.d1.y1  [3.16]      ",
+            "mda.d2.y2  [3.75527777]",
+            "",
+            "",
+            "0 Implicit Output(s) in 'mda'",
+            "-----------------------------",
+         ]
+
+        stream = StringIO()
+        case.list_outputs(hierarchical=False, out_stream=stream)
+        text = stream.getvalue().split('\n')
+        for i, line in enumerate(expected):
+            if i == 0:
+                self.assertEqual(text[i], line)
+            elif line and not line.startswith('-'):
+                self.assertTrue(text[i].startswith(line.split()[0]))
 
         np.testing.assert_almost_equal(case.abs_err, 0, decimal=6)
         np.testing.assert_almost_equal(case.rel_err, 0, decimal=6)

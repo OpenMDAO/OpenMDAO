@@ -3,395 +3,170 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script type="text/javascript" src="http://d3js.org/d3.v3.js"></script>
+<script type="text/javascript">
+    <tabulator_src>
+</script>
 <style>
+    .unitnomatch {
+        color: red;
+        font-weight: bold;
+    }
 
-html, body {
-    overflow: hidden;
-}
+    .promoted {
+        color: blue;
+    }
 
-#scroller {
-    overflow: auto;
-}
+    .middle {
+        text-align: center;
+        width: 100%;
+        display:table;
+    }
 
-/* highlighting for targets set from outside of selected target scope */
-.outscope {
-    color: #9812d0;
-    font-weight: bold;
-}
+    .toggle {
+        width: 5%;
+        display:table-cell;
+        text-align: center;
+    }
 
-.unit_diff {
-    color: red;
-}
+    input {
+        margin: 3px 5px 3px 5px;
+    }
 
-select {
-    size: 10;
-}
 
-table {
-    font-family:Arial, Helvetica, sans-serif;
-    color: black;
-	font-size:12px;
-	text-shadow: 1px 1px 0px #fff;
-	background:#eaebec;
-	margin:20px;
-	border: black 1px solid;
-
-	-moz-border-radius:3px;
-	-webkit-border-radius:3px;
-	border-radius:3px;
-}
-
-table th {
-	padding:11px 15px 12px 15px;
-	border: black 1px solid;
-
-	background: #ededed;
-}
-
-table td {
-	border-top: 1px solid #ffffff;
-	border-bottom:1px solid #e0e0e0;
-	border-left: 1px solid #e0e0e0;
-
-    background: #e6e6e6;
-    text-align: center;
-}
-
-table td:first-child {
-	text-align: right;
-    padding-right: 10px;
-}
-
-table td:last-child {
-    text-align: left;
-    padding-left: 10px;
-}
-
-table tr.even td {
-    background: #f2f2f2;
-}
-
-table tr:hover td {
-	background: #ccffff;
-}
-
-.buttonish {
-  font: bold 11px Arial;
-  text-decoration: none;
-  background-color: #EEEEEE;
-  color: #333333;
-  padding: 2px 6px 2px 6px;
-  border-top: 1px solid #CCCCCC;
-  border-right: 1px solid #333333;
-  border-bottom: 1px solid #333333;
-  border-left: 1px solid #CCCCCC;
-}
-
-#conn_table {
-    width: 95%;
-}
-
-#filters {
-    width: 100%;
-    margin-left: 20px;
-}
-
-#htable_container {
-    width: 100%;
-    display: table;
-    border-spacing: 10px;
-    margin-left: 10px;
-}
-
-#htable_row {
-    display: table-row;
-}
-
-.htable_data {
-    display: table-cell;
-}
-
-h3 {
-    margin: 1px;
-    padding: 1px;
-}
-
-#arrayModal{
-    display: none; /* Hidden by default */
-    background-color: rgb(0,0,0); /* Fallback color */
-    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-    height: 100%;
-    left: 0;
-    margin: 0;
-    padding: 0;
-    position: absolute;
-    top: 0;
-    width: 100%;
-    z-index: 1;
-}
-#modalText {
-    background: none repeat scroll 0 0 rgba(0, 0, 0, 0);
-    font-family:Courier New, Courier, monospace;
-    background-color: #fefefe;
-    border: 1px solid #888;
-    height: 200px;
-    left: 50%;
-    margin-left: -200px;
-    margin-top: -100px;
-    position: fixed;
-    top: 50%;
-    width: 400px;
-    overflow: auto; /* Enable scroll if needed */
-}
+    <tabulator_style>
 </style>
+<title>Connectione Viewer</title>
 </head>
 <body>
+    <h2 id="conn_title"></h2>
+    <div id="connection-table"></div>
 <script type="text/javascript">
 
 var data = <connection_data>;
+var tabledata = data.table;
 
-var src2tgts = data.src2tgts;
-var proms = data.proms;
-var units = data.units;
-var vals = data.vals;
-var src_systems = data.src_systems;
-var tgt_systems = data.tgt_systems;
-var noconn_srcs = data.noconn_srcs;
+document.title = data.title;
+document.getElementById("conn_title").innerHTML = data.title
 
-var src_prefix=data.src_filter, tgt_prefix=data.tgt_filter;
-var w, h;
-var modal;
-var span;
-var modal_text;
-
-window.onresize = fill_vars;
-
-window.onload = function() {
-
-    var src_filter = d3.select("#src_filter")
-        .selectAll("option")
-        .data(src_systems)
-        .enter()
-        .append("option")
-        .text(function(d, i){ return d.name})
-
-    var tgt_filter = d3.select("#tgt_filter")
-        .selectAll("option")
-        .data(tgt_systems)
-        .enter()
-        .append("option")
-        .text(function(d, i){ return d.name})
-
-    document.getElementById("src_filter").value = src_prefix
-    document.getElementById("tgt_filter").value = tgt_prefix
-
-    modal = document.getElementById("arrayModal");
-    modal_text = document.getElementById("modalText");
-
-    // When the user clicks anywhere outside of the modal, close it
-    window.onclick = function(event) {
-        if (event.target == modal) {
-            modal.style.display = "none";
-        }
-    }
-
-    fill_vars();
+if(data.show_values == true) {
+    valstr = "<span class='toggle'><input type='checkbox' checked='true' onclick='values_toggle(this)'>Values</input></span>";
+}
+else {
+    valstr = "<span class='toggle'><input type='checkbox' onclick='values_toggle(this)'>Values</input></span>";
 }
 
-function window_height() {
-    return window.innerHeight-120;
-}
-
-
-function fill_vars() {
-    var noconn = "NO CONNECTION";
-    var tbl = d3.select('table');
-
-    d3.select("#scroller")
-         .style("height", window_height()+"px");
-
-    // first, clear out old stuff
-    tbl.select("tbody")
-        .selectAll("tr")
-        .remove();
-
-    var i, j, source, proms, promt, tgt, tgts, in_scope;
-
-    var rows = [];
-    var cols = [];
-    var vtmp = 0;
-
-    // use scope to determine when a source comes from
-    // outside of the selected system of the target.
-    var scope = false;
-    if (src_prefix != noconn && tgt_prefix != noconn && tgt_prefix != "") {
-        scope = tgt_prefix;
-    }
-
-    if (tgt_prefix == noconn) {
-        for (i=0; i<noconn_srcs.length; i++) {
-            if (noconn_srcs[i].startsWith(src_prefix)) {
-                rows.push({
-                    "Unknowns": noconn_srcs[i],
-                    "UUnits": units[noconn_srcs[i]],
-                    "Value": vals[noconn_srcs[i]],
-                    "PUnits": "",
-                    "Params": tgt_prefix,
-                    "in_scope": true,
-                    "needs_viewer": vals[noconn_srcs[i]].length > 20,
-                });
-            }
-        }
-    }
-    else {
-        for (i=0; i<src2tgts.length; i++) {
-            source = src2tgts[i][0];
-
-            if (source.startsWith(src_prefix)) {
-                cols = [];
-                tgts = src2tgts[i][1];
-                for (j=0; j<tgts.length; j++) {
-                    if (tgts[j].startsWith(tgt_prefix)) {
-                        cols.push(tgts[j]);
+var table =
+    new Tabulator("#connection-table", {
+        // set height of table (in CSS or here), this enables the Virtual DOM and
+        // improves render speed dramatically (can be any valid css height value)
+        height: 650,
+        data:tabledata, //assign data to table
+        layout:"fitColumns", //"fitDataFill",
+        footerElement:"<p class='middle'>" +
+                            "<span class='toggle'><input type='checkbox' onclick='src_abs_toggle(this)'>Absolute Outputs</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='src_prom_toggle(this)'>Promoted Outputs</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='sunits_toggle(this)'>Output Units</input></span>" +
+                            valstr +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='tunits_toggle(this)'>Input Units</input></span>" +
+                            "<span class='toggle'><input type='checkbox' onclick='tgt_abs_toggle(this)'>Absolute Inputs</input></span>" +
+                            "<span class='toggle'><input type='checkbox' checked='true' onclick='tgt_prom_toggle(this)'>Promoted Inputs</input></span></p>",
+        columns:[ //Define Table Columns
+                {title: "Output (absolute)", field:"src", align:"left", headerFilter:true,
+                    visible:false, minWidth:300,
+                tooltip:function(cell){
+                    return cell.getData().sprom;
+                }},
+                {title: "Output (promoted)", field:"sprom", align:"left", headerFilter:true, minWidth:300,
+                    formatter:function(cell, formmaterParams, onRendered) {
+                    var promname = cell.getData().sprom;
+                    if (promname == cell.getData().src) {
+                        return promname;
                     }
-                }
-                if (cols.length > 0) {
-                    for (j=0; j<cols.length; j++) {
-                        in_scope = true;
-                        tgt = cols[j];
-                        if (scope == tgt_prefix && source != noconn) {
-                            in_scope = source.startsWith(tgt_prefix);
+                    else {
+                        return "<span class='promoted'>" + promname + "</span>";
+                    }
+                },
+                tooltip:function(cell){
+                    return cell.getData().src;
+                }},
+                {title: "Units", field:"sunits", align:"center", headerFilter:true,
+                    formatter:function(cell, formatterParams){
+                    var value = cell.getValue();
+                    if(value.startsWith("!")){
+                        return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
+                    }else{
+                        return value;
+                    }
+                    }},
+                {title: "Value", visible:data.show_values, field:"val", align:"center", headerFilter:true},
+                {title: "Units", field:"tunits", align:"center", headerFilter:true,
+                    formatter:function(cell, formatterParams){
+                        var value = cell.getValue();
+                        if(value.startsWith("!")){
+                            return "<span class='unitnomatch'>" + value.substring(1) + "</span>";
+                        }else{
+                            return value;
                         }
-                        rows.push({
-                            "Unknowns": source,
-                            "UUnits": units[source],
-                            "Value": vals[tgt],
-                            "PUnits": units[tgt],
-                            "Params": tgt,
-                            "in_scope": in_scope,
-                            "needs_viewer": vals[tgt].length > 20,
-                        });
                     }
-                }
-            }
-        }
-    }
+                },
+                {title: "Input (absolute)", field:"tgt", align:"left", headerFilter:true,
+                    visible:false, minWidth:300,
+                    tooltip:function(cell){
+                    return cell.getData().tprom;
+                    }},
+                {title: "Input (promoted)", field:"tprom", align:"left", headerFilter:true,
+                    minWidth:300,
+                    formatter:function(cell, formmaterParams, onRendered) {
+                    var promname = cell.getData().tprom;
+                    if (promname == cell.getData().tgt) {
+                        return promname;
+                    }
+                    else {
+                        return "<span class='promoted'>" + promname + "</span>";
+                    }
+                    },
+                    tooltip:function(cell){
+                    return cell.getData().tgt;
+                }},
+        ],
+});
 
-    var ccols = ['Unknowns', 'UUnits', 'Value', 'PUnits', 'Params']
-    tabulate(rows, ccols);
+
+function src_abs_toggle(tbutton) {
+    table.toggleColumn("src");
+    table.redraw();
 }
 
-
-// The table generation function
-function tabulate(data, columns) {
-    var table = d3.select("#conn_table"),
-        tbody = table.select("tbody");
-
-    // create a row for each object in the data
-    var rows = tbody.selectAll("tr")
-        .data(data)
-        .enter()
-        .append("tr")
-        .classed("even", function(d,i) { return i % 2 == 0; });
-
-    var udiff;
-    var in_scope;
-
-    // create a cell in each row for each column
-    var cells = rows.selectAll("td")
-        .data(function(row) {
-            return columns.map(function(column) {
-                in_scope = true;
-                udiff = false;
-
-                // find different units
-                if (column == "UUnits") {
-                    udiff = row[column] != row["PUnits"];
-                }
-                else if (column == "PUnits") {
-                    udiff = row["UUnits"] != row[column];
-                }
-                else if (column == "Params") {
-                    in_scope = row["in_scope"];
-                }
-
-                return {
-                    column: column,
-                    "value": row[column],
-                    "udiff": udiff,
-                    "in_scope": in_scope,
-                    "needs_viewer": (row["needs_viewer"] && column === "Value"),
-                };
-            });
-        })
-        .enter()
-        .append("td")
-        .classed("unit_diff", function(d) { return d.udiff; })
-        .classed("outscope", function(d) { return !d.in_scope; })
-        .classed("buttonish", function(d) {
-            return (d.needs_viewer);
-        })
-        .text(function(d) {
-            if (d.needs_viewer) {
-                return "View";
-            }
-            else {
-                return d.value;
-            }
-        })
-        .on("click", function(d) {
-            if (d.needs_viewer) {
-                modal_text.textContent = d.value;
-                modal.style.display = "block";
-            }
-        });
-
-    return table;
+function src_prom_toggle(tbutton) {
+    table.toggleColumn("sprom");
+    table.redraw();
 }
 
-function src_system_changed() {
-    var selectBox = document.getElementById("src_filter");
-    src_prefix = selectBox.options[selectBox.selectedIndex].value;
-    fill_vars();
+function tgt_abs_toggle(tbutton) {
+    table.toggleColumn("tgt");
+    table.redraw();
 }
 
-function tgt_system_changed() {
-    var selectBox = document.getElementById("tgt_filter");
-    tgt_prefix = selectBox.options[selectBox.selectedIndex].value;
-    fill_vars();
+function tgt_prom_toggle(tbutton) {
+    table.toggleColumn("tprom");
+    table.redraw();
+}
+
+function values_toggle(tbutton) {
+    table.toggleColumn("val");
+    table.redraw();
+}
+
+function sunits_toggle(tbutton) {
+    table.toggleColumn("sunits");
+    table.redraw();
+}
+
+function tunits_toggle(tbutton) {
+    table.toggleColumn("tunits");
+    table.redraw();
 }
 
 </script>
-    <header>
-        <div id="htable_container">
-            <div id="htable_row">
-               <div class="htable_data">
-                   <h3>Filter by Source System</h3>
-                   <select id="src_filter" onchange="src_system_changed()"></select>
-               </div>
-               <div class="htable_data">
-                    <h3>Filter by Target System</h3>
-                    <select id="tgt_filter" onchange="tgt_system_changed()"></select>
-                </div>
-            </div>
-        </div>
-   </header>
-    <h2></h2>
-    <div id="scroller">
-        <table id="conn_table">
-         <thead>
-          <tr><th>Source</th><th>Units</th><th>Value</th><th>Units</th><th>Target</th></tr>
-         </thead>
-         <tbody>
-         </tbody>
-        </table>
-        <div id="arrayModal">
-            <div id="modalText">
-                array goes here...
-            </div>
-        </div>
-    </div>
-
 </body>
 </html>

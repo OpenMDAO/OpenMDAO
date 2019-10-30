@@ -42,6 +42,7 @@ from openmdao.utils.name_maps import abs_key2rel_key
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
+from openmdao.utils.hooks import _setup_hooks
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -127,15 +128,13 @@ class Problem(object):
         Force allocation of imaginary part in nonlinear vectors. OpenMDAO can generally
         detect when you need to do this, but in some cases (e.g., complex step is used
         after a reconfiguration) you may need to set this to True.
-    _color_dir_hash : str
-        Hash used to detect collisions of coloring files.
+    _name : str
+        Problem name.
     __get_remote : bool
         Flag used to determine when __getitem__ will retrieve remote variables.
     """
 
-    _post_setup_func = None
-
-    def __init__(self, model=None, driver=None, comm=None, root=None, **options):
+    def __init__(self, model=None, driver=None, comm=None, root=None, name=None, **options):
         """
         Initialize attributes.
 
@@ -149,6 +148,9 @@ class Problem(object):
             The global communicator.
         root : <System> or None
             Deprecated kwarg for `model`.
+        name : str
+            Problem name. Can be used to specify a Problem instance when multiple Problems
+            exist.
         **options : named args
             All remaining named args are converted to options.
         """
@@ -156,6 +158,7 @@ class Problem(object):
         self.__get_remote = False
 
         self.cite = CITATION
+        self._name = name
 
         if comm is None:
             try:
@@ -166,7 +169,7 @@ class Problem(object):
 
         if root is not None:
             if model is not None:
-                raise ValueError("Cannot specify both 'root' and 'model'. "
+                raise ValueError(self.msginfo + ": Cannot specify both 'root' and 'model'. "
                                  "'root' has been deprecated, please use 'model'.")
 
             warn_deprecation("The 'root' argument provides backwards compatibility "
@@ -179,14 +182,16 @@ class Problem(object):
         elif isinstance(model, System):
             self.model = model
         else:
-            raise TypeError("The value provided for 'model' is not a valid System.")
+            raise TypeError(self.msginfo +
+                            ": The value provided for 'model' is not a valid System.")
 
         if driver is None:
             self.driver = Driver()
         elif isinstance(driver, Driver):
             self.driver = driver
         else:
-            raise TypeError("The value provided for 'driver' is not a valid Driver.")
+            raise TypeError(self.msginfo +
+                            ": The value provided for 'driver' is not a valid Driver.")
 
         self.comm = comm
 
@@ -228,6 +233,8 @@ class Problem(object):
                                        desc='Patterns for vars to exclude in recording '
                                             '(processed post-includes)')
 
+        _setup_hooks(self)
+
     def _get_var_abs_name(self, name):
         if name in self.model._var_allprocs_abs2meta:
             return name
@@ -238,11 +245,29 @@ class Problem(object):
             if len(abs_names) == 1:
                 return abs_names[0]
             else:
-                raise KeyError("Using promoted name `{}' is ambiguous and matches unconnected "
-                               "inputs %s. Use absolute name to disambiguate.".format(name,
+                raise KeyError("{}: Using promoted name `{}' is ambiguous and matches unconnected "
+                               "inputs %s. Use absolute name to disambiguate.".format(self.msginfo,
+                                                                                      name,
                                                                                       abs_names))
 
-        raise KeyError("Variable '{}' not found.".format(name))
+        raise KeyError("{}: Variable '{}' not found.".format(self.msginfo, name))
+
+    @property
+    def msginfo(self):
+        """
+        Return info to prepend to messages.
+
+        Returns
+        -------
+        str
+            Info to prepend to messages.
+        """
+        if self._name is None:
+            return type(self).__name__
+        return '{} {}'.format(type(self).__name__, self._name)
+
+    def _get_inst_id(self):
+        return self._name
 
     def is_local(self, name):
         """
@@ -259,7 +284,8 @@ class Problem(object):
             True if the named system or variable is local to this process.
         """
         if self._setup_status < 1:
-            raise RuntimeError("is_local('{}') was called before setup() completed.".format(name))
+            raise RuntimeError("{}: is_local('{}') was called before setup() "
+                               "completed.".format(self.msginfo, name))
 
         try:
             abs_name = self._get_var_abs_name(name)
@@ -371,8 +397,8 @@ class Problem(object):
             if abs_name in self._remote_var_set:
                 if self.__get_remote:
                     if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
-                        raise RuntimeError("Retrieval of the full distributed variable '%s' is not "
-                                           "supported." % abs_name)
+                        raise RuntimeError("%s: Retrieval of the full distributed variable '%s' "
+                                           "is not supported." % (self.msginfo, abs_name))
                     loc_val = val
                     owner = self.model._owning_rank[abs_name]
                     if owner != self.model.comm.rank:
@@ -388,12 +414,13 @@ class Problem(object):
                         val = new_val
                 elif val is _undefined:
                     raise RuntimeError(
-                        "Variable '{}' is not local to rank {}. You can retrieve values from "
+                        "{}: Variable '{}' is not local to rank {}. You can retrieve values from "
                         "other processes using "
-                        "`problem.get_val(<name>, get_remote=True)`.".format(name, self.comm.rank))
+                        "`problem.get_val(<name>, get_remote=True)`.".format(self.msginfo, name,
+                                                                             self.comm.rank))
 
         if val is _undefined:
-            raise KeyError('Variable name "{}" not found.'.format(name))
+            raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
 
         return val
 
@@ -437,14 +464,14 @@ class Problem(object):
             base_units = self._get_units(name)
 
             if base_units is None:
-                msg = "Can't express variable '{}' with units of 'None' in units of '{}'."
-                raise TypeError(msg.format(name, units))
+                msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
+                raise TypeError(msg.format(self.msginfo, name, units))
 
             try:
                 scale, offset = get_conversion(base_units, units)
             except TypeError:
-                msg = "Can't express variable '{}' with units of '{}' in units of '{}'."
-                raise TypeError(msg.format(name, base_units, units))
+                msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
+                raise TypeError(msg.format(self.msginfo, name, base_units, units))
 
             val = (val + offset) * scale
 
@@ -480,7 +507,7 @@ class Problem(object):
                 abs_name = prom_name2abs_name(self.model, name, 'input')
                 return meta[abs_name]['units']
 
-        raise KeyError('Variable name "{}" not found.'.format(name))
+        raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
 
     def __setitem__(self, name, value):
         """
@@ -520,7 +547,7 @@ class Problem(object):
                     print("Variable '{}' is remote on rank {}.  "
                           "Local assignment ignored.".format(name, self.comm.rank))
                 else:
-                    raise KeyError('Variable name "{}" not found.'.format(name))
+                    raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
 
     def set_val(self, name, value, units=None, indices=None):
         """
@@ -543,14 +570,14 @@ class Problem(object):
             base_units = self._get_units(name)
 
             if base_units is None:
-                msg = "Can't set variable '{}' with units of 'None' to value with units of '{}'."
-                raise TypeError(msg.format(name, units))
+                msg = "{}: Can't set variable '{}' with units 'None' to value with units '{}'."
+                raise TypeError(msg.format(self.msginfo, name, units))
 
             try:
                 scale, offset = get_conversion(units, base_units)
             except TypeError:
-                msg = "Can't set variable '{}' with units of '{}' to value with units of '{}'."
-                raise TypeError(msg.format(name, base_units, units))
+                msg = "{}: Can't set variable '{}' with units '{}' to value with units '{}'."
+                raise TypeError(msg.format(self.msginfo, name, base_units, units))
 
             value = (value + offset) * scale
 
@@ -610,11 +637,12 @@ class Problem(object):
             If True and model has been run previously, reset all iteration counters.
         """
         if self._mode is None:
-            raise RuntimeError("The `setup` method must be called before `run_model`.")
+            raise RuntimeError(self.msginfo +
+                               ": The `setup` method must be called before `run_model`.")
 
         if case_prefix:
             if not isinstance(case_prefix, str):
-                raise TypeError("The 'case_prefix' argument should be a string.")
+                raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
         else:
             self._recording_iter.prefix = None
@@ -645,11 +673,12 @@ class Problem(object):
             Failure flag; True if failed to converge, False is successful.
         """
         if self._mode is None:
-            raise RuntimeError("The `setup` method must be called before `run_driver`.")
+            raise RuntimeError(self.msginfo +
+                               ": The `setup` method must be called before `run_driver`.")
 
         if case_prefix:
             if not isinstance(case_prefix, str):
-                raise TypeError("The 'case_prefix' argument should be a string.")
+                raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
             self._recording_iter.prefix = case_prefix
         else:
             self._recording_iter.prefix = None
@@ -661,6 +690,64 @@ class Problem(object):
         self.final_setup()
         self.model._clear_iprint()
         return self.driver.run()
+
+    def compute_jacvec_product(self, of, wrt, mode, seed):
+        """
+        Given a seed and 'of' and 'wrt' variables, compute the total jacobian vector product.
+
+        Parameters
+        ----------
+        of : list of str
+            Variables whose derivatives will be computed.
+        wrt : list of str
+            Derivatives will be computed with respect to these variables.
+        mode : str
+            Derivative direction ('fwd' or 'rev').
+        seed : dict or list
+            Either a dict keyed by 'wrt' varnames (fwd) or 'of' varnames (rev), containing
+            dresidual (fwd) or doutput (rev) values, OR a list of dresidual or doutput
+            values that matches the corresponding 'wrt' (fwd) or 'of' (rev) varname list.
+
+        Returns
+        -------
+        dict
+            The total jacobian vector product, keyed by variable name.
+        """
+        if mode == 'fwd':
+            if len(wrt) != len(seed):
+                raise RuntimeError(self.msginfo +
+                                   ": seed and 'wrt' list must be the same length in fwd mode.")
+            lnames, rnames = of, wrt
+            lkind, rkind = 'output', 'residual'
+        else:  # rev
+            if len(of) != len(seed):
+                raise RuntimeError(self.msginfo +
+                                   ": seed and 'of' list must be the same length in rev mode.")
+            lnames, rnames = wrt, of
+            lkind, rkind = 'residual', 'output'
+
+        rvec = self.model._vectors[rkind]['linear']
+        lvec = self.model._vectors[lkind]['linear']
+
+        rvec._data[:] = 0.
+
+        # set seed values into dresids (fwd) or doutputs (rev)
+        try:
+            seed[rnames[0]]
+        except (IndexError, TypeError):
+            for i, name in enumerate(rnames):
+                rvec[name] = seed[i]
+        else:
+            for name in rnames:
+                rvec[name] = seed[name]
+
+        # We apply a -1 here because the derivative of the output is minus the derivative of
+        # the residual in openmdao.
+        rvec._data *= -1.
+
+        self.model.run_solve_linear(['linear'], mode)
+
+        return {n: lvec[n].copy() for n in lnames}
 
     def run_once(self):
         """
@@ -834,15 +921,16 @@ class Problem(object):
         # PETScVector is required for MPI
         if comm.size > 1:
             if PETScVector is None:
-                raise ValueError("Attempting to run in parallel under MPI but PETScVector could not"
-                                 "be imported.")
+                raise ValueError(self.msginfo +
+                                 ": Attempting to run in parallel under MPI but PETScVector "
+                                 "could not be imported.")
             elif distributed_vector_class is not PETScVector:
-                raise ValueError("The `distributed_vector_class` argument must be `PETScVector` "
-                                 "when running in parallel under MPI but '%s' was specified."
-                                 % distributed_vector_class.__name__)
+                raise ValueError("%s: The `distributed_vector_class` argument must be "
+                                 "`PETScVector` when running in parallel under MPI but '%s' was "
+                                 "specified." % (self.msginfo, distributed_vector_class.__name__))
 
         if mode not in ['fwd', 'rev', 'auto']:
-            msg = "Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % mode
+            msg = "%s: Unsupported mode: '%s'. Use either 'fwd' or 'rev'." % (self.msginfo, mode)
             raise ValueError(msg)
 
         self._mode = self._orig_mode = mode
@@ -921,11 +1009,12 @@ class Problem(object):
 
         driver._setup_driver(self)
 
-        coloring = driver._coloring_info['coloring']
-        if coloring is coloring_mod._STD_COLORING_FNAME:
+        info = driver._coloring_info
+        coloring = info['coloring']
+        if coloring is None and info['static'] is not None:
             coloring = driver._get_static_coloring()
-        if (coloring and coloring is not coloring_mod._DYN_COLORING and
-                coloring_mod._use_total_sparsity):
+
+        if coloring and coloring_mod._use_total_sparsity:
             # if we're using simultaneous total derivatives then our effective size is less
             # than the full size
             if coloring._fwd and coloring._rev:
@@ -953,6 +1042,10 @@ class Problem(object):
             self.set_solver_print(level=items[0], depth=items[1], type_=items[2])
         self._solver_print_cache = []
 
+        if self._setup_status < 2:
+            self._setup_status = 2
+            self._set_initial_conditions()
+
         if self._check:
             if self._check is True:
                 checks = _default_checks
@@ -963,14 +1056,6 @@ class Problem(object):
             else:
                 logger = TestLogger()
             self.check_config(logger, checks=checks)
-
-        if self._setup_status < 2:
-            self._setup_status = 2
-            self._set_initial_conditions()
-
-        # check for post-setup hook
-        if Problem._post_setup_func is not None:
-            Problem._post_setup_func(self)
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
@@ -1036,7 +1121,8 @@ class Problem(object):
         model = self.model
 
         if not model._use_derivatives:
-            raise RuntimeError("Can't check partials.  Derivative support has been turned off.")
+            raise RuntimeError(self.msginfo +
+                               ": Can't check partials.  Derivative support has been turned off.")
 
         # TODO: Once we're tracking iteration counts, run the model if it has not been run before.
 
@@ -1394,12 +1480,14 @@ class Problem(object):
                 forward - fd, adjoint - fd, forward - adjoint.
         """
         if self._setup_status < 2:
-            raise RuntimeError("run_model must be called before total derivatives can be checked.")
+            raise RuntimeError(self.msginfo + ": run_model must be called before total "
+                               "derivatives can be checked.")
 
         model = self.model
 
         if method == 'cs' and not model._outputs._alloc_complex:
-            msg = "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
+            msg = "\n" + self.msginfo + ": To enable complex step, specify "\
+                  "'force_alloc_complex=True' when calling " + \
                   "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
             raise RuntimeError(msg)
 
@@ -1468,7 +1556,7 @@ class Problem(object):
             Variables with respect to which the derivatives will be computed.
             Default is None, which uses the driver's desvars.
         return_format : string
-            Format to return the derivatives. Can be either 'dict' or 'flat_dict'.
+            Format to return the derivatives. Can be 'dict', 'flat_dict', or 'array'.
             Default is a 'flat_dict', which returns them in a dictionary whose keys are
             tuples of form (of, wrt).
         debug_print : bool
@@ -1692,16 +1780,16 @@ class Problem(object):
         if inputs:
             for name in inputs.absolute_names():
                 if name not in self.model._var_abs_names['input']:
-                    raise KeyError("Input variable, '{}', recorded in the case is not "
-                                   "found in the model".format(name))
+                    raise KeyError("{}: Input variable, '{}', recorded in the case is not "
+                                   "found in the model".format(self.msginfo, name))
                 self[name] = inputs[name]
 
         outputs = case.outputs if case.outputs is not None else None
         if outputs:
             for name in outputs.absolute_names():
                 if name not in self.model._var_abs_names['output']:
-                    raise KeyError("Output variable, '{}', recorded in the case is not "
-                                   "found in the model".format(name))
+                    raise KeyError("{}: Output variable, '{}', recorded in the case is not "
+                                   "found in the model".format(self.msginfo, name))
                 self[name] = outputs[name]
 
         return
@@ -2161,3 +2249,29 @@ def _format_error(error, tol):
     if np.isnan(error) or error < tol:
         return '{:.6e}'.format(error)
     return '{:.6e} *'.format(error)
+
+
+class Slicer(object):
+    """
+    Helper class that can be used with the indices argument for Problem set_val and get_val.
+    """
+
+    def __getitem__(self, val):
+        """
+        Pass through indices or slice.
+
+        Parameters
+        ----------
+        val : int or slice object or tuples of slice objects
+            Indices or slice to return.
+
+        Returns
+        -------
+        indices : int or slice object or tuples of slice objects
+            Indices or slice to return.
+        """
+        return val
+
+
+# instance of the Slicer class to be used by users for the set_val and get_val methods of Problem
+slicer = Slicer()

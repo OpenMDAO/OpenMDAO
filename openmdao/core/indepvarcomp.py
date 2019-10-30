@@ -7,7 +7,7 @@ import collections
 from six import string_types
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import warn_deprecation, convert_user_defined_tags_to_set
+from openmdao.utils.general_utils import warn_deprecation, make_set
 
 
 class IndepVarComp(ExplicitComponent):
@@ -49,13 +49,9 @@ class IndepVarComp(ExplicitComponent):
         self._indep_external_discrete = []
 
         if 'tags' not in kwargs:
-            kwargs['tags'] = set()
+            kwargs['tags'] = {'indep_var'}
         else:
-            if not isinstance(kwargs['tags'], (str, set, list)):
-                raise TypeError('The tags argument should be a str, set, or list')
-
-        kwargs['tags'] = convert_user_defined_tags_to_set(kwargs['tags'])
-        kwargs['tags'].add('indep_var')  # Tag all indep var comps this way
+            kwargs['tags'] = make_set(kwargs['tags'], name='tags') | {'indep_var'}
 
         # A single variable is declared during instantiation
         if isinstance(name, string_types):
@@ -158,11 +154,10 @@ class IndepVarComp(ExplicitComponent):
         if res_ref is None:
             res_ref = ref
 
-        if tags is not None and not isinstance(tags, (str, list)):
-            raise TypeError('The tags argument should be a str or list')
-
-        tags = convert_user_defined_tags_to_set(tags)
-        tags.add('indep_var')
+        if tags is None:
+            tags = {'indep_var'}
+        else:
+            tags = make_set(tags) | {'indep_var'}
 
         kwargs = {'shape': shape, 'units': units, 'res_units': res_units, 'desc': desc,
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
@@ -186,10 +181,10 @@ class IndepVarComp(ExplicitComponent):
             User defined tags that can be used to filter what gets listed when calling
             list_outputs.
         """
-        if tags is not None and not isinstance(tags, (str, list)):
-            raise TypeError('The tags argument should be a str or list')
-
-        tags = convert_user_defined_tags_to_set(tags)
+        if tags is None:
+            tags = {'indep_var'}
+        else:
+            tags = make_set(tags, name='tags') | {'indep_var'}
 
         kwargs = {'desc': desc, 'tags': tags}
         self._indep_external_discrete.append((name, val, kwargs))

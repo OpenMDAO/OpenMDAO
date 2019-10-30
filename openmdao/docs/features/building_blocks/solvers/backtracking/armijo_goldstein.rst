@@ -38,17 +38,17 @@ ArmijoGoldsteinLS includes the `bound_enforcement` option in its options diction
 
 There are three different acceptable values for bounds-enforcement schemes available in this option.
 
-With "vector" bounds enforcement, the solution in the output vector is pulled back to a point where none of the
-variables violate any upper or lower bounds. Further backtracking continues along the Newton gradient direction vector back towards the
-initial point.
-
-.. image:: BT1.jpg
-
 With "scalar" bounds enforcement, only the variables that violate their bounds are pulled back to feasible values; the
 remaining values are kept at the Newton-stepped point. This changes the direction of the backtracking vector so that
 it still moves in the direction of the initial point.
 
 .. image:: BT2.jpg
+
+With "vector" bounds enforcement, the solution in the output vector is pulled back to a point where none of the
+variables violate any upper or lower bounds. Further backtracking continues along the Newton gradient direction vector back towards the
+initial point.
+
+.. image:: BT1.jpg
 
 With "wall" bounds enforcement, only the variables that violate their bounds are pulled back to feasible values; the
 remaining values are kept at the Newton-stepped point. Further backtracking only occurs in the direction of the non-violating

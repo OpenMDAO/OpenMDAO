@@ -15,7 +15,6 @@ import os
 import time
 from numbers import Integral
 import itertools
-from pprint import pprint
 
 from six import iteritems, itervalues, string_types
 
@@ -31,12 +30,12 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
-from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.general_utils import filter_var_based_on_tags, convert_user_defined_tags_to_set
+from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
+from openmdao.utils.general_utils import make_set, var_name_match_includes_excludes, simple_warning
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
-    _STD_COLORING_FNAME, _DYN_COLORING, _DEF_COMP_SPARSITY_ARGS
+    _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
@@ -62,11 +61,14 @@ _supported_methods = {
 }
 
 _DEFAULT_COLORING_META = {
-    'wrt_patterns': ('*',),
-    'method': 'fd',
-    'wrt_matches': None,
-    'per_instance': False,
-    'coloring': None,
+    'wrt_patterns': ('*',),  # patterns used to match wrt variables
+    'method': 'fd',          # finite differencing method  ('fd' or 'cs')
+    'wrt_matches': None,     # where matched wrt names are stored
+    'per_instance': True,    # assume each instance can have a different coloring
+    'coloring': None,        # this will contain the actual Coloring object
+    'dynamic': False,        # True if dynamic coloring is being used
+    'static': None,          # either _STD_COLORING_FNAME, a filename, or a Coloring object
+                             # if use_fixed_coloring was called
 }
 
 _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
@@ -164,6 +166,12 @@ class System(object):
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
+    _owned_sizes : ndarray
+        Array of local sizes for 'owned' or distributed vars only.
+    _nodup_out_ranges : dict
+        Range of each output/resid in the global non-duplicated array.
+    _nodup2local_out_inds : ndarray
+        Indices that map values from the global non-duplicated array into the local output/resids.
     _var_offsets : {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
         Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
@@ -302,6 +310,18 @@ class System(object):
         used if this System does no partial or semi-total coloring.
     _first_call_to_linearize : bool
         If True, this is the first call to _linearize.
+    _nodup_out_ranges : OrderedDict
+        Tuples of the form (start, end) keyed on variable name.
+    _nodup2local_out_inds : ndarray
+        Index array mapping global non-dup outputs/resids to local outputs/resids.
+    _local2owned_inds : ndarray
+        Index array mapping local outputs/resids to owned local outputs/resids.
+    _noncontig_dis_inds : ndarray
+        Index array mapping global stacked (rank order) array to global array where
+        distrib vars are contiguous and all vars appear in global execution order.
+        Execution order is meaningless for systems in ParallelGroups, but for purposes
+        of global ordering, the declared execution order, which is the same across all
+        ranks, is used.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -375,7 +395,10 @@ class System(object):
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
+        self._owned_sizes = None
         self._var_offsets = None
+        self._nodup_out_ranges = None
+        self._nodup2local_out_inds = None
 
         self._full_comm = None
 
@@ -638,6 +661,9 @@ class System(object):
             else:
                 self._scale_factors = {}
 
+            if self._vector_class is None:
+                self._vector_class = self._local_vector_class
+
             vector_class = self._vector_class
 
             for vec_name in vec_names:
@@ -776,6 +802,10 @@ class System(object):
         # save a ref to the problem level options.
         self._problem_options = prob_options
 
+        # reset any coloring if a Coloring object was not set explicitly
+        if self._coloring_info['dynamic'] or self._coloring_info['static'] is not None:
+            self._coloring_info['coloring'] = None
+
         # 1. Full setup that must be called in the root system.
         if setup_mode == 'full':
             recurse = True
@@ -900,27 +930,22 @@ class System(object):
             If True, set fixed coloring in all subsystems that declare a coloring. Ignored
             if a specific coloring is passed in.
         """
-        if coloring not in (_STD_COLORING_FNAME, _DYN_COLORING):
+        if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
+            self._coloring_info['dynamic'] = True
+            return  # don't use static this time
+
+        self._coloring_info['static'] = coloring
+        self._coloring_info['dynamic'] = False
+
+        if coloring is not _STD_COLORING_FNAME:
             if recurse:
                 simple_warning("%s: recurse was passed to use_fixed_coloring but a specific "
                                "coloring was set, so recurse was ignored." % self.pathname)
-            self._coloring_info['coloring'] = coloring
             if isinstance(coloring, Coloring):
                 approx = self._get_approx_scheme(coloring._meta['method'])
                 # force regen of approx groups on next call to compute_approximations
-                approx._colored_approx_groups = None
-                approx._approx_groups = None
+                approx._reset()
             return
-
-        if coloring_mod._force_dyn_coloring and coloring is _STD_COLORING_FNAME:
-            # force the generation of a dynamic coloring this time
-            coloring = _DYN_COLORING
-
-        if self._coloring_info['coloring'] is None:
-            simple_warning('%s: use_fixed_coloring() ignored because no coloring was declared.' %
-                           self.pathname)
-        else:
-            self._coloring_info['coloring'] = coloring
 
         if recurse:
             for s in self._subsystems_myproc:
@@ -936,6 +961,7 @@ class System(object):
                          tol=_DEFAULT_COLORING_META['tol'],
                          orders=_DEFAULT_COLORING_META['orders'],
                          perturb_size=_DEFAULT_COLORING_META['perturb_size'],
+                         min_improve_pct=_DEFAULT_COLORING_META['min_improve_pct'],
                          show_summary=_DEFAULT_COLORING_META['show_summary'],
                          show_sparsity=_DEFAULT_COLORING_META['show_sparsity']):
         """
@@ -966,6 +992,9 @@ class System(object):
             Number of orders above and below the tolerance to check during the tolerance sweep.
         perturb_size : float
             Size of input/output perturbation during generation of sparsity.
+        min_improve_pct : float
+            If coloring does not improve (decrease) the number of solves more than the given
+            percentage, coloring will not be used.
         show_summary : bool
             If True, display summary information after generating coloring.
         show_sparsity : bool
@@ -981,13 +1010,11 @@ class System(object):
         options = _DEFAULT_COLORING_META.copy()
         options.update(approx.DEFAULT_OPTIONS)
 
-        if self._coloring_info['coloring'] is None:
-            # calling declare_coloring turns on dynamic coloring.  Calling use_fixed_coloring
-            # will switch it to use a static coloring.
-            options['coloring'] = _DYN_COLORING
+        if self._coloring_info['static'] is None:
+            options['dynamic'] = True
         else:
-            # this will handle cases where use_fixed_coloring was called before declare_coloring
-            options['coloring'] = self._coloring_info['coloring']
+            options['dynamic'] = False
+            options['static'] = self._coloring_info['static']
 
         options['wrt_patterns'] = [wrt] if isinstance(wrt, string_types) else wrt
         options['method'] = method
@@ -996,8 +1023,10 @@ class System(object):
         options['tol'] = tol
         options['orders'] = orders
         options['perturb_size'] = perturb_size
+        options['min_improve_pct'] = min_improve_pct
         options['show_summary'] = show_summary
         options['show_sparsity'] = show_sparsity
+        options['coloring'] = self._coloring_info['coloring']
         if form is not None:
             options['form'] = form
         if step is not None:
@@ -1037,12 +1066,14 @@ class System(object):
                     if s._coloring_info['coloring'] is not None:
                         coloring = s._compute_approx_coloring(recurse=False, **overrides)[0]
                         colorings.append(coloring)
-                        coloring._meta['pathname'] = s.pathname
-                        coloring._meta['class'] = type(s).__name__
-            return colorings
+                        if coloring is not None:
+                            coloring._meta['pathname'] = s.pathname
+                            coloring._meta['class'] = type(s).__name__
+            return [c for c in colorings if c is not None] or [None]
 
         # don't override metadata if it's already declared
         info = self._coloring_info
+
         info.update(**overrides)
         if isinstance(info['wrt_patterns'], string_types):
             info['wrt_patterns'] = [info['wrt_patterns']]
@@ -1069,6 +1100,27 @@ class System(object):
 
         approx_scheme = self._get_approx_scheme(self._coloring_info['method'])
 
+        if self._coloring_info['coloring'] is None and self._coloring_info['static'] is None:
+            self._coloring_info['dynamic'] = True
+
+        coloring_fname = self.get_approx_coloring_fname()
+
+        # if we find a previously computed class coloring for our class, just use that
+        # instead of regenerating a coloring.
+        if not info['per_instance'] and coloring_fname in coloring_mod._CLASS_COLORINGS:
+            info['coloring'] = coloring = coloring_mod._CLASS_COLORINGS[coloring_fname]
+            if coloring is None:
+                print("\nClass coloring for class '{}' wasn't good enough, "
+                      "so skipping for '{}'".format(type(self).__name__, self.pathname))
+                info['static'] = info['dynamic'] = None
+            else:
+                print("\n{} using class coloring for class '{}'".format(self.pathname,
+                                                                        type(self).__name__))
+                info.update(coloring._meta)
+                # force regen of approx groups during next compute_approximations
+                approx_scheme._reset()
+            return [coloring]
+
         from openmdao.core.group import Group
         is_total = isinstance(self, Group)
 
@@ -1084,9 +1136,6 @@ class System(object):
         out_offsets *= info['perturb_size']
 
         starting_resids = self._residuals._data.copy()
-
-        if self._coloring_info['coloring'] is None:
-            self._coloring_info['coloring'] = coloring_mod._DYN_COLORING
 
         # for groups, this does some setup of approximations
         self._setup_approx_coloring()
@@ -1109,14 +1158,14 @@ class System(object):
                     self._apply_nonlinear()
 
                 for scheme in self._approx_schemes.values():
-                    scheme._approx_groups = None  # force a re-initialization of approx
+                    scheme._reset()  # force a re-initialization of approx
 
             self.run_linearize()
             self._jacobian._save_sparsity(self)
 
         sparsity_time = time.time() - sparsity_start_time
 
-        self._update_wrt_matches(self._coloring_info)
+        self._update_wrt_matches(info)
 
         ordered_of_info = list(self._jacobian_of_iter())
         ordered_wrt_info = list(self._jacobian_wrt_iter(info['wrt_matches']))
@@ -1137,6 +1186,17 @@ class System(object):
             ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
 
         coloring = _compute_coloring(sparsity, 'fwd')
+
+        # if the improvement wasn't large enough, don't use coloring
+        pct = coloring._solves_info()[-1]
+        if info['min_improve_pct'] > pct:
+            info['coloring'] = info['static'] = info['dynamic'] = None
+            simple_warning("%s: Coloring was deactivated.  Improvement of %.1f%% was less than min "
+                           "allowed (%.1f%%)." % (self.msginfo, pct, info['min_improve_pct']))
+            if not info['per_instance']:
+                coloring_mod._CLASS_COLORINGS[coloring_fname] = None
+            return [None]
+
         coloring._row_vars = [t[0] for t in ordered_of_info]
         coloring._col_vars = [t[0] for t in ordered_wrt_info]
         coloring._row_var_sizes = [t[2] - t[1] for t in ordered_of_info]
@@ -1150,11 +1210,10 @@ class System(object):
 
         approx = self._get_approx_scheme(coloring._meta['method'])
         # force regen of approx groups during next compute_approximations
-        approx._colored_approx_groups = None
-        approx._approx_groups = None
+        approx._reset()
 
         if info['show_sparsity'] or info['show_summary']:
-            print("\nApprox coloring for '%s' (class %s)\n" % (self.pathname, type(self).__name__))
+            print("\nApprox coloring for '%s' (class %s)" % (self.pathname, type(self).__name__))
 
         if info['show_sparsity']:
             coloring.display_txt()
@@ -1162,6 +1221,10 @@ class System(object):
             coloring.summary()
 
         self._save_coloring(coloring)
+
+        if not info['per_instance']:
+            # save the class coloring for other instances of this class to use
+            coloring_mod._CLASS_COLORINGS[coloring_fname] = coloring
 
         # restore original inputs/outputs
         self._inputs._data[:] = starting_inputs
@@ -1232,9 +1295,7 @@ class System(object):
             # total coloring
             return os.path.join(directory, 'total_coloring.pkl')
 
-        per_instance = self._coloring_info.get('per_instance')
-
-        if per_instance:
+        if self._coloring_info.get('per_instance'):
             # base the name on the instance pathname
             fname = 'coloring_' + self.pathname.replace('.', '_') + '.pkl'
         else:
@@ -1271,15 +1332,15 @@ class System(object):
         """
         info = self._coloring_info
         coloring = info['coloring']
+        if coloring is not None:
+            return coloring
 
-        if coloring is _DYN_COLORING:
-            return None
-
-        if coloring is _STD_COLORING_FNAME or isinstance(coloring, string_types):
-            if coloring is _STD_COLORING_FNAME:
+        static = info['static']
+        if static is _STD_COLORING_FNAME or isinstance(static, string_types):
+            if static is _STD_COLORING_FNAME:
                 fname = self.get_approx_coloring_fname()
             else:
-                fname = coloring
+                fname = static
             print("%s: loading coloring from file %s" % (self.msginfo, fname))
             info['coloring'] = coloring = Coloring.load(fname)
             if info['wrt_patterns'] != coloring._meta['wrt_patterns']:
@@ -1290,8 +1351,14 @@ class System(object):
             info.update(info['coloring']._meta)
             approx = self._get_approx_scheme(info['method'])
             # force regen of approx groups during next compute_approximations
-            approx._colored_approx_groups = None
-            approx._approx_groups = None
+            approx._reset()
+        elif isinstance(static, coloring_mod.Coloring):
+            info['coloring'] = coloring = static
+
+        if coloring is not None:
+            info['dynamic'] = False
+
+        info['static'] = coloring
 
         return coloring
 
@@ -1307,9 +1374,10 @@ class System(object):
             Coloring object, possible loaded from a file or dynamically generated, or None
         """
         coloring = self._get_static_coloring()
-        if coloring is None and self._coloring_info['coloring'] is _DYN_COLORING:
+        if coloring is None and self._coloring_info['dynamic']:
             self._coloring_info['coloring'] = coloring = self._compute_approx_coloring()[0]
-            self._coloring_info.update(coloring._meta)
+            if coloring is not None:
+                self._coloring_info.update(coloring._meta)
 
         return coloring
 
@@ -1352,24 +1420,46 @@ class System(object):
 
     def _setup_recording(self, recurse=True):
         myinputs = myoutputs = myresiduals = set()
-        incl = self.recording_options['includes']
-        excl = self.recording_options['excludes']
 
-        if self.recording_options['record_inputs']:
+        options = self.recording_options
+        incl = options['includes']
+        excl = options['excludes']
+
+        # includes and excludes for inputs are specified using _absolute_ names
+        # vectors are keyed on absolute name, discretes on relative/promoted name
+        abs2prom = self._var_abs2prom['input']
+
+        if options['record_inputs']:
+            myinputs = set()
             if self._inputs:
-                myinputs = {n for n in self._inputs._names
-                            if check_path(n, incl, excl)}
+                myinputs.update({n for n in self._inputs._names
+                                 if check_path(n, incl, excl)})
 
-        # includes and excludes for outputs are specified using promoted names
+            if len(self._var_discrete['input']) > 0:
+                for n in self._var_discrete['input']:
+                    abs_name = self.pathname + '.' + n if self.pathname else n
+                    if check_path(abs_name, incl, excl):
+                        myinputs.add(n)
+
+        # includes and excludes for outputs are specified using _promoted_ names
+        # vectors are keyed on absolute name, discretes on relative/promoted name
         abs2prom = self._var_abs2prom['output']
 
-        if self.recording_options['record_outputs']:
+        if options['record_outputs']:
+            myoutputs = set()
             if self._outputs:
-                myoutputs = {n for n in self._outputs._names
-                             if n in abs2prom and check_path(abs2prom[n], incl, excl)}
-            if self.recording_options['record_residuals']:
-                myresiduals = myoutputs  # outputs and residuals have same names
-        elif self.recording_options['record_residuals']:
+                myoutputs.update({n for n in self._outputs._names
+                                  if n in abs2prom and check_path(abs2prom[n], incl, excl)})
+
+            # residuals have the same names as the continuous outputs
+            if options['record_residuals']:
+                myresiduals = myoutputs.copy()
+
+            if len(self._var_discrete['output']) > 0:
+                myoutputs.update({n for n in self._var_discrete['output']
+                                  if check_path(n, incl, excl)})
+
+        elif options['record_residuals']:
             if self._residuals:
                 myresiduals = {n for n in self._residuals._names
                                if n in abs2prom and check_path(abs2prom[n], incl, excl)}
@@ -1451,6 +1541,9 @@ class System(object):
             Whether to call this method in subsystems.
         """
         self._var_sizes = {}
+        self._owned_sizes = None
+        self._nodup_out_ranges = None
+        self._nodup2local_out_inds = None
         self._owning_rank = defaultdict(int)
 
     def _setup_global_shapes(self):
@@ -1659,6 +1752,9 @@ class System(object):
             raise RuntimeError("{}: In order to activate complex step during reconfiguration, "
                                "you need to set 'force_alloc_complex' to True during setup. e.g. "
                                "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
+
+        if self._vector_class is None:
+            self._vector_class = self._local_vector_class
 
         vector_class = self._vector_class
 
@@ -1925,13 +2021,17 @@ class System(object):
 
             not_found = (set(names).union(renames).union(patterns)) - found
             if not_found:
+                if not self._var_abs2meta and isinstance(self, openmdao.core.group.Group):
+                    empty_group_msg = ' Group contains no variables.'
+                else:
+                    empty_group_msg = ''
                 if len(io_types) == 2:
                     call = 'promotes'
                 else:
                     call = 'promotes_%ss' % io_types[0]
                 raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                   "names or patterns: %s." %
-                                   (self.msginfo, call, sorted(not_found)))
+                                   "names or patterns: %s.%s" %
+                                   (self.msginfo, call, sorted(not_found), empty_group_msg))
 
         maps = {'input': {}, 'output': {}}
 
@@ -2356,6 +2456,20 @@ class System(object):
                 for sub in s.system_iter(recurse=True, typ=typ):
                     yield sub
 
+    def _all_subsystem_iter(self):
+        """
+        Yield a generator of subsystems along with their local status.
+
+        Yields
+        ------
+        System
+            Current subsystem.
+        bool
+            True if current subsystem is local.
+        """
+        for isub, subsys in enumerate(self._subsystems_allprocs):
+            yield subsys, subsys.name in self._loc_subsys_map
+
     def add_design_var(self, name, lower=None, upper=None, ref=None,
                        ref0=None, indices=None, adder=None, scaler=None,
                        parallel_deriv_color=None, vectorize_derivs=False,
@@ -2581,17 +2695,32 @@ class System(object):
         resp = OrderedDict()
 
         if type_ == 'con':
+
             # Convert lower to ndarray/float as necessary
-            lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
-                                             flatten=True)
+            try:
+                lower = format_as_float_or_array('lower', lower, val_if_none=-openmdao.INF_BOUND,
+                                                 flatten=True)
+            except (TypeError, ValueError):
+                raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
+                                "specify a variable as lower bound. You can only provide constant "
+                                "float values".format(lower))
 
             # Convert upper to ndarray/float as necessary
-            upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
-                                             flatten=True)
-
+            try:
+                upper = format_as_float_or_array('upper', upper, val_if_none=openmdao.INF_BOUND,
+                                                 flatten=True)
+            except (TypeError, ValueError):
+                raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
+                                "specify a variable as upper bound. You can only provide constant "
+                                "float values".format(upper))
             # Convert equals to ndarray/float as necessary
             if equals is not None:
-                equals = format_as_float_or_array('equals', equals, flatten=True)
+                try:
+                    equals = format_as_float_or_array('equals', equals, flatten=True)
+                except (TypeError, ValueError):
+                    raise TypeError("Argument 'equals' can not be a string ('{}' given). You can "
+                                    "not specify a variable as equals bound. You can only provide "
+                                    "constant float values".format(equals))
 
             # Scale the bounds
             if lower is not None:
@@ -2711,6 +2840,8 @@ class System(object):
         The response can be scaled using ref and ref0.
         The argument :code:`ref0` represents the physical value when the scaled value is 0.
         The argument :code:`ref` represents the physical value when the scaled value is 1.
+        The arguments (:code:`lower`, :code:`upper`, :code:`equals`) can not be strings or variable
+        names.
         """
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
@@ -2962,6 +3093,8 @@ class System(object):
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
+                    includes=None,
+                    excludes=None,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
@@ -2993,6 +3126,12 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only inputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3009,12 +3148,13 @@ class System(object):
         meta = self._var_abs2meta
         inputs = []
 
-        tags = convert_user_defined_tags_to_set(tags)
-
         for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
-
             # Filter based on tags
-            if filter_var_based_on_tags(tags, meta[var_name]):
+            if tags and not (make_set(tags) & meta[var_name]['tags']):
+                continue
+
+            if not var_name_match_includes_excludes(var_name, self._var_abs2prom['input'][var_name],
+                                                    includes, excludes):
                 continue
 
             var_meta = {}
@@ -3030,10 +3170,16 @@ class System(object):
             inputs.append((var_name, var_meta))
 
         if self._discrete_inputs:
-            for var_name, val in iteritems(self._discrete_inputs):
+            disc_meta = self._discrete_inputs._dict
 
+            for var_name, val in iteritems(self._discrete_inputs):
                 # Filter based on tags
-                if filter_var_based_on_tags(tags, self._discrete_inputs._dict[var_name]):
+                if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
+                    continue
+
+                if not var_name_match_includes_excludes(var_name,
+                                                        self._var_abs2prom['input'][var_name],
+                                                        includes, excludes):
                     continue
 
                 var_meta = {}
@@ -3047,7 +3193,9 @@ class System(object):
                 if shape:
                     var_meta['shape'] = ''
 
-                inputs.append((var_name, var_meta))
+                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
+
+                inputs.append((abs_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3070,6 +3218,8 @@ class System(object):
                      hierarchical=True,
                      print_arrays=False,
                      tags=None,
+                     includes=None,
+                     excludes=None,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -3115,6 +3265,12 @@ class System(object):
             User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
+        includes : None or list_like
+            List of glob patterns for pathnames to include in the check. Default is None, which
+            includes all components in the model.
+        excludes : None or list_like
+            List of glob patterns for pathnames to exclude from the check. Default is None, which
+            excludes nothing.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3132,16 +3288,18 @@ class System(object):
         meta = self._var_abs2meta  # This only includes metadata for this process.
         states = self._list_states()
 
-        tags = convert_user_defined_tags_to_set(tags)
-
         # Go though the hierarchy. Printing Systems
         # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
         for var_name, val in iteritems(self._outputs._views):
-
             # Filter based on tags
-            if filter_var_based_on_tags(tags, meta[var_name]):
+            if tags and not (make_set(tags) & meta[var_name]['tags']):
+                continue
+
+            if not var_name_match_includes_excludes(var_name,
+                                                    self._var_abs2prom['output'][var_name],
+                                                    includes, excludes):
                 continue
 
             if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
@@ -3172,9 +3330,16 @@ class System(object):
                 expl_outputs.append((var_name, var_meta))
 
         if self._discrete_outputs and not residuals_tol:
+            disc_meta = self._discrete_outputs._dict
+
             for var_name, val in iteritems(self._discrete_outputs):
                 # Filter based on tags
-                if filter_var_based_on_tags(tags, self._discrete_outputs._dict[var_name]):
+                if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
+                    continue
+
+                if not var_name_match_includes_excludes(var_name,
+                                                        self._var_abs2prom['output'][var_name],
+                                                        includes, excludes):
                     continue
 
                 var_meta = {}
@@ -3197,10 +3362,12 @@ class System(object):
                     var_meta['ref0'] = ''
                     var_meta['res_ref'] = ''
 
+                abs_name = self.pathname + '.' + var_name if self.pathname else var_name
+
                 if var_name in states:
-                    impl_outputs.append((var_name, var_meta))
+                    impl_outputs.append((abs_name, var_meta))
                 else:
-                    expl_outputs.append((var_name, var_meta))
+                    expl_outputs.append((abs_name, var_meta))
 
         if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -3291,12 +3458,42 @@ class System(object):
                                     np.append(var_dict[name]['resids'],
                                               proc_vars[name]['resids'])
 
-        # get list of var names in execution order, based on the order subsystems were setup
+        inputs = var_type is 'input'
+        outputs = not inputs
+        var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
+
+        write_var_table(self.pathname, var_list, var_type, var_dict,
+                        hierarchical, print_arrays, out_stream)
+
+    def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None):
+        """
+        Get list of variable names in execution order, based on the order subsystems were setup.
+
+        Parameters
+        ----------
+        outputs : bool, optional
+            Get names of output variables. Default is False.
+        inputs : bool, optional
+            Get names of input variables. Default is False.
+        variables : Collection (list or dict)
+            Absolute path names of the subset of variables to include.
+            If None then all variables will be included. Default is None.
+
+        Returns
+        -------
+        list
+            list of variable names in execution order
+        """
         var_list = []
 
-        in_or_out = 'input' if var_type is 'input' else 'output'
-        real_vars = self._var_allprocs_abs_names[in_or_out]
-        disc_vars = self._var_allprocs_discrete[in_or_out]
+        real_vars = self._var_allprocs_abs_names
+        disc_vars = self._var_allprocs_discrete
+
+        in_or_out = []
+        if inputs:
+            in_or_out.append('input')
+        if outputs:
+            in_or_out.append('output')
 
         if self._subsystems_allprocs:
             for subsys in self._subsystems_allprocs:
@@ -3304,24 +3501,24 @@ class System(object):
                 # but subsys.name will be properly defined.
                 path = '.'.join((self.pathname, subsys.name)) if self.pathname else subsys.name
                 path += '.'
-                for var_name in real_vars:
-                    if var_name in var_dict and var_name.startswith(path):
-                        var_list.append(var_name)
-                for var_name in disc_vars:
-                    if var_name in var_dict and var_name.startswith(path):
-                        var_list.append(var_name)
+                for var_type in in_or_out:
+                    for var_name in real_vars[var_type]:
+                        if (not variables or var_name in variables) and var_name.startswith(path):
+                            var_list.append(var_name)
+                    for var_name in disc_vars[var_type]:
+                        if (not variables or var_name in variables) and var_name.startswith(path):
+                            var_list.append(var_name)
         else:
             # For components with no children, self._subsystems_allprocs is empty.
-            for var_name in real_vars:
-                if var_name in var_dict:
-                    var_list.append(var_name)
+            for var_type in in_or_out:
+                for var_name in real_vars[var_type]:
+                    if not variables or var_name in variables:
+                        var_list.append(var_name)
+                for var_name in disc_vars[var_type]:
+                    if not variables or var_name in variables:
+                        var_list.append(var_name)
 
-            for var_name in disc_vars:
-                if var_name in var_dict:
-                    var_list.append(var_name)
-
-        write_var_table(self.pathname, var_list, var_type, var_dict,
-                        hierarchical, print_arrays, out_stream)
+        return var_list
 
     def run_solve_nonlinear(self):
         """
@@ -3512,6 +3709,8 @@ class System(object):
         Record an iteration of the current System.
         """
         if self._rec_mgr._recorders:
+            options = self.recording_options
+
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
@@ -3528,35 +3727,58 @@ class System(object):
             else:
                 inputs, outputs, residuals = self.get_linear_vectors()
 
+            discrete_inputs = self._discrete_inputs
+            discrete_outputs = self._discrete_outputs
+
             data = {}
-            if self.recording_options['record_inputs'] and inputs._names:
+            if options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
                 data['i'] = {}
                 if 'i' in self._filtered_vars_to_record:
                     # use filtered inputs
                     for inp in self._filtered_vars_to_record['i']:
                         if inp in inputs._names:
                             data['i'][inp] = inputs._views[inp]
+                        elif inp in discrete_inputs:
+                            abs_name = self.pathname + '.' + inp if self.pathname else inp
+                            data['i'][abs_name] = discrete_inputs[inp]
                 else:
                     # use all the inputs
-                    data['i'] = inputs._names
+                    if len(discrete_inputs) > 0:
+                        for inp in inputs:
+                            data['i'][inp] = inputs._views[inp]
+                        for inp in discrete_inputs:
+                            abs_name = self.pathname + '.' + inp if self.pathname else inp
+                            data['i'][abs_name] = discrete_inputs[inp]
+                    else:
+                        data['i'] = inputs._names
+
             else:
                 data['i'] = None
 
-            if self.recording_options['record_outputs'] and outputs._names:
+            if options['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
                 data['o'] = {}
-
                 if 'o' in self._filtered_vars_to_record:
                     # use outputs from filtered list.
                     for out in self._filtered_vars_to_record['o']:
                         if out in outputs._names:
                             data['o'][out] = outputs._views[out]
+                        elif out in discrete_outputs:
+                            abs_name = self.pathname + '.' + out if self.pathname else out
+                            data['o'][abs_name] = discrete_outputs[out]
                 else:
                     # use all the outputs
-                    data['o'] = outputs._names
+                    if len(discrete_outputs) > 0:
+                        for out in outputs:
+                            data['o'][out] = outputs._views[out]
+                        for out in discrete_outputs:
+                            abs_name = self.pathname + '.' + out if self.pathname else out
+                            data['o'][abs_name] = discrete_outputs[out]
+                    else:
+                        data['o'] = outputs._names
             else:
                 data['o'] = None
 
-            if self.recording_options['record_residuals'] and residuals._names:
+            if options['record_residuals'] and residuals._names:
                 data['r'] = {}
 
                 if 'r' in self._filtered_vars_to_record:
@@ -3718,6 +3940,146 @@ class System(object):
             else:
                 new_list.append((abs2prom_in[abs_name], offset, end, idxs))
         return new_list
+
+    def _get_nodup_out_ranges(self, var_list=None):
+        """
+        Compute necessary ranges/indices for working with non-dup global outputs array.
+
+        Parameters
+        ----------
+        var_list : list
+            Optional list of variables if we want to transfer a subset of the vector.
+
+        Returns
+        -------
+        OrderedDict
+            Tuples of the form (start, end) keyed on variable name.
+        ndarray
+            Index array mapping global non-dup outputs/resids to local outputs/resids.
+        ndarray
+            Index array mapping local outputs/resids to owned local outputs/resids.
+        ndarray
+            Index array mapping global stacked (rank order) array to global array where
+            distrib vars are contiguous and all vars appear in global execution order.
+            Execution order is meaningless for systems in ParallelGroups, but for purposes
+            of global ordering, the declared execution order, which is the same across all
+            ranks, is used.
+        """
+        if var_list:
+            key = tuple(var_list)
+        else:
+            key = 'all'
+
+        if self._nodup_out_ranges is None:
+            self._nodup_out_ranges = {}
+            self._nodup2local_out_inds = {}
+            self._local2owned_inds = {}
+            self._noncontig_dis_inds = {}
+
+        if key not in self._nodup_out_ranges:
+            iproc = self.comm.rank
+            abs2meta = self._var_allprocs_abs2meta
+            sizes = self._var_sizes['linear']['output']
+            owned_sizes = self._owned_sizes
+
+            if var_list:
+                prom2abs = self._var_allprocs_prom2abs_list['output']
+                var_list = [prom2abs[name][0] for name in var_list]
+
+            ranges = OrderedDict()
+            out_views = self._outputs._views
+
+            # compute offsets into the full non-dup output/resid array by summing down columns
+            # of owned_sizes array. This results in the distributed vars being contiguous, and
+            # having the same offsets in every proc so that overlapping indices, etc. will be
+            # properly handled.
+            contig_offsets = sizes2offsets(np.sum(owned_sizes, axis=0))
+
+            # compute offsets into the full non-dup output/resid array where distrib vars are not
+            # contiguous
+            offsets = sizes2offsets(owned_sizes)
+
+            # order ranks with our rank first
+            ordered_ranks = [iproc] + [r for r in range(self.comm.size) if r != iproc]
+
+            contig_inds = []
+            non_contig_inds = []
+            # compute ranges/indices into the full non-duplicated output/resid arrays
+            for i, name in enumerate(self._var_allprocs_abs_names['output']):
+
+                # Skip if we are only interested in a subset of the vars.
+                if var_list and name not in var_list:
+                    continue
+
+                distrib = abs2meta[name]['distributed']
+                found = False
+                # check each rank (this rank first) for the first nonzero size
+                for irank in ordered_ranks:
+                    size = owned_sizes[irank, i]
+
+                    if size > 0:
+                        if not found:
+                            found = True
+                            dsize = np.sum(owned_sizes[:, i]) if distrib else size
+
+                            contig_start = contig_offsets[i]
+                            ranges[name] = (contig_start, contig_start + dsize)
+                            if name in out_views:
+                                if distrib:
+                                    # need offset into the dist var
+                                    dstart = contig_start + np.sum(owned_sizes[:irank, i])
+                                    contig_inds.append(np.arange(dstart, dstart + size, dtype=int))
+                                else:
+                                    contig_inds.append(np.arange(*ranges[name], dtype=int))
+
+                        non_contig_start = offsets[irank, i]
+                        non_contig_inds.append(np.arange(non_contig_start, non_contig_start + size))
+
+            self._nodup_out_ranges[key] = ranges
+            self._nodup2local_out_inds[key] = _arraylist2array(contig_inds)
+
+            # get indices to pull out only the 'owned' values from the local array
+            local2owned_inds = []
+            start = end = 0
+            for owned_sz, sz in zip(owned_sizes[iproc], sizes[iproc]):
+                if sz == 0:
+                    continue
+                end += sz
+                if owned_sz > 0:
+                    local2owned_inds.append(np.arange(start, end, dtype=int))
+                start = end
+
+            self._local2owned_inds[key] = _arraylist2array(local2owned_inds)
+
+            # compute inds to map gathered nodup order to nodup ordered by ownership
+            self._noncontig_dis_inds[key] = _arraylist2array(non_contig_inds)
+
+        return (self._nodup_out_ranges[key], self._nodup2local_out_inds[key],
+                self._local2owned_inds[key], self._noncontig_dis_inds[key])
+
+
+def _arraylist2array(lst, dtype=int):
+    """
+    Given a list of arrays, return a stacked array of the specified dtype.
+
+    Parameters
+    ----------
+    lst : list
+        List of arrays.
+    dtype : type
+        Specified dtype for the return array.
+
+    Returns
+    -------
+    ndarray
+        The stacked array.
+    """
+    if len(lst) > 1:
+        return np.hstack(lst)
+    elif lst:
+        return lst[0]
+
+    return np.zeros(0, dtype=dtype)
 
 
 def get_relevant_vars(connections, desvars, responses, mode):

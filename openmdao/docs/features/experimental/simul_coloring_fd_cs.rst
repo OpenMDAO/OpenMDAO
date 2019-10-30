@@ -37,13 +37,15 @@ outputs (states) of `comp`.
 .. code-block:: python
 
     comp = prob.model.add_subsystem('comp', MyComp())
-    comp.declare_coloring('x*', method='cs', num_full_jacs=2)
+    comp.declare_coloring('x*', method='cs', num_full_jacs=2, min_improve_pct=10.)
 
 
 Note that in the call to :code:`declare_coloring`, we also set :code:`num_full_jacs` to 2.  This means
 that the first 2 times that a partial jacobian is computed for 'comp', it's values will be computed
 without coloring and stored.  Just prior to the 3rd time, the coloring will be computed and used for
-the rest of the run.
+the rest of the run.  We also set :code:`min_improve_pct` to 10, meaning that if the computed
+coloring does not reduce the number of nonlinear solves required to compute `comp's` partial jacobian,
+then `comp` will not use coloring at all.
 
 Semi-total derivative coloring can be performed in a similar way, except that
 :code:`declare_coloring` would be called on a :code:`Group` instead of a :code:`Component`.

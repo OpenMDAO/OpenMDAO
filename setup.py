@@ -17,6 +17,9 @@ optional_dependencies = {
         'redbaron',
         'sphinx>=1.8.5',
     ],
+    'visualization': [
+        'bokeh>=1.3.4'
+    ],
     'test': [
         'coverage',
         'parameterized',
@@ -32,7 +35,7 @@ optional_dependencies['all'] = sorted([
     dependency
     for dependencies in optional_dependencies.values()
     for dependency in dependencies
-])
+] + ['colorama'])
 
 
 setup(
@@ -69,6 +72,7 @@ setup(
         'openmdao.approximation_schemes',
         'openmdao.code_review',
         'openmdao.components',
+        'openmdao.components.structured_metamodel_util',
         'openmdao.core',
         'openmdao.devtools',
         'openmdao.devtools.iprofile_app',
@@ -91,12 +95,14 @@ setup(
         'openmdao.test_suite.test_examples',
         'openmdao.test_suite.test_examples.beam_optimization',
         'openmdao.test_suite.test_examples.beam_optimization.components',
+        'openmdao.test_suite.test_examples.meta_model_examples',
         'openmdao.utils',
         'openmdao.vectors',
         'openmdao.visualization',
         'openmdao.visualization.connection_viewer',
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.xdsm_viewer',
+        'openmdao.visualization.meta_model_viewer',
         'openmdao.surrogate_models',
         'openmdao.surrogate_models.nn_interpolators'
     ],
@@ -111,6 +117,8 @@ setup(
         ],
         'openmdao.visualization.connection_viewer': [
             '*.html',
+            'libs/*.js',
+            'style/*.css'
         ],
         'openmdao.visualization.xdsm_viewer': [
             'XDSMjs/*',
@@ -119,6 +127,9 @@ setup(
             'XDSMjs/test/*.js',
             'XDSMjs/test/*.html',
             'XDSMjs/examples/*.json',
+        ],
+        'openmdao.visualization.meta_model_viewer': [
+            'tests/known_data_point_files/*.csv',
         ],
         'openmdao.devtools.iprofile_app': [
             'static/*.html',
@@ -140,13 +151,13 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'six',
+        'six'
     ],
     # scripts=['bin/om-pylint.sh']
     entry_points="""
     [console_scripts]
     wingproj=openmdao.devtools.wingproj:run_wing
-    webview=openmdao.devtools.webview:webview_argv
+    webview=openmdao.utils.webview:webview_argv
     run_test=openmdao.devtools.run_test:run_test
     openmdao=openmdao.utils.om:openmdao_cmd
     """,

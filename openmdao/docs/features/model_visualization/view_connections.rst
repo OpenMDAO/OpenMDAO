@@ -8,7 +8,8 @@ View Connections from Command Line
 ##################################
 
 The :code:`openmdao view_connections` command generates a table of connection information for all input and
-output variables in the model.  This is documented on :ref:`openmdao view_connections <om-command-view_connections>`.
+output variables in the model.  For more in-depth documentation, see
+:ref:`openmdao view_connections <om-command-view_connections>`.
 
 View Connections from Script
 ############################
@@ -33,5 +34,5 @@ browser. The page will look like this.
 
    An example of a connection viewer.
 
-You can use the two menus at the top of the page to filter the connections that are displayed. One does filtering
-based on the source `System` and one based on the target `System`.
+
+

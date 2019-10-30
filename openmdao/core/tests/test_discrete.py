@@ -9,13 +9,13 @@ from six import assertRaisesRegex, StringIO, assertRegex
 import numpy as np
 
 import openmdao.api as om
-from openmdao.core.group import get_relevant_vars
 from openmdao.core.driver import Driver
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.general_utils import remove_whitespace
 
 
 class ModCompEx(om.ExplicitComponent):
@@ -314,7 +314,7 @@ class DiscreteTestCase(unittest.TestCase):
         #
         stream = StringIO()
 
-        prob.model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
+        model.list_inputs(hierarchical=False, prom_name=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -331,15 +331,14 @@ class DiscreteTestCase(unittest.TestCase):
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                # compare with all spaces removed
-                self.assertEqual(text[i].replace(' ', ''), line.replace(' ', ''))
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
         #
         # list outputs
         #
         stream = StringIO()
 
-        prob.model.list_outputs(prom_name=True, out_stream=stream)
+        model.list_outputs(prom_name=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
@@ -369,8 +368,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                # compare with all spaces removed
-                self.assertEqual(text[i].replace(' ', ''), line.replace(' ', ''))
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
     def test_list_inputs_outputs_with_tags(self):
         prob = om.Problem()

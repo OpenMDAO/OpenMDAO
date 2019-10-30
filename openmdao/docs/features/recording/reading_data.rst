@@ -51,6 +51,19 @@ The following example shows how to use these methods.
     openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs
     :layout: interleave
 
+The :code:`Case.list_inputs` and :code:`Case.list_outputs` methods have optional arguments that let you filter based on
+variable names what gets listed. This is shown in these examples.
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs_with_includes_excludes
+    :layout: interleave
+
+Finally, you can also make use of the variable tagging feature when getting values from cases. This example shows how to do
+that.
+
+.. embed-code::
+    openmdao.recorders.tests.test_sqlite_reader.TestFeatureSqliteReader.test_feature_list_inputs_and_outputs_with_tags
+    :layout: interleave
 
 Getting Variable Data from Case By Specifying Variable Name and Units Desired
 -----------------------------------------------------------------------------

@@ -1349,7 +1349,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             totals = prob.check_totals(method='fd', out_stream=False)
 
-        expected_msg = "run_model must be called before total derivatives can be checked."
+        expected_msg = "Problem: run_model must be called before total derivatives can be checked."
 
         self.assertEqual(expected_msg, str(cm.exception))
 

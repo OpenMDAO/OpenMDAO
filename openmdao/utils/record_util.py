@@ -5,6 +5,7 @@ from fnmatch import fnmatchcase
 from six.moves import map, zip
 from six import iteritems
 import os
+import re
 import json
 import numpy as np
 
@@ -67,6 +68,40 @@ def format_iteration_coordinate(coord, prefix=None):
         prefix = "rank%d" % (coord[0])
 
     return ':'.join([prefix, separator.join(iteration_coordinate)])
+
+
+# regular expression used to determine if a node in an iteration coordinate represents a system
+_coord_system_re = re.compile('(_solve_nonlinear|_apply_nonlinear)$')
+
+# Regular expression used for splitting iteration coordinates, removes separator and iter counts
+_coord_split_re = re.compile('\\|\\d+\\|*')
+
+
+def get_source_system(iteration_coordinate):
+    """
+    Get pathname of system that is the source of the iteration.
+
+    Parameters
+    ----------
+    iteration_coordinate : str
+        The full unique identifier for this iteration.
+
+    Returns
+    -------
+    str
+        The pathname of the system that is the source of the iteration.
+    """
+    path = []
+    parts = _coord_split_re.split(iteration_coordinate)
+    for part in parts:
+        if (_coord_system_re.search(part) is not None):
+            if ':' in part:
+                # get rid of 'rank#:'
+                part = part.split(':')[1]
+            path.append(part.split('.')[0])
+
+    # return pathname of the system
+    return '.'.join(path)
 
 
 def check_valid_sqlite3_db(filename):
@@ -138,61 +173,46 @@ def check_path(path, includes, excludes, include_all_path=False):
     return False
 
 
-def json_to_np_array(vals, abs2meta):
+def deserialize(json_data, abs2meta):
     """
-    Convert from a JSON string to a numpy named array.
+    Deserialize recorded data from a JSON formatted string.
+
+    If all data values are arrays then a numpy structured array will be returned,
+    otherwise a dictionary mapping variable names to values will be returned.
 
     Parameters
     ----------
-    vals : string
-        json string of data
+    json_data : string
+        JSON encoded data
     abs2meta : dict
-        Dictionary mapping absolute variable names to variable metadata.
+        Dictionary mapping absolute variable names to variable metadata
 
     Returns
     -------
-    array: numpy named array
-        named array containing the same names and values as the input values json string.
+    array or dict
+        Variable names and values parsed from the JSON string
     """
-    json_vals = json.loads(vals)
-    if json_vals is None:
+    values = json.loads(json_data)
+    if values is None:
         return None
 
-    for var in json_vals:
-        json_vals[var] = convert_to_np_array(json_vals[var], var, abs2meta[var]['shape'])
+    all_array = True
 
-    return values_to_array(json_vals)
+    for name, value in iteritems(values):
+        if isinstance(value, list) and 'shape' in abs2meta[name]:
+            values[name] = np.resize(np.array(value), abs2meta[name]['shape'])
+        else:
+            all_array = False
+
+    if all_array:
+        return dict_to_structured_array(values)
+    else:
+        return values
 
 
-def convert_to_np_array(val, varname, shape):
+def dict_to_structured_array(values):
     """
-    Convert list to numpy array.
-
-    Parameters
-    ----------
-    val : list
-        the list to be converted to an np.array
-    varname : str
-        name of variable to be converted
-    shape : tuple
-        the shape of the resulting np.array
-
-    Returns
-    -------
-    numpy.array :
-        The converted array.
-    """
-    if isinstance(val, list):
-        array = np.array(val)
-        array = np.resize(array, shape)
-        return array
-
-    return val
-
-
-def values_to_array(values):
-    """
-    Convert a dict of variable names and values into a numpy named array.
+    Convert a dict of variable names and values into a numpy structured array.
 
     Parameters
     ----------
@@ -201,8 +221,8 @@ def values_to_array(values):
 
     Returns
     -------
-    array: numpy named array
-        named array containing the same names and values as the input values dict.
+    array
+        numpy structured array containing the same names and values as the input values dict.
     """
     if values:
         dtype_tuples = []
@@ -214,7 +234,7 @@ def values_to_array(values):
 
         for name, value in iteritems(values):
             array[name] = value
-    else:
-        array = None
 
-    return array
+        return array
+    else:
+        return None
