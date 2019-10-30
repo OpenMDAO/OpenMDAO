@@ -118,7 +118,7 @@ def _iprof_setup_parser(parser):
 
 
 if tornado is None:
-    def _iprof_exec(options):
+    def _iprof_exec(options, user_args):
         """
         Called from a command line to instance based profile data in a web page.
         """
@@ -202,7 +202,8 @@ else:
             self.set_header('Content-Type', 'application/json')
             self.write(dump)
 
-    def _iprof_exec(options):
+
+    def _iprof_exec(options, user_args):
         """
         Called from a command line to instance based profile data in a web page.
         """
@@ -210,7 +211,8 @@ else:
             if len(options.file) > 1:
                 print("iprofview can only process a single python file.", file=sys.stderr)
                 sys.exit(-1)
-            _iprof_py_file(options)
+
+            _iprof_py_file(options, user_args)
             if MPI:
                 options.file = ['iprof.%d' % i for i in range(MPI.COMM_WORLD.size)]
             else:

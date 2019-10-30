@@ -972,39 +972,6 @@ class Driver(object):
         """
         return "Driver"
 
-    def set_total_jac_sparsity(self, sparsity):
-        """
-        Set the sparsity of sub-jacobians of the total jacobian.
-
-        Note: This currently will have no effect if you are not using the pyOptSparseDriver.
-
-        Parameters
-        ----------
-        sparsity : str or dict
-
-            ::
-
-                # Sparsity is a nested dictionary where the outer keys are response
-                # names, the inner keys are design variable names, and the value is a tuple of
-                # the form (row_list, col_list, shape).
-                {
-                    resp1: {
-                        dv1: (rows, cols, shape),  # for sub-jac d_resp1/d_dv1
-                        dv2: (rows, cols, shape),
-                          ...
-                    },
-                    resp2: {
-                        ...
-                    }
-                    ...
-                }
-        """
-        if self.supports['total_jac_sparsity']:
-            self._total_jac_sparsity = sparsity
-        else:
-            raise RuntimeError("Driver '%s' does not support setting of total jacobian sparsity." %
-                               self._get_name())
-
     def declare_coloring(self, num_full_jacs=coloring_mod._DEF_COMP_SPARSITY_ARGS['num_full_jacs'],
                          tol=coloring_mod._DEF_COMP_SPARSITY_ARGS['tol'],
                          orders=coloring_mod._DEF_COMP_SPARSITY_ARGS['orders'],

@@ -119,30 +119,32 @@ def _list_package_pyfiles(package):
 
 def _mem_prof_setup_parser(parser):
     parser.add_argument('-o', '--outfile', action='store', dest='outfile', default='mem_trace.raw',
-                        help='Name of file containing memory dump.')
+                        help='Name of file containing memory dump. Default is mem_trace.raw.')
     parser.add_argument('--min', action='store', dest='min_mem', type=float, default=1.0,
                         help='Dump function trace with memory usage in MB above min_mem to the '
-                        'given file. Default is 1.0.')
+                        'given file. Default is 1 MB.')
     parser.add_argument('-c', '--colors', action='store_true', dest='show_colors',
                         help="Display colors if the terminal supports it.  Requires 'colorama' "
                              "python package.  Use 'pip install colorama' to install it.")
     parser.add_argument('--nogc', action='store_true', dest='nogc',
                         help="Disables automatic garbage collection.")
     parser.add_argument('-p', '--package', action='append', dest='packages',
-                        default=[], help='Determines which packages will be traced.')
+                        default=[], help='Determines which packages will be traced. '
+                        'Default package is openmdao.')
     parser.add_argument('-t', '--tree', action='store_true', dest='tree',
                         help="Display memory use in tree format, showing memory use for each "
                              "unique call sequence down to a function.")
     parser.add_argument('file', metavar='file', nargs=1, help='Python file to profile.')
 
 
-def _mem_prof_exec(options):
+def _mem_prof_exec(options, user_args):
     """
     Process command line args and perform memory profiling on a specified python file.
     """
 
     progname = options.file[0]
     sys.path.insert(0, os.path.dirname(progname))
+
 
     globals_dict = {
         '__file__': progname,
@@ -162,6 +164,9 @@ def _mem_prof_exec(options):
 
     if options.nogc:
         gc.disable()
+
+    # update sys.argv in case python script takes cmd line args
+    sys.argv[:] = [progname] + user_args
 
     exec (code, globals_dict)
 
@@ -211,7 +216,7 @@ def memtrace(**kwargs):
 
 def _mempost_setup_parser(parser):
     parser.add_argument('--out', action='store', dest='outfile', default=None,
-                        help='Dump memory tree to given file.')
+                        help='Dump memory report to given file.')
     parser.add_argument('--min', action='store', dest='min_mem', type=float, default=1.0,
                         help='Dump function trace with memory usage to given file.')
     parser.add_argument('-c', '--colors', action='store_true', dest='show_colors',
@@ -223,7 +228,7 @@ def _mempost_setup_parser(parser):
     parser.add_argument('file', metavar='file', nargs=1, help='Memory dump file to process.')
 
 
-def _mempost_exec(options):
+def _mempost_exec(options, user_args):
     """
     Process command line args and perform postprocessing on the specified memory dump file.
     """

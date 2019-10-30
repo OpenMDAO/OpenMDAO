@@ -1479,10 +1479,10 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         else:  # component or group
             if not class_names:
                 x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                       comp_type=comp['component_type'])
+                           comp_type=comp['component_type'])
             else:
                 x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                        comp_type=comp['component_type'], cls=comp.get('class', None))
+                           comp_type=comp['component_type'], cls=comp.get('class', None))
 
     # Add process connections
     if add_process_conns:

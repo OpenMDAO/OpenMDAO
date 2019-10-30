@@ -49,7 +49,7 @@ def _get_template(fname, **kwargs):
     return template
 
 
-def _scaffold_exec(options):
+def _scaffold_exec(options, user_args):
     """
     Execute the 'openmdao scaffold' command.
 
@@ -57,6 +57,8 @@ def _scaffold_exec(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Command line options after '--' (if any).  Passed to user script.
     """
     if options.file is None:
         outfile = _camel_case_split(options.class_name)

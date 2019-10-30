@@ -92,6 +92,7 @@ def get_logger(name='default_logger', level=logging.INFO, use_format=False,
     else:
         # create new logger
         logger = logging.getLogger(name)
+        logger.setLevel(level)
         if out_stream:
             _set_handler(logger, logging.StreamHandler(out_stream), level, use_format)
         if out_file:
