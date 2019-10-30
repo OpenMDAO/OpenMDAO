@@ -1757,7 +1757,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     Coloring
         The computed coloring.
     """
-    problem = driver._problem
+    problem = driver._problem()
     if not problem.model._use_derivatives:
         simple_warning("Derivatives have been turned off. Skipping dynamic simul coloring.")
         return

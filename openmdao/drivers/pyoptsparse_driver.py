@@ -191,7 +191,7 @@ class pyOptSparseDriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        problem = self._problem
+        problem = self._problem()
         model = problem.model
         relevant = model._relevant
         self.pyopt_solution = None
@@ -434,7 +434,7 @@ class pyOptSparseDriver(Driver):
             0 for successful function evaluation
             1 for unsuccessful function evaluation
         """
-        model = self._problem.model
+        model = self._problem().model
         fail = 0
 
         try:
@@ -501,7 +501,7 @@ class pyOptSparseDriver(Driver):
             0 for successful function evaluation
             1 for unsuccessful function evaluation
         """
-        prob = self._problem
+        prob = self._problem()
         fail = 0
 
         try:

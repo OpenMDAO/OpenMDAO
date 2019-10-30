@@ -32,10 +32,10 @@ def report_leaks(classes=(object,), flags=gc.DEBUG_COLLECTABLE | gc.DEBUG_UNCOLL
     gc.set_debug(0)
 
 
-
-with report_leaks((System, om.Problem, Vector, Driver, Solver)):
-    for i in range(3):
-        p_color = run_opt(om.pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
-                          dynamic_total_coloring=True, partial_coloring=True)
-        p_color = None
+if __name__ == '__main__':
+    with report_leaks((System, om.Problem, Vector, Driver, Solver)):
+        for i in range(3):
+            p_color = run_opt(om.pyOptSparseDriver, 'auto', optimizer='SNOPT', print_results=False,
+                            dynamic_total_coloring=True, partial_coloring=True)
+            p_color = None
 
