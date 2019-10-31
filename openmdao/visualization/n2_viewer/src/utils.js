@@ -66,3 +66,12 @@ Array.isPopulatedArray = function (arr) {
 
 const paramRegex = /^(param|unconnected_param)$/;
 const paramOrUnknownRegex = /^(unknown|param|unconnected_param)$/;
+
+d3.selection.prototype.originalFuncs = {
+    'transition': d3.selection.prototype.transition,
+    'duration': d3.selection.prototype.duration,
+    'delay': d3.selection.prototype.delay
+};
+d3.selection.prototype.transitionAllowed = true;
+
+function returnThis() { return this; }

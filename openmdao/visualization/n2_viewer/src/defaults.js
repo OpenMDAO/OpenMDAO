@@ -33,7 +33,8 @@ let N2TransitionDefaults = {
     'startDelay': 100,
     'duration': 1000,
     'durationFast': 1000,
-    'durationSlow': 1500
+    'durationSlow': 1500,
+    'maxNodes': 150
 }
 
 // Object.freeze(N2TransitionDefaults);

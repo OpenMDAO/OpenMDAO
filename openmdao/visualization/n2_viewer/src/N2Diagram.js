@@ -5,8 +5,8 @@
  * @property {N2Style} style Manages N2-related styles and functions.
  * @property {N2Layout} layout Sizes and positions of visible elements.
  * @property {N2Matrix} matrix Manages the grid of model elements.
- * @property {Object} zoomedElement The element the diagram is currently based on.
- * @property {Object} zoomedElementPrev Reference to last zoomedElement.
+ * @property {N2TreeNode} zoomedElement The element the diagram is currently based on.
+ * @property {N2TreeNode} zoomedElementPrev Reference to last zoomedElement.
  * @property {Object} dom Container for references to web page elements.
  * @property {Object} dom.parentDiv
  * @property {Object} dom.d3ContentDiv The div containing all of the diagram's content.
