@@ -945,9 +945,6 @@ class MetaModelVisualization(object):
 
         if not self.is_structured_meta_model:
             try:
-                # for output_name in self.output_names:
-                    # print("Standard deviation of %s: %f" % (
-                    #     output_name, self.meta_model._metadata(output_name)['rmse']))
                 return float(self.meta_model._metadata(self.output_select.value)['rmse'])
 
             except Exception:
