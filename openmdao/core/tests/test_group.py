@@ -579,7 +579,7 @@ class TestGroup(unittest.TestCase):
 
         warnings = testlogger.get('warning')
         self.assertEqual(len(warnings), 1)
-        self.assertTrue('inconsistent units and/or values!!' not in warnings[0])
+        self.assertTrue("connected input values don't match" not in warnings[0])
 
     def test_unconnected_input_units_mismatch(self):
         p = om.Problem()
@@ -601,9 +601,8 @@ class TestGroup(unittest.TestCase):
         p.run_model()
 
         warnings = testlogger.get('warning')
-        print(warnings)
         self.assertEqual(len(warnings), 1)
-        self.assertTrue('inconsistent units and/or values!!' in warnings[0])
+        self.assertTrue("connected input values don't match" in warnings[0])
 
     def test_connect_1_to_many(self):
         import numpy as np

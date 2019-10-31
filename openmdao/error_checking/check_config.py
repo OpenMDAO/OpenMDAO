@@ -342,13 +342,15 @@ def _check_hanging_inputs(problem, logger):
                 mismatch = _has_val_mismatch(problem.model._var_allprocs_discrete['input'],
                                              absnames, units, vals)
                 if mismatch:
-                    msg.append("\n   ----- WARNING: inconsistent units and/or values!! -----\n")
+                    msg.append("\n   ----- WARNING: connected input values don't match when "
+                               "converted to consistent units. -----\n")
                 msg.append("   {}  (p):\n".format(prom))
                 for a, u, v in zip(absnames, units, vals):
                     valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
                     msg.append(template_prom.format(a, u, valstr, nwid=nwid, uwid=uwid))
                 if mismatch:
-                    msg.append("   -------------------------------------------------------\n\n")
+                    msg.append("   --------------------------------------------------------------"
+                               "-----------------------------\n\n")
 
         logger.warning(''.join(msg))
 
