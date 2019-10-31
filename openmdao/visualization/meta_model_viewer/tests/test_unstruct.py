@@ -328,6 +328,41 @@ class UnstructuredMetaModelCompTests(unittest.TestCase):
         assert_rel_error(self, right_transparency, known_points_right, 1.1e-02)
         assert_rel_error(self, bottom_transparency, known_points_bottom, 1.6e-02)
 
+    def test_kriging_rmse_stats_error(self):
+        # Model
+        interp = om.MetaModelUnStructuredComp()
+
+        # Training Data
+        x_train1 = np.linspace(0, 10, 20)
+        x_train2 = np.linspace(0, 20, 20)
+        x_train3 = np.linspace(0, 30, 20)
+        x_train4 = np.linspace(0, 40, 20)
+        y_train = np.linspace(10, 20, 20)
+
+        # Inputs
+        interp.add_input('input_1', 0., training_data=x_train1)
+        interp.add_input('input_2', 0., training_data=x_train2)
+        interp.add_input('input_3', 0., training_data=x_train3)
+        interp.add_input('input_4', 0., training_data=x_train4)
+
+        # Outputs
+        interp.add_output('output_1', 0., training_data=.5 * np.cos(y_train))
+        interp.add_output('output_2', 0., training_data=.5 * np.sin(y_train))
+
+        # Surrogate Model
+        interp.options['default_surrogate'] = om.KrigingSurrogate()
+
+        prob = om.Problem()
+        prob.model.add_subsystem('interp', interp)
+        prob.setup()
+        prob.final_setup()
+
+        with self.assertRaises(Exception) as context:
+            viz = MetaModelVisualization(interp, stats=True)
+
+        msg = ("eval_rmse not set to true. Set the eval_rmse parameter to true "
+        "KrigingSurrogate(eval_rmse=True)")
+        self.assertTrue(msg in str(context.exception))
 
 
 if __name__ == '__main__':

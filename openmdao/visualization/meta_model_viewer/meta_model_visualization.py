@@ -45,6 +45,8 @@ class MetaModelVisualization(object):
     ----------
     prob : Problem
         Name of variable corresponding to Problem Component
+    stats : bool
+        Boolean to determine if the user wants error bars for a kriging surrogate
     meta_model : MetaModel
         Name of empty Meta Model Component object reference
     resolution : int
@@ -129,6 +131,8 @@ class MetaModelVisualization(object):
             Value used to calculate the size of contour plot meshgrid
         doc : Document
             The bokeh document to build.
+        stats : bool
+            Boolean to determine if the user wants error bars for a kriging surrogate
         """
         self.prob = Problem()
         self.resolution = resolution
@@ -559,14 +563,16 @@ class MetaModelVisualization(object):
         # Update the data source with new data and include dashed lines to show the upper and lower
         # limits of the surrogate's rmse
         if self.stats:
-            self.std_of_output = self.meta_model_stats()
+            self.std_of_output = self._meta_model_stats()
 
             self.right_plot_source.data = dict(
                 x=x, y=y, upper_std=[y + self.std_of_output for y in x],
                 lower_std=[y - self.std_of_output for y in x])
             right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
-            right_plot_fig.line(x='upper_std', y='y', line_dash='dashed', source=self.right_plot_source)
-            right_plot_fig.line(x='lower_std', y='y', line_dash='dashed', source=self.right_plot_source)
+            right_plot_fig.line(x='upper_std', y='y', line_dash='dashed',
+                                source=self.right_plot_source)
+            right_plot_fig.line(x='lower_std', y='y', line_dash='dashed',
+                                source=self.right_plot_source)
         else:
             self.right_plot_source.data = dict(x=x, y=y)
             right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
@@ -650,14 +656,16 @@ class MetaModelVisualization(object):
         # Update the data source with new data and include dashed lines to show the upper and lower
         # limits of the surrogate's rmse
         if self.stats:
-            self.std_of_output = self.meta_model_stats()
+            self.std_of_output = self._meta_model_stats()
 
             self.bottom_plot_source.data = dict(
                 x=x, y=y, upper_std=[i + self.std_of_output for i in y],
                 lower_std=[i - self.std_of_output for i in y])
             bottom_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
-            bottom_plot_fig.line(x='x', y='upper_std', line_dash='dashed', source=self.bottom_plot_source)
-            bottom_plot_fig.line(x='x', y='lower_std', line_dash='dashed', source=self.bottom_plot_source)
+            bottom_plot_fig.line(x='x', y='upper_std', line_dash='dashed',
+                                 source=self.bottom_plot_source)
+            bottom_plot_fig.line(x='x', y='lower_std', line_dash='dashed',
+                                 source=self.bottom_plot_source)
         else:
             self.bottom_plot_source.data = dict(x=x, y=y)
             bottom_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
@@ -942,7 +950,7 @@ class MetaModelVisualization(object):
         self.output_variable = self.output_names.index(new)
         self._update_all_plots()
 
-    def meta_model_stats(self):
+    def _meta_model_stats(self):
 
         if not self.is_structured_meta_model:
             try:
@@ -952,6 +960,7 @@ class MetaModelVisualization(object):
                 msg = ("eval_rmse not set to true. Set the eval_rmse parameter to true "
                        "KrigingSurrogate(eval_rmse=True)")
                 raise KeyError(msg)
+
 
 def view_metamodel(meta_model_comp, resolution, port_number, stats):
     """
@@ -965,6 +974,8 @@ def view_metamodel(meta_model_comp, resolution, port_number, stats):
         Number of points to control contour plot resolution.
     port_number : int
         Bokeh plot port number.
+    stats : bool
+        Boolean to determine if the user wants error bars for a kriging surrogate
     """
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler
