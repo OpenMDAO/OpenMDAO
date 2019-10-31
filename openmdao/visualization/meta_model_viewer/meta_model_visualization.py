@@ -117,7 +117,7 @@ class MetaModelVisualization(object):
         A 2D array containing contour plot data
     """
 
-    def __init__(self, model, resolution=50, doc=None):
+    def __init__(self, model, resolution=50, stats=False, doc=None):
         """
         Initialize parameters.
 
@@ -132,6 +132,7 @@ class MetaModelVisualization(object):
         """
         self.prob = Problem()
         self.resolution = resolution
+        self.stats = stats
         logging.getLogger("bokeh").setLevel(logging.ERROR)
 
         # If the surrogate model coming in is structured
@@ -557,7 +558,7 @@ class MetaModelVisualization(object):
 
         # Update the data source with new data and include dashed lines to show the upper and lower
         # limits of the surrogate's rmse
-        if self.meta_model_stats():
+        if self.stats:
             self.std_of_output = self.meta_model_stats()
 
             self.right_plot_source.data = dict(
@@ -648,7 +649,7 @@ class MetaModelVisualization(object):
 
         # Update the data source with new data and include dashed lines to show the upper and lower
         # limits of the surrogate's rmse
-        if self.meta_model_stats():
+        if self.stats:
             self.std_of_output = self.meta_model_stats()
 
             self.bottom_plot_source.data = dict(
@@ -658,7 +659,7 @@ class MetaModelVisualization(object):
             bottom_plot_fig.line(x='x', y='upper_std', line_dash='dashed', source=self.bottom_plot_source)
             bottom_plot_fig.line(x='x', y='lower_std', line_dash='dashed', source=self.bottom_plot_source)
         else:
-            self.right_plot_source.data = dict(x=x, y=y)
+            self.bottom_plot_source.data = dict(x=x, y=y)
             bottom_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
 
         bottom_plot_fig.xaxis.axis_label = x_idx
@@ -952,7 +953,7 @@ class MetaModelVisualization(object):
                        "KrigingSurrogate(eval_rmse=True)")
                 raise KeyError(msg)
 
-def view_metamodel(meta_model_comp, resolution, port_number):
+def view_metamodel(meta_model_comp, resolution, port_number, stats):
     """
     Visualize a metamodel.
 
@@ -969,7 +970,7 @@ def view_metamodel(meta_model_comp, resolution, port_number):
     from bokeh.application.handlers import FunctionHandler
 
     def make_doc(doc):
-        MetaModelVisualization(meta_model_comp, resolution, doc=doc)
+        MetaModelVisualization(meta_model_comp, resolution, stats, doc=doc)
 
     # print('Opening Bokeh application on http://localhost:5006/')
     server = Server({'/': Application(FunctionHandler(make_doc))}, port=int(port_number))
