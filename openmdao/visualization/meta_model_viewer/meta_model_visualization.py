@@ -550,17 +550,29 @@ class MetaModelVisualization(object):
         x = z_data
         y = self.slider_source.data[y_idx]
 
-        # Update the data source with new data
-        self.right_plot_source.data = dict(x=x, y=y)
-
         # Create and format figure
         self.right_plot_fig = right_plot_fig = figure(
             plot_width=250, plot_height=500,
             title="{} vs {}".format(y_idx, self.output_select.value), tools="pan")
+
+        # Update the data source with new data and include dashed lines to show the upper and lower
+        # limits of the surrogate's rmse
+        if self.meta_model_stats():
+            self.std_of_output = self.meta_model_stats()
+
+            self.right_plot_source.data = dict(
+                x=x, y=y, upper_std=[y + self.std_of_output for y in x],
+                lower_std=[y - self.std_of_output for y in x])
+            right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
+            right_plot_fig.line(x='upper_std', y='y', line_dash='dashed', source=self.right_plot_source)
+            right_plot_fig.line(x='lower_std', y='y', line_dash='dashed', source=self.right_plot_source)
+        else:
+            self.right_plot_source.data = dict(x=x, y=y)
+            right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
+
         right_plot_fig.xaxis.axis_label = self.output_select.value
         right_plot_fig.yaxis.axis_label = y_idx
         right_plot_fig.xaxis.major_label_orientation = math.pi / 9
-        right_plot_fig.line(x='x', y='y', source=self.right_plot_source)
         right_plot_fig.x_range.range_padding = 0.1
         right_plot_fig.y_range.range_padding = 0.02
 
@@ -633,9 +645,24 @@ class MetaModelVisualization(object):
         self.bottom_plot_fig = bottom_plot_fig = figure(
             plot_width=550, plot_height=250,
             title="{} vs {}".format(x_idx, self.output_select.value), tools="")
+
+        # Update the data source with new data and include dashed lines to show the upper and lower
+        # limits of the surrogate's rmse
+        if self.meta_model_stats():
+            self.std_of_output = self.meta_model_stats()
+
+            self.bottom_plot_source.data = dict(
+                x=x, y=y, upper_std=[i + self.std_of_output for i in y],
+                lower_std=[i - self.std_of_output for i in y])
+            bottom_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
+            bottom_plot_fig.line(x='x', y='upper_std', line_dash='dashed', source=self.bottom_plot_source)
+            bottom_plot_fig.line(x='x', y='lower_std', line_dash='dashed', source=self.bottom_plot_source)
+        else:
+            self.right_plot_source.data = dict(x=x, y=y)
+            bottom_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
+
         bottom_plot_fig.xaxis.axis_label = x_idx
         bottom_plot_fig.yaxis.axis_label = self.output_select.value
-        bottom_plot_fig.line(x='x', y='y', source=self.bottom_plot_source)
         bottom_plot_fig.x_range.range_padding = 0.02
         bottom_plot_fig.y_range.range_padding = 0.1
 
@@ -914,6 +941,19 @@ class MetaModelVisualization(object):
         self.output_variable = self.output_names.index(new)
         self._update_all_plots()
 
+    def meta_model_stats(self):
+
+        if not self.is_structured_meta_model:
+            try:
+                # for output_name in self.output_names:
+                    # print("Standard deviation of %s: %f" % (
+                    #     output_name, self.meta_model._metadata(output_name)['rmse']))
+                return float(self.meta_model._metadata(self.output_select.value)['rmse'])
+
+            except Exception:
+                msg = ("eval_rmse not set to true. Set the eval_rmse parameter to true "
+                       "KrigingSurrogate(eval_rmse=True)")
+                raise KeyError(msg)
 
 def view_metamodel(meta_model_comp, resolution, port_number):
     """
