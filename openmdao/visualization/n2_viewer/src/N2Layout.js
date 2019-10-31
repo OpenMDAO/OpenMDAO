@@ -78,6 +78,44 @@ class N2Layout {
         if (this.zoomedElement.parent)
             this.zoomedSolverNodes.push(this.zoomedElement.parent);
 
+        this.setTransitionPermission();
+
+    }
+
+    /**
+     * If there are too many nodes, don't bother with transition animations
+     * because it will cause lag and may timeout anyway. This is accomplished
+     * by redefining a few D3 methods to return the same selection instead
+     * of a transition object. When the number of nodes is low enough,
+     * the original transition methods are restored.
+     */
+    setTransitionPermission() {
+        // Too many nodes, disable transitions.
+        if (this.visibleNodes.length >= N2TransitionDefaults.maxNodes) {
+            console.log("Denying transitions: ", this.visibleNodes.length,
+                " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
+
+            // Return if already denied
+            if (!d3.selection.prototype.transitionAllowed) return;
+            d3.selection.prototype.transitionAllowed = false;
+
+            d3.selection.prototype.transition = returnThis;
+            d3.selection.prototype.duration = returnThis;
+            d3.selection.prototype.delay = returnThis;
+        }
+        else { // OK, enable transitions.
+            console.log("Allowing transitions: ", this.visibleNodes.length,
+                " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
+
+            // Return if already allowed
+            if (d3.selection.prototype.transitionAllowed) return;
+            d3.selection.prototype.transitionAllowed = true;
+
+            for (const func in d3.selection.prototype.originalFuncs) {
+                d3.selection.prototype[func] =
+                    d3.selection.prototype.originalFuncs[func];
+            }
+        }
     }
 
     /** Create an off-screen area to render text for _getTextWidth() */
