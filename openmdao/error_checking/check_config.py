@@ -3,6 +3,7 @@ from __future__ import print_function
 
 from collections import defaultdict
 from six import iteritems
+from distutils.version import LooseVersion
 
 import numpy as np
 
@@ -20,6 +21,12 @@ from openmdao.utils.units import convert_units
 
 
 _UNSET = object()
+
+# numpy default print options changed in 1.14
+if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+    _npy_print_opts = {'legacy': '1.13'}
+else:
+    _npy_print_opts = {}
 
 
 def _check_cycles(group, infos=None):
@@ -222,12 +229,18 @@ def _trim_str(obj, size):
     str
         The trimmed string.
     """
-    s = str(obj)
+    if isinstance(obj, np.ndarray):
+        with printoptions(**_npy_print_opts):
+            s = str(obj)
+    else:
+        s = str(obj)
+
     if len(s) > size:
         if isinstance(obj, np.ndarray) and np.issubdtype(obj.dtype, np.floating):
             s = 'shape={}, norm={:<.3}'.format(obj.shape, np.linalg.norm(obj))
         else:
             s = s[:size - 4] + ' ...'
+
     return s
 
 
