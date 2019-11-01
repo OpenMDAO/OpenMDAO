@@ -114,6 +114,10 @@ class N2Matrix {
         this.levelOfDetailThreshold = height / 3;
     }
 
+    tooMuchDetail() {
+        return (this.nodes.length >= this.levelOfDetailThreshold);
+    }
+
     /**
      * Add a cell to the grid Object and allCells array, with special
      * handling for declared partials.
@@ -142,7 +146,7 @@ class N2Matrix {
         this.grid = {};
         this.allCells = [];
 
-        if (this.nodes.length >= this.levelOfDetailThreshold) return;
+        if (this.tooMuchDetail()) return;
 
         for (let srcIdx = 0; srcIdx < this.nodes.length; ++srcIdx) {
             let srcObj = this.nodes[srcIdx];
@@ -225,7 +229,7 @@ class N2Matrix {
 
         //do this so you save old index for the exit()
         this.gridLines = [];
-        if (this.nodes.length < this.levelOfDetailThreshold) {
+        if (!this.tooMuchDetail()) {
             for (let i = 0; i < this.nodes.length; ++i) {
                 let obj = this.nodes[i];
                 let gl = { "i": i, "obj": obj };
@@ -462,10 +466,21 @@ class N2Matrix {
     /** Add all the visible elements to the matrix. */
     draw() {
         console.time('N2Matrix.draw');
+        console.log("maxDepth: ", this.layout.model.maxDepth, " zoomedElement depth: ", this.layout.zoomedElement.depth)
 
         this._drawCells();
-        this._drawHorizontalLines();
-        this._drawVerticalLines();
+
+        // Draw gridlines:
+        if (!this.tooMuchDetail()) {
+            console.log("Drawing gridlines.")
+            this._drawHorizontalLines();
+            this._drawVerticalLines();
+        }
+        else {
+            console.log("Erasing gridlines.")
+            this.n2Groups.gridlines.selectAll('.horiz_line').remove();
+            this.n2Groups.gridlines.selectAll(".vert_line").remove();
+        }
         this._drawComponentBoxes();
 
         console.timeEnd('N2Matrix.draw');
@@ -565,7 +580,7 @@ class N2Matrix {
                                 }
                             }
                             if (firstBeginIndex == -1) {
-                                throw("Error: first begin index not found");
+                                throw ("Error: first begin index not found");
                             }
 
                             // find first end index
@@ -577,7 +592,7 @@ class N2Matrix {
                                 }
                             }
                             if (firstEndIndex == -1) {
-                                throw("Error: first end index not found");
+                                throw ("Error: first end index not found");
                             }
 
                             if (firstBeginIndex != firstEndIndex) {

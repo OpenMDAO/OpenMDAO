@@ -206,3 +206,21 @@ class TestLogger(object):
                 return True
 
         return False
+
+    def find_in(self, typ, message):
+        """
+        Find the given message among the stored messages.
+
+        Raises an exception if the given message isn't found.
+
+        Parameters
+        ----------
+        typ : str
+            Type of messages ('error', 'warning', 'info') to be searched.
+
+        message : str
+            The message to match.
+        """
+        if not self.contains(typ, message):
+            raise RuntimeError('Message "{}" not found in {}.'.format(message,
+                                                                      ',\n'.join(self._msgs[typ])))

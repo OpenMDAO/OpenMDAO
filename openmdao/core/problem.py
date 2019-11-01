@@ -435,7 +435,7 @@ class Problem(object):
         name : str
             Promoted or relative variable name in the root system's namespace.
         units : str, optional
-            Units to convert to before upon return.
+            Units to convert to before return.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to return.
         get_remote : bool

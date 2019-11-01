@@ -2,6 +2,12 @@
  * Essentially the same as a JSON object from the model tree,
  * with some utility functions.
  * @typedef {N2TreeNode}
+ * @property {Object} dims The size and location of the node when drawn.
+ * @property {Object} prevDims The previous value of dims.
+ * @property {Object} solverDims The size and location of the node within the solver tree.
+ * @property {Object} prevSolverDims The previous value of solverDims.
+ * @property {Object} isMinimized Whether this node or a parent has been collapsed.
+ * @property {number} depth
 */
 class N2TreeNode {
 
@@ -29,6 +35,7 @@ class N2TreeNode {
         this.isMinimized = false;
     }
 
+    /** Run when a node is collapsed/restored. */
     toggleMinimize() {
         this.isMinimized = !this.isMinimized;
         return this.isMinimized;

@@ -40,14 +40,17 @@ class TestCheckConfig(unittest.TestCase):
 
         expected = (
             "The following inputs are not connected:\n"
-            "   G3.G4.C4.v\n"
-            "   G3.G4.C4.x\n"
-            "   G3.G4.u: ['G3.G4.C3.u']\n"
-            "   G3.G4.x: ['G3.G4.C3.x']\n"
-            "   w: ['G1.G2.C1.w']\n"
+            "   G3.G4.C4.v     [ 1.]\n"
+            "   G3.G4.C4.x     [ 1.]\n"
+            "   G3.G4.u  (p):\n"
+            "      G3.G4.C3.u  [ 1.]\n"
+            "   G3.G4.x  (p):\n"
+            "      G3.G4.C3.x  [ 1.]\n"
+            "   w  (p):\n"
+            "      G1.G2.C1.w  [ 1.]\n"
         )
 
-        self.assertTrue(testlogger.contains('warning', expected))
+        testlogger.find_in('warning', expected)
 
     def test_dataflow_1_level(self):
         p = Problem()
@@ -88,8 +91,8 @@ class TestCheckConfig(unittest.TestCase):
             "   System 'C3' executes out-of-order with respect to its source systems ['C4']\n"
         )
 
-        self.assertTrue(testlogger.contains('info', expected_info))
-        self.assertTrue(testlogger.contains('warning', expected_warning))
+        testlogger.find_in('info', expected_info)
+        testlogger.find_in('warning', expected_warning)
 
     def test_dataflow_multi_level(self):
         p = Problem()
@@ -135,8 +138,8 @@ class TestCheckConfig(unittest.TestCase):
             "   System 'G1.C1' executes out-of-order with respect to its source systems ['G1.C2']\n"
         )
 
-        self.assertTrue(testlogger.contains('info', expected_info))
-        self.assertTrue(testlogger.contains('warning', expected_warning))
+        testlogger.find_in('info', expected_info)
+        testlogger.find_in('warning', expected_warning)
 
         # test comps_only cycle check
         graph = root.compute_sys_graph(comps_only=True)
@@ -171,8 +174,8 @@ class TestCheckConfig(unittest.TestCase):
             "   C1 has inputs ['a', 'b'] connected to C2.y\n"
         )
 
-        self.assertTrue(testlogger.contains('warning', expected_warning_1))
-        self.assertTrue(testlogger.contains('warning', expected_warning_2))
+        testlogger.find_in('warning', expected_warning_1)
+        testlogger.find_in('warning', expected_warning_2)
 
     def test_multi_cycles(self):
         p = Problem()
@@ -225,7 +228,7 @@ class TestCheckConfig(unittest.TestCase):
             "   System 'G1.C3' executes out-of-order with respect to its source systems ['G1.C11']\n"
         )
 
-        self.assertTrue(testlogger.contains('warning', expected_warning_1))
+        testlogger.find_in('warning', expected_warning_1)
 
     def test_multi_cycles_non_default(self):
         p = Problem()
@@ -285,21 +288,21 @@ class TestCheckConfig(unittest.TestCase):
         )
 
         expected_warning_2 = (
-            "The following inputs are not connected:\n"
-            "   G1.C1.b\n"
-            "   G1.C11.b\n"
-            "   G1.C13.b\n"
-            "   G1.C22.b\n"
-            "   G1.C23.b\n"
-            "   G1.N1.a\n"
-            "   G1.N1.b\n"
-            "   G1.N2.a\n"
-            "   G1.N3.a\n"
+            'The following inputs are not connected:\n'
+            '   G1.C1.b      [ 1.]\n'
+            '   G1.C11.b     [ 1.]\n'
+            '   G1.C13.b     [ 1.]\n'
+            '   G1.C22.b     [ 1.]\n'
+            '   G1.C23.b     [ 1.]\n'
+            '   G1.N1.a      [ 1.]\n'
+            '   G1.N1.b      [ 1.]\n'
+            '   G1.N2.a      [ 1.]\n'
+            '   G1.N3.a      [ 1.]\n'
         )
 
-        self.assertTrue(testlogger.contains('info', expected_info))
-        self.assertTrue(testlogger.contains('warning', expected_warning_1))
-        self.assertTrue(testlogger.contains('warning', expected_warning_2))
+        testlogger.find_in('info', expected_info)
+        testlogger.find_in('warning', expected_warning_1)
+        testlogger.find_in('warning', expected_warning_2)
 
     def test_comp_has_no_outputs(self):
         p = Problem()
@@ -321,7 +324,7 @@ class TestCheckConfig(unittest.TestCase):
             "   comp1\n"
         )
 
-        self.assertTrue(testlogger.contains('warning', expected))
+        testlogger.find_in('warning', expected)
 
     def test_initial_condition_order(self):
         # Makes sure we set vars to their initial condition before running checks.
@@ -377,7 +380,7 @@ class TestRecorderCheckConfig(unittest.TestCase):
         p.final_setup()
 
         expected_warning = "The Problem has no recorder of any kind attached"
-        self.assertTrue(testlogger.contains('warning', expected_warning))
+        testlogger.find_in('warning', expected_warning)
 
     def test_check_driver_recorder_set(self):
         p = Problem()
