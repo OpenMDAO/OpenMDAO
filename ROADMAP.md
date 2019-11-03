@@ -37,6 +37,38 @@ but will include some important practical changes:
 ----------------------------------------------
 ----------------------------------------------
 ----------------------------------------------
+
+# Improvements for integration with distributed HPC codes
+
+**Motivation** At the 2019 OpenMDAO workshop, a number of separate parties all independently discussed a weakness in the OpenMDAO setup process when it comes to integration with parallel, distributed memory codes like FEA and CFD solvers. 
+Graeme Kennedy (Georgia Tech), Tim Brooks (Aurora Flight Sciences), Sandy Mader (University of Michigan), and Kevin Jacobson (NASA Langley) all separately broached the subject. 
+Although there are current workable solutions, they are less efficient both in terms of memory and general code organization than we would all like. 
+
+**Overall Goal:** To modify OpenMDAO to avoid any unnecessary data copying in cases where two components share an output/input on the same process and there is no unit conversion between them (openMDAO currently copies all outputs to a separate input vector), and to make any changes to the framework necessary to support the instantiation of these types of components when MPI COMMs must be shared between them. 
+
+## 1) Develop a stable of simple, but representative test cases that can serve as the basis for a broader code design discussion 
+### Goal: 
+- Capture community examples to summarize the key situations that are showing up in their usage, 
+in order to provide the Dev Team with a clear understanding of all the various scenarios 
+- Enable effective testing and benchmarking of new functionality at various scales without requiring execution of actual engineering codes 
+
+### Potential Challenges: 
+- Will likely require iterative interaction between the Dev Team and users who are providing test cases, in order to fully capture the nature of what they can and can not currently accomplish with existing APIs. 
+
+## 2) Make low-level modifications to how OpenMDAO handles data-passing in key situations when copying can be avoided 
+### Goal: 
+- Make all OpenMDAO models faster and more memory efficient by lowering required memory allocations for data vectors and reducing the need for wasteful copies 
+
+### Potential Challenges: 
+- This has the potential to add significant code complexity to the underlying data passing mechanisms, and will need to be handled very carefully to ensure a stable and maintainable result. 
+It will probably take a while to implement and test. 
+- It seems possible that, if too much for-looping is added to the data transfer scheme to support this, that in an attempt to speed things up for large HPC applications we may slow them down for low-fidelity applications.
+So some benchmarking will be needed. 
+
+
+----------------------------------------------
+----------------------------------------------
+----------------------------------------------
 # Model & Data Visualization 
 
 **Motivation:** Provide tools that make it easier to quickly build and debug complex 
@@ -73,16 +105,17 @@ model has been run.
   navigational features. We'll need a new concept for the UI.
 
 ### Notes:
-- Two different proposals for a new UI are outlined in POEM-001 and POEM-002.
+- A POEM detailing proposed new API will be posted by end of January 2020 detailing proposed new API concept
 
-## 3) OVIS application for quickly plotting data from CaseRecorder databases
+## 3) Integrate N<sup>2</sup> with CaseRecorder data so the state of specific parts of the model can be inspected via case DBs. 
 ### Goal: 
-- Make it simpler for users to inspect, navigate, and plot data from the case recorder.
+- Leverage the N<sup>2</sup> interface to allow users to understand their models more efficiently.
+- Potentially useful as a debugging tools.
 
 ### Potential Challenges: 
-- OVIS is a stand-alone application. Will users be willing to download and install it?
-- A separate application brings significant overhead for the development team, which may not be 
-  sustainable in the long term.
+- It is unclear how will this functionality should be implemented. 
+  Current possibilities are Jupyter Lab, or stand alone Electron based javascript app. 
+
 
 ----------------------------------------------
 ----------------------------------------------
