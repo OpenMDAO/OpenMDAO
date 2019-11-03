@@ -44,7 +44,8 @@ but will include some important practical changes:
 Graeme Kennedy (Georgia Tech), Tim Brooks (Aurora Flight Sciences), Sandy Mader (University of Michigan), and Kevin Jacobson (NASA Langley) all separately broached the subject. 
 Although there are current workable solutions, they are less efficient both in terms of memory and general code organization than we would all like. 
 
-**Overall Goal:** To modify OpenMDAO to avoid any unnecessary data copying in cases where two components share an output/input on the same process and there is no unit conversion between them (openMDAO currently copies all outputs to a separate input vector), and to make any changes to the framework necessary to support the instantiation of these types of components when MPI COMMs must be shared between them. 
+**Overall Goal:** To modify OpenMDAO to avoid any unnecessary data copying in cases where two components share an output/input on the same process and there is no unit conversion between them (OpenMDAO currently copies all outputs to a separate input vector), and to make any necessary extensions to the Component and Group APIs necessary to support the instantiation of these types of components when MPI COMMs must be shared between them. 
+These changes, if at all possible, should not break any current APIs that do not deal directly with distributed components nor should the necessitate changes to existing non distributed components. 
 
 ## 1) Develop a stable of simple, but representative test cases that can serve as the basis for a broader code design discussion 
 ### Goal: 
@@ -54,16 +55,19 @@ in order to provide the Dev Team with a clear understanding of all the various s
 
 ### Potential Challenges: 
 - Will likely require iterative interaction between the Dev Team and users who are providing test cases, in order to fully capture the nature of what they can and can not currently accomplish with existing APIs. 
+It is very possible that we will need a separate small workshop specifically on this topic. 
 
 ## 2) Make low-level modifications to how OpenMDAO handles data-passing in key situations when copying can be avoided 
 ### Goal: 
-- Make all OpenMDAO models faster and more memory efficient by lowering required memory allocations for data vectors and reducing the need for wasteful copies 
+- Make all OpenMDAO models (not just ones that run distributed across HPC resources) faster and more memory efficient by lowering required memory allocations for data vectors and reducing the need for wasteful copies 
 
 ### Potential Challenges: 
-- This has the potential to add significant code complexity to the underlying data passing mechanisms, and will need to be handled very carefully to ensure a stable and maintainable result. 
-It will probably take a while to implement and test. 
+- The envisioned changes could add significant code complexity to the underlying data passing mechanisms, 
+and will need to be handled very carefully to ensure a stable and maintainable result. 
+It will probably take a while to implement and test this new idea. 
 - It seems possible that, if too much for-looping is added to the data transfer scheme to support this, that in an attempt to speed things up for large HPC applications we may slow them down for low-fidelity applications.
-So some benchmarking will be needed. 
+So some benchmarking will be needed to try to ensure that does not happen, 
+but if it does then the way forward is less clear and will require some careful reconsideration of how to retain performance for both types of applications. 
 
 
 ----------------------------------------------
