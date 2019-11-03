@@ -9,6 +9,7 @@ the most important areas to focus on for framework development in 2020. It is in
 communicate this perspective to the OpenMDAO user community, and to provide a basis for
 feedback. It is not intended to be all-encompassing or a binding development plan,
 but should be regarded as an indication of the current direction of the core development team. 
+Also, it should be clearly understood that there is very probably more listed here than can actually be accomplished in a single year! 
 
 There are four main areas of focus: 
 - Releasing OpenMDAO V3.0
