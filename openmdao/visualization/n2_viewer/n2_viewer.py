@@ -387,7 +387,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
                'vk_beautify': 'vkBeautify'}
     libs = read_files(itervalues(lib_dct), libs_dir, 'js')
     src_names = \
-        'draw', \
         'legend', \
         'modal', \
         'utils', \
