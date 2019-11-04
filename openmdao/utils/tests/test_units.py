@@ -255,6 +255,10 @@ class TestPhysicalUnit(unittest.TestCase):
         else:
             self.fail("Expecting RuntimeError")
 
+    def test_light_year(self):
+        factor, offset = get_conversion('ly', 'au')
+        self.assertAlmostEqual(factor, 63241, places=0)
+
 
 class TestModuleFunctions(unittest.TestCase):
     def test_add_unit(self):
