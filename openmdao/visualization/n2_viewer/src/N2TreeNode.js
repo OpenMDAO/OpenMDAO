@@ -71,10 +71,12 @@ class N2TreeNode {
         return this.type.match(paramRegex);
     }
 
+    /** True if this is a parameter and connected. */
     isConnectedParam() {
         return (this.type == 'param');
     }
 
+    /** True if this a paramater and unconnected. */
     isUnconnectedParam() {
         return (this.type == 'unconnected_param');
     }
@@ -94,15 +96,18 @@ class N2TreeNode {
         return (this.type == 'subsystem');
     }
 
-
-    _hasObjectInChildren(node, toMatchObj) {
-        if (node === toMatchObj) {
+    /**
+     * Compare the supplied node, and recurse through children if it doesn't match.
+     * @returns {Boolean} True if a match is found.
+     */
+    _hasNodeInChildren(compareNode) {
+        if (this === compareNode) {
             return true;
         }
 
-        if (node.hasChildren()) {
+        if (this.hasChildren()) {
             for (let child of node.children) {
-                if (node._hasObjectInChildren(child, toMatchObj)) {
+                if (child._hasNodeInChildren(compareNode)) {
                     return true;
                 }
             }
@@ -111,29 +116,40 @@ class N2TreeNode {
         return false;
     }
 
-    hasObject(toMatchObj) {
+    /**
+     * Look for the supplied node in the lineage of this one. First check
+     * parents, then children.
+     * @param {N2TreeNode} compareNode The node to look for.
+     * @returns {Boolean} True if the node is found, otherwise false.
+    */
+    hasNode(compareNode) {
         for (let obj = this; obj != null; obj = obj.parent) {
-            if (obj === toMatchObj) {
+            if (obj === compareNode) {
                 return true;
             }
         }
-        return this._hasObjectInChildren(this, toMatchObj);
+        return this._hasNodeInChildren(compareNode);
     }
 
-    _getObjectsInChildrenWithCycleArrows(node, arr) {
-        if (node.cycleArrows) { arr.push(node); }
-        if (node.hasChildren()) {
+    _getNodesInChildrenWithCycleArrows(arr) {
+        if (this.cycleArrows) { arr.push(this); }
+
+        if (this.hasChildren()) {
             for (let child of node.children) {
-                this._getObjectsInChildrenWithCycleArrows(child, arr);
+                child._getNodesInChildrenWithCycleArrows(arr);
             }
         }
     }
 
-    getObjectsWithCycleArrows(arr) {
+    getNodesWithCycleArrows() {
+        let arr = [];
+
         //start with parent.. the children will get the current object to avoid duplicates
         for (let obj = this.parent; obj != null; obj = obj.parent) {
             if (obj.cycleArrows) { arr.push(obj); }
         }
-        this._getObjectsInChildrenWithCycleArrows(this, arr);
+        this._getNodesInChildrenWithCycleArrows(arr);
+
+        return arr;
     }
 }
