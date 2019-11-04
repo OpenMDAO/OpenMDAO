@@ -630,12 +630,11 @@ class N2Matrix {
         }, this.n2Groups, this.nodeSize);
 
         if (cell.row > cell.col) {
-            let targetsWithCycleArrows = [];
-            tgt.getObjectsWithCycleArrows(targetsWithCycleArrows);
+            let targetsWithCycleArrows = tgt.getNodesWithCycleArrows();
 
             for (let twca of targetsWithCycleArrows) {
                 for (let ai of twca.cycleArrows) {
-                    if (src.hasObject(ai.src)) {
+                    if (src.hasNode(ai.src)) {
                         for (let si of ai.arrows) {
                             let beginObj = si.begin;
                             let endObj = si.end;
@@ -644,7 +643,7 @@ class N2Matrix {
                             // find first begin index
                             for (let mi in this.layout.visibleNodes) {
                                 let rtNode = this.layout.visibleNodes[mi];
-                                if (rtNode.hasObject(beginObj)) {
+                                if (rtNode.hasNode(beginObj)) {
                                     firstBeginIndex = mi;
                                     break;
                                 }
@@ -656,7 +655,7 @@ class N2Matrix {
                             // find first end index
                             for (let mi in this.layout.visibleNodes) {
                                 let rtNode = this.layout.visibleNodes[mi];
-                                if (rtNode.hasObject(endObj)) {
+                                if (rtNode.hasNode(endObj)) {
                                     firstEndIndex = mi;
                                     break;
                                 }
