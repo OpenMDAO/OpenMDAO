@@ -117,20 +117,26 @@ class N2TreeNode {
     }
 
     /**
-     * Look for the supplied node in the lineage of this one. First check
-     * parents, then children.
+     * Look for the supplied node in the lineage of this one.
      * @param {N2TreeNode} compareNode The node to look for.
      * @returns {Boolean} True if the node is found, otherwise false.
     */
     hasNode(compareNode) {
+        // Check parents first.
         for (let obj = this; obj != null; obj = obj.parent) {
             if (obj === compareNode) {
                 return true;
             }
         }
+
+        // Check children if not found in parents.
         return this._hasNodeInChildren(compareNode);
     }
 
+    /**
+     * Add ourselves to the supplied array if we contain a cycleArrows property.
+     * @param {Array} arr The array to add to.
+     */
     _getNodesInChildrenWithCycleArrows(arr) {
         if (this.cycleArrows) { arr.push(this); }
 
@@ -141,13 +147,19 @@ class N2TreeNode {
         }
     }
 
+    /**
+     * Populate an array with nodes in our lineage that contain a cycleArrows member.
+     * @returns {Array} The array containing all the found nodes with cycleArrows.
+     */
     getNodesWithCycleArrows() {
         let arr = [];
 
-        //start with parent.. the children will get the current object to avoid duplicates
+        // Check parents first.
         for (let obj = this.parent; obj != null; obj = obj.parent) {
             if (obj.cycleArrows) { arr.push(obj); }
         }
+
+        // Check all descendants as well.
         this._getNodesInChildrenWithCycleArrows(arr);
 
         return arr;
