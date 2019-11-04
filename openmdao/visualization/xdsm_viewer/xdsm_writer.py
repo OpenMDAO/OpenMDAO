@@ -1477,8 +1477,12 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 # If not default solver, add to the solver dictionary
                 solver_dcts.append(comp)
         else:  # component or group
-            x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                       comp_type=comp['component_type'], cls=comp.get('class', None))
+            if not class_names:
+                x.add_comp(name=comp['abs_name'], label=label, stack=stack,
+                           comp_type=comp['component_type'])
+            else:
+                x.add_comp(name=comp['abs_name'], label=label, stack=stack,
+                           comp_type=comp['component_type'], cls=comp.get('class', None))
 
     # Add process connections
     if add_process_conns:

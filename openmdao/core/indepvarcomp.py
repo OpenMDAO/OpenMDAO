@@ -2,7 +2,10 @@
 
 from __future__ import division
 
-import collections
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 
 from six import string_types
 
@@ -57,7 +60,7 @@ class IndepVarComp(ExplicitComponent):
         if isinstance(name, string_types):
             self._indep.append((name, val, kwargs))
         # Mutiple variables are declared during instantiation (deprecated)
-        elif isinstance(name, collections.Iterable):
+        elif isinstance(name, Iterable):
             warn_deprecation('Declaring multiple variables in this way is deprecated. '
                              'In OpenMDAO 2.x or later, multiple variables should be declared '
                              'as separate add_output calls.')

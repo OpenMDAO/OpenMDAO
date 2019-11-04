@@ -244,7 +244,7 @@ class TestGroup(unittest.TestCase):
         _check_hanging_inputs(p, logger)
         for w in logger.get('warning'):
             if 'The following inputs are not connected:' in w:
-                if "gouter.couter.a" in w and "gouter.xx: ['gouter.g.c0.x']" in w:
+                if "gouter.couter.a" in w and "gouter.xx" in w and 'gouter.g.c0.x':
                     break
         else:
             self.fail("Expected warning not found.")
@@ -558,6 +558,52 @@ class TestGroup(unittest.TestCase):
         assert_rel_error(self, p['comp1.x'], np.ones(5)*12.)
         assert_rel_error(self, p['comp1.y'], 60.)
 
+    def test_unconnected_input_units_no_mismatch(self):
+        p = om.Problem()
+
+        indep_comp = om.IndepVarComp()
+        indep_comp.add_output('x', np.ones(5), units='ft')
+
+        p.model.add_subsystem('indep', indep_comp)
+        p.model.add_subsystem('comp1', om.ExecComp('y=sum(x)',
+                                                   x={'value': np.ones(5) * 6., 'units': 'inch'},
+                                                   y={'units': 'inch'}), promotes=['x'])
+        p.model.add_subsystem('comp2', om.ExecComp('y=sum(x)',
+                                                   x={'value': np.ones(5) * .5, 'units': 'ft'},
+                                                   y={'units': 'inch'}), promotes=['x'])
+
+        testlogger = TestLogger()
+
+        p.setup(check=['unconnected_inputs'], logger=testlogger)
+        p.run_model()
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 1)
+        self.assertTrue("connected input values don't match" not in warnings[0])
+
+    def test_unconnected_input_units_mismatch(self):
+        p = om.Problem()
+
+        indep_comp = om.IndepVarComp()
+        indep_comp.add_output('x', np.ones(5), units='ft')
+
+        p.model.add_subsystem('indep', indep_comp)
+        p.model.add_subsystem('comp1', om.ExecComp('y=sum(x)',
+                                                   x={'value': np.ones(5) * 6., 'units': 'inch'},
+                                                   y={'units': 'inch'}), promotes=['x'])
+        p.model.add_subsystem('comp2', om.ExecComp('y=sum(x)',
+                                                   x={'value': np.ones(5) * .6, 'units': 'ft'},
+                                                   y={'units': 'inch'}), promotes=['x'])
+
+        testlogger = TestLogger()
+
+        p.setup(check=['unconnected_inputs'], logger=testlogger)
+        p.run_model()
+
+        warnings = testlogger.get('warning')
+        self.assertEqual(len(warnings), 1)
+        self.assertTrue("connected input values don't match" in warnings[0])
+
     def test_connect_1_to_many(self):
         import numpy as np
 
@@ -686,6 +732,17 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(str(context.exception),
                          "ExecComp (C2): 'promotes' failed to find any matches for "
                          "the following names or patterns: ['xx'].")
+
+    def test_empty_group(self):
+        p = om.Problem()
+        g1 = p.model.add_subsystem('G1', om.Group(), promotes=['*'])
+
+        with self.assertRaises(Exception) as context:
+            p.setup()
+        self.assertEqual(str(context.exception),
+                         "Group (G1): 'promotes' failed to find any matches for "
+                         "the following names or patterns: ['*']. "
+                         "Group contains no variables.")
 
     def test_missing_promote_var(self):
         p = om.Problem()
