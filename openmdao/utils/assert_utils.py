@@ -51,7 +51,6 @@ def assert_warning(category, msg):
             raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
 
 
-
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):
     """
     Raise assertion if any entry from the return from check_partials is above a tolerance.
