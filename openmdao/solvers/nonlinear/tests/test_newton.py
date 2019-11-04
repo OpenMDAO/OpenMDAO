@@ -13,6 +13,7 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, SellarStateConnection, StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.mpi import MPI
 
 
 class TestNewton(unittest.TestCase):
@@ -845,6 +846,23 @@ class TestNewton(unittest.TestCase):
         assert_rel_error(self, J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
 
     def test_linsearch_3_deprecation(self):
+        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NewtonSolver()))
+
+        prob.setup()
+
+        msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
+              'to use the BoundsEnforceLS line search.'
+
+        with assert_warning(DeprecationWarning, msg):
+            prob.final_setup()
+
+@unittest.skipUnless(MPI, "MPI is required.")
+class MPITestCase(unittest.TestCase):
+
+    N_PROCS = 4
+
+    def test_comm_warning(self):
+
         prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NewtonSolver()))
 
         prob.setup()

@@ -109,7 +109,8 @@ class NewtonSolver(NonlinearSolver):
                 pathname += ': '
             msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
                   'to use the BoundsEnforceLS line search.'
-            warn_deprecation(pathname + msg)
+            if self.linear_solver._rec_mgr.rank == 0:
+                warn_deprecation(pathname + msg)
 
     def _assembled_jac_solver_iter(self):
         """
