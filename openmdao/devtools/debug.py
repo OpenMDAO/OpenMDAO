@@ -195,6 +195,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
         if isinstance(s, Group):
             cprint("%s " % type(s).__name__, color=Fore.GREEN + Style.BRIGHT)
             cprint("%s" % s.name)
+            dist = False
         else:
             if isinstance(s, ImplicitComponent):
                 colr = Back.CYAN + Fore.BLACK + Style.BRIGHT
@@ -202,6 +203,10 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
                 colr = Fore.CYAN + Style.BRIGHT
             cprint("%s " % type(s).__name__, color=colr)
             cprint("%s" % s.name)
+            dist = s.options['distributed']
+
+        if dist:
+            cprint(" (distributed)", color=Fore.MAGENTA)
 
         # FIXME: these sizes could be wrong under MPI
         if show_sizes:

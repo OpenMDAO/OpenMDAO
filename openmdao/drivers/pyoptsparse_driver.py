@@ -399,6 +399,8 @@ class pyOptSparseDriver(Driver):
 
         # Save the most recent solution.
         self.pyopt_solution = sol
+        sol.objFun = None  # remove circular ref
+
         try:
             exit_status = sol.optInform['value']
             self.fail = False

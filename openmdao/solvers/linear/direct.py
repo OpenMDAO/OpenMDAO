@@ -235,7 +235,7 @@ class DirectSolver(LinearSolver):
         ndarray
             Jacobian matrix.
         """
-        system = self._system
+        system = self._system()
         bvec = system._vectors['residual']['linear']
         xvec = system._vectors['output']['linear']
 
@@ -271,7 +271,7 @@ class DirectSolver(LinearSolver):
         """
         Perform factorization.
         """
-        system = self._system
+        system = self._system()
         nproc = system.comm.size
 
         if self._assembled_jac is not None:
@@ -357,7 +357,7 @@ class DirectSolver(LinearSolver):
         ndarray
             Inverse Jacobian.
         """
-        system = self._system
+        system = self._system()
         iproc = system.comm.rank
         nproc = system.comm.size
 
@@ -405,6 +405,9 @@ class DirectSolver(LinearSolver):
                                        " in %s." % (type(matrix), system.msginfo))
 
         else:
+            if nproc > 1:
+                raise RuntimeError("BroydenSolvers without an assembled jacobian are not supported "
+                                   "when running under MPI if comm.size > 1.")
             mtx = self._build_mtx()
 
             # During inversion detect singularities and warn user.
@@ -443,7 +446,7 @@ class DirectSolver(LinearSolver):
 
         self._vec_names = vec_names
 
-        system = self._system
+        system = self._system()
         iproc = system.comm.rank
         nproc = system.comm.size
 

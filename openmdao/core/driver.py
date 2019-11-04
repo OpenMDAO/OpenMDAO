@@ -1214,7 +1214,7 @@ class RecordingDebugging(Recording):
             self
         """
         super(RecordingDebugging, self).__enter__()
-        self.recording_requester._pre_run_model_debug_print()
+        self.recording_requester()._pre_run_model_debug_print()
         return self
 
     def __exit__(self, *args):
@@ -1226,5 +1226,5 @@ class RecordingDebugging(Recording):
         *args : array
             Solver recording requires extra args.
         """
-        self.recording_requester._post_run_model_debug_print()
+        self.recording_requester()._post_run_model_debug_print()
         super(RecordingDebugging, self).__exit__()
