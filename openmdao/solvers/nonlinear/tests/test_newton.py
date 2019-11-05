@@ -1,6 +1,8 @@
 """Test the Newton nonlinear solver. """
 
 import unittest
+import warnings
+
 
 import numpy as np
 
@@ -858,10 +860,11 @@ class TestNewton(unittest.TestCase):
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class MPITestCase(unittest.TestCase):
-
     N_PROCS = 4
 
     def test_comm_warning(self):
+
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NewtonSolver()))
 
@@ -869,10 +872,15 @@ class MPITestCase(unittest.TestCase):
 
         msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
               'to use the BoundsEnforceLS line search.'
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.final_setup()
-
+        if rank == 0:
+            with assert_warning(DeprecationWarning, msg):
+                prob.final_setup()
+        else:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                yield
+            with assert_warning(w, []):
+                prob.final_setup()
 
 class TestNewtonFeatures(unittest.TestCase):
 
