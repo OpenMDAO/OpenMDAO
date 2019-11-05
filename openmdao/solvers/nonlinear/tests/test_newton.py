@@ -14,7 +14,7 @@ from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTw
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
      SellarNoDerivatives, SellarDerivatives, SellarStateConnection, StateConnection, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_no_warning
 from openmdao.utils.mpi import MPI
 
 
@@ -876,10 +876,7 @@ class MPITestCase(unittest.TestCase):
             with assert_warning(DeprecationWarning, msg):
                 prob.final_setup()
         else:
-            with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter("always")
-                yield
-            with assert_warning(w, []):
+            with assert_no_warning(DeprecationWarning, msg):
                 prob.final_setup()
 
 class TestNewtonFeatures(unittest.TestCase):
