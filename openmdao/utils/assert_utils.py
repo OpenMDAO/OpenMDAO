@@ -46,6 +46,7 @@ def assert_warning(category, msg):
     else:
         raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
 
+
 @contextmanager
 def assert_no_warning(category, msg):
     """
@@ -73,6 +74,7 @@ def assert_no_warning(category, msg):
             raise AssertionError("Found warning: ", msg)
         else:
             break
+
 
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):
     """
