@@ -16,7 +16,6 @@ from openmdao.core.component import Component
 from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import pad_name, reset_warning_registry
-from openmdao.utils.mpi import MPI
 
 
 @contextmanager
@@ -36,19 +35,16 @@ def assert_warning(category, msg):
     AssertionError
         If the expected warning is not raised.
     """
-    # print(MPI.COMM_WORLD.rank)
-    rank = MPI.COMM_WORLD.rank if MPI is not None else 0
     with reset_warning_registry():
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             yield
 
-    if rank == 0:
-        for warn in w:
-            if (issubclass(warn.category, category) and str(warn.message) == msg):
-                break
-        else:
-            raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
+    for warn in w:
+        if (issubclass(warn.category, category) and str(warn.message) == msg):
+            break
+    else:
+        raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
 
 
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):

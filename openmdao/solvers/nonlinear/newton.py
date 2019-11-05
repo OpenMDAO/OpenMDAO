@@ -7,6 +7,7 @@ import numpy as np
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import MPI
 
 
 class NewtonSolver(NonlinearSolver):
@@ -90,6 +91,7 @@ class NewtonSolver(NonlinearSolver):
             depth of the current system (already incremented).
         """
         super(NewtonSolver, self)._setup_solvers(system, depth)
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         self._disallow_discrete_outputs()
 
@@ -109,7 +111,8 @@ class NewtonSolver(NonlinearSolver):
                 pathname += ': '
             msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
                   'to use the BoundsEnforceLS line search.'
-            if self.linear_solver._rec_mgr.rank == 0:
+
+            if rank == 0:
                 warn_deprecation(pathname + msg)
 
     def _assembled_jac_solver_iter(self):
