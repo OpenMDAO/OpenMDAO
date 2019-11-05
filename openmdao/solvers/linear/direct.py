@@ -400,6 +400,11 @@ class DirectSolver(LinearSolver):
                             raise RuntimeError(format_singular_csc_error(system, matrix))
                         else:
                             reraise(*sys.exc_info())
+
+                    # to prevent broadcasting errors later, make sure inv_jac is 2D
+                    # scipy.sparse.linalg.inv returns a shape (1,) array if matrix is shape (1,1)
+                    if inv_jac.size == 1:
+                        inv_jac = inv_jac.reshape((1, 1))
                 else:
                     raise RuntimeError("Direct solver not implemented for matrix type %s"
                                        " in %s." % (type(matrix), system.msginfo))

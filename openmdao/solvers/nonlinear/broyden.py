@@ -495,10 +495,11 @@ class BroydenSolver(NonlinearSolver):
             Updated inverse Jacobian.
         """
         Gm = self.Gm
+        use_owned = self._system._use_owned_sizes()
 
         # Apply the Broyden Update approximation to the previous value of the inverse jacobian.
         if self.options['update_broyden'] and not self._recompute_jacobian:
-            if self._system.comm.rank == 0:
+            if not use_owned or self._system.comm.rank == 0:
                 dfxm = self.delta_fxm
                 fact = np.linalg.norm(dfxm)
 

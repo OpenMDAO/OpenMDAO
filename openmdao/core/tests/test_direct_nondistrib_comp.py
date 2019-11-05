@@ -19,10 +19,10 @@ class QuadraticComp(om.ImplicitComponent):
     """
 
     def setup(self):
-        self.add_input('a', val=1.)
-        self.add_input('b', val=1.)
-        self.add_input('c', val=1.)
-        self.add_output('x', val=0.)
+        self.add_input('a', val=1.0)
+        self.add_input('b', val=1.0)
+        self.add_input('c', val=1.0)
+        self.add_output('x', val=1.0)
 
         self.declare_partials(of='x', wrt='*')
 
@@ -52,14 +52,27 @@ class NondistribDirectCompTestCase(unittest.TestCase):
 
     def test_direct(self):
         p = om.Problem()
-        
+
         comp = p.model.add_subsystem('comp', QuadraticComp())
         comp.nonlinear_solver = om.NewtonSolver()
         comp.linear_solver = om.DirectSolver()
 
         p.setup(force_alloc_complex=True)
         p.run_model()
-        
+
+        partials = p.check_partials(includes=['comp'], method='cs', out_stream=None)
+        assert_check_partials(partials)
+
+    def test_broyden(self):
+        p = om.Problem()
+
+        comp = p.model.add_subsystem('comp', QuadraticComp())
+        comp.nonlinear_solver = om.BroydenSolver()
+        comp.linear_solver = om.DirectSolver()
+
+        p.setup(force_alloc_complex=True)
+        p.run_model()
+
         partials = p.check_partials(includes=['comp'], method='cs', out_stream=None)
         assert_check_partials(partials)
 
