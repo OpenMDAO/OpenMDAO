@@ -66,9 +66,9 @@ function SearchButtonClicked() {
     searchCollapsedUndo = [];
     if (searchVals0.length != 0) DoSearch(n2Diag.zoomedElement, GetSearchRegExp(searchVals0), searchCollapsedUndo);
 
-    FindRootOfChangeFunction = FindRootOfChangeForSearch;
+    n2Diag.ui.findRootOfChangeFunction = FindRootOfChangeForSearch;
     N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
-    lastClickWasLeft = false;
+    n2Diag.ui.lastClickWasLeft = false;
     n2Diag.updateRecomputesAutoComplete = false;
     n2Diag.update();
 }

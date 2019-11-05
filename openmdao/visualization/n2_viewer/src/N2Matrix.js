@@ -18,20 +18,24 @@
 class N2Matrix {
     /**
      * Render the matrix of visible elements in the model.
-     * @param {N2TreeNodes[]} visibleNodes Nodes that will be drawn.
      * @param {ModelData} model The pre-processed model data.
      * @param {N2Layout} layout Pre-computed layout of the diagram.
      * @param {N2MatrixCell[][]} grid N2MatrixCell objects in row,col order.
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
+     * @param {Boolean} lastClickWasLeft
+     * @param {function} findRootOfChangeFunction
      * @param {Object} [prevNodeSize = {'width': 0, 'height': 0}] Previous node
      *  width & height for transition purposes.
      */
-    constructor(visibleNodes, model, layout, n2Groups,
+    constructor(model, layout, n2Groups, lastClickWasLeft,
+        findRootOfChangeFunction,
         prevNodeSize = { 'width': 0, 'height': 0 }) {
 
-        this.nodes = visibleNodes;
         this.layout = layout;
+        this.nodes = layout.visibleNodes;
         this.n2Groups = n2Groups;
+        this.lastClickWasLeft = lastClickWasLeft;
+        this.findRootOfChangeFunction = findRootOfChangeFunction;
 
         this.prevNodeSize = prevNodeSize;
         this.nodeSize = {
@@ -72,7 +76,6 @@ class N2Matrix {
         console.time('N2Matrix._setupComponentBoxesAndGridLines');
         this._setupComponentBoxesAndGridLines();
         console.timeEnd('N2Matrix._setupComponentBoxesAndGridLines');
-
     }
 
     /**
@@ -239,22 +242,42 @@ class N2Matrix {
     }
 
     /**
+     * Draw a rectangle at the specified locate to bring attention to
+     * a variable name.
+     * @param {Number} x Upper-left corner X-coordinate in px.
+     * @param {Number} y Upper-left corner Y-coordinate in px.
+     * @param {Number} width Rectangle width in px.
+     * @param {Number} height Rectangle height in px.
+     * @param {string} fill Fill color.
+     */
+    hilight(x, y, width, height, fill) {
+        this.n2Groups.elements.insert("rect")
+            .attr("class", "n2_hover_elements")
+            .attr("y", y)
+            .attr("x", x)
+            .attr("width", width)
+            .attr("height", height)
+            .attr("fill", fill)
+            .attr("fill-opacity", "1");
+    }
+
+    /**
      * Create an SVG group for each visible element, and have the element
      * render its shape in it. Move the groups around to their correct
      * positions, providing an animated transition from the previous
      * rendering.
      */
     _drawCells() {
-        let self = this; // For callbacks that change "this"
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = this.n2Groups.elements.selectAll('.n2cell')
-            .data(this.allCells, d => d.id);
+            .data(self.allCells, d => d.id);
 
         // Use D3 to join N2MatrixCells to SVG groups, and render shapes in them.
         let gEnter = selection.enter().append('g')
             .attr('class', 'n2cell')
             .attr('transform', function (d) {
-                if (lastClickWasLeft) {
+                if (self.lastClickWasLeft) {
                     return 'translate(' +
                         (self.prevCellDims.size.width * (d.col - enterIndex) +
                             self.prevCellDims.bottomRight.x) + ',' +
@@ -262,8 +285,8 @@ class N2Matrix {
                             self.prevCellDims.bottomRight.y) + ')';
                 }
 
-                let roc = (d.obj && FindRootOfChangeFunction) ?
-                    FindRootOfChangeFunction(d.obj) : null;
+                let roc = (d.obj && self.findRootOfChangeFunction) ?
+                    self.findRootOfChangeFunction(d.obj) : null;
 
                 if (roc) {
                     let prevIdx = roc.prevRootIndex -
@@ -276,6 +299,7 @@ class N2Matrix {
                 throw ('Enter transform not found');
             })
             .each(function (d) {
+                // "this" refers to the element here, so leave it alone:
                 d.renderer.renderPrevious(this)
                     .on('mouseover', d.mouseover())
                     .on('mouseleave', n2MouseFuncs.out)
@@ -290,19 +314,20 @@ class N2Matrix {
                     (self.cellDims.size.height * (d.row) +
                         self.cellDims.bottomRight.y) + ')';
             })
+            // "this" refers to the element here, so leave it alone:
             .each(function (d) { d.renderer.updateCurrent(this) });
 
         selection.exit()
             .transition(sharedTransition)
             .attr('transform', function (d) {
-                if (lastClickWasLeft)
+                if (self.lastClickWasLeft)
                     return 'translate(' + (self.cellDims.size.width *
                         (d.col - exitIndex) + self.cellDims.bottomRight.x) + ',' +
                         (self.cellDims.size.height * (d.row - exitIndex) +
                             self.cellDims.bottomRight.y) + ')';
 
-                let roc = (d.obj && FindRootOfChangeFunction) ?
-                    FindRootOfChangeFunction(d.obj) : null;
+                let roc = (d.obj && self.findRootOfChangeFunction) ?
+                    self.findRootOfChangeFunction(d.obj) : null;
 
                 if (roc) {
                     let index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
@@ -312,155 +337,172 @@ class N2Matrix {
                 }
                 throw ('Exit transform not found');
             })
+            // "this" refers to the element here, so leave it alone:
             .each(function (d) { d.renderer.updateCurrent(this) })
             .remove();
     }
 
     /** Draw a line above every row in the matrix. */
     _drawHorizontalLines() {
-        let sel = this.n2Groups.gridlines.selectAll('.horiz_line')
-            .data(this.gridLines, function (d) {
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
+
+        let selection = self.n2Groups.gridlines.selectAll('.horiz_line')
+            .data(self.gridLines, function (d) {
                 return d.obj.id;
             });
 
-        let gEnter = sel.enter().append('g')
+        let gEnter = selection.enter().append('g')
             .attr('class', 'horiz_line')
             .attr('transform', function (d) {
-                if (lastClickWasLeft) return 'translate(0,' +
-                    (this.prevCellDims.size.height * (d.i - enterIndex)) + ')';
-                let roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                if (self.lastClickWasLeft) return 'translate(0,' +
+                    (self.prevCellDims.size.height * (d.i - enterIndex)) + ')';
+                let roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
                 if (roc) {
-                    let index0 = roc.prevRootIndex - this.layout.zoomedElement.prevRootIndex;
-                    return 'translate(0,' + (this.prevCellDims.size.height * index0) + ')';
+                    let index0 = roc.prevRootIndex - self.layout.zoomedElement.prevRootIndex;
+                    return 'translate(0,' + (self.prevCellDims.size.height * index0) + ')';
                 }
                 throw ('enter transform not found');
-            }.bind(this));
+            });
         gEnter.append('line')
-            .attr('x2', this.layout.size.diagram.width);
+            .attr('x2', self.layout.size.diagram.width);
 
-        let gUpdate = gEnter.merge(sel).transition(sharedTransition)
+        let gUpdate = gEnter.merge(selection).transition(sharedTransition)
             .attr('transform', function (d) {
-                return 'translate(0,' + (this.cellDims.size.height * d.i) + ')';
-            }.bind(this));
+                return 'translate(0,' + (self.cellDims.size.height * d.i) + ')';
+            });
         gUpdate.select('line')
-            .attr('x2', this.layout.size.diagram.width);
+            .attr('x2', self.layout.size.diagram.width);
 
-        sel.exit().transition(sharedTransition)
+        selection.exit().transition(sharedTransition)
             .attr('transform', function (d) {
-                if (lastClickWasLeft) return 'translate(0,' + (this.cellDims.size.height * (d.i - exitIndex)) + ')';
-                let roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                if (self.lastClickWasLeft) return 'translate(0,' +
+                    (self.cellDims.size.height * (d.i - exitIndex)) + ')';
+                let roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
                 if (roc) {
-                    let index = roc.rootIndex - this.layout.zoomedElement.rootIndex;
-                    return 'translate(0,' + (this.cellDims.size.height * index) + ')';
+                    let index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
+                    return 'translate(0,' + (self.cellDims.size.height * index) + ')';
                 }
                 throw ('exit transform not found');
-            }.bind(this))
+            })
             .remove();
     }
 
     /** Draw a vertical line for every column in the matrix. */
     _drawVerticalLines() {
-        let sel = this.n2Groups.gridlines.selectAll(".vert_line")
-            .data(this.gridLines, function (d) {
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
+
+        let selection = self.n2Groups.gridlines.selectAll(".vert_line")
+            .data(self.gridLines, function (d) {
                 return d.obj.id;
             });
-        let gEnter = sel.enter().append("g")
+        let gEnter = selection.enter().append("g")
             .attr("class", "vert_line")
             .attr("transform", function (d) {
-                if (lastClickWasLeft) return "translate(" + (this.prevCellDims.size.width * (d.i - enterIndex)) + ")rotate(-90)";
-                let roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                if (self.lastClickWasLeft) return "translate(" +
+                    (self.prevCellDims.size.width * (d.i - enterIndex)) + ")rotate(-90)";
+                let roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
                 if (roc) {
-                    let i0 = roc.prevRootIndex - this.layout.zoomedElement.prevRootIndex;
-                    return "translate(" + (this.prevCellDims.size.width * i0) + ")rotate(-90)";
+                    let i0 = roc.prevRootIndex - self.layout.zoomedElement.prevRootIndex;
+                    return "translate(" + (self.prevCellDims.size.width * i0) + ")rotate(-90)";
                 }
                 throw ("enter transform not found");
-            }.bind(this));
+            });
         gEnter.append("line")
-            .attr("x1", -this.layout.size.diagram.height);
+            .attr("x1", -self.layout.size.diagram.height);
 
-        let gUpdate = gEnter.merge(sel).transition(sharedTransition)
+        let gUpdate = gEnter.merge(selection).transition(sharedTransition)
             .attr("transform", function (d) {
-                return "translate(" + (this.cellDims.size.width * d.i) + ")rotate(-90)";
-            }.bind(this));
+                return "translate(" + (self.cellDims.size.width * d.i) + ")rotate(-90)";
+            });
         gUpdate.select("line")
-            .attr("x1", -this.layout.size.diagram.height);
+            .attr("x1", -self.layout.size.diagram.height);
 
-        sel.exit().transition(sharedTransition)
+        selection.exit().transition(sharedTransition)
             .attr("transform", function (d) {
-                if (lastClickWasLeft) return "translate(" + (this.cellDims.size.width * (d.i - exitIndex)) + ")rotate(-90)";
-                let roc = (FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                if (self.lastClickWasLeft) return "translate(" +
+                    (self.cellDims.size.width * (d.i - exitIndex)) + ")rotate(-90)";
+                let roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
                 if (roc) {
-                    let i = roc.rootIndex - this.layout.zoomedElement.rootIndex;
-                    return "translate(" + (this.cellDims.size.width * i) + ")rotate(-90)";
+                    let i = roc.rootIndex - self.layout.zoomedElement.rootIndex;
+                    return "translate(" + (self.cellDims.size.width * i) + ")rotate(-90)";
                 }
                 throw ("exit transform not found");
-            }.bind(this))
+            })
             .remove();
     }
 
     /** Draw boxes around the cells associated with each component. */
     _drawComponentBoxes() {
-        let sel = this.n2Groups.componentBoxes.selectAll(".component_box")
-            .data(this.componentBoxInfo, function (d) {
+        let self = this; // For callbacks that change "this". Alternative to using .bind().
+
+        let selection = self.n2Groups.componentBoxes.selectAll(".component_box")
+            .data(self.componentBoxInfo, function (d) {
                 return d.obj.id;
             });
-        let gEnter = sel.enter().append("g")
+        let gEnter = selection.enter().append("g")
             .attr("class", "component_box")
             .attr("transform", function (d) {
-                if (lastClickWasLeft) return "translate(" + (this.prevCellDims.size.width * (d.startI - enterIndex)) + "," + (this.prevCellDims.size.height * (d.startI - enterIndex)) + ")";
-                let roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                if (self.lastClickWasLeft) return "translate(" +
+                    (self.prevCellDims.size.width * (d.startI - enterIndex)) + "," +
+                    (self.prevCellDims.size.height * (d.startI - enterIndex)) + ")";
+                let roc = (d.obj && self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
                 if (roc) {
-                    let index0 = roc.prevRootIndex - this.layout.zoomedElement.prevRootIndex;
-                    return "translate(" + (this.prevCellDims.size.width * index0) + "," + (this.prevCellDims.size.height * index0) + ")";
+                    let index0 = roc.prevRootIndex - self.layout.zoomedElement.prevRootIndex;
+                    return "translate(" + (self.prevCellDims.size.width * index0) + "," +
+                        (self.prevCellDims.size.height * index0) + ")";
                 }
                 throw ("enter transform not found");
-            }.bind(this));
+            });
 
         gEnter.append("rect")
             .attr("width", function (d) {
-                if (lastClickWasLeft) return this.prevCellDims.size.width * (1 + d.stopI - d.startI);
-                return this.prevCellDims.size.width;
-            }.bind(this))
+                if (self.lastClickWasLeft) return self.prevCellDims.size.width * (1 + d.stopI - d.startI);
+                return self.prevCellDims.size.width;
+            })
             .attr("height", function (d) {
-                if (lastClickWasLeft) return this.prevCellDims.size.height * (1 + d.stopI - d.startI);
-                return this.prevCellDims.size.height;
-            }.bind(this));
+                if (self.lastClickWasLeft) return self.prevCellDims.size.height * (1 + d.stopI - d.startI);
+                return self.prevCellDims.size.height;
+            });
 
-        let gUpdate = gEnter.merge(sel).transition(sharedTransition)
+        let gUpdate = gEnter.merge(selection).transition(sharedTransition)
             .attr("transform", function (d) {
-                return "translate(" + (this.cellDims.size.width * d.startI) + "," + (this.cellDims.size.height * d.startI) + ")";
-            }.bind(this));
+                return "translate(" + (self.cellDims.size.width * d.startI) + "," +
+                    (self.cellDims.size.height * d.startI) + ")";
+            });
 
         gUpdate.select("rect")
             .attr("width", function (d) {
-                return this.cellDims.size.width * (1 + d.stopI - d.startI);
-            }.bind(this))
+                return self.cellDims.size.width * (1 + d.stopI - d.startI);
+            })
             .attr("height", function (d) {
-                return this.cellDims.size.height * (1 + d.stopI - d.startI);
-            }.bind(this));
+                return self.cellDims.size.height * (1 + d.stopI - d.startI);
+            });
 
-
-        let nodeExit = sel.exit().transition(sharedTransition)
+        let nodeExit = selection.exit().transition(sharedTransition)
             .attr("transform", function (d) {
-                if (lastClickWasLeft) return "translate(" + (this.cellDims.size.width * (d.startI - exitIndex)) + "," + (this.cellDims.size.height * (d.startI - exitIndex)) + ")";
-                let roc = (d.obj && FindRootOfChangeFunction) ? FindRootOfChangeFunction(d.obj) : null;
+                if (self.lastClickWasLeft) return "translate(" +
+                    (self.cellDims.size.width * (d.startI - exitIndex)) + "," +
+                    (self.cellDims.size.height * (d.startI - exitIndex)) + ")";
+                let roc = (d.obj && self.findRootOfChangeFunction) ?
+                    self.findRootOfChangeFunction(d.obj) : null;
                 if (roc) {
-                    let index = roc.rootIndex - this.layout.zoomedElement.rootIndex;
-                    return "translate(" + (this.cellDims.size.width * index) + "," + (this.cellDims.size.height * index) + ")";
+                    let index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
+                    return "translate(" + (self.cellDims.size.width * index) + "," +
+                        (self.cellDims.size.height * index) + ")";
                 }
                 throw ("exit transform not found");
-            }.bind(this))
+            })
             .remove();
 
         nodeExit.select("rect")
             .attr("width", function (d) {
-                if (lastClickWasLeft) return this.cellDims.size.width * (1 + d.stopI - d.startI);
-                return this.cellDims.size.width;
-            }.bind(this))
+                if (self.lastClickWasLeft) return self.cellDims.size.width * (1 + d.stopI - d.startI);
+                return self.cellDims.size.width;
+            })
             .attr("height", function (d) {
-                if (lastClickWasLeft) return this.cellDims.size.height * (1 + d.stopI - d.startI);
-                return this.cellDims.size.height;
-            }.bind(this));
+                if (self.lastClickWasLeft) return self.cellDims.size.height * (1 + d.stopI - d.startI);
+                return self.cellDims.size.height;
+            });
     }
 
     /** Add all the visible elements to the matrix. */
@@ -491,7 +533,6 @@ class N2Matrix {
      * When the mouse goes over a cell that's on the diagonal, look for and
      * draw connection arrows, and highlight variable names.
      * @param {N2MatrixCell} cell The cell the event occured on.
-     * TODO: move DrawRect() someplace non-global
      */
     mouseOverOnDiagonal(cell) {
         let leftTextWidthHovered = this.layout.visibleNodes[cell.row].nameWidthPx;
@@ -500,7 +541,7 @@ class N2Matrix {
         let lineWidth = Math.min(5, this.nodeSize.width * .5,
             this.nodeSize.height * .5);
 
-        DrawRect(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
+        this.hilight(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.row, leftTextWidthHovered,
             this.nodeSize.height, N2Style.color.highlightHovered); //highlight hovered
 
@@ -516,7 +557,7 @@ class N2Matrix {
                     }, this.n2Groups, this.nodeSize);
 
                     //highlight var name
-                    DrawRect(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
+                    this.hilight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
                         this.nodeSize.height * col, leftTextWidthDependency,
                         this.nodeSize.height, N2Style.color.greenArrow);
                 }
@@ -533,11 +574,40 @@ class N2Matrix {
                     }, this.n2Groups, this.nodeSize);
 
                     //highlight var name
-                    DrawRect(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
+                    this.hilight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
                         this.nodeSize.height * col, leftTextWidthDependency,
                         this.nodeSize.height, N2Style.color.redArrow);
                 }
             }
+        }
+    }
+
+    drawArrowsParamView(startIndex, endIndex, nodeSize) {
+        let lineWidth = Math.min(5, nodeSize.width * .5, nodeSize.height * .5);  
+        let boxStart = this.boxInfo[startIndex];
+        let boxEnd = this.boxInfo[endIndex];
+    
+        // Draw multiple horizontal lines, but no more than one vertical line
+        // for box-to-box connections
+        let startIndices = [], endIndices = [];
+        for (let startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
+            for (let endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
+                if (this.cell(startsI, endsI) !== undefined) {
+                    startIndices.push(startsI);
+                    endIndices.push(endsI);
+                }
+            }
+        }
+    
+        for (let i = 0; i < startIndices.length; ++i) {
+            let startI = startIndices[i];
+            let endI = endIndices[i];
+            new N2Arrow({
+                'start': { col: startI, row: startI },
+                'end': { col: endI, row: endI },
+                'color': (startIndex < endIndex) ? N2Style.color.greenArrow : N2Style.color.redArrow,
+                'width': lineWidth
+            }, this.n2Groups, this.nodeSize);
         }
     }
 
@@ -560,12 +630,11 @@ class N2Matrix {
         }, this.n2Groups, this.nodeSize);
 
         if (cell.row > cell.col) {
-            let targetsWithCycleArrows = [];
-            tgt.getObjectsWithCycleArrows(targetsWithCycleArrows);
+            let targetsWithCycleArrows = tgt.getNodesWithCycleArrows();
 
             for (let twca of targetsWithCycleArrows) {
                 for (let ai of twca.cycleArrows) {
-                    if (src.hasObject(ai.src)) {
+                    if (src.hasNode(ai.src)) {
                         for (let si of ai.arrows) {
                             let beginObj = si.begin;
                             let endObj = si.end;
@@ -573,8 +642,8 @@ class N2Matrix {
 
                             // find first begin index
                             for (let mi in this.layout.visibleNodes) {
-                                let rtNode = n2Diag.layout.visibleNodes[mi];
-                                if (rtNode.hasObject(beginObj)) {
+                                let rtNode = this.layout.visibleNodes[mi];
+                                if (rtNode.hasNode(beginObj)) {
                                     firstBeginIndex = mi;
                                     break;
                                 }
@@ -586,7 +655,7 @@ class N2Matrix {
                             // find first end index
                             for (let mi in this.layout.visibleNodes) {
                                 let rtNode = this.layout.visibleNodes[mi];
-                                if (rtNode.hasObject(endObj)) {
+                                if (rtNode.hasNode(endObj)) {
                                     firstEndIndex = mi;
                                     break;
                                 }
@@ -596,7 +665,8 @@ class N2Matrix {
                             }
 
                             if (firstBeginIndex != firstEndIndex) {
-                                DrawArrowsParamView(firstBeginIndex, firstEndIndex, n2Diag.matrix.nodeSize);
+                                this.drawArrowsParamView(firstBeginIndex, firstEndIndex,
+                                    this.nodeSize);
                             }
                         }
                     }
@@ -608,12 +678,12 @@ class N2Matrix {
             leftTextWidthC = this.layout.visibleNodes[cell.col].nameWidthPx;
 
         // highlight var name
-        DrawRect(-leftTextWidthR - this.layout.size.partitionTreeGap,
+        this.hilight(-leftTextWidthR - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.row, leftTextWidthR, this.nodeSize.height,
             N2Style.color.redArrow);
 
         // highlight var name
-        DrawRect(-leftTextWidthC - this.layout.size.partitionTreeGap,
+        this.hilight(-leftTextWidthC - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.col, leftTextWidthC, this.nodeSize.height,
             N2Style.color.greenArrow);
     }
