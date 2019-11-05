@@ -7,44 +7,6 @@ import numpy as np
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_check_partials
 
-#size = 5
-
-#class MyImplicitComp(om.ImplicitComponent):
-
-
-    #def setup(self):
-        #self.nonlinear_solver = om.NewtonSolver()
-        #self.linear_solver = om.DirectSolver()
-
-        #self.add_input('a', val=np.ones(size))
-        #self.add_input('b', val=np.ones(size))
-        #self.add_input('c', val=np.ones(size))
-
-        #self.add_output('x', val=np.ones(size))
-        #self.add_output('y', val=np.ones(size))
-        #self.add_output('z', val=np.ones(size))
-
-        #arange = np.arange(size, dtype=int)
-
-        #self.declare_partials('x', 'a', rows=arange, cols=arange)
-        #self.declare_partials('x', 'b', rows=arange, cols=arange, val=1.0)
-        #self.declare_partials('y', 'b', rows=arange, cols=arange, val=3.0)
-        #self.declare_partials('y', 'c', rows=arange, cols=arange, val=1.0)
-        #self.declare_partials('z', 'c', rows=arange, cols=arange, val=5.0)
-
-        #for v in ('x', 'y', 'z'):
-            #self.declare_partials(v, v, rows=arange, cols=arange, val=1.0)
-
-    #def apply_nonlinear(self, inputs, outputs, residuals):
-        #residuals['x'] = inputs['a'] ** 2 * 2. + inputs['b']
-        #residuals['y'] = inputs['b'] ** 2 * 3. + inputs['c']
-        #residuals['z'] = inputs['c'] ** 2 * 5.
-
-    #def linearize(self, inputs, outputs, partials):
-        #partials['x', 'a'] = inputs['a'] * 4.0
-        #partials['y', 'b'] = inputs['b'] * 6.0
-        #partials['z', 'c'] = inputs['a'] * 10.0
-
 
 class QuadraticComp(om.ImplicitComponent):
     """
@@ -91,7 +53,9 @@ class NondistribDirectCompTestCase(unittest.TestCase):
     def test_direct(self):
         p = om.Problem()
         
-        p.model.add_subsystem('comp', QuadraticComp())
+        comp = p.model.add_subsystem('comp', QuadraticComp())
+        comp.nonlinear_solver = om.NewtonSolver()
+        comp.linear_solver = om.DirectSolver()
 
         p.setup(force_alloc_complex=True)
         p.run_model()
