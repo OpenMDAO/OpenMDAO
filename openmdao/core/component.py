@@ -388,9 +388,6 @@ class Component(System):
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
         self._owned_sizes = self._var_sizes['nonlinear']['output']
-        if not self._use_owned_sizes():
-            self._owned_sizes = self._owned_sizes.copy()
-            self._owned_sizes[1:, :] = 0
 
         self._setup_global_shapes()
 
