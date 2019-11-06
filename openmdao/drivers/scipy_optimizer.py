@@ -788,7 +788,7 @@ def signature_extender(fcn, extra_args):
         The function with the signature expected by the driver.
     """
     def closure(x, *args):
-        return fcn()(x, *extra_args)
+        return fcn(x, *extra_args)
 
     return closure
 
