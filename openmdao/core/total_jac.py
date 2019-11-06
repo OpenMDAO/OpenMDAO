@@ -1229,10 +1229,6 @@ class _TotalJacInfo(object):
                              sub_do_ln=model._linear_solver._linearize_children())
         model._linear_solver._linearize()
 
-        # forward is columns and reverse is rows
-        # If the mode is fwd or rev
-        # inds is the indices
-
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for mode in self.idx_iter_dict:
             for key, idx_info in iteritems(self.idx_iter_dict[mode]):
