@@ -1229,6 +1229,10 @@ class _TotalJacInfo(object):
                              sub_do_ln=model._linear_solver._linearize_children())
         model._linear_solver._linearize()
 
+        # forward is columns and reverse is rows
+        # If the mode is fwd or rev
+        # inds is the indices
+
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for mode in self.idx_iter_dict:
             for key, idx_info in iteritems(self.idx_iter_dict[mode]):
@@ -1242,7 +1246,8 @@ class _TotalJacInfo(object):
                             varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
-                            print('Solving variable:', key)
+                            print('Solving variable: {0} \nIn mode: {1} \n'
+                                  'Sub Indices: {2}'.format(key, mode, inds))
 
                         sys.stdout.flush()
                         t0 = time.time()
