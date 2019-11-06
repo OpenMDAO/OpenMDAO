@@ -159,7 +159,7 @@ offering a spectrum of options that can potentially trade required user effort w
 ### Goal: 
 - Provide forward and reverse mode AD that works for a wide variety of general use cases including
   with many numpy functions.
-- AD should have relatively good performance compared to hand differentiation.
+- AD should have performance comparable to hand differentiation.
 
 ### Potential Challenges: 
 - AD tools will struggle with current OpenMDAO syntax for `compute` and `apply_nonlinear` methods, 
