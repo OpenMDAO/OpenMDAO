@@ -1248,7 +1248,7 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         # we can verify all gradients by checking against finite-difference
         prob.check_partials(compact_print=True)
 
-    def test_scalar_only(self):
+    def test_error_messages_scalar_only(self):
         prob = om.Problem()
         model = prob.model
 
