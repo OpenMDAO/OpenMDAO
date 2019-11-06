@@ -320,6 +320,17 @@ class Component(System):
         else:
             self._discrete_inputs = self._discrete_outputs = ()
 
+    def _use_owned_sizes(self):
+        """
+        Return True if owned_sizes array should be used to determine non-duplicated vec sizes.
+
+        Returns
+        -------
+        bool
+            True if owned_sizes array should be used to determine non-duplicated vec sizes.
+        """
+        return self.comm.size > 1 and self.options['distributed']
+
     def _setup_var_sizes(self, recurse=True):
         """
         Compute the arrays of local variable sizes for all variables/procs on this system.
@@ -376,7 +387,6 @@ class Component(System):
         if self._use_derivatives:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
-        # for a component, all vars are 'owned'
         self._owned_sizes = self._var_sizes['nonlinear']['output']
 
         self._setup_global_shapes()
