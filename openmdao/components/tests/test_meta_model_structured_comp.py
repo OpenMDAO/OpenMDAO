@@ -1248,6 +1248,35 @@ class TestMetaModelStructuredCompFeature(unittest.TestCase):
         # we can verify all gradients by checking against finite-difference
         prob.check_partials(compact_print=True)
 
+    def test_scalar_only(self):
+        prob = om.Problem()
+        model = prob.model
+
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          method='slinear', vec_size=3)
+
+        with self.assertRaises(ValueError) as cm:
+            comp.add_input('x1', np.array([1.0, 2.0]))
+
+        msg = "MetaModelStructuredComp: Input x1 must either be scalar, or of length equal to vec_size."
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            comp.add_input('x1', np.zeros((3, 3)))
+
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            comp.add_output('x1', np.array([1.0, 2.0]))
+
+        msg = "MetaModelStructuredComp: Output x1 must either be scalar, or of length equal to vec_size."
+        self.assertEqual(str(cm.exception), msg)
+
+        with self.assertRaises(ValueError) as cm:
+            comp.add_output('x1', np.zeros((3, 3)))
+
+        self.assertEqual(str(cm.exception), msg)
+
 
 if __name__ == "__main__":
     unittest.main()
