@@ -170,8 +170,8 @@ class ComplexStep(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        idx_info : tuple of (ndarray of int, ndarray of float)
-            Tuple of wrt indices and corresponding data array to perturb.
+        idx_info : tuple of (Vector, ndarray of int)
+            Tuple of wrt indices and corresponding data vector to perturb.
         delta : complex
             Perturbation amount.
         result_array : ndarray
@@ -184,9 +184,9 @@ class ComplexStep(ApproximationScheme):
         Vector
             Copy of the results from running the perturbed system.
         """
-        for arr, idxs in idx_info:
-            if arr is not None:
-                arr._data[idxs] += delta
+        for vec, idxs in idx_info:
+            if vec is not None:
+                vec._data[idxs] += delta
 
         if total:
             system.run_solve_nonlinear()
@@ -197,8 +197,8 @@ class ComplexStep(ApproximationScheme):
 
         result_array[:] = results_vec._data
 
-        for arr, idxs in idx_info:
-            if arr is not None:
-                arr._data[idxs] -= delta
+        for vec, idxs in idx_info:
+            if vec is not None:
+                vec._data[idxs] -= delta
 
         return result_array

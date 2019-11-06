@@ -80,38 +80,38 @@ def record_leaks(classes=(object,),
     gc.set_debug(0)
 
 
-# class LeakTestPyoptSparseCase(unittest.TestCase):
+class LeakTestPyoptSparseCase(unittest.TestCase):
 
-#     ISOLATED = True
+    ISOLATED = True
 
-#     def test_leaks_pyoptsparse(self):
+    def test_leaks_pyoptsparse(self):
 
-#         with record_leaks(_om_classes) as rec:
-#             for i in range(3):
-#                 p_color = run_opt(om.pyOptSparseDriver, 'auto', optimizer='SLSQP',
-#                                   dynamic_total_coloring=True, partial_coloring=True)
-#                 p_color = None
+        with record_leaks(_om_classes) as rec:
+            for i in range(3):
+                p_color = run_opt(om.pyOptSparseDriver, 'auto', optimizer='SLSQP',
+                                  dynamic_total_coloring=True, partial_coloring=True)
+                p_color = None
 
-#         if len(rec) > 0:
-#             msgs = []
-#             for o, refs in rec:
-#                 try:
-#                     n = o.__name__
-#                 except AttributeError:
-#                     n = ''
-#                 msgs.append('Retained: {} {}'.format(n, type(o)))
+        if len(rec) > 0:
+            msgs = []
+            for o, refs in rec:
+                try:
+                    n = o.__name__
+                except AttributeError:
+                    n = ''
+                msgs.append('Retained: {} {}'.format(n, type(o)))
 
-#                 for r in refs:
-#                     try:
-#                         nr = r.__name__
-#                     except AttributeError:
-#                         nr = ''
-#                     msgs.append("   referred to by: {} {}".format(nr, type(r)))
+                for r in refs:
+                    try:
+                        nr = r.__name__
+                    except AttributeError:
+                        nr = ''
+                    msgs.append("   referred to by: {} {}".format(nr, type(r)))
 
-#             self.fail('\n'.join(msgs))
+            self.fail('\n'.join(msgs))
 
-#         # Force a sweep
-#         gc.collect()
+        # Force a sweep
+        gc.collect()
 
 
 class LeakTestScipyCase(unittest.TestCase):

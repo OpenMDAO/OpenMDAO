@@ -23,6 +23,7 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import FakeComm
 
 
@@ -244,7 +245,8 @@ class pyOptSparseDriver(Driver):
                                                                    info['min_improve_pct']))
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
-        opt_prob = Optimization(self.options['title'], self._objfunc, comm=comm)
+        opt_prob = Optimization(self.options['title'], weak_method_wrapper(self, '_objfunc'),
+                                comm=comm)
 
         # Add all design variables
         param_meta = self._designvars
@@ -378,8 +380,8 @@ class pyOptSparseDriver(Driver):
         else:
 
             # Use OpenMDAO's differentiator for the gradient
-            sol = opt(opt_prob, sens=self._gradfunc, storeHistory=self.hist_file,
-                      hotStart=self.hotstart_file)
+            sol = opt(opt_prob, sens=weak_method_wrapper(self, '_gradfunc'),
+                      storeHistory=self.hist_file, hotStart=self.hotstart_file)
 
         # Print results
         if self.options['print_results']:
@@ -399,7 +401,6 @@ class pyOptSparseDriver(Driver):
 
         # Save the most recent solution.
         self.pyopt_solution = sol
-        sol.objFun = None  # remove circular ref
 
         try:
             exit_status = sol.optInform['value']
