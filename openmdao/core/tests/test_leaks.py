@@ -122,7 +122,7 @@ class LeakTestScipyCase(unittest.TestCase):
 
         with record_leaks(_om_classes) as rec:
             for i in range(3):
-                p_color = run_opt(om.ScipyOptimizer, 'auto', optimizer='SLSQP',
+                p_color = run_opt(om.ScipyOptimizeDriver, 'auto', optimizer='SLSQP',
                                   dynamic_total_coloring=True, partial_coloring=True)
                 p_color = None
 
