@@ -1207,6 +1207,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed.")
 
         self.assertTrue('Solving variable: comp.f_xy' in output)
+        self.assertTrue('In mode: rev ' in output)
+        self.assertTrue('Sub Indices: 0' in output)
+        self.assertTrue('Elapsed Time:' in output)
         self.assertTrue('Solving variable: con.c' in output)
 
         prob = om.Problem()
@@ -1239,41 +1242,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertTrue('Solving variable: p1.x' in output)
         self.assertTrue('Solving variable: p2.y' in output)
-
-    def test_debug_print_option_totals_complete(self):
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
-
-        prob.set_solver_print(level=0)
-
-        prob.driver = om.ScipyOptimizeDriver()
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.options['tol'] = 1e-9
-        prob.driver.options['disp'] = False
-
-        prob.driver.options['debug_print'] = ['totals']
-
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15.0)
-
-        prob.setup(check=False, mode='fwd')
-
-        failed, output = run_driver(prob)
-
-        self.assertFalse(failed, "Optimization failed.")
-
-        self.assertTrue('Solving variable: p1.x' in output)
-        self.assertTrue('In mode: fwd ' in output)
-        self.assertTrue('Sub Indices: 0' in output)
-        self.assertTrue('Elapsed Time:' in output)
 
     def test_debug_print_option(self):
 
