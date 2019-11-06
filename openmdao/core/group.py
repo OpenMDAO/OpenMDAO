@@ -556,6 +556,17 @@ class Group(System):
             for subsys in self._subsystems_myproc:
                 subsys._setup_var_index_ranges(recurse)
 
+    def _use_owned_sizes(self):
+        """
+        Return True if owned_sizes array should be used to determine non-duplicated vec sizes.
+
+        Returns
+        -------
+        bool
+            True if owned_sizes array should be used to determine non-duplicated vec sizes.
+        """
+        return self.comm.size > 1
+
     def _setup_var_data(self, recurse=True):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.

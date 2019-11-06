@@ -95,6 +95,14 @@ class MetaModelStructuredComp(ExplicitComponent):
             Additional agruments for add_input.
         """
         n = self.options['vec_size']
+
+        # Currently no support for vector inputs, apart from vec_size
+        if not np.isscalar(val):
+
+            if len(val) not in [1, n] or len(val.shape) > 1:
+                msg = "{}: Input {} must either be scalar, or of length equal to vec_size."
+                raise ValueError(msg.format(self.msginfo, name))
+
         super(MetaModelStructuredComp, self).add_input(name, val * np.ones(n), **kwargs)
 
         self.pnames.append(name)
@@ -116,6 +124,14 @@ class MetaModelStructuredComp(ExplicitComponent):
             Additional agruments for add_output.
         """
         n = self.options['vec_size']
+
+        # Currently no support for vector outputs, apart from vec_size
+        if not np.isscalar(val):
+
+            if len(val) not in [1, n] or len(val.shape) > 1:
+                msg = "{}: Output {} must either be scalar, or of length equal to vec_size."
+                raise ValueError(msg.format(self.msginfo, name))
+
         super(MetaModelStructuredComp, self).add_output(name, val * np.ones(n), **kwargs)
 
         self.training_outputs[name] = training_data

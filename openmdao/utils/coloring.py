@@ -2072,7 +2072,7 @@ def _view_coloring_setup_parser(parser):
                         'for a particular variable.')
 
 
-def _view_coloring_exec(options):
+def _view_coloring_exec(options, user_args):
     """
     Execute the 'openmdao view_coloring' command.
 
@@ -2080,6 +2080,8 @@ def _view_coloring_exec(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Command line options after '--' (if any).  Passed to user script.
     """
     coloring = Coloring.load(options.file[0])
     if options.show_sparsity_text:

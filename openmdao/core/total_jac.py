@@ -1242,7 +1242,8 @@ class _TotalJacInfo(object):
                             varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
-                            print('Solving variable:', key)
+                            print('Solving variable: {0} \nIn mode: {1} \n'
+                                  'Sub Indices: {2}'.format(key, mode, inds))
 
                         sys.stdout.flush()
                         t0 = time.time()

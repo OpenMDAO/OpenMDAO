@@ -72,7 +72,7 @@ class AssembledJacobian(Jacobian):
         self._matrix_class = matrix_class
         self._out_ranges = self._get_ranges(system, 'output')
         self._nodup_out_ranges = system._get_nodup_out_ranges()[0] \
-            if system.comm.size > 1 else self._out_ranges
+            if system._use_owned_sizes() else self._out_ranges
         self._in_ranges = self._get_ranges(system, 'input')
         self._subjac_iters = defaultdict(lambda: None)
 
@@ -124,7 +124,6 @@ class AssembledJacobian(Jacobian):
         iproc = system.comm.rank
         abs2idx = system._var_allprocs_abs2idx['nonlinear']
         in_sizes = system._var_sizes['nonlinear']['input']
-        owned_sizes = system._owned_sizes
         out_ranges = self._out_ranges
         # for non-MPI case, global_out_ranges is out_ranges
         global_out_ranges = self._nodup_out_ranges
@@ -134,7 +133,7 @@ class AssembledJacobian(Jacobian):
         owns = system._owning_rank
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
         abs_key2shape = self._abs_key2shape
-        check_owns = MPI is not None and system.comm.size > 1
+        check_owns = system._use_owned_sizes()
 
         # create the matrix subjacs
         for abs_key, info in iteritems(self._subjacs_info):
@@ -312,13 +311,15 @@ class AssembledJacobian(Jacobian):
 
             if isinstance(system, Component):
                 global_conns = _empty_dict
+                iscomp = True
             else:
                 global_conns = system._conn_global_abs_in2out
+                iscomp = False
 
             output_names = set(n for n in system._var_abs_names['output']
-                               if owned[n] == irank or meta[n]['distributed'])
+                               if iscomp or owned[n] == irank or meta[n]['distributed'])
             input_names = set(n for n in system._var_abs_names['input']
-                              if owned[n] == irank or meta[n]['distributed'])
+                              if iscomp or owned[n] == irank or meta[n]['distributed'])
 
             rev_conns = defaultdict(list)
             for tgt, src in iteritems(global_conns):

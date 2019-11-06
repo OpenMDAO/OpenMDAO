@@ -9,7 +9,7 @@ import warnings
 from contextlib import contextmanager
 from collections import defaultdict, OrderedDict
 
-from six import string_types
+from six import string_types, PY2
 from six.moves import cStringIO
 from numpy import ndarray
 try:
@@ -81,8 +81,12 @@ def _get_printer(stream, rank=-1):
 
     # rank < 0 means output on all ranks
     if not MPI or rank < 0 or MPI.COMM_WORLD.rank == rank:
-        def prt(*args, **kwargs):
-            print(*args, file=stream, flush=True, **kwargs)
+        if PY2:  # python 2 doesn't like the flush arg
+            def prt(*args, **kwargs):
+                print(*args, file=stream, **kwargs)
+        else:
+            def prt(*args, **kwargs):
+                print(*args, file=stream, flush=True, **kwargs)
     else:
         def prt(*args, **kwargs):
             pass
@@ -385,7 +389,7 @@ def _itrace_setup_parser(parser):
                              'expression can be added for each class.')
 
 
-def _itrace_exec(options):
+def _itrace_exec(options, user_args):
     """
     Process command line args and perform tracing on a specified python file.
     """
@@ -405,4 +409,5 @@ def _itrace_exec(options):
     _setup(options)
     start()
 
+    sys.argv[:] = [progname] + user_args
     exec (code, globals_dict)

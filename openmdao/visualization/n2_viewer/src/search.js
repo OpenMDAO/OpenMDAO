@@ -25,7 +25,7 @@ function DoSearch(d, regexMatch, undoList) {
             if (DoSearch(d.children[i], regexMatch, undoList)) didMatch = true;
         }
     }
-    if (d === zoomedElement) return didMatch;
+    if (d === n2Diag.zoomedElement) return didMatch;
     if (!didMatch && !d.children && (d.type === "param" || d.type === "unknown")) {
         didMatch = regexMatch.test(d.absPathName);
         if (didMatch) {
@@ -50,7 +50,7 @@ function CountMatches() {
         else d.isMinimized = false;
     });
     numMatches = 0;
-    if (searchVals0.length != 0) DoSearch(zoomedElement, GetSearchRegExp(searchVals0), null);
+    if (searchVals0.length != 0) DoSearch(n2Diag.zoomedElement, GetSearchRegExp(searchVals0), null);
     searchCollapsedUndo.forEach(function (d) { //auto undo on successive searches
         if (!d.children && (d.type === "param" || d.type === "unknown")) d.varIsHidden = true;
         else d.isMinimized = true;
@@ -64,13 +64,13 @@ function SearchButtonClicked() {
     });
     numMatches = 0;
     searchCollapsedUndo = [];
-    if (searchVals0.length != 0) DoSearch(zoomedElement, GetSearchRegExp(searchVals0), searchCollapsedUndo);
+    if (searchVals0.length != 0) DoSearch(n2Diag.zoomedElement, GetSearchRegExp(searchVals0), searchCollapsedUndo);
 
-    FindRootOfChangeFunction = FindRootOfChangeForSearch;
-    TRANSITION_DURATION = TRANSITION_DURATION_SLOW;
-    lastClickWasLeft = false;
-    updateRecomputesAutoComplete = false;
-    updateFunc();
+    n2Diag.ui.findRootOfChangeFunction = FindRootOfChangeForSearch;
+    N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
+    n2Diag.ui.lastClickWasLeft = false;
+    n2Diag.updateRecomputesAutoComplete = false;
+    n2Diag.update();
 }
 
 function GetSearchRegExp(searchValsArray) {
@@ -205,7 +205,7 @@ function PopulateAutoCompleteList(d) {
             PopulateAutoCompleteList(d.children[i]);
         }
     }
-    if (d === zoomedElement) return;
+    if (d === n2Diag.zoomedElement) return;
 
     var n = d.name;
     if (d.splitByColon && d.children && d.children.length > 0) n += ":";
@@ -221,7 +221,7 @@ function PopulateAutoCompleteList(d) {
         }
     });
 
-    var localPathName = (zoomedElement === root) ? d.absPathName : d.absPathName.slice(zoomedElement.absPathName.length + 1);
+    var localPathName = (n2Diag.zoomedElement === n2Diag.model.root) ? d.absPathName : d.absPathName.slice(n2Diag.zoomedElement.absPathName.length + 1);
     if (!autoCompleteSetPathNames.hasOwnProperty(localPathName)) {
         autoCompleteSetPathNames[localPathName] = true;
         autoCompleteListPathNames.push(localPathName);

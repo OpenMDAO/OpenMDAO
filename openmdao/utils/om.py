@@ -63,7 +63,7 @@ def _n2_setup_parser(parser):
                         help="use declare partial info for internal connectivity.")
 
 
-def _n2_cmd(options):
+def _n2_cmd(options, user_args):
     """
     Process command line args and call n2 on the specified file.
 
@@ -71,6 +71,8 @@ def _n2_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Command line options after '--' (if any).  Passed to user script.
     """
     filename = options.file[0]
 
@@ -86,7 +88,7 @@ def _n2_cmd(options):
 
         hooks._register_hook('final_setup', 'Problem', pre=_viewmod)
 
-        _simple_exec(options)
+        _simple_exec(options, user_args)
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title,
@@ -94,9 +96,9 @@ def _n2_cmd(options):
            use_declare_partial_info=options.use_declare_partial_info)
 
 
-def _view_model_cmd(options):
+def _view_model_cmd(options, user_args):
     warn_deprecation("The 'view_model' command has been deprecated. Use 'n2' instead.")
-    _n2_cmd(options)
+    _n2_cmd(options, user_args)
 
 
 def _xdsm_setup_parser(parser):
@@ -156,7 +158,7 @@ def _xdsm_setup_parser(parser):
                              'component blocks of the diagram..')
 
 
-def _xdsm_cmd(options):
+def _xdsm_cmd(options, user_args):
     """
     Process command line args and call xdsm on the specified file.
 
@@ -164,6 +166,8 @@ def _xdsm_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Command line options after '--' (if any).  Passed to user script.
     """
     filename = options.file[0]
 
@@ -193,7 +197,7 @@ def _xdsm_cmd(options):
 
         hooks._register_hook('setup', 'Problem', post=_xdsm)
 
-        _simple_exec(options)
+        _simple_exec(options, user_args)
     else:
         # assume the file is a recording, run standalone
         write_xdsm(filename, filename=options.outfile, model_path=options.model_path,
@@ -372,7 +376,7 @@ def _config_summary_cmd(options):
     """
     def summary(prob):
         config_summary(prob)
-        exit()
+        sys.exit(0)
 
     hooks._register_hook('final_setup', 'Problem', post=summary)
 
@@ -584,7 +588,7 @@ def _cite_cmd(options):
     return _cite
 
 
-def _simple_exec(options):
+def _simple_exec(options, user_args):
     """
     Use this as executor for commands that run as Problem commands.
 
@@ -596,6 +600,8 @@ def _simple_exec(options):
     progname = options.file[0]
 
     sys.path.insert(0, os.path.dirname(progname))
+
+    sys.argv[:] = [progname] + user_args
 
     with open(progname, 'rb') as fp:
         code = compile(fp.read(), progname, 'exec')
@@ -672,8 +678,20 @@ def openmdao_cmd():
     """
     Wrap a number of Problem viewing/debugging command line functions.
     """
+    # pre-parse sys.argv to split between before and after '--'
+    if '--' in sys.argv:
+        idx = sys.argv.index('--')
+        sys_args = sys.argv[:idx]
+        user_args = sys.argv[idx + 1:]
+        sys.argv[:] = sys_args
+    else:
+        user_args = []
+
     parser = argparse.ArgumentParser(description='OpenMDAO Command Line Tools',
-                                     epilog='Use -h after any sub-command for sub-command help.')
+                                     epilog='Use -h after any sub-command for sub-command help.'
+                                     ' If using a tool on a script that takes its own command line'
+                                     ' arguments, place those arguments after a "--". For example:'
+                                     ' openmdao n2 -o foo.html myscript.py -- -x --myarg=bar')
 
     # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
@@ -685,7 +703,7 @@ def openmdao_cmd():
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
     if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(args[0]):
-        _simple_exec(_Options(file=[args[0]], func=None))
+        _simple_exec(_Options(file=[args[0]], func=None), user_args)
     else:
         hooks.use_hooks = True
         # we do a parse_known_args here instead of parse_args so that we can associate errors with
@@ -702,8 +720,9 @@ def openmdao_cmd():
                 print(sub.format_usage(), file=sys.stderr)
                 print(msg, file=sys.stderr)
             parser.exit(2)
+
         if hasattr(options, 'executor'):
-            options.executor(options)
+            options.executor(options, user_args)
         else:
             print("\nNothing to do.")
 
