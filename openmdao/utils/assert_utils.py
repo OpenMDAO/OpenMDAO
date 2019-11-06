@@ -72,8 +72,6 @@ def assert_no_warning(category, msg):
     for warn in w:
         if (issubclass(warn.category, category) and str(warn.message) == msg):
             raise AssertionError("Found warning: ", msg)
-        else:
-            break
 
 
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):
