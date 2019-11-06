@@ -40,7 +40,7 @@ class ModelData {
         this._computeConnections();
         console.timeEnd('ModelData._computeConnections');
 
-        // console.log("New model: ", modelJSON);
+        console.log("New model: ", modelJSON);
         // this.errorCheck();
     }
 

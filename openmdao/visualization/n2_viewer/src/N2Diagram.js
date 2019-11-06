@@ -64,6 +64,8 @@ class N2Diagram {
         this.matrix = new N2Matrix(this.model, this.layout, this.dom.n2Groups,
             true, this.ui.findRootOfChangeFunction);
 
+        this.matrixMax = this.matrix;
+
         // TODO: Move to N2Layout
         this.scales = {
             'unit': 'px',
@@ -147,11 +149,7 @@ class N2Diagram {
      */
     updateZoomedElement(newZoomedElement) {
         this.zoomedElementPrev = this.zoomedElement;
-
-        // TODO: Stop updating the global zoomedElement when we
-        // implement a different place to put it.
         this.zoomedElement = newZoomedElement;
-
         this.layout.zoomedElement = this.zoomedElement;
     }
 
@@ -555,9 +553,13 @@ class N2Diagram {
             this.layout = new N2Layout(this.model, this.zoomedElement,
                 this.showLinearSolverNames, this.dims);
             this.ui.updateClickedIndices();
+            /*
             this.matrix = new N2Matrix(this.model, this.layout,
                 this.dom.n2Groups, this.ui.lastClickWasLeft,
                 this.ui.findRootOfChangeFunction, this.matrix.nodeSize);
+                */
+            this.matrix.update(this.layout, this.ui.lastClickWasLeft,
+                this.ui.findRootOfChangeFunction);
         }
 
         this._updateScale();

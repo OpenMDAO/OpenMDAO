@@ -12,7 +12,7 @@
  * @property {Object} cellDims nodeSize with computed coordinates.
  * @property {Object} prevCellDims prevNodeSize with computed coordinates.
  * @property {Object[][]} grid Object keys corresponding to rows and columns.
- * @property {Array} allCells One-dimensional array of all cells, for D3 processing.
+ * @property {Array} visibleCells One-dimensional array of all cells, for D3 processing.
  * @property {Array} boxInfo Component box dimensions.
  */
 class N2Matrix {
@@ -24,8 +24,6 @@ class N2Matrix {
      * @param {Object} n2Groups References to <g> SVG elements created by N2Diagram.
      * @param {Boolean} lastClickWasLeft
      * @param {function} findRootOfChangeFunction
-     * @param {Object} [prevNodeSize = {'width': 0, 'height': 0}] Previous node
-     *  width & height for transition purposes.
      */
     constructor(model, layout, n2Groups, lastClickWasLeft,
         findRootOfChangeFunction,
@@ -37,36 +35,13 @@ class N2Matrix {
         this.lastClickWasLeft = lastClickWasLeft;
         this.findRootOfChangeFunction = findRootOfChangeFunction;
 
-        this.prevNodeSize = prevNodeSize;
+        this.prevNodeSize = { 'width': 0, 'height': 0 };
         this.nodeSize = {
             'width': layout.size.diagram.width / this.nodes.length,
             'height': layout.size.diagram.height / this.nodes.length,
         }
 
-        this.cellDims = {
-            'size': this.nodeSize,
-            'bottomRight': {
-                'x': this.nodeSize.width * .5,
-                'y': this.nodeSize.height * .5
-            },
-            'topLeft': {
-                'x': -(this.nodeSize.width * .5),
-                'y': -(this.nodeSize.width * .5)
-            }
-        }
-
-        this.prevCellDims = {
-            'size': this.prevNodeSize,
-            'bottomRight': {
-                'x': this.prevNodeSize.width * .5,
-                'y': this.prevNodeSize.height * .5
-            },
-            'topLeft': {
-                'x': -(this.prevNodeSize.width * .5),
-                'y': -(this.prevNodeSize.width * .5)
-            }
-        }
-
+        N2CellRenderer.updateDims(this.nodeSize.width, this.nodeSize.height);
         this.updateLevelOfDetailThreshold(layout.size.diagram.height);
 
         console.time('N2Matrix._buildGrid');
@@ -78,6 +53,9 @@ class N2Matrix {
         console.timeEnd('N2Matrix._setupComponentBoxesAndGridLines');
     }
 
+    get cellDims() { return N2CellRenderer.dims; }
+    get prevCellDims() { return N2CellRenderer.prevDims; }
+
     /**
      * Determine if a node exists at the specified location.
      * @param {number} row Row number of the node
@@ -85,8 +63,11 @@ class N2Matrix {
      * @returns False if the row doesn't exist or a column doesn't exist
      *  in the row; true otherwise.
      */
-    exists(row, col) {
-        if (this.grid[row] && this.grid[row][col]) { return true; }
+    exists(row, col, useOffset = true) {
+        let offsetRow = useOffset? row + N2MatrixCell.boundary.first.row : row,
+            offsetCol = useOffset? col + N2MatrixCell.boundary.first.col : col;
+
+        if (this.grid[offsetRow] && this.grid[offsetRow][offsetCol]) { return true; }
         return false;
     }
 
@@ -98,12 +79,15 @@ class N2Matrix {
      * @param {boolean} doThrow Whether to throw an exception if node undefined.
      * @returns {N2MatrixCell} The node if it exists, undefined otherwise.
      */
-    cell(row, col, doThrow = false) {
-        if (this.exists(row, col)) {
-            return this.grid[row][col];
+    cell(row, col, doThrow = false, useOffset = true) {
+        let offsetRow = useOffset? row + N2MatrixCell.boundary.first.row : row,
+            offsetCol = useOffset? col + N2MatrixCell.boundary.first.col : col;
+
+        if (this.exists(row, col, useOffset)) {
+            return this.grid[offsetRow][offsetCol];
         }
         else if (doThrow) {
-            throw "No node in matrix at (" + row + ", " + col + ").";
+            throw "No node in matrix at (" + offsetRow + ", " + offsetCol + ").";
         }
 
         return undefined;
@@ -118,17 +102,21 @@ class N2Matrix {
     }
 
     tooMuchDetail() {
-        return (this.nodes.length >= this.levelOfDetailThreshold);
+        let tooMuch = (this.nodes.length >= this.levelOfDetailThreshold);
+
+        if (tooMuch) console.log("Too much detail.")
+
+        return tooMuch;
     }
 
     /**
-     * Add a cell to the grid Object and allCells array, with special
+     * Add a cell to the grid Object and visibleCells array, with special
      * handling for declared partials.
-     * @param {N2MatrixCell} newCell Cell created in _buildGrid().
      * @param {number} row Index of the row in the grid to place the cell.
      * @param {number} col Index of the column in the grid to place the cell.
+     * @param {N2MatrixCell} newCell Cell created in _buildGrid().
      */
-    _addCell(newCell, row, col) {
+    _addCell(row, col, newCell) {
         if (modelData.options.use_declare_partial_info &&
             newCell.symbolType.potentialDeclaredPartial &&
             !newCell.symbolType.declaredPartial) {
@@ -136,8 +124,8 @@ class N2Matrix {
             return;
         }
 
-        this.grid[row][col] = newCell;
-        this.allCells.push(newCell);
+        if (!this.exists(row, col)) { this.grid[row][col] = newCell; }
+        this.visibleCells.push(newCell);
     }
 
     /**
@@ -145,31 +133,43 @@ class N2Matrix {
      * matrix, but not an actual two dimensional array because most of
      * it would be unused.
      */
-    _buildGrid(model) {
-        this.grid = {};
-        this.allCells = [];
+    _buildGrid(model = null) {
+        this.visibleCells = [];
+        let makeNewGrid = (this.grid == undefined);
 
-        if (this.tooMuchDetail()) return;
+        if (makeNewGrid) {
+            this.grid = {};
+        }
+        else {
+            N2MatrixCell.updateBoundary(this.nodes[0].cell,
+                this.nodes[this.nodes.length - 1].cell);
+
+            if (this.tooMuchDetail()) return;
+        }
 
         for (let srcIdx = 0; srcIdx < this.nodes.length; ++srcIdx) {
             let srcObj = this.nodes[srcIdx];
 
             // New row
-            if (!this.exists(srcIdx)) this.grid[srcIdx] = {};
+            if (!this.exists(srcIdx) && makeNewGrid) this.grid[srcIdx] = {};
 
             // On the diagonal
-            let newCell = new N2MatrixCell(srcIdx, srcIdx, srcObj, srcObj, model,
-                this.cellDims, this.prevCellDims);
-            this._addCell(newCell, srcIdx, srcIdx);
+            let newCell = makeNewGrid ?
+                new N2MatrixCell(srcIdx, srcIdx, srcObj, srcObj, model,
+                    this.cellDims, this.prevCellDims) :
+                this.cell(srcIdx, srcIdx, true);
+            this._addCell(srcIdx, srcIdx, newCell);
 
             let targets = srcObj.targetsParamView;
 
             for (let tgtObj of targets) {
                 let tgtIdx = indexFor(this.nodes, tgtObj);
                 if (tgtIdx != -1) {
-                    let newCell = new N2MatrixCell(srcIdx, tgtIdx, srcObj, tgtObj, model,
-                        this.cellDims, this.prevCellDims);
-                    this._addCell(newCell, srcIdx, tgtIdx);
+                    let newCell = makeNewGrid ?
+                        new N2MatrixCell(srcIdx, tgtIdx, srcObj, tgtObj, model,
+                            this.cellDims, this.prevCellDims) :
+                        this.cell(srcIdx, tgtIdx, true);
+                    this._addCell(srcIdx, tgtIdx, newCell);
                 }
             }
 
@@ -181,12 +181,19 @@ class N2Matrix {
 
                     if (tgtObj.isUnknown()) {
                         let tgtIdx = j;
-                        let newCell = new N2MatrixCell(srcIdx, tgtIdx, srcObj, tgtObj,
-                            model, this.cellDims, this.prevCellDims);
-                        this._addCell(newCell, srcIdx, tgtIdx);
+                        let newCell = makeNewGrid ?
+                            new N2MatrixCell(srcIdx, tgtIdx, srcObj, tgtObj,
+                                model, this.cellDims, this.prevCellDims) :
+                            this.cell(srcIdx, tgtIdx, true);
+                        this._addCell(srcIdx, tgtIdx, newCell);
                     }
                 }
             }
+        }
+
+        if (makeNewGrid) {
+            N2MatrixCell.updateBoundary(this.nodes[0].cell,
+                this.nodes[this.nodes.length - 1].cell);
         }
     }
 
@@ -271,7 +278,7 @@ class N2Matrix {
         let self = this; // For callbacks that change "this". Alternative to using .bind().
 
         let selection = this.n2Groups.elements.selectAll('.n2cell')
-            .data(self.allCells, d => d.id);
+            .data(self.visibleCells, d => d.id);
 
         // Use D3 to join N2MatrixCells to SVG groups, and render shapes in them.
         let gEnter = selection.enter().append('g')
@@ -279,9 +286,11 @@ class N2Matrix {
             .attr('transform', function (d) {
                 if (self.lastClickWasLeft) {
                     return 'translate(' +
-                        (self.prevCellDims.size.width * (d.col - enterIndex) +
+                        (self.prevCellDims.size.width *
+                            (d.col - enterIndex) +
                             self.prevCellDims.bottomRight.x) + ',' +
-                        (self.prevCellDims.size.height * (d.row - enterIndex) +
+                        (self.prevCellDims.size.height *
+                            (d.row - enterIndex) +
                             self.prevCellDims.bottomRight.y) + ')';
                 }
 
@@ -309,9 +318,9 @@ class N2Matrix {
         gEnter.merge(selection)
             .transition(sharedTransition)
             .attr('transform', function (d) {
-                return 'translate(' + (self.cellDims.size.width * (d.col) +
+                return 'translate(' + (self.cellDims.size.width * d.col +
                     self.cellDims.bottomRight.x) + ',' +
-                    (self.cellDims.size.height * (d.row) +
+                    (self.cellDims.size.height * d.row +
                         self.cellDims.bottomRight.y) + ')';
             })
             // "this" refers to the element here, so leave it alone:
@@ -356,7 +365,8 @@ class N2Matrix {
             .attr('transform', function (d) {
                 if (self.lastClickWasLeft) return 'translate(0,' +
                     (self.prevCellDims.size.height * (d.i - enterIndex)) + ')';
-                let roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
+                let roc = (self.findRootOfChangeFunction) ?
+                    self.findRootOfChangeFunction(d.obj) : null;
                 if (roc) {
                     let index0 = roc.prevRootIndex - self.layout.zoomedElement.prevRootIndex;
                     return 'translate(0,' + (self.prevCellDims.size.height * index0) + ')';
@@ -377,7 +387,8 @@ class N2Matrix {
             .attr('transform', function (d) {
                 if (self.lastClickWasLeft) return 'translate(0,' +
                     (self.cellDims.size.height * (d.i - exitIndex)) + ')';
-                let roc = (self.findRootOfChangeFunction) ? self.findRootOfChangeFunction(d.obj) : null;
+                let roc = (self.findRootOfChangeFunction) ?
+                    self.findRootOfChangeFunction(d.obj) : null;
                 if (roc) {
                     let index = roc.rootIndex - self.layout.zoomedElement.rootIndex;
                     return 'translate(0,' + (self.cellDims.size.height * index) + ')';
@@ -535,7 +546,7 @@ class N2Matrix {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(cell) {
-        let leftTextWidthHovered = this.layout.visibleNodes[cell.row].nameWidthPx;
+        let leftTextWidthHovered = this.nodes[cell.row].nameWidthPx;
 
         // Loop over all elements in the matrix looking for other cells in the same column as
         let lineWidth = Math.min(5, this.nodeSize.width * .5,
@@ -545,16 +556,22 @@ class N2Matrix {
             this.nodeSize.height * cell.row, leftTextWidthHovered,
             this.nodeSize.height, N2Style.color.highlightHovered); //highlight hovered
 
+        // TODO: Iterate over whole grid!
         for (let col = 0; col < this.layout.visibleNodes.length; ++col) {
             let leftTextWidthDependency = this.layout.visibleNodes[col].nameWidthPx;
             if (this.exists(cell.row, col)) {
                 if (col != cell.row) {
-                    new N2Arrow({
-                        'end': { 'col': col, 'row': col },
-                        'start': { 'col': cell.row, 'row': cell.row },
-                        'color': N2Style.color.greenArrow,
-                        'width': lineWidth
-                    }, this.n2Groups, this.nodeSize);
+                    if (this.cell(cell.row, col).withinBounds()) {
+                        new N2Arrow({
+                            'end': { 'col': col, 'row': col },
+                            'start': { 'col': cell.row, 'row': cell.row },
+                            'color': N2Style.color.greenArrow,
+                            'width': lineWidth
+                        }, this.n2Groups, this.nodeSize);
+                    }
+                    else {
+                        console.log("Offscreen connector: ", cell.row, ',', col);
+                    }
 
                     //highlight var name
                     this.hilight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
@@ -566,13 +583,17 @@ class N2Matrix {
             // Now swap row and col
             if (this.exists(col, cell.row)) {
                 if (col != cell.row) {
-                    new N2Arrow({
-                        'start': { 'col': col, 'row': col },
-                        'end': { 'col': cell.row, 'row': cell.row },
-                        'color': N2Style.color.redArrow,
-                        'width': lineWidth
-                    }, this.n2Groups, this.nodeSize);
-
+                    if (this.cell(col, cell.row).withinBounds()) {
+                        new N2Arrow({
+                            'start': { 'col': col, 'row': col },
+                            'end': { 'col': cell.row, 'row': cell.row },
+                            'color': N2Style.color.redArrow,
+                            'width': lineWidth
+                        }, this.n2Groups, this.nodeSize);
+                    }
+                    else {
+                        console.log("Offscreen connector: ", col, ',', cell.row);
+                    }
                     //highlight var name
                     this.hilight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
                         this.nodeSize.height * col, leftTextWidthDependency,
@@ -583,31 +604,36 @@ class N2Matrix {
     }
 
     drawArrowsParamView(startIndex, endIndex, nodeSize) {
-        let lineWidth = Math.min(5, nodeSize.width * .5, nodeSize.height * .5);  
+        let lineWidth = Math.min(5, nodeSize.width * .5, nodeSize.height * .5);
         let boxStart = this.boxInfo[startIndex];
         let boxEnd = this.boxInfo[endIndex];
-    
+
         // Draw multiple horizontal lines, but no more than one vertical line
         // for box-to-box connections
         let startIndices = [], endIndices = [];
         for (let startsI = boxStart.startI; startsI <= boxStart.stopI; ++startsI) {
             for (let endsI = boxEnd.startI; endsI <= boxEnd.stopI; ++endsI) {
-                if (this.cell(startsI, endsI) !== undefined) {
+                if (this.exists(startsI, endsI)) {
                     startIndices.push(startsI);
                     endIndices.push(endsI);
                 }
             }
         }
-    
+
         for (let i = 0; i < startIndices.length; ++i) {
             let startI = startIndices[i];
             let endI = endIndices[i];
-            new N2Arrow({
-                'start': { col: startI, row: startI },
-                'end': { col: endI, row: endI },
-                'color': (startIndex < endIndex) ? N2Style.color.greenArrow : N2Style.color.redArrow,
-                'width': lineWidth
-            }, this.n2Groups, this.nodeSize);
+            if (this.cell(startI, endI).withinBounds()) {
+                new N2Arrow({
+                    'start': { col: startI, row: startI },
+                    'end': { col: endI, row: endI },
+                    'color': (startIndex < endIndex) ? N2Style.color.greenArrow : N2Style.color.redArrow,
+                    'width': lineWidth
+                }, this.n2Groups, this.nodeSize);
+            }
+            else {
+                console.log("Offscreen connector: ", startI, ',', endI);
+            }
         }
     }
 
@@ -622,12 +648,18 @@ class N2Matrix {
         let tgt = this.layout.visibleNodes[cell.col];
         // let boxEnd = this.boxInfo[cell.col]; // not used?
 
-        new N2Arrow({
-            'start': { 'col': cell.row, 'row': cell.row },
-            'end': { 'col': cell.col, 'row': cell.col },
-            'color': N2Style.color.redArrow,
-            'width': lineWidth
-        }, this.n2Groups, this.nodeSize);
+        if (cell.withinBounds()) {
+            new N2Arrow({
+                'start': { 'col': cell.row, 'row': cell.row },
+                'end': { 'col': cell.col, 'row': cell.col },
+                'color': N2Style.color.redArrow,
+                'width': lineWidth
+            }, this.n2Groups, this.nodeSize);
+        }
+        else {
+            console.log("Offscreen connector: ", cell.row, ',', cell.col);
+            return;
+        }
 
         if (cell.row > cell.col) {
             let targetsWithCycleArrows = tgt.getNodesWithCycleArrows();
@@ -686,5 +718,25 @@ class N2Matrix {
         this.hilight(-leftTextWidthC - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.col, leftTextWidthC, this.nodeSize.height,
             N2Style.color.greenArrow);
+    }
+
+    update(layout, lastClickWasLeft, findRootOfChangeFunction) {
+        this.layout = layout;
+        this.nodes = layout.visibleNodes;
+
+        this.lastClickWasLeft = lastClickWasLeft;
+        this.findRootOfChangeFunction = findRootOfChangeFunction;
+
+        Object.assign(this.prevNodeSize, this.nodeSize);
+        this.nodeSize = {
+            'width': layout.size.diagram.width / this.nodes.length,
+            'height': layout.size.diagram.height / this.nodes.length,
+        }
+
+        N2CellRenderer.updateDims(this.nodeSize.width, this.nodeSize.height);
+        this.updateLevelOfDetailThreshold(layout.size.diagram.height);
+
+        this._buildGrid();
+        this._setupComponentBoxesAndGridLines();
     }
 }
