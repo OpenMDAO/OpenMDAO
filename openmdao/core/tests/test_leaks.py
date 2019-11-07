@@ -56,6 +56,9 @@ def record_leaks(classes=(object,),
     # Force a sweep
     gc.collect()
 
+    # keep track of any starting garbage
+    old_garbage = set([id(o) for o in gc.garbage])
+
     gc.set_debug(flags)
 
     yield lst
@@ -65,7 +68,7 @@ def record_leaks(classes=(object,),
 
     # Report on what was left
     for o in gc.garbage:
-        if isinstance(o, classes):
+        if id(o) not in old_garbage and isinstance(o, classes):
             rlist = []
             for r in find_referring_objects(o, classes):
                 rlist.append(r)
