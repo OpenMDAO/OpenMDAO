@@ -2,7 +2,11 @@
 import unittest
 import gc
 from contextlib import contextmanager
-from types import FunctionType, MethodType, CoroutineType, GeneratorType, FrameType
+from six import PY2
+if PY2:
+    from types import FunctionType, MethodType
+else:
+    from types import FunctionType, MethodType, CoroutineType, GeneratorType, FrameType
 from collections import defaultdict
 
 import openmdao.api as om
@@ -25,8 +29,10 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT', fallback=True)
 # variables, and from the garbage collector's bookkeeping.
 REFERRERS_TO_IGNORE = [locals(), globals(), gc.garbage]
 
-_om_classes = [System, om.Problem, Vector, Driver, Solver, MethodType, FunctionType,
-               GeneratorType, CoroutineType]
+_om_classes = [System, om.Problem, Vector, Driver, Solver, MethodType]
+
+if not PY2:
+    _om_classes.extend([GeneratorType, CoroutineType])
 
 if OPTIMIZER:
     import pyoptsparse
@@ -83,46 +89,57 @@ def record_leaks(classes=(object,),
     gc.set_debug(0)
 
 
+def check_refs(func, niters):
+    with record_leaks(_om_classes) as rec:
+        for i in range(niters):
+            func()
+
+    msgs = []
+    if len(rec) > 0:
+        for o, refs in rec:
+            try:
+                n = o.__name__
+            except AttributeError:
+                n = ''
+            msgs.append('Retained: {} {}'.format(n, type(o)))
+
+            for r in refs:
+                try:
+                    nr = r.__name__
+                except AttributeError:
+                    nr = ''
+                msgs.append("   referred to by: {} {}".format(nr, type(r)))
+
+    return msgs
+
+
+def run_opt_wrapper(driver_class, optimizer):
+    def _wrapper():
+        run_opt(driver_class, 'auto', optimizer=optimizer,
+                dynamic_total_coloring=True, partial_coloring=True)
+    return _wrapper
+
+
 class LeakTestCase(unittest.TestCase):
 
     ISOLATED = True
 
-    def _check_leaks(self, driver_class, optimizer):
-        with record_leaks(_om_classes) as rec:
-            for i in range(3):
-                p_color = run_opt(driver_class, 'auto', optimizer=optimizer,
-                                  dynamic_total_coloring=True, partial_coloring=True)
-                p_color = None
-
-        if len(rec) > 0:
-            msgs = []
-            for o, refs in rec:
-                try:
-                    n = o.__name__
-                except AttributeError:
-                    n = ''
-                msgs.append('Retained: {} {}'.format(n, type(o)))
-
-                for r in refs:
-                    try:
-                        nr = r.__name__
-                    except AttributeError:
-                        nr = ''
-                    msgs.append("   referred to by: {} {}".format(nr, type(r)))
-
-            self.fail('\n'.join(msgs))
-
-
     @unittest.skipIf(OPTIMIZER is None, 'pyoptsparse SLSQP is not installed.')
     def test_leaks_pyoptsparse_slsqp(self):
-        self._check_leaks(om.pyOptSparseDriver, 'SLSQP')
+        msgs = check_refs(run_opt_wrapper(om.pyOptSparseDriver, 'SLSQP'), 3)
+        if msgs:
+            self.fail('\n'.join(msgs))
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', 'pyoptsparse SNOPT is not installed.')
     def test_leaks_pyoptsparse_snopt(self):
-        self._check_leaks(om.pyOptSparseDriver, 'SNOPT')
+        msgs = check_refs(run_opt_wrapper(om.pyOptSparseDriver, 'SNOPT'), 3)
+        if msgs:
+            self.fail('\n'.join(msgs))
 
     def test_leaks_scipy_slsqp(self):
-        self._check_leaks(om.ScipyOptimizeDriver, 'SLSQP')
+        msgs = check_refs(run_opt_wrapper(om.ScipyOptimizeDriver, 'SLSQP'), 3)
+        if msgs:
+            self.fail('\n'.join(msgs))
 
 
 if __name__ == '__main__':
