@@ -2311,6 +2311,71 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
         assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
 
+    def test_recorder_resetup(self):
+        vec_size = 7
+        prob = om.Problem(model=om.Group())
+
+        class _TestSys(om.Group):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                ivc = self.add_subsystem('ivc', subsys=om.IndepVarComp(), promotes_outputs=['*'])
+                ivc.add_output('x', shape=(nn,), units=None)
+
+                self.add_subsystem('mag',
+                                   subsys=om.ExecComp('y=x**2',
+                                                      y={'shape': (nn,)},
+                                                      x={'shape': (nn,)}),
+                                   promotes_inputs=['*'], promotes_outputs=['*'])
+
+                self.add_subsystem('sum',
+                                   subsys=om.ExecComp('z=sum(y)',
+                                                      y={'shape': (nn,)},
+                                                      z={'shape': (1,)}),
+                                   promotes_inputs=['*'], promotes_outputs=['*'])
+
+                self.add_design_var('x', lower=0, upper=100)
+                self.add_objective('z')
+
+        test_sys = prob.model.add_subsystem('test_sys', subsys=_TestSys(vec_size=vec_size))
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.driver.recording_options['includes'] = ['*y*']
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+
+        prob.set_val('test_sys.x', np.random.rand(vec_size))
+
+        prob.run_driver()
+
+        y0 = prob.get_val('test_sys.y')
+
+        test_sys.options['vec_size'] = 10
+
+        prob.setup()
+
+        prob.set_val('test_sys.x', np.random.rand(test_sys.options['vec_size']))
+
+        prob.run_driver()
+
+        y1 = prob.get_val('test_sys.y')
+
+        case = om.CaseReader('cases.sql').get_case(-1)
+
+        y_recorded = case.get_val('test_sys.y')
+
+        assert_rel_error(self, y_recorded, y1)
+
 
 @use_tempdirs
 class TestFeatureBasicRecording(unittest.TestCase):
