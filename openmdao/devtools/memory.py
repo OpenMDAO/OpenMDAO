@@ -78,6 +78,18 @@ except ImportError:
 try:
     import objgraph
 
+    def get_new_objects(lst, fn, *args, **kwargs):
+        start_objs = objgraph.typestats()
+        start_objs['frame'] += 1
+        start_objs['function'] += 1
+        start_objs['builtin_function_or_method'] += 1
+        start_objs['cell'] += 1
+        ret = fn(*args, **kwargs)
+        lst.extend([(str(o), delta) for o, _, delta in objgraph.growth(peak_stats=start_objs)])
+        for obj, _, delta_objs in objgraph.growth(peak_stats=start_objs):
+            print(str(fn), "added %s %+d" % (obj, delta_objs))
+        return ret
+
     def new_objects(fn):
         """
         This performs garbage collection before and after the function call and prints any
@@ -86,11 +98,9 @@ try:
         """
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            start_objs = objgraph.typestats()
-            start_objs['frame'] += 1
-            start_objs['cell'] += 1
-            ret = fn(*args, **kwargs)
-            for obj, _, delta_objs in objgraph.growth(peak_stats=start_objs):
+            lst = []
+            ret = get_new_objects(lst, fn, *args, **kwargs)
+            for obj, delta_objs in lst:
                 print(str(fn), "added %s %+d" % (obj, delta_objs))
             return ret
         return wrapper

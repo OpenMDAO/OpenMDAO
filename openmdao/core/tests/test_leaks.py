@@ -16,6 +16,7 @@ from openmdao.vectors.vector import Vector
 from openmdao.solvers.solver import Solver
 from openmdao.core.driver import Driver
 from openmdao.jacobians.jacobian import Jacobian
+from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 
@@ -29,7 +30,7 @@ OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT', fallback=True)
 # variables, and from the garbage collector's bookkeeping.
 REFERRERS_TO_IGNORE = [locals(), globals(), gc.garbage]
 
-_om_classes = [System, om.Problem, Vector, Driver, Solver, MethodType]
+_om_classes = [System, om.Problem, Vector, Driver, Solver, ApproximationScheme]
 
 if not PY2:
     _om_classes.extend([GeneratorType, CoroutineType])
@@ -74,9 +75,9 @@ def record_leaks(classes=(object,),
 
     # Report on what was left
     for o in gc.garbage:
-        if id(o) not in old_garbage and isinstance(o, classes):
+        if id(o) not in old_garbage and not isinstance(o, type) and isinstance(o, _om_classes):
             rlist = []
-            for r in find_referring_objects(o, classes):
+            for r in find_referring_objects(o):
                 rlist.append(r)
 
             # only add 'o' to the list if there are objects referring to it
@@ -90,7 +91,7 @@ def record_leaks(classes=(object,),
 
 
 def check_refs(func, niters):
-    with record_leaks(_om_classes) as rec:
+    with record_leaks() as rec:
         for i in range(niters):
             func()
 
