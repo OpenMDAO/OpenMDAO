@@ -155,29 +155,29 @@ class BalanceComp(ImplicitComponent):
 
             meta = self.add_output(name, **options['kwargs'])
 
-            n = meta['size']
+            shape = meta['shape']
 
             for s in ('lhs', 'rhs', 'mult'):
                 if options['{0}_name'.format(s)] is None:
                     options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
 
             self.add_input(options['lhs_name'],
-                           val=np.ones(n),
+                           val=np.ones(shape),
                            units=options['eq_units'])
 
             self.add_input(options['rhs_name'],
-                           val=options['rhs_val'] * np.ones(n),
+                           val=options['rhs_val'] * np.ones(shape),
                            units=options['eq_units'])
 
             if options['use_mult']:
                 self.add_input(options['mult_name'],
-                               val=options['mult_val'] * np.ones(n),
+                               val=options['mult_val'] * np.ones(shape),
                                units=None)
 
-            self._scale_factor = np.ones(n)
-            self._dscale_drhs = np.ones(n)
+            self._scale_factor = np.ones(shape)
+            self._dscale_drhs = np.ones(shape)
 
-            ar = np.arange(n)
+            ar = np.arange(np.prod(shape))
             self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
             self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
 
@@ -268,15 +268,18 @@ class BalanceComp(ImplicitComponent):
                 mult = inputs[mult_name]
 
                 # Partials of residual wrt mult
-                jacobian[name, mult_name] = lhs * self._scale_factor
+                deriv = lhs * self._scale_factor
+                jacobian[name, mult_name] = deriv.flatten()
             else:
                 mult = 1.0
 
             # Partials of residual wrt rhs
-            jacobian[name, rhs_name] = (mult * lhs - rhs) * self._dscale_drhs - self._scale_factor
+            deriv = (mult * lhs - rhs) * self._dscale_drhs - self._scale_factor
+            jacobian[name, rhs_name] = deriv.flatten()
 
             # Partials of residual wrt lhs
-            jacobian[name, lhs_name] = mult * self._scale_factor
+            deriv = mult * self._scale_factor
+            jacobian[name, lhs_name] = deriv.flatten()
 
     def guess_nonlinear(self, inputs, outputs, residuals):
         """
