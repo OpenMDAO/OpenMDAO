@@ -807,6 +807,50 @@ class TestBalanceComp(unittest.TestCase):
         assert_almost_equal(prob['balance.x'], -c/b, decimal=6)
         assert_almost_equal(-c/b, prob['balance.x'], decimal=6)  # expected
 
+    def test_specified_shape(self):
+        shape = (3, 2, 4)
+
+        prob = om.Problem(model=om.Group(assembled_jac_type='dense'))
+
+        bal = om.BalanceComp()
+
+        bal.add_balance('x', val=np.ones(shape), use_mult=True)
+
+        tgt = om.IndepVarComp(name='y_tgt', val=4*np.ones(shape))
+
+        mult_ivc = om.IndepVarComp(name='mult', val=2.0*np.ones(shape))
+
+        exec_comp = om.ExecComp('y=x**2', x={'value': np.ones(shape)}, y={'value': np.ones(shape)})
+
+        prob.model.add_subsystem(name='target', subsys=tgt, promotes_outputs=['y_tgt'])
+        prob.model.add_subsystem(name='mult_comp', subsys=mult_ivc, promotes_outputs=['mult'])
+
+        prob.model.add_subsystem(name='exec', subsys=exec_comp)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        prob.model.connect('y_tgt', 'balance.rhs:x')
+        prob.model.connect('mult', 'balance.mult:x')
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+
+        prob.setup()
+
+        prob['balance.x'] = np.random.random(shape)
+
+        prob.run_model()
+
+        assert_almost_equal(prob['balance.x'], np.sqrt(2), decimal=7)
+
+        cpd = prob.check_partials(out_stream=None)
+
+        for (of, wrt) in cpd['balance']:
+            assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
+
 
 if __name__ == '__main__':  # pragma: no cover
     unittest.main()
