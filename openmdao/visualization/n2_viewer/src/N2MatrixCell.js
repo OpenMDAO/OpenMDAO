@@ -359,42 +359,23 @@ class N2MatrixCell {
      * @param {N2TreeNode} srcObj The node in the model tree this node is associated with.
      * @param {N2TreeNode} tgtObj The model tree node that this outputs to.
      * @param {ModelData} model Reference to the model to get some info from it.
-     * @param {Object} dims Layout and dimensions for the current cell spec.
-     * @param {Object} prevDims Layout and dimensions for the previous cell spec.
      * @param {N2CellRenderer} renderer The object that draws the cell.
     */
     constructor(row, col, srcObj, tgtObj, model) {
-        this.mainRow = row;
-        this.mainCol = col;
+        this.row = row;
+        this.col = col;
         this.srcObj = this.obj = srcObj;
         this.tgtObj = tgtObj;
         this.id = srcObj.id + "_" + tgtObj.id;
 
         this.symbolType = new SymbolType(this, model);
-
         this.renderer = this._newRenderer();
-        this.tgtObj.cell = this;
-    }
 
-    static updateBoundary(firstCell, lastCell) {
-        N2MatrixCell.boundary = {
-            'first': { 'row': firstCell.mainRow, 'col': firstCell.mainCol },
-            'last': { 'row': lastCell.mainRow, 'col': lastCell.mainCol }
-        };
-
-        console.log("New top left: ", firstCell.mainRow, firstCell.mainCol);
-        console.log("New bottom right: ", lastCell.mainRow, lastCell.mainCol);
-        console.log(firstCell, lastCell)
-    }
-
-    get row() { return this.mainRow - N2MatrixCell.boundary.first.row; }
-    get col() { return this.mainCol - N2MatrixCell.boundary.first.col; }
-
-    withinBounds() {
-        return (this.mainRow >= N2MatrixCell.boundary.first.row &&
-            this.mainCol >= N2MatrixCell.boundary.first.col &&
-            this.mainRow <= N2MatrixCell.boundary.last.row &&
-            this.mainCol <= N2MatrixCell.boundary.last.col);
+        this.offScreen = {
+            'top': { 'incoming': [], 'outgoing': []},
+            'bottom': { 'incoming': [], 'outgoing': []},
+            'total': 0
+        }
     }
 
     /**
@@ -430,6 +411,49 @@ class N2MatrixCell {
         return N2Style.color.connection;
     }
 
+
+    /**
+     * An connection going "off-screen" was detected between two nodes.
+     * Determine whether the arrow should be in the top or bottom section of the
+     * matrix based on rootIndex, and add to the appropriate array of
+     * tracked offscreen connections.
+     * @param {N2TreeNode} srcNode Where the connection starts.
+     * @param {N2TreeNode} tgtNode Where the connection ends.
+     */
+    addOffScreenConn(srcNode, tgtNode) {
+        let debugStr = ': ' + srcNode.absPathName + ' -> ' + tgtNode.absPathName;
+
+        if (srcNode === this.tgtObj) {
+            // Outgoing
+            if (srcNode.rootIndex < tgtNode.rootIndex) {
+                // Top
+                debugInfo("New offscreen outgoing connection on top" + debugStr);
+                this.offScreen.top.outgoing.push(tgtNode);
+            }
+            else {
+                // Bottom
+                debugInfo("New offscreen outgoing connection on bottom" + debugStr);
+                this.offScreen.bottom.outgoing.push(tgtNode);
+            }
+        }
+        else {
+            // Incoming
+            if (srcNode.rootIndex < tgtNode.rootIndex) {
+                // Top
+                debugInfo("New offscreen incoming connection on top" + debugStr);
+                this.offScreen.top.incoming.push(srcNode);
+            }
+            else {
+                // Bottom
+                debugInfo("New offscreen incoming connection on bottom" + debugStr);
+                this.offScreen.bottom.incoming.push(srcNode);
+            }
+        }
+
+        this.offScreen.total++;
+        // debugInfo("Total offscreen connections found: " + this.offScreen.total);
+    }
+
     /** Choose a renderer based on our SymbolType.
      * @param {Object} dims Layout and dimensions for the current cell spec.
      * @param {Object} prevDims Layout and dimensions for the previous cell spec.
@@ -451,8 +475,3 @@ class N2MatrixCell {
         }
     }
 }
-
-N2MatrixCell.boundary = {
-    'first': { 'row': 0, 'col': 0 },
-    'last': { 'row': NaN, 'col': NaN }
-};
