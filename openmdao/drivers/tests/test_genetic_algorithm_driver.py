@@ -353,6 +353,26 @@ class TestSimpleGA(unittest.TestCase):
 
         self.assertEqual(exception.args[0], msg)
 
+    def test_vectorized_constraints(self):
+        prob = om.Problem()
+        model = prob.model
+
+        dim = 2
+        model.add_subsystem('x', om.IndepVarComp('x', np.ones(dim)), promotes=['*'])
+        model.add_subsystem('f_x', om.ExecComp('f_x = sum(x * x)', x=np.ones(dim), f_x=1.0), promotes=['*'])
+        model.add_subsystem('g_x', om.ExecComp('g_x = 1 - x', x=np.ones(dim), g_x=np.zeros(dim)), promotes=['*'])
+
+        prob.driver = om.SimpleGADriver()
+
+        prob.model.add_design_var('x', lower=-10, upper=10)
+        prob.model.add_objective('f_x')
+
+        # Without bugfix to genetic_algorithm_driver, using vectorized constraint limits causes an exception
+        prob.model.add_constraint('g_x', upper=np.zeros(dim))
+
+        prob.setup()
+        prob.run_driver()
+
 
 class TestDriverOptionsSimpleGA(unittest.TestCase):
 
