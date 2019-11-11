@@ -82,19 +82,19 @@ class ProbRemoteTestCase(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             loc = p.is_local('indep.x')
-        self.assertEqual(str(cm.exception), "is_local('indep.x') was called before setup() completed.")
+        self.assertEqual(str(cm.exception), "Problem: is_local('indep.x') was called before setup() completed.")
 
         with self.assertRaises(RuntimeError) as cm:
             loc = p.is_local('par.C1')
-        self.assertEqual(str(cm.exception), "is_local('par.C1') was called before setup() completed.")
+        self.assertEqual(str(cm.exception), "Problem: is_local('par.C1') was called before setup() completed.")
 
         with self.assertRaises(RuntimeError) as cm:
             loc = p.is_local('par.C1.y')
-        self.assertEqual(str(cm.exception), "is_local('par.C1.y') was called before setup() completed.")
+        self.assertEqual(str(cm.exception), "Problem: is_local('par.C1.y') was called before setup() completed.")
 
         with self.assertRaises(RuntimeError) as cm:
             loc = p.is_local('par.C1.x')
-        self.assertEqual(str(cm.exception), "is_local('par.C1.x') was called before setup() completed.")
+        self.assertEqual(str(cm.exception), "Problem: is_local('par.C1.x') was called before setup() completed.")
 
         p.setup()
         p.final_setup()

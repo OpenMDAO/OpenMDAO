@@ -166,9 +166,6 @@ class ScipyOptimizeDriver(Driver):
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically if True '
                              '(deprecated)')
-        self.options.declare('dynamic_derivs_repeats', default=3, types=int,
-                             desc='Number of compute_totals calls during dynamic computation of '
-                                  'simultaneous derivative coloring')
 
     def _get_name(self):
         """

@@ -569,19 +569,19 @@ class ProbRemoteTests(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             ans = p.get_val('par.C2.invec', get_remote=True)
         self.assertEqual(str(context.exception),
-                         "Retrieval of the full distributed variable 'par.C2.invec' is not supported.")
+                         "Problem: Retrieval of the full distributed variable 'par.C2.invec' is not supported.")
         with self.assertRaises(Exception) as context:
             ans = p.get_val('par.C2.outvec', get_remote=True)
         self.assertEqual(str(context.exception),
-                         "Retrieval of the full distributed variable 'par.C2.outvec' is not supported.")
+                         "Problem: Retrieval of the full distributed variable 'par.C2.outvec' is not supported.")
         with self.assertRaises(Exception) as context:
             ans = p.get_val('par.C1.invec', get_remote=True)
         self.assertEqual(str(context.exception),
-                         "Retrieval of the full distributed variable 'par.C1.invec' is not supported.")
+                         "Problem: Retrieval of the full distributed variable 'par.C1.invec' is not supported.")
         with self.assertRaises(Exception) as context:
             ans = p.get_val('par.C1.outvec', get_remote=True)
         self.assertEqual(str(context.exception),
-                         "Retrieval of the full distributed variable 'par.C1.outvec' is not supported.")
+                         "Problem: Retrieval of the full distributed variable 'par.C1.outvec' is not supported.")
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

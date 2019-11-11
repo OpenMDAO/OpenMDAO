@@ -3,6 +3,7 @@ from __future__ import print_function
 
 from collections import defaultdict
 from six import iteritems
+from distutils.version import LooseVersion
 
 import numpy as np
 
@@ -14,6 +15,18 @@ from openmdao.utils.graph_utils import get_sccs_topo
 from openmdao.utils.logger_utils import get_logger
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.mpi import MPI
+from openmdao.utils.hooks import _register_hook
+from openmdao.utils.general_utils import printoptions
+from openmdao.utils.units import convert_units
+
+
+_UNSET = object()
+
+# numpy default print options changed in 1.14
+if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+    _npy_print_opts = {'legacy': '1.13'}
+else:
+    _npy_print_opts = {}
 
 
 def _check_cycles(group, infos=None):
@@ -198,6 +211,85 @@ def _check_dup_comp_inputs(problem, logger):
         logger.warning(''.join(msg))
 
 
+def _trim_str(obj, size):
+    """
+    Truncate given string if it's longer than the given size.
+
+    For arrays, use the norm if the size is exceeded.
+
+    Parameters
+    ----------
+    obj : object
+        Object to be stringified and trimmed.
+    size : int
+        Max allowable size of the returned string.
+
+    Returns
+    -------
+    str
+        The trimmed string.
+    """
+    if isinstance(obj, np.ndarray):
+        with printoptions(**_npy_print_opts):
+            s = str(obj)
+    else:
+        s = str(obj)
+
+    if len(s) > size:
+        if isinstance(obj, np.ndarray) and np.issubdtype(obj.dtype, np.floating):
+            s = 'shape={}, norm={:<.3}'.format(obj.shape, np.linalg.norm(obj))
+        else:
+            s = s[:size - 4] + ' ...'
+
+    return s
+
+
+def _has_val_mismatch(discretes, names, units, vals):
+    """
+    Return True if any of the given values don't match, subject to unit conversion.
+
+    Parameters
+    ----------
+    discretes : set-like
+        Set of discrete variable names.
+    names : list
+        List of variable names.
+    units : list
+        List of units corresponding to names.
+    vals : list
+        List of values corresponding to names.
+
+    Returns
+    -------
+    bool
+        True if a mismatch was found, otherwise False.
+    """
+    if len(names) < 2:
+        return False
+
+    uset = set(units)
+    if '' in uset and len(uset) > 1:
+        # at least one case has no units and at least one does, so there must be a mismatch
+        return True
+
+    u0 = v0 = _UNSET
+    for n, u, v in zip(names, units, vals):
+        if n in discretes:
+            continue
+        if u0 is _UNSET:
+            u0 = u
+            v0 = v
+        else:
+            if u != u0:
+                # convert units
+                v = convert_units(v, u, new_units=u0)
+
+            if np.linalg.norm(v - v0) > 1e-10:
+                return True
+
+    return False
+
+
 def _check_hanging_inputs(problem, logger):
     """
     Issue a logger warning if any inputs are not connected.
@@ -217,20 +309,49 @@ def _check_hanging_inputs(problem, logger):
         input_srcs = problem.model._conn_global_abs_in2out
 
     prom_ins = problem.model._var_allprocs_prom2abs_list['input']
+    abs2meta = problem.model._var_allprocs_abs2meta
     unconns = []
+    nwid = uwid = 0
+
     for prom, abslist in iteritems(prom_ins):
         unconn = [a for a in abslist if a not in input_srcs or len(input_srcs[a]) == 0]
         if unconn:
-            unconns.append(prom)
+            w = max([len(u) for u in unconn])
+            if w > nwid:
+                nwid = w
+            units = [abs2meta[a]['units'] if a in abs2meta else '' for a in unconn]
+            units = [u if u is not None else '' for u in units]
+            lens = [len(u) for u in units]
+            if lens:
+                u = max(lens)
+                if u > uwid:
+                    uwid = u
+            unconns.append((prom, unconn, units))
 
     if unconns:
+        template_abs = "   {:<{nwid}} {:<{uwid}} {}\n"
+        template_prom = "      {:<{nwid}} {:<{uwid}} {}\n"
         msg = ["The following inputs are not connected:\n"]
-        for prom in sorted(unconns):
-            absnames = prom_ins[prom]
+        for prom, absnames, units in sorted(unconns, key=lambda x: x[0]):
             if len(absnames) == 1 and prom == absnames[0]:  # not really promoted
-                msg.append("   %s\n" % prom)
+                a = absnames[0]
+                valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
+                msg.append(template_abs.format(a, units[0], valstr, nwid=nwid + 3, uwid=uwid))
             else:  # promoted
-                msg.append("   %s: %s\n" % (prom, prom_ins[prom]))
+                vals = [problem.get_val(a, get_remote=True) for a in absnames]
+                mismatch = _has_val_mismatch(problem.model._var_allprocs_discrete['input'],
+                                             absnames, units, vals)
+                if mismatch:
+                    msg.append("\n   ----- WARNING: connected input values don't match when "
+                               "converted to consistent units. -----\n")
+                msg.append("   {}  (p):\n".format(prom))
+                for a, u, v in zip(absnames, units, vals):
+                    valstr = _trim_str(problem.get_val(a, get_remote=True), 25)
+                    msg.append(template_prom.format(a, u, valstr, nwid=nwid, uwid=uwid))
+                if mismatch:
+                    msg.append("   --------------------------------------------------------------"
+                               "-----------------------------\n\n")
+
         logger.warning(''.join(msg))
 
 
@@ -483,11 +604,12 @@ def _check_config_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', action='store', dest='outfile', help='output file.')
+    parser.add_argument('file', nargs=1, help='Python file containing the model')
+    parser.add_argument('-o', action='store', dest='outfile', help='output file')
+    parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
     parser.add_argument('-c', action='append', dest='checks', default=[],
                         help='Only perform specific check(s). Default checks are: %s. '
-                        'Other available checks are: %s.' %
+                        'Other available checks are: %s' %
                         (sorted(_default_checks), sorted(set(_all_checks) - set(_default_checks))))
 
 
@@ -521,6 +643,9 @@ def _check_config_cmd(options):
             prob.check_config(logger, options.checks)
 
         exit()
+
+    # register the hook
+    _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config)
 
     return _check_config
 

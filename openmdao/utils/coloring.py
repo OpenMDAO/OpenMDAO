@@ -26,6 +26,7 @@ from scipy.sparse.compressed import get_index_dtype
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning
+import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
 
 
@@ -42,10 +43,10 @@ CITATIONS = """
 }
 """
 
-# If this is True, then IF simul coloring/sparsity is specified, use it.
+# If this is True, then IF simul coloring is specified, use it.
 # If False, don't use it regardless.
-# The command line total_coloring and sparsity commands make this False when generating a
-# new coloring and/or sparsity.
+# The command line total_coloring command makes this False when generating a
+# new coloring.
 _use_total_sparsity = True
 
 # If this is True, then IF partial/semi-total coloring is specified, use it.
@@ -268,8 +269,8 @@ class Coloring(object):
         float
             Percent improvment.
         """
-        rev_size = self._shape[0] if self._shape else -1  # nrows
-        fwd_size = self._shape[1] if self._shape else -1  # ncols
+        rev_size = self._shape[0]  # nrows
+        fwd_size = self._shape[1]  # ncols
 
         tot_solves = self.total_solves()
 
@@ -281,7 +282,9 @@ class Coloring(object):
             fwd_lists = self._fwd[0] if self._fwd else []
             rev_lists = self._rev[0] if self._rev else []
 
-            if fwd_lists and not rev_lists:
+            if self._meta.get('bidirectional'):
+                tot_size = min(fwd_size, rev_size)
+            elif fwd_lists and not rev_lists:
                 tot_size = fwd_size
             elif rev_lists and not fwd_lists:
                 tot_size = rev_size
@@ -627,8 +630,8 @@ class Coloring(object):
         except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
-                  "object or by using 'openmdao view_coloring --jtext <your_coloring_file>' from "
-                  "the command line.")
+                  "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
+                  "from the command line.")
             return
 
         nrows, ncols = self._shape
@@ -804,7 +807,7 @@ class Coloring(object):
         Returns
         -------
         dict or None
-            Mapping of (of, wrt) keys to thier corresponding (nzrows, nzcols, shape).
+            Mapping of (of, wrt) keys to their corresponding (nzrows, nzcols, shape).
         """
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:
             J = self.get_dense_sparsity()
@@ -1149,7 +1152,11 @@ def MNCO_bidir(J):
     row_i = col_i = 0
 
     # partition J into Jc and Jr
-    # We build Jc from bottom up and Jr from right to left.
+    # Jc is colored by column and those columns will be solved in fwd mode
+    # Jr is colored by row and those rows will be solved in reverse mode
+    # We build Jc from bottom up (by row) and Jr from right to left (by column).
+
+    # get index of row with fewest nonzeros and col with fewest nonzeros
     r = M_row_nonzeros.argmin()
     c = M_col_nonzeros.argmin()
 
@@ -1160,7 +1167,14 @@ def MNCO_bidir(J):
     Jr_nz_max = 0   # max col nonzeros in Jr
 
     while M_rows.size + M_cols.size > 0:
-        if Jr_nz_max + max(Jc_nz_max, nnz_r) < (Jc_nz_max + max(Jr_nz_max, nnz_c)):
+        # what the algorithm is doing is basically minimizing the total of the max number of nonzero
+        # columns in Jc + the max number of nonzero rows in Jr, so it's basically minimizing
+        # the upper bound of the number of colors that will be needed.
+
+        # we differ from the algorithm in the paper here slightly because we add ncols and nrows to
+        # different sides of the inequality in order to prevent bad colorings when we have
+        # matrices that have many more rows than columns or many more columns than rows.
+        if ncols + Jr_nz_max + max(Jc_nz_max, nnz_r) < (nrows + Jc_nz_max + max(Jr_nz_max, nnz_c)):
             Jc_rows[r] = M_cols[M_rows == r]
             Jc_nz_max = max(nnz_r, Jc_nz_max)
 
@@ -1220,6 +1234,7 @@ def MNCO_bidir(J):
     # check_coloring(J, coloring)
 
     coloring._meta['coloring_time'] = time.time() - start_time
+    coloring._meta['bidirectional'] = True
 
     return coloring
 
@@ -1578,6 +1593,7 @@ def _compute_coloring(J, mode):
     nrows, ncols = J.shape
     best_nocolor = min(nrows, ncols)  # lowest number of solves possible if we don't use coloring
 
+    fallback = False
     if mode == 'auto':  # use bidirectional coloring
         coloring = MNCO_bidir(J)
         if coloring.total_solves() < best_nocolor:
@@ -1586,6 +1602,7 @@ def _compute_coloring(J, mode):
             mode = 'fwd'
         else:
             mode = 'rev'
+        fallback = True
 
     rev = mode == 'rev'
 
@@ -1608,6 +1625,8 @@ def _compute_coloring(J, mode):
         coloring._fwd = (col_groups, col2rows)
 
     coloring._meta['coloring_time'] = time.time() - start_time
+    if fallback:
+        coloring._meta['fallback'] = True
 
     return coloring
 
@@ -1720,33 +1739,6 @@ def compute_total_coloring(problem, mode=None,
     return coloring
 
 
-def dynamic_derivs_sparsity(driver):
-    """
-    Compute deriv sparsity during runtime.
-
-    Parameters
-    ----------
-    driver : <Driver>
-        The driver performing the optimization.
-    """
-    problem = driver._problem
-    if not problem.model._use_derivatives:
-        simple_warning("Derivatives have been turned off. Skipping dynamic sparsity computation.")
-        return
-
-    driver._total_jac = None
-    num_full_jacs = driver.options['dynamic_derivs_repeats']
-
-    # save the total_sparsity.json file for later inspection
-    sparsity, _ = get_tot_jac_sparsity(problem, mode=problem._mode, num_full_jacs=num_full_jacs)
-
-    with open("total_sparsity.json", "w") as f:
-        _write_sparsity(sparsity, f)
-
-    driver.set_total_jac_sparsity(sparsity)
-    driver._setup_tot_jac_sparsity()
-
-
 def dynamic_total_coloring(driver, run_model=True, fname=None):
     """
     Compute simultaneous deriv coloring during runtime.
@@ -1814,13 +1806,11 @@ def _total_coloring_setup_parser(parser):
                         help='Number of orders (+/-) used in the tolerance sweep.')
     parser.add_argument('-t', '--tol', action='store', dest='tolerance', type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
-    parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
+    parser.add_argument('--view', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the final jacobian used to "
                         "compute the coloring.")
-    parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
+    parser.add_argument('--textview', action='store_true', dest='show_sparsity_text',
                         help="Display a text-based visualization of the colored jacobian.")
-    parser.add_argument('--no-sparsity', action='store_true', dest='no_sparsity',
-                        help="Exclude the sparsity structure from the coloring data structure.")
     parser.add_argument('--profile', action='store_true', dest='profile',
                         help="Do profiling on the coloring process.")
 
@@ -1837,7 +1827,7 @@ def _total_coloring_cmd(options):
     Returns
     -------
     function
-        The post-setup hook function.
+        The hook function.
     """
     from openmdao.core.problem import Problem
     from openmdao.devtools.debug import profiling
@@ -1849,7 +1839,7 @@ def _total_coloring_cmd(options):
 
     def _total_coloring(prob):
         if prob.model._use_derivatives:
-            Problem._post_setup_func = None  # avoid recursive loop
+            hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
             if options.outfile:
                 outfile = os.path.abspath(options.outfile)
             else:
@@ -1879,6 +1869,9 @@ def _total_coloring_cmd(options):
         else:
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
+
+    hooks._register_hook('final_setup', 'Problem', post=_total_coloring)
+
     return _total_coloring
 
 
@@ -1918,16 +1911,17 @@ def _partial_coloring_setup_parser(parser):
     parser.add_argument('--tol', action='store', dest='tol', default=1.e-15, type=float,
                         help='tolerance used to determine if a jacobian entry is nonzero')
     parser.add_argument('--per_instance', action='store', dest='per_instance',
-                        help='tolerance used to determine if a jacobian entry is nonzero')
-    parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
+                        help='Generate a coloring file per instance, rather than a coloring file '
+                        'per class.')
+    parser.add_argument('--view', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the colored jacobian.")
-    parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
+    parser.add_argument('--textview', action='store_true', dest='show_sparsity_text',
                         help="Display a text-based visualization of the colored jacobian.")
     parser.add_argument('--profile', action='store_true', dest='profile',
                         help="Do profiling on the coloring process.")
 
 
-def _get_partial_coloring_kwargs(options):
+def _get_partial_coloring_kwargs(system, options):
     if options.system != '' and options.classes:
         raise RuntimeError("Can't specify --system and --class together.")
 
@@ -1937,7 +1931,11 @@ def _get_partial_coloring_kwargs(options):
         if getattr(options, name) is not None:
             kwargs[name] = getattr(options, name)
 
-    kwargs['recurse'] = not options.norecurse
+    recurse = not options.norecurse
+    if recurse and not system._subsystems_allprocs:
+        recurse = False
+    kwargs['recurse'] = recurse
+
     per_instance = getattr(options, 'per_instance')
     kwargs['per_instance'] = (per_instance is None or
                               per_instance.lower() not in ['false', '0', 'no'])
@@ -1947,7 +1945,7 @@ def _get_partial_coloring_kwargs(options):
 
 def _partial_coloring_cmd(options):
     """
-    Return the post_setup hook function for 'openmdao partial_color'.
+    Return the hook function for 'openmdao partial_color'.
 
     Parameters
     ----------
@@ -1957,7 +1955,7 @@ def _partial_coloring_cmd(options):
     Returns
     -------
     function
-        The post-setup hook function.
+        The hook function.
     """
     from openmdao.core.problem import Problem
     from openmdao.core.component import Component
@@ -1985,13 +1983,13 @@ def _partial_coloring_cmd(options):
             print('\n')
 
         if options.compute_decls and isinstance(system, Component):
-            print('    # add the following lines to class %s to declare sparsity' %
+            print('\n    # add the following lines to class %s to declare sparsity' %
                   type(system).__name__)
             print(coloring.get_declare_partials_calls())
 
     def _partial_coloring(prob):
         if prob.model._use_derivatives:
-            Problem._post_setup_func = None  # avoid recursive loop
+            hooks._unregister_hook('final_setup', 'Problem')  # avoid recursive loop
 
             prob.run_model()  # get a consistent starting values for inputs and outputs
 
@@ -2000,12 +1998,11 @@ def _partial_coloring_cmd(options):
                     system = prob.model
                     _initialize_model_approx(system, prob.driver)
                 else:
-                    system = prob.model.get_subsystem(options.system)
+                    system = prob.model._get_subsystem(options.system)
                 if system is None:
                     raise RuntimeError("Can't find system with pathname '%s'." % options.system)
 
-                kwargs = _get_partial_coloring_kwargs(options)
-                recurse = not options.norecurse
+                kwargs = _get_partial_coloring_kwargs(system, options)
 
                 if options.classes:
                     to_find = set(options.classes)
@@ -2035,7 +2032,6 @@ def _partial_coloring_cmd(options):
                                                sorted(to_find - found))
                 else:
                     colorings = system._compute_approx_coloring(**kwargs)
-
                     if not colorings:
                         print("No coloring found.")
                     else:
@@ -2048,68 +2044,9 @@ def _partial_coloring_cmd(options):
             print("Derivatives are turned off.  Cannot compute simul coloring.")
         exit()
 
+    hooks._register_hook('final_setup', 'Problem', post=_partial_coloring)
+
     return _partial_coloring
-
-
-def _sparsity_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao sparsity' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', action='store', dest='outfile', help='output file (json format).')
-    parser.add_argument('-n', action='store', dest='num_jacs', default=3, type=int,
-                        help='number of times to repeat total derivative computation.')
-    parser.add_argument('-t', action='store', dest='tolerance', default=1.e-15, type=float,
-                        help='tolerance used to determine if a total jacobian entry is nonzero.')
-    parser.add_argument('-j', '--jac', action='store_true', dest='show_sparsity',
-                        help="Display a visualization of the final total jacobian used to "
-                        "compute the sparsity.")
-
-
-def _sparsity_cmd(options):
-    """
-    Return the post_setup hook function for 'openmdao total_sparsity'.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-
-    Returns
-    -------
-    function
-        The post-setup hook function.
-    """
-    from openmdao.core.problem import Problem
-    global _use_total_sparsity
-
-    _use_total_sparsity = False
-
-    def _sparsity(prob):
-        Problem._post_setup_func = None  # avoid recursive loop
-        sparsity, J = get_tot_jac_sparsity(prob, num_full_jacs=options.num_jacs,
-                                           tol=options.tolerance,
-                                           mode=prob._mode, setup=True, run_model=True)
-
-        if options.outfile is None:
-            outfile = sys.stdout
-        else:
-            outfile = open(options.outfile, 'w')
-        _write_sparsity(sparsity, outfile)
-
-        if options.show_sparsity:
-            print("\n")
-            ofs = prob.driver._get_ordered_nl_responses()
-            wrts = list(prob.driver._designvars)
-            array_viz(J, prob, ofs, wrts)
-
-        exit(0)
-    return _sparsity
 
 
 def _view_coloring_setup_parser(parser):
@@ -2122,9 +2059,9 @@ def _view_coloring_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='coloring file.')
-    parser.add_argument('-j', action='store_true', dest='show_sparsity',
+    parser.add_argument('--view', action='store_true', dest='show_sparsity',
                         help="Display a visualization of the colored jacobian.")
-    parser.add_argument('--jtext', action='store_true', dest='show_sparsity_text',
+    parser.add_argument('--textview', action='store_true', dest='show_sparsity_text',
                         help="Display a text-based visualization of the colored jacobian.")
     parser.add_argument('-s', action='store_true', dest='subjac_sparsity',
                         help="Display sparsity patterns for subjacs.")
@@ -2135,7 +2072,7 @@ def _view_coloring_setup_parser(parser):
                         'for a particular variable.')
 
 
-def _view_coloring_exec(options):
+def _view_coloring_exec(options, user_args):
     """
     Execute the 'openmdao view_coloring' command.
 
@@ -2143,6 +2080,8 @@ def _view_coloring_exec(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Command line options after '--' (if any).  Passed to user script.
     """
     coloring = Coloring.load(options.file[0])
     if options.show_sparsity_text:

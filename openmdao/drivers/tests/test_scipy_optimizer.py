@@ -1207,6 +1207,9 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertFalse(failed, "Optimization failed.")
 
         self.assertTrue('Solving variable: comp.f_xy' in output)
+        self.assertTrue('In mode: rev ' in output)
+        self.assertTrue('Sub Indices: 0' in output)
+        self.assertTrue('Elapsed Time:' in output)
         self.assertTrue('Solving variable: con.c' in output)
 
         prob = om.Problem()
@@ -1349,7 +1352,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             totals = prob.check_totals(method='fd', out_stream=False)
 
-        expected_msg = "run_model must be called before total derivatives can be checked."
+        expected_msg = "Problem: run_model must be called before total derivatives can be checked."
 
         self.assertEqual(expected_msg, str(cm.exception))
 

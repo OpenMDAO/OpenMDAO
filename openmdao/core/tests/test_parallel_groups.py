@@ -52,16 +52,21 @@ class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+    @parameterized.expand(itertools.product([(om.LinearRunOnce, None), (om.DirectSolver, 'csc'),
+                                             (om.DirectSolver, 'dense')],
                                             [om.NonlinearBlockGS, om.NonLinearRunOnce]),
                           name_func=_test_func_name)
-    def test_fan_out_grouped(self, solver, nlsolver):
+    def test_fan_out_grouped(self, solv_tup, nlsolver):
         prob = om.Problem(FanOutGrouped())
 
         of=['c2.y', "c3.y"]
         wrt=['iv.x']
 
+        solver, jactype = solv_tup
+
         prob.model.linear_solver = solver()
+        if jactype is not None:
+            prob.model.options['assembled_jac_type'] = jactype
         prob.model.nonlinear_solver = nlsolver()
 
         prob.setup(check=False, mode='fwd')
@@ -303,7 +308,7 @@ class TestParallelGroups(unittest.TestCase):
 
         # check that error is thrown if not using PETScVector
         if MPI:
-            msg = ("The `distributed_vector_class` argument must be `PETScVector` when "
+            msg = ("Problem: The `distributed_vector_class` argument must be `PETScVector` when "
                    "running in parallel under MPI but 'DefaultVector' was specified.")
             with self.assertRaises(ValueError) as cm:
                 prob.setup(check=False, mode='fwd', distributed_vector_class=om.DefaultVector)

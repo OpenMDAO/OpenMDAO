@@ -2379,7 +2379,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.check_totals(method='cs')
 
-        msg = "\nTo enable complex step, specify 'force_alloc_complex=True' when calling " + \
+        msg = "\nProblem: To enable complex step, specify 'force_alloc_complex=True' when calling " + \
                 "setup on the problem, e.g. 'problem.setup(force_alloc_complex=True)'"
         self.assertEqual(str(cm.exception), msg)
 

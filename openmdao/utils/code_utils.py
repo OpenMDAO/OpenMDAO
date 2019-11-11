@@ -209,12 +209,14 @@ def _calltree_setup_parser(parser):
     """
     Set up the command line options for the 'openmdao call_tree' command line tool.
     """
-    parser.add_argument('method_path', nargs=1, help='Full module path to desired class method.')
+    parser.add_argument('method_path', nargs=1,
+                        help='Full module path to desired class method, e.g., '
+                        '"openmdao.components.exec_comp.ExecComp.setup".')
     parser.add_argument('-o', '--outfile', action='store', dest='outfile',
                         default='stdout', help='Output file.  Defaults to stdout.')
 
 
-def _calltree_exec(options):
+def _calltree_exec(options, user_args):
     """
     Process command line args and call get_nested_calls on the specified class method.
     """
