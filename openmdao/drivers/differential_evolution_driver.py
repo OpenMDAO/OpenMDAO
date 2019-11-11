@@ -529,13 +529,13 @@ class DifferentialEvolutionDriver(Driver):
             for name, val in iteritems(self.get_constraint_values()):
                 con = self._cons[name]
                 # The not used fields will either None or a very large number
-                if (con["lower"] is not None) and (con["lower"] > -almost_inf):
+                if (con["lower"] is not None) and np.any(con["lower"] > -almost_inf):
                     diff = val - con["lower"]
                     violation = np.array([0.0 if d >= 0 else abs(d) for d in diff])
-                elif (con["upper"] is not None) and (con["upper"] < almost_inf):
+                elif (con["upper"] is not None) and np.any(con["upper"] < almost_inf):
                     diff = val - con["upper"]
                     violation = np.array([0.0 if d <= 0 else abs(d) for d in diff])
-                elif (con["equals"] is not None) and (abs(con["equals"]) < almost_inf):
+                elif (con["equals"] is not None) and np.any(np.abs(con["equals"]) < almost_inf):
                     diff = val - con["equals"]
                     violation = np.absolute(diff)
                 constraint_violations = np.hstack((constraint_violations, violation))

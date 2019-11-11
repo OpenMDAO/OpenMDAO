@@ -16,14 +16,16 @@ from openmdao.drivers.differential_evolution_driver import DifferentialEvolution
 class TestDifferentialEvolutionDriver(unittest.TestCase):
     def setUp(self):
         os.environ["DifferentialEvolutionDriver_seed"] = "11"
-        dim = 2
+        self.dim = 2
 
         prob = om.Problem()
         prob.model.add_subsystem(
-            "indeps", om.IndepVarComp("x", val=np.ones(dim)), promotes=["*"]
+            "indeps", om.IndepVarComp("x", val=np.ones(self.dim)), promotes=["*"]
         )
         prob.model.add_subsystem(
-            "objf", om.ExecComp("f = sum(x * x)", f=1.0, x=np.ones(dim)), promotes=["*"]
+            "objf",
+            om.ExecComp("f = sum(x * x)", f=1.0, x=np.ones(self.dim)),
+            promotes=["*"],
         )
 
         prob.model.add_design_var("x", lower=-100.0, upper=100.0)
@@ -144,6 +146,32 @@ class TestDifferentialEvolutionDriver(unittest.TestCase):
         self.problem.run_driver()
         self.assertEqual(self.problem.driver._de.n_pop, n_pop)
         self.assertEqual(self.problem.driver._de.pop.shape[0], n_pop)
+
+    def test_constraint(self):
+        f_con = om.ExecComp("c = 1 - x[0]", c=0.0, x=np.ones(self.dim))
+        self.problem.model.add_subsystem("con", f_con, promotes=["*"])
+        self.problem.model.add_constraint("c", upper=0.0)
+
+        self.problem.setup()
+        self.problem.run_driver()
+
+        self.assertAlmostEqual(self.problem["x"][0], 1.0, 4)
+        self.assertTrue(np.all(np.abs(self.problem["x"][1:]) <= 1e-4))
+        self.assertAlmostEqual(self.problem["f"][0], 1.0, 4)
+
+    def test_vectorized_constraints(self):
+        self.problem.model.add_subsystem(
+            "con",
+            om.ExecComp("c = 1 - x", c=np.zeros(self.dim), x=np.ones(self.dim)),
+            promotes=["*"],
+        )
+        self.problem.model.add_constraint("c", upper=np.zeros(self.dim))
+
+        self.problem.setup()
+        self.problem.run_driver()
+
+        self.assertTrue(np.all(np.abs(self.problem["x"] - 1.0) <= 1e-4))
+        self.assertAlmostEqual(self.problem["f"][0], self.dim, 4)
 
 
 if __name__ == "__main__":
