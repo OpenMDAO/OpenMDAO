@@ -371,9 +371,9 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        # Check that the constraint is satisfied (x <= 1)
+        # Check that the constraint is satisfied (x >= 1)
         for i in range(dim):
-            self.assertLessEqual(prob["x"][i], 1.0)
+            self.assertLessEqual(1.0, prob["x"][i])
 
 
 class TestDriverOptionsSimpleGA(unittest.TestCase):
