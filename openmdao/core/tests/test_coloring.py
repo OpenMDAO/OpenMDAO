@@ -155,6 +155,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.driver.declare_coloring(tol=1e-15)
         del options['dynamic_total_coloring']
 
+    p.driver.options['debug_print'] = ['totals']
     p.driver.options.update(options)
 
     p.model.add_design_var('x')

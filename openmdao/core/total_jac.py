@@ -533,6 +533,7 @@ class _TotalJacInfo(object):
             imeta['itermeta'] = itermeta = []
             locs = None
             for ilist in simul_coloring.color_iter(mode):
+                # Maybe create dict here
                 for i in ilist:
                     _, rel_systems, cache_lin_sol = idx_map[i]
                     _update_rel_systems(all_rel_systems, rel_systems)
@@ -1197,6 +1198,40 @@ class _TotalJacInfo(object):
         for matmat_idxs in inds:
             self.matmat_jac_setter(matmat_idxs, mode)
 
+    def local_indices(self, inds):
+        # _col_var_sizes is the size of width of the columns in each of the _col_vars
+        # _fwd[0] contains the list of sub_indices that need to be converted to local
+        # Ex. 3 will turn into [0, 2, 4, 6, 8]
+        # Don't forget to do a version with reverse. Which the sizes will correspond to the rows
+        col_names = self.idx_iter_dict[self.mode]['@simul_coloring'][0]['coloring']._col_vars
+        col_sizes = self.idx_iter_dict[self.mode]['@simul_coloring'][0]['coloring']._col_var_sizes
+
+        row_names = self.idx_iter_dict[self.mode]['@simul_coloring'][0]['coloring']._row_vars
+        row_sizes = self.idx_iter_dict[self.mode]['@simul_coloring'][0]['coloring']._row_var_sizes
+
+        names_array = np.zeros((len(row_vars), sum(col_sizes)), dtype=object)
+        local_positions_array = np.zeros((len(row_vars), sum(col_sizes)), dtype=int)
+
+        names = []
+        local_indices = []
+        for i, j in zip(col_names, col_sizes):
+            names.append(np.repeat(i, j))
+            local_indices.append(np.arange(j))
+
+        names_list = np.concatenate(names).ravel().tolist()
+        local_list = np.concatenate(local_indices).ravel().tolist()
+        names_array[:, :] = names_list
+        local_positions_array[:, :] = local_list
+
+        if isinstance(inds, (list)):
+            idx_name = names_array[0, inds[0]]
+        else:
+            idx_name = names_array[0, inds]
+        idx = local_positions_array[0, inds]
+
+        return idx_name, idx
+
+
     def compute_totals(self):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1242,8 +1277,14 @@ class _TotalJacInfo(object):
                             varlist = '(' + ', '.join([name for name in par_deriv[key]]) + ')'
                             print('Solving color:', key, varlist)
                         else:
-                            print('Solving variable: {0} \nIn mode: {1} \n'
-                                  'Sub Indices: {2}'.format(key, mode, inds))
+                            if key == '@simul_coloring':
+                                local_inds = self.local_indices(inds)
+                                print('In mode: {0}, Solving variable: {1}\n'
+                                      'Sub Indices: {1} {2}'.format(mode, local_inds[0], local_inds[1]))
+                            else:
+                                # new_function_to_create_local_arrays()
+                                print('In mode: {0}, Solving variable: {1}\n'
+                                    'Sub Indices: {1} {2}'.format(mode, key, inds))
 
                         sys.stdout.flush()
                         t0 = time.time()
