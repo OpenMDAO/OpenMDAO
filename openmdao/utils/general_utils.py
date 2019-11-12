@@ -790,12 +790,12 @@ def make_serializable(o):
     """
     if isinstance(o, _container_classes):
         return [make_serializable(item) for item in o]
+    elif isinstance(o, np.ndarray):
+        return o.tolist()
     elif isinstance(o, np.number):
         return o.item()
-    elif isinstance(o, np.ndarray):
-        return make_serializable(o.tolist())
     elif hasattr(o, '__dict__'):
-        return make_serializable(o.__class__.__name__)
+        return o.__class__.__name__
     else:
         return o
 
