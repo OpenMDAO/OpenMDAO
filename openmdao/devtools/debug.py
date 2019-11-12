@@ -202,6 +202,8 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
                 colr = Fore.CYAN + Style.BRIGHT
             cprint("%s " % type(s).__name__, color=colr)
             cprint("%s" % s.name)
+            if s.options['distributed']:
+                cprint(" (distributed)", color=Fore.MAGENTA)
 
         # FIXME: these sizes could be wrong under MPI
         if show_sizes:

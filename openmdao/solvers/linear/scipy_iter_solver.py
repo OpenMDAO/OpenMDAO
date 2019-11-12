@@ -87,7 +87,7 @@ class ScipyKrylov(LinearSolver):
         super(ScipyKrylov, self)._setup_solvers(system, depth)
 
         if self.precon is not None:
-            self.precon._setup_solvers(self._system, self._depth + 1)
+            self.precon._setup_solvers(self._system(), self._depth + 1)
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -141,7 +141,7 @@ class ScipyKrylov(LinearSolver):
             the outgoing array after the product.
         """
         vec_name = self._vec_name
-        system = self._system
+        system = self._system()
 
         if self._mode == 'fwd':
             x_vec = system._vectors['output'][vec_name]
@@ -197,7 +197,7 @@ class ScipyKrylov(LinearSolver):
         self._rel_systems = rel_systems
         self._mode = mode
 
-        system = self._system
+        system = self._system()
         solver = _SOLVER_TYPES[self.options['solver']]
         if solver is gmres:
             restart = self.options['restart']
@@ -263,7 +263,7 @@ class ScipyKrylov(LinearSolver):
         ndarray
             The preconditioned Vector.
         """
-        system = self._system
+        system = self._system()
         vec_name = self._vec_name
         mode = self._mode
 
