@@ -366,12 +366,14 @@ class TestSimpleGA(unittest.TestCase):
 
         prob.model.add_design_var('x', lower=-10, upper=10)
         prob.model.add_objective('f_x')
-
-        # Without bugfix to genetic_algorithm_driver, using vectorized constraint limits causes an exception
         prob.model.add_constraint('g_x', upper=np.zeros(dim))
 
         prob.setup()
         prob.run_driver()
+
+        # Check that the constraint is satisfied (x <= 1)
+        for i in range(dim):
+            self.assertLessEqual(prob["x"][i], 1.0)
 
 
 class TestDriverOptionsSimpleGA(unittest.TestCase):
