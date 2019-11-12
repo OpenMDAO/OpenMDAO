@@ -41,10 +41,12 @@ class N2CellRenderer {
         }
     }
 
+    /** Enable access to the static dims variable through 'this'. */
     get dims() {
         return N2CellRenderer.dims;
     }
 
+    /** Enable access to the static prevDims variable through 'this'. */
     get prevDims() {
         return N2CellRenderer.prevDims;
     }

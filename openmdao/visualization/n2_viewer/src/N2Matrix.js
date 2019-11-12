@@ -1,5 +1,3 @@
-
-
 /**
  * Use the model tree to build the matrix of parameters and connections, display, and
  * perform operations with it.
@@ -11,8 +9,6 @@
  * @property {number} levelOfDetailThreshold Don't draw elements below this size in pixels.
  * @property {Object} nodeSize Width and height of each node in the matrix.
  * @property {Object} prevNodeSize Width and height of each node in the previous matrix.
- * @property {Object} cellDims nodeSize with computed coordinates.
- * @property {Object} prevCellDims prevNodeSize with computed coordinates.
  * @property {Object[][]} grid Object keys corresponding to rows and columns.
  * @property {Array} visibleCells One-dimensional array of all cells, for D3 processing.
  * @property {Array} boxInfo Component box dimensions.
@@ -97,6 +93,10 @@ class N2Matrix {
         this.levelOfDetailThreshold = height / 3;
     }
 
+    /**
+     * Compare the number of visible nodes to the amount allowed by
+     * the threshold setting.
+     */
     tooMuchDetail() {
         let tooMuch = (this.diagNodes.length >= this.levelOfDetailThreshold);
 
