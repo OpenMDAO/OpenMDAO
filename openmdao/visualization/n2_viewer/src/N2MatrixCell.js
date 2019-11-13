@@ -1,27 +1,64 @@
 /** Base class for all cell renderers */
-class N2CellRendererBase {
+class N2CellRenderer {
     /**
      * Set values shared by objects of all derived class types.
-     * @param {Object} dims Layout and dimensions for the current cell spec.
-     * @param {Object} prevDims Layout and dimensions for the previous cell spec.
      * @param {string} color The color to render all shapes in.
      * @param {string} className The CSS class to tag primary shapes with, used for selecting.
      */
-    constructor(dims, prevDims, color, className) {
-        this.dims = dims;
-        this.prevDims = prevDims;
+    constructor(color, className) {
         this.color = color;
         this.className = className;
     }
 
+    static updateDims(baseWidth, baseHeight) {
+        if (!N2CellRenderer.dims) {
+            N2CellRenderer.prevDims = {
+                'size': { 'width': 0, 'height': 0 },
+                'bottomRight': { 'x': 0, 'y': 0 },
+                'topLeft': { 'x': 0, 'y': 0 }
+            }
+        }
+        else {
+            for (let prop of ['size', 'bottomRight', 'topLeft']) {
+                Object.assign(N2CellRenderer.prevDims[prop],
+                    N2CellRenderer.dims[prop]);
+            }
+        }
+
+        N2CellRenderer.dims = {
+            'size': {
+                'width': baseWidth,
+                'height': baseHeight
+            },
+            'bottomRight': {
+                'x': baseWidth * .5,
+                'y': baseHeight * .5
+            },
+            'topLeft': {
+                'x': baseWidth * -.5,
+                'y': baseHeight * -.5
+            }
+        }
+    }
+
+    /** Enable access to the static dims variable through 'this'. */
+    get dims() {
+        return N2CellRenderer.dims;
+    }
+
+    /** Enable access to the static prevDims variable through 'this'. */
+    get prevDims() {
+        return N2CellRenderer.prevDims;
+    }
+
     /** Act like an abstract base class force derived classes to define. */
     update() {
-        throw ("ERROR: N2CellRendererBase.update() called.")
+        throw ("ERROR: N2CellRenderer.update() called.")
     }
 
     /** Act like an abstract base class force derived classes to define. */
     render() {
-        throw ("ERROR: N2CellRendererBase.render() called.")
+        throw ("ERROR: N2CellRenderer.render() called.")
     }
 
     /** Reposition an SVG element based on dimensions of the current cell size. */
@@ -46,7 +83,7 @@ class N2CellRendererBase {
 }
 
 /** Draws/updates an SVG circle for scalar types, with a transition animation. */
-class N2ScalarBase extends N2CellRendererBase {
+class N2ScalarBase extends N2CellRenderer {
 
     /**
      * Invoke the superclass constructor with these values and "sMid" as a CSS class.
@@ -54,8 +91,8 @@ class N2ScalarBase extends N2CellRendererBase {
      * @param {Object} prevDims Layout and dimensions for the previous cell spec.
      * @param {string} color The color to render all shapes in.
      */
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color, "sMid");
+    constructor(color) {
+        super(color, "sMid");
     }
 
     /**
@@ -88,7 +125,7 @@ class N2ScalarBase extends N2CellRendererBase {
 }
 
 /** Draws/updates an SVG rect for vector types, with a transition animation. */
-class N2VectorBase extends N2CellRendererBase {
+class N2VectorBase extends N2CellRenderer {
 
     /**
      * Invoke the superclass constructor with these values and "vMid" as a CSS class.
@@ -96,8 +133,8 @@ class N2VectorBase extends N2CellRendererBase {
      * @param {Object} prevDims Layout and dimensions for the previous cell spec.
      * @param {string} color The color to render all shapes in.
      */
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color, "vMid");
+    constructor(color) {
+        super(color, "vMid");
     }
 
     /**
@@ -134,15 +171,15 @@ class N2VectorBase extends N2CellRendererBase {
 }
 
 /** Draws/updates an SVG rect with a border for group types, with a transition animation. */
-class N2GroupBase extends N2CellRendererBase {
+class N2GroupBase extends N2CellRenderer {
     /**
      * Invoke the superclass constructor with these values and "gMid" as a CSS class.
      * @param {Object} dims Layout and dimensions for the current cell spec.
      * @param {Object} prevDims Layout and dimensions for the previous cell spec.
      * @param {string} color The color to render all shapes in.
      */
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color, "gMid");
+    constructor(color) {
+        super(color, "gMid");
     }
 
     /**
@@ -233,74 +270,74 @@ class N2GroupBase extends N2CellRendererBase {
 }
 
 class N2ScalarCell extends N2ScalarBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2VectorCell extends N2VectorBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2GroupCell extends N2GroupBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2ScalarScalarCell extends N2ScalarBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2ScalarVectorCell extends N2VectorBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2VectorScalarCell extends N2VectorBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2VectorVectorCell extends N2VectorBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2ScalarGroupCell extends N2GroupBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2GroupScalarCell extends N2GroupBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2VectorGroupCell extends N2GroupBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2GroupVectorCell extends N2GroupBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
 class N2GroupGroupCell extends N2GroupBase {
-    constructor(dims, prevDims, color) {
-        super(dims, prevDims, color);
+    constructor(color) {
+        super(color);
     }
 }
 
@@ -324,11 +361,9 @@ class N2MatrixCell {
      * @param {N2TreeNode} srcObj The node in the model tree this node is associated with.
      * @param {N2TreeNode} tgtObj The model tree node that this outputs to.
      * @param {ModelData} model Reference to the model to get some info from it.
-     * @param {Object} dims Layout and dimensions for the current cell spec.
-     * @param {Object} prevDims Layout and dimensions for the previous cell spec.
-     * @param {N2CellRendererBase} renderer The object that draws the cell.
+     * @param {N2CellRenderer} renderer The object that draws the cell.
     */
-    constructor(row, col, srcObj, tgtObj, model, dims, prevDims) {
+    constructor(row, col, srcObj, tgtObj, model) {
         this.row = row;
         this.col = col;
         this.srcObj = this.obj = srcObj;
@@ -336,8 +371,13 @@ class N2MatrixCell {
         this.id = srcObj.id + "_" + tgtObj.id;
 
         this.symbolType = new SymbolType(this, model);
+        this.renderer = this._newRenderer();
 
-        this.renderer = this._newRenderer(dims, prevDims);
+        this.offScreen = {
+            'top': { 'incoming': [], 'outgoing': []},
+            'bottom': { 'incoming': [], 'outgoing': []},
+            'total': 0
+        }
     }
 
     /**
@@ -373,24 +413,67 @@ class N2MatrixCell {
         return N2Style.color.connection;
     }
 
+
+    /**
+     * An connection going "off-screen" was detected between two nodes.
+     * Determine whether the arrow should be in the top or bottom section of the
+     * matrix based on rootIndex, and add to the appropriate array of
+     * tracked offscreen connections.
+     * @param {N2TreeNode} srcNode Where the connection starts.
+     * @param {N2TreeNode} tgtNode Where the connection ends.
+     */
+    addOffScreenConn(srcNode, tgtNode) {
+        let debugStr = ': ' + srcNode.absPathName + ' -> ' + tgtNode.absPathName;
+
+        if (srcNode === this.tgtObj) {
+            // Outgoing
+            if (srcNode.rootIndex < tgtNode.rootIndex) {
+                // Top
+                debugInfo("New offscreen outgoing connection on top" + debugStr);
+                this.offScreen.top.outgoing.push(tgtNode);
+            }
+            else {
+                // Bottom
+                debugInfo("New offscreen outgoing connection on bottom" + debugStr);
+                this.offScreen.bottom.outgoing.push(tgtNode);
+            }
+        }
+        else {
+            // Incoming
+            if (srcNode.rootIndex < tgtNode.rootIndex) {
+                // Top
+                debugInfo("New offscreen incoming connection on top" + debugStr);
+                this.offScreen.top.incoming.push(srcNode);
+            }
+            else {
+                // Bottom
+                debugInfo("New offscreen incoming connection on bottom" + debugStr);
+                this.offScreen.bottom.incoming.push(srcNode);
+            }
+        }
+
+        this.offScreen.total++;
+        // debugInfo("Total offscreen connections found: " + this.offScreen.total);
+    }
+
     /** Choose a renderer based on our SymbolType.
      * @param {Object} dims Layout and dimensions for the current cell spec.
      * @param {Object} prevDims Layout and dimensions for the previous cell spec.
      */
-    _newRenderer(dims, prevDims) {
+    _newRenderer() {
         switch (this.symbolType.name) {
-            case 'scalar': return new N2ScalarCell(dims, prevDims, this.color());
-            case 'vector': return new N2VectorCell(dims, prevDims, this.color());
-            case 'group': return new N2GroupCell(dims, prevDims, this.color());
-            case 'scalarScalar': return new N2ScalarScalarCell(dims, prevDims, this.color());
-            case 'scalarVector': return new N2ScalarVectorCell(dims, prevDims, this.color());
-            case 'vectorScalar': return new N2VectorScalarCell(dims, prevDims, this.color());
-            case 'vectorVector': return new N2VectorVectorCell(dims, prevDims, this.color());
-            case 'scalarGroup': return new N2ScalarGroupCell(dims, prevDims, this.color());
-            case 'groupScalar': return new N2GroupScalarCell(dims, prevDims, this.color());
-            case 'vectorGroup': return new N2VectorGroupCell(dims, prevDims, this.color());
-            case 'groupVector': return new N2GroupVectorCell(dims, prevDims, this.color());
-            case 'groupGroup': return new N2GroupGroupCell(dims, prevDims, this.color());
+            case 'scalar': return new N2ScalarCell(this.color());
+            case 'vector': return new N2VectorCell(this.color());
+            case 'group': return new N2GroupCell(this.color());
+            case 'scalarScalar': return new N2ScalarScalarCell(this.color());
+            case 'scalarVector': return new N2ScalarVectorCell(this.color());
+            case 'vectorScalar': return new N2VectorScalarCell(this.color());
+            case 'vectorVector': return new N2VectorVectorCell(this.color());
+            case 'scalarGroup': return new N2ScalarGroupCell(this.color());
+            case 'groupScalar': return new N2GroupScalarCell(this.color());
+            case 'vectorGroup': return new N2VectorGroupCell(this.color());
+            case 'groupVector': return new N2GroupVectorCell(this.color());
+            case 'groupGroup': return new N2GroupGroupCell(this.color());
         }
     }
 }
