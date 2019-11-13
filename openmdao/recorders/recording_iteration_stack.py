@@ -1,4 +1,6 @@
 """Management of iteration stack for recording."""
+import weakref
+
 from openmdao.utils.mpi import MPI
 
 
@@ -80,7 +82,7 @@ class Recording(object):
         Name of object getting recorded.
     iter_count : int
         Current counter of iterations completed.
-    recording_requester : object
+    recording_requester : weakref to object
         The object that wants to be recorded.
     stack : list
         Stack containing names and iteration counts.
@@ -107,13 +109,12 @@ class Recording(object):
         """
         self.name = name
         self.iter_count = iter_count
-        self.recording_requester = recording_requester
-        self.stack = recording_requester._recording_iter.stack
+        self.recording_requester = weakref.ref(recording_requester)
         self.abs = 0
         self.rel = 0
 
         from openmdao.solvers.solver import Solver
-        self._is_solver = isinstance(self.recording_requester, Solver)
+        self._is_solver = isinstance(recording_requester, Solver)
 
     def __enter__(self):
         """
@@ -124,7 +125,7 @@ class Recording(object):
         self : object
             self
         """
-        self.stack.append((self.name, self.iter_count))
+        self.recording_requester()._recording_iter.stack.append((self.name, self.iter_count))
         return self
 
     def __exit__(self, *args):
@@ -136,23 +137,21 @@ class Recording(object):
         *args : array
             Solver recording requires extra args.
         """
-        # Determine if recording is justified.
-        do_recording = True
+        requester = self.recording_requester()
+        stack = requester._recording_iter.stack
 
-        for stack_item in self.stack:
+        # Determine if recording is justified.
+        for stack_item in stack:
             if stack_item[0] in ('_run_apply', '_compute_totals'):
                 do_recording = False
                 break
-
-        if do_recording:
+        else:
             if self._is_solver:
-                self.recording_requester.record_iteration(abs=self.abs, rel=self.rel)
+                requester.record_iteration(abs=self.abs, rel=self.rel)
             else:
-                self.recording_requester.record_iteration()
+                requester.record_iteration()
 
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()
 
-        self.stack.pop()
-
-        self.recording_requester = None
+        stack.pop()

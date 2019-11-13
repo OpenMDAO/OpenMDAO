@@ -70,7 +70,8 @@ class N2UserInterface {
 
         if (!node.hasChildren()) return;
 
-        if (node.depth > this.n2Diag.zoomedElement.depth) { // Don't allow minimizing of root node
+        // Don't allow minimizing of root node
+        if (node.depth > this.n2Diag.zoomedElement.depth) { 
             this.rightClickedNode = node;
             this.findRootOfChangeFunction =
                 this.findRootOfChangeForRightClick.bind(this);

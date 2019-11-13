@@ -82,16 +82,17 @@ class NonlinearBlockGS(NonlinearSolver):
         float
             error at the first iteration.
         """
+        system = self._system()
+
         if self.options['use_aitken']:
-            outputs = self._system._outputs
-            self._delta_outputs_n_1 = outputs._data.copy()
+            self._delta_outputs_n_1 = system._outputs._data.copy()
             self._theta_n_1 = 1.
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration.
-        if self._system.under_complex_step and self.options['cs_reconverge']:
-            self._system._outputs._data += np.linalg.norm(self._system._outputs._data) * 1e-10
+        if system.under_complex_step and self.options['cs_reconverge']:
+            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
 
         return super(NonlinearBlockGS, self)._iter_initialize()
 
@@ -99,7 +100,7 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-        system = self._system
+        system = self._system()
         outputs = system._outputs
         residuals = system._residuals
         use_aitken = self.options['use_aitken']
@@ -194,7 +195,7 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Run the apply_nonlinear method on the system.
         """
-        system = self._system
+        system = self._system()
         maxiter = self.options['maxiter']
         itercount = self._iter_count
 
@@ -234,9 +235,9 @@ class NonlinearBlockGS(NonlinearSolver):
         """
         Print header text before solving.
         """
-        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
+        if (self.options['iprint'] > 0 and self._system().comm.rank == 0):
 
-            pathname = self._system.pathname
+            pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
                 prefix = self._solver_info.prefix

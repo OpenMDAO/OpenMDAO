@@ -12,35 +12,36 @@ class ModelData {
         this.maxDepth = 1;
         this.idCounter = 0;
         this.unconnectedParams = 0;
+        this.nodePaths = {};
 
-        console.time('ModelData._convertToN2TreeNodes');
+        startTimer('ModelData._convertToN2TreeNodes');
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
-        console.timeEnd('ModelData._convertToN2TreeNodes');
+        stopTimer('ModelData._convertToN2TreeNodes');
 
-        console.time('ModelData._expandColonVars');
+        startTimer('ModelData._expandColonVars');
         this._expandColonVars(this.root);
-        console.timeEnd('ModelData._expandColonVars');
+        stopTimer('ModelData._expandColonVars');
 
-        console.time('ModelData._flattenColonGroups');
+        startTimer('ModelData._flattenColonGroups');
         this._flattenColonGroups(this.root);
-        console.timeEnd('ModelData._flattenColonGroups');
+        stopTimer('ModelData._flattenColonGroups');
 
-        console.time('ModelData._setParentsAndDepth');
+        startTimer('ModelData._setParentsAndDepth');
         this._setParentsAndDepth(this.root, null, 1);
-        console.timeEnd('ModelData._setParentsAndDepth');
+        stopTimer('ModelData._setParentsAndDepth');
 
         if (this.unconnectedParams > 0)
             console.info("Unconnected nodes: ", this.unconnectedParams);
 
-        console.time('ModelData._initSubSystemChildren');
+        startTimer('ModelData._initSubSystemChildren');
         this._initSubSystemChildren(this.root);
-        console.timeEnd('ModelData._initSubSystemChildren');
+        stopTimer('ModelData._initSubSystemChildren');
 
-        console.time('ModelData._computeConnections');
+        startTimer('ModelData._computeConnections');
         this._computeConnections();
-        console.timeEnd('ModelData._computeConnections');
+        stopTimer('ModelData._computeConnections');
 
-        // console.log("New model: ", modelJSON);
+        debugInfo("New model: ", this);
         // this.errorCheck();
     }
 
@@ -50,11 +51,11 @@ class ModelData {
      */
     errorCheck(node = this.root) {
         if (!(node instanceof N2TreeNode))
-            console.log('Node with problem: ', node);
+            debugInfo('Node with problem: ', node);
 
         for (let prop of ['parent', 'originalParent', 'parentComponent']) {
             if (node[prop] && !(node[prop] instanceof N2TreeNode))
-                console.log('Node with problem ' + prop + ': ', node);
+                debugInfo('Node with problem ' + prop + ': ', node);
         }
 
         if (node.hasChildren()) {
@@ -76,7 +77,8 @@ class ModelData {
             for (let i = 0; i < newNode.children.length; ++i) {
                 newNode.children[i] = this._convertToN2TreeNodes(newNode.children[i]);
                 newNode.children[i].parent = newNode;
-                if (exists(newNode.children[i].parentComponent)) newNode.children[i].parentComponent = newNode;
+                if (exists(newNode.children[i].parentComponent))
+                    newNode.children[i].parentComponent = newNode;
             }
         }
 
@@ -197,6 +199,8 @@ class ModelData {
                 node.absPathName += (node.parent.splitByColon) ? ":" : ".";
             }
             node.absPathName += node.name;
+
+            this.nodePaths[node.absPathName] = node;
         }
 
         this.identifyUnconnectedParam(node);
@@ -356,9 +360,7 @@ class ModelData {
      * @param {N2TreeNode[]} objArray Array to add to.
      */
     _addLeaves(node, objArray) {
-        if (!node.isParam()) {
-            objArray.push(node);
-        }
+        if (!node.isParam()) { objArray.push(node); }
 
         if (node.hasChildren()) {
             for (let child of node.children) {
@@ -368,89 +370,87 @@ class ModelData {
     }
 
     /**
-     * Iterate over the connections list, and find the two objects that
-     * make up each connection.
+     * Iterate over the connections list, and find the objects that make up
+     * each connection, and do some error checking. Store an array containing the
+     * target object and all of its parents in the source object and all of *its*
+     * parents. In the target object, store an array containing references to
+     * the begin and end of all the cycle arrows.
      */
     _computeConnections() {
         let sysPathnames = this.sysPathnamesList;
+        let throwLbl = 'ModelData._computeConnections: ';
 
         for (let conn of this.conns) {
             // Process sources
-            let srcSplitArray = conn.src.split(/\.|:/);
-            let srcObj = this._getObjectInTree(this.root, srcSplitArray, 0);
+            let srcObj = this.nodePaths[conn.src];
+            if (!srcObj)
+                throw (throwLbl + "Cannot find connection source " + conn.src);
 
-            if (srcObj == null)
-                throw ("Cannot find connection source " + conn.src);
+            let srcObjParents = [srcObj];
+            if (!srcObj.isUnknown()) // source obj must be unknown
+                throw (throwLbl + "Found a source that is not an unknown.");
 
-            let srcObjArray = [srcObj];
-            if (srcObj.type !== "unknown") // source obj must be unknown
-                throw ("There is a source that is not an unknown.");
-
-            if (srcObj.hasChildren()) throw ("There is a source that has children.");
+            if (srcObj.hasChildren())
+                throw (throwLbl + "Found a source that has children.");
 
             for (let obj = srcObj.parent; obj != null; obj = obj.parent) {
-                srcObjArray.push(obj);
+                srcObjParents.push(obj);
             }
 
             // Process targets
-            let tgtSplitArray = conn.tgt.split(/\.|:/);
-            let tgtObj = this._getObjectInTree(this.root, tgtSplitArray, 0);
+            let tgtObj = this.nodePaths[conn.tgt];
+            if (!tgtObj)
+                throw (throwLbl + "Cannot find connection target " + conn.tgt);
 
-            if (tgtObj == null) throw ("Cannot find connection target " + conn.tgt);
-
-            let tgtObjArrayParamView = [tgtObj];
-            let tgtObjArrayHideParams = [tgtObj];
 
             // Target obj must be a param
-            if (!tgtObj.isParam()) throw ("There is a target that is NOT a param.");
-
-            if (tgtObj.hasChildren()) throw ("There is a target that has children.");
+            if (!tgtObj.isParam())
+                throw (throwLbl + "Found a target that is NOT a param.");
+            if (tgtObj.hasChildren())
+                throw (throwLbl + "Found a target that has children.");
 
             if (!tgtObj.parentComponent)
-                throw ("Target object " + conn.tgt + " has missing parentComponent.");
+                throw (throwLbl + "Target object " + conn.tgt +
+                    " is missing a parentComponent.");
 
-            this._addLeaves(tgtObj.parentComponent, tgtObjArrayHideParams); //contaminate
-            for (let obj = tgtObj.parent; obj != null; obj = obj.parent) {
-                tgtObjArrayParamView.push(obj);
-                tgtObjArrayHideParams.push(obj);
+            let tgtObjParents = [tgtObj];
+            for (let parentObj = tgtObj.parent; parentObj != null; parentObj = parentObj.parent) {
+                tgtObjParents.push(parentObj);
             }
 
-            for (let srcObj of srcObjArray) {
-                if (!srcObj.hasOwnProperty('targetsParamView'))
-                    srcObj.targetsParamView = new Set();
-                if (!srcObj.hasOwnProperty('targetsHideParams'))
-                    srcObj.targetsHideParams = new Set();
-
-                tgtObjArrayParamView.forEach(item => srcObj.targetsParamView.add(item));
-                tgtObjArrayHideParams.forEach(item => srcObj.targetsHideParams.add(item));
+            for (let srcParent of srcObjParents) {
+                for (let tgtParent of tgtObjParents) {
+                    srcParent.targetParentSet.add(tgtParent);
+                }
             }
 
-            let cycleArrowsArray = [];
+            /*
+            * The cycle_arrows object in each connection is an array of length-2 arrays,
+            * each of which is an index into the sysPathnames array. Using that array we
+            * can resolve the indexes to pathnames to the associated objects.
+            */
             if (Array.isPopulatedArray(conn.cycle_arrows)) {
+                let cycleArrowsArray = [];
                 let cycleArrows = conn.cycle_arrows;
                 for (let cycleArrow of cycleArrows) {
                     if (cycleArrow.length != 2)
-                        throw ("cycleArrowsSplitArray length not 2, got " +
+                        throw (throwLbl + "cycleArrowsSplitArray length not 2, got " +
                             cycleArrow.length + ": " + cycleArrow);
 
                     let srcPathname = sysPathnames[cycleArrow[0]];
                     let tgtPathname = sysPathnames[cycleArrow[1]];
 
-                    let splitArray = srcPathname.split(/\.|:/);
-                    let arrowBeginObj = this._getObjectInTree(this.root, splitArray, 0);
-                    if (arrowBeginObj == null)
-                        throw ("Cannot find cycle arrows begin object " + srcPathname);
+                    let arrowBeginObj = this.nodePaths[srcPathname];
+                    if (!arrowBeginObj)
+                        throw (throwLbl + "Cannot find cycle arrows begin object " + srcPathname);
 
-                    splitArray = tgtPathname.split(/\.|:/);
-                    let arrowEndObj = this._getObjectInTree(this.root, splitArray, 0);
-                    if (arrowEndObj == null)
-                        throw ("Cannot find cycle arrows end object " + tgtPathname);
+                    let arrowEndObj = this.nodePaths[tgtPathname];
+                    if (!arrowEndObj)
+                        throw (throwLbl + "Cannot find cycle arrows end object " + tgtPathname);
 
                     cycleArrowsArray.push({ "begin": arrowBeginObj, "end": arrowEndObj });
                 }
-            }
 
-            if (cycleArrowsArray.length > 0) {
                 if (!tgtObj.parent.hasOwnProperty("cycleArrows")) {
                     tgtObj.parent.cycleArrows = [];
                 }

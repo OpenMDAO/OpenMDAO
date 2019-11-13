@@ -235,7 +235,7 @@ class DirectSolver(LinearSolver):
         ndarray
             Jacobian matrix.
         """
-        system = self._system
+        system = self._system()
         bvec = system._vectors['residual']['linear']
         xvec = system._vectors['output']['linear']
 
@@ -271,21 +271,21 @@ class DirectSolver(LinearSolver):
         """
         Perform factorization.
         """
-        system = self._system
+        system = self._system()
         nproc = system.comm.size
 
         if self._assembled_jac is not None:
-
-            with multi_proc_exception_check(system.comm) if nproc > 1 else do_nothing_context():
-                if nproc == 1:
-                    matrix = self._assembled_jac._int_mtx._matrix
-                else:
+            use_owned = system._use_owned_sizes()
+            with multi_proc_exception_check(system.comm) if use_owned else do_nothing_context():
+                if use_owned:
                     matrix = self._assembled_jac._int_mtx._get_assembled_matrix(system)
                     if self._owned_size_totals is None:
                         self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
+                else:
+                    matrix = self._assembled_jac._int_mtx._matrix
 
                 if matrix is None:
-                    # this happens if we're not rank 0
+                    # this happens if we're not rank 0 when using owned_sizes
                     self._lu = self._lup = None
                     self._nodup_size = np.sum(system._owned_sizes)
 
@@ -357,23 +357,23 @@ class DirectSolver(LinearSolver):
         ndarray
             Inverse Jacobian.
         """
-        system = self._system
+        system = self._system()
         iproc = system.comm.rank
         nproc = system.comm.size
 
         if self._assembled_jac is not None:
+            use_owned = system._use_owned_sizes()
+            with multi_proc_exception_check(system.comm) if use_owned else do_nothing_context():
 
-            with multi_proc_exception_check(system.comm) if nproc > 1 else do_nothing_context():
-
-                if nproc == 1:
-                    matrix = self._assembled_jac._int_mtx._matrix
-                else:
+                if use_owned:
                     matrix = self._assembled_jac._int_mtx._get_assembled_matrix(system)
                     if self._owned_size_totals is None:
                         self._owned_size_totals = np.sum(system._owned_sizes, axis=1)
+                else:
+                    matrix = self._assembled_jac._int_mtx._matrix
 
                 if matrix is None:
-                    # This happens if we're not rank 0
+                    # This happens if we're not rank 0 and owned_sizes are being used
                     sz = np.sum(system._owned_sizes)
                     inv_jac = np.zeros((sz, sz))
 
@@ -400,11 +400,19 @@ class DirectSolver(LinearSolver):
                             raise RuntimeError(format_singular_csc_error(system, matrix))
                         else:
                             reraise(*sys.exc_info())
+
+                    # to prevent broadcasting errors later, make sure inv_jac is 2D
+                    # scipy.sparse.linalg.inv returns a shape (1,) array if matrix is shape (1,1)
+                    if inv_jac.size == 1:
+                        inv_jac = inv_jac.reshape((1, 1))
                 else:
                     raise RuntimeError("Direct solver not implemented for matrix type %s"
                                        " in %s." % (type(matrix), system.msginfo))
 
         else:
+            if nproc > 1:
+                raise RuntimeError("BroydenSolvers without an assembled jacobian are not supported "
+                                   "when running under MPI if comm.size > 1.")
             mtx = self._build_mtx()
 
             # During inversion detect singularities and warn user.
@@ -443,7 +451,7 @@ class DirectSolver(LinearSolver):
 
         self._vec_names = vec_names
 
-        system = self._system
+        system = self._system()
         iproc = system.comm.rank
         nproc = system.comm.size
 
@@ -464,7 +472,7 @@ class DirectSolver(LinearSolver):
 
         # AssembledJacobians are unscaled.
         if self._assembled_jac is not None:
-            if nproc > 1:
+            if system._use_owned_sizes():
                 _, nodup2local_inds, local2owned_inds, noncontig_dist_inds = \
                     system._get_nodup_out_ranges()
                 # gather the 'owned' parts of b_vec from each process
@@ -477,11 +485,12 @@ class DirectSolver(LinearSolver):
             else:
                 full_b = tmp = b_vec
 
+            use_owned = system._use_owned_sizes()
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                if iproc == 0:
+                if iproc == 0 or not use_owned:
                     # convert full_b to the same ordering that the matrix expects, where
                     # dist vars are contiguous and other vars appear in 'execution' order.
-                    if nproc > 1:
+                    if use_owned:
                         full_b = tmp[noncontig_dist_inds]
 
                     if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
@@ -489,7 +498,7 @@ class DirectSolver(LinearSolver):
                     else:
                         arr = self._lu.solve(full_b, trans_splu)
 
-                if nproc > 1:
+                if use_owned:
                     if iproc > 0:
                         arr = np.zeros(tmp.size, dtype=tmp.dtype)
 

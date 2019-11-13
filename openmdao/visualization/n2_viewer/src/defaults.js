@@ -37,4 +37,9 @@ let N2TransitionDefaults = {
     'maxNodes': 150
 }
 
+let DebugFlags = {
+    'timings': false,
+    'info': false
+}
+
 // Object.freeze(N2TransitionDefaults);

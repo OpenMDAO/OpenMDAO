@@ -1374,6 +1374,9 @@ class TestPyoptSparse(unittest.TestCase):
                                  str(prob.driver.pyopt_solution.optInform))
 
         self.assertTrue('Solving variable: comp.f_xy' in output)
+        self.assertTrue('In mode: rev' in output)
+        self.assertTrue('Sub Indices: 0' in output)
+        self.assertTrue('Elapsed Time:' in output)
         self.assertTrue('Solving variable: con.c' in output)
 
         prob = om.Problem()
