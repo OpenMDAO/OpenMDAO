@@ -77,6 +77,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['component_type'] = 'implicit'
         elif isinstance(system, ExecComp):
             tree_dict['component_type'] = 'exec'
+            tree_dict['info'] = system._exprs
         elif isinstance(system, (MetaModelStructuredComp, MetaModelUnStructuredComp)):
             tree_dict['component_type'] = 'metamodel'
         elif isinstance(system, IndepVarComp):
@@ -307,7 +308,7 @@ def view_tree(*args, **kwargs):
     Parameters
     ----------
     *args : dict
-        Postional args.
+        Positional args.
     **kwargs : dict
         Keyword args.
     """
@@ -322,7 +323,7 @@ def view_model(*args, **kwargs):
     Parameters
     ----------
     *args : dict
-        Postional args.
+        Positional args.
     **kwargs : dict
         Keyword args.
     """
@@ -368,8 +369,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     # grab the model viewer data
     model_data = _get_viewer_data(data_source)
-    options = {}
-    options['use_declare_partial_info'] = use_declare_partial_info
+    options = {'use_declare_partial_info': use_declare_partial_info}
     model_data['options'] = options
 
     model_data = 'var modelData = %s' % json.dumps(

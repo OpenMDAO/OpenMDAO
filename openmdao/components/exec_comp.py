@@ -210,8 +210,7 @@ class ExecComp(ExplicitComponent):
         if 'vectorize' in kwargs:
             warn_deprecation("The 'vectorize' option is deprecated.  "
                              "Please use 'has_diag_partials' instead.")
-            kwargs['has_diag_partials'] = kwargs['vectorize']
-            del kwargs['vectorize']
+            kwargs['has_diag_partials'] = kwargs.pop('vectorize')
 
         options = {}
         for name in _disallowed_names:
@@ -332,7 +331,7 @@ class ExecComp(ExplicitComponent):
                 iarray = isinstance(ival, ndarray) and ival.size > 1
                 for out in osorted:
                     oval = init_vals[out]
-                    if (iarray and isinstance(oval, ndarray) and oval.size > 1):
+                    if iarray and isinstance(oval, ndarray) and oval.size > 1:
                         if oval.size != ival.size:
                             raise RuntimeError("%s: has_diag_partials is True but partial(%s, %s) "
                                                "is not square (shape=(%d, %d))." %

@@ -736,6 +736,7 @@ else:
 
             for comp in self._comps:
                 label = comp['label']
+                info = comp.get('info', None)
                 # If the process steps are included in the labels
                 if self.add_component_indices:
                     i = i0 = comp.pop('index', None)
@@ -750,10 +751,10 @@ else:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
                     # Add the number
                     label = self.finalize_label(i, label, self.number_alignment,
-                                                class_name=comp['class'])
+                                                class_name=comp['class'], info=info)
                 else:
                     label = self.finalize_label(None, label, self.number_alignment,
-                                                class_name=comp['class'])
+                                                class_name=comp['class'], info=info)
                 # Convert from math mode to regular text
                 comp['label'] = self._textify(label)
                 # Now the label is finished.
@@ -908,7 +909,7 @@ else:
 
             Parameters
             ----------
-            names : str
+            names : list
                 Names to put into block.
             stacking : str
                 Controls the appearance of boxes. Possible values are: 'max_chars','vertical',
@@ -1001,7 +1002,7 @@ else:
             txt = '{}, {}$ \\rightarrow $ {}'
             return txt.format(first + i, last + i, first + i + 1)
 
-        def finalize_label(self, number, txt, alignment, class_name=None):
+        def finalize_label(self, number, txt, alignment, class_name=None, info=None):
             """
             Add an index to the label either above or on the left side.
 
@@ -1016,21 +1017,26 @@ else:
             class_name : str or None, optional
                 Class name.
                 Defaults to None.
+            info: None or str
+                Additional info to be appended.
 
             Returns
             -------
             str
                 Label to be used for this item.
             """
-            def multi_ln(txt, number=None):
+
+            def multi_ln(txt, num=None):
                 # Converts text to a multiline block, if an index or class name is added in
                 # separate row.
                 if self.class_names and (class_name is not None):
+                    if info is not None:
+                        txt = r'} \\ \text{'.join([txt, info])  # Formatting for multi-line array
                     cls_name = '\\textit{%s}' % class_name  # Makes it italic
-                    txt = '} \\\\ \\text{'.join([txt, cls_name])  # Formatting for multi-line array
-                elif number is None:
+                    txt = r'} \\ \text{'.join([txt, cls_name])  # Formatting for multi-line array
+                elif num is None and info is None:
                     return txt  # No number, no classname, just flows through
-                texts = [number, txt] if number is not None else [txt]
+                texts = [num, txt] if num is not None else [txt]
                 return _multiline_block(*texts)
 
             if number:  # If number is None or empty string, it won't be inserted
@@ -1065,7 +1071,6 @@ else:
                                                    label=style)
             style_strs = [node_str.format(name="style{}".format(i), style=style, label=style)
                           for i, style in enumerate(styles)]
-            # return '};\n\\matrix[MatrixSetup, below left]{' + '  &\n'.join(style_strs) + r'\\'
             title_str = r'\node (legend_title) {{\LARGE \textbf{{{title}}}}};\\'
             return title_str.format(title=title) + '  &\n'.join(style_strs) + r'\\'
 
@@ -1329,7 +1334,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
     **kwargs : dict
-        Keyword arguments
+        Keyword arguments, includes writer soecific options.
 
     Returns
     -------
@@ -1477,12 +1482,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 # If not default solver, add to the solver dictionary
                 solver_dcts.append(comp)
         else:  # component or group
-            if not class_names:
-                x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                           comp_type=comp['component_type'])
-            else:
-                x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                           comp_type=comp['component_type'], cls=comp.get('class', None))
+            cls_name = comp.get('class', None) if class_names else None
+            x.add_comp(name=comp['abs_name'], label=label, stack=stack,
+                       comp_type=comp['component_type'], cls=cls_name)
 
     # Add process connections
     if add_process_conns:
@@ -1647,7 +1649,7 @@ def _convert_name(name, recurse=True, subs=None):
                 'abs_name': _format_name(name), 'path': _format_name(path)}
 
     if isinstance(name, list):  # If a source has multiple targets
-        return [convert(n) for n in name]
+        return map(convert, name)
     else:  # string
         return convert(name)
 
@@ -1842,7 +1844,7 @@ def _replace_chars(name, substitutes):
        str
     """
     if substitutes:
-        for (k, v) in substitutes:
+        for k, v in substitutes:
             name = name.replace(k, v)
     return name
 
@@ -1875,7 +1877,7 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
     if stacking == 'vertical':
         # Make multiline comp if not numbered
         if add_indices:  # array is already created for the numbering
-            return '} \\\\ \\text{'.join(solvers)  # With a TeX array this is a line separator
+            return r'} \\ \text{'.join(solvers)  # With a TeX array this is a line separator
         else:  # Goes into an array environment
             return _multiline_block(*solvers)
     elif stacking in ('horizontal', 'max_chars', 'cut_chars'):
@@ -1903,5 +1905,5 @@ def _multiline_block(*texts, **kwargs):
     end_char = kwargs.pop('end_char', '')
     texts = ['\\text{{{}{}}}'.format(t, end_char) for t in texts]
     template = '$\\begin{{array}}{{{pos}}} {text} \\end{{array}}$'
-    new_line = ' \\\\ '
+    new_line = r' \\ '
     return template.format(text=new_line.join(texts), pos='c' * len(texts))
