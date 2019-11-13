@@ -533,7 +533,6 @@ class _TotalJacInfo(object):
             imeta['itermeta'] = itermeta = []
             locs = None
             for ilist in simul_coloring.color_iter(mode):
-                # Maybe create dict here
                 for i in ilist:
                     _, rel_systems, cache_lin_sol = idx_map[i]
                     _update_rel_systems(all_rel_systems, rel_systems)
