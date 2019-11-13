@@ -323,7 +323,7 @@ class AkimaSplineComp(ExplicitComponent):
             m[ncp + 2] = 2.0 * m[ncp + 1] - m[ncp]
 
             # Slope at points.
-            for i in range(2, ncp + 1):
+            for i in range(2, ncp + 2):
                 m1d = md[:, i - 2]
                 m2d = md[:, i - 1]
                 m3d = md[:, i]
