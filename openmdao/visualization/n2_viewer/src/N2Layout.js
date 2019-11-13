@@ -162,6 +162,8 @@ class N2Layout {
      * @return {string} The selected text.
      */
     getText(node) {
+        testThis(this, 'N2Layout', 'getText');
+
         let retVal = node.name;
 
         if (this.outputNamingType == "Promoted" &&
@@ -184,6 +186,8 @@ class N2Layout {
      * @param {N2TreeNode} node The item to get the solver text from.
      */
     getSolverText(node) {
+        testThis(this, 'N2Layout', 'getSolverText');
+
         return this.showLinearSolverNames ?
             node.linear_solver : node.nonlinear_solver;
     }

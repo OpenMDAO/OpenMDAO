@@ -56,7 +56,7 @@ class N2Diagram {
         this.showLinearSolverNames = true;
 
         this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
-        this.layout = new N2Layout(this.model, this.zoomedElement, true, this.dims);
+        this.layout = new N2Layout(this.model, this.zoomedElement, this.showLinearSolverNames, this.dims);
         this.ui = new N2UserInterface(this);
 
         this._setupSvgElements();
@@ -172,6 +172,11 @@ class N2Diagram {
         for (let gName of ['elements', 'gridlines', 'componentBoxes', 'arrows', 'dots', 'highlights']) {
             this.dom.n2Groups[gName] = this.dom.n2TopGroup.append('g').attr('id', 'n2' + gName);
         };
+        /*
+        this.dom.n2Groups.elements.node().innerHTML = '<defs>' +
+            '<marker id="arrow" viewBox="0 -5 10 10" refX="5" refY="0" markerWidth="1" markerHeight="1" orient="auto">' +
+            '<path d="M0,-5L10,0L0,5" class="arrowHead"></path></marker></defs>';
+            */
     }
 
     /**
@@ -323,7 +328,7 @@ class N2Diagram {
                 if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
-            .text(self.layout.getText);
+            .text(self.layout.getText.bind(self.layout));
 
         return { 'selection': selection, 'nodeEnter': nodeEnter };
     }
@@ -360,7 +365,7 @@ class N2Diagram {
                 if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
-            .text(self.layout.getText);
+            .text(self.layout.getText.bind(self.layout));
     }
 
     _runPartitionTransition(selection) {
@@ -459,7 +464,7 @@ class N2Diagram {
                 if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
-            .text(self.layout.getSolverText);
+            .text(self.layout.getSolverText.bind(self.layout));
 
         return ({ 'selection': selection, 'nodeEnter': nodeEnter });
     }
@@ -501,7 +506,7 @@ class N2Diagram {
                 if (d.depth < self.zoomedElement.depth) return 0;
                 return d.textOpacity;
             })
-            .text(self.layout.getSolverText);
+            .text(self.layout.getSolverText.bind(self.layout));
     }
 
     _runSolverTransition(selection) {
@@ -509,7 +514,7 @@ class N2Diagram {
 
         // Transition exiting nodes to the parent's new position.
         let nodeExit = selection.exit()
-        .transition(sharedTransition)
+            .transition(sharedTransition)
             .attr("transform", function (d) {
                 return "translate(" + self.scales.solver.x(d.solverDims.x) + "," +
                     self.scales.solver.y(d.solverDims.y) + ")";
@@ -553,7 +558,7 @@ class N2Diagram {
             this.layout = new N2Layout(this.model, this.zoomedElement,
                 this.showLinearSolverNames, this.dims);
             this.ui.updateClickedIndices();
-            
+
             this.matrix = new N2Matrix(this.model, this.layout,
                 this.dom.n2Groups, this.ui.lastClickWasLeft,
                 this.ui.findRootOfChangeFunction, this.matrix.nodeSize);

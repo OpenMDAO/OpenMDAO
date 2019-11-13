@@ -38,6 +38,10 @@ class N2Matrix {
             'width': layout.size.diagram.width / this.diagNodes.length,
             'height': layout.size.diagram.height / this.diagNodes.length,
         }
+        
+        let markerSize = Math.max(2, this.nodeSize.width * .04, this.nodeSize.height * .04);
+        d3.select("#arrow").attr("markerWidth", markerSize).attr("markerHeight", markerSize);
+        d3.select("#offgridArrow").attr("markerWidth", markerSize*2).attr("markerHeight", markerSize);
 
         N2CellRenderer.updateDims(this.nodeSize.width, this.nodeSize.height);
         this.updateLevelOfDetailThreshold(layout.size.diagram.height);
@@ -561,24 +565,52 @@ class N2Matrix {
             debugInfo("Draw arrow on top going right away from " +
                 cell.tgtObj.absPathName + " to offscreen target " +
                 offscreenNode.absPathName);
+            new N2OffGridArrow({
+                'cell': { 'col': cell.row, 'row': cell.row },
+                'direction': 'right',
+                'color': N2Style.color.greenArrow,
+                'width': lineWidth,
+                'matrixSize': this.diagNodes.length
+            }, this.n2Groups, this.nodeSize);
         }
 
         for (let offscreenNode of cell.offScreen.bottom.outgoing) {
             debugInfo("Draw arrow on bottom going left from " +
                 cell.tgtObj.absPathName + " to offscreen target " +
                 offscreenNode.absPathName);
+            new N2OffGridArrow({
+                'cell': { 'col': cell.row, 'row': cell.row },
+                'direction': 'left',
+                'color': N2Style.color.greenArrow,
+                'width': lineWidth,
+                'matrixSize': this.diagNodes.length
+            }, this.n2Groups, this.nodeSize);
         }
 
         for (let offscreenNode of cell.offScreen.top.incoming) {
             debugInfo("Draw arrow on top coming down into " +
                 cell.tgtObj.absPathName + " from offscreen source " +
                 offscreenNode.absPathName);
+            new N2OffGridArrow({
+                'cell': { 'col': cell.row, 'row': cell.row },
+                'direction': 'down',
+                'color': N2Style.color.redArrow,
+                'width': lineWidth,
+                'matrixSize': this.diagNodes.length
+            }, this.n2Groups, this.nodeSize);
         }
 
         for (let offscreenNode of cell.offScreen.bottom.incoming) {
             debugInfo("Draw arrow on bottom coming up into " +
                 cell.tgtObj.absPathName + " from offscreen source " +
                 offscreenNode.absPathName)
+            new N2OffGridArrow({
+                'cell': { 'col': cell.row, 'row': cell.row },
+                'direction': 'up',
+                'color': N2Style.color.redArrow,
+                'width': lineWidth,
+                'matrixSize': this.diagNodes.length
+            }, this.n2Groups, this.nodeSize);
         }
     }
 
@@ -591,7 +623,7 @@ class N2Matrix {
         let leftTextWidthHovered = this.diagNodes[cell.row].nameWidthPx;
 
         // Loop over all elements in the matrix looking for other cells in the same column as
-        let lineWidth = Math.min(5, this.nodeSize.width * .5,
+        let lineWidth = Math.min(4, this.nodeSize.width * .5,
             this.nodeSize.height * .5);
 
         this.hilight(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
@@ -605,7 +637,7 @@ class N2Matrix {
             if (this.exists(cell.row, col)) {
                 if (col != cell.row) {
 
-                    new N2Arrow({
+                    new N2BentArrow({
                         'end': { 'col': col, 'row': col },
                         'start': { 'col': cell.row, 'row': cell.row },
                         'color': N2Style.color.greenArrow,
@@ -623,7 +655,7 @@ class N2Matrix {
             if (this.exists(col, cell.row)) {
                 if (col != cell.row) {
 
-                    new N2Arrow({
+                    new N2BentArrow({
                         'start': { 'col': col, 'row': col },
                         'end': { 'col': cell.row, 'row': cell.row },
                         'color': N2Style.color.redArrow,
@@ -659,7 +691,7 @@ class N2Matrix {
         }
 
         for (let arrow of arrows) {
-            new N2Arrow({
+            new N2BentArrow({
                 'start': { 'col': arrow.start, 'row': arrow.start },
                 'end': { 'col': arrow.end, 'row': arrow.end },
                 'color': (startIndex < endIndex) ?
@@ -679,7 +711,7 @@ class N2Matrix {
         let src = this.diagNodes[cell.row];
         let tgt = this.diagNodes[cell.col];
 
-        new N2Arrow({
+        new N2BentArrow({
             'start': { 'col': cell.row, 'row': cell.row },
             'end': { 'col': cell.col, 'row': cell.col },
             'color': N2Style.color.redArrow,
