@@ -1206,8 +1206,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('Solving variable: comp.f_xy' in output)
-        self.assertTrue('In mode: rev ' in output)
+        self.assertTrue('In mode: rev, Solving variable: comp.f_xy' in output)
         self.assertTrue('Sub Indices: 0' in output)
         self.assertTrue('Elapsed Time:' in output)
         self.assertTrue('Solving variable: con.c' in output)
@@ -1240,8 +1239,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('Solving variable: p1.x' in output)
-        self.assertTrue('Solving variable: p2.y' in output)
+        self.assertTrue('In mode: fwd, Solving variable: p1.x' in output)
+        self.assertTrue('In mode: fwd, Solving variable: p2.y' in output)
 
     def test_debug_print_option(self):
 

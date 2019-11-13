@@ -1278,13 +1278,13 @@ class _TotalJacInfo(object):
                             print('Solving color:', key, varlist)
                         else:
                             if key == '@simul_coloring':
-                                local_inds = self.local_indices_fwd(inds)
+                                local_inds = self.local_indices(inds)
                                 print('In mode: {0}, Solving variable: {1}\n'
-                                      'Sub Indices: {1} {2}'.format(
+                                      'Sub Indices: {2}'.format(
                                           mode, local_inds[0], local_inds[1]))
                             else:
                                 print('In mode: {0}, Solving variable: {1}\n'
-                                      'Sub Indices: {1} {2}'.format(mode, key, inds))
+                                      'Sub Indices: {2}'.format(mode, key, inds))
 
                         sys.stdout.flush()
                         t0 = time.time()

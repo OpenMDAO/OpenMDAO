@@ -27,6 +27,7 @@ from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
+from openmdao.utils.general_utils import run_driver
 
 import openmdao.test_suite
 
@@ -346,6 +347,34 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         rep = repr(p_color.driver._coloring_info['coloring'])
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
 
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_print_options_total_with_coloring_fwd(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True)
+
+        failed, output = run_driver(p_color)
+
+        self.assertFalse(failed, "Optimization failed.")
+
+        self.assertTrue('In mode: fwd, Solving variable: indeps.y' in output)
+        self.assertTrue('Sub Indices: [1 3 5 7 9]' in output)
+        self.assertTrue('Elapsed Time:' in output)
+
+    def test_print_options_total_with_coloring_rev(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True)
+
+        failed, output = run_driver(p_color)
+
+        self.assertFalse(failed, "Optimization failed.")
+
+        self.assertTrue('In mode: rev, Solving variable: r_con.g' in output)
+        self.assertTrue('Sub Indices: [2 0]' in output)
+        self.assertTrue('Elapsed Time:' in output)
 
 @use_tempdirs
 @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
