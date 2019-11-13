@@ -167,6 +167,9 @@ class Coloring(object):
         self._rev = None
         self._meta = {}
 
+        self.names_array = None
+        self.local_array = None
+
     def color_iter(self, direction):
         """
         Given a direction, yield an iterator over column (or row) groups.
@@ -907,6 +910,36 @@ class Coloring(object):
                         rev_solves += 1
 
         return fwd_solves, rev_solves
+
+    def _local_indices(self, inds, mode):
+
+        if self.names_array is None and self.local_array is None:
+            col_names = self._col_vars
+            col_sizes = self._col_var_sizes
+            row_names = self._row_vars
+            row_sizes = self._row_var_sizes
+
+            if mode == 'fwd':
+                col_info = zip(col_names, col_sizes)
+            else:
+                col_info = zip(row_names, row_sizes)
+
+            names = []
+            indices = []
+            for i, j in col_info:
+                names.append(np.repeat(i, j))
+                indices.append(np.arange(j))
+
+            self.names_array = np.concatenate(names)
+            self.local_array = np.concatenate(indices)
+
+        if isinstance(inds, (list)):
+            idx_name = self.names_array[inds[0]]
+        else:
+            idx_name = self.names_array[inds]
+        idx = self.local_array[inds]
+
+        return idx_name, idx
 
 
 def _order_by_ID(col_matrix):

@@ -1197,40 +1197,6 @@ class _TotalJacInfo(object):
         for matmat_idxs in inds:
             self.matmat_jac_setter(matmat_idxs, mode)
 
-    def local_indices(self, inds):
-        col_names = self.idx_iter_dict[self.mode]['@simul_coloring'][0]['coloring']._col_vars
-        col_sizes = self.idx_iter_dict[self.mode]['@simul_coloring'][0]['coloring']._col_var_sizes
-        row_names = self.idx_iter_dict[self.mode]['@simul_coloring'][0]['coloring']._row_vars
-        row_sizes = self.idx_iter_dict[self.mode]['@simul_coloring'][0]['coloring']._row_var_sizes
-
-        if self.mode == 'fwd':
-            names_array = np.zeros((1, sum(col_sizes)), dtype=object)
-            local_positions_array = np.zeros((1, sum(col_sizes)), dtype=int)
-            col_info = zip(col_names, col_sizes)
-        else:
-            names_array = np.zeros((1, sum(row_sizes)), dtype=object)
-            local_positions_array = np.zeros((1, sum(row_sizes)), dtype=int)
-            col_info = zip(row_names, row_sizes)
-
-        names = []
-        local_indices = []
-        for i, j in col_info:
-            names.append(np.repeat(i, j))
-            local_indices.append(np.arange(j))
-
-        names_list = np.concatenate(names).ravel().tolist()
-        local_list = np.concatenate(local_indices).ravel().tolist()
-        names_array[0, :] = names_list
-        local_positions_array[0, :] = local_list
-
-        if isinstance(inds, (list)):
-            idx_name = names_array[0, inds[0]]
-        else:
-            idx_name = names_array[0, inds]
-        idx = local_positions_array[0, inds]
-
-        return idx_name, idx
-
     def compute_totals(self):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1277,7 +1243,7 @@ class _TotalJacInfo(object):
                             print('Solving color:', key, varlist)
                         else:
                             if key == '@simul_coloring':
-                                local_inds = self.local_indices(inds)
+                                local_inds = imeta['coloring']._local_indices(inds=inds, mode=self.mode)
                                 print('In mode: {0}, Solving variable: {1}\n'
                                       'Sub Indices: {2}'.format(
                                           mode, local_inds[0], local_inds[1]))
