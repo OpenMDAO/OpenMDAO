@@ -41,40 +41,40 @@ class N2Layout {
         this.svg = d3.select("#svgId");
 
         this._setupTextRenderer();
-        console.time('N2Layout._updateTextWidths');
+        startTimer('N2Layout._updateTextWidths');
         this._updateTextWidths();
-        console.timeEnd('N2Layout._updateTextWidths');
+        stopTimer('N2Layout._updateTextWidths');
 
-        console.time('N2Layout._updateSolverTextWidths');
+        startTimer('N2Layout._updateSolverTextWidths');
         this._updateSolverTextWidths();
-        console.timeEnd('N2Layout._updateSolverTextWidths');
+        stopTimer('N2Layout._updateSolverTextWidths');
         delete (this.textRenderer);
 
-        console.time('N2Layout._computeLeaves');
+        startTimer('N2Layout._computeLeaves');
         this._computeLeaves();
-        console.timeEnd('N2Layout._computeLeaves');
+        stopTimer('N2Layout._computeLeaves');
 
-        console.time('N2Layout._computeColumnWidths');
+        startTimer('N2Layout._computeColumnWidths');
         this._computeColumnWidths();
-        console.timeEnd('N2Layout._computeColumnWidths');
+        stopTimer('N2Layout._computeColumnWidths');
 
-        console.time('N2Layout._computeSolverColumnWidths');
+        startTimer('N2Layout._computeSolverColumnWidths');
         this._computeSolverColumnWidths();
-        console.timeEnd('N2Layout._computeSolverColumnWidths');
+        stopTimer('N2Layout._computeSolverColumnWidths');
 
-        console.time('N2Layout._setColumnLocations');
+        startTimer('N2Layout._setColumnLocations');
         this._setColumnLocations();
-        console.timeEnd('N2Layout._setColumnLocations');
+        stopTimer('N2Layout._setColumnLocations');
 
-        console.time('N2Layout._computeNormalizedPositions');
+        startTimer('N2Layout._computeNormalizedPositions');
         this._computeNormalizedPositions(this.model.root, 0, false, null);
-        console.timeEnd('N2Layout._computeNormalizedPositions');
+        stopTimer('N2Layout._computeNormalizedPositions');
         if (this.zoomedElement.parent)
             this.zoomedNodes.push(this.zoomedElement.parent);
 
-        console.time('N2Layout._computeSolverNormalizedPositions');
+        startTimer('N2Layout._computeSolverNormalizedPositions');
         this._computeSolverNormalizedPositions(this.model.root, 0, false, null);
-        console.timeEnd('N2Layout._computeSolverNormalizedPositions');
+        stopTimer('N2Layout._computeSolverNormalizedPositions');
         if (this.zoomedElement.parent)
             this.zoomedSolverNodes.push(this.zoomedElement.parent);
 
@@ -92,7 +92,7 @@ class N2Layout {
     setTransitionPermission() {
         // Too many nodes, disable transitions.
         if (this.visibleNodes.length >= N2TransitionDefaults.maxNodes) {
-            console.log("Denying transitions: ", this.visibleNodes.length,
+            debugInfo("Denying transitions: ", this.visibleNodes.length,
                 " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
 
             // Return if already denied
@@ -104,7 +104,7 @@ class N2Layout {
             d3.selection.prototype.delay = returnThis;
         }
         else { // OK, enable transitions.
-            console.log("Allowing transitions: ", this.visibleNodes.length,
+            debugInfo("Allowing transitions: ", this.visibleNodes.length,
                 " visible nodes, max allowed: ", N2TransitionDefaults.maxNodes)
 
             // Return if already allowed
@@ -344,8 +344,6 @@ class N2Layout {
      * merged as much as possible.
      */
 
-    /** TODO: Document what the *0 variables are for */
-
     /** Recurse over the model tree and determine the coordinates and
      * size of visible nodes. If a parent is minimized, operations are
      * performed on it instead.
@@ -363,7 +361,7 @@ class N2Layout {
 
         if (earliestMinimizedParent == null && isChildOfZoomed) {
             if (!node.varIsHidden) this.zoomedNodes.push(node);
-            if (!node.hasChildren() || node.isMinimized) { //at a "leaf" node
+            if (!node.hasChildren() || node.isMinimized) { // at a "leaf" node
                 if (!node.varIsHidden) this.visibleNodes.push(node);
                 earliestMinimizedParent = node;
             }

@@ -1063,7 +1063,7 @@ class MyDriver(Driver):
         self.con_meta = deepcopy(self._cons)
 
         # Run model
-        model = self._problem.model
+        model = self._problem().model
         model.run_solve_nonlinear()
 
         # Con vals and derivs

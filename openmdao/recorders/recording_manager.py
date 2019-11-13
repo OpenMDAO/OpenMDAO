@@ -90,7 +90,7 @@ class RecordingManager(object):
             return
 
         # The remaining code only works for recording of Drivers
-        model = recording_requester._problem.model
+        model = recording_requester._problem().model
         if MPI:
             # TODO Eventually, we think we can get rid of this next check. But to be safe,
             #       we are leaving it in there.

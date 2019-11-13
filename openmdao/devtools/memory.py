@@ -1,16 +1,19 @@
 """Various debugging functions."""
 
-from __future__ import print_function
+from __future__ import print_function, division
 
 import sys
 import os
 import functools
+import gc
 
 try:
     import resource
 
     def max_mem_usage():
         """
+        Return the maximum memory used by this process and its children so far.
+
         Returns
         -------
         The max memory used by this process and its children, in MB.
@@ -32,9 +35,18 @@ try:
 
     def mem_usage(msg='', out=sys.stdout):
         """
+        Display current memory usage.
+
+        Parameters
+        ----------
+        msg : str
+            String prepended to each reported memory usage.
+        out : file-like
+            Output will be sent to this stream.
+
         Returns
         -------
-        The current memory used by this process (and it's children?), in MB.
+        The current memory used by this process, in MB.
         """
         denom = 1024. * 1024.
         p = psutil.Process(os.getpid())
@@ -45,9 +57,19 @@ try:
 
     def diff_mem(fn):
         """
-        This gives the difference in memory before and after the
-        decorated function is called. Does not show output unless there is a memory increase.
-        Requires psutil to be installed.
+        Decorator that prints the difference in memory usage resulting from the function call.
+
+        Does not show output unless there is a memory increase. Requires psutil to be installed.
+
+        Parameters
+        ----------
+        fn : function
+            The function being decorated.
+
+        Returns
+        -------
+        function
+            The wrapper function.
         """
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
@@ -65,6 +87,29 @@ try:
             return ret
         return wrapper
 
+    def check_iter_mem(niter, func, *args, **kwargs):
+        """
+        Run func niter times and collect info on memory usage.
+
+        Parameters
+        ----------
+        niter : int
+            Number of times to run func.
+        func : function
+            A function that takes no arguments.
+        *args : tuple
+            Positional args passed to func.
+        **kwargs : dict
+            Named args to be passed to func.
+        """
+        gc.collect()
+
+        yield mem_usage()
+        for i in range(niter):
+            func(*args, **kwargs)
+            gc.collect()
+            yield mem_usage()
+
 except ImportError:
     psutil = None
     def mem_usage(*args, **kwargs):
@@ -73,30 +118,160 @@ except ImportError:
     def diff_mem(*args, **kwargs):
         raise RuntimeError("The 'diff_mem' function requires the 'psutil' package.  You can "
                            "install it using 'pip install psutil'.")
+    def check_iter_mem(*args, **kwargs):
+        raise RuntimeError("The 'check_iter_mem' function requires the 'psutil' package.  You can "
+                           "install it using 'pip install psutil'.")
 
 
 try:
     import objgraph
 
+    def get_new_objects(lst, fn, *args, **kwargs):
+        """
+        Collect types and numbers of new objects left over after the given function is called.
+
+        If lst is not empty after the call, this MAY indicate a memory leak, but not necessarily,
+        since some functions are intended to create new objects for later use.
+
+        Parameters
+        ----------
+        lst : list
+            List used to collect objects and deltas.
+        fn : function
+            The function being checked for possible memory leaks.
+        *args : tuple
+            Positional args passed to fn.
+        **kwargs : dict
+            Named args to be passed to fn.
+
+        Returns
+        -------
+        object
+            The object returned by the call to fn.
+        """
+        gc.collect()
+        start_objs = objgraph.typestats()
+        start_objs['frame'] += 1
+        start_objs['function'] += 1
+        start_objs['builtin_function_or_method'] += 1
+        start_objs['cell'] += 1
+        ret = fn(*args, **kwargs)
+        gc.collect()
+        lst.extend([(str(o), delta) for o, _, delta in objgraph.growth(peak_stats=start_objs)])
+        return ret
+
+
     def new_objects(fn):
         """
-        This performs garbage collection before and after the function call and prints any
-        new objects that have not been garbage collected after the function returns.  This
-        MAY indicate a memory leak, but not necessarily.
+        A decorator that prints types and numbers of new objects left over after calling fn.
+
+        Parameters
+        ----------
+        fn : function
+            The function being checked for possible memory leaks.
+
+        Returns
+        -------
+        function
+            A wrapper for fn that reports possible memory leaks.
         """
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            start_objs = objgraph.typestats()
-            start_objs['frame'] += 1
-            start_objs['cell'] += 1
-            ret = fn(*args, **kwargs)
-            for obj, _, delta_objs in objgraph.growth(peak_stats=start_objs):
+            lst = []
+            ret = get_new_objects(lst, fn, *args, **kwargs)
+            for obj, delta_objs in lst:
                 print(str(fn), "added %s %+d" % (obj, delta_objs))
             return ret
         return wrapper
 
+
+    def check_iter_leaks(niter, func, *args, **kwargs):
+        """
+        Run func niter times and collect info on new objects left over after each iteration.
+
+        Parameters
+        ----------
+        niter : int
+            Number of times to run func.
+        func : function
+            A function that takes no arguments.
+        *args : tuple
+            Positional args passed to func.
+        **kwargs : dict
+            Named args to be passed to func.
+
+        Returns
+        -------
+        list
+            List of tuples of the form (iter, leak_info_list)
+        """
+        iters = []
+        for i in range(niter):
+            lst = []
+            get_new_objects(lst, func, *args, **kwargs)
+            if lst:
+                iters.append((i, lst))
+
+        return iters
+
+
+    def list_iter_leaks(iterleaks, out=sys.stdout):
+        """
+        Print any new objects left over after each call to the specified function.
+
+        Parameters
+        ----------
+        iterleaks : list of (i, list of leaked objs)
+            Output of check_iter_leaks.
+        out : file-like
+            Output stream.
+        """
+        if iterleaks:
+            print(file=out)
+            for i, lst in iterleaks:
+                print("\nIteration {}:".format(i), file=out)
+                for objstr, deltas in lst:
+                    print(objstr, deltas, file=out)
+            print(file=out)
+        else:
+            print("\nNo possible memory leaks detected.\n", file=out)
+
 except ImportError:
     objgraph = None
-    def new_objects(fn):
+    def get_new_objects(*args, **kwargs):
+        raise RuntimeError("The 'get_new_objects' function requires the 'objgraph' package.  "
+                           "You can install it using 'pip install objgraph'.")
+
+    def new_objects(*args, **kwargs):
         raise RuntimeError("The 'new_objects' decorator requires the 'objgraph' package.  You can "
                            "install it using 'pip install objgraph'.")
+
+    def check_iter_leaks(*args, **kwargs):
+        raise RuntimeError("The 'check_iter_leaks' function requires the 'objgraph' package.  "
+                           "You can install it using 'pip install objgraph'.")
+
+    def list_iter_leaks(*args, **kwargs):
+        raise RuntimeError("The 'list_iter_leaks' function requires the 'objgraph' package.  "
+                           "You can install it using 'pip install objgraph'.")
+
+def plot_mem(mems, fname=None):
+    """
+    Plot memory usage.
+
+    Parameters
+    ----------
+    mems : iter of float
+        Iterator containing memory usage values.
+    fname : str (optional)
+        If specified, save the plot to this file.
+    """
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    mems = list(mems)
+    ax.plot(list(range(len(mems))), mems)
+    ax.set(xlabel='Iterations', ylabel='Memory (MB)', title='Memory useage per iteration')
+    ax.grid()
+    if fname is not None:
+        fig.savefig(fname)
+    plt.show()
+

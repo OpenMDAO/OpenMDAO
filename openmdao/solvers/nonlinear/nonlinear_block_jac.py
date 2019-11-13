@@ -15,7 +15,7 @@ class NonlinearBlockJac(NonlinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-        system = self._system
+        system = self._system()
         self._solver_info.append_subsolver()
         system._transfer('nonlinear', 'fwd')
 
@@ -42,7 +42,7 @@ class NonlinearBlockJac(NonlinearSolver):
         """
         if (self.options['iprint'] > 0):
 
-            pathname = self._system.pathname
+            pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
                 prefix = self._solver_info.prefix
@@ -56,7 +56,7 @@ class NonlinearBlockJac(NonlinearSolver):
         """
         Run the apply_nonlinear method on the system.
         """
-        system = self._system
+        system = self._system()
 
         # If this is a parallel group, check for analysis errors and reraise.
         if len(system._subsystems_myproc) != len(system._subsystems_allprocs):

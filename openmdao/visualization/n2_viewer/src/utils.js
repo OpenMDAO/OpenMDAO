@@ -75,3 +75,15 @@ d3.selection.prototype.originalFuncs = {
 d3.selection.prototype.transitionAllowed = true;
 
 function returnThis() { return this; }
+
+function startTimer(label) {
+    if (DebugFlags.timings) console.time(label);
+}
+
+function stopTimer(label) {
+    if (DebugFlags.timings) console.timeEnd(label);
+}
+
+function debugInfo(msg) {
+    if (DebugFlags.info) console.log(msg);
+}
