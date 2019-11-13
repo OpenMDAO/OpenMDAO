@@ -172,11 +172,6 @@ class N2Diagram {
         for (let gName of ['elements', 'gridlines', 'componentBoxes', 'arrows', 'dots', 'highlights']) {
             this.dom.n2Groups[gName] = this.dom.n2TopGroup.append('g').attr('id', 'n2' + gName);
         };
-        /*
-        this.dom.n2Groups.elements.node().innerHTML = '<defs>' +
-            '<marker id="arrow" viewBox="0 -5 10 10" refX="5" refY="0" markerWidth="1" markerHeight="1" orient="auto">' +
-            '<path d="M0,-5L10,0L0,5" class="arrowHead"></path></marker></defs>';
-            */
     }
 
     /**
@@ -567,13 +562,13 @@ class N2Diagram {
         this._updateScale();
         this.layout.updateTransitionInfo(this.dom, this.transitionStartDelay);
 
-        let d3Refs = this._createPartitionCells();
-        this._setupPartitionTransition(d3Refs);
-        this._runPartitionTransition(d3Refs.selection);
+        let d3PartRefs = this._createPartitionCells();
+        this._setupPartitionTransition(d3PartRefs);
+        this._runPartitionTransition(d3PartRefs.selection);
 
-        d3Refs = this._createSolverCells();
-        this._setupSolverTransition(d3Refs);
-        this._runSolverTransition(d3Refs.selection);
+        let d3SolverRefs = this._createSolverCells();
+        this._setupSolverTransition(d3SolverRefs);
+        this._runSolverTransition(d3SolverRefs.selection);
 
         this.matrix.draw();
     }
@@ -624,7 +619,8 @@ class N2Diagram {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(cell) {
-        this.matrix.mouseOverOnDiagonal(cell);
+        if (this.matrix.cellExists(cell))
+            this.matrix.mouseOverOnDiagonal(cell);
     }
 
     /**
@@ -632,7 +628,8 @@ class N2Diagram {
      * rather than setting one up that points directly to a specific matrix.
      */
     mouseOverOffDiagonal(cell) {
-        this.matrix.mouseOverOffDiagonal(cell);
+        if (this.matrix.cellExists(cell))
+            this.matrix.mouseOverOffDiagonal(cell);
     }
 
     /** When the mouse leaves a cell, remove all temporary arrows. */

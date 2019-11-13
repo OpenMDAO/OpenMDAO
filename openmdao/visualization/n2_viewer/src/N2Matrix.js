@@ -38,10 +38,10 @@ class N2Matrix {
             'width': layout.size.diagram.width / this.diagNodes.length,
             'height': layout.size.diagram.height / this.diagNodes.length,
         }
-        
+
         let markerSize = Math.max(2, this.nodeSize.width * .04, this.nodeSize.height * .04);
         d3.select("#arrow").attr("markerWidth", markerSize).attr("markerHeight", markerSize);
-        d3.select("#offgridArrow").attr("markerWidth", markerSize*2).attr("markerHeight", markerSize);
+        d3.select("#offgridArrow").attr("markerWidth", markerSize * 2).attr("markerHeight", markerSize);
 
         N2CellRenderer.updateDims(this.nodeSize.width, this.nodeSize.height);
         this.updateLevelOfDetailThreshold(layout.size.diagram.height);
@@ -66,8 +66,19 @@ class N2Matrix {
      *  in the row; true otherwise.
      */
     exists(row, col) {
-        if (this.grid[row] && this.grid[row][col]) { return true; }
+        if (this.grid[row] && this.grid[row][col]) return true;
         return false;
+    }
+
+    /**
+     * Make sure the cell is still part of the matrix and not an old one.
+     * @param {N2MatrixCell} cell The cell to test.
+     * @returns {Boolean} True if this.diagNodes has an object in the
+     *   same row and column, and it matches the provided cell.
+    */
+    cellExists(cell) {
+        return (this.exists(cell.row, cell.col) &&
+            this.cell(cell.row, cell.col) === cell);
     }
 
     /**
@@ -620,11 +631,14 @@ class N2Matrix {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(cell) {
-        let leftTextWidthHovered = this.diagNodes[cell.row].nameWidthPx;
+        // Don't do anything during transition:
+        if (d3.active(cell)) return;
 
         // Loop over all elements in the matrix looking for other cells in the same column as
         let lineWidth = Math.min(4, this.nodeSize.width * .5,
             this.nodeSize.height * .5);
+
+        let leftTextWidthHovered = this.diagNodes[cell.row].nameWidthPx;
 
         this.hilight(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.row, leftTextWidthHovered,
@@ -634,6 +648,7 @@ class N2Matrix {
 
         for (let col = 0; col < this.layout.visibleNodes.length; ++col) {
             let leftTextWidthDependency = this.layout.visibleNodes[col].nameWidthPx;
+
             if (this.exists(cell.row, col)) {
                 if (col != cell.row) {
 
@@ -649,6 +664,7 @@ class N2Matrix {
                         this.nodeSize.height * col, leftTextWidthDependency,
                         this.nodeSize.height, N2Style.color.greenArrow);
                 }
+
             }
 
             // Now swap row and col
@@ -661,11 +677,13 @@ class N2Matrix {
                         'color': N2Style.color.redArrow,
                         'width': lineWidth
                     }, this.n2Groups, this.nodeSize);
+
                     //highlight var name
                     this.hilight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
                         this.nodeSize.height * col, leftTextWidthDependency,
                         this.nodeSize.height, N2Style.color.redArrow);
                 }
+
             }
         }
     }
@@ -707,6 +725,9 @@ class N2Matrix {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOffDiagonal(cell) {
+        // Don't do anything during transition:
+        if (d3.active(cell)) return;
+
         let lineWidth = Math.min(5, this.nodeSize.width * .5, this.nodeSize.height * .5);
         let src = this.diagNodes[cell.row];
         let tgt = this.diagNodes[cell.col];

@@ -21,7 +21,6 @@ class N2Arrow {
         this.dotsGrp = n2Groups.dots;
         this.nodeSize = nodeSize;
         this.attribs = attribs;
-
     }
 
     get offsetAbsX() {
@@ -145,28 +144,28 @@ class N2OffGridArrow extends N2Arrow {
                 this.pts.start.y = this.attribs.matrixSize * this.nodeSize.height +
                     this.nodeSize.height * .5 + offsetY;
                 this.pts.end.y = this.nodeSize.height * this.cell.row +
-                    this.nodeSize.height;
+                    this.nodeSize.height * .5 + offsetY
                 break;
             case 'down':
                 this.pts.start.x = this.pts.end.x =
                     this.nodeSize.width * this.cell.col + this.nodeSize.width * .5;
                 this.pts.start.y = this.nodeSize.height * -.5 - offsetY;
-                this.pts.end.y = this.nodeSize.height * this.cell.row;
+                this.pts.end.y = this.nodeSize.height * this.cell.row +
+                    this.nodeSize.height * .5 - offsetY;
                 break;
             case 'left':
                 this.pts.start.y = this.pts.end.y =
                     this.nodeSize.height * this.cell.row + this.nodeSize.height * .5;
-
-                this.pts.start.x = this.cell.col * this.nodeSize.width +
+                this.pts.start.x = this.nodeSize.width * this.cell.col +
                     this.nodeSize.width * .5 - offsetX;
-                this.pts.end.x = offsetX;
+                this.pts.end.x = 0;
                 break;
             case 'right':
                 this.pts.start.y = this.pts.end.y =
                     this.nodeSize.height * this.cell.row + this.nodeSize.height * .5;
                 this.pts.start.x = this.nodeSize.width * this.cell.col +
                     this.nodeSize.width * .5 + offsetX;
-                this.pts.end.x = this.attribs.matrixSize * this.nodeSize.width - offsetX;
+                this.pts.end.x = this.attribs.matrixSize * this.nodeSize.width;
                 break;
             default:
                 throw ('N2OffGridArrow._computePts(): Unrecognized direction "' +
@@ -178,12 +177,13 @@ class N2OffGridArrow extends N2Arrow {
     draw() {
         this.path = this.arrowsGrp.insert("path")
             .attr("class", "n2_hover_elements")
+            .attr("stroke-dasharray", "5,5")
             .attr("d", "M" + this.pts.start.x + " " + this.pts.start.y +
                 " L" + this.pts.end.x + " " + this.pts.end.y)
             .attr("fill", "none")
             .style("stroke-width", this.width)
             .style("stroke", this.color);
 
-        this.path.attr("marker-end", "url(#offgridArrow)");
+        this.path.attr("marker-end", "url(#arrow)");
     }
 }

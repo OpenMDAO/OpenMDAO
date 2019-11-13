@@ -91,6 +91,7 @@ class N2UserInterface {
         this.leftClickedNode = node1;
         this.rightClickedNode = node2;
         d3.event.preventDefault();
+        d3.event.stopPropagation();
         this.collapse();
     }
 
@@ -124,9 +125,9 @@ class N2UserInterface {
         this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
         this.forwardButtonHistory = [];
         this._setupLeftClick(node);
-        this.n2Diag.update();
         d3.event.preventDefault();
         d3.event.stopPropagation();
+        this.n2Diag.update();
     }
 
     /**
