@@ -620,10 +620,11 @@ class TestGroupFiniteDifference(unittest.TestCase):
 
         prob = om.Problem()
         model = prob.model = om.Group(assembled_jac_type='dense')
-        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
         model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])
+
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
         sub.add_subsystem('d1', SellarDis1withDerivatives(), promotes=['x', 'z', 'y1', 'y2'])
         sub.add_subsystem('d2', SellarDis2withDerivatives(), promotes=['z', 'y1', 'y2'])

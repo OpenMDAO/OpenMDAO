@@ -306,11 +306,10 @@ class AkimaSplineComp(ExplicitComponent):
             ypt_jj = ypt[jj, :]
 
             # Compute segment slopes
-            md[:, 2:ncp + 1] = ((yptd[:, 1:] - yptd[:, :-1]) * (xpt[1:] - xpt[:-1]) -
-                                (ypt_jj[1:] - ypt_jj[:-1]) * (xptd[:, 1:] - xptd[:, :-1])) / \
-                (xpt[1:] - xpt[:-1]) ** 2
+            md[:, 2:ncp + 1] = ((yptd[:, 1:] - yptd[:, :-1]) * dx -
+                                (ypt_jj[1:] - ypt_jj[:-1]) * dxd) / dx2
 
-            m[2:ncp + 1] = (ypt_jj[1:] - ypt_jj[:-1]) / (xpt[1:] - xpt[:-1])
+            m[2:ncp + 1] = (ypt_jj[1:] - ypt_jj[:-1]) / dx
 
             # Estimation for end points.
             md[:, 1] = 2.0 * md[:, 2] - md[:, 3]
