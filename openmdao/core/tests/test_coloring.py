@@ -362,6 +362,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         self.assertTrue('Sub Indices: [1 3 5 7 9]' in output)
         self.assertTrue('Elapsed Time:' in output)
 
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
     def test_print_options_total_with_coloring_rev(self):
         # first, run w/o coloring
         p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
