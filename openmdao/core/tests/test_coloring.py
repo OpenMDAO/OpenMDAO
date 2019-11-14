@@ -938,6 +938,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
         except Exception as err:
             print(str(err))
 
+class SimulColoringVarOutputTestClass(unittest.TestCase):
     def test_multi_variable_coloring_debug_print_totals(self):
         size = 10
         num_pts = 4
@@ -945,15 +946,15 @@ class MatMultMultipointTestCase(unittest.TestCase):
         np.random.seed(11)
 
         p = om.Problem()
-        p.driver = pyOptSparseDriver()
-        p.driver.options['optimizer'] = OPTIMIZER
+        p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
         p.driver.declare_coloring()
         p.driver.options['debug_print'] = ['totals']
-        if OPTIMIZER == 'SLSQP':
-            p.driver.opt_settings['Major iterations limit'] = 100
-            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
-            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
-            p.driver.opt_settings['iSumm'] = 6
+        # if OPTIMIZER == 'SLSQP':
+        #     p.driver.opt_settings['Major iterations limit'] = 100
+        #     p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+        #     p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+        #     p.driver.opt_settings['iSumm'] = 6
 
         model = p.model
         for i in range(num_pts):
