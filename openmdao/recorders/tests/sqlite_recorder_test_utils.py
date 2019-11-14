@@ -1,5 +1,6 @@
 from six import iteritems, PY2, PY3
 
+import sys
 import sqlite3
 import numpy as np
 import json

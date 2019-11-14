@@ -886,9 +886,9 @@ class Driver(object):
 
         if opts['record_responses']:
             # res_vars = self.get_response_values()  # not really working yet
-            res_vars = {}
-        else:
-            res_vars = {}
+            simple_warning("option 'record_responses' not supported yet.")
+
+        res_vars = {}
 
         des_vars = {name: des_vars[name] for name in filt['des']}
         obj_vars = {name: obj_vars[name] for name in filt['obj']}
@@ -897,14 +897,12 @@ class Driver(object):
 
         model = self._problem.model
 
-        names = model._outputs._names
         views = model._outputs._views
-        sys_vars = {name: views[name] for name in names if name in filt['sys']}
+        sys_vars = {name: views[name] for name in model._outputs._names if name in filt['sys']}
 
         if self.recording_options['record_inputs']:
-            names = model._inputs._names
             views = model._inputs._views
-            in_vars = {name: views[name] for name in names if name in filt['in']}
+            in_vars = {name: views[name] for name in model._inputs._names if name in filt['in']}
         else:
             in_vars = {}
 
