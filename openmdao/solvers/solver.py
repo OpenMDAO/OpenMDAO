@@ -289,28 +289,13 @@ class Solver(object):
         excl = self.recording_options['excludes']
 
         if self.recording_options['record_solver_residuals']:
-            if isinstance(self, NonlinearSolver):
-                residuals = system._residuals
-            else:  # it's a LinearSolver
-                residuals = system._vectors['residual']['linear']
-
-            myresiduals = {n for n in residuals._names if check_path(n, incl, excl)}
+            myresiduals = {n for n in system._residuals._names if check_path(n, incl, excl)}
 
         if self.recording_options['record_outputs']:
-            if isinstance(self, NonlinearSolver):
-                outputs = system._outputs
-            else:  # it's a LinearSolver
-                outputs = system._vectors['output']['linear']
-
-            myoutputs = {n for n in outputs._names if check_path(n, incl, excl)}
+            myoutputs = {n for n in system._outputs._names if check_path(n, incl, excl)}
 
         if self.recording_options['record_inputs']:
-            if isinstance(self, NonlinearSolver):
-                inputs = system._inputs
-            else:
-                inputs = system._vectors['input']['linear']
-
-            myinputs = {n for n in inputs._names if check_path(n, incl, excl)}
+            myinputs = {n for n in system._inputs._names if check_path(n, incl, excl)}
 
         self._filtered_vars_to_record = {
             'in': myinputs,

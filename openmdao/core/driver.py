@@ -331,7 +331,7 @@ class Driver(object):
         Returns
         -------
         dict
-           Dictionary containing lists of variables to record.
+           Dictionary containing sets of variables to record.
         """
         problem = self._problem
         model = problem.model
@@ -352,6 +352,9 @@ class Driver(object):
         # NOTE: only local var names are in abs2prom, all will be gathered later
         abs2prom = model._var_abs2prom['output']
 
+        # design variables, objectives and constraints are always in the options
+        mydesvars = myobjectives = myconstraints = set()
+
         all_desvars = {n for n in self._designvars
                        if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
         all_objectives = {n for n in self._objs
@@ -359,26 +362,23 @@ class Driver(object):
         all_constraints = {n for n in self._cons
                            if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
 
-        # design variables, objectives and constraints are always in the options
-        mydesvars = myobjectives = myconstraints = set()
-
         if recording_options['record_desvars']:
             if MPI:
-                mydesvars = [n for n in all_desvars if rrank == rowned[n]]
+                mydesvars = {n for n in all_desvars if rrank == rowned[n]}
             else:
-                mydesvars = list(all_desvars)
+                mydesvars = all_desvars
 
         if recording_options['record_objectives']:
             if MPI:
-                myobjectives = [n for n in all_objectives if rrank == rowned[n]]
+                myobjectives = {n for n in all_objectives if rrank == rowned[n]}
             else:
-                myobjectives = list(all_objectives)
+                myobjectives = all_objectives
 
         if recording_options['record_constraints']:
             if MPI:
-                myconstraints = [n for n in all_constraints if rrank == rowned[n]]
+                myconstraints = {n for n in all_constraints if rrank == rowned[n]}
             else:
-                myconstraints = list(all_constraints)
+                myconstraints = all_constraints
 
         filtered_vars_to_record = {
             'des': mydesvars,
@@ -393,30 +393,23 @@ class Driver(object):
             if recording_options['record_responses']:
                 myresponses = {n for n in self._responses
                                if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
-
                 if MPI:
-                    myresponses = [n for n in myresponses if rrank == rowned[n]]
+                    myresponses = {n for n in myresponses if rrank == rowned[n]}
 
-            filtered_vars_to_record['res'] = list(myresponses)
+            filtered_vars_to_record['res'] = myresponses
 
         # inputs (if in options)
         if 'record_inputs' in recording_options:
-            myinputs = set()
 
             if recording_options['record_inputs']:
                 myinputs = {n for n in model._inputs if check_path(n, incl, excl)}
 
                 if MPI:
-                    # gather the variables from all ranks to rank 0
-                    all_vars = model.comm.gather(myinputs, root=0)
-                    if MPI.COMM_WORLD.rank == 0:
-                        myinputs = all_vars[-1]
-                        for d in all_vars[:-1]:
-                            myinputs.update(d)
+                    myinputs = {n for n in myinputs if rrank == rowned[n]}
+            else:
+                myinputs = set()
 
-                    myinputs = [n for n in myinputs if rrank == rowned[n]]
-
-            filtered_vars_to_record['in'] = list(myinputs)
+            filtered_vars_to_record['in'] = myinputs
 
         # system outputs
         myoutputs = set()
@@ -426,20 +419,12 @@ class Driver(object):
                          if n in abs2prom and check_path(abs2prom[n], incl, excl)}
 
             if MPI:
-                # gather the variables from all ranks to rank 0
-                all_vars = model.comm.gather(myoutputs, root=0)
-                if MPI.COMM_WORLD.rank == 0:
-                    myoutputs = all_vars[-1]
-                    for d in all_vars[:-1]:
-                        myoutputs.update(d)
+                myoutputs = {n for n in myoutputs if rrank == rowned[n]}
 
             # de-duplicate
             myoutputs = myoutputs.difference(all_desvars, all_objectives, all_constraints)
 
-            if MPI:
-                myoutputs = [n for n in myoutputs if rrank == rowned[n]]
-
-        filtered_vars_to_record['sys'] = list(myoutputs)
+        filtered_vars_to_record['sys'] = myoutputs
 
         return filtered_vars_to_record
 
@@ -545,8 +530,8 @@ class Driver(object):
 
         Parameters
         ----------
-        filter : list
-            List of desvar names used by recorders.
+        filter : set
+            Set of desvar names used by recorders.
         driver_scaling : bool
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
@@ -614,8 +599,8 @@ class Driver(object):
 
         Parameters
         ----------
-        filter : list
-            List of response names used by recorders.
+        filter : set
+            Set of response names used by recorders.
 
         Returns
         -------
@@ -639,8 +624,8 @@ class Driver(object):
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
-        filter : list
-            List of objective names used by recorders.
+        filter : set
+            Set of objective names used by recorders.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
 
@@ -676,8 +661,8 @@ class Driver(object):
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
-        filter : list
-            List of constraint names used by recorders.
+        filter : set
+            Set of constraint names used by recorders.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
 
@@ -954,8 +939,8 @@ class Driver(object):
         #     debug("DONE gathering rec vars for %s" % root.pathname)
 
         if root.comm.rank == 0:
-            dct = all_vars[-1]
-            for d in all_vars[:-1]:
+            dct = all_vars[0]
+            for d in all_vars[1:]:
                 dct.update(d)
             return dct
 

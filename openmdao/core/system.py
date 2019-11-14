@@ -1451,13 +1451,14 @@ class System(object):
                 myoutputs.update({n for n in self._outputs._names
                                   if n in abs2prom and check_path(abs2prom[n], incl, excl)})
 
-            # residuals have the same names as the continuous outputs
-            if options['record_residuals']:
-                myresiduals = myoutputs.copy()
-
             if len(self._var_discrete['output']) > 0:
                 myoutputs.update({n for n in self._var_discrete['output']
                                   if check_path(n, incl, excl)})
+                # residuals have the same names as the continuous outputs
+                if options['record_residuals']:
+                    myresiduals = myoutputs.copy()
+            elif options['record_residuals']:
+                myresiduals = myoutputs
 
         elif options['record_residuals']:
             if self._residuals:
