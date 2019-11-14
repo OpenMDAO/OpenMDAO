@@ -1248,10 +1248,12 @@ class _TotalJacInfo(object):
                                 print('In mode: {0}, Solving variable(s):'.format(
                                       mode))
                                 print(*local_inds, sep='\n')
-                                pass
                             else:
-                                print('In mode: {0}, Solving variable(s): {1}\n'
-                                      'Sub Indices: {2}'.format(mode, key, inds))
+                                print('In mode: {0}, Solving variable(s):'.format(
+                                      mode))
+                                print("('{0}', [{1}])".format(key, inds))
+                                # print('In mode: {0}, Solving variable(s): {1}\n'
+                                #       'Sub Indices: {2}'.format(mode, key, inds))
 
                         sys.stdout.flush()
                         t0 = time.time()

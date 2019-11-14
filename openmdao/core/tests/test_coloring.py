@@ -871,13 +871,11 @@ def _get_random_mat(rows, cols):
 
 
 @use_tempdirs
-@unittest.skipUnless(MPI is not None and PETScVector is not None and OPTIMIZER is not None, "PETSc and pyOptSparse required.")
 class MatMultMultipointTestCase(unittest.TestCase):
-    N_PROCS = 4
 
     def test_multipoint_with_coloring(self):
         size = 10
-        num_pts = self.N_PROCS
+        num_pts = 4
 
         np.random.seed(11)
 
@@ -885,7 +883,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
         p.driver.declare_coloring()
-        if OPTIMIZER == 'SNOPT':
+        if OPTIMIZER == 'SLSQP':
             p.driver.opt_settings['Major iterations limit'] = 100
             p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
             p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
@@ -941,7 +939,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
     def test_multi_variable_coloring_debug_print_totals(self):
         size = 10
-        num_pts = self.N_PROCS
+        num_pts = 4
 
         np.random.seed(11)
 
@@ -950,7 +948,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p.driver.options['optimizer'] = OPTIMIZER
         p.driver.declare_coloring()
         p.driver.options['debug_print'] = ['totals']
-        if OPTIMIZER == 'SNOPT':
+        if OPTIMIZER == 'SLSQP':
             p.driver.opt_settings['Major iterations limit'] = 100
             p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
             p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
@@ -984,18 +982,17 @@ class MatMultMultipointTestCase(unittest.TestCase):
 
         model.add_objective('obj.y')
 
-        try:
-            p.setup()
+        p.setup(check=False)
 
-            failed, output = run_driver(p)
+        failed, output = run_driver(p)
 
-            self.assertFalse(failed, "Optimization failed.")
+        self.assertFalse(failed, "Optimization failed.")
 
-            self.assertTrue('In mode: fwd, Solving variable(s):' in output)
-
-        except Exception as err:
-            print(str(err))
-
+        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue("('indep0.x', [7])" in output)
+        self.assertTrue("('indep1.x', [7])" in output)
+        self.assertTrue("('indep2.x', [7])" in output)
+        self.assertTrue("('indep3.x', [7])" in output)
 
 
 class DumbComp(om.ExplicitComponent):
