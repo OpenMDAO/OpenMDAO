@@ -16,6 +16,7 @@ from itertools import combinations, chain
 from distutils.version import LooseVersion
 from contextlib import contextmanager
 from pprint import pprint
+from itertools import groupby
 
 from six import iteritems, string_types
 from six.moves import range
@@ -133,6 +134,10 @@ class Coloring(object):
         Sizes of row variables.
     _meta : dict
         Dictionary of metadata used to create the coloring.
+    _names_array : ndarray or None:
+        Names of total jacobian rows or columns.
+    _local_array : ndarray or None:
+        Indices of total jacobian rows or columns.
     """
 
     def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
@@ -167,8 +172,8 @@ class Coloring(object):
         self._rev = None
         self._meta = {}
 
-        self.names_array = None
-        self.local_array = None
+        self._names_array = None
+        self._local_array = None
 
     def color_iter(self, direction):
         """
@@ -913,7 +918,7 @@ class Coloring(object):
 
     def _local_indices(self, inds, mode):
 
-        if self.names_array is None and self.local_array is None:
+        if self._names_array is None and self._local_array is None:
             col_names = self._col_vars
             col_sizes = self._col_var_sizes
             row_names = self._row_vars
@@ -930,16 +935,16 @@ class Coloring(object):
                 names.append(np.repeat(i, j))
                 indices.append(np.arange(j))
 
-            self.names_array = np.concatenate(names)
-            self.local_array = np.concatenate(indices)
+            self._names_array = np.concatenate(names)
+            self._local_array = np.concatenate(indices)
 
-        if isinstance(inds, (list)):
-            idx_name = self.names_array[inds[0]]
+        if isinstance(inds, list):
+            var_name_and_sub_indices = [(key, [x[1] for x in group]) for key, group in groupby(
+                zip(self._names_array[inds], self._local_array[inds]), key=lambda x: x[0])]
         else:
-            idx_name = self.names_array[inds]
-        idx = self.local_array[inds]
+            var_name_and_sub_indices = [(self._names_array[inds], self._local_array[inds])]
 
-        return idx_name, idx
+        return var_name_and_sub_indices
 
 
 def _order_by_ID(col_matrix):

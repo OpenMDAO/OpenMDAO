@@ -1243,12 +1243,14 @@ class _TotalJacInfo(object):
                             print('Solving color:', key, varlist)
                         else:
                             if key == '@simul_coloring':
-                                local_inds = imeta['coloring']._local_indices(inds=inds, mode=self.mode)
-                                print('In mode: {0}, Solving variable: {1}\n'
-                                      'Sub Indices: {2}'.format(
-                                          mode, local_inds[0], local_inds[1]))
+                                local_inds = imeta['coloring']._local_indices(
+                                    inds=inds, mode=self.mode)
+                                print('In mode: {0}, Solving variable(s):'.format(
+                                      mode))
+                                print(*local_inds, sep='\n')
+                                pass
                             else:
-                                print('In mode: {0}, Solving variable: {1}\n'
+                                print('In mode: {0}, Solving variable(s): {1}\n'
                                       'Sub Indices: {2}'.format(mode, key, inds))
 
                         sys.stdout.flush()

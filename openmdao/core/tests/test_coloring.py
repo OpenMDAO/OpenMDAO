@@ -358,8 +358,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: fwd, Solving variable: indeps.y' in output)
-        self.assertTrue('Sub Indices: [1 3 5 7 9]' in output)
+        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
     @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
@@ -373,8 +373,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
 
         self.assertFalse(failed, "Optimization failed.")
 
-        self.assertTrue('In mode: rev, Solving variable: r_con.g' in output)
-        self.assertTrue('Sub Indices: [2 0]' in output)
+        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue("('r_con.g', [0])" in output)
         self.assertTrue('Elapsed Time:' in output)
 
 @use_tempdirs
@@ -938,6 +938,64 @@ class MatMultMultipointTestCase(unittest.TestCase):
             print("final obj:", p['obj.y'])
         except Exception as err:
             print(str(err))
+
+    def test_multi_variable_coloring_debug_print_totals(self):
+        size = 10
+        num_pts = self.N_PROCS
+
+        np.random.seed(11)
+
+        p = om.Problem()
+        p.driver = pyOptSparseDriver()
+        p.driver.options['optimizer'] = OPTIMIZER
+        p.driver.declare_coloring()
+        p.driver.options['debug_print'] = ['totals']
+        if OPTIMIZER == 'SNOPT':
+            p.driver.opt_settings['Major iterations limit'] = 100
+            p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+            p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+            p.driver.opt_settings['iSumm'] = 6
+
+        model = p.model
+        for i in range(num_pts):
+            model.add_subsystem('indep%d' % i, om.IndepVarComp('x', val=np.ones(size)))
+            model.add_design_var('indep%d.x' % i)
+
+        par1 = model.add_subsystem('par1', om.ParallelGroup())
+        for i in range(num_pts):
+            mat = _get_random_mat(5, size)
+            par1.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
+            model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
+
+        par2 = model.add_subsystem('par2', om.ParallelGroup())
+        for i in range(num_pts):
+            mat = _get_random_mat(size, 5)
+            par2.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
+            model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
+            par2.add_constraint('comp%d.y' % i, lower=-1.)
+
+            model.add_subsystem('normcomp%d' % i, om.ExecComp("y=sum(x*x)", x=np.ones(size)))
+            model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
+
+        model.add_subsystem('obj', om.ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
+
+        for i in range(num_pts):
+            model.connect('normcomp%d.y' % i, 'obj.x%d' % i)
+
+        model.add_objective('obj.y')
+
+        try:
+            p.setup()
+
+            failed, output = run_driver(p)
+
+            self.assertFalse(failed, "Optimization failed.")
+
+            self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+
+        except Exception as err:
+            print(str(err))
+
 
 
 class DumbComp(om.ExplicitComponent):
