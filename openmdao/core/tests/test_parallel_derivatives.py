@@ -168,7 +168,7 @@ class ParDerivTestCase(unittest.TestCase):
             sys.stdout = stdout
 
         output = strout.getvalue()
-        print(output)
+
         if not prob.comm.rank:
             self.assertTrue('Solving color: par_dv (iv.x1, iv.x2)' in output)
             self.assertTrue('In mode: fwd, Solving variable(s):' in output)
