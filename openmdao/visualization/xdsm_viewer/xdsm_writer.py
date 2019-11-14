@@ -46,9 +46,6 @@ _CHAR_SUBS = {
 }
 # Variable formatting settings
 _SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't', 'consistency': 'c'}
-# Text constants.
-# "no_data" - showed as the output of an MDA
-_TEXT_CONSTANTS = {'no_data': '(no data)'}
 # Default solver, if no solver is added to a group.
 _DEFAULT_SOLVER_NAMES = {'linear': 'LN: RUNONCE', 'nonlinear': 'NL: RUNONCE'}
 # On which side to place outputs? One of "left", "right"
@@ -152,8 +149,6 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         List of systems where the list items are dicts indicating type, id, and name.
     connections : list of dicts
         List of connections where the list items are dicts indicating 'to', 'from', 'name' of edge.
-    ins : dict ???
-        OpenMDAO component type.
     processes : list
         List of process.
     """
@@ -170,7 +165,6 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         super(AbstractXDSMWriter, self).__init__(name=name)
         self.comps = []
         self.connections = []
-        self.ins = {}
         self.processes = []
 
     def add_solver(self, label, name='solver', **kwargs):
@@ -370,17 +364,16 @@ class XDSMjsWriter(AbstractXDSMWriter):
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
         self._ul = '_U_'  # Name of the virtual first element
-        self._br = '_E_'  # Name of the virtual last component
         # If component ends with this string, it will be treated as a parallel component
         self._multi_suffix = '_multi'
-        self.reserved_words = self._ul, self._br  # Ignored at text formatting
+        self.reserved_words = self._ul,  # Ignored at text formatting
         # Output file saved with this extension
         self.extension = 'html'
         if self.name in _COMPONENT_TYPE_MAP:
             self.type_map = _COMPONENT_TYPE_MAP[self.name]
         else:  # Use default
             self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
-            msg = 'Name not "{}" found in component type mapping, will default to "{}"'
+            msg = 'Name "{}" not found in component type mapping, will default to "{}"'
             simple_warning(msg.format(self.name, _DEFAULT_WRITER))
         self.class_names = class_names
 
@@ -483,6 +476,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
         stack : bool
             True for parallel.
             Defaults to False.
+        cls : str or None, optional
+            Class name, if not None, it is added to the label.
         **kwargs : dict
             Keyword args
         """
@@ -736,7 +731,6 @@ else:
 
             for comp in self._comps:
                 label = comp['label']
-                info = comp.get('info', None)
                 # If the process steps are included in the labels
                 if self.add_component_indices:
                     i = i0 = comp.pop('index', None)
@@ -749,12 +743,10 @@ else:
                     # will be made showing the starting end and step and the index of the next step.
                     if step is not None:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
-                    # Add the number
-                    label = self.finalize_label(i, label, self.number_alignment,
-                                                class_name=comp['class'], info=info)
                 else:
-                    label = self.finalize_label(None, label, self.number_alignment,
-                                                class_name=comp['class'], info=info)
+                    i = None
+                label = self.finalize_label(i, label, self.number_alignment,
+                                            class_name=comp['class'])
                 # Convert from math mode to regular text
                 comp['label'] = self._textify(label)
                 # Now the label is finished.
@@ -900,7 +892,7 @@ else:
         @staticmethod
         def _textify(name):
             # Uses the LaTeX \text{} command to insert plain text in math mode
-            return '\\text{%s}' % name
+            return r'\text{%s}' % name
 
         @staticmethod
         def format_block(names, stacking='vertical', **kwargs):
@@ -1002,7 +994,7 @@ else:
             txt = '{}, {}$ \\rightarrow $ {}'
             return txt.format(first + i, last + i, first + i + 1)
 
-        def finalize_label(self, number, txt, alignment, class_name=None, info=None):
+        def finalize_label(self, number, txt, alignment, class_name=None):
             """
             Add an index to the label either above or on the left side.
 
@@ -1017,8 +1009,6 @@ else:
             class_name : str or None, optional
                 Class name.
                 Defaults to None.
-            info: None or str
-                Additional info to be appended.
 
             Returns
             -------
@@ -1030,11 +1020,9 @@ else:
                 # Converts text to a multiline block, if an index or class name is added in
                 # separate row.
                 if self.class_names and (class_name is not None):
-                    if info is not None:
-                        txt = r'} \\ \text{'.join([txt, info])  # Formatting for multi-line array
-                    cls_name = '\\textit{%s}' % class_name  # Makes it italic
+                    cls_name = r'\textit{%s}' % class_name  # Makes it italic
                     txt = r'} \\ \text{'.join([txt, cls_name])  # Formatting for multi-line array
-                elif num is None and info is None:
+                elif num is None:
                     return txt  # No number, no classname, just flows through
                 texts = [num, txt] if num is not None else [txt]
                 return _multiline_block(*texts)
@@ -1334,7 +1322,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
     **kwargs : dict
-        Keyword arguments, includes writer soecific options.
+        Keyword arguments, includes writer specific options.
 
     Returns
     -------
@@ -1603,10 +1591,7 @@ def _make_rel_path(full_path, model_path, sep='.'):
         first_char = len(path)
         if full_path.startswith(path):
             return full_path[first_char:]
-        else:
-            return full_path
-    else:
-        return full_path  # No model path, so return the original
+    return full_path  # No model path, so return the original
 
 
 def _convert_name(name, recurse=True, subs=None):
@@ -1617,7 +1602,7 @@ def _convert_name(name, recurse=True, subs=None):
 
     Parameters
     ----------
-    name : str
+    name : str or list(str)
         Connection absolute path and name
     recurse : bool
         If False, treat the top level of each name as the source/target component.
@@ -1690,29 +1675,29 @@ def _prune_connections(conns, model_path=None, sep='.'):
         to an external target.
 
     """
-    internal_conns = []
     external_inputs = []
     external_outputs = []
 
     if model_path is None:
         return conns, external_inputs, external_outputs
     else:
+        internal_conns = []
+
         path = model_path + sep  # Add separator character
         for conn in conns:
             src = conn['src']
             src_path = _make_rel_path(src, model_path=model_path)
             tgt = conn['tgt']
             tgt_path = _make_rel_path(tgt, model_path=model_path)
+            conn_dct = {'src': src_path, 'tgt': tgt_path}
 
-            if src.startswith(path) and tgt.startswith(path):
-                # Internal connections
-                internal_conns.append({'src': src_path, 'tgt': tgt_path})
-            elif not src.startswith(path) and tgt.startswith(path):
-                # Externally connected input
-                external_inputs.append({'src': src_path, 'tgt': tgt_path})
-            elif src.startswith(path) and not tgt.startswith(path):
-                # Externally connected output
-                external_outputs.append({'src': src_path, 'tgt': tgt_path})
+            if src.startswith(path):
+                if tgt.startswith(path):
+                    internal_conns.append(conn_dct)  # Internal connections
+                else:
+                    external_outputs.append(conn_dct)  # Externally connected output
+            elif tgt.startswith(path):
+                external_inputs.append(conn_dct)  # Externally connected input
         return internal_conns, external_inputs, external_outputs
 
 
