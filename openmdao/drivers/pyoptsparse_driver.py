@@ -9,6 +9,7 @@ from __future__ import print_function
 
 from collections import OrderedDict
 import json
+import signal
 import sys
 import traceback
 
@@ -58,6 +59,16 @@ CITATIONS = """@article{Hwang_maud_2018
 }
 """
 
+class UserRequestedException(Exception):
+    """
+    User Requested Exception.
+
+    This exception indicates that the user has requested that SNOPT/pyoptsparse ceases
+    model execution and report to SNOPT that executioin should be terminated.
+    """
+
+    pass
+
 
 class pyOptSparseDriver(Driver):
     """
@@ -96,6 +107,9 @@ class pyOptSparseDriver(Driver):
         List of design variables.
     _quantities : list
         Contains the objectives plus nonlinear constraints.
+    _signal_cache : <Function>
+        Cached function pointer that was assigned as handler for signal defined in option
+        user_teriminate_signal.
     """
 
     def __init__(self, **kwargs):
@@ -138,6 +152,7 @@ class pyOptSparseDriver(Driver):
         self._indep_list = []
         self._quantities = []
         self.fail = False
+        self._signal_cache = None
 
         self.cite = CITATIONS
 
@@ -157,6 +172,10 @@ class pyOptSparseDriver(Driver):
         self.options.declare('dynamic_simul_derivs', default=False, types=bool,
                              desc='Compute simultaneous derivative coloring dynamically '
                              'if True (deprecated)')
+        self.options.declare('user_teriminate_signal', default=signal.SIGUSR1, allow_none=True,
+                             desc='OS signal that triggers a clean user-terimnation. Only SNOPT'
+                             'supports this option.')
+
 
     def _setup_driver(self, problem):
         """
@@ -440,6 +459,13 @@ class pyOptSparseDriver(Driver):
         model = self._problem().model
         fail = 0
 
+        # Note: we place our handler as late as possible so that codes that run in the
+        # workflow can place their own handlers.
+        sigusr = self.options['user_teriminate_signal']
+        if sigusr is not None and self._signal_cache is None:
+            self._signal_cache = signal.getsignal(sigusr)
+            signal.signal(sigusr, self._signal_handler)
+
         try:
             for name in self._indep_list:
                 self.set_design_var(name, dv_dict[name])
@@ -457,6 +483,11 @@ class pyOptSparseDriver(Driver):
                 except AnalysisError:
                     model._clear_iprint()
                     fail = 1
+
+                # User requested termination
+                except UserRequestedException:
+                    model._clear_iprint()
+                    fail = 2
 
                 func_dict = self.get_objective_values()
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
@@ -528,6 +559,14 @@ class pyOptSparseDriver(Driver):
                     for ikey, ival in iteritems(dv_dict):
                         isize = len(ival)
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
+
+            # User requested termination
+            except UserRequestedException:
+                prob.model._clear_iprint()
+                fail = 2
+
+                sens_dict = {}
+
             else:
                 # if we don't convert to 'coo' here, pyoptsparse will do a
                 # conversion of our dense array into a fully dense 'coo', which is bad.
@@ -630,3 +669,10 @@ class pyOptSparseDriver(Driver):
                     'coo': [rows, cols, np.zeros(rows.size)],
                     'shape': shape,
                 }
+
+    def _signal_handler(self, signum, frame):
+        # Subsystems (particularly external codes) may declare their own signal handling, so
+        # execute the cached handler first.
+        self._signal_cache()
+
+        raise UserRequestedException('User requested termination.')
