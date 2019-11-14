@@ -885,6 +885,13 @@ class Driver(object):
         views = model._outputs._views
         sys_vars = {name: views[name] for name in model._outputs._names if name in filt['sys']}
 
+        # unflatten variables
+        meta = model._var_allprocs_abs2meta
+        _unflatten(des_vars, meta)
+        _unflatten(obj_vars, meta)
+        _unflatten(con_vars, meta)
+        # _unflatten(res_vars)
+
         if self.recording_options['record_inputs']:
             views = model._inputs._views
             in_vars = {name: views[name] for name in model._inputs._names if name in filt['in']}
@@ -1210,3 +1217,8 @@ class RecordingDebugging(Recording):
         """
         self.recording_requester._post_run_model_debug_print()
         super(RecordingDebugging, self).__exit__()
+
+
+def _unflatten(vardict, meta):
+    for name, val in iteritems(vardict):
+        val.shape = meta[name]['shape']

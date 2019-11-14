@@ -2165,11 +2165,10 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # check 'use_indices' option, default is to use indices
         dvs = case.get_design_vars()
-        driver_dvs = prob.driver.get_design_var_values()
-        assert_rel_error(self, dvs['x'], driver_dvs['indeps.x'], 1e-12)
+        assert_rel_error(self, dvs['x'], x_vals[[0, 3]], 1e-12)
 
         dvs = case.get_design_vars(use_indices=False)
-        assert_rel_error(self, dvs['x'], x_vals.reshape((10,)), 1e-12)
+        assert_rel_error(self, dvs['x'], x_vals, 1e-12)
 
         cons = case.get_constraints()
         self.assertEqual(len(cons['theta_con.g']), len(EVEN_IND))
