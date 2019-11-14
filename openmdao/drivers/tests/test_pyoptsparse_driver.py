@@ -1704,6 +1704,7 @@ class TestPyoptSparse(unittest.TestCase):
                 if self.iter_count > 1:
                     raise RuntimeError('SNOPT should have stopped.')
                 else:
+                    # Pretends that this was raised by a signal handler triggered by the user.
                     raise UserRequestedException('This is expected.')
 
             def compute_partials(self, inputs, partials):
