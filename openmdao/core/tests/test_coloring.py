@@ -871,6 +871,7 @@ def _get_random_mat(rows, cols):
 
 
 @use_tempdirs
+@unittest.skipUnless(OPTIMIZER is not None, "pyOptSparse required.")
 class MatMultMultipointTestCase(unittest.TestCase):
 
     def test_multipoint_with_coloring(self):
