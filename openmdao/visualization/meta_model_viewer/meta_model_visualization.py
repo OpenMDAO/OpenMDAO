@@ -946,6 +946,8 @@ def view_metamodel(meta_model_comp, resolution, port_number, browser):
         Number of points to control contour plot resolution.
     port_number : int
         Bokeh plot port number.
+    browser : bool
+        Boolean to show the browser
     """
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler
@@ -957,6 +959,6 @@ def view_metamodel(meta_model_comp, resolution, port_number, browser):
     if browser:
         server.io_loop.add_callback(server.show, "/")
     else:
-        print('Open viewer on http://localhost:{}/'.format(port_number))
+        print('Server started, to view go to http://localhost:{}/'.format(port_number))
 
     server.io_loop.start()

@@ -74,3 +74,6 @@ want to visualize if there is more than one, and optionally a port number:
 .. embed-shell-cmd::
     :cmd: openmdao view_mm -h
 
+.. note::
+    When using Bash on Windows set --no_browser option to start the server, then open an internet
+    browser and copy/paste the path to viewer.
