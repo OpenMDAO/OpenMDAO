@@ -1021,7 +1021,6 @@ else:
             str
                 Label to be used for this item.
             """
-
             def multi_ln(txt, num=None):
                 # Converts text to a multiline block, if an index or class name is added in
                 # separate row.
