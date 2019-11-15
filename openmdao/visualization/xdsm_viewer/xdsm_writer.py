@@ -121,7 +121,7 @@ class BaseXDSMWriter(object):
         XDSM component type.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, options={}):
         """
         Initialize.
 
@@ -129,6 +129,8 @@ class BaseXDSMWriter(object):
         ----------
         name : str
             Name of this XDSM writer
+        options : dict
+            Writer options.
         """
         self.name = name
         # This should be a dictionary mapping OpenMDAO system types to XDSM component types.
@@ -349,7 +351,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         Include class names of components in diagonal blocks.
     """
 
-    def __init__(self, name='xdsmjs', class_names=False):
+    def __init__(self, name='xdsmjs', class_names=False, options={}):
         """
         Initialize.
 
@@ -359,6 +361,8 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Name of this XDSM writer
         class_names : bool
             Include class names of the components in the diagonal
+        options : dict
+            Writer options.
         """
         super(XDSMjsWriter, self).__init__(name=name)
         self.driver = 'opt'  # Driver default name
@@ -500,9 +504,9 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Solver info.
         """
         def recurse(solv, nr, process):
-            for i, cmp in enumerate(process):
+            for i, cmp in enumerate(process, start=1):
                 if cmp == solv:
-                    process[i + 1:i + 1 + nr] = [process[i + 1:i + 1 + nr]]
+                    process[i:i + nr] = [process[i:i + nr]]
                     return
                 elif isinstance(cmp, list):
                     recurse(solv, nr, cmp)
@@ -664,7 +668,7 @@ else:
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
                      number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False, class_names=False,
-                     add_component_indices=True):
+                     add_component_indices=True, options={}):
             """
             Initialize.
 
@@ -685,8 +689,10 @@ else:
                 Defaults to False.
             add_component_indices : bool
                 If true, display components with numbers.
+            **options
+                Keyword argument options of the XDSM class.
             """
-            super(XDSMWriter, self).__init__()
+            super(XDSMWriter, self).__init__(**options)
             self.name = name
             # Formatting options
             self.box_stacking = box_stacking
@@ -1081,7 +1087,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
                add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE,
-               legend=False, class_names=True, **kwargs):
+               legend=False, class_names=True, writer_options={}, **kwargs):
     """
     Write XDSM diagram of an optimization problem.
 
@@ -1168,6 +1174,8 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
     class_names : bool, optional
         If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
+    writer_options : dict
+        Options passed to the writer class at initialization.
     **kwargs : dict
         Keyword arguments
 
@@ -1253,7 +1261,8 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, build_pdf=build_pdf,
                        show_parallel=show_parallel, driver_type=driver_type,
-                       output_side=output_side, legend=legend, class_names=class_names, **kwargs)
+                       output_side=output_side, legend=legend, class_names=class_names,
+                       writer_options=writer_options, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanup=True,
@@ -1261,7 +1270,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
                 output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', legend=False,
-                class_names=False, **kwargs):
+                class_names=False, writer_options={}, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -1321,6 +1330,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     class_names : bool, optional
         If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
+    writer_options : dict
+        Options passed to the writer class at initialization.
     **kwargs : dict
         Keyword arguments, includes writer specific options.
 
@@ -1346,9 +1357,10 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                            number_alignment=number_alignment,
                            add_component_indices=add_component_indices,
                            legend=legend,
-                           class_names=class_names)
+                           class_names=class_names,
+                           options=writer_options)
         elif writer.lower() == 'xdsmjs':  # XDSMjs
-            x = XDSMjsWriter()
+            x = XDSMjsWriter(options=writer_options)
         else:
             raise ValueError(error_msg.format(writer))
     elif isinstance(writer, BaseXDSMWriter):  # Custom writer
