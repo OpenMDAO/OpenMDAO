@@ -120,6 +120,12 @@ class N2OffGridArrow extends N2Arrow {
 
         this.cell = attribs.cell;
 
+        this.label = {
+            'text': attribs.label,
+            'pts': {},
+            'ref': null
+        }
+
         this.pts = {
             'start': { 'x': -1, 'y': -1 },
             'end': { 'x': -1, 'y': -1 }
@@ -136,6 +142,7 @@ class N2OffGridArrow extends N2Arrow {
     _computePts() {
         let offsetX = this.offsetAbsX;
         let offsetY = this.offsetAbsY;
+        let rect = this.arrowsGrp.node().getBoundingClientRect();
 
         switch (this.attribs.direction) {
             case 'up':
@@ -145,6 +152,11 @@ class N2OffGridArrow extends N2Arrow {
                     this.nodeSize.height * .5 + offsetY;
                 this.pts.end.y = this.nodeSize.height * this.cell.row +
                     this.nodeSize.height * .5 + offsetY
+
+                this.label.pts.left = this.pts.start.x + rect.left + 8;
+                this.label.pts.top = this.pts.start.y + rect.bottom - 120;
+                this.label.ref = d3.select("div#top.offgrid");
+
                 break;
             case 'down':
                 this.pts.start.x = this.pts.end.x =
@@ -152,6 +164,11 @@ class N2OffGridArrow extends N2Arrow {
                 this.pts.start.y = this.nodeSize.height * -.5 - offsetY;
                 this.pts.end.y = this.nodeSize.height * this.cell.row +
                     this.nodeSize.height * .5 - offsetY;
+
+                this.label.pts.left = this.pts.start.x + rect.left + 8;
+                this.label.pts.top = this.pts.start.y + rect.top + 130;
+                this.label.ref = d3.select("div#bottom.offgrid");
+
                 break;
             case 'left':
                 this.pts.start.y = this.pts.end.y =
@@ -159,6 +176,11 @@ class N2OffGridArrow extends N2Arrow {
                 this.pts.start.x = this.nodeSize.width * this.cell.col +
                     this.nodeSize.width * .5 - offsetX;
                 this.pts.end.x = 0;
+
+                this.label.pts.left = this.pts.end.x + rect.left + 8;
+                this.label.pts.top = this.pts.end.y + rect.top + 10;
+                this.label.ref = d3.select("div#left.offgrid");
+
                 break;
             case 'right':
                 this.pts.start.y = this.pts.end.y =
@@ -166,24 +188,45 @@ class N2OffGridArrow extends N2Arrow {
                 this.pts.start.x = this.nodeSize.width * this.cell.col +
                     this.nodeSize.width * .5 + offsetX;
                 this.pts.end.x = this.attribs.matrixSize * this.nodeSize.width;
+
+                this.label.pts.left = this.pts.end.x + rect.left - 75;
+                this.label.pts.top = this.pts.end.y + rect.top + 12;
+                this.label.ref = d3.select("div#right.offgrid");
+
                 break;
             default:
                 throw ('N2OffGridArrow._computePts(): Unrecognized direction "' +
                     this.attribs.direction + '" used.')
-
         }
     }
 
     draw() {
-        this.path = this.arrowsGrp.insert("path")
-            .attr("class", "n2_hover_elements")
-            .attr("stroke-dasharray", "5,5")
-            .attr("d", "M" + this.pts.start.x + " " + this.pts.start.y +
-                " L" + this.pts.end.x + " " + this.pts.end.y)
-            .attr("fill", "none")
-            .style("stroke-width", this.width)
-            .style("stroke", this.color);
+        this.path = this.arrowsGrp.insert('path')
+            .attr('class', 'n2_hover_elements')
+            .attr('stroke-dasharray', '5,5')
+            .attr('d', 'M' + this.pts.start.x + ' ' + this.pts.start.y +
+                ' L' + this.pts.end.x + ' ' + this.pts.end.y)
+            .attr('fill', 'none')
+            .style('stroke-width', this.width)
+            .style('stroke', this.color);
 
-        this.path.attr("marker-end", "url(#arrow)");
+        this.path.attr('marker-end', 'url(#arrow)');
+
+        // debugInfo(this.label)
+
+        if (this.label.ref.style('visibility') != 'visible') {
+            for (let pos in this.label.pts) {
+                this.label.ref.style(pos, this.label.pts[pos] + 'px');
+            }
+
+            this.label.ref
+                .style("visibility", "visible")
+                .node().innerHTML = this.label.text;
+        }
+        else {
+            let newText = this.label.ref.node().innerHTML;
+            newText += "<br>" + this.label.text;
+            this.label.ref.node().innerHTML = newText;
+        }
     }
 }

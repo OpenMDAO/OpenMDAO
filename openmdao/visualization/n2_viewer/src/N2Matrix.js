@@ -587,7 +587,8 @@ class N2Matrix {
                 'direction': 'right',
                 'color': N2Style.color.greenArrow,
                 'width': lineWidth,
-                'matrixSize': this.diagNodes.length
+                'matrixSize': this.diagNodes.length,
+                'label': offscreenNode.absPathName
             }, this.n2Groups, this.nodeSize);
         }
 
@@ -600,7 +601,8 @@ class N2Matrix {
                 'direction': 'left',
                 'color': N2Style.color.greenArrow,
                 'width': lineWidth,
-                'matrixSize': this.diagNodes.length
+                'matrixSize': this.diagNodes.length,
+                'label': offscreenNode.absPathName
             }, this.n2Groups, this.nodeSize);
         }
 
@@ -613,7 +615,8 @@ class N2Matrix {
                 'direction': 'down',
                 'color': N2Style.color.redArrow,
                 'width': lineWidth,
-                'matrixSize': this.diagNodes.length
+                'matrixSize': this.diagNodes.length,
+                'label': offscreenNode.absPathName
             }, this.n2Groups, this.nodeSize);
         }
 
@@ -626,7 +629,8 @@ class N2Matrix {
                 'direction': 'up',
                 'color': N2Style.color.redArrow,
                 'width': lineWidth,
-                'matrixSize': this.diagNodes.length
+                'matrixSize': this.diagNodes.length,
+                'label': offscreenNode.absPathName
             }, this.n2Groups, this.nodeSize);
         }
     }

@@ -197,8 +197,9 @@ class N2Diagram {
 
         let ogg = {};
         for (let oName of ['top', 'left', 'right', 'bottom']) {
-            ogg[oName] = this.dom.n2OuterGroup.append('text')
-                .attr('id', 'n2' + oName);
+            ogg[oName] = this.dom.n2OuterGroup.append('g')
+                .attr('id', 'n2' + oName)
+                .attr('class', 'offgridLabel');
         }
         this.dom.n2Groups.offgrid = ogg;
 
@@ -300,6 +301,28 @@ class N2Diagram {
                     innerDims.height +
                     innerDims.margin) + " " +
                     innerDims.margin + ")");
+
+            let offgridHeight = this.dims.size.font + 2;
+            this.dom.n2Groups.offgrid.top
+                .attr("transform", "translate(" + innerDims.margin + " 0)")
+                .attr("width", innerDims.height)
+                .attr("height", offgridHeight);
+
+                /*
+            this.dom.n2Groups.offgrid.top
+                .append("text")
+                .attr("x", 0).attr("y", 0)
+                // .attr("transform", "translate(0 0)")
+                //.attr("width", innerDims.height)
+                //.attr("height", offgridHeight)
+                //.style("fill", "black")
+                .text("HOWDY.HOWDY.HOWDY.HOWDY");
+                */
+
+            this.dom.n2Groups.offgrid.bottom
+                .attr("transform", "translate(0 " + innerDims.height + offgridHeight + ")")
+                .attr("width", outerDims.height)
+                .attr("height", offgridHeight);
         }
     }
 
@@ -706,6 +729,9 @@ class N2Diagram {
     /** When the mouse leaves a cell, remove all temporary arrows. */
     mouseOut() {
         this.dom.n2OuterGroup.selectAll(".n2_hover_elements").remove();
+        d3.selectAll("div.offgrid")
+            .style("visibility", "hidden")
+            .node().innerHTML = '';
     }
 
     /**

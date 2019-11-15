@@ -120,8 +120,8 @@ class N2Layout {
 
     /** Create an off-screen area to render text for _getTextWidth() */
     _setupTextRenderer() {
-        let textGroup = this.svg.append("svg:g").attr("class", "partition_group");
-        let textSVG = textGroup.append("svg:text")
+        let textGroup = this.svg.append("g").attr("class", "partition_group");
+        let textSVG = textGroup.append("text")
             .text("")
             .attr("x", -100); // Put text off screen to the left.
 
