@@ -184,8 +184,14 @@ class N2Layout {
      * @param {N2TreeNode} node The item to get the solver text from.
      */
     getSolverText(node) {
-        return this.showLinearSolverNames ?
-            node.linear_solver : node.nonlinear_solver;
+
+        let solver_name = this.showLinearSolverNames ? node.linear_solver : node.nonlinear_solver;
+
+        if (!this.showLinearSolverNames && node.hasOwnProperty("solve_subsystems") && node.solve_subsystems){
+            return solver_name + " (sub_solve)";
+        } else {
+            return solver_name;
+        }
     }
 
     /**
