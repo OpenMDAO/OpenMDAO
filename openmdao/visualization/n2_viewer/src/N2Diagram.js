@@ -171,7 +171,6 @@ class N2Diagram {
 
         this.dom.n2InnerGroup = this.dom.n2OuterGroup.append('g')
             .attr('id', 'n2inner');
-        // .attr('clip-path', 'url(#n2MatrixClip');
 
         this.dom.pTreeGroup = this.dom.svg.append('g')
             .attr('id', 'tree')
@@ -192,13 +191,16 @@ class N2Diagram {
                     .attr('id', 'n2' + gName);
         };
 
+        for (let clippedGrp of ['elements', 'gridlines', 'componentBoxes', 'dots']) {
+            this.dom.n2Groups[clippedGrp].attr('clip-path', 'url(#n2MatrixClip)');
+        }
+
         let ogg = {};
         for (let oName of ['top', 'left', 'right', 'bottom']) {
             ogg[oName] = this.dom.n2OuterGroup.append('text')
                 .attr('id', 'n2' + oName);
         }
         this.dom.n2Groups.offgrid = ogg;
-
 
     }
 

@@ -550,6 +550,12 @@ class N2Matrix {
         startTimer('N2Matrix.draw');
         // debugInfo("maxDepth: ", this.layout.model.maxDepth, " zoomedElement depth: ", this.layout.zoomedElement.depth)
 
+        let size = this.layout.size;
+        d3.select("#n2MatrixClip > rect")
+            .transition(sharedTransition)
+            .attr('width', size.n2matrix.width + size.svgMargin * 2)
+            .attr('height', size.n2matrix.height + size.svgMargin * 2);
+
         this._drawCells();
 
         // Draw gridlines:
