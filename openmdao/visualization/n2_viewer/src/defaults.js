@@ -42,7 +42,7 @@ let N2TransitionDefaults = {
 
 let DebugFlags = {
     'timings': false,
-    'info': true
+    'info': false
 }
 
 // Object.freeze(N2TransitionDefaults);
