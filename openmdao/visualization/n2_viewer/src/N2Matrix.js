@@ -35,8 +35,8 @@ class N2Matrix {
 
         this.prevNodeSize = prevNodeSize;
         this.nodeSize = {
-            'width': layout.size.diagram.width / this.diagNodes.length,
-            'height': layout.size.diagram.height / this.diagNodes.length,
+            'width': layout.size.n2matrix.width / this.diagNodes.length,
+            'height': layout.size.n2matrix.height / this.diagNodes.length,
         }
 
         let markerSize = Math.max(2, this.nodeSize.width * .04, this.nodeSize.height * .04);
@@ -44,7 +44,7 @@ class N2Matrix {
         d3.select("#offgridArrow").attr("markerWidth", markerSize * 2).attr("markerHeight", markerSize);
 
         N2CellRenderer.updateDims(this.nodeSize.width, this.nodeSize.height);
-        this.updateLevelOfDetailThreshold(layout.size.diagram.height);
+        this.updateLevelOfDetailThreshold(layout.size.n2matrix.height);
 
         startTimer('N2Matrix._buildGrid');
         this._buildGrid(model);
@@ -286,8 +286,8 @@ class N2Matrix {
      * @param {Number} height Rectangle height in px.
      * @param {string} fill Fill color.
      */
-    hilight(x, y, width, height, fill) {
-        this.n2Groups.elements.insert("rect")
+    highlight(x, y, width, height, fill) {
+        this.n2Groups.highlights.insert("rect")
             .attr("class", "n2_hover_elements")
             .attr("y", y)
             .attr("x", x)
@@ -403,14 +403,14 @@ class N2Matrix {
                 throw ('enter transform not found');
             });
         gEnter.append('line')
-            .attr('x2', self.layout.size.diagram.width);
+            .attr('x2', self.layout.size.n2matrix.width);
 
         let gUpdate = gEnter.merge(selection).transition(sharedTransition)
             .attr('transform', function (d) {
                 return 'translate(0,' + (self.cellDims.size.height * d.i) + ')';
             });
         gUpdate.select('line')
-            .attr('x2', self.layout.size.diagram.width);
+            .attr('x2', self.layout.size.n2matrix.width);
 
         selection.exit().transition(sharedTransition)
             .attr('transform', function (d) {
@@ -448,14 +448,14 @@ class N2Matrix {
                 throw ("enter transform not found");
             });
         gEnter.append("line")
-            .attr("x1", -self.layout.size.diagram.height);
+            .attr("x1", -self.layout.size.n2matrix.height);
 
         let gUpdate = gEnter.merge(selection).transition(sharedTransition)
             .attr("transform", function (d) {
                 return "translate(" + (self.cellDims.size.width * d.i) + ")rotate(-90)";
             });
         gUpdate.select("line")
-            .attr("x1", -self.layout.size.diagram.height);
+            .attr("x1", -self.layout.size.n2matrix.height);
 
         selection.exit().transition(sharedTransition)
             .attr("transform", function (d) {
@@ -640,7 +640,7 @@ class N2Matrix {
 
         let leftTextWidthHovered = this.diagNodes[cell.row].nameWidthPx;
 
-        this.hilight(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
+        this.highlight(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.row, leftTextWidthHovered,
             this.nodeSize.height, N2Style.color.highlightHovered); //highlight hovered
 
@@ -660,7 +660,7 @@ class N2Matrix {
                     }, this.n2Groups, this.nodeSize);
 
                     //highlight var name
-                    this.hilight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
+                    this.highlight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
                         this.nodeSize.height * col, leftTextWidthDependency,
                         this.nodeSize.height, N2Style.color.greenArrow);
                 }
@@ -679,7 +679,7 @@ class N2Matrix {
                     }, this.n2Groups, this.nodeSize);
 
                     //highlight var name
-                    this.hilight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
+                    this.highlight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
                         this.nodeSize.height * col, leftTextWidthDependency,
                         this.nodeSize.height, N2Style.color.redArrow);
                 }
@@ -786,12 +786,12 @@ class N2Matrix {
             leftTextWidthC = this.layout.visibleNodes[cell.col].nameWidthPx;
 
         // highlight var name
-        this.hilight(-leftTextWidthR - this.layout.size.partitionTreeGap,
+        this.highlight(-leftTextWidthR - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.row, leftTextWidthR, this.nodeSize.height,
             N2Style.color.redArrow);
 
         // highlight var name
-        this.hilight(-leftTextWidthC - this.layout.size.partitionTreeGap,
+        this.highlight(-leftTextWidthC - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.col, leftTextWidthC, this.nodeSize.height,
             N2Style.color.greenArrow);
     }

@@ -84,8 +84,8 @@ function stopTimer(label) {
     if (DebugFlags.timings) console.timeEnd(label);
 }
 
-function debugInfo(msg) {
-    if (DebugFlags.info) console.log(msg);
+function debugInfo() {
+    if (DebugFlags.info) console.log(...arguments);
 }
 
 /**
