@@ -404,11 +404,7 @@ class N2Diagram {
             .attr("class", function (d) {
                 let solver_class = self.style.getSolverClass(self.showLinearSolverNames,
                     { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
-                if (!self.showLinearSolverNames && d.hasOwnProperty("solve_subsystems") && d.solve_subsystems){
-                    return solver_class + "_solve_subs" + " " + "solver_group " + self.style.getNodeClass(d);
-                } else {
-                    return solver_class + " " + "solver_group " + self.style.getNodeClass(d);
-                }
+                return solver_class + " solver_group " + self.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
                 let x = 1.0 - d.prevSolverDims.x - d.prevSolverDims.width;
@@ -476,11 +472,7 @@ class N2Diagram {
             .attr("class", function (d) {
                 let solver_class = self.style.getSolverClass(self.showLinearSolverNames,
                     { 'linear': d.linear_solver, 'nonLinear': d.nonlinear_solver });
-                if (!self.showLinearSolverNames && d.hasOwnProperty("solve_subsystems") && d.solve_subsystems){
-                    return solver_class + "_solve_subs" + " " + "solver_group " + self.style.getNodeClass(d);
-                } else {
-                    return solver_class + " " + "solver_group " + self.style.getNodeClass(d);
-                }
+                return solver_class + " solver_group " + self.style.getNodeClass(d);
             })
             .attr("transform", function (d) {
                 let x = 1.0 - d.solverDims.x - d.solverDims.width;
