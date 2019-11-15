@@ -29,7 +29,7 @@ AkimaSplineComp Basic Example
 
 The following is a simple example where an AkimaSplineComp is used to approximate a curve that has
 11 points where we would like to evaluate it.  The approximating curve contains 6 points. Note that
-unlke the `BsplinesComp`, the control points fall on the curve.
+unlike the `BsplinesComp`, the control points fall on the curve.
 
 When we instantiate the AkimaSplineComp, we specify "name", which is used as the stem for all inputs and
 outputs as follows:
