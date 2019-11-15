@@ -27,6 +27,7 @@ from openmdao.utils.coloring import Coloring, _compute_coloring, array_viz
 from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder
+from openmdao.utils.general_utils import run_driver
 
 import openmdao.test_suite
 
@@ -155,6 +156,7 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
         p.driver.declare_coloring(tol=1e-15)
         del options['dynamic_total_coloring']
 
+    p.driver.options['debug_print'] = ['totals']
     p.driver.options.update(options)
 
     p.model.add_design_var('x')
@@ -345,6 +347,35 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         rep = repr(p_color.driver._coloring_info['coloring'])
         self.assertEqual(rep.replace('L', ''), 'Coloring (direction: fwd, ncolors: 5, shape: (22, 21)')
 
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_print_options_total_with_coloring_fwd(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True)
+
+        failed, output = run_driver(p_color)
+
+        self.assertFalse(failed, "Optimization failed.")
+
+        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue("('indeps.y', [1, 3, 5, 7, 9])" in output)
+        self.assertTrue('Elapsed Time:' in output)
+
+    @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
+    def test_print_options_total_with_coloring_rev(self):
+        # first, run w/o coloring
+        p = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False)
+        p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
+                          dynamic_total_coloring=True)
+
+        failed, output = run_driver(p_color)
+
+        self.assertFalse(failed, "Optimization failed.")
+
+        self.assertTrue('In mode: rev, Solving variable(s):' in output)
+        self.assertTrue("('r_con.g', [0])" in output)
+        self.assertTrue('Elapsed Time:' in output)
 
 @use_tempdirs
 @unittest.skipUnless(OPTIMIZER == 'SNOPT', "This test requires SNOPT.")
@@ -807,13 +838,12 @@ def _get_random_mat(rows, cols):
 
 
 @use_tempdirs
-@unittest.skipUnless(MPI is not None and PETScVector is not None and OPTIMIZER is not None, "PETSc and pyOptSparse required.")
+@unittest.skipUnless(OPTIMIZER is not None, "pyOptSparse required.")
 class MatMultMultipointTestCase(unittest.TestCase):
-    N_PROCS = 4
 
     def test_multipoint_with_coloring(self):
         size = 10
-        num_pts = self.N_PROCS
+        num_pts = 4
 
         np.random.seed(11)
 
@@ -821,7 +851,7 @@ class MatMultMultipointTestCase(unittest.TestCase):
         p.driver = pyOptSparseDriver()
         p.driver.options['optimizer'] = OPTIMIZER
         p.driver.declare_coloring()
-        if OPTIMIZER == 'SNOPT':
+        if OPTIMIZER == 'SLSQP':
             p.driver.opt_settings['Major iterations limit'] = 100
             p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
             p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
@@ -874,6 +904,64 @@ class MatMultMultipointTestCase(unittest.TestCase):
             print("final obj:", p['obj.y'])
         except Exception as err:
             print(str(err))
+
+class SimulColoringVarOutputTestClass(unittest.TestCase):
+    def test_multi_variable_coloring_debug_print_totals(self):
+        size = 10
+        num_pts = 4
+
+        np.random.seed(11)
+
+        p = om.Problem()
+        p.driver = om.ScipyOptimizeDriver()
+        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.declare_coloring()
+        p.driver.options['debug_print'] = ['totals']
+        # if OPTIMIZER == 'SLSQP':
+        #     p.driver.opt_settings['Major iterations limit'] = 100
+        #     p.driver.opt_settings['Major feasibility tolerance'] = 1.0E-6
+        #     p.driver.opt_settings['Major optimality tolerance'] = 1.0E-6
+        #     p.driver.opt_settings['iSumm'] = 6
+
+        model = p.model
+        for i in range(num_pts):
+            model.add_subsystem('indep%d' % i, om.IndepVarComp('x', val=np.ones(size)))
+            model.add_design_var('indep%d.x' % i)
+
+        par1 = model.add_subsystem('par1', om.ParallelGroup())
+        for i in range(num_pts):
+            mat = _get_random_mat(5, size)
+            par1.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(size), y=np.ones(5)))
+            model.connect('indep%d.x' % i, 'par1.comp%d.x' % i)
+
+        par2 = model.add_subsystem('par2', om.ParallelGroup())
+        for i in range(num_pts):
+            mat = _get_random_mat(size, 5)
+            par2.add_subsystem('comp%d' % i, om.ExecComp('y=A.dot(x)', A=mat, x=np.ones(5), y=np.ones(size)))
+            model.connect('par1.comp%d.y' % i, 'par2.comp%d.x' % i)
+            par2.add_constraint('comp%d.y' % i, lower=-1.)
+
+            model.add_subsystem('normcomp%d' % i, om.ExecComp("y=sum(x*x)", x=np.ones(size)))
+            model.connect('par2.comp%d.y' % i, 'normcomp%d.x' % i)
+
+        model.add_subsystem('obj', om.ExecComp("y=" + '+'.join(['x%d' % i for i in range(num_pts)])))
+
+        for i in range(num_pts):
+            model.connect('normcomp%d.y' % i, 'obj.x%d' % i)
+
+        model.add_objective('obj.y')
+
+        p.setup(check=False)
+
+        failed, output = run_driver(p)
+
+        self.assertFalse(failed, "Optimization failed.")
+
+        self.assertTrue('In mode: fwd, Solving variable(s):' in output)
+        self.assertTrue("('indep0.x', [7])" in output)
+        self.assertTrue("('indep1.x', [7])" in output)
+        self.assertTrue("('indep2.x', [7])" in output)
+        self.assertTrue("('indep3.x', [7])" in output)
 
 
 class DumbComp(om.ExplicitComponent):
