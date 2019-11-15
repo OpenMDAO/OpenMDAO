@@ -1701,11 +1701,14 @@ class TestPyoptSparse(unittest.TestCase):
 
             def compute(self, inputs, outputs):
                 self.iter_count += 1
-                if self.iter_count > 1:
-                    raise RuntimeError('SNOPT should have stopped.')
-                else:
+                if self.iter_count == 1:
                     # Pretends that this was raised by a signal handler triggered by the user.
                     raise UserRequestedException('This is expected.')
+                elif self.iter_count > 3:
+                    raise RuntimeError('SNOPT should have stopped.')
+                else:
+                    # Post optimization run with optimal params.
+                    pass
 
             def compute_partials(self, inputs, partials):
                 x = inputs['x']
@@ -1730,6 +1733,10 @@ class TestPyoptSparse(unittest.TestCase):
         prob.setup()
 
         prob.run_driver()
+
+        # SNOPT return code 71 is a user-requested termination.
+        code = prob.driver.pyopt_solution.optInform['value']
+        self.assertEqual(code, 71)
 
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")

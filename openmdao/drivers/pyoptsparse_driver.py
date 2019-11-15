@@ -59,6 +59,7 @@ CITATIONS = """@article{Hwang_maud_2018
 }
 """
 
+
 class UserRequestedException(Exception):
     """
     User Requested Exception.
@@ -103,6 +104,9 @@ class pyOptSparseDriver(Driver):
         Dictionary for setting optimizer-specific options.
     pyopt_solution : Solution
         Pyopt_sparse solution object.
+    _in_user_function :bool
+        This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
+        restored to False at the finish of each callback.
     _indep_list : list
         List of design variables.
     _quantities : list
@@ -110,6 +114,8 @@ class pyOptSparseDriver(Driver):
     _signal_cache : <Function>
         Cached function pointer that was assigned as handler for signal defined in option
         user_teriminate_signal.
+    _user_termination_flag : bool
+        Set to True when the user sends a signal to terminate the job.
     """
 
     def __init__(self, **kwargs):
@@ -153,6 +159,8 @@ class pyOptSparseDriver(Driver):
         self._quantities = []
         self.fail = False
         self._signal_cache = None
+        self._user_termination_flag = False
+        self._in_user_function = False
 
         self.cite = CITATIONS
 
@@ -175,7 +183,6 @@ class pyOptSparseDriver(Driver):
         self.options.declare('user_teriminate_signal', default=signal.SIGUSR1, allow_none=True,
                              desc='OS signal that triggers a clean user-terimnation. Only SNOPT'
                              'supports this option.')
-
 
     def _setup_driver(self, problem):
         """
@@ -473,10 +480,17 @@ class pyOptSparseDriver(Driver):
             # print("Setting DV")
             # print(dv_dict)
 
+            # Check if we caught a termination signal while SNOPT was running.
+            if self._user_termination_flag:
+                func_dict = self.get_objective_values()
+                func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+                return {}, 2
+
             # Execute the model
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self.iter_count += 1
                 try:
+                    self._in_user_function = True
                     model.run_solve_nonlinear()
 
                 # Let the optimizer try to handle the error
@@ -510,6 +524,7 @@ class pyOptSparseDriver(Driver):
         # print("Functions calculated")
         # print(dv_dict)
 
+        self._in_user_function = False
         return func_dict, fail
 
     def _gradfunc(self, dv_dict, func_dict):
@@ -540,7 +555,12 @@ class pyOptSparseDriver(Driver):
 
         try:
 
+            # Check if we caught a termination signal while SNOPT was running.
+            if self._user_termination_flag:
+                return {}, 2
+
             try:
+                self._in_user_function = True
                 sens_dict = self._compute_totals(of=self._quantities,
                                                  wrt=self._indep_list,
                                                  return_format='dict')
@@ -565,7 +585,16 @@ class pyOptSparseDriver(Driver):
                 prob.model._clear_iprint()
                 fail = 2
 
-                sens_dict = {}
+                # We need to cobble together a sens_dict of the correct size.
+                # Best we can do is return zeros.
+
+                sens_dict = OrderedDict()
+                for okey, oval in iteritems(func_dict):
+                    sens_dict[okey] = OrderedDict()
+                    osize = len(oval)
+                    for ikey, ival in iteritems(dv_dict):
+                        isize = len(ival)
+                        sens_dict[okey][ikey] = np.zeros((osize, isize))
 
             else:
                 # if we don't convert to 'coo' here, pyoptsparse will do a
@@ -598,6 +627,7 @@ class pyOptSparseDriver(Driver):
         # print("Derivatives calculated")
         # print(dv_dict)
         # print(sens_dict)
+        self._in_user_function = False
         return sens_dict, fail
 
     def _get_name(self):
@@ -673,6 +703,9 @@ class pyOptSparseDriver(Driver):
     def _signal_handler(self, signum, frame):
         # Subsystems (particularly external codes) may declare their own signal handling, so
         # execute the cached handler first.
-        self._signal_cache()
+        if self._signal_cache is not signal.Handlers.SIG_DFL:
+            self._signal_cache(signum, frame)
 
-        raise UserRequestedException('User requested termination.')
+        self._user_termination_flag = True
+        if self._in_user_function:
+            raise UserRequestedException('User requested termination.')
