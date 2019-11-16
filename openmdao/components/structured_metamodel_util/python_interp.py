@@ -433,8 +433,8 @@ class InterpAkima(object):
             m5 = (val6 - val5) / (grid[idx + 3] - grid[idx + 2])
 
         if idx == 0:
-            m1 = 3 * m3 - 2 * m4
             m2 = 2 * m3 - m4
+            m1 = 2 * m2 - m3
 
         elif idx == 1:
             m1 = 2 * m2 - m3
@@ -444,7 +444,7 @@ class InterpAkima(object):
 
         elif idx == ngrid - 2:
             m4 = 2 * m3 - m2
-            m5 = 3 * m3 - 2 * m2
+            m5 = 2 * m4 - m3
 
         m1 = np.atleast_1d(m1)
         m2 = np.atleast_1d(m2)

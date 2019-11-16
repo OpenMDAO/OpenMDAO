@@ -47,6 +47,33 @@ def assert_warning(category, msg):
         raise AssertionError("Did not see expected %s: %s" % (category.__name__, msg))
 
 
+@contextmanager
+def assert_no_warning(category, msg):
+    """
+    Context manager asserting that a warning is not issued.
+
+    Parameters
+    ----------
+    category : class
+        The class of the warning.
+    msg : str
+        The text of the warning.
+
+    Raises
+    ------
+    AssertionError
+        If the warning is raised.
+    """
+    with reset_warning_registry():
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            yield
+
+    for warn in w:
+        if (issubclass(warn.category, category) and str(warn.message) == msg):
+            raise AssertionError("Found warning: ", msg)
+
+
 def assert_check_partials(data, atol=1e-6, rtol=1e-6):
     """
     Raise assertion if any entry from the return from check_partials is above a tolerance.
