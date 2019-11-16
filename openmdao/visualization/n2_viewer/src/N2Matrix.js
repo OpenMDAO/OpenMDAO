@@ -35,12 +35,16 @@ class N2Matrix {
 
         this.prevNodeSize = prevNodeSize;
         this.nodeSize = {
-            'width': layout.size.diagram.width / this.diagNodes.length,
-            'height': layout.size.diagram.height / this.diagNodes.length,
+            'width': layout.size.n2matrix.width / this.diagNodes.length,
+            'height': layout.size.n2matrix.height / this.diagNodes.length,
         }
 
+        let markerSize = Math.max(2, this.nodeSize.width * .04, this.nodeSize.height * .04);
+        d3.select("#arrow").attr("markerWidth", markerSize).attr("markerHeight", markerSize);
+        d3.select("#offgridArrow").attr("markerWidth", markerSize * 2).attr("markerHeight", markerSize);
+
         N2CellRenderer.updateDims(this.nodeSize.width, this.nodeSize.height);
-        this.updateLevelOfDetailThreshold(layout.size.diagram.height);
+        this.updateLevelOfDetailThreshold(layout.size.n2matrix.height);
 
         startTimer('N2Matrix._buildGrid');
         this._buildGrid(model);
@@ -62,8 +66,19 @@ class N2Matrix {
      *  in the row; true otherwise.
      */
     exists(row, col) {
-        if (this.grid[row] && this.grid[row][col]) { return true; }
+        if (this.grid[row] && this.grid[row][col]) return true;
         return false;
+    }
+
+    /**
+     * Make sure the cell is still part of the matrix and not an old one.
+     * @param {N2MatrixCell} cell The cell to test.
+     * @returns {Boolean} True if this.diagNodes has an object in the
+     *   same row and column, and it matches the provided cell.
+    */
+    cellExists(cell) {
+        return (this.exists(cell.row, cell.col) &&
+            this.cell(cell.row, cell.col) === cell);
     }
 
     /**
@@ -271,8 +286,8 @@ class N2Matrix {
      * @param {Number} height Rectangle height in px.
      * @param {string} fill Fill color.
      */
-    hilight(x, y, width, height, fill) {
-        this.n2Groups.elements.insert("rect")
+    highlight(x, y, width, height, fill) {
+        this.n2Groups.highlights.insert("rect")
             .attr("class", "n2_hover_elements")
             .attr("y", y)
             .attr("x", x)
@@ -388,14 +403,14 @@ class N2Matrix {
                 throw ('enter transform not found');
             });
         gEnter.append('line')
-            .attr('x2', self.layout.size.diagram.width);
+            .attr('x2', self.layout.size.n2matrix.width);
 
         let gUpdate = gEnter.merge(selection).transition(sharedTransition)
             .attr('transform', function (d) {
                 return 'translate(0,' + (self.cellDims.size.height * d.i) + ')';
             });
         gUpdate.select('line')
-            .attr('x2', self.layout.size.diagram.width);
+            .attr('x2', self.layout.size.n2matrix.width);
 
         selection.exit().transition(sharedTransition)
             .attr('transform', function (d) {
@@ -433,14 +448,14 @@ class N2Matrix {
                 throw ("enter transform not found");
             });
         gEnter.append("line")
-            .attr("x1", -self.layout.size.diagram.height);
+            .attr("x1", -self.layout.size.n2matrix.height);
 
         let gUpdate = gEnter.merge(selection).transition(sharedTransition)
             .attr("transform", function (d) {
                 return "translate(" + (self.cellDims.size.width * d.i) + ")rotate(-90)";
             });
         gUpdate.select("line")
-            .attr("x1", -self.layout.size.diagram.height);
+            .attr("x1", -self.layout.size.n2matrix.height);
 
         selection.exit().transition(sharedTransition)
             .attr("transform", function (d) {
@@ -535,6 +550,12 @@ class N2Matrix {
         startTimer('N2Matrix.draw');
         // debugInfo("maxDepth: ", this.layout.model.maxDepth, " zoomedElement depth: ", this.layout.zoomedElement.depth)
 
+        let size = this.layout.size;
+        d3.select("#n2MatrixClip > rect")
+            .transition(sharedTransition)
+            .attr('width', size.n2matrix.width + size.svgMargin * 2)
+            .attr('height', size.n2matrix.height + size.svgMargin * 2);
+
         this._drawCells();
 
         // Draw gridlines:
@@ -561,24 +582,56 @@ class N2Matrix {
             debugInfo("Draw arrow on top going right away from " +
                 cell.tgtObj.absPathName + " to offscreen target " +
                 offscreenNode.absPathName);
+            new N2OffGridArrow({
+                'cell': { 'col': cell.row, 'row': cell.row },
+                'direction': 'right',
+                'color': N2Style.color.greenArrow,
+                'width': lineWidth,
+                'matrixSize': this.diagNodes.length,
+                'label': offscreenNode.absPathName
+            }, this.n2Groups, this.nodeSize);
         }
 
         for (let offscreenNode of cell.offScreen.bottom.outgoing) {
             debugInfo("Draw arrow on bottom going left from " +
                 cell.tgtObj.absPathName + " to offscreen target " +
                 offscreenNode.absPathName);
+            new N2OffGridArrow({
+                'cell': { 'col': cell.row, 'row': cell.row },
+                'direction': 'left',
+                'color': N2Style.color.greenArrow,
+                'width': lineWidth,
+                'matrixSize': this.diagNodes.length,
+                'label': offscreenNode.absPathName
+            }, this.n2Groups, this.nodeSize);
         }
 
         for (let offscreenNode of cell.offScreen.top.incoming) {
             debugInfo("Draw arrow on top coming down into " +
                 cell.tgtObj.absPathName + " from offscreen source " +
                 offscreenNode.absPathName);
+            new N2OffGridArrow({
+                'cell': { 'col': cell.row, 'row': cell.row },
+                'direction': 'down',
+                'color': N2Style.color.redArrow,
+                'width': lineWidth,
+                'matrixSize': this.diagNodes.length,
+                'label': offscreenNode.absPathName
+            }, this.n2Groups, this.nodeSize);
         }
 
         for (let offscreenNode of cell.offScreen.bottom.incoming) {
             debugInfo("Draw arrow on bottom coming up into " +
                 cell.tgtObj.absPathName + " from offscreen source " +
                 offscreenNode.absPathName)
+            new N2OffGridArrow({
+                'cell': { 'col': cell.row, 'row': cell.row },
+                'direction': 'up',
+                'color': N2Style.color.redArrow,
+                'width': lineWidth,
+                'matrixSize': this.diagNodes.length,
+                'label': offscreenNode.absPathName
+            }, this.n2Groups, this.nodeSize);
         }
     }
 
@@ -588,13 +641,16 @@ class N2Matrix {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOnDiagonal(cell) {
-        let leftTextWidthHovered = this.diagNodes[cell.row].nameWidthPx;
+        // Don't do anything during transition:
+        if (d3.active(cell)) return;
 
         // Loop over all elements in the matrix looking for other cells in the same column as
-        let lineWidth = Math.min(5, this.nodeSize.width * .5,
+        let lineWidth = Math.min(4, this.nodeSize.width * .5,
             this.nodeSize.height * .5);
 
-        this.hilight(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
+        let leftTextWidthHovered = this.diagNodes[cell.row].nameWidthPx;
+
+        this.highlight(-leftTextWidthHovered - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.row, leftTextWidthHovered,
             this.nodeSize.height, N2Style.color.highlightHovered); //highlight hovered
 
@@ -602,10 +658,11 @@ class N2Matrix {
 
         for (let col = 0; col < this.layout.visibleNodes.length; ++col) {
             let leftTextWidthDependency = this.layout.visibleNodes[col].nameWidthPx;
+
             if (this.exists(cell.row, col)) {
                 if (col != cell.row) {
 
-                    new N2Arrow({
+                    new N2BentArrow({
                         'end': { 'col': col, 'row': col },
                         'start': { 'col': cell.row, 'row': cell.row },
                         'color': N2Style.color.greenArrow,
@@ -613,27 +670,30 @@ class N2Matrix {
                     }, this.n2Groups, this.nodeSize);
 
                     //highlight var name
-                    this.hilight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
+                    this.highlight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
                         this.nodeSize.height * col, leftTextWidthDependency,
                         this.nodeSize.height, N2Style.color.greenArrow);
                 }
+
             }
 
             // Now swap row and col
             if (this.exists(col, cell.row)) {
                 if (col != cell.row) {
 
-                    new N2Arrow({
+                    new N2BentArrow({
                         'start': { 'col': col, 'row': col },
                         'end': { 'col': cell.row, 'row': cell.row },
                         'color': N2Style.color.redArrow,
                         'width': lineWidth
                     }, this.n2Groups, this.nodeSize);
+
                     //highlight var name
-                    this.hilight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
+                    this.highlight(-leftTextWidthDependency - this.layout.size.partitionTreeGap,
                         this.nodeSize.height * col, leftTextWidthDependency,
                         this.nodeSize.height, N2Style.color.redArrow);
                 }
+
             }
         }
     }
@@ -659,7 +719,7 @@ class N2Matrix {
         }
 
         for (let arrow of arrows) {
-            new N2Arrow({
+            new N2BentArrow({
                 'start': { 'col': arrow.start, 'row': arrow.start },
                 'end': { 'col': arrow.end, 'row': arrow.end },
                 'color': (startIndex < endIndex) ?
@@ -675,11 +735,14 @@ class N2Matrix {
      * @param {N2MatrixCell} cell The cell the event occured on.
      */
     mouseOverOffDiagonal(cell) {
+        // Don't do anything during transition:
+        if (d3.active(cell)) return;
+
         let lineWidth = Math.min(5, this.nodeSize.width * .5, this.nodeSize.height * .5);
         let src = this.diagNodes[cell.row];
         let tgt = this.diagNodes[cell.col];
 
-        new N2Arrow({
+        new N2BentArrow({
             'start': { 'col': cell.row, 'row': cell.row },
             'end': { 'col': cell.col, 'row': cell.col },
             'color': N2Style.color.redArrow,
@@ -733,12 +796,12 @@ class N2Matrix {
             leftTextWidthC = this.layout.visibleNodes[cell.col].nameWidthPx;
 
         // highlight var name
-        this.hilight(-leftTextWidthR - this.layout.size.partitionTreeGap,
+        this.highlight(-leftTextWidthR - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.row, leftTextWidthR, this.nodeSize.height,
             N2Style.color.redArrow);
 
         // highlight var name
-        this.hilight(-leftTextWidthC - this.layout.size.partitionTreeGap,
+        this.highlight(-leftTextWidthC - this.layout.size.partitionTreeGap,
             this.nodeSize.height * cell.col, leftTextWidthC, this.nodeSize.height,
             N2Style.color.greenArrow);
     }
