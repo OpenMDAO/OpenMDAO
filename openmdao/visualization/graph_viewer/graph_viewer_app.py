@@ -38,9 +38,25 @@ def startThread(fn):
 
 
 class Application(tornado.web.Application):
-    def __init__(self, problem, port):
+    """
+    An application that allows a user to view the system graph for any group in a model.
+    """
+    def __init__(self, problem, port, engine='dot'):
+        """
+        Inialize the app.
+
+        Parameters
+        ----------
+        problem : Problem
+            The Problem containing the model.
+        port : int
+            The server port.
+        engine : str
+            The graphviz layout engine to use.  Should be one of ['dot', 'fdp', 'circo'].
+        """
         handlers = [
             (r"/", Index),
+            (r"/sysgraph/", Index),
             (r"/sysgraph/([_a-zA-Z][_a-zA-Z0-9.]*)", SysGraph),
         ]
 
@@ -53,12 +69,31 @@ class Application(tornado.web.Application):
 
         self.prob = problem
         self.port = port
+        self.engine = engine
 
 
-def get_graph_info(group, title):
+def get_graph_info(group, title, engine='dot'):
+    """
+    Get the system graph from the give group and return the graphviz generated SVG string.
+
+    Parameters
+    ----------
+    group : Group
+        Retrieve the graph SVG for this Group.
+    title : str
+        The title shown at the top of the rendered graph.
+    engine : str
+        The graphviz layout engine to use to layout the graph. Should be one of
+        ['dot', 'fdp', 'circo'].
+
+    Returns
+    -------
+    str
+        The SVG string describing the graph.
+    """
     graph = group.compute_sys_graph()
 
-    f = Digraph(title, filename=title + '.gv', format='svg')
+    f = Digraph(title, filename=title + '.gv', format='svg', engine=engine)
     f.attr(rankdir='LR', size='600, 600')
 
     f.attr('node', shape='doublecircle')
@@ -81,7 +116,7 @@ def get_graph_info(group, title):
 
 
 class SysGraph(tornado.web.RequestHandler):
-    def get(self, pathname):
+    def get(self, pathname=''):
         self.write_graph(pathname)
 
     def write_graph(self, pathname):
@@ -99,14 +134,23 @@ class SysGraph(tornado.web.RequestHandler):
             self.write("Components don't have graphs.")
             return
         
-        svg, subgroups = get_graph_info(system, title)
+        svg, subgroups = get_graph_info(system, title, app.engine)
         pathname = system.pathname
+        parent = '' if not pathname else pathname.rsplit('.', 1)[0]
+        if parent == pathname:
+            parent = ''
         subgroups = [g.name for g in subgroups]
 
         self.write("""\
     <html>
     <head>
     <style>
+        .buttongrp {
+            display: inline-block;
+        }
+        .buttongrp button {
+            cursor: pointer; /* Pointer/hand icon */
+        }
     </style>
     <script src="https://d3js.org/d3.v4.min.js"></script>
     <script>
@@ -149,12 +193,13 @@ class SysGraph(tornado.web.RequestHandler):
     </script>
     </head>
     <body>
-    <a href="/">Home</a>
-    <h1>%s</h1>
+        <input type="button" onclick="location.href='/';" value="Home" />
+        <input type="button" onclick="location.href='/sysgraph/%s';" value="Up" />
+        <div class="gtitle"><h1>%s</h1></div>
     %s
     </body>
     </html>
-    """ % ([pathname], subgroups, title, svg))
+    """ % ([pathname], subgroups, parent, title, svg))
 
 
 class Index(SysGraph):
@@ -177,6 +222,8 @@ def _view_graphs_setup_parser(parser):
     parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
     parser.add_argument('-g', '--group', action='append', default=[], dest='groups',
                         help='Display the graph for the given group.')
+    parser.add_argument('-e', '--engine', action='store', dest='engine',
+                        default='dot', help='Specify graph layout engine (dot, circo, fdp)')
     parser.add_argument('file', metavar='file', nargs=1,
                         help='profile file to view.')
 
@@ -195,9 +242,13 @@ def _view_graphs_cmd(options):
     function
         The post-setup hook function.
     """
+    if options.engine not in {'dot', 'circo', 'fdp'}:
+        raise RuntimeError("Graph layout engine '{}' not supported.".format(options.engine))
+
     def _view_graphs(prob):
         if not MPI or MPI.COMM_WORLD.rank == 0:
-            view_graphs(prob, progname=options.file[0], port=options.port, groups=options.groups)
+            view_graphs(prob, progname=options.file[0], port=options.port, 
+                        groups=options.groups, engine=options.engine)
         exit()
 
     # register the hook
@@ -206,7 +257,7 @@ def _view_graphs_cmd(options):
     return _view_graphs
 
 
-def view_graphs(prob, progname, port=8009, groups=()):
+def view_graphs(prob, progname, port=8009, groups=(), engine='dot'):
     """
     Start an interactive graph viewer for an OpenMDAO model.
 
@@ -219,7 +270,7 @@ def view_graphs(prob, progname, port=8009, groups=()):
     port: int
         Port number used by web server.
     """
-    app = Application(prob, port)
+    app = Application(prob, port, engine)
     app.listen(port)
 
     print("starting server on port %d" % port)
