@@ -102,6 +102,9 @@ Here is what section of the legend looks like for both linear and nonlinear solv
 
 |linear_solvers_legend|    |nonlinear_solvers_legend|
 
+When a System has a Newton nonlinear solver and the `solve_subsystems` option is set to True for that solver,
+the Solver Structure box for that System has the text `NL: Newton (sub_solve)`.
+
 Toolbar
 -------
 

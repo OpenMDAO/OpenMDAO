@@ -25,13 +25,14 @@ from openmdao.core.group import Group
 from openmdao.core.problem import Problem
 from openmdao.core.component import Component
 from openmdao.core.implicitcomponent import ImplicitComponent
-from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
+from openmdao.drivers.doe_driver import DOEDriver
+from openmdao.recorders.case_reader import CaseReader
+from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import warn_deprecation, simple_warning, make_serializable
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
-from openmdao.recorders.case_reader import CaseReader
-from openmdao.drivers.doe_driver import DOEDriver
+from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
 
 # Toolbar settings
 _FONT_SIZES = [8, 9, 10, 11, 12, 13, 14]
@@ -139,6 +140,9 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
 
         if system.nonlinear_solver:
             tree_dict['nonlinear_solver'] = system.nonlinear_solver.SOLVER
+
+            if system.nonlinear_solver.SOLVER == NewtonSolver.SOLVER:
+                tree_dict['solve_subsystems'] = system._nonlinear_solver.options['solve_subsystems']
         else:
             tree_dict['nonlinear_solver'] = ""
 
@@ -307,7 +311,7 @@ def view_tree(*args, **kwargs):
     Parameters
     ----------
     *args : dict
-        Postional args.
+        Positional args.
     **kwargs : dict
         Keyword args.
     """
@@ -322,7 +326,7 @@ def view_model(*args, **kwargs):
     Parameters
     ----------
     *args : dict
-        Postional args.
+        Positional args.
     **kwargs : dict
         Keyword args.
     """
@@ -368,8 +372,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
 
     # grab the model viewer data
     model_data = _get_viewer_data(data_source)
-    options = {}
-    options['use_declare_partial_info'] = use_declare_partial_info
+    options = {'use_declare_partial_info': use_declare_partial_info}
     model_data['options'] = options
 
     model_data = 'var modelData = %s' % json.dumps(
