@@ -96,11 +96,13 @@ def get_graph_info(group, title, engine='dot'):
     f = Digraph(title, filename=title + '.gv', format='svg', engine=engine)
     f.attr(rankdir='LR', size='600, 600')
 
+    # display groups as double circles
     f.attr('node', shape='doublecircle')
     groupset = set(group._subgroups_myproc)
     for g in groupset:
         f.node(g.name)
 
+    # components as regular circles
     f.attr('node', shape='circle')
     for s in group._subsystems_myproc:
         if s not in groupset:
@@ -145,12 +147,6 @@ class SysGraph(tornado.web.RequestHandler):
     <html>
     <head>
     <style>
-        .buttongrp {
-            display: inline-block;
-        }
-        .buttongrp button {
-            cursor: pointer; /* Pointer/hand icon */
-        }
     </style>
     <script src="https://d3js.org/d3.v4.min.js"></script>
     <script>
@@ -195,7 +191,7 @@ class SysGraph(tornado.web.RequestHandler):
     <body>
         <input type="button" onclick="location.href='/';" value="Home" />
         <input type="button" onclick="location.href='/sysgraph/%s';" value="Up" />
-        <div class="gtitle"><h1>%s</h1></div>
+        <h1>%s</h1>
     %s
     </body>
     </html>
