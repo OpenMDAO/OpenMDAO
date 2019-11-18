@@ -101,8 +101,7 @@ from openmdao.visualization.partial_deriv_plot import partial_deriv_plot
 import os
 if os.environ.get('OPENMDAO_TRACE'):
     from openmdao.devtools.itrace import setup, start
-    ret = bool(os.environ.get('OPENMDAO_TRACE_RETURN'))
-    setup(os.environ['OPENMDAO_TRACE'], show_return=ret)
+    setup(os.environ['OPENMDAO_TRACE'])
     start()
 elif os.environ.get('OPENMDAO_PROF_MEM'):
     from openmdao.devtools.iprof_mem import setup, start
