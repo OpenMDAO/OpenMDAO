@@ -666,7 +666,7 @@ else:
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
                      number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False, class_names=False,
-                     add_component_indices=True, options={}):
+                     add_component_indices=True, equations=False, options={}):
             """
             Initialize.
 
@@ -695,6 +695,7 @@ else:
             # Formatting options
             self.box_stacking = box_stacking
             self.class_names = class_names
+            self.has_equations = equations
             self.number_alignment = number_alignment
             self.add_component_indices = add_component_indices
             self.has_legend = legend  # If true, a legend will be added to the diagram
@@ -744,13 +745,15 @@ else:
                         if loop < i0:
                             i += 1
                     # Step is not None for the driver and solvers, for these a different label
-                    # will be made showing the starting end and step and the index of the next step.
+                    # will be made showing the starting end and step and the index of the next
+                    # step.
                     if step is not None:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
                 else:
                     i = None
                 label = self.finalize_label(i, label, self.number_alignment,
                                             class_name=comp['class'])
+
                 # Convert from math mode to regular text
                 comp['label'] = self._textify(label)
                 # Now the label is finished.
@@ -897,11 +900,6 @@ else:
         def _textify(name):
             # Uses the LaTeX \text{} command to insert plain text in math mode
             return r'\text{%s}' % name
-
-        @staticmethod
-        def py2tex(txt):
-            from pytexit import py2tex
-            return py2tex(txt)
 
         @staticmethod
         def format_block(names, stacking='vertical', **kwargs):
@@ -1089,7 +1087,8 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
                add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE,
-               legend=False, class_names=True, writer_options={}, **kwargs):
+               legend=False, class_names=True, equations=True,
+               writer_options={}, **kwargs):
     """
     Write XDSM diagram of an optimization problem.
 
@@ -1264,7 +1263,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                        add_process_conns=add_process_conns, build_pdf=build_pdf,
                        show_parallel=show_parallel, driver_type=driver_type,
                        output_side=output_side, legend=legend, class_names=class_names,
-                       writer_options=writer_options, **kwargs)
+                       writer_options=writer_options, equations=equations, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanup=True,
@@ -1272,7 +1271,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
                 output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', legend=False,
-                class_names=False, writer_options={}, **kwargs):
+                class_names=False, equations=False, writer_options={}, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -1360,6 +1359,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                            add_component_indices=add_component_indices,
                            legend=legend,
                            class_names=class_names,
+                           equations=equations,
                            options=writer_options)
         elif writer.lower() == 'xdsmjs':  # XDSMjs
             x = XDSMjsWriter(options=writer_options)
@@ -1476,8 +1476,14 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     # Add components
     solver_dcts = []
+    if equations:
+        from pytexit import py2tex
     for comp in comps:  # Driver is 1, so starting from 2
-        label = _replace_chars(comp['name'], substitutes=subs)
+        if equations and comp.get('expression', None) is not None:
+            label = "$" + ', '.join(map(py2tex, comp['expression'])) + "$"
+        else:
+            label = comp['name']
+            label = _replace_chars(label, substitutes=subs)
         stack = comp['is_parallel'] and show_parallel
         if include_solver and comp['type'] == 'solver':  # solver
             if add_solver(comp):  # Return value is true, if solver is not the default
