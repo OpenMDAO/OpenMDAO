@@ -899,6 +899,11 @@ else:
             return r'\text{%s}' % name
 
         @staticmethod
+        def py2tex(txt):
+            from pytexit import py2tex
+            return py2tex(txt)
+
+        @staticmethod
         def format_block(names, stacking='vertical', **kwargs):
             """
             Format a block.
