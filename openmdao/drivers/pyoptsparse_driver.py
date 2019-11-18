@@ -484,7 +484,7 @@ class pyOptSparseDriver(Driver):
             if self._user_termination_flag:
                 func_dict = self.get_objective_values()
                 func_dict.update(self.get_constraint_values(lintype='nonlinear'))
-                return {}, 2
+                return func_dict, 2
 
             # Execute the model
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
