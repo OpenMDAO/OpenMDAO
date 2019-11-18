@@ -65,7 +65,7 @@ class UserRequestedException(Exception):
     User Requested Exception.
 
     This exception indicates that the user has requested that SNOPT/pyoptsparse ceases
-    model execution and report to SNOPT that executioin should be terminated.
+    model execution and report to SNOPT that execution should be terminated.
     """
 
     pass
@@ -115,7 +115,7 @@ class pyOptSparseDriver(Driver):
         Cached function pointer that was assigned as handler for signal defined in option
         user_teriminate_signal.
     _user_termination_flag : bool
-        Set to True when the user sends a signal to terminate the job.
+        This is set to True when the user sends a signal to terminate the job.
     """
 
     def __init__(self, **kwargs):
@@ -569,32 +569,10 @@ class pyOptSparseDriver(Driver):
                 prob.model._clear_iprint()
                 fail = 1
 
-                # We need to cobble together a sens_dict of the correct size.
-                # Best we can do is return zeros.
-
-                sens_dict = OrderedDict()
-                for okey, oval in iteritems(func_dict):
-                    sens_dict[okey] = OrderedDict()
-                    osize = len(oval)
-                    for ikey, ival in iteritems(dv_dict):
-                        isize = len(ival)
-                        sens_dict[okey][ikey] = np.zeros((osize, isize))
-
             # User requested termination
             except UserRequestedException:
                 prob.model._clear_iprint()
                 fail = 2
-
-                # We need to cobble together a sens_dict of the correct size.
-                # Best we can do is return zeros.
-
-                sens_dict = OrderedDict()
-                for okey, oval in iteritems(func_dict):
-                    sens_dict[okey] = OrderedDict()
-                    osize = len(oval)
-                    for ikey, ival in iteritems(dv_dict):
-                        isize = len(ival)
-                        sens_dict[okey][ikey] = np.zeros((osize, isize))
 
             else:
                 # if we don't convert to 'coo' here, pyoptsparse will do a
@@ -614,6 +592,18 @@ class pyOptSparseDriver(Driver):
                         elif okey in sens_dict:
                             newdv[ikey] = sens_dict[okey][ikey]
                 sens_dict = new_sens
+
+            if fail > 0:
+                # We need to cobble together a sens_dict of the correct size.
+                # Best we can do is return zeros.
+
+                sens_dict = OrderedDict()
+                for okey, oval in iteritems(func_dict):
+                    sens_dict[okey] = OrderedDict()
+                    osize = len(oval)
+                    for ikey, ival in iteritems(dv_dict):
+                        isize = len(ival)
+                        sens_dict[okey][ikey] = np.zeros((osize, isize))
 
         except Exception as msg:
             tb = traceback.format_exc()
