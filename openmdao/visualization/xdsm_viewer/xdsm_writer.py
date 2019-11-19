@@ -884,10 +884,10 @@ else:
                 # processes
                 for proc in self.processes:
                     process_name = proc[0]
-                    for i, item in enumerate(proc):
+                    for i, item in enumerate(proc, start=1):
                         if solver_name == item:  # solver found in an already added process
                             # Delete items belonging to the new process from the others
-                            proc[i + 1:i + 1 + nr] = []
+                            proc[i:i + nr] = []
                             process_index = index_dct[process_name]
                             # There is a process loop inside, this adds plus one step
                             self._comps[process_index]['step'] += 1
