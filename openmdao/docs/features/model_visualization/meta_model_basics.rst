@@ -75,5 +75,6 @@ want to visualize if there is more than one, and optionally a port number:
     :cmd: openmdao view_mm -h
 
 .. note::
-    When using Bash on Windows set --no_browser option to start the server, then open an internet
-    browser and copy/paste the path to viewer.
+    When using Bash on Windows you are required to set --no_browser option to start the server and
+    then open an internet browser and copy/paste the path to viewer. Bash on Windows does not allow
+    the terminal to access your browser to open the viewer.
