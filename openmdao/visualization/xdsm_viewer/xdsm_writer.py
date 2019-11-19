@@ -695,7 +695,6 @@ else:
             # Formatting options
             self.box_stacking = box_stacking
             self.class_names = class_names
-            self.has_equations = equations
             self.number_alignment = number_alignment
             self.add_component_indices = add_component_indices
             self.has_legend = legend  # If true, a legend will be added to the diagram
@@ -754,9 +753,10 @@ else:
                 label = self.finalize_label(i, label, self.number_alignment,
                                             class_name=comp['class'])
 
-                # Convert from math mode to regular text
-                comp['label'] = self._textify(label)
-                # Now the label is finished.
+                # Convert from math mode to regular text, if it is a one liner wrapped in math mode
+                if isinstance(label, string_types):
+                    label = _textify(label)
+                comp['label'] = label  # Now the label is finished.
                 # Now really add the system with the XDSM class' method
                 self.add_system(**comp)
 
@@ -895,11 +895,6 @@ else:
             # Close the loop by
             comp_names.append(comp_names[0])
             self.add_process(comp_names, arrow=_PROCESS_ARROWS)
-
-        @staticmethod
-        def _textify(name):
-            # Uses the LaTeX \text{} command to insert plain text in math mode
-            return r'\text{%s}' % name
 
         @staticmethod
         def format_block(names, stacking='vertical', **kwargs):
@@ -1087,7 +1082,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
                add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE,
-               legend=False, class_names=True, equations=True,
+               legend=False, class_names=True, equations=False,
                writer_options={}, **kwargs):
     """
     Write XDSM diagram of an optimization problem.
@@ -1359,7 +1354,6 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                            add_component_indices=add_component_indices,
                            legend=legend,
                            class_names=class_names,
-                           equations=equations,
                            options=writer_options)
         elif writer.lower() == 'xdsmjs':  # XDSMjs
             x = XDSMjsWriter(options=writer_options)
@@ -1477,10 +1471,19 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     # Add components
     solver_dcts = []
     if equations:
-        from pytexit import py2tex
+        try:
+            from pytexit import py2tex
+        except ImportError():
+            equations = False
+            msg = 'The LaTeX equation formatting requires the pytexit package.' \
+                  'The "equations" options was turned off.' \
+                  'To enable this option install the package with "pip install pytexit".'
+            simple_warning(msg)
     for comp in comps:  # Driver is 1, so starting from 2
+        # The second condition is for backwards compatibility with older data.
         if equations and comp.get('expression', None) is not None:
-            label = "$" + ', '.join(map(py2tex, comp['expression'])) + "$"
+            # One of the $ signs has to be removed to correctly parse it
+            label = ', '.join(map(lambda ex: py2tex(ex).replace("$$", "$"), comp['expression']))
         else:
             label = comp['name']
             label = _replace_chars(label, substitutes=subs)
@@ -1905,10 +1908,12 @@ def _multiline_block(*texts, **kwargs):
 
     Returns
     -------
-       str
+       list
     """
     end_char = kwargs.pop('end_char', '')
-    texts = ['\\text{{{}{}}}'.format(t, end_char) for t in texts]
-    template = '$\\begin{{array}}{{{pos}}} {text} \\end{{array}}$'
-    new_line = r' \\ '
-    return template.format(text=new_line.join(texts), pos='c' * len(texts))
+    return [_textify(t + end_char) for t in texts]
+
+
+def _textify(name):
+    # Uses the LaTeX \text{} command to insert plain text in math mode
+    return r'\text{{{}}}'.format(name)
