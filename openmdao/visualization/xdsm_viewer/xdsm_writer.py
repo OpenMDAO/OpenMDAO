@@ -1014,35 +1014,25 @@ else:
 
             Returns
             -------
-            str
-                Label to be used for this item.
+            str or list(str)
+                Label to be used for this item. List, if it is multiline.
             """
             if isinstance(txt, string_types):
-                txt = [txt]
+                txt = [txt]  # Make iterable, it will be converted back if there is only 1 line.
 
-            def multi_ln(texts, num=None):
-                # Converts text to a multiline block, if an index or class name is added in
-                # separate row.
-                if self.class_names and (class_name is not None):
-                    cls_name = r'\textit{{{}}}'.format(class_name)  # Makes it italic
-                    texts.append(cls_name)  # Formatting for multi-line array
-                elif num is None:
-                    return _multiline_block(*texts)  # No number, no classname, just flows through
-                if num:
-                    texts.insert(0, num)
-                return _multiline_block(*texts)
-
+            if self.class_names and (class_name is not None):
+                cls_name = r'\textit{{{}}}'.format(class_name)  # Makes it italic
+                txt.append(cls_name)  # Class name goes to a new line
             if number:  # If number is None or empty string, it won't be inserted
                 number_str = '{}: '.format(number)
                 if alignment == 'horizontal':
-                    txt[0] = number_str + txt[0]
-                    return multi_ln(txt)
+                    txt[0] = number_str + txt[0]  # Number added to first line
                 elif alignment == 'vertical':
-                    return multi_ln(txt, number_str)
+                    txt.insert(0, number_str)  # Number added to new line
                 else:
-                    return txt  # In case of a wrong setting
-            else:
-                return multi_ln(txt)
+                    msg = '"{}" is an invalid option for number_alignment, it will be ignored.'
+                    simple_warning(msg.format(alignment))
+            return _multiline_block(*txt)
 
         def _make_legend(self, title="Legend"):
             """
