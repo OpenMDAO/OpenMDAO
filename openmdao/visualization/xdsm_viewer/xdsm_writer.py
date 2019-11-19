@@ -993,7 +993,7 @@ else:
         def _make_loop_str(first, last, start_index=0):
             # Start index shifts all numbers
             i = start_index
-            txt = '{}, {}$ \\rightarrow $ {}'
+            txt = '{}, {} $ \\rightarrow $ {}'
             return txt.format(first + i, last + i, first + i + 1)
 
         def finalize_label(self, number, txt, alignment, class_name=None):
@@ -1017,21 +1017,25 @@ else:
             str
                 Label to be used for this item.
             """
-            def multi_ln(txt, num=None):
+            if isinstance(txt, string_types):
+                txt = [txt]
+
+            def multi_ln(texts, num=None):
                 # Converts text to a multiline block, if an index or class name is added in
                 # separate row.
                 if self.class_names and (class_name is not None):
-                    cls_name = r'\textit{%s}' % class_name  # Makes it italic
-                    txt = r'} \\ \text{'.join([txt, cls_name])  # Formatting for multi-line array
+                    cls_name = r'\textit{{{}}}'.format(class_name)  # Makes it italic
+                    texts.append(cls_name)  # Formatting for multi-line array
                 elif num is None:
-                    return txt  # No number, no classname, just flows through
-                texts = [num, txt] if num is not None else [txt]
+                    return _multiline_block(*texts)  # No number, no classname, just flows through
+                if num:
+                    texts.insert(0, num)
                 return _multiline_block(*texts)
 
             if number:  # If number is None or empty string, it won't be inserted
                 number_str = '{}: '.format(number)
                 if alignment == 'horizontal':
-                    txt = '{}{}'.format(number_str, txt)
+                    txt[0] = number_str + txt[0]
                     return multi_ln(txt)
                 elif alignment == 'vertical':
                     return multi_ln(txt, number_str)
@@ -1408,10 +1412,12 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # Uses some vars from the outer scope.
         # Returns True, if it is a non-default linear or nonlinear solver
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
-        solver_label = _format_solver_str(solver_dct,
-                                          stacking=box_stacking,
-                                          add_indices=add_component_indices)
-        solver_label = _replace_chars(solver_label, subs)
+        solver_label = _format_solver_str(solver_dct, stacking=box_stacking)
+
+        if isinstance(solver_label, string_types):
+            solver_label = _replace_chars(solver_label, subs)
+        else:
+            solver_label = [_replace_chars(i, subs) for i in solver_label]
         solver_name = _format_name(solver_dct['abs_name'])
 
         if solver_label:  # At least one non-default solver (default solvers are ignored)
@@ -1857,8 +1863,7 @@ def _replace_chars(name, substitutes):
     return name
 
 
-def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'linear'),
-                       add_indices=False):
+def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'linear')):
     """
     Format solver string.
 
@@ -1884,10 +1889,7 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
             solvers.append(solver_name)
     if stacking == 'vertical':
         # Make multiline comp if not numbered
-        if add_indices:  # array is already created for the numbering
-            return r'} \\ \text{'.join(solvers)  # With a TeX array this is a line separator
-        else:  # Goes into an array environment
-            return _multiline_block(*solvers)
+        return _multiline_block(*solvers)
     elif stacking in ('horizontal', 'max_chars', 'cut_chars'):
         return ' '.join(solvers)
     else:
@@ -1908,10 +1910,13 @@ def _multiline_block(*texts, **kwargs):
 
     Returns
     -------
-       list
+       list(str)
     """
     end_char = kwargs.pop('end_char', '')
-    return [_textify(t + end_char) for t in texts]
+    out_txts = [_textify(t + end_char) for t in texts]
+    if len(out_txts) < 2:
+        out_txts = out_txts[0]
+    return out_txts
 
 
 def _textify(name):
