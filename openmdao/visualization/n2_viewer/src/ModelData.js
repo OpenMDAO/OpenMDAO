@@ -3,7 +3,7 @@ class ModelData {
 
     /** Do some discovery in the tree and rearrange & enhance where necessary. */
     constructor(modelJSON) {
-        // debugInfo(modelJSON);
+        debugInfo(modelJSON);
         modelJSON.tree.name = 'model'; // Change 'root' to 'model'
         this.conns = modelJSON.connections_list;
         this.abs2prom = modelJSON.abs2prom; // May be undefined.
@@ -423,6 +423,7 @@ class ModelData {
             for (let srcParent of srcObjParents) {
                 for (let tgtParent of tgtObjParents) {
                     srcParent.targetParentSet.add(tgtParent);
+                    tgtParent.sourceParentSet.add(srcParent);
                 }
             }
 

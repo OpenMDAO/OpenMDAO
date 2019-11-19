@@ -20,6 +20,7 @@ class N2TreeNode {
         Object.assign(this, origNode);
 
         // From old ClearConnections():
+        this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
 
         // Solver names may be empty, so set them to "None" instead.

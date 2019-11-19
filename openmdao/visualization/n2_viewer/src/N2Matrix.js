@@ -185,40 +185,51 @@ class N2Matrix {
         if (this.tooMuchDetail()) return;
 
         for (let srcIdx = 0; srcIdx < this.diagNodes.length; ++srcIdx) {
-            let srcObj = this.diagNodes[srcIdx];
+            let diagNode = this.diagNodes[srcIdx];
 
             // New row
             if (!this.grid.propExists(srcIdx)) this.grid[srcIdx] = {};
 
             // On the diagonal
-            let newDiagCell = new N2MatrixCell(srcIdx, srcIdx, srcObj, srcObj, model);
+            let newDiagCell = new N2MatrixCell(srcIdx, srcIdx, diagNode, diagNode, model);
             this._addCell(srcIdx, srcIdx, newDiagCell);
             this._findUnseenCycleSources(newDiagCell);
 
-            let targets = srcObj.targetParentSet;
+            let targets = diagNode.targetParentSet;
 
-            for (let tgtObj of targets) {
-                let tgtIdx = indexFor(this.diagNodes, tgtObj);
+            for (let tgt of targets) {
+                let tgtIdx = indexFor(this.diagNodes, tgt);
                 if (tgtIdx != -1) {
-                    let newCell = new N2MatrixCell(srcIdx, tgtIdx, srcObj, tgtObj, model);
+                    let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgt, model);
                     this._addCell(srcIdx, tgtIdx, newCell);
                 }
                 else {
-                    if (tgtObj.isParamOrUnknown()) {
-                        newDiagCell.addOffScreenConn(srcObj, tgtObj)
+                    if (tgt.isParamOrUnknown()) {
+                        newDiagCell.addOffScreenConn(diagNode, tgt)
+                    }
+                }
+            }
+
+            // Check for missing source part of connections
+            let sources = diagNode.sourceParentSet;
+            for (let src of sources) {
+                let srcIdx = indexFor(this.diagNodes, src)
+                if (srcIdx == -1) {
+                    if (src.isParamOrUnknown()) {
+                        newDiagCell.addOffScreenConn(src, diagNode);
                     }
                 }
             }
 
             // Solver nodes
-            if (srcObj.isParam()) {
+            if (diagNode.isParam()) {
                 for (let j = srcIdx + 1; j < this.diagNodes.length; ++j) {
                     let tgtObj = this.diagNodes[j];
-                    if (srcObj.parentComponent !== tgtObj.parentComponent) break;
+                    if (diagNode.parentComponent !== tgtObj.parentComponent) break;
 
                     if (tgtObj.isUnknown()) {
                         let tgtIdx = j;
-                        let newCell = new N2MatrixCell(srcIdx, tgtIdx, srcObj, tgtObj, model);
+                        let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgtObj, model);
                         this._addCell(srcIdx, tgtIdx, newCell);
                     }
                 }
