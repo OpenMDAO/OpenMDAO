@@ -1488,7 +1488,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             # One of the $ signs has to be removed to correctly parse it
             if isinstance(x, XDSMWriter):
                 def parse(expr):
-                    for (ch, rep) in (('$$', '$'), (r'[', ''), (r']', '')):
+                    for (ch, rep) in (('$$', '$'), (r'[', '_'), (r']', '')):
                         expr = expr.replace(ch, rep)
                     # One of the $ signs has to be removed to correctly parse it
                     return py2tex(expr).replace('$$', '$')
