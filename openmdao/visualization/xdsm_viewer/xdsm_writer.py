@@ -1164,7 +1164,10 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
     class_names : bool, optional
         If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
-    writer_options : dict
+    equations : bool, optional
+        If true, for ExecComps their equations are shown in the diagram
+        Defaults to False.
+    writer_options : dict, optional
         Options passed to the writer class at initialization.
     **kwargs : dict
         Keyword arguments
@@ -1320,7 +1323,10 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     class_names : bool, optional
         If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
-    writer_options : dict
+    equations : bool, optional
+        If true, for ExecComps their equations are shown in the diagram
+        Defaults to False.
+    writer_options : dict, optional
         Options passed to the writer class at initialization.
     **kwargs : dict
         Keyword arguments, includes writer specific options.
