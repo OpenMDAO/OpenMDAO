@@ -455,9 +455,9 @@ class SqliteRecorder(CaseRecorder):
             Dictionary containing execution metadata.
         """
         if self.connection:
-            inputs = data['i']
-            outputs = data['o']
-            residuals = data['r']
+            inputs = data['in']
+            outputs = data['out']
+            residuals = data['res']
 
             # convert to list so this can be dumped as JSON
             for i_o_r in (inputs, outputs, residuals):
@@ -504,9 +504,9 @@ class SqliteRecorder(CaseRecorder):
         if self.connection:
             abs = data['abs']
             rel = data['rel']
-            inputs = data['i']
-            outputs = data['o']
-            residuals = data['r']
+            inputs = data['in']
+            outputs = data['out']
+            residuals = data['res']
 
             # convert to list so this can be dumped as JSON
             for i_o_r in (inputs, outputs, residuals):

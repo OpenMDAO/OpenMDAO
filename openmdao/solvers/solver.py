@@ -501,37 +501,37 @@ class Solver(object):
         residuals = system._vectors['residual'][typ]
 
         if self.recording_options['record_outputs']:
-            data['o'] = {}
+            data['out'] = {}
             if 'out' in self._filtered_vars_to_record:
                 for out in self._filtered_vars_to_record['out']:
                     if out in outputs._names:
-                        data['o'][out] = outputs._views[out]
+                        data['out'][out] = outputs._views[out]
             else:
-                data['o'] = outputs
+                data['out'] = outputs
         else:
-            data['o'] = None
+            data['out'] = None
 
         if self.recording_options['record_inputs']:
-            data['i'] = {}
+            data['in'] = {}
             if 'in' in self._filtered_vars_to_record:
                 for inp in self._filtered_vars_to_record['in']:
                     if inp in inputs._names:
-                        data['i'][inp] = inputs._views[inp]
+                        data['in'][inp] = inputs._views[inp]
             else:
-                data['i'] = inputs
+                data['in'] = inputs
         else:
-            data['i'] = None
+            data['in'] = None
 
         if self.recording_options['record_solver_residuals']:
-            data['r'] = {}
+            data['res'] = {}
             if 'res' in self._filtered_vars_to_record:
                 for res in self._filtered_vars_to_record['res']:
                     if res in residuals._names:
-                        data['r'][res] = residuals._views[res]
+                        data['res'][res] = residuals._views[res]
             else:
-                data['r'] = residuals
+                data['res'] = residuals
         else:
-            data['r'] = None
+            data['res'] = None
 
         self._rec_mgr.record_iteration(self, data, metadata)
 

@@ -1466,9 +1466,9 @@ class System(object):
                                if n in abs2prom and check_path(abs2prom[n], incl, excl)}
 
         self._filtered_vars_to_record = {
-            'i': myinputs,
-            'o': myoutputs,
-            'r': myresiduals
+            'in': myinputs,
+            'out': myoutputs,
+            'res': myresiduals
         }
 
         self._rec_mgr.startup(self)
@@ -3734,65 +3734,65 @@ class System(object):
 
             data = {}
             if options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
-                data['i'] = {}
-                if 'i' in self._filtered_vars_to_record:
+                data['in'] = {}
+                if 'in' in self._filtered_vars_to_record:
                     # use filtered inputs
-                    for inp in self._filtered_vars_to_record['i']:
+                    for inp in self._filtered_vars_to_record['in']:
                         if inp in inputs._names:
-                            data['i'][inp] = inputs._views[inp]
+                            data['in'][inp] = inputs._views[inp]
                         elif inp in discrete_inputs:
                             abs_name = self.pathname + '.' + inp if self.pathname else inp
-                            data['i'][abs_name] = discrete_inputs[inp]
+                            data['in'][abs_name] = discrete_inputs[inp]
                 else:
                     # use all the inputs
                     if len(discrete_inputs) > 0:
                         for inp in inputs:
-                            data['i'][inp] = inputs._views[inp]
+                            data['in'][inp] = inputs._views[inp]
                         for inp in discrete_inputs:
                             abs_name = self.pathname + '.' + inp if self.pathname else inp
-                            data['i'][abs_name] = discrete_inputs[inp]
+                            data['in'][abs_name] = discrete_inputs[inp]
                     else:
-                        data['i'] = inputs._names
+                        data['in'] = inputs._names
 
             else:
-                data['i'] = None
+                data['in'] = None
 
             if options['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
-                data['o'] = {}
-                if 'o' in self._filtered_vars_to_record:
+                data['out'] = {}
+                if 'out' in self._filtered_vars_to_record:
                     # use outputs from filtered list.
-                    for out in self._filtered_vars_to_record['o']:
+                    for out in self._filtered_vars_to_record['out']:
                         if out in outputs._names:
-                            data['o'][out] = outputs._views[out]
+                            data['out'][out] = outputs._views[out]
                         elif out in discrete_outputs:
                             abs_name = self.pathname + '.' + out if self.pathname else out
-                            data['o'][abs_name] = discrete_outputs[out]
+                            data['out'][abs_name] = discrete_outputs[out]
                 else:
                     # use all the outputs
                     if len(discrete_outputs) > 0:
                         for out in outputs:
-                            data['o'][out] = outputs._views[out]
+                            data['out'][out] = outputs._views[out]
                         for out in discrete_outputs:
                             abs_name = self.pathname + '.' + out if self.pathname else out
-                            data['o'][abs_name] = discrete_outputs[out]
+                            data['out'][abs_name] = discrete_outputs[out]
                     else:
-                        data['o'] = outputs._names
+                        data['out'] = outputs._names
             else:
-                data['o'] = None
+                data['out'] = None
 
             if options['record_residuals'] and residuals._names:
-                data['r'] = {}
+                data['res'] = {}
 
-                if 'r' in self._filtered_vars_to_record:
+                if 'res' in self._filtered_vars_to_record:
                     # use filtered residuals
-                    for res in self._filtered_vars_to_record['r']:
+                    for res in self._filtered_vars_to_record['res']:
                         if res in residuals._names:
-                            data['r'][res] = residuals._views[res]
+                            data['res'][res] = residuals._views[res]
                 else:
                     # use all the residuals
-                    data['r'] = residuals._names
+                    data['res'] = residuals._names
             else:
-                data['r'] = None
+                data['res'] = None
 
             self._rec_mgr.record_iteration(self, data, metadata)
 
