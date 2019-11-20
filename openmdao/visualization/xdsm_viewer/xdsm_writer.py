@@ -1486,18 +1486,24 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # The second condition is for backwards compatibility with older data.
         if equations and comp.get('expressions', None) is not None:
             # One of the $ signs has to be removed to correctly parse it
-            def parse(expr):
-                for (ch, rep) in (('$$', '$'), (r'[', ''), (r']', '')):
-                    expr = expr.replace(ch, rep)
-                # One of the $ signs has to be removed to correctly parse it
-                return py2tex(expr).replace('$$', '$')
+            if isinstance(writer, XDSMWriter):
+                def parse(expr):
+                    for (ch, rep) in (('$$', '$'), (r'[', ''), (r']', '')):
+                        expr = expr.replace(ch, rep)
+                    # One of the $ signs has to be removed to correctly parse it
+                    return py2tex(expr).replace('$$', '$')
 
-            expression = comp['expressions']
-            try:
-                label = ', '.join(map(parse, expression))
-            except TypeError:
+                expression = comp['expressions']
+                try:
+                    label = ', '.join(map(parse, expression))
+                except TypeError:
+                    label = _replace_chars(comp['name'], substitutes=subs)
+                    simple_warning('Could not parse "{}"'.format(expression))
+            else:
+                msg = 'The "equations" option is available only with pyXDSM. Set the output ' \
+                      'format to "tex" or "pdf" to enable this option.'
+                simple_warning(msg)
                 label = _replace_chars(comp['name'], substitutes=subs)
-                simple_warning('Could not parse "{}"'.format(expression))
         else:
             label = _replace_chars(comp['name'], substitutes=subs)
         stack = comp['is_parallel'] and show_parallel
