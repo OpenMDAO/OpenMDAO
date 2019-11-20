@@ -918,6 +918,22 @@ class Problem(object):
         """
         record_iteration(self, self, case_name)
 
+    def _get_recorder_metadata(self, case_name):
+        """
+        Return metadata from the latest iteration for use in the recorder.
+
+        Parameters
+        ----------
+        case_name : str
+            Name of current case.
+
+        Returns
+        -------
+        dict
+            Metadata dictionary for the recorder.
+        """
+        return create_local_meta(case_name)
+
     def setup(self, vector_class=None, check=False, logger=None, mode='auto',
               force_alloc_complex=False, distributed_vector_class=PETScVector,
               local_vector_class=DefaultVector, derivatives=True):

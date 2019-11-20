@@ -268,3 +268,20 @@ class DOEDriver(Driver):
                             recorder._record_on_proc = False
 
         super(DOEDriver, self)._setup_recording()
+
+    def _get_recorder_metadata(self, case_name):
+        """
+        Return metadata from the latest iteration for use in the recorder.
+
+        Parameters
+        ----------
+        case_name : str
+            Name of current case.
+
+        Returns
+        -------
+        dict
+            Metadata dictionary for the recorder.
+        """
+        self._metadata['name'] = case_name
+        return self._metadata

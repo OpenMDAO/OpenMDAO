@@ -834,6 +834,22 @@ class Driver(object):
         """
         record_iteration(self, self._problem, self._get_name())
 
+    def _get_recorder_metadata(self, case_name):
+        """
+        Return metadata from the latest iteration for use in the recorder.
+
+        Parameters
+        ----------
+        case_name : str
+            Name of current case.
+
+        Returns
+        -------
+        dict
+            Metadata dictionary for the recorder.
+        """
+        return create_local_meta(case_name)
+
     def _gather_vars(self, root, local_vars):
         """
         Gather and return only variables listed in `local_vars` from the `root` System.
@@ -1205,4 +1221,5 @@ def record_iteration(requester, prob, case_name):
         'in': ins
     }
 
-    requester._rec_mgr.record_iteration(requester, data, create_local_meta(case_name))
+    requester._rec_mgr.record_iteration(requester, data,
+                                        requester._get_recorder_metadata(case_name))
