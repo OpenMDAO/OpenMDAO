@@ -18,7 +18,7 @@ import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.core.component import Component
-from openmdao.core.driver import Driver
+from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.group import Group
 from openmdao.core.group import System
@@ -34,11 +34,12 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
-from openmdao.utils.name_maps import prom_name2abs_name
+from openmdao.utils.name_maps import prom_name2abs_name, name2abs_name
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
@@ -235,6 +236,10 @@ class Problem(object):
 
         _setup_hooks(self)
 
+        from openmdao.utils.general_utils import env_truthy
+        if env_truthy('USE_WING'):
+            import wingdbstub
+
     def _get_var_abs_name(self, name):
         if name in self.model._var_allprocs_abs2meta:
             return name
@@ -301,6 +306,54 @@ class Problem(object):
         # variable exists, but may be remote
         return abs_name in self.model._var_abs2meta
 
+    def _get_cached_val(self, name):
+        proms = self.model._var_allprocs_prom2abs_list
+        meta = self.model._var_abs2meta
+
+        # We have set and cached already
+        if name in self._initial_condition_cache:
+            return self._initial_condition_cache[name]
+
+        # Vector not setup, so we need to pull values from saved metadata request.
+        else:
+            if name in meta:
+                if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
+                    src_name = self.model._conn_abs_in2out[name]
+                    val = meta[src_name]['value']
+                else:
+                    val = meta[name]['value']
+
+            elif name in proms['output']:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+                if abs_name in meta:
+                    val = meta[abs_name]['value']
+
+            elif name in proms['input']:
+                abs_name = proms['input'][name][0]
+                conn = self.model._conn_abs_in2out
+                if abs_name in meta:
+                    if isinstance(self.model, Group) and abs_name in conn:
+                        src_name = self.model._conn_abs_in2out[abs_name]
+                        # So, if the inputs and outputs are promoted to the same name, then we
+                        # allow getitem, but if they aren't, then we raise an error due to non
+                        # uniqueness.
+                        if name not in proms['output']:
+                            # This triggers a check for unconnected non-unique inputs, and
+                            # raises the same error as vector access.
+                            abs_name = prom_name2abs_name(self.model, name, 'input')
+                        val = meta[src_name]['value']
+                    else:
+                        # This triggers a check for unconnected non-unique inputs, and
+                        # raises the same error as vector access.
+                        abs_name = prom_name2abs_name(self.model, name, 'input')
+                        val = meta[abs_name]['value']
+
+            if val is not _undefined:
+                # Need to cache the "get" in case the user calls in-place numpy operations.
+                self._initial_condition_cache[name] = val
+
+        return val
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -320,52 +373,9 @@ class Problem(object):
         meta = self.model._var_abs2meta
 
         val = _undefined
-        abs_name = None
 
         if self._setup_status == 1:
-
-            # We have set and cached already
-            if name in self._initial_condition_cache:
-                return self._initial_condition_cache[name]
-
-            # Vector not setup, so we need to pull values from saved metadata request.
-            else:
-                if name in meta:
-                    if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
-                        src_name = self.model._conn_abs_in2out[name]
-                        val = meta[src_name]['value']
-                    else:
-                        val = meta[name]['value']
-
-                elif name in proms['output']:
-                    abs_name = prom_name2abs_name(self.model, name, 'output')
-                    if abs_name in meta:
-                        val = meta[abs_name]['value']
-
-                elif name in proms['input']:
-                    abs_name = proms['input'][name][0]
-                    conn = self.model._conn_abs_in2out
-                    if abs_name in meta:
-                        if isinstance(self.model, Group) and abs_name in conn:
-                            src_name = self.model._conn_abs_in2out[abs_name]
-                            # So, if the inputs and outputs are promoted to the same name, then we
-                            # allow getitem, but if they aren't, then we raise an error due to non
-                            # uniqueness.
-                            if name not in proms['output']:
-                                # This triggers a check for unconnected non-unique inputs, and
-                                # raises the same error as vector access.
-                                abs_name = prom_name2abs_name(self.model, name, 'input')
-                            val = meta[src_name]['value']
-                        else:
-                            # This triggers a check for unconnected non-unique inputs, and
-                            # raises the same error as vector access.
-                            abs_name = prom_name2abs_name(self.model, name, 'input')
-                            val = meta[abs_name]['value']
-
-                if val is not _undefined:
-                    # Need to cache the "get" in case the user calls in-place numpy operations.
-                    self._initial_condition_cache[name] = val
-
+            val = self._get_cached_val(name)
         else:
             if name in proms['output']:
                 name = proms['output'][name][0]
@@ -384,6 +394,7 @@ class Problem(object):
             elif name in self.model._discrete_inputs:
                 val = self.model._discrete_inputs[name]
 
+        abs_name = None
         if self.model.comm.size > 1:
             allprocs_meta = self.model._var_allprocs_abs2meta
             # check for remote var
@@ -394,37 +405,96 @@ class Problem(object):
             elif name in proms['input']:
                 abs_name = proms['input'][name][0]
 
-            if abs_name in self._remote_var_set:
-                if self.__get_remote:
-                    if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
-                        raise RuntimeError("%s: Retrieval of the full distributed variable '%s' "
-                                           "is not supported." % (self.msginfo, abs_name))
-                    loc_val = val
-                    owner = self.model._owning_rank[abs_name]
-                    if owner != self.model.comm.rank:
-                        val = None
-                    else:
-                        owner = self.model._owning_rank[abs_name]
-                        if val is _undefined:
-                            val = None
-                    new_val = self.model.comm.bcast(val, root=owner)
-                    if loc_val is not None and loc_val is not _undefined:
-                        val = loc_val
-                    else:
-                        val = new_val
-                elif val is _undefined:
-                    raise RuntimeError(
-                        "{}: Variable '{}' is not local to rank {}. You can retrieve values from "
-                        "other processes using "
-                        "`problem.get_val(<name>, get_remote=True)`.".format(self.msginfo, name,
-                                                                             self.comm.rank))
+            if abs_name in self._remote_var_set and val is _undefined:
+                raise RuntimeError(
+                    "{}: Variable '{}' is not local to rank {}. You can retrieve values from "
+                    "other processes using "
+                    "`problem.get_val(<name>, get_remote=True)`.".format(self.msginfo, name,
+                                                                         self.comm.rank))
 
         if val is _undefined:
             raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
 
         return val
 
-    def get_val(self, name, units=None, indices=None, get_remote=False):
+    def _abs_get_val(self, abs_name, get_remote=False, rank=None):
+        """
+        Return the value of the variable specified by the given absolute name.
+
+        Parameters
+        ----------
+        abs_name : str
+            The absolute name of the variable.
+        get_remote : bool
+            If True, return the value even if the variable is remote. NOTE: this requires a
+            collective MPI call so this function must be called in all procs in the Problem's
+            MPI communicator.
+        rank : int or None
+            If not None, specifies that the value is to be gathered to the given rank only.
+            Otherwise, if get_remote is specified, the value will be broadcast to all procs
+            in the MPI communicator.
+
+        Returns
+        -------
+        object
+            The value of the requested output/input variable.
+        """
+        model = self.model
+
+        try:
+            if get_remote:
+                meta = self.model._var_allprocs_abs2meta[abs_name]
+            else:
+                meta = self.model._var_abs2meta[abs_name]
+        except KeyError:
+            raise RuntimeError("{}: Variable '{}' was not found.".format(self.msginfo, abs_name))
+        distrib = meta['distributed']
+
+        typ = 'output'
+        if abs_name in model._outputs._views_flat:
+            val = model._outputs._views_flat[abs_name]
+        elif abs_name in model._inputs._views_flat:
+            val = model._inputs._views_flat[abs_name]
+            typ = 'input'
+        else:
+            val = None
+
+        if get_remote:
+            owner = self.model._owning_rank[abs_name]
+            loc_val = val if val is not None else np.zeros(0)
+            if rank is None:   # bcast
+                if distrib:
+                    idx = model._var_allprocs_abs2idx['nonlinear'][abs_name]
+                    sizes = model._var_sizes['nonlinear'][typ][:, idx]
+                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+                    offsets[1:] = np.cumsum(sizes[:-1])
+                    val = np.zeros(np.sum(sizes))
+                    model.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
+                else:
+                    if owner != model.comm.rank:
+                        val = None
+                    new_val = model.comm.bcast(val, root=owner)
+                    val = new_val
+            else:   # gather
+                if distrib:
+                    idx = model._var_allprocs_abs2idx['nonlinear'][abs_name]
+                    sizes = model._var_sizes['nonlinear'][typ][:, idx]
+                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+                    offsets[1:] = np.cumsum(sizes[:-1])
+                    val = np.zeros(np.sum(sizes))
+                    model.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
+                else:
+                    if rank != owner:
+                        vals = model.comm.gather(val, root=rank)
+                        if model.comm.rank == rank:
+                            val = vals[owner]
+
+        if val is not None:
+            val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
+
+        return val
+
+    def get_val(self, name, units=None, indices=None, get_remote=False, rank=None):
         """
         Get an output/input variable.
 
@@ -442,26 +512,44 @@ class Problem(object):
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
+        rank : int or None
+            If not None, only gather value to this rank.
 
         Returns
         -------
-        float or ndarray
-            The requested output/input variable.
+        object
+            The value of the requested output/input variable.
         """
-        if get_remote:
-            self.__get_remote = True
+        model = self.model
+        if get_remote or units is not None:
+            abs_name = name2abs_name(model, name)
+            if abs_name is None:
+                raise NameError("{}: Variable '{}' not found.".format(self.msginfo, name))
             try:
-                val = self[name]
-            finally:
-                self.__get_remote = False
+                distrib = model._var_allprocs_abs2meta[abs_name]['distributed']
+            except KeyError:
+                # var is disccrete
+                if abs_name in model._discrete_outputs:
+                    return model._discrete_outputs[abs_name]
+                else:
+                    return model._discrete_inputs[abs_name]
+
+            if self._setup_status == 1:
+                val = self._get_cached_val(name)
+            else:
+                val = self._abs_get_val(abs_name, get_remote, rank)
         else:
             val = self[name]
+            abs_name = None
+            distrib = False
 
-        if indices is not None:
+        if indices is not None and not distrib:
             val = val[indices]
 
         if units is not None:
-            base_units = self._get_units(name)
+            meta = model._var_allprocs_abs2meta[abs_name]
+
+            base_units = meta['units']
 
             if base_units is None:
                 msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
@@ -477,6 +565,38 @@ class Problem(object):
 
         return val
 
+    def _get_var_meta(self, name):
+        """
+        Get the metadata for a variable.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+
+        Returns
+        -------
+        dict
+            The metadata dictionary for the named variable.
+        """
+        abs_name = name2abs_name(self.model, name)
+        meta = self.model._var_allprocs_abs2meta
+        if name in meta:
+            return meta[name]
+
+        proms = self.model._var_allprocs_prom2abs_list
+        if self._setup_status >= 1:
+            if name in proms['output']:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+                return meta[abs_name]
+            elif name in proms['input']:
+                # This triggers a check for unconnected non-unique inputs, and
+                # raises the same error as vector access.
+                abs_name = prom_name2abs_name(self.model, name, 'input')
+                return meta[abs_name]
+
+        raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
+
     def _get_units(self, name):
         """
         Get the units for a variable name.
@@ -491,23 +611,7 @@ class Problem(object):
         str
             Unit string.
         """
-        meta = self.model._var_allprocs_abs2meta
-        if name in meta:
-            return meta[name]['units']
-
-        proms = self.model._var_allprocs_prom2abs_list
-        if self._setup_status >= 1:
-
-            if name in proms['output']:
-                abs_name = prom_name2abs_name(self.model, name, 'output')
-                return meta[abs_name]['units']
-            elif name in proms['input']:
-                # This triggers a check for unconnected non-unique inputs, and
-                # raises the same error as vector access.
-                abs_name = prom_name2abs_name(self.model, name, 'input')
-                return meta[abs_name]['units']
-
-        raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
+        return self._get_var_meta(name)['units']
 
     def __setitem__(self, name, value):
         """
@@ -812,59 +916,58 @@ class Problem(object):
         case_name : str
             Name used to identify this Problem case.
         """
-        if not self._rec_mgr._recorders:
-            return
+        record_iteration(self, self, case_name)
+        # if not self._rec_mgr._recorders:
+        #     return
 
-        # Get the data to record (collective calls that get across all ranks)
-        opts = self.recording_options
-        filt = self._filtered_vars_to_record
+        # # Get the data to record (collective calls that get across all ranks)
+        # opts = self.recording_options
+        # filt = self._filtered_vars_to_record
 
-        model = self.model
-        driver = self.driver
+        # model = self.model
+        # driver = self.driver
 
-        if opts['record_desvars']:
-            des_vars = driver.get_design_var_values()
-        else:
-            des_vars = {}
+        # if opts['record_desvars']:
+        #     des_vars = driver.get_design_var_values()
+        # else:
+        #     des_vars = {}
 
-        if opts['record_objectives']:
-            obj_vars = driver.get_objective_values()
-        else:
-            obj_vars = {}
+        # if opts['record_objectives']:
+        #     obj_vars = driver.get_objective_values()
+        # else:
+        #     obj_vars = {}
 
-        if opts['record_constraints']:
-            con_vars = driver.get_constraint_values()
-        else:
-            con_vars = {}
+        # if opts['record_constraints']:
+        #     con_vars = driver.get_constraint_values()
+        # else:
+        #     con_vars = {}
 
-        des_vars = {name: des_vars[name] for name in filt['des']}
-        obj_vars = {name: obj_vars[name] for name in filt['obj']}
-        con_vars = {name: con_vars[name] for name in filt['con']}
+        # des_vars = {name: des_vars[name] for name in filt['des']}
+        # obj_vars = {name: obj_vars[name] for name in filt['obj']}
+        # con_vars = {name: con_vars[name] for name in filt['con']}
 
-        names = model._outputs._names
-        views = model._outputs._views
-        sys_vars = {name: views[name] for name in names if name in filt['sys']}
+        # names = model._outputs._names
+        # views = model._outputs._views
+        # sys_vars = {name: views[name] for name in filt['sys'] if name in names}
 
-        if MPI:
-            des_vars = driver._gather_vars(model, des_vars)
-            obj_vars = driver._gather_vars(model, obj_vars)
-            con_vars = driver._gather_vars(model, con_vars)
-            sys_vars = driver._gather_vars(model, sys_vars)
+        # if MPI:
+        #     des_vars = driver._gather_vars(model, des_vars)
+        #     obj_vars = driver._gather_vars(model, obj_vars)
+        #     con_vars = driver._gather_vars(model, con_vars)
+        #     sys_vars = driver._gather_vars(model, sys_vars)
 
-        outs = {}
-        if not MPI or model.comm.rank == 0:
-            outs.update(des_vars)
-            outs.update(obj_vars)
-            outs.update(con_vars)
-            outs.update(sys_vars)
+        # outs = {}
+        # if not MPI or model.comm.rank == 0:
+        #     outs.update(des_vars)
+        #     outs.update(obj_vars)
+        #     outs.update(con_vars)
+        #     outs.update(sys_vars)
 
-        data = {
-            'out': outs,
-        }
+        # data = {
+        #     'out': outs,
+        # }
 
-        metadata = create_local_meta(case_name)
-
-        self._rec_mgr.record_iteration(self, data, metadata)
+        # self._rec_mgr.record_iteration(self, data, create_local_meta(case_name))
 
     def setup(self, vector_class=None, check=False, logger=None, mode='auto',
               force_alloc_complex=False, distributed_vector_class=PETScVector,

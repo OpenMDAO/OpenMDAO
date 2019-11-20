@@ -318,6 +318,9 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
+
+        import wingdbstub
+
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
@@ -552,6 +555,7 @@ class ProbRemoteTests(unittest.TestCase):
         par = top.add_subsystem('par', om.ParallelGroup())
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+
         p.setup()
 
         # Conclude setup but don't run model.
@@ -566,22 +570,14 @@ class ProbRemoteTests(unittest.TestCase):
         p.run_model()
 
         # test that getitem from Problem on a distrib var raises an exception
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C2.invec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C2.invec' is not supported.")
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C2.outvec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C2.outvec' is not supported.")
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C1.invec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C1.invec' is not supported.")
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C1.outvec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C1.outvec' is not supported.")
+        ans = p.get_val('par.C2.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([6, 3,3], dtype=float))
+        ans = p.get_val('par.C2.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([12, 6, 6], dtype=float))
+        ans = p.get_val('par.C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
+        ans = p.get_val('par.C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4, 2, 2], dtype=float))
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")

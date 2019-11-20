@@ -488,27 +488,17 @@ class Solver(object):
         metadata = create_local_meta(self.SOLVER)
 
         # Get the data
-        data = {}
-
-        if self.recording_options['record_abs_error']:
-            data['abs'] = kwargs.get('abs')
-        else:
-            data['abs'] = None
-
-        if self.recording_options['record_rel_error']:
-            data['rel'] = kwargs.get('rel')
-        else:
-            data['rel'] = None
+        data = {
+            'abs': kwargs.get('abs') if self.recording_options['record_abs_error'] else None,
+            'rel': kwargs.get('rel') if self.recording_options['record_rel_error'] else None
+        }
 
         system = self._system
-        if isinstance(self, NonlinearSolver):
-            outputs = system._outputs
-            inputs = system._inputs
-            residuals = system._residuals
-        else:  # it's a LinearSolver
-            outputs = system._vectors['output']['linear']
-            inputs = system._vectors['input']['linear']
-            residuals = system._vectors['residual']['linear']
+        typ = 'nonlinear' if isinstance(self, NonlinearSolver) else 'linear'
+
+        outputs = system._vectors['output'][typ]
+        inputs = system._vectors['input'][typ]
+        residuals = system._vectors['residual'][typ]
 
         if self.recording_options['record_outputs']:
             data['o'] = {}

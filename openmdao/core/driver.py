@@ -128,8 +128,6 @@ class Driver(object):
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
-        self.recording_options.declare('record_responses', types=bool, default=False,
-                                       desc='Set to True to record responses at the driver level')
         self.recording_options.declare('record_objectives', types=bool, default=True,
                                        desc='Set to True to record objectives at the driver level')
         self.recording_options.declare('record_constraints', types=bool, default=True,
@@ -285,8 +283,12 @@ class Driver(object):
             # to bcast to others later
             owning_ranks = model._owning_rank
             sizes = model._var_sizes['nonlinear']['output']
+            abs2meta = model._var_allprocs_abs2meta
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
-                owner = owning_ranks[vname]
+                if abs2meta[vname]['distributed']:
+                    owner = None
+                else:
+                    owner = owning_ranks[vname]
                 if vname in dv_set:
                     dv_dict[vname] = (owner, sizes[owner, i])
                 if vname in con_set:
@@ -335,98 +337,51 @@ class Driver(object):
         """
         problem = self._problem
         model = problem.model
-
-        if MPI:
-            # TODO: Eventually, we think we can get rid of this next check.
-            #       But to be safe, we are leaving it in there.
-            if not model.is_active():
-                raise RuntimeError("RecordingManager.startup should never be called when "
-                                   "running in parallel on an inactive System")
-            rrank = problem.comm.rank
-            rowned = model._owning_rank
+        rrank = problem.comm.rank
 
         incl = recording_options['includes']
         excl = recording_options['excludes']
 
         # includes and excludes for outputs are specified using promoted names
         # NOTE: only local var names are in abs2prom, all will be gathered later
-        abs2prom = model._var_abs2prom['output']
+        abs2prom = model._var_allprocs_abs2prom['output']
 
-        # design variables, objectives and constraints are always in the options
-        mydesvars = myobjectives = myconstraints = set()
-
-        all_desvars = {n for n in self._designvars
-                       if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
-        all_objectives = {n for n in self._objs
-                          if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
-        all_constraints = {n for n in self._cons
-                           if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
-
+        allvars = []
+        skip = set()
         if recording_options['record_desvars']:
-            if MPI:
-                mydesvars = {n for n in all_desvars if rrank == rowned[n]}
-            else:
-                mydesvars = all_desvars
-
+            allvars.extend(self._designvars)
+        else:
+            skip.update(self._designvars)
         if recording_options['record_objectives']:
-            if MPI:
-                myobjectives = {n for n in all_objectives if rrank == rowned[n]}
-            else:
-                myobjectives = all_objectives
-
+            allvars.extend(self._objs)
+        else:
+            skip.update(self._objs)
         if recording_options['record_constraints']:
-            if MPI:
-                myconstraints = {n for n in all_constraints if rrank == rowned[n]}
-            else:
-                myconstraints = all_constraints
+            allvars.extend(self._cons)
+        else:
+            skip.update(self._cons)
 
-        filtered_vars_to_record = {
-            'des': mydesvars,
-            'obj': myobjectives,
-            'con': myconstraints
+        vars2record = {
+            'out': [n for n in allvars
+                    if n in abs2prom and check_path(abs2prom[n], incl, excl, True)]
         }
-
-        # responses (if in options)
-        if 'record_responses' in recording_options:
-            myresponses = set()
-
-            if recording_options['record_responses']:
-                myresponses = {n for n in self._responses
-                               if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
-                if MPI:
-                    myresponses = {n for n in myresponses if rrank == rowned[n]}
-
-            filtered_vars_to_record['res'] = myresponses
 
         # inputs (if in options)
         if 'record_inputs' in recording_options:
-
             if recording_options['record_inputs']:
-                myinputs = {n for n in model._inputs if check_path(n, incl, excl)}
-
-                if MPI:
-                    myinputs = {n for n in myinputs if rrank == rowned[n]}
+                vars2record['in'] = [n for n in model._var_allprocs_abs_names['input']
+                                     if check_path(n, incl, excl)]
             else:
-                myinputs = set()
-
-            filtered_vars_to_record['in'] = myinputs
-
-        # system outputs
-        myoutputs = set()
+                vars2record['in'] = []
 
         if incl:
-            myoutputs = {n for n in model._outputs
-                         if n in abs2prom and check_path(abs2prom[n], incl, excl)}
+            vars2record['out'].extend(n for n in model._var_allprocs_abs_names['output']
+                                      if n in abs2prom and check_path(abs2prom[n], incl, excl)
+                                      and n not in skip)
+            # remove dups and make sure order is the same on all procs
+            vars2record['out'] = sorted(set(vars2record['out']))
 
-            if MPI:
-                myoutputs = {n for n in myoutputs if rrank == rowned[n]}
-
-            # de-duplicate
-            myoutputs = myoutputs.difference(all_desvars, all_objectives, all_constraints)
-
-        filtered_vars_to_record['sys'] = myoutputs
-
-        return filtered_vars_to_record
+        return vars2record
 
     def _setup_recording(self):
         """
@@ -441,7 +396,8 @@ class Driver(object):
             for sub in self._problem.model.system_iter(recurse=True, include_self=True):
                 self._rec_mgr.record_metadata(sub)
 
-    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, ignore_indices=False):
+    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, ignore_indices=False,
+                     rank=None):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -462,6 +418,8 @@ class Driver(object):
             add_constraint were called on the model. Default is True.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
+        rank : int or None
+            If not None, gather value to this rank only.
 
         Returns
         -------
@@ -475,17 +433,24 @@ class Driver(object):
 
         if name in remote_vois:
             owner, size = remote_vois[name]
-            if owner == comm.rank:
-                if indices is None or ignore_indices:
-                    val = vec[name].copy()
-                else:
-                    val = vec[name][indices]
+            # if var is distributed or only gathering to one rank
+            if owner is None or rank is not None:
+                val = self._problem.get_val(name, get_remote=True, rank=rank)
+                if indices is not None:
+                    val = val[indices]
             else:
-                if not (indices is None or ignore_indices):
-                    size = len(indices)
-                val = np.empty(size)
+                if owner == comm.rank:
+                    if indices is None or ignore_indices:
+                        val = vec[name].copy()
+                    else:
+                        val = vec[name][indices]
+                else:
+                    if not (indices is None or ignore_indices):
+                        size = len(indices)
+                    val = np.empty(size)
 
-            comm.Bcast(val, root=owner)
+                comm.Bcast(val, root=owner)
+
         else:
             if name in self._designvars_discrete:
                 val = model._discrete_outputs[name]
@@ -497,12 +462,9 @@ class Driver(object):
                       "discrete variables when used as a design variable. "
                 if np.isscalar(val) and not isinstance(val, int):
                     msg += "A value of type '{}' was specified.".format(val.__class__.__name__)
-                    valid = False
+                    raise ValueError(msg)
                 elif isinstance(val, np.ndarray) and not np.issubdtype(val[0], int):
                     msg += "An array of type '{}' was specified.".format(val[0].__class__.__name__)
-                    valid = False
-
-                if valid is False:
                     raise ValueError(msg)
 
             elif indices is None or ignore_indices:
@@ -522,7 +484,8 @@ class Driver(object):
 
         return val
 
-    def get_design_var_values(self, filter=None, driver_scaling=True, ignore_indices=False):
+    def get_design_var_values(self, filter=None, driver_scaling=True, ignore_indices=False,
+                              get_remote=True):
         """
         Return the design variable values.
 
@@ -538,6 +501,8 @@ class Driver(object):
             add_constraint were called on the model. Default is True.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
+        get_remote : bool
+            If True, retrieve remote values as well.
 
         Returns
         -------
@@ -550,7 +515,12 @@ class Driver(object):
             # use all the designvars
             dvs = self._designvars
 
-        return {n: self._get_voi_val(n, self._designvars[n], self._remote_dvs,
+        if get_remote:
+            remote_dvs = self._remote_dvs
+        else:
+            remote_dvs = ()
+
+        return {n: self._get_voi_val(n, self._designvars[n], remote_dvs,
                                      driver_scaling=driver_scaling,
                                      ignore_indices=ignore_indices) for n in dvs}
 
@@ -614,7 +584,8 @@ class Driver(object):
 
         return {n: self._get_voi_val(n, self._responses[n], self._remote_objs) for n in resps}
 
-    def get_objective_values(self, driver_scaling=True, filter=None, ignore_indices=False):
+    def get_objective_values(self, driver_scaling=True, filter=None, ignore_indices=False,
+                             get_remote=True):
         """
         Return objective values.
 
@@ -628,6 +599,8 @@ class Driver(object):
             Set of objective names used by recorders.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
+        get_remote : bool
+            If True, retrieve remote values as well.
 
         Returns
         -------
@@ -639,13 +612,18 @@ class Driver(object):
         else:
             objs = self._objs
 
-        return {n: self._get_voi_val(n, self._objs[n], self._remote_objs,
+        if get_remote:
+            remote_objs = self._remote_objs
+        else:
+            remote_objs = ()
+
+        return {n: self._get_voi_val(n, self._objs[n], remote_objs,
                                      driver_scaling=driver_scaling,
                                      ignore_indices=ignore_indices)
                 for n in objs}
 
     def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True, filter=None,
-                              ignore_indices=False):
+                              ignore_indices=False, get_remote=True):
         """
         Return constraint values.
 
@@ -665,6 +643,8 @@ class Driver(object):
             Set of constraint names used by recorders.
         ignore_indices : bool
             Set to True if the full array is desired, not just those indicated by indices.
+        get_remote : bool
+            If True, retrieve remote values as well.
 
         Returns
         -------
@@ -675,6 +655,11 @@ class Driver(object):
             cons = filter
         else:
             cons = self._cons
+
+        if get_remote:
+            remote_cons = self._remote_cons
+        else:
+            remote_cons = ()
 
         con_dict = {}
         for name in cons:
@@ -692,7 +677,7 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
-            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
+            con_dict[name] = self._get_voi_val(name, meta, remote_cons,
                                                driver_scaling=driver_scaling,
                                                ignore_indices=ignore_indices)
 
@@ -847,81 +832,75 @@ class Driver(object):
         """
         Record an iteration of the current Driver.
         """
-        if not self._rec_mgr._recorders:
-            return
+        record_iteration(self, self._problem, self._get_name())
 
-        # Get the data to record (collective calls that get across all ranks)
-        opts = self.recording_options
-        filt = self._filtered_vars_to_record
+        # if not self._rec_mgr._recorders:
+        #     return
 
-        if opts['record_desvars']:
-            des_vars = self.get_design_var_values(driver_scaling=False, ignore_indices=True)
-        else:
-            des_vars = {}
+        # # Get the data to record (collective calls that get across all ranks)
+        # opts = self.recording_options
+        # filt = self._filtered_vars_to_record
 
-        if opts['record_objectives']:
-            obj_vars = self.get_objective_values(driver_scaling=False, ignore_indices=True)
-        else:
-            obj_vars = {}
+        # prob = self._problem
+        # model = self._problem.model
+        # rank = model.comm.rank
+        # nrank = model.comm.size
+        # owns = model._owning_rank
+        # views = model._outputs._views
+        # meta = model._var_allprocs_abs2meta
 
-        if opts['record_constraints']:
-            con_vars = self.get_constraint_values(driver_scaling=False, ignore_indices=True)
-        else:
-            con_vars = {}
+        # parallel = False
+        # if nrank > 1:
+        #     for r in self._rec_mgr._recorders:
+        #         if r._parallel:
+        #             parallel = True
+        #             break
 
-        if opts['record_responses']:
-            # res_vars = self.get_response_values()  # not really working yet
-            simple_warning("option 'record_responses' not supported yet.")
+        # outs = {}
+        # if filt['out']:
+        #     if nrank == 1:
+        #         outs = {n: views[n] for n in filt['out']}
+        #     elif parallel:
+        #         sizes = model._var_sizes['nonlinear']['output']
+        #         abs2idx = model._var_allprocs_abs2idx['nonlinear']
+        #         outs = {n: views[n] for n in filt['out'] if sizes[n][abs2idx[n]] > 0}
+        #     else:
+        #         for name in filt['out']:
+        #             if owns[name] == 0 and not meta[name]['distributed']:
+        #                 if rank == 0:
+        #                     outs[name] = views[name]
+        #             else:
+        #                 outs[name] = prob.get_val(name, get_remote=True, rank=0)
 
-        res_vars = {}
+        # ins = {}
+        # if 'in' in filt and filt['in']:
+        #     views = model._inputs._views
+        #     names = model._inputs._names
+        #     if nrank == 1:
+        #         ins = {n: views[n] for n in filt['in'] if n in names}
+        #     elif parallel:
+        #         sizes = model._var_sizes['nonlinear']['input']
+        #         abs2idx = model._var_allprocs_abs2idx['nonlinear']
+        #         ins = {n: views[n] for n in filt['in'] if sizes[n][abs2idx[n]] > 0}
+        #     else:
+        #         for name in filt['in']:
+        #             if name not in names:
+        #                 continue
+        #             if owns[name] == 0 and not meta[name]['distributed']:
+        #                 if rank == 0:
+        #                     ins[name] = views[name]
+        #             else:
+        #                 ins[name] = prob.get_val(name, get_remote=True, rank=0)
 
-        des_vars = {name: des_vars[name] for name in filt['des']}
-        obj_vars = {name: obj_vars[name] for name in filt['obj']}
-        con_vars = {name: con_vars[name] for name in filt['con']}
-        # res_vars = {name: res_vars[name] for name in filt['res']}
+        # data = {
+        #     'out': outs,
+        #     'in': ins
+        # }
 
-        model = self._problem.model
+        # if case_name is None:
+        #     case_name = self._get_name()
 
-        views = model._outputs._views
-        sys_vars = {name: views[name] for name in model._outputs._names if name in filt['sys']}
-
-        # unflatten variables
-        meta = model._var_allprocs_abs2meta
-        _unflatten(des_vars, meta)
-        _unflatten(obj_vars, meta)
-        _unflatten(con_vars, meta)
-        # _unflatten(res_vars)
-
-        if self.recording_options['record_inputs']:
-            views = model._inputs._views
-            in_vars = {name: views[name] for name in model._inputs._names if name in filt['in']}
-        else:
-            in_vars = {}
-
-        if MPI:
-            des_vars = self._gather_vars(model, des_vars)
-            res_vars = self._gather_vars(model, res_vars)
-            obj_vars = self._gather_vars(model, obj_vars)
-            con_vars = self._gather_vars(model, con_vars)
-            sys_vars = self._gather_vars(model, sys_vars)
-            in_vars = self._gather_vars(model, in_vars)
-
-        outs = {}
-        if not MPI or model.comm.rank == 0:
-            outs.update(des_vars)
-            outs.update(res_vars)
-            outs.update(obj_vars)
-            outs.update(con_vars)
-            outs.update(sys_vars)
-
-        data = {
-            'out': outs,
-            'in': in_vars
-        }
-
-        metadata = create_local_meta(self._get_name())
-
-        self._rec_mgr.record_iteration(self, data, metadata)
+        # self._rec_mgr.record_iteration(self, data, create_local_meta(case_name))
 
     def _gather_vars(self, root, local_vars):
         """
@@ -936,7 +915,7 @@ class Driver(object):
 
         Returns
         -------
-        dct : dict
+        dict
             variable names and values.
         """
         # if trace:
@@ -1219,6 +1198,82 @@ class RecordingDebugging(Recording):
         super(RecordingDebugging, self).__exit__()
 
 
-def _unflatten(vardict, meta):
-    for name, val in iteritems(vardict):
-        val.shape = meta[name]['shape']
+def record_iteration(requester, prob, case_name):
+    """
+    Record an iteration of the current Problem or Driver.
+
+    Parameters
+    ----------
+    requester : Problem or Driver
+        The recording requester.
+    prob : Problem
+        The Problem.
+    case_name : str
+        The name of this case.
+    """
+    if not requester._rec_mgr._recorders:
+        return
+
+    # Get the data to record (collective calls that get across all ranks)
+    opts = requester.recording_options
+    filt = requester._filtered_vars_to_record
+
+    model = prob.model
+    rank = model.comm.rank
+    nrank = model.comm.size
+    owns = model._owning_rank
+    views = model._outputs._views
+    meta = model._var_allprocs_abs2meta
+
+    parallel = False
+    if nrank > 1:
+        for r in requester._rec_mgr._recorders:
+            if r._parallel:
+                parallel = True
+                break
+
+    outs = {}
+    if filt['out']:
+        if nrank == 1:
+            outs = {n: views[n] for n in filt['out']}
+        elif parallel:
+            sizes = model._var_sizes['nonlinear']['output']
+            abs2idx = model._var_allprocs_abs2idx['nonlinear']
+            outs = {n: views[n] for n in filt['out'] if sizes[rank, abs2idx[n]] > 0}
+        else:
+            for name in filt['out']:
+                if owns[name] == 0 and not meta[name]['distributed']:
+                    if rank == 0:
+                        outs[name] = views[name]
+                else:
+                    outs[name] = prob.get_val(name, get_remote=True, rank=0)
+
+    ins = {}
+    if 'in' in filt and filt['in']:
+        views = model._inputs._views
+        names = model._inputs._names
+        if nrank == 1:
+            ins = {n: views[n] for n in filt['in'] if n in names}
+        elif parallel:
+            sizes = model._var_sizes['nonlinear']['input']
+            abs2idx = model._var_allprocs_abs2idx['nonlinear']
+            ins = {n: views[n] for n in filt['in'] if sizes[n][abs2idx[n]] > 0}
+        else:
+            for name in filt['in']:
+                if name not in names:
+                    continue
+                if owns[name] == 0 and not meta[name]['distributed']:
+                    if rank == 0:
+                        ins[name] = views[name]
+                else:
+                    ins[name] = prob.get_val(name, get_remote=True, rank=0)
+
+    data = {
+        'out': outs,
+        'in': ins
+    }
+
+    import pprint
+    print(model.comm.rank)
+    pprint.pprint(data)
+    requester._rec_mgr.record_iteration(requester, data, create_local_meta(case_name))

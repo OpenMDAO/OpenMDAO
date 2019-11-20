@@ -121,7 +121,7 @@ def prom_name2abs_name(system, prom_name, type_):
         return None
 
 
-def name2abs_name(system, name, names, type_):
+def name2abs_name(system, name):
     """
     Map the given promoted or relative name to the absolute name.
 
@@ -133,23 +133,24 @@ def name2abs_name(system, name, names, type_):
         System to which name is relative.
     name : str
         Promoted or relative variable name in the owning system's namespace.
-    names : dict or list of str
-        List of valid names.
-    type_ : str
-        Either 'input' or 'output'.
 
     Returns
     -------
     str or None
         Absolute variable name if unique abs_name found or None otherwise.
     """
-    abs_name1 = prom_name2abs_name(system, name, type_)
-    if abs_name1 in names:
-        return abs_name1
+    if name in system._var_allprocs_abs2meta:
+        return name
 
-    abs_name2 = rel_name2abs_name(system, name)
-    if abs_name2 in names:
-        return abs_name2
+    if name in system._var_allprocs_prom2abs_list['output']:
+        abs_name = prom_name2abs_name(system, name, 'output')
+    else:
+        abs_name = prom_name2abs_name(system, name, 'input')
+
+    if abs_name is None:
+        abs_name = rel_name2abs_name(system, name)
+
+    return abs_name
 
 
 def prom_key2abs_key(system, prom_key):

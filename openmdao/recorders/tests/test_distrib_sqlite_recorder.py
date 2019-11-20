@@ -7,7 +7,7 @@ from tempfile import mkdtemp
 
 import numpy as np
 
-from openmdao.utils.general_utils import set_pyoptsparse_opt
+from openmdao.utils.general_utils import set_pyoptsparse_opt, env_truthy
 from openmdao.utils.mpi import MPI
 
 from openmdao.api import ExecComp, ExplicitComponent, Problem, \
@@ -144,10 +144,9 @@ class DistributedRecorderTest(unittest.TestCase):
         prob.model.add_subsystem('plus', DistributedAdder(size), promotes=['x', 'y'])
         prob.model.add_subsystem('summer', Summer(size), promotes=['y', 'sum'])
         prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
-        prob.driver.recording_options['includes'] = []
+        prob.driver.recording_options['includes'] = ['y']
         prob.driver.add_recorder(self.recorder)
 
         prob.model.add_design_var('x')
@@ -155,23 +154,29 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.setup()
 
+        if env_truthy('USE_WING'):
+            import wingdbstub
+
         prob['x'] = np.ones(size)
 
         t0, t1 = run_driver(prob)
         prob.cleanup()
 
+        coordinate = [0, 'Driver', (0,)]
+
+        expected_desvars = {
+            "des_vars.x": prob['des_vars.x'],
+        }
+
+        expected_objectives = {
+            "summer.sum": prob['summer.sum'],
+        }
+
+        expected_outputs = expected_desvars.copy()
+        expected_outputs['plus.y'] = prob.get_val('plus.y', get_remote=True)
+        print('y', len(expected_outputs['plus.y']))
+
         if prob.comm.rank == 0:
-            coordinate = [0, 'Driver', (0,)]
-
-            expected_desvars = {
-                "des_vars.x": prob['des_vars.x'],
-            }
-
-            expected_objectives = {
-                "summer.sum": prob['summer.sum'],
-            }
-
-            expected_outputs = expected_desvars
             expected_outputs.update(expected_objectives)
 
             expected_data = ((coordinate, (t0, t1), expected_outputs, None),)
@@ -190,11 +195,13 @@ class DistributedRecorderTest(unittest.TestCase):
         model.add_subsystem('Obj', ExecComp('obj=y1+y2'))
         model.add_objective('Obj.obj')
 
+        if env_truthy('USE_WING'):
+            import wingdbstub
+
         # Configure driver to record VOIs on both procs
         driver = ScipyOptimizeDriver(disp=False)
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['par.G1.y', 'par.G2.y']
@@ -241,8 +248,8 @@ class DistributedRecorderTest(unittest.TestCase):
         if prob.comm.rank == 0:
             # Only on rank 0 do we have all the values. The all_vars variable is a list of
             # dicts from all ranks 0,1,... In this case, just ranks 0 and 1
-            dct = all_vars[-1]
-            for d in all_vars[:-1]:
+            dct = all_vars[0]
+            for d in all_vars[1:]:
                 dct.update(d)
 
             expected_includes = {

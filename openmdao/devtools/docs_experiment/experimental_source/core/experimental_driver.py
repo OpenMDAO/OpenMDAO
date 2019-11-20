@@ -95,8 +95,6 @@ class ExperimentalDriver(object):
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the \
                                        driver level')
-        self.recording_options.declare('record_responses', types=bool, default=False,
-                                       desc='Set to True to record responses at the driver level')
         self.recording_options.declare('record_objectives', types=bool, default=True,
                                        desc='Set to True to record objectives at the \
                                        driver level')
@@ -240,7 +238,6 @@ class ExperimentalDriver(object):
         rec_desvars = self.recording_options['record_desvars']
         rec_objectives = self.recording_options['record_objectives']
         rec_constraints = self.recording_options['record_constraints']
-        rec_responses = self.recording_options['record_responses']
 
         # includes and excludes for outputs are specified using promoted names
         # NOTE: only local var names are in abs2prom, all will be gathered later
@@ -260,10 +257,6 @@ class ExperimentalDriver(object):
 
         if rec_constraints:
             myconstraints = all_constraints
-
-        if rec_responses:
-            myresponses = {n for n in self._responses
-                           if n in abs2prom and check_path(abs2prom[n], incl, excl, True)}
 
         # get the includes that were requested for this Driver recording
         if incl:
@@ -638,12 +631,6 @@ class ExperimentalDriver(object):
         else:
             desvars = {}
 
-        if self.recording_options['record_responses']:
-            # responses = self.get_response_values() # not really working yet
-            responses = {}
-        else:
-            responses = {}
-
         if self.recording_options['record_objectives']:
             objectives = self.get_objective_values()
         else:
@@ -656,8 +643,6 @@ class ExperimentalDriver(object):
 
         desvars = {name: desvars[name]
                    for name in self._filtered_vars_to_record['des']}
-        # responses not working yet
-        # responses = {name: responses[name] for name in self._filtered_vars_to_record['res']}
         objectives = {name: objectives[name]
                       for name in self._filtered_vars_to_record['obj']}
         constraints = {name: constraints[name]

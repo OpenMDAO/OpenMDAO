@@ -1553,35 +1553,36 @@ class System(object):
         """
         meta = self._var_allprocs_abs2meta
 
-        # now set global sizes and shapes into metadata for distributed outputs
-        sizes = self._var_sizes['nonlinear']['output']
-        for idx, abs_name in enumerate(self._var_allprocs_abs_names['output']):
-            mymeta = meta[abs_name]
-            local_shape = mymeta['shape']
-            if not mymeta['distributed']:
-                # not distributed, just use local shape and size
-                mymeta['global_size'] = mymeta['size']
-                mymeta['global_shape'] = local_shape
-                continue
+        for typ in ('input', 'output'):
+            # now set global sizes and shapes into metadata for distributed variables
+            sizes = self._var_sizes['nonlinear'][typ]
+            for idx, abs_name in enumerate(self._var_allprocs_abs_names[typ]):
+                mymeta = meta[abs_name]
+                local_shape = mymeta['shape']
+                if not mymeta['distributed']:
+                    # not distributed, just use local shape and size
+                    mymeta['global_size'] = mymeta['size']
+                    mymeta['global_shape'] = local_shape
+                    continue
 
-            global_size = np.sum(sizes[:, idx])
-            mymeta['global_size'] = global_size
+                global_size = np.sum(sizes[:, idx])
+                mymeta['global_size'] = global_size
 
-            # assume that all but the first dimension of the shape of a
-            # distributed output is the same on all procs
-            high_dims = local_shape[1:]
-            if high_dims:
-                high_size = np.prod(high_dims)
-                dim1 = global_size // high_size
-                if global_size % high_size != 0:
-                    raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
-                                       "with local shape %s" % (self.msginfo, abs_name,
-                                                                global_size, local_shape))
-                global_shape = tuple([dim1] + list(high_dims))
-            else:
-                high_size = 1
-                global_shape = (global_size,)
-            mymeta['global_shape'] = global_shape
+                # assume that all but the first dimension of the shape of a
+                # distributed variable is the same on all procs
+                high_dims = local_shape[1:]
+                if high_dims:
+                    high_size = np.prod(high_dims)
+                    dim1 = global_size // high_size
+                    if global_size % high_size != 0:
+                        raise RuntimeError("%s: Global size of output '%s' (%s) does not agree "
+                                           "with local shape %s" % (self.msginfo, abs_name,
+                                                                    global_size, local_shape))
+                    global_shape = tuple([dim1] + list(high_dims))
+                else:
+                    high_size = 1
+                    global_shape = (global_size,)
+                mymeta['global_shape'] = global_shape
 
     def _setup_global_connections(self, recurse=True, conns=None):
         """

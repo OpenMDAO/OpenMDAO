@@ -69,7 +69,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -90,7 +89,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -112,7 +110,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = False
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -134,7 +131,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = False
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = []
@@ -159,7 +155,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
@@ -206,7 +201,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = False
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = []
@@ -235,7 +229,6 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.options['print_results'] = False
         driver.opt_settings['ACC'] = 1e-9
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
@@ -282,7 +275,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
@@ -616,7 +608,6 @@ class TestSqliteRecorder(unittest.TestCase):
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['*']
@@ -662,7 +653,6 @@ class TestSqliteRecorder(unittest.TestCase):
         # Set up recorder after intitial setup.
         driver.add_recorder(self.recorder)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['*']
@@ -1123,7 +1113,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         # Driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.add_recorder(self.recorder)
@@ -1433,7 +1422,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_inputs'] = False
@@ -1479,7 +1467,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -1494,7 +1481,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -1688,7 +1674,6 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
 
@@ -1753,7 +1738,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         driver.options['tol'] = 1e-9
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
 

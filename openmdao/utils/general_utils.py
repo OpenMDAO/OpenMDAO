@@ -869,3 +869,20 @@ def var_name_match_includes_excludes(name, prom_name, includes, excludes):
         return not match
 
     return True
+
+
+def env_truthy(env_var):
+    """
+    Return True if the given environment variable is 'truthy'.
+
+    Parameters
+    ----------
+    env_var : str
+        The name of the environment variable.
+
+    Returns
+    -------
+    bool
+        True if the specified environment variable is 'truthy'.
+    """
+    return os.environ.get(env_var, '0').lower() not in ('0', 'false', 'no')
