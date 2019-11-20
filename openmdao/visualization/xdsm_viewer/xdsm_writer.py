@@ -1486,7 +1486,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # The second condition is for backwards compatibility with older data.
         if equations and comp.get('expressions', None) is not None:
             # One of the $ signs has to be removed to correctly parse it
-            if isinstance(writer, XDSMWriter):
+            if isinstance(x, XDSMWriter):
                 def parse(expr):
                     for (ch, rep) in (('$$', '$'), (r'[', ''), (r']', '')):
                         expr = expr.replace(ch, rep)
