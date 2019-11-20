@@ -1915,6 +1915,8 @@ def _multiline_block(*texts, **kwargs):
     """
     Make a string for a multiline block.
 
+    A string is returned, if there would be only 1 line.
+
     texts : iterable(str)
         Text strings, each will go to new line
     **kwargs : dict
@@ -1923,7 +1925,7 @@ def _multiline_block(*texts, **kwargs):
 
     Returns
     -------
-       list(str)
+       list(str) or str
     """
     end_char = kwargs.pop('end_char', '')
     out_txts = [_textify(t + end_char) for t in texts]
