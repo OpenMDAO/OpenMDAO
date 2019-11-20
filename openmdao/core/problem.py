@@ -917,57 +917,6 @@ class Problem(object):
             Name used to identify this Problem case.
         """
         record_iteration(self, self, case_name)
-        # if not self._rec_mgr._recorders:
-        #     return
-
-        # # Get the data to record (collective calls that get across all ranks)
-        # opts = self.recording_options
-        # filt = self._filtered_vars_to_record
-
-        # model = self.model
-        # driver = self.driver
-
-        # if opts['record_desvars']:
-        #     des_vars = driver.get_design_var_values()
-        # else:
-        #     des_vars = {}
-
-        # if opts['record_objectives']:
-        #     obj_vars = driver.get_objective_values()
-        # else:
-        #     obj_vars = {}
-
-        # if opts['record_constraints']:
-        #     con_vars = driver.get_constraint_values()
-        # else:
-        #     con_vars = {}
-
-        # des_vars = {name: des_vars[name] for name in filt['des']}
-        # obj_vars = {name: obj_vars[name] for name in filt['obj']}
-        # con_vars = {name: con_vars[name] for name in filt['con']}
-
-        # names = model._outputs._names
-        # views = model._outputs._views
-        # sys_vars = {name: views[name] for name in filt['sys'] if name in names}
-
-        # if MPI:
-        #     des_vars = driver._gather_vars(model, des_vars)
-        #     obj_vars = driver._gather_vars(model, obj_vars)
-        #     con_vars = driver._gather_vars(model, con_vars)
-        #     sys_vars = driver._gather_vars(model, sys_vars)
-
-        # outs = {}
-        # if not MPI or model.comm.rank == 0:
-        #     outs.update(des_vars)
-        #     outs.update(obj_vars)
-        #     outs.update(con_vars)
-        #     outs.update(sys_vars)
-
-        # data = {
-        #     'out': outs,
-        # }
-
-        # self._rec_mgr.record_iteration(self, data, create_local_meta(case_name))
 
     def setup(self, vector_class=None, check=False, logger=None, mode='auto',
               force_alloc_complex=False, distributed_vector_class=PETScVector,

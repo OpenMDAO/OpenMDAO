@@ -834,74 +834,6 @@ class Driver(object):
         """
         record_iteration(self, self._problem, self._get_name())
 
-        # if not self._rec_mgr._recorders:
-        #     return
-
-        # # Get the data to record (collective calls that get across all ranks)
-        # opts = self.recording_options
-        # filt = self._filtered_vars_to_record
-
-        # prob = self._problem
-        # model = self._problem.model
-        # rank = model.comm.rank
-        # nrank = model.comm.size
-        # owns = model._owning_rank
-        # views = model._outputs._views
-        # meta = model._var_allprocs_abs2meta
-
-        # parallel = False
-        # if nrank > 1:
-        #     for r in self._rec_mgr._recorders:
-        #         if r._parallel:
-        #             parallel = True
-        #             break
-
-        # outs = {}
-        # if filt['out']:
-        #     if nrank == 1:
-        #         outs = {n: views[n] for n in filt['out']}
-        #     elif parallel:
-        #         sizes = model._var_sizes['nonlinear']['output']
-        #         abs2idx = model._var_allprocs_abs2idx['nonlinear']
-        #         outs = {n: views[n] for n in filt['out'] if sizes[n][abs2idx[n]] > 0}
-        #     else:
-        #         for name in filt['out']:
-        #             if owns[name] == 0 and not meta[name]['distributed']:
-        #                 if rank == 0:
-        #                     outs[name] = views[name]
-        #             else:
-        #                 outs[name] = prob.get_val(name, get_remote=True, rank=0)
-
-        # ins = {}
-        # if 'in' in filt and filt['in']:
-        #     views = model._inputs._views
-        #     names = model._inputs._names
-        #     if nrank == 1:
-        #         ins = {n: views[n] for n in filt['in'] if n in names}
-        #     elif parallel:
-        #         sizes = model._var_sizes['nonlinear']['input']
-        #         abs2idx = model._var_allprocs_abs2idx['nonlinear']
-        #         ins = {n: views[n] for n in filt['in'] if sizes[n][abs2idx[n]] > 0}
-        #     else:
-        #         for name in filt['in']:
-        #             if name not in names:
-        #                 continue
-        #             if owns[name] == 0 and not meta[name]['distributed']:
-        #                 if rank == 0:
-        #                     ins[name] = views[name]
-        #             else:
-        #                 ins[name] = prob.get_val(name, get_remote=True, rank=0)
-
-        # data = {
-        #     'out': outs,
-        #     'in': ins
-        # }
-
-        # if case_name is None:
-        #     case_name = self._get_name()
-
-        # self._rec_mgr.record_iteration(self, data, create_local_meta(case_name))
-
     def _gather_vars(self, root, local_vars):
         """
         Gather and return only variables listed in `local_vars` from the `root` System.
@@ -1273,7 +1205,4 @@ def record_iteration(requester, prob, case_name):
         'in': ins
     }
 
-    import pprint
-    print(model.comm.rank)
-    pprint.pprint(data)
     requester._rec_mgr.record_iteration(requester, data, create_local_meta(case_name))
