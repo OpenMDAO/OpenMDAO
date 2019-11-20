@@ -33,7 +33,266 @@ class TestViewModelData(unittest.TestCase):
         self.sqlite_html_filename = os.path.join(self.dir, "sqlite_n2.html")
         self.problem_html_filename = os.path.join(self.dir, "problem_n2.html")
 
-        self.expected_tree = json.loads('{"name": "root", "type": "root", "class": "SellarStateConnection", "component_type": null, "subsystem_type": "group", "is_parallel": false, "linear_solver": "LN: SCIPY", "nonlinear_solver": "NL: Newton", "solve_subsystems": false, "children": [{"name": "px", "type": "subsystem", "class": "IndepVarComp", "subsystem_type": "component", "is_parallel": false, "component_type": "indep", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "x", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "pz", "type": "subsystem", "class": "IndepVarComp", "subsystem_type": "component", "is_parallel": false, "component_type": "indep", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "z", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "sub", "type": "subsystem", "class": "Group", "component_type": null, "subsystem_type": "group", "is_parallel": false, "linear_solver": "LN: SCIPY", "nonlinear_solver": "NL: RUNONCE", "children": [{"name": "state_eq_group", "type": "subsystem", "class": "Group", "component_type": null, "subsystem_type": "group", "is_parallel": false, "linear_solver": "LN: SCIPY", "nonlinear_solver": "NL: RUNONCE", "children": [{"name": "state_eq", "type": "subsystem", "class": "StateConnection", "subsystem_type": "component", "is_parallel": false, "component_type": "implicit", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "y2_actual", "type": "param", "dtype": "ndarray"}, {"name": "y2_command", "type": "unknown", "implicit": true, "dtype": "ndarray"}]}]}, {"name": "d1", "type": "subsystem", "class": "SellarDis1withDerivatives", "subsystem_type": "component", "is_parallel": false, "component_type": "explicit", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "z", "type": "param", "dtype": "ndarray"}, {"name": "x", "type": "param", "dtype": "ndarray"}, {"name": "y2", "type": "param", "dtype": "ndarray"}, {"name": "y1", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "d2", "type": "subsystem", "class": "SellarDis2withDerivatives", "subsystem_type": "component", "is_parallel": false, "component_type": "explicit", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "z", "type": "param", "dtype": "ndarray"}, {"name": "y1", "type": "param", "dtype": "ndarray"}, {"name": "y2", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}]}, {"name": "obj_cmp", "type": "subsystem", "class": "ExecComp", "subsystem_type": "component", "is_parallel": false, "component_type": "exec", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "x", "type": "param", "dtype": "ndarray"}, {"name": "y1", "type": "param", "dtype": "ndarray"}, {"name": "y2", "type": "param", "dtype": "ndarray"}, {"name": "z", "type": "param", "dtype": "ndarray"}, {"name": "obj", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "con_cmp1", "type": "subsystem", "class": "ExecComp", "subsystem_type": "component", "is_parallel": false, "component_type": "exec", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "y1", "type": "param", "dtype": "ndarray"}, {"name": "con1", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}, {"name": "con_cmp2", "type": "subsystem", "class": "ExecComp", "subsystem_type": "component", "is_parallel": false, "component_type": "exec", "linear_solver": "", "nonlinear_solver": "", "children": [{"name": "y2", "type": "param", "dtype": "ndarray"}, {"name": "con2", "type": "unknown", "implicit": false, "dtype": "ndarray"}]}]}')
+        self.expected_tree = json.loads("""
+            {
+               "name":"root",
+               "type":"root",
+               "class":"SellarStateConnection",
+               "expressions":null,
+               "component_type":null,
+               "subsystem_type":"group",
+               "is_parallel":false,
+               "linear_solver":"LN: SCIPY",
+               "nonlinear_solver":"NL: Newton",
+               "solve_subsystems":false,
+               "children":[
+                  {
+                     "name":"px",
+                     "type":"subsystem",
+                     "class":"IndepVarComp",
+                     "expressions":null,
+                     "subsystem_type":"component",
+                     "is_parallel":false,
+                     "component_type":"indep",
+                     "linear_solver":"",
+                     "nonlinear_solver":"",
+                     "children":[
+                        {
+                           "name":"x",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        }
+                     ]
+                  },
+                  {
+                     "name":"pz",
+                     "type":"subsystem",
+                     "class":"IndepVarComp",
+                     "expressions":null,
+                     "subsystem_type":"component",
+                     "is_parallel":false,
+                     "component_type":"indep",
+                     "linear_solver":"",
+                     "nonlinear_solver":"",
+                     "children":[
+                        {
+                           "name":"z",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        }
+                     ]
+                  },
+                  {
+                     "name":"sub",
+                     "type":"subsystem",
+                     "class":"Group",
+                     "expressions":null,
+                     "component_type":null,
+                     "subsystem_type":"group",
+                     "is_parallel":false,
+                     "linear_solver":"LN: SCIPY",
+                     "nonlinear_solver":"NL: RUNONCE",
+                     "children":[
+                        {
+                           "name":"state_eq_group",
+                           "type":"subsystem",
+                           "class":"Group",
+                           "expressions":null,
+                           "component_type":null,
+                           "subsystem_type":"group",
+                           "is_parallel":false,
+                           "linear_solver":"LN: SCIPY",
+                           "nonlinear_solver":"NL: RUNONCE",
+                           "children":[
+                              {
+                                 "name":"state_eq",
+                                 "type":"subsystem",
+                                 "class":"StateConnection",
+                                 "expressions":null,
+                                 "subsystem_type":"component",
+                                 "is_parallel":false,
+                                 "component_type":"implicit",
+                                 "linear_solver":"",
+                                 "nonlinear_solver":"",
+                                 "children":[
+                                    {
+                                       "name":"y2_actual",
+                                       "type":"param",
+                                       "dtype":"ndarray"
+                                    },
+                                    {
+                                       "name":"y2_command",
+                                       "type":"unknown",
+                                       "implicit":true,
+                                       "dtype":"ndarray"
+                                    }
+                                 ]
+                              }
+                           ]
+                        },
+                        {
+                           "name":"d1",
+                           "type":"subsystem",
+                           "class":"SellarDis1withDerivatives",
+                           "expressions":null,
+                           "subsystem_type":"component",
+                           "is_parallel":false,
+                           "component_type":"explicit",
+                           "linear_solver":"",
+                           "nonlinear_solver":"",
+                           "children":[
+                              {
+                                 "name":"z",
+                                 "type":"param",
+                                 "dtype":"ndarray"
+                              },
+                              {
+                                 "name":"x",
+                                 "type":"param",
+                                 "dtype":"ndarray"
+                              },
+                              {
+                                 "name":"y2",
+                                 "type":"param",
+                                 "dtype":"ndarray"
+                              },
+                              {
+                                 "name":"y1",
+                                 "type":"unknown",
+                                 "implicit":false,
+                                 "dtype":"ndarray"
+                              }
+                           ]
+                        },
+                        {
+                           "name":"d2",
+                           "type":"subsystem",
+                           "class":"SellarDis2withDerivatives",
+                           "expressions":null,
+                           "subsystem_type":"component",
+                           "is_parallel":false,
+                           "component_type":"explicit",
+                           "linear_solver":"",
+                           "nonlinear_solver":"",
+                           "children":[
+                              {
+                                 "name":"z",
+                                 "type":"param",
+                                 "dtype":"ndarray"
+                              },
+                              {
+                                 "name":"y1",
+                                 "type":"param",
+                                 "dtype":"ndarray"
+                              },
+                              {
+                                 "name":"y2",
+                                 "type":"unknown",
+                                 "implicit":false,
+                                 "dtype":"ndarray"
+                              }
+                           ]
+                        }
+                     ]
+                  },
+                  {
+                     "name":"obj_cmp",
+                     "type":"subsystem",
+                     "class":"ExecComp",
+                     "expressions":[
+                        "obj = x**2 + z[1] + y1 + exp(-y2)"
+                     ],
+                     "subsystem_type":"component",
+                     "is_parallel":false,
+                     "component_type":"exec",
+                     "linear_solver":"",
+                     "nonlinear_solver":"",
+                     "children":[
+                        {
+                           "name":"x",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        {
+                           "name":"y1",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        {
+                           "name":"y2",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        {
+                           "name":"z",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        {
+                           "name":"obj",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        }
+                     ]
+                  },
+                  {
+                     "name":"con_cmp1",
+                     "type":"subsystem",
+                     "class":"ExecComp",
+                     "expressions":[
+                        "con1 = 3.16 - y1"
+                     ],
+                     "subsystem_type":"component",
+                     "is_parallel":false,
+                     "component_type":"exec",
+                     "linear_solver":"",
+                     "nonlinear_solver":"",
+                     "children":[
+                        {
+                           "name":"y1",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        {
+                           "name":"con1",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        }
+                     ]
+                  },
+                  {
+                     "name":"con_cmp2",
+                     "type":"subsystem",
+                     "class":"ExecComp",
+                     "expressions":[
+                        "con2 = y2 - 24.0"
+                     ],
+                     "subsystem_type":"component",
+                     "is_parallel":false,
+                     "component_type":"exec",
+                     "linear_solver":"",
+                     "nonlinear_solver":"",
+                     "children":[
+                        {
+                           "name":"y2",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        {
+                           "name":"con2",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        }
+                     ]
+                  }
+               ]
+            }
+        """)
         self.expected_pathnames = json.loads('["sub.d1", "sub.d2", "sub.state_eq_group.state_eq"]')
         self.expected_conns = json.loads("""
             [
@@ -107,7 +366,7 @@ class TestViewModelData(unittest.TestCase):
                                 expected_design_vars_names,
                                 expected_responses_names
                                 ):
-
+        print(model_viewer_data['tree'])
         self.assertDictEqual(model_viewer_data['tree'], expected_tree)
 
         # check expected system pathnames
@@ -118,7 +377,7 @@ class TestViewModelData(unittest.TestCase):
         connections = sorted(model_viewer_data['connections_list'],
                              key=lambda x: (x['tgt'], x['src']))
         expected_conns = sorted(expected_conns,
-                             key=lambda x: (x['tgt'], x['src']))
+                                key=lambda x: (x['tgt'], x['src']))
         self.assertEqual(len(connections), len(expected_conns))
         for conn in connections:
             if 'cycle_arrows' in conn and conn['cycle_arrows']:
@@ -140,8 +399,10 @@ class TestViewModelData(unittest.TestCase):
 
         self.assertEqual(model_viewer_data['driver']['name'], expected_driver_name)
 
-        self.assertListEqual( sorted(dv for dv in model_viewer_data['design_vars']), sorted(expected_design_vars_names))
-        self.assertListEqual( sorted(resp for resp in model_viewer_data['responses']), sorted(expected_responses_names))
+        self.assertListEqual(sorted(dv for dv in model_viewer_data['design_vars']),
+                             sorted(expected_design_vars_names))
+        self.assertListEqual(sorted(resp for resp in model_viewer_data['responses']),
+                             sorted(expected_responses_names))
 
     def test_model_viewer_has_correct_data_from_problem(self):
         """
@@ -197,7 +458,6 @@ class TestViewModelData(unittest.TestCase):
             self.expected_responses_names
         )
 
-
     def test_model_viewer_has_correct_data_from_optimization_problem(self):
         """
         Verify that the correct model structure data exists when stored as compared
@@ -231,37 +491,126 @@ class TestViewModelData(unittest.TestCase):
         model_viewer_data = _get_viewer_data(prob)
 
         expected_tree_betz = json.loads("""
-                    {"name": "root", "type": "root", "class": "Group", "component_type": null,
-                     "subsystem_type": "group", "is_parallel": false, "linear_solver": "LN: RUNONCE",
-                     "nonlinear_solver": "NL: RUNONCE", "children": [
-                        {"name": "indeps", "type": "subsystem", "class": "IndepVarComp",
-                         "subsystem_type": "component", "is_parallel": false, "component_type": "indep",
-                         "linear_solver": "", "nonlinear_solver": "", "children": [
-                            {"name": "a", "type": "unknown", "implicit": false, "dtype": "ndarray"},
-                            {"name": "Area", "type": "unknown", "implicit": false, "dtype": "ndarray"},
-                            {"name": "rho", "type": "unknown", "implicit": false, "dtype": "ndarray"},
-                            {"name": "Vu", "type": "unknown", "implicit": false, "dtype": "ndarray"}]},
-                        {"name": "a_disk", "type": "subsystem", "class": "ActuatorDisc",
-                         "subsystem_type": "component", "is_parallel": false, "component_type": "explicit",
-                         "linear_solver": "", "nonlinear_solver": "",
-                         "children": [{"name": "a", "type": "param", "dtype": "ndarray"},
-                                      {"name": "Area", "type": "param", "dtype": "ndarray"},
-                                      {"name": "rho", "type": "param", "dtype": "ndarray"},
-                                      {"name": "Vu", "type": "param", "dtype": "ndarray"},
-                                      {"name": "Vr", "type": "unknown", "implicit": false,
-                                       "dtype": "ndarray"},
-                                      {"name": "Vd", "type": "unknown", "implicit": false,
-                                       "dtype": "ndarray"},
-                                      {"name": "Ct", "type": "unknown", "implicit": false,
-                                       "dtype": "ndarray"},
-                                      {"name": "thrust", "type": "unknown", "implicit": false,
-                                       "dtype": "ndarray"},
-                                      {"name": "Cp", "type": "unknown", "implicit": false,
-                                       "dtype": "ndarray"},
-                                      {"name": "power", "type": "unknown", "implicit": false,
-                                       "dtype": "ndarray"}]}]}
-                    """
-                                             )
+            { 
+               "name":"root",
+               "type":"root",
+               "class":"Group",
+               "expressions":null,
+               "component_type":null,
+               "subsystem_type":"group",
+               "is_parallel":false,
+               "linear_solver":"LN: RUNONCE",
+               "nonlinear_solver":"NL: RUNONCE",
+               "children":[ 
+                  { 
+                     "name":"indeps",
+                     "type":"subsystem",
+                     "class":"IndepVarComp",
+                     "expressions":null,
+                     "subsystem_type":"component",
+                     "is_parallel":false,
+                     "component_type":"indep",
+                     "linear_solver":"",
+                     "nonlinear_solver":"",
+                     "children":[ 
+                        { 
+                           "name":"a",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"Area",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"rho",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"Vu",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        }
+                     ]
+                  },
+                  { 
+                     "name":"a_disk",
+                     "type":"subsystem",
+                     "class":"ActuatorDisc",
+                     "expressions":null,
+                     "subsystem_type":"component",
+                     "is_parallel":false,
+                     "component_type":"explicit",
+                     "linear_solver":"",
+                     "nonlinear_solver":"",
+                     "children":[ 
+                        { 
+                           "name":"a",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"Area",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"rho",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"Vu",
+                           "type":"param",
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"Vr",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"Vd",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"Ct",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"thrust",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"Cp",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        },
+                        { 
+                           "name":"power",
+                           "type":"unknown",
+                           "implicit":false,
+                           "dtype":"ndarray"
+                        }
+                     ]
+                  }
+               ]
+            }
+        """)
         expected_pathnames_betz = json.loads('[]')
         expected_conns_betz = json.loads("""
                 [{"src": "indeps.a", "tgt": "a_disk.a"}, {"src": "indeps.Area", "tgt": "a_disk.Area"},
@@ -346,13 +695,13 @@ class TestViewModelData(unittest.TestCase):
         p.model = SellarStateConnection()
         p.setup()
         n2(p, outfile=self.problem_html_filename, show_browser=DEBUG,
-                   title="Sellar State Connection")
+           title="Sellar State Connection")
 
         # Check that the html file has been created and has something in it.
         self.assertTrue(os.path.isfile(self.problem_html_filename),
                         (self.problem_html_filename + " is not a valid file."))
-        self.assertTrue( 'OpenMDAO Model Hierarchy and N2 diagram: Sellar State Connection' \
-                         in open(self.problem_html_filename).read() )
+        self.assertTrue('OpenMDAO Model Hierarchy and N2 diagram: Sellar State Connection'
+                        in open(self.problem_html_filename).read())
 
 
 if __name__ == "__main__":

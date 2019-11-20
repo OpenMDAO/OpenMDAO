@@ -42,7 +42,7 @@ _OUT_FORMATS = {'tex': 'pyxdsm', 'pdf': 'pyxdsm', 'json': 'xdsmjs', 'html': 'xds
 # Round parenthesis is replaced with subscript syntax, e.g. x(1) --> x_{1}
 _CHAR_SUBS = {
     'pyxdsm': (('_', '\_'), ('(', '_{'), (')', '}'),),
-    'xdsmjs': ((' ', '-'), (':', '')),
+    'xdsmjs': ((' ', '-'), (':', ''), ('_', '\_'),),
 }
 # Variable formatting settings
 _SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't', 'consistency': 'c'}
@@ -1475,11 +1475,12 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                   'The "equations" options was turned off.' \
                   'To enable this option install the package with "pip install pytexit".'
             simple_warning(msg)
+
     for comp in comps:  # Driver is 1, so starting from 2
         # The second condition is for backwards compatibility with older data.
-        if equations and comp.get('expression', None) is not None:
+        if equations and comp.get('expressions', None) is not None:
             # One of the $ signs has to be removed to correctly parse it
-            label = ', '.join(map(lambda ex: py2tex(ex).replace("$$", "$"), comp['expression']))
+            label = ', '.join(map(lambda ex: py2tex(ex).replace("$$", "$"), comp['expressions']))
         else:
             label = comp['name']
             label = _replace_chars(label, substitutes=subs)
@@ -1904,7 +1905,7 @@ def _multiline_block(*texts, **kwargs):
     """
     end_char = kwargs.pop('end_char', '')
     out_txts = [_textify(t + end_char) for t in texts]
-    if len(out_txts) < 2:
+    if len(out_txts) == 1:
         out_txts = out_txts[0]
     return out_txts
 

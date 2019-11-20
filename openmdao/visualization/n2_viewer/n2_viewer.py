@@ -70,7 +70,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
     tree_dict['name'] = system.name
     tree_dict['type'] = 'subsystem'
     tree_dict['class'] = system.__class__.__name__
-    tree_dict['expression'] = None
+    tree_dict['expressions'] = None
 
     if not isinstance(system, Group):
         tree_dict['subsystem_type'] = 'component'
@@ -79,7 +79,7 @@ def _get_tree_dict(system, component_execution_orders, component_execution_index
             tree_dict['component_type'] = 'implicit'
         elif isinstance(system, ExecComp):
             tree_dict['component_type'] = 'exec'
-            tree_dict['expression'] = system._exprs
+            tree_dict['expressions'] = system._exprs
         elif isinstance(system, (MetaModelStructuredComp, MetaModelUnStructuredComp)):
             tree_dict['component_type'] = 'metamodel'
         elif isinstance(system, IndepVarComp):
