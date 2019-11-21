@@ -4,6 +4,8 @@ from __future__ import division, print_function
 
 import unittest
 import itertools
+
+# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
 try:
     from collections.abc import Iterable
 except ImportError:
