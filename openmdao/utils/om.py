@@ -281,6 +281,8 @@ def _meta_model_parser(parser):
                         help='Number of points to create contour grid')
     parser.add_argument('-p', '--port_number', default=5007, action='store', dest='port_number',
                         help='Port number to open viewer')
+    parser.add_argument('--no_browser', action='store_false', dest='browser',
+                        help='Bokeh server will start server without browser')
 
 
 def _meta_model_cmd(options):
@@ -310,11 +312,12 @@ def _meta_model_cmd(options):
         pathname = options.pathname
         port_number = options.port_number
         resolution = options.resolution
+        browser = options.browser
 
         if pathname:
             comp = prob.model._get_subsystem(pathname)
             if comp and isinstance(comp, mm_types):
-                view_metamodel(comp, resolution, port_number)
+                view_metamodel(comp, resolution, port_number, browser)
                 exit()
         else:
             comp = None
@@ -330,7 +333,7 @@ def _meta_model_cmd(options):
 
         elif mm_count == 1 and not pathname:
             comp = metamodels[mm_names[0]]
-            view_metamodel(comp, resolution, port_number)
+            view_metamodel(comp, resolution, port_number, browser)
 
         else:
             try_str = "Try one of the following: {}.".format(mm_names)
