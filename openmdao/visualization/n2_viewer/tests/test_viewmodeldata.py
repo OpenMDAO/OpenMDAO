@@ -366,7 +366,6 @@ class TestViewModelData(unittest.TestCase):
                                 expected_design_vars_names,
                                 expected_responses_names
                                 ):
-        print(model_viewer_data['tree'])
         self.assertDictEqual(model_viewer_data['tree'], expected_tree)
 
         # check expected system pathnames
