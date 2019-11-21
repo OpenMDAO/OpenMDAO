@@ -195,27 +195,24 @@ class N2Matrix {
             this._addCell(srcIdx, srcIdx, newDiagCell);
             this._findUnseenCycleSources(newDiagCell);
 
-            let targets = diagNode.targetParentSet;
 
-            for (let tgt of targets) {
+            for (let tgt of diagNode.targetParentSet) {
                 let tgtIdx = indexFor(this.diagNodes, tgt);
                 if (tgtIdx != -1) {
                     let newCell = new N2MatrixCell(srcIdx, tgtIdx, diagNode, tgt, model);
                     this._addCell(srcIdx, tgtIdx, newCell);
                 }
-                else {
-                    if (tgt.isParamOrUnknown()) {
-                        newDiagCell.addOffScreenConn(diagNode, tgt)
-                    }
+                else if ((tgt.isParamOrUnknown() && !tgt.parentComponent.isMinimized) ||
+                    tgt.isMinimized) {
+                    newDiagCell.addOffScreenConn(diagNode, tgt);
                 }
             }
 
             // Check for missing source part of connections
-            let sources = diagNode.sourceParentSet;
-            for (let src of sources) {
-                let srcIdx = indexFor(this.diagNodes, src)
-                if (srcIdx == -1) {
-                    if (src.isParamOrUnknown()) {
+            for (let src of diagNode.sourceParentSet) {
+                if (indexFor(this.diagNodes, src) == -1) {
+                    if ((src.isParamOrUnknown() && !src.parentComponent.isMinimized) ||
+                        src.isMinimized) {
                         newDiagCell.addOffScreenConn(src, diagNode);
                     }
                 }
@@ -236,6 +233,7 @@ class N2Matrix {
             }
         }
     }
+
 
     /**
      * Determine the size of the boxes that will border the parameters of each component.
