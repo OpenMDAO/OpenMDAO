@@ -1519,6 +1519,9 @@ class TestProblem(unittest.TestCase):
                 self.options.declare('where_to_add', values=('setup', 'configure'))
 
             def setup(self):
+                print('-----------------------')
+                print(self.msginfo, 'setup')
+                print('-----------------------')
                 comp1 = self.add_subsystem('comp1', om.IndepVarComp())
                 comp2 = self.add_subsystem('comp2', om.IndepVarComp())
 
@@ -1528,6 +1531,7 @@ class TestProblem(unittest.TestCase):
                 self.add_subsystem('comp3', om.ExecComp('y=a+b'))
 
                 if self.options['where_to_add'] == 'setup':
+                    print('=== adding outputs ===')
                     comp1.add_output('a', val=2.0)
                     comp2.add_output('b', val=3.0)
 
@@ -1535,7 +1539,11 @@ class TestProblem(unittest.TestCase):
                     self.connect('comp2.b', 'comp3.b')
 
             def configure(self):
+                print('-----------------------')
+                print(self.msginfo, 'configure')
+                print('-----------------------')
                 if self.options['where_to_add'] == 'configure':
+                    print('=== adding outputs ===')
                     self.comp1.add_output('a', val=2.0)
                     self.comp2.add_output('b', val=3.0)
 
@@ -1561,6 +1569,7 @@ class TestProblem(unittest.TestCase):
                 ('comp2.foo', {'value': [1.]}),
                 ('comp3.y',   {'value': [5.]})
             ], "Outputs don't match when added in %s." % where)
+            print('=================================================================')
 
     def test_feature_system_configure(self):
         import openmdao.api as om

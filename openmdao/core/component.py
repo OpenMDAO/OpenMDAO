@@ -216,32 +216,14 @@ class Component(System):
         self._responses.update(self._static_responses)
         self.setup()
 
-    def _post_configure(self):
-        """
-        Do any remaining setup that had to wait until after final user configuration.
-        """
         # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
         # Unfortunately we have to do this check after system setup has been called because that's
         # when declare_partials generally happens, so we raise an exception here instead of just
         # resetting the value of num_par_fd (because the comm has already been split and possibly
         # used by the system setup).
         if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
-                                                                self._approx_schemes):
+                                                                     self._approx_schemes):
             raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
-
-        # check here if declare_coloring was called during setup but declare_partials
-        # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
-        # have something to color.
-        if self._coloring_info['coloring'] is not None:
-            for key, meta in iteritems(self._declared_partials):
-                if 'method' in meta and meta['method'] is not None:
-                    break
-            else:
-                method = self._coloring_info['method']
-                simple_warning("%s: declare_coloring or use_fixed_coloring was called but no approx"
-                               " partials were declared.  Declaring all partials as approximated "
-                               "using default metadata and method='%s'." % (self.msginfo, method))
-                self.declare_partials('*', '*', method=method)
 
         self._static_mode = True
 
@@ -256,6 +238,26 @@ class Component(System):
                 self._vector_class = self._local_vector_class
         else:
             self._vector_class = self._local_vector_class
+
+    def _post_configure(self, mode, recurse):
+        """
+        Do any remaining setup that had to wait until after final user configuration.
+        """
+        # check here if declare_coloring was called during setup but declare_partials
+        # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
+        # have something to color.
+        if self._coloring_info['coloring'] is not None:
+            for key, meta in iteritems(self._declared_partials):
+                if 'method' in meta and meta['method'] is not None:
+                    break
+            else:
+                method = self._coloring_info['method']
+                simple_warning("%s: declare_coloring or use_fixed_coloring was called but no approx"
+                               " partials were declared.  Declaring all partials as approximated "
+                               "using default metadata and method='%s'." % (self.msginfo, method))
+                self.declare_partials('*', '*', method=method)
+
+        super(Component, self)._post_configure(mode, recurse)
 
     def _setup_var_data(self, recurse=True):
         """

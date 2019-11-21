@@ -577,12 +577,6 @@ class System(object):
         """
         pass
 
-    def _post_configure(self):
-        """
-        Do any remaining setup that had to wait until after final user configuration.
-        """
-        pass
-
     def _get_initial_global(self, initial):
         """
         Get initial values for _ext_num_vars, _ext_sizes.
@@ -840,11 +834,18 @@ class System(object):
             self._setup_procs(self.pathname, comm, mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
+        # User may create additional inputs & outputs in this phase, so we set static_mode to False.
+        self._static_mode = False
         self._configure()
+        self._static_mode = True
 
-        # Now do anything that had to wait until after final configuration (including new I/O)
-        self._post_configure()
+        # Recurse model from top to bottom for remaining setup.
+        self._post_configure(mode, recurse)
 
+    def _post_configure(self, mode, recurse):
+        """
+        Do any remaining setup that had to wait until after final user configuration.
+        """
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.

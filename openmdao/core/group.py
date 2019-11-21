@@ -358,10 +358,6 @@ class Group(System):
         # Call setup function for this group.
         self.setup()
 
-    def _post_configure(self):
-        """
-        Do any remaining setup that had to wait until after final user configuration.
-        """
         self._static_mode = True
 
         if MPI:
@@ -432,6 +428,15 @@ class Group(System):
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
 
         self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
+
+    def _post_configure(self, mode, recurse):
+        """
+        Do any remaining setup that had to wait until after final user configuration.
+        """
+        for subsys in self._subsystems_myproc:
+            subsys._post_configure(mode, recurse)
+
+        super(Group, self)._post_configure(mode, recurse)
 
     def _check_child_reconf(self, subsys=None):
         """

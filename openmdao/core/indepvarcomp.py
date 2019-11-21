@@ -93,10 +93,13 @@ class IndepVarComp(ExplicitComponent):
                 raise ValueError("IndepVarComp init: '%s' is not supported "
                                  "in IndepVarComp." % illegal)
 
-    def setup(self):
+    def _post_configure(self, mode, recurse):
         """
         Define the independent variables as output variables.
         """
+        self._static_mode = False
+
+        print(self.msginfo, '_post_configure()')
         for (name, val, kwargs) in self._indep + self._indep_external:
             super(IndepVarComp, self).add_output(name, val, **kwargs)
 
@@ -108,6 +111,8 @@ class IndepVarComp(ExplicitComponent):
                                "They must either be declared during "
                                "instantiation or by calling add_output or add_discrete_output "
                                "afterwards.".format(self.msginfo))
+
+        self._static_mode = True
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):
