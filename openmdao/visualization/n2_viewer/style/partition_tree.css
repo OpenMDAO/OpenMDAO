@@ -278,5 +278,6 @@ div.offgrid {
   font-size: 11px;
   padding: 5;
   background-color: #fff;
-  border: solid 1px #dfdfdf;   
+  border: solid 1px #dfdfdf;
+  position: absolute;
 }

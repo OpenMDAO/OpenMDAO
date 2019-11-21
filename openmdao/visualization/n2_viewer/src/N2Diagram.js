@@ -182,6 +182,7 @@ class N2Diagram {
             .attr('clip-path', 'url(#solverTreeClip');
 
         this.dom.n2BackgroundRect = this.dom.n2InnerGroup.append('rect')
+            .attr('id', 'backgroundRect')
             .attr('class', 'background');
 
         this.dom.n2Groups = {};

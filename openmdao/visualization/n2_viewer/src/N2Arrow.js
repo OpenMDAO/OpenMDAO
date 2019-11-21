@@ -19,6 +19,7 @@ class N2Arrow {
         this.width = attribs.width;
         this.arrowsGrp = n2Groups.arrows;
         this.dotsGrp = n2Groups.dots;
+        this.elementsGrp = n2Groups.elements;
         this.nodeSize = nodeSize;
         this.attribs = attribs;
     }
@@ -123,7 +124,8 @@ class N2OffGridArrow extends N2Arrow {
         this.label = {
             'text': attribs.label,
             'pts': {},
-            'ref': null
+            'ref': null,
+            'labels': {}
         }
 
         this.pts = {
@@ -142,7 +144,7 @@ class N2OffGridArrow extends N2Arrow {
     _computePts() {
         let offsetX = this.offsetAbsX;
         let offsetY = this.offsetAbsY;
-        let rect = this.arrowsGrp.node().getBoundingClientRect();
+        let rect = d3.select("#backgroundRect").node().getBoundingClientRect();
 
         switch (this.attribs.direction) {
             case 'up':
@@ -154,7 +156,7 @@ class N2OffGridArrow extends N2Arrow {
                     this.nodeSize.height * .5 + offsetY
 
                 this.label.pts.left = this.pts.start.x + rect.left + 8;
-                this.label.pts.top = this.pts.start.y + rect.bottom - 120;
+                this.label.pts.top = rect.bottom + 8;
                 this.label.ref = d3.select("div#top.offgrid");
 
                 break;
@@ -166,7 +168,7 @@ class N2OffGridArrow extends N2Arrow {
                     this.nodeSize.height * .5 - offsetY;
 
                 this.label.pts.left = this.pts.start.x + rect.left + 8;
-                this.label.pts.top = this.pts.start.y + rect.top + 130;
+                this.label.pts.top = rect.top - 8;
                 this.label.ref = d3.select("div#bottom.offgrid");
 
                 break;
@@ -201,6 +203,24 @@ class N2OffGridArrow extends N2Arrow {
     }
 
     draw() {
+        debugInfo('Adding offscreen ' + this.attribs.direction + 
+            ' arrow connected to ' + this.label.text);
+
+        let visValue = this.label.ref.style('visibility');
+        let firstEntry = (! visValue.match(/visible/));
+        let tipHTML = this.label.ref.node().innerHTML;
+
+        // Prevent duplicate listings
+        if (firstEntry) {
+            debugInfo('First entry for label to ' + this.label.text);
+            this.label.ref.labels = {};
+        }
+        else if (tipHTML.match(this.label.text)) {
+            debugInfo('Duplicate entry for label to ' + this.label.text);
+
+            return;
+        }
+
         this.path = this.arrowsGrp.insert('path')
             .attr('class', 'n2_hover_elements')
             .attr('stroke-dasharray', '5,5')
@@ -214,19 +234,17 @@ class N2OffGridArrow extends N2Arrow {
 
         // debugInfo(this.label)
 
-        if (this.label.ref.style('visibility') != 'visible') {
+        if (firstEntry) {
+            this.label.ref
+                .style('visibility', 'visible')
+                .node().innerHTML = this.label.text;
+
             for (let pos in this.label.pts) {
                 this.label.ref.style(pos, this.label.pts[pos] + 'px');
             }
-
-            this.label.ref
-                .style("visibility", "visible")
-                .node().innerHTML = this.label.text;
         }
         else {
-            let newText = this.label.ref.node().innerHTML;
-            newText += "<br>" + this.label.text;
-            this.label.ref.node().innerHTML = newText;
+            this.label.ref.node().innerHTML += '<br>' + this.label.text;
         }
     }
 }
