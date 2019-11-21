@@ -20,8 +20,7 @@ import scipy.sparse as sparse
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.group import Group
-from openmdao.core.group import System
+from openmdao.core.group import Group, System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.approximation_schemes.complex_step import ComplexStep
@@ -255,7 +254,7 @@ class Problem(object):
                                                                                       name,
                                                                                       abs_names))
 
-        raise KeyError("{}: Variable '{}' not found.".format(self.msginfo, name))
+        raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
 
     @property
     def msginfo(self):
@@ -307,15 +306,14 @@ class Problem(object):
         return abs_name in self.model._var_abs2meta
 
     def _get_cached_val(self, name):
-        proms = self.model._var_allprocs_prom2abs_list
-        meta = self.model._var_abs2meta
-
         # We have set and cached already
         if name in self._initial_condition_cache:
             return self._initial_condition_cache[name]
 
         # Vector not setup, so we need to pull values from saved metadata request.
         else:
+            proms = self.model._var_allprocs_prom2abs_list
+            meta = self.model._var_abs2meta
             if name in meta:
                 if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
                     src_name = self.model._conn_abs_in2out[name]
@@ -368,133 +366,9 @@ class Problem(object):
         float or ndarray or any python object
             the requested output/input variable.
         """
-        # Caching only needed if vectors aren't allocated yet.
-        proms = self.model._var_allprocs_prom2abs_list
-        meta = self.model._var_abs2meta
+        return self.get_val(name)
 
-        val = _undefined
-
-        if self._setup_status == 1:
-            val = self._get_cached_val(name)
-        else:
-            if name in proms['output']:
-                name = proms['output'][name][0]
-            elif name in proms['input']:
-                name = prom_name2abs_name(self.model, name, 'input')
-
-            if name in meta:   # local var
-                if name in self.model._outputs._views:
-                    val = self.model._outputs[name]
-                else:
-                    val = self.model._inputs[name]
-
-            elif name in self.model._discrete_outputs:
-                val = self.model._discrete_outputs[name]
-
-            elif name in self.model._discrete_inputs:
-                val = self.model._discrete_inputs[name]
-
-        abs_name = None
-        if self.model.comm.size > 1:
-            allprocs_meta = self.model._var_allprocs_abs2meta
-            # check for remote var
-            if name in allprocs_meta:
-                abs_name = name
-            elif name in proms['output']:
-                abs_name = proms['output'][name][0]
-            elif name in proms['input']:
-                abs_name = proms['input'][name][0]
-
-            if abs_name in self._remote_var_set and val is _undefined:
-                raise RuntimeError(
-                    "{}: Variable '{}' is not local to rank {}. You can retrieve values from "
-                    "other processes using "
-                    "`problem.get_val(<name>, get_remote=True)`.".format(self.msginfo, name,
-                                                                         self.comm.rank))
-
-        if val is _undefined:
-            raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
-
-        return val
-
-    def _abs_get_val(self, abs_name, get_remote=False, rank=None):
-        """
-        Return the value of the variable specified by the given absolute name.
-
-        Parameters
-        ----------
-        abs_name : str
-            The absolute name of the variable.
-        get_remote : bool
-            If True, return the value even if the variable is remote. NOTE: this requires a
-            collective MPI call so this function must be called in all procs in the Problem's
-            MPI communicator.
-        rank : int or None
-            If not None, specifies that the value is to be gathered to the given rank only.
-            Otherwise, if get_remote is specified, the value will be broadcast to all procs
-            in the MPI communicator.
-
-        Returns
-        -------
-        object
-            The value of the requested output/input variable.
-        """
-        model = self.model
-
-        try:
-            if get_remote:
-                meta = self.model._var_allprocs_abs2meta[abs_name]
-            else:
-                meta = self.model._var_abs2meta[abs_name]
-        except KeyError:
-            raise RuntimeError("{}: Variable '{}' was not found.".format(self.msginfo, abs_name))
-        distrib = meta['distributed']
-
-        typ = 'output'
-        if abs_name in model._outputs._views_flat:
-            val = model._outputs._views_flat[abs_name]
-        elif abs_name in model._inputs._views_flat:
-            val = model._inputs._views_flat[abs_name]
-            typ = 'input'
-        else:
-            val = None
-
-        if get_remote:
-            owner = self.model._owning_rank[abs_name]
-            loc_val = val if val is not None else np.zeros(0)
-            if rank is None:   # bcast
-                if distrib:
-                    idx = model._var_allprocs_abs2idx['nonlinear'][abs_name]
-                    sizes = model._var_sizes['nonlinear'][typ][:, idx]
-                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
-                    offsets[1:] = np.cumsum(sizes[:-1])
-                    val = np.zeros(np.sum(sizes))
-                    model.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
-                else:
-                    if owner != model.comm.rank:
-                        val = None
-                    new_val = model.comm.bcast(val, root=owner)
-                    val = new_val
-            else:   # gather
-                if distrib:
-                    idx = model._var_allprocs_abs2idx['nonlinear'][abs_name]
-                    sizes = model._var_sizes['nonlinear'][typ][:, idx]
-                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
-                    offsets[1:] = np.cumsum(sizes[:-1])
-                    val = np.zeros(np.sum(sizes))
-                    model.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
-                else:
-                    if rank != owner:
-                        vals = model.comm.gather(val, root=rank)
-                        if model.comm.rank == rank:
-                            val = vals[owner]
-
-        if val is not None:
-            val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
-
-        return val
-
-    def get_val(self, name, units=None, indices=None, get_remote=False, rank=None):
+    def get_val(self, name, units=None, indices=None, get_remote=False):
         """
         Get an output/input variable.
 
@@ -512,106 +386,33 @@ class Problem(object):
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
-        rank : int or None
-            If not None, only gather value to this rank.
 
         Returns
         -------
         object
             The value of the requested output/input variable.
         """
-        model = self.model
-        if get_remote or units is not None:
-            abs_name = name2abs_name(model, name)
-            if abs_name is None:
-                raise NameError("{}: Variable '{}' not found.".format(self.msginfo, name))
-            try:
-                distrib = model._var_allprocs_abs2meta[abs_name]['distributed']
-            except KeyError:
-                # var is disccrete
-                if abs_name in model._discrete_outputs:
-                    return model._discrete_outputs[abs_name]
-                else:
-                    return model._discrete_inputs[abs_name]
+        if self._setup_status == 1:
+            val = self._get_cached_val(name)
+            if units is not None:
+                val = self.model.convert2units(name, val, units)
+            if indices is not None:
+                val = val[indices]
+            return val
 
-            if self._setup_status == 1:
-                val = self._get_cached_val(name)
+        val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote)
+
+        if val is System._undefined:
+            if get_remote:
+                raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
             else:
-                val = self._abs_get_val(abs_name, get_remote, rank)
-        else:
-            val = self[name]
-            abs_name = None
-            distrib = False
-
-        if indices is not None and not distrib:
-            val = val[indices]
-
-        if units is not None:
-            meta = model._var_allprocs_abs2meta[abs_name]
-
-            base_units = meta['units']
-
-            if base_units is None:
-                msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
-                raise TypeError(msg.format(self.msginfo, name, units))
-
-            try:
-                scale, offset = get_conversion(base_units, units)
-            except TypeError:
-                msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
-                raise TypeError(msg.format(self.msginfo, name, base_units, units))
-
-            val = (val + offset) * scale
+                raise RuntimeError(
+                    "{}: Variable '{}' is not local to rank {}. You can retrieve values from "
+                    "other processes using "
+                    "`problem.get_val(<name>, get_remote=True)`.".format(self.msginfo, name,
+                                                                         self.comm.rank))
 
         return val
-
-    def _get_var_meta(self, name):
-        """
-        Get the metadata for a variable.
-
-        Parameters
-        ----------
-        name : str
-            Promoted or relative variable name in the root system's namespace.
-
-        Returns
-        -------
-        dict
-            The metadata dictionary for the named variable.
-        """
-        abs_name = name2abs_name(self.model, name)
-        meta = self.model._var_allprocs_abs2meta
-        if name in meta:
-            return meta[name]
-
-        proms = self.model._var_allprocs_prom2abs_list
-        if self._setup_status >= 1:
-            if name in proms['output']:
-                abs_name = prom_name2abs_name(self.model, name, 'output')
-                return meta[abs_name]
-            elif name in proms['input']:
-                # This triggers a check for unconnected non-unique inputs, and
-                # raises the same error as vector access.
-                abs_name = prom_name2abs_name(self.model, name, 'input')
-                return meta[abs_name]
-
-        raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
-
-    def _get_units(self, name):
-        """
-        Get the units for a variable name.
-
-        Parameters
-        ----------
-        name : str
-            Promoted or relative variable name in the root system's namespace.
-
-        Returns
-        -------
-        str
-            Unit string.
-        """
-        return self._get_var_meta(name)['units']
 
     def __setitem__(self, name, value):
         """
@@ -651,7 +452,7 @@ class Problem(object):
                     print("Variable '{}' is remote on rank {}.  "
                           "Local assignment ignored.".format(name, self.comm.rank))
                 else:
-                    raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
+                    raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
 
     def set_val(self, name, value, units=None, indices=None):
         """
@@ -671,7 +472,7 @@ class Problem(object):
             Indices or slice to set to specified value.
         """
         if units is not None:
-            base_units = self._get_units(name)
+            base_units = self.model._get_var_meta(name)['units']
 
             if base_units is None:
                 msg = "{}: Can't set variable '{}' with units 'None' to value with units '{}'."

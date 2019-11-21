@@ -113,27 +113,32 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg = 'Variable name "{}" not found.'
+        msg = '\'Group (<model>): Variable "{}" not found.\''
 
         # inputs
-        with assertRaisesRegex(self, KeyError, msg.format('x')):
+        with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
             p.final_setup()
+        self.assertEqual(str(ctx.exception), msg.format('x'))
         p._initial_condition_cache = {}
 
-        with assertRaisesRegex(self, KeyError, msg.format('x')):
+        with self.assertRaises(KeyError) as ctx:
             p['x']
+        self.assertEqual(str(ctx.exception), msg.format('x'))
 
         # outputs
-        with assertRaisesRegex(self, KeyError, msg.format('y')):
+        with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
             p.final_setup()
+        self.assertEqual(str(ctx.exception), msg.format('y'))
         p._initial_condition_cache = {}
 
-        with assertRaisesRegex(self, KeyError, msg.format('y')):
+        with self.assertRaises(KeyError) as ctx:
             p['y']
+        self.assertEqual(str(ctx.exception), msg.format('y'))
 
-        msg = 'Variable name "{}" not found.'
+
+        msg = '\'Variable name "{}" not found.\''
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
@@ -404,6 +409,23 @@ class TestGetSetVariables(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             self.assertEqual(jac['y', 'x'], 5.0)
         self.assertEqual(str(context.exception), msg2)
+
+
+class TestGetSetMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def _get_problem(self):
+        p = Problem()
+        indeps = p.model.add_subsystem('indeps', IndepVarComp())
+        indeps.add_output('x', np.ones(5))
+        indeps.add_discrete_output('x_desc', 'foo')
+        par = p.model.add_subsystem('par', ParallelGroup())
+
+        return p
+
+    def test_get_val(self):
+        pass
 
 
 if __name__ == '__main__':

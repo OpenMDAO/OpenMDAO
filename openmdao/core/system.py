@@ -33,7 +33,7 @@ from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
 from openmdao.utils.general_utils import make_set, var_name_match_includes_excludes, simple_warning
 from openmdao.utils.graph_utils import all_connected_nodes
-from openmdao.utils.name_maps import rel_name2abs_name
+from openmdao.utils.name_maps import rel_name2abs_name, name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     _STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS
 import openmdao.utils.coloring as coloring_mod
@@ -42,6 +42,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     simple_warning
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.utils.units import get_conversion
 
 # Use this as a special value to be able to tell if the caller set a value for the optional
 #   out_stream argument. We run into problems running testflo if we use a default of sys.stdout.
@@ -323,6 +324,8 @@ class System(object):
         of global ordering, the declared execution order, which is the same across all
         ranks, is used.
     """
+
+    _undefined = object()
 
     def __init__(self, num_par_fd=1, **kwargs):
         """
@@ -4058,6 +4061,251 @@ class System(object):
 
         return (self._nodup_out_ranges[key], self._nodup2local_out_inds[key],
                 self._local2owned_inds[key], self._noncontig_dis_inds[key])
+
+    def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None):
+        """
+        Return the value of the variable specified by the given absolute name.
+
+        Parameters
+        ----------
+        abs_name : str
+            The absolute name of the variable.
+        get_remote : bool
+            If True, return the value even if the variable is remote. NOTE: this requires a
+            collective MPI call so this function must be called in all procs in the Problem's
+            MPI communicator.
+        rank : int or None
+            If not None, specifies that the value is to be gathered to the given rank only.
+            Otherwise, if get_remote is specified, the value will be broadcast to all procs
+            in the MPI communicator.
+        vec_name : str
+            Name of the vector to use.
+        kind : str or None
+            Kind of variable ('input', 'output', or 'residual').  If None, returned value
+            will be either an input or output.
+
+        Returns
+        -------
+        object or None
+            The value of the requested output/input/resid variable.  None if variable is not found.
+        """
+        discrete = distrib = False
+        val = System._undefined
+        typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
+
+        try:
+            if get_remote:
+                meta = self._var_allprocs_abs2meta[abs_name]
+                distrib = meta['distributed']
+            else:
+                meta = self._var_abs2meta[abs_name]
+        except KeyError:
+            discrete = True
+            relname = abs_name[len(self.pathname) + 1:] if self.pathname else abs_name
+            if relname in self._discrete_outputs:
+                val = self._discrete_outputs[relname]
+            elif relname in self._discrete_inputs:
+                val = self._discrete_inputs[relname]
+            elif abs_name in self._var_allprocs_discrete['output']:
+                pass  # non-local discrete output
+            elif abs_name in self._var_allprocs_discrete['input']:
+                pass  # non-local discrete input
+            else:
+                return System._undefined
+
+        if kind is None:
+            kind = typ
+
+        if not discrete:
+            vec = self._vectors[kind][vec_name]
+            if abs_name in vec._views:
+                val = vec._views[abs_name]
+
+        if get_remote:
+            owner = self._owning_rank[abs_name]
+            loc_val = val if val is not System._undefined else np.zeros(0)
+            if rank is None:   # bcast
+                if distrib:
+                    idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
+                    sizes = self._var_sizes['nonlinear'][typ][:, idx]
+                    # TODO: could cache these offsets
+                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+                    offsets[1:] = np.cumsum(sizes[:-1])
+                    val = np.zeros(np.sum(sizes))
+                    self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
+                else:
+                    if owner != self.comm.rank:
+                        val = None
+                    # TODO: use Bcast if not discrete for speed
+                    new_val = self.comm.bcast(val, root=owner)
+                    val = new_val
+            else:   # retrieve to rank
+                if distrib:
+                    idx = self._var_allprocs_abs2idx['nonlinear'][abs_name]
+                    sizes = self._var_sizes['nonlinear'][typ][:, idx]
+                    # TODO: could cache these offsets
+                    offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+                    offsets[1:] = np.cumsum(sizes[:-1])
+                    val = np.zeros(np.sum(sizes))
+                    self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
+                else:
+                    if rank != owner:
+                        # TODO: use point to point to retrieve value
+                        vals = self.comm.gather(val, root=rank)
+                        if self.comm.rank == rank:
+                            val = vals[owner]
+
+        if val is not System._undefined and not discrete:
+            val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
+
+        return val
+
+    def _get_val(self, name, units=None, indices=None, get_remote=False, rank=None,
+                 vec_name='nonlinear', kind=None):
+        """
+        Get an output/input/residual variable.
+
+        Function is used if you want to specify display units.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+        units : str, optional
+            Units to convert to before return.
+        indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
+            Indices or slice to return.
+        get_remote : bool
+            If True, retrieve the value even if it is on a remote process.  Note that if the
+            variable is remote on ANY process, this function must be called on EVERY process
+            in the Problem's MPI communicator.
+        rank : int or None
+            If not None, only gather the value to this rank.
+        vec_name : str
+            Name of the vector to use.   Defaults to 'nonlinear'.
+        kind : str or None
+            Kind of variable ('input', 'output', or 'residual').  If None, returned value
+            will be either an input or output.
+
+        Returns
+        -------
+        object
+            The value of the requested output/input variable.
+        """
+        abs_name, typ = name2abs_name(self, name)
+        if abs_name is None:
+            raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
+
+        val = self._abs_get_val(abs_name, get_remote, rank, vec_name, kind)
+
+        # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
+        if indices is not None:
+            val = val[indices]
+
+        if units is not None:
+            meta = self._var_allprocs_abs2meta[abs_name]
+
+            base_units = meta['units']
+
+            if base_units is None:
+                msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
+                raise TypeError(msg.format(self.msginfo, name, units))
+
+            try:
+                scale, offset = get_conversion(base_units, units)
+            except TypeError:
+                msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
+                raise TypeError(msg.format(self.msginfo, name, base_units, units))
+
+            val = (val + offset) * scale
+
+        return val
+
+    def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name):
+        vdict = {}
+        owns = self._owning_rank
+        variables = filtered_vars.get(kind)
+        if variables:
+            views = self._vectors[kind][vec_name]._views
+            names = self._vectors[kind][vec_name]._names
+            if self.comm.size == 1:
+                vdict = {n: views[n] for n in variables if n in names}
+            elif parallel:
+                sizes = model._var_sizes[vec_name][kind]
+                abs2idx = model._var_allprocs_abs2idx[vec_name]
+                vdict = {n: views[n] for n in variables if sizes[n][abs2idx[n]] > 0}
+            else:
+                for name in variables:
+                    if name not in names:
+                        continue
+                    if owns[name] == 0 and not meta[name]['distributed']:
+                        # if using a serial recorder and rank 0 owns the variable,
+                        # use local value on rank 0 and do nothing on other ranks.
+                        if rank == 0:
+                            vdict[name] = views[name]
+                    else:
+                        vdict[name] = prob.get_val(name, get_remote=True, rank=0, vec_name=vec_name,
+                                                   kind=kind)
+
+        return vdict
+
+    def convert2units(self, name, val, units):
+        """
+        Convert the given value to the specified units.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        val : float or ndarray of float
+            The value of the variable.
+        units : str
+            The units to convert to.
+
+        Returns
+        -------
+        float or ndarray of float
+            The value converted to the specified units.
+        """
+        meta = self._get_var_meta(name)
+
+        base_units = meta['units']
+
+        if base_units is None:
+            msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
+            raise TypeError(msg.format(self.msginfo, name, units))
+
+        try:
+            scale, offset = get_conversion(base_units, units)
+        except TypeError:
+            msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
+            raise TypeError(msg.format(self.msginfo, name, base_units, units))
+
+        return (val + offset) * scale
+
+    def _get_var_meta(self, name):
+        """
+        Get the metadata for a variable.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the root system's namespace.
+
+        Returns
+        -------
+        dict
+            The metadata dictionary for the named variable.
+        """
+        meta = self._var_allprocs_abs2meta
+        if name in meta:
+            return meta[name]
+
+        abs_name, _ = name2abs_name(self, name)
+        if abs_name is not None:
+            return meta[abs_name]
+
+        raise KeyError('{}: Metadata for variable "{}" not found.'.format(self.msginfo, name))
 
 
 def _arraylist2array(lst, dtype=int):

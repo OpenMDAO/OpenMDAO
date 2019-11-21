@@ -307,7 +307,8 @@ class Component(System):
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_discrete (metadata for discrete vars)
-                self._var_allprocs_discrete[type_][abs_name] = val
+                self._var_allprocs_discrete[type_][abs_name] = v = val.copy()
+                del v['value']
 
         self._var_allprocs_abs2prom = abs2prom
 

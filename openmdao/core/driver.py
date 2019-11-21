@@ -396,8 +396,7 @@ class Driver(object):
             for sub in self._problem.model.system_iter(recurse=True, include_self=True):
                 self._rec_mgr.record_metadata(sub)
 
-    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, ignore_indices=False,
-                     rank=None):
+    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, rank=None):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -416,8 +415,6 @@ class Driver(object):
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
-        ignore_indices : bool
-            Set to True if the full array is desired, not just those indicated by indices.
         rank : int or None
             If not None, gather value to this rank only.
 
@@ -440,12 +437,12 @@ class Driver(object):
                     val = val[indices]
             else:
                 if owner == comm.rank:
-                    if indices is None or ignore_indices:
+                    if indices is None:
                         val = vec[name].copy()
                     else:
                         val = vec[name][indices]
                 else:
-                    if not (indices is None or ignore_indices):
+                    if indices is not None:
                         size = len(indices)
                     val = np.empty(size)
 
@@ -457,7 +454,6 @@ class Driver(object):
 
                 # At present, only integers are supported by OpenMDAO drivers.
                 # We check the values here.
-                valid = True
                 msg = "Only integer scalars or ndarrays are supported as values for " + \
                       "discrete variables when used as a design variable. "
                 if np.isscalar(val) and not isinstance(val, int):
@@ -467,7 +463,7 @@ class Driver(object):
                     msg += "An array of type '{}' was specified.".format(val[0].__class__.__name__)
                     raise ValueError(msg)
 
-            elif indices is None or ignore_indices:
+            elif indices is None:
                 val = vec[name].copy()
             else:
                 val = vec[name][indices]
@@ -484,45 +480,16 @@ class Driver(object):
 
         return val
 
-    def get_design_var_values(self, filter=None, driver_scaling=True, ignore_indices=False,
-                              get_remote=True):
+    def get_design_var_values(self):
         """
         Return the design variable values.
-
-        This is called to gather the initial design variable state.
-
-        Parameters
-        ----------
-        filter : set
-            Set of desvar names used by recorders.
-        driver_scaling : bool
-            When True, return values that are scaled according to either the adder and scaler or
-            the ref and ref0 values that were specified when add_design_var, add_objective, and
-            add_constraint were called on the model. Default is True.
-        ignore_indices : bool
-            Set to True if the full array is desired, not just those indicated by indices.
-        get_remote : bool
-            If True, retrieve remote values as well.
 
         Returns
         -------
         dict
            Dictionary containing values of each design variable.
         """
-        if filter:
-            dvs = filter
-        else:
-            # use all the designvars
-            dvs = self._designvars
-
-        if get_remote:
-            remote_dvs = self._remote_dvs
-        else:
-            remote_dvs = ()
-
-        return {n: self._get_voi_val(n, self._designvars[n], remote_dvs,
-                                     driver_scaling=driver_scaling,
-                                     ignore_indices=ignore_indices) for n in dvs}
+        return {n: self._get_voi_val(n, dv, self._remote_dvs) for n, dv in self._designvars.items()}
 
     def set_design_var(self, name, value):
         """
@@ -563,29 +530,7 @@ class Driver(object):
                 if adder is not None:
                     desvar[indices] -= adder
 
-    def get_response_values(self, filter=None):
-        """
-        Return response values.
-
-        Parameters
-        ----------
-        filter : set
-            Set of response names used by recorders.
-
-        Returns
-        -------
-        dict
-           Dictionary containing values of each response.
-        """
-        if filter:
-            resps = filter
-        else:
-            resps = self._responses
-
-        return {n: self._get_voi_val(n, self._responses[n], self._remote_objs) for n in resps}
-
-    def get_objective_values(self, driver_scaling=True, filter=None, ignore_indices=False,
-                             get_remote=True):
+    def get_objective_values(self, driver_scaling=True):
         """
         Return objective values.
 
@@ -595,35 +540,16 @@ class Driver(object):
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
-        filter : set
-            Set of objective names used by recorders.
-        ignore_indices : bool
-            Set to True if the full array is desired, not just those indicated by indices.
-        get_remote : bool
-            If True, retrieve remote values as well.
 
         Returns
         -------
         dict
            Dictionary containing values of each objective.
         """
-        if filter:
-            objs = filter
-        else:
-            objs = self._objs
+        return {n: self._get_voi_val(n, obj, self._remote_objs, driver_scaling=driver_scaling)
+                for n, obj in self._objs.items()}
 
-        if get_remote:
-            remote_objs = self._remote_objs
-        else:
-            remote_objs = ()
-
-        return {n: self._get_voi_val(n, self._objs[n], remote_objs,
-                                     driver_scaling=driver_scaling,
-                                     ignore_indices=ignore_indices)
-                for n in objs}
-
-    def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True, filter=None,
-                              ignore_indices=False, get_remote=True):
+    def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True):
         """
         Return constraint values.
 
@@ -639,30 +565,14 @@ class Driver(object):
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
-        filter : set
-            Set of constraint names used by recorders.
-        ignore_indices : bool
-            Set to True if the full array is desired, not just those indicated by indices.
-        get_remote : bool
-            If True, retrieve remote values as well.
 
         Returns
         -------
         dict
            Dictionary containing values of each constraint.
         """
-        if filter is not None:
-            cons = filter
-        else:
-            cons = self._cons
-
-        if get_remote:
-            remote_cons = self._remote_cons
-        else:
-            remote_cons = ()
-
         con_dict = {}
-        for name in cons:
+        for name in self._cons:
             meta = self._cons[name]
 
             if lintype == 'linear' and not meta['linear']:
@@ -677,9 +587,8 @@ class Driver(object):
             if ctype == 'ineq' and meta['equals'] is not None:
                 continue
 
-            con_dict[name] = self._get_voi_val(name, meta, remote_cons,
-                                               driver_scaling=driver_scaling,
-                                               ignore_indices=ignore_indices)
+            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
+                                               driver_scaling=driver_scaling)
 
         return con_dict
 
@@ -1058,16 +967,11 @@ class Driver(object):
             print(len(header) * '-')
 
         if 'desvars' in debug_opt:
-            desvar_vals = self.get_design_var_values(driver_scaling=False, ignore_indices=True)
+            model = self._problem.model
+            desvar_vals = {n: model._get_val(n, get_remote=True, rank=0) for n in self._designvars}
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Design Vars")
                 if desvar_vals:
-
-                    # Print desvars in non_flattened state.
-                    meta = self._problem.model._var_allprocs_abs2meta
-                    for name in desvar_vals:
-                        shape = meta[name]['shape']
-                        desvar_vals[name] = desvar_vals[name].reshape(shape)
                     pprint.pprint(desvar_vals)
                 else:
                     print("None")
@@ -1194,7 +1098,7 @@ def record_iteration(requester, prob, case_name):
                     if rank == 0:
                         outs[name] = views[name]
                 else:
-                    outs[name] = prob.get_val(name, get_remote=True, rank=0)
+                    outs[name] = prob.model._get_val(name, get_remote=True, rank=0)
 
     ins = {}
     if 'in' in filt and filt['in']:

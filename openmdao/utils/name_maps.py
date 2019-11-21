@@ -138,19 +138,30 @@ def name2abs_name(system, name):
     -------
     str or None
         Absolute variable name if unique abs_name found or None otherwise.
+    str or None
+        The type ('input' or 'output') of the corresponding variable.
     """
-    if name in system._var_allprocs_abs2meta:
-        return name
+    if name in system._var_allprocs_abs2prom['output']:
+        return (name, 'output')
+    if name in system._var_allprocs_abs2prom['input']:
+        return (name, 'input')
 
     if name in system._var_allprocs_prom2abs_list['output']:
-        abs_name = prom_name2abs_name(system, name, 'output')
-    else:
-        abs_name = prom_name2abs_name(system, name, 'input')
+        abs_name = system._var_allprocs_prom2abs_list['output'][name][0]
+        return (abs_name, 'output')
 
-    if abs_name is None:
-        abs_name = rel_name2abs_name(system, name)
+    # This will raise an exception if name is not unique
+    abs_name = prom_name2abs_name(system, name, 'input')
+    if abs_name is not None:
+        return (abs_name, 'input')
 
-    return abs_name
+    abs_name = rel_name2abs_name(system, name)
+    if abs_name in system._var_allprocs_abs2prom['output']:
+        return (abs_name, 'output')
+    elif abs_name in system._var_allprocs_abs2prom['input']:
+        return (abs_name, 'input')
+
+    return None, None
 
 
 def prom_key2abs_key(system, prom_key):
