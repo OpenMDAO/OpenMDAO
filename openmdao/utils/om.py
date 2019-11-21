@@ -155,7 +155,9 @@ def _xdsm_setup_parser(parser):
                         help='If True, show legend.')
     parser.add_argument('--class_names', action='store_true', dest='class_names',
                         help='If true, appends class name of the groups/components to the '
-                             'component blocks of the diagram..')
+                             'component blocks of the diagram.')
+    parser.add_argument('--equations', action='store_true', dest='equations',
+                        help='If true, for ExecComps their equations are shown in the diagram.')
 
 
 def _xdsm_cmd(options, user_args):
@@ -190,6 +192,7 @@ def _xdsm_cmd(options, user_args):
                        output_side=options.output_side,
                        legend=options.legend,
                        class_names=options.class_names,
+                       equations=options.equations,
                        **kwargs)
             exit()
 
@@ -207,6 +210,9 @@ def _xdsm_cmd(options, user_args):
                    include_solver=options.include_solver, subs=_CHAR_SUBS,
                    show_browser=not options.no_browser, show_parallel=not options.no_parallel,
                    add_process_conns=not options.no_process_conns, output_side=options.output_side,
+                   legend=options.legend,
+                   class_names=options.class_names,
+                   equations=options.equations,
                    **kwargs)
 
 
