@@ -56,7 +56,6 @@ class SellarOneComp(om.ImplicitComponent):
         self.declare_partials('R_y1', ['R_y1', 'x', 'z', 'y1', 'y2'])
         self.declare_partials('R_y2', ['R_y2','z', 'y1', 'y2'])
 
-
     def apply_nonlinear(self, inputs, outputs, residuals):
 
         z0 = inputs['z'][0]
@@ -105,7 +104,6 @@ class SellarOneComp(om.ImplicitComponent):
         J['R_y2','y2'] = -1
         J['R_y2','z'] = [1, 1]
         J['R_y2','y1'] = 0.5*outputs['y1']**-0.5
-
 
     def solve_nonlinear(self, inputs, outputs):
         z0 = inputs['z'][0]
@@ -1514,6 +1512,56 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
+    def test_configure_add_output(self):
+
+        class Model(om.Group):
+            def initialize(self):
+                self.options.declare('where_to_add', values=('setup', 'configure'))
+
+            def setup(self):
+                comp1 = self.add_subsystem('comp1', om.IndepVarComp())
+                comp2 = self.add_subsystem('comp2', om.IndepVarComp())
+
+                comp1.add_output('foo', val=1.0)
+                comp2.add_output('foo', val=1.0)
+
+                self.add_subsystem('comp3', om.ExecComp('y=a+b'))
+
+                if self.options['where_to_add'] == 'setup':
+                    comp1.add_output('a', val=2.0)
+                    comp2.add_output('b', val=3.0)
+
+                    self.connect('comp1.a', 'comp3.a')
+                    self.connect('comp2.b', 'comp3.b')
+
+            def configure(self):
+                if self.options['where_to_add'] == 'configure':
+                    self.comp1.add_output('a', val=2.0)
+                    self.comp2.add_output('b', val=3.0)
+
+                    self.connect('comp1.a', 'comp3.a')
+                    self.connect('comp2.b', 'comp3.b')
+
+        for where in ('setup', 'configure'):
+            p = om.Problem(Model(where_to_add=where))
+            p.setup()
+            p.run_model()
+
+            inputs = p.model.list_inputs(out_stream=None)
+            self.assertEqual(sorted(inputs), [
+                ('comp3.a', {'value': [2.]}),
+                ('comp3.b', {'value': [3.]})
+            ], "Inputs don't match when added in %s." % where)
+
+            outputs= p.model.list_outputs(out_stream=None)
+            self.assertEqual(sorted(outputs), [
+                ('comp1.a',   {'value': [2.]}),
+                ('comp1.foo', {'value': [1.]}),
+                ('comp2.b',   {'value': [3.]}),
+                ('comp2.foo', {'value': [1.]}),
+                ('comp3.y',   {'value': [5.]})
+            ], "Outputs don't match when added in %s." % where)
+
     def test_feature_system_configure(self):
         import openmdao.api as om
 
@@ -1801,7 +1849,6 @@ class NestedProblemTestCase(unittest.TestCase):
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
         p.run_model()
-
 
 
 

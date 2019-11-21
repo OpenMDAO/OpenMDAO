@@ -213,6 +213,10 @@ class Component(System):
         self._responses.update(self._static_responses)
         self.setup()
 
+    def _post_configure(self):
+        """
+        Do any remaining setup that had to wait until after final user configuration.
+        """
         # check to make sure that if num_par_fd > 1 that this system is actually doing FD.
         # Unfortunately we have to do this check after system setup has been called because that's
         # when declare_partials generally happens, so we raise an exception here instead of just

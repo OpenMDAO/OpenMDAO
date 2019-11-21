@@ -574,6 +574,12 @@ class System(object):
         """
         pass
 
+    def _post_configure(self):
+        """
+        Do any remaining setup that had to wait until after final user configuration.
+        """
+        pass
+
     def _get_initial_global(self, initial):
         """
         Get initial values for _ext_num_vars, _ext_sizes.
@@ -832,6 +838,9 @@ class System(object):
 
         # Recurse model from the bottom to the top for configuring.
         self._configure()
+
+        # Now do anything that had to wait until after final configuration (including new I/O)
+        self._post_configure()
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
