@@ -72,16 +72,16 @@ class Application(tornado.web.Application):
         self.engine = engine
 
 
-def get_graph_info(group, title, engine='dot'):
+def get_graph_info(prob, group, engine='dot'):
     """
     Get the system graph from the give group and return the graphviz generated SVG string.
 
     Parameters
     ----------
+    prob : Problem
+        The Problem containing the Group.
     group : Group
         Retrieve the graph SVG for this Group.
-    title : str
-        The title shown at the top of the rendered graph.
     engine : str
         The graphviz layout engine to use to layout the graph. Should be one of
         ['dot', 'fdp', 'circo'].
@@ -92,26 +92,53 @@ def get_graph_info(group, title, engine='dot'):
         The SVG string describing the graph.
     """
     graph = group.compute_sys_graph()
+    title = group.pathname if group.pathname else 'Model'
 
-    f = Digraph(title, filename=title + '.gv', format='svg', engine=engine)
-    f.attr(rankdir='LR', size='600, 600')
+    g = Digraph(filename=title + '.gv', format='svg', engine=engine)
+    g.attr(rankdir='LR', size='600, 600')
 
-    # display groups as double circles
-    f.attr('node', shape='doublecircle')
-    groupset = set(group._subgroups_myproc)
-    for g in groupset:
-        f.node(g.name)
+    # groups
+    with g.subgraph(name='cluster_0') as c:
+        c.node_attr.update(style='filled', color='lightblue')
+        c.attr(label=group.pathname)
 
-    # components as regular circles
-    f.attr('node', shape='circle')
-    for s in group._subsystems_myproc:
-        if s not in groupset:
-            f.node(s.name)
-    
-    for u, v in graph.edges():
-        f.edge(u, v)
+        groupset = set(group._subgroups_myproc)
+        for grp in groupset:
+            c.node(grp.name)
 
-    svg = f.pipe()
+    # components
+    with g.subgraph(name='cluster_0') as c:
+        c.node_attr.update(color='gray')
+        for s in group._subsystems_myproc:
+            if s not in groupset:
+                c.node(s.name)
+        
+        for u, v in graph.edges():
+            c.edge(u, v)
+
+    # connections from outside the group
+    model = prob.model
+    if group is not model:
+        g.attr('node', color='lightgrey')
+        g.attr('edge', style='dotted')
+        pname = group.pathname + '.'
+        plen = len(group.pathname.split('.'))
+        conn_set = set()
+        for tgt, src in model._conn_global_abs_in2out.items():
+            tparts = tgt.split('.')
+            sparts = src.split('.')
+            if tgt.startswith(pname) and not src.startswith(pname):
+                edge = (src.rsplit('.', 1)[0], tparts[plen])
+                if edge not in conn_set:
+                    g.edge(*edge)
+                    conn_set.add(edge)
+            elif src.startswith(pname) and not tgt.startswith(pname):
+                edge = (sparts[plen], tgt.rsplit('.', 1)[0])
+                if edge not in conn_set:
+                    g.edge(*edge)
+                    conn_set.add(edge)
+
+    svg = g.pipe()
 
     svg = str(svg.replace(b'\n', b''))
     return svg[1:].strip("'"), group._subgroups_myproc
@@ -127,16 +154,14 @@ class SysGraph(tornado.web.RequestHandler):
 
         if pathname:
             system = model._get_subsystem(pathname)
-            title = pathname
         else:
             system = model
-            title = 'Model'
 
         if not isinstance(system, Group):
             self.write("Components don't have graphs.")
             return
         
-        svg, subgroups = get_graph_info(system, title, app.engine)
+        svg, subgroups = get_graph_info(app.prob, system, app.engine)
         pathname = system.pathname
         parent = '' if not pathname else pathname.rsplit('.', 1)[0]
         if parent == pathname:
@@ -191,11 +216,11 @@ class SysGraph(tornado.web.RequestHandler):
     <body>
         <input type="button" onclick="location.href='/';" value="Home" />
         <input type="button" onclick="location.href='/sysgraph/%s';" value="Up" />
-        <h1>%s</h1>
+        <input type="button" onclick="location.href='/sysgraph/'+pathnames[0];" value="Show Outside Connections" />
     %s
     </body>
     </html>
-    """ % ([pathname], subgroups, parent, title, svg))
+    """ % ([pathname], subgroups, parent, svg))
 
 
 class Index(SysGraph):
