@@ -84,6 +84,27 @@ function stopTimer(label) {
     if (DebugFlags.timings) console.timeEnd(label);
 }
 
-function debugInfo(msg) {
-    if (DebugFlags.info) console.log(msg);
+function debugInfo() {
+    if (DebugFlags.info) console.log(...arguments);
+}
+
+/**
+ * When class member functions are used with callbacks, 'this' can be redefined if
+ * not managed carefully. This function double checks to make sure 'this' refers
+ * to the correct class.
+ * @param {Object} testThis The 'this' from inside the calling member function.
+ * @param {string} className The name of the expected class.
+ * @param {string} funcName The name of the calling function, for error reporting.
+ * @throws {TypeError} If testThis isn't an instance of className.
+ */
+function testThis(testThis, className, funcName) {
+    let thisClass = testThis.constructor.name;
+
+    if (thisClass != className) {
+        throw new TypeError(className + '.' + funcName +
+            ": 'this' is an instance of '" + thisClass +
+            "'; expected '" + className + "'.");
+    }
+
+    // console.log(className + '.' + funcName + ": 'this' IS an instance of the " + className + " class.");
 }
