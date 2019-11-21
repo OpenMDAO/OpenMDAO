@@ -575,63 +575,24 @@ class N2Matrix {
 
     }
 
+    /**
+     * Iterate through all the offscreen connection sets of the
+     * hovered cell and draw an arrow/add a tooltip for each.
+     */
     _drawOffscreenArrows(cell, lineWidth) {
         if (!cell.offScreen.total) return;
 
-        for (let offscreenNode of cell.offScreen.top.outgoing) {
-            debugInfo("Draw arrow on top going right away from " +
-                cell.tgtObj.absPathName + " to offscreen target " +
-                offscreenNode.absPathName);
-            new N2OffGridArrow({
-                'cell': { 'col': cell.row, 'row': cell.row },
-                'direction': 'right',
-                'color': N2Style.color.greenArrow,
-                'width': lineWidth,
-                'matrixSize': this.diagNodes.length,
-                'label': offscreenNode.absPathName
-            }, this.n2Groups, this.nodeSize);
-        }
-
-        for (let offscreenNode of cell.offScreen.bottom.outgoing) {
-            debugInfo("Draw arrow on bottom going left from " +
-                cell.tgtObj.absPathName + " to offscreen target " +
-                offscreenNode.absPathName);
-            new N2OffGridArrow({
-                'cell': { 'col': cell.row, 'row': cell.row },
-                'direction': 'left',
-                'color': N2Style.color.greenArrow,
-                'width': lineWidth,
-                'matrixSize': this.diagNodes.length,
-                'label': offscreenNode.absPathName
-            }, this.n2Groups, this.nodeSize);
-        }
-
-        for (let offscreenNode of cell.offScreen.top.incoming) {
-            debugInfo("Draw arrow on top coming down into " +
-                cell.tgtObj.absPathName + " from offscreen source " +
-                offscreenNode.absPathName);
-            new N2OffGridArrow({
-                'cell': { 'col': cell.row, 'row': cell.row },
-                'direction': 'down',
-                'color': N2Style.color.redArrow,
-                'width': lineWidth,
-                'matrixSize': this.diagNodes.length,
-                'label': offscreenNode.absPathName
-            }, this.n2Groups, this.nodeSize);
-        }
-
-        for (let offscreenNode of cell.offScreen.bottom.incoming) {
-            debugInfo("Draw arrow on bottom coming up into " +
-                cell.tgtObj.absPathName + " from offscreen source " +
-                offscreenNode.absPathName)
-            new N2OffGridArrow({
-                'cell': { 'col': cell.row, 'row': cell.row },
-                'direction': 'up',
-                'color': N2Style.color.redArrow,
-                'width': lineWidth,
-                'matrixSize': this.diagNodes.length,
-                'label': offscreenNode.absPathName
-            }, this.n2Groups, this.nodeSize);
+        for (let side in cell.offScreen) {
+            for (let dir in cell.offScreen[side]) {
+                for (let offscreenNode of cell.offScreen[side][dir]) {
+                    new (N2OffGridArrow.arrowDir[side][dir])({
+                        'cell': { 'col': cell.row, 'row': cell.row },
+                        'width': lineWidth,
+                        'matrixSize': this.diagNodes.length,
+                        'label': offscreenNode.absPathName
+                    }, this.n2Groups, this.nodeSize);
+                }
+            }
         }
     }
 

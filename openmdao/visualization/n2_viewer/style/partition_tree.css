@@ -280,4 +280,5 @@ div.offgrid {
   background-color: #fff;
   border: solid 1px #dfdfdf;
   position: absolute;
+  opacity: 0.7;
 }
