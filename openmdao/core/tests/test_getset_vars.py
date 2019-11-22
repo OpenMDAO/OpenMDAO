@@ -417,11 +417,12 @@ class TestGetSetMPI(unittest.TestCase):
 
     def _get_problem(self):
         p = Problem()
-        indeps = p.model.add_subsystem('indeps', IndepVarComp())
+        indeps = p.model.add_subsystem('indeps', IndepVarComp(), promotes_outputs=['x', 'x_desc'])
         indeps.add_output('x', np.ones(5))
         indeps.add_discrete_output('x_desc', 'foo')
         par = p.model.add_subsystem('par', ParallelGroup())
-
+        par.add_subsystem('C1', ExecComp('y=2*x'), promotes_inputs=['x'])
+        par.add_subsystem('C2', ExecComp('y=2*x'))
         return p
 
     def test_get_val(self):

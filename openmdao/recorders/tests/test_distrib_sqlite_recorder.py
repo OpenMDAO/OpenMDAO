@@ -248,8 +248,8 @@ class DistributedRecorderTest(unittest.TestCase):
         if prob.comm.rank == 0:
             # Only on rank 0 do we have all the values. The all_vars variable is a list of
             # dicts from all ranks 0,1,... In this case, just ranks 0 and 1
-            dct = all_vars[0]
-            for d in all_vars[1:]:
+            dct = {}
+            for d in all_vars:
                 dct.update(d)
 
             expected_includes = {

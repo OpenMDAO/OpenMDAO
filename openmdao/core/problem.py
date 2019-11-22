@@ -227,6 +227,9 @@ class Problem(object):
         self.recording_options.declare('record_constraints', types=bool, default=True,
                                        desc='Set to True to record constraints at the '
                                             'problem level')
+        self.recording_options.declare('record_responses', types=bool, default=False,
+                                       desc='Set True to record constraints and objectives at the '
+                                            'problem level.')
         self.recording_options.declare('includes', types=list, default=['*'],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
@@ -682,7 +685,6 @@ class Problem(object):
         Set up case recording.
         """
         self._filtered_vars_to_record = self.driver._get_vars_to_record(self.recording_options)
-
         self._rec_mgr.startup(self)
 
     def add_recorder(self, recorder):

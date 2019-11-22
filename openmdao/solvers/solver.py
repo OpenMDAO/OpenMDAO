@@ -298,9 +298,9 @@ class Solver(object):
             myinputs = {n for n in system._inputs._names if check_path(n, incl, excl)}
 
         self._filtered_vars_to_record = {
-            'in': myinputs,
-            'out': myoutputs,
-            'res': myresiduals
+            'input': myinputs,
+            'output': myoutputs,
+            'residual': myresiduals
         }
 
         # Raise a deprecation warning for changed option.
@@ -501,37 +501,37 @@ class Solver(object):
         residuals = system._vectors['residual'][typ]
 
         if self.recording_options['record_outputs']:
-            data['out'] = {}
-            if 'out' in self._filtered_vars_to_record:
-                for out in self._filtered_vars_to_record['out']:
+            data['output'] = {}
+            if 'output' in self._filtered_vars_to_record:
+                for out in self._filtered_vars_to_record['output']:
                     if out in outputs._names:
-                        data['out'][out] = outputs._views[out]
+                        data['output'][out] = outputs._views[out]
             else:
-                data['out'] = outputs
+                data['output'] = outputs
         else:
-            data['out'] = None
+            data['output'] = None
 
         if self.recording_options['record_inputs']:
-            data['in'] = {}
-            if 'in' in self._filtered_vars_to_record:
-                for inp in self._filtered_vars_to_record['in']:
+            data['input'] = {}
+            if 'input' in self._filtered_vars_to_record:
+                for inp in self._filtered_vars_to_record['input']:
                     if inp in inputs._names:
-                        data['in'][inp] = inputs._views[inp]
+                        data['input'][inp] = inputs._views[inp]
             else:
-                data['in'] = inputs
+                data['input'] = inputs
         else:
-            data['in'] = None
+            data['input'] = None
 
         if self.recording_options['record_solver_residuals']:
-            data['res'] = {}
-            if 'res' in self._filtered_vars_to_record:
-                for res in self._filtered_vars_to_record['res']:
+            data['residual'] = {}
+            if 'residual' in self._filtered_vars_to_record:
+                for res in self._filtered_vars_to_record['residual']:
                     if res in residuals._names:
-                        data['res'][res] = residuals._views[res]
+                        data['residual'][res] = residuals._views[res]
             else:
-                data['res'] = residuals
+                data['residual'] = residuals
         else:
-            data['res'] = None
+            data['residual'] = None
 
         self._rec_mgr.record_iteration(self, data, metadata)
 

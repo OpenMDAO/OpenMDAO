@@ -133,6 +133,9 @@ class Driver(object):
         self.recording_options.declare('record_constraints', types=bool, default=True,
                                        desc='Set to True to record constraints at the '
                                             'driver level')
+        self.recording_options.declare('record_responses', types=bool, default=False,
+                                       desc='Set True to record constraints and objectives at the '
+                                            'driver level.')
         self.recording_options.declare('includes', types=list, default=[],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
@@ -352,34 +355,34 @@ class Driver(object):
             allvars.extend(self._designvars)
         else:
             skip.update(self._designvars)
-        if recording_options['record_objectives']:
+        if recording_options['record_objectives'] or recording_options['record_responses']:
             allvars.extend(self._objs)
         else:
             skip.update(self._objs)
-        if recording_options['record_constraints']:
+        if recording_options['record_constraints'] or recording_options['record_responses']:
             allvars.extend(self._cons)
         else:
             skip.update(self._cons)
 
         vars2record = {
-            'out': [n for n in allvars
-                    if n in abs2prom and check_path(abs2prom[n], incl, excl, True)]
+            'output': [n for n in allvars
+                       if n in abs2prom and check_path(abs2prom[n], incl, excl, True)]
         }
 
         # inputs (if in options)
         if 'record_inputs' in recording_options:
             if recording_options['record_inputs']:
-                vars2record['in'] = [n for n in model._var_allprocs_abs_names['input']
-                                     if check_path(n, incl, excl)]
+                vars2record['input'] = [n for n in model._var_allprocs_abs_names['input']
+                                        if check_path(n, incl, excl)]
             else:
-                vars2record['in'] = []
+                vars2record['input'] = []
 
         if incl:
-            vars2record['out'].extend(n for n in model._var_allprocs_abs_names['output']
-                                      if n in abs2prom and check_path(abs2prom[n], incl, excl)
-                                      and n not in skip)
+            vars2record['output'].extend(n for n in model._var_allprocs_abs_names['output']
+                                         if n in abs2prom and check_path(abs2prom[n], incl, excl)
+                                         and n not in skip)
             # remove dups and make sure order is the same on all procs
-            vars2record['out'] = sorted(set(vars2record['out']))
+            vars2record['output'] = sorted(set(vars2record['output']))
 
         return vars2record
 
@@ -759,34 +762,6 @@ class Driver(object):
         """
         return create_local_meta(case_name)
 
-    def _gather_vars(self, root, local_vars):
-        """
-        Gather and return only variables listed in `local_vars` from the `root` System.
-
-        Parameters
-        ----------
-        root : <System>
-            the root System for the Problem
-        local_vars : dict
-            local variable names and values
-
-        Returns
-        -------
-        dict
-            variable names and values.
-        """
-        # if trace:
-        #     debug("gathering vars for recording in %s" % root.pathname)
-        all_vars = root.comm.gather(local_vars, root=0)
-        # if trace:
-        #     debug("DONE gathering rec vars for %s" % root.pathname)
-
-        if root.comm.rank == 0:
-            dct = all_vars[0]
-            for d in all_vars[1:]:
-                dct.update(d)
-            return dct
-
     def _get_name(self):
         """
         Get name of current Driver.
@@ -1083,46 +1058,54 @@ def record_iteration(requester, prob, case_name):
             if r._parallel:
                 parallel = True
                 break
+        # check to make sure we don't have mixed parallel/non-parallel, because that
+        # currently won't work properly.
+        for r in requester._rec_mgr._recorders:
+            if r._parallel != parallel:
+                raise RuntimeError("OpenMDAO currently does not support a mixture of parallel "
+                                   "and non-parallel recorders.")
 
-    outs = {}
-    if filt['out']:
-        if nrank == 1:
-            outs = {n: views[n] for n in filt['out']}
-        elif parallel:
-            sizes = model._var_sizes['nonlinear']['output']
-            abs2idx = model._var_allprocs_abs2idx['nonlinear']
-            outs = {n: views[n] for n in filt['out'] if sizes[rank, abs2idx[n]] > 0}
-        else:
-            for name in filt['out']:
-                if owns[name] == 0 and not meta[name]['distributed']:
-                    if rank == 0:
-                        outs[name] = views[name]
-                else:
-                    outs[name] = prob.model._get_val(name, get_remote=True, rank=0)
+    outs = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
+    # outs = {}
+    # if filt['output']:
+    #     if nrank == 1:
+    #         outs = {n: views[n] for n in filt['output']}
+    #     elif parallel:
+    #         sizes = model._var_sizes['nonlinear']['output']
+    #         abs2idx = model._var_allprocs_abs2idx['nonlinear']
+    #         outs = {n: views[n] for n in filt['output'] if sizes[rank, abs2idx[n]] > 0}
+    #     else:
+    #         for name in filt['output']:
+    #             if owns[name] == 0 and not meta[name]['distributed']:
+    #                 if rank == 0:
+    #                     outs[name] = views[name]
+    #             else:
+    #                 outs[name] = prob.model._get_val(name, get_remote=True, rank=0)
 
-    ins = {}
-    if 'in' in filt and filt['in']:
-        views = model._inputs._views
-        names = model._inputs._names
-        if nrank == 1:
-            ins = {n: views[n] for n in filt['in'] if n in names}
-        elif parallel:
-            sizes = model._var_sizes['nonlinear']['input']
-            abs2idx = model._var_allprocs_abs2idx['nonlinear']
-            ins = {n: views[n] for n in filt['in'] if sizes[n][abs2idx[n]] > 0}
-        else:
-            for name in filt['in']:
-                if name not in names:
-                    continue
-                if owns[name] == 0 and not meta[name]['distributed']:
-                    if rank == 0:
-                        ins[name] = views[name]
-                else:
-                    ins[name] = prob.get_val(name, get_remote=True, rank=0)
+    ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
+    # ins = {}
+    # if 'input' in filt and filt['input']:
+    #     views = model._inputs._views
+    #     names = model._inputs._names
+    #     if nrank == 1:
+    #         ins = {n: views[n] for n in filt['input'] if n in names}
+    #     elif parallel:
+    #         sizes = model._var_sizes['nonlinear']['input']
+    #         abs2idx = model._var_allprocs_abs2idx['nonlinear']
+    #         ins = {n: views[n] for n in filt['input'] if sizes[n][abs2idx[n]] > 0}
+    #     else:
+    #         for name in filt['input']:
+    #             if name not in names:
+    #                 continue
+    #             if owns[name] == 0 and not meta[name]['distributed']:
+    #                 if rank == 0:
+    #                     ins[name] = views[name]
+    #             else:
+    #                 ins[name] = prob.get_val(name, get_remote=True, rank=0)
 
     data = {
-        'out': outs,
-        'in': ins
+        'output': outs,
+        'input': ins
     }
 
     requester._rec_mgr.record_iteration(requester, data,

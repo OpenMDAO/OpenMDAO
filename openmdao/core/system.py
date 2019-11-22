@@ -1469,9 +1469,9 @@ class System(object):
                                if n in abs2prom and check_path(abs2prom[n], incl, excl)}
 
         self._filtered_vars_to_record = {
-            'in': myinputs,
-            'out': myoutputs,
-            'res': myresiduals
+            'input': myinputs,
+            'output': myoutputs,
+            'residual': myresiduals
         }
 
         self._rec_mgr.startup(self)
@@ -3737,65 +3737,65 @@ class System(object):
 
             data = {}
             if options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
-                data['in'] = {}
-                if 'in' in self._filtered_vars_to_record:
+                data['input'] = {}
+                if 'input' in self._filtered_vars_to_record:
                     # use filtered inputs
-                    for inp in self._filtered_vars_to_record['in']:
+                    for inp in self._filtered_vars_to_record['input']:
                         if inp in inputs._names:
-                            data['in'][inp] = inputs._views[inp]
+                            data['input'][inp] = inputs._views[inp]
                         elif inp in discrete_inputs:
                             abs_name = self.pathname + '.' + inp if self.pathname else inp
-                            data['in'][abs_name] = discrete_inputs[inp]
+                            data['input'][abs_name] = discrete_inputs[inp]
                 else:
                     # use all the inputs
                     if len(discrete_inputs) > 0:
                         for inp in inputs:
-                            data['in'][inp] = inputs._views[inp]
+                            data['input'][inp] = inputs._views[inp]
                         for inp in discrete_inputs:
                             abs_name = self.pathname + '.' + inp if self.pathname else inp
-                            data['in'][abs_name] = discrete_inputs[inp]
+                            data['input'][abs_name] = discrete_inputs[inp]
                     else:
-                        data['in'] = inputs._names
+                        data['input'] = inputs._names
 
             else:
-                data['in'] = None
+                data['input'] = None
 
             if options['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
-                data['out'] = {}
-                if 'out' in self._filtered_vars_to_record:
+                data['output'] = {}
+                if 'output' in self._filtered_vars_to_record:
                     # use outputs from filtered list.
-                    for out in self._filtered_vars_to_record['out']:
+                    for out in self._filtered_vars_to_record['output']:
                         if out in outputs._names:
-                            data['out'][out] = outputs._views[out]
+                            data['output'][out] = outputs._views[out]
                         elif out in discrete_outputs:
                             abs_name = self.pathname + '.' + out if self.pathname else out
-                            data['out'][abs_name] = discrete_outputs[out]
+                            data['output'][abs_name] = discrete_outputs[out]
                 else:
                     # use all the outputs
                     if len(discrete_outputs) > 0:
                         for out in outputs:
-                            data['out'][out] = outputs._views[out]
+                            data['output'][out] = outputs._views[out]
                         for out in discrete_outputs:
                             abs_name = self.pathname + '.' + out if self.pathname else out
-                            data['out'][abs_name] = discrete_outputs[out]
+                            data['output'][abs_name] = discrete_outputs[out]
                     else:
-                        data['out'] = outputs._names
+                        data['output'] = outputs._names
             else:
-                data['out'] = None
+                data['output'] = None
 
             if options['record_residuals'] and residuals._names:
-                data['res'] = {}
+                data['residual'] = {}
 
-                if 'res' in self._filtered_vars_to_record:
+                if 'residual' in self._filtered_vars_to_record:
                     # use filtered residuals
-                    for res in self._filtered_vars_to_record['res']:
+                    for res in self._filtered_vars_to_record['residual']:
                         if res in residuals._names:
-                            data['res'][res] = residuals._views[res]
+                            data['residual'][res] = residuals._views[res]
                 else:
                     # use all the residuals
-                    data['res'] = residuals._names
+                    data['residual'] = residuals._names
             else:
-                data['res'] = None
+                data['residual'] = None
 
             self._rec_mgr.record_iteration(self, data, metadata)
 
@@ -4150,7 +4150,10 @@ class System(object):
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                 else:
                     if rank != owner:
-                        # TODO: use point to point to retrieve value
+                        # if self.comm.rank == owner:
+                        #     self.comm.send(val, dest=rank, tag=INT_DTYPE(hash(abs_name)))
+                        # elif self.comm.rank == rank:
+                        #     val = self.comm.recv(source=owner, tag=INT_DTYPE(hash(abs_name)))
                         vals = self.comm.gather(val, root=rank)
                         if self.comm.rank == rank:
                             val = vals[owner]
@@ -4221,31 +4224,30 @@ class System(object):
 
         return val
 
-    def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name):
+    def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
         vdict = {}
-        owns = self._owning_rank
         variables = filtered_vars.get(kind)
         if variables:
             views = self._vectors[kind][vec_name]._views
-            names = self._vectors[kind][vec_name]._names
+            rank = self.comm.rank
             if self.comm.size == 1:
-                vdict = {n: views[n] for n in variables if n in names}
+                vdict = {n: views[n] for n in variables}
             elif parallel:
-                sizes = model._var_sizes[vec_name][kind]
-                abs2idx = model._var_allprocs_abs2idx[vec_name]
-                vdict = {n: views[n] for n in variables if sizes[n][abs2idx[n]] > 0}
+                sizes = self._var_sizes[vec_name][kind]
+                abs2idx = self._var_allprocs_abs2idx[vec_name]
+                vdict = {n: views[n] for n in variables if sizes[rank, abs2idx[n]] > 0}
             else:
+                owns = self._owning_rank
+                meta = self._var_allprocs_abs2meta
                 for name in variables:
-                    if name not in names:
-                        continue
                     if owns[name] == 0 and not meta[name]['distributed']:
                         # if using a serial recorder and rank 0 owns the variable,
                         # use local value on rank 0 and do nothing on other ranks.
                         if rank == 0:
                             vdict[name] = views[name]
                     else:
-                        vdict[name] = prob.get_val(name, get_remote=True, rank=0, vec_name=vec_name,
-                                                   kind=kind)
+                        vdict[name] = self._get_val(name, get_remote=True, rank=0,
+                                                    vec_name=vec_name, kind=kind)
 
         return vdict
 
