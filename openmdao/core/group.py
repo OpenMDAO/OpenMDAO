@@ -441,7 +441,6 @@ class Group(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        print(self.msginfo, 'Group._post_configure()')
         for subsys in self._subsystems_myproc:
             subsys._post_configure(mode, recurse)
 

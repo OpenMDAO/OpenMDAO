@@ -834,7 +834,7 @@ class System(object):
             self._setup_procs(self.pathname, comm, mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
-        # User may create additional inputs & outputs in this phase, so we set static_mode to False.
+        # Set static_mode to False because additional inputs & outputs may be created.
         self._static_mode = False
         self._configure()
         self._static_mode = True
@@ -854,7 +854,6 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        print(self.msginfo, 'System._post_configure()')
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.

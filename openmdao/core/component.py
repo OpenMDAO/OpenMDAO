@@ -222,7 +222,7 @@ class Component(System):
         # resetting the value of num_par_fd (because the comm has already been split and possibly
         # used by the system setup).
         if self._num_par_fd > 1 and orig_comm.size > 1 and not (self._owns_approx_jac or
-                                                                     self._approx_schemes):
+                                                                self._approx_schemes):
             raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
 
         self._static_mode = True
@@ -251,7 +251,6 @@ class Component(System):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        print(self.msginfo, 'Component._post_configure()')
         # check here if declare_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
         # have something to color.

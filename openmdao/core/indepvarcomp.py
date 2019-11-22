@@ -105,7 +105,6 @@ class IndepVarComp(ExplicitComponent):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        print(self.msginfo, 'IndepVarComp._post_configure()')
         # set static mode to False because we are doing things that would normally be done in setup
         self._static_mode = False
 
