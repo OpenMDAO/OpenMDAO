@@ -399,7 +399,7 @@ class Group(System):
                 # subsystems_myproc_inds
                 self._subsystems_myproc_inds = [sub_idxs[s.name] for s in self._subsystems_myproc]
         else:
-            sub_comm = self.comm
+            sub_comm = comm
             self._subsystems_myproc = self._subsystems_allprocs
             self._subsystems_myproc_inds = list(range(len(self._subsystems_myproc)))
             sub_proc_range = (0, 1)
@@ -419,10 +419,10 @@ class Group(System):
             subsys._recording_iter = self._recording_iter
 
             if self.pathname:
-                subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, self._mode,
-                                    self._problem_options)
+                subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode,
+                                    prob_options)
             else:
-                subsys._setup_procs(subsys.name, sub_comm, self._mode, self._problem_options)
+                subsys._setup_procs(subsys.name, sub_comm, mode, prob_options)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
@@ -432,7 +432,16 @@ class Group(System):
     def _post_configure(self, mode, recurse):
         """
         Do any remaining setup that had to wait until after final user configuration.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd', or 'rev', or 'auto'
+
+        recurse : bool
+            Whether to call this method in subsystems.
         """
+        print(self.msginfo, 'Group._post_configure()')
         for subsys in self._subsystems_myproc:
             subsys._post_configure(mode, recurse)
 

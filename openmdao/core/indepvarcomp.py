@@ -95,11 +95,20 @@ class IndepVarComp(ExplicitComponent):
 
     def _post_configure(self, mode, recurse):
         """
-        Define the independent variables as output variables.
+        Do any remaining setup that had to wait until after final user configuration.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd', or 'rev', or 'auto'
+
+        recurse : bool
+            Whether to call this method in subsystems.
         """
+        print(self.msginfo, 'IndepVarComp._post_configure()')
+        # set static mode to False because we are doing things that would normally be done in setup
         self._static_mode = False
 
-        print(self.msginfo, '_post_configure()')
         for (name, val, kwargs) in self._indep + self._indep_external:
             super(IndepVarComp, self).add_output(name, val, **kwargs)
 
@@ -113,6 +122,8 @@ class IndepVarComp(ExplicitComponent):
                                "afterwards.".format(self.msginfo))
 
         self._static_mode = True
+
+        super(IndepVarComp, self)._post_configure(mode, recurse)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):

@@ -845,7 +845,16 @@ class System(object):
     def _post_configure(self, mode, recurse):
         """
         Do any remaining setup that had to wait until after final user configuration.
+
+        Parameters
+        ----------
+        mode : str
+            Derivative direction, either 'fwd', or 'rev', or 'auto'
+
+        recurse : bool
+            Whether to call this method in subsystems.
         """
+        print(self.msginfo, 'System._post_configure()')
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
         # and no recursion is necessary.
