@@ -99,6 +99,10 @@ class N2Style {
                 'font-family': 'helvetica, sans-serif',
                 'font-size': fontSize + 'px',
             },
+            'text.offgridLabel': {
+                'font-family': 'helvetica, sans-serif',
+                'font-size': fontSize + 'px',
+            },
             '#svgId g.solver_group > text': {
                 'text-anchor': 'end',
                 'pointer-events': 'none',

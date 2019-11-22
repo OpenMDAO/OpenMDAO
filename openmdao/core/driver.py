@@ -5,6 +5,7 @@ from collections import OrderedDict
 import pprint
 import sys
 import os
+import weakref
 
 from six import iteritems, itervalues, string_types
 
@@ -58,7 +59,7 @@ class Driver(object):
     cite : str
         Listing of relevant citations that should be referenced when
         publishing work that uses this class.
-    _problem : <Problem>
+    _problem : weakref to <Problem>
         Pointer to the containing problem.
     supports : <OptionsDictionary>
         Provides a consistent way for drivers to declare what features they support.
@@ -242,7 +243,7 @@ class Driver(object):
         problem : <Problem>
             Pointer to the containing problem.
         """
-        self._problem = problem
+        self._problem = weakref.ref(problem)
         self._recording_iter = problem._recording_iter
         model = problem.model
 
@@ -338,7 +339,7 @@ class Driver(object):
         dict
            Dictionary containing sets of variables to record.
         """
-        problem = self._problem
+        problem = self._problem()
         model = problem.model
         rrank = problem.comm.rank
 
@@ -396,7 +397,7 @@ class Driver(object):
 
         # record the system metadata to the recorders attached to this Driver
         if self.recording_options['record_model_metadata']:
-            for sub in self._problem.model.system_iter(recurse=True, include_self=True):
+            for sub in self._problem().model.system_iter(recurse=True, include_self=True):
                 self._rec_mgr.record_metadata(sub)
 
     def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True, rank=None):
@@ -426,7 +427,7 @@ class Driver(object):
         float or ndarray
             The value of the named variable of interest.
         """
-        model = self._problem.model
+        model = self._problem().model
         comm = model.comm
         vec = model._outputs._views_flat
         indices = meta['indices']
@@ -505,7 +506,7 @@ class Driver(object):
         value : float or ndarray
             Value for the design variable.
         """
-        problem = self._problem
+        problem = self._problem()
 
         if (name in self._remote_dvs and
                 problem.model._owning_rank[name] != problem.comm.rank):
@@ -659,7 +660,7 @@ class Driver(object):
             Failure flag; True if failed to converge, False is successful.
         """
         with RecordingDebugging(self._get_name(), self.iter_count, self):
-            self._problem.model.run_solve_nonlinear()
+            self._problem().model.run_solve_nonlinear()
 
         self.iter_count += 1
         return False
@@ -690,7 +691,7 @@ class Driver(object):
         derivs : object
             Derivatives in form requested by 'return_format'.
         """
-        problem = self._problem
+        problem = self._problem()
         total_jac = self._total_jac
         debug_print = 'totals' in self.options['debug_print'] and (not MPI or
                                                                    MPI.COMM_WORLD.rank == 0)
@@ -744,7 +745,7 @@ class Driver(object):
         """
         Record an iteration of the current Driver.
         """
-        record_iteration(self, self._problem, self._get_name())
+        record_iteration(self, self._problem(), self._get_name())
 
     def _get_recorder_metadata(self, case_name):
         """
@@ -897,7 +898,7 @@ class Driver(object):
             return coloring
 
     def _get_total_coloring_fname(self):
-        return os.path.join(self._problem.options['coloring_dir'], 'total_coloring.pkl')
+        return os.path.join(self._problem().options['coloring_dir'], 'total_coloring.pkl')
 
     def _setup_simul_coloring(self):
         """
@@ -909,7 +910,7 @@ class Driver(object):
         if not coloring_mod._use_total_sparsity:
             return
 
-        problem = self._problem
+        problem = self._problem()
         if not problem.model._use_derivatives:
             simple_warning("Derivatives are turned off.  Skipping simul deriv coloring.")
             return
@@ -942,7 +943,7 @@ class Driver(object):
             print(len(header) * '-')
 
         if 'desvars' in debug_opt:
-            model = self._problem.model
+            model = self._problem().model
             desvar_vals = {n: model._get_val(n, get_remote=True, rank=0) for n in self._designvars}
             if not MPI or MPI.COMM_WORLD.rank == 0:
                 print("Design Vars")
@@ -1009,7 +1010,7 @@ class RecordingDebugging(Recording):
             self
         """
         super(RecordingDebugging, self).__enter__()
-        self.recording_requester._pre_run_model_debug_print()
+        self.recording_requester()._pre_run_model_debug_print()
         return self
 
     def __exit__(self, *args):
@@ -1021,7 +1022,7 @@ class RecordingDebugging(Recording):
         *args : array
             Solver recording requires extra args.
         """
-        self.recording_requester._post_run_model_debug_print()
+        self.recording_requester()._post_run_model_debug_print()
         super(RecordingDebugging, self).__exit__()
 
 

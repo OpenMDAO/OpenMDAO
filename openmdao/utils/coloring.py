@@ -16,6 +16,7 @@ from itertools import combinations, chain
 from distutils.version import LooseVersion
 from contextlib import contextmanager
 from pprint import pprint
+from itertools import groupby
 
 from six import iteritems, string_types
 from six.moves import range
@@ -133,6 +134,10 @@ class Coloring(object):
         Sizes of row variables.
     _meta : dict
         Dictionary of metadata used to create the coloring.
+    _names_array : ndarray or None:
+        Names of total jacobian rows or columns.
+    _local_array : ndarray or None:
+        Indices of total jacobian rows or columns.
     """
 
     def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
@@ -166,6 +171,9 @@ class Coloring(object):
         self._fwd = None
         self._rev = None
         self._meta = {}
+
+        self._names_array = None
+        self._local_array = None
 
     def color_iter(self, direction):
         """
@@ -907,6 +915,36 @@ class Coloring(object):
                         rev_solves += 1
 
         return fwd_solves, rev_solves
+
+    def _local_indices(self, inds, mode):
+
+        if self._names_array is None and self._local_array is None:
+            col_names = self._col_vars
+            col_sizes = self._col_var_sizes
+            row_names = self._row_vars
+            row_sizes = self._row_var_sizes
+
+            if mode == 'fwd':
+                col_info = zip(col_names, col_sizes)
+            else:
+                col_info = zip(row_names, row_sizes)
+
+            names = []
+            indices = []
+            for i, j in col_info:
+                names.append(np.repeat(i, j))
+                indices.append(np.arange(j))
+
+            self._names_array = np.concatenate(names)
+            self._local_array = np.concatenate(indices)
+
+        if isinstance(inds, list):
+            var_name_and_sub_indices = [(key, [x[1] for x in group]) for key, group in groupby(
+                zip(self._names_array[inds], self._local_array[inds]), key=lambda x: x[0])]
+        else:
+            var_name_and_sub_indices = [(self._names_array[inds], self._local_array[inds])]
+
+        return var_name_and_sub_indices
 
 
 def _order_by_ID(col_matrix):
@@ -1757,7 +1795,7 @@ def dynamic_total_coloring(driver, run_model=True, fname=None):
     Coloring
         The computed coloring.
     """
-    problem = driver._problem
+    problem = driver._problem()
     if not problem.model._use_derivatives:
         simple_warning("Derivatives have been turned off. Skipping dynamic simul coloring.")
         return

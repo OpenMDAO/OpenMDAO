@@ -155,7 +155,9 @@ def _xdsm_setup_parser(parser):
                         help='If True, show legend.')
     parser.add_argument('--class_names', action='store_true', dest='class_names',
                         help='If true, appends class name of the groups/components to the '
-                             'component blocks of the diagram..')
+                             'component blocks of the diagram.')
+    parser.add_argument('--equations', action='store_true', dest='equations',
+                        help='If true, for ExecComps their equations are shown in the diagram.')
 
 
 def _xdsm_cmd(options, user_args):
@@ -190,6 +192,7 @@ def _xdsm_cmd(options, user_args):
                        output_side=options.output_side,
                        legend=options.legend,
                        class_names=options.class_names,
+                       equations=options.equations,
                        **kwargs)
             exit()
 
@@ -207,6 +210,9 @@ def _xdsm_cmd(options, user_args):
                    include_solver=options.include_solver, subs=_CHAR_SUBS,
                    show_browser=not options.no_browser, show_parallel=not options.no_parallel,
                    add_process_conns=not options.no_process_conns, output_side=options.output_side,
+                   legend=options.legend,
+                   class_names=options.class_names,
+                   equations=options.equations,
                    **kwargs)
 
 
@@ -281,6 +287,8 @@ def _meta_model_parser(parser):
                         help='Number of points to create contour grid')
     parser.add_argument('-p', '--port_number', default=5007, action='store', dest='port_number',
                         help='Port number to open viewer')
+    parser.add_argument('--no_browser', action='store_false', dest='browser',
+                        help='Bokeh server will start server without browser')
 
 
 def _meta_model_cmd(options):
@@ -310,11 +318,12 @@ def _meta_model_cmd(options):
         pathname = options.pathname
         port_number = options.port_number
         resolution = options.resolution
+        browser = options.browser
 
         if pathname:
             comp = prob.model._get_subsystem(pathname)
             if comp and isinstance(comp, mm_types):
-                view_metamodel(comp, resolution, port_number)
+                view_metamodel(comp, resolution, port_number, browser)
                 exit()
         else:
             comp = None
@@ -330,7 +339,7 @@ def _meta_model_cmd(options):
 
         elif mm_count == 1 and not pathname:
             comp = metamodels[mm_names[0]]
-            view_metamodel(comp, resolution, port_number)
+            view_metamodel(comp, resolution, port_number, browser)
 
         else:
             try_str = "Try one of the following: {}.".format(mm_names)

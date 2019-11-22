@@ -20,8 +20,8 @@ class N2TreeNode {
         Object.assign(this, origNode);
 
         // From old ClearConnections():
-        this.targetsParamView = new Set();
-        this.targetsHideParams = new Set();
+        this.sourceParentSet = new Set();
+        this.targetParentSet = new Set();
 
         // Solver names may be empty, so set them to "None" instead.
         if (this.linear_solver == "") this.linear_solver = "None";
@@ -106,7 +106,7 @@ class N2TreeNode {
         }
 
         if (this.hasChildren()) {
-            for (let child of node.children) {
+            for (let child of this.children) {
                 if (child._hasNodeInChildren(compareNode)) {
                     return true;
                 }
@@ -119,11 +119,12 @@ class N2TreeNode {
     /**
      * Look for the supplied node in the lineage of this one.
      * @param {N2TreeNode} compareNode The node to look for.
+     * @param {N2TreeNode} [parentLimit = null] Stop searching at this common parent.
      * @returns {Boolean} True if the node is found, otherwise false.
     */
-    hasNode(compareNode) {
+    hasNode(compareNode, parentLimit = null) {
         // Check parents first.
-        for (let obj = this; obj != null; obj = obj.parent) {
+        for (let obj = this; obj != null && obj !== parentLimit; obj = obj.parent) {
             if (obj === compareNode) {
                 return true;
             }
@@ -141,7 +142,7 @@ class N2TreeNode {
         if (this.cycleArrows) { arr.push(this); }
 
         if (this.hasChildren()) {
-            for (let child of node.children) {
+            for (let child of this.children) {
                 child._getNodesInChildrenWithCycleArrows(arr);
             }
         }
@@ -163,5 +164,20 @@ class N2TreeNode {
         this._getNodesInChildrenWithCycleArrows(arr);
 
         return arr;
+    }
+
+    /**
+     * Find the closest parent shared by two nodes; farthest should be tree root.
+     * @param {N2TreeNode} other Another node to compare parents with.
+     * @returns {N2TreeNode} The first common parent found.
+     */
+    nearestCommonParent(other) {
+        for (let myParent = this.parent; myParent != null; myParent = myParent.parent )
+            for (let otherParent = other.parent; otherParent != null; otherParent = otherParent.parent)
+                if (myParent === otherParent) return myParent;
+
+        // Should never get here because root is parent of all
+        debugInfo("No common parent found between two nodes: ", this, other);
+        return null;
     }
 }

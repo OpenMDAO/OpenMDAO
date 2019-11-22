@@ -266,7 +266,7 @@ class SqliteRecorder(CaseRecorder):
 
         # grab the system
         if isinstance(recording_requester, Driver):
-            system = recording_requester._problem.model
+            system = recording_requester._problem().model
             driver = recording_requester
         elif isinstance(recording_requester, System):
             system = recording_requester
@@ -274,7 +274,7 @@ class SqliteRecorder(CaseRecorder):
             system = recording_requester.model
             driver = recording_requester.driver
         elif isinstance(recording_requester, Solver):
-            system = recording_requester._system
+            system = recording_requester._system()
         else:
             raise ValueError('Driver encountered a recording_requester it cannot handle'
                              ': {0}'.format(recording_requester))
@@ -531,7 +531,7 @@ class SqliteRecorder(CaseRecorder):
                            abs, rel, inputs_text, outputs_text, residuals_text))
 
                 # get the pathname of the source system
-                source_system = recording_requester._system.pathname
+                source_system = recording_requester._system().pathname
                 if source_system == '':
                     source_system = 'root'
 
@@ -625,7 +625,7 @@ class SqliteRecorder(CaseRecorder):
             The Solver that would like to record its metadata.
         """
         if self.connection:
-            path = recording_requester._system.pathname
+            path = recording_requester._system().pathname
             solver_class = type(recording_requester).__name__
             if not path:
                 path = 'root'

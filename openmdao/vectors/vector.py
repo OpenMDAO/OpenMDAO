@@ -4,6 +4,8 @@ from __future__ import division, print_function
 from six import iteritems, PY3
 from copy import deepcopy
 import os
+import weakref
+
 import numpy as np
 
 from openmdao.utils.name_maps import name2abs_name, prom_name2abs_name, rel_name2abs_name
@@ -124,7 +126,7 @@ class Vector(object):
         self._icol = None
         self._relevant = relevant
 
-        self._system = system
+        self._system = weakref.ref(system)
 
         self._iproc = system.comm.rank
         self._views = {}
@@ -207,7 +209,7 @@ class Vector(object):
         <Vector>
             instance of the clone; the data is copied.
         """
-        vec = self.__class__(self._name, self._kind, self._system, self._root_vector,
+        vec = self.__class__(self._name, self._kind, self._system(), self._root_vector,
                              alloc_complex=self._alloc_complex, ncol=self._ncol)
         vec._under_complex_step = self._under_complex_step
         vec._clone_data()
@@ -264,7 +266,7 @@ class Vector(object):
         str or None
             Absolute variable name if unique abs_name found or None otherwise.
         """
-        system = self._system
+        system = self._system()
         abs_name = prom_name2abs_name(system, name, self._typ)
         if abs_name in self._names:
             return abs_name
@@ -282,7 +284,7 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        system = self._system
+        system = self._system()
         path = system.pathname
         idx = len(path) + 1 if path else 0
 

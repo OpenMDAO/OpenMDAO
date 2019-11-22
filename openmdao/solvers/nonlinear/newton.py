@@ -7,6 +7,7 @@ import numpy as np
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import MPI
 
 
 class NewtonSolver(NonlinearSolver):
@@ -90,26 +91,29 @@ class NewtonSolver(NonlinearSolver):
             depth of the current system (already incremented).
         """
         super(NewtonSolver, self)._setup_solvers(system, depth)
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         self._disallow_discrete_outputs()
 
         if self.linear_solver is not None:
-            self.linear_solver._setup_solvers(self._system, self._depth + 1)
+            self.linear_solver._setup_solvers(self._system(), self._depth + 1)
         else:
             self.linear_solver = system.linear_solver
 
         if self.linesearch is not None:
-            self.linesearch._setup_solvers(self._system, self._depth + 1)
+            self.linesearch._setup_solvers(self._system(), self._depth + 1)
 
         else:
             # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
             # This deprecation warning is to prepare users for the change.
-            pathname = self._system.pathname
+            pathname = self._system().pathname
             if pathname:
                 pathname += ': '
             msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
                   'to use the BoundsEnforceLS line search.'
-            warn_deprecation(pathname + msg)
+
+            if rank == 0:
+                warn_deprecation(pathname + msg)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -146,7 +150,7 @@ class NewtonSolver(NonlinearSolver):
         """
         self._recording_iter.stack.append(('_run_apply', 0))
 
-        system = self._system
+        system = self._system()
 
         # Disable local fd
         approx_status = system._owns_approx_jac
@@ -193,17 +197,17 @@ class NewtonSolver(NonlinearSolver):
         float
             error at the first iteration.
         """
-        if self.options['debug_print']:
-            self._err_cache['inputs'] = self._system._inputs._copy_views()
-            self._err_cache['outputs'] = self._system._outputs._copy_views()
+        system = self._system()
 
-        system = self._system
+        if self.options['debug_print']:
+            self._err_cache['inputs'] = system._inputs._copy_views()
+            self._err_cache['outputs'] = system._outputs._copy_views()
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
         # one iteration of Newton.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs._data += np.linalg.norm(self._system._outputs._data) * 1e-10
+            system._outputs._data += np.linalg.norm(system._outputs._data) * 1e-10
 
         # Execute guess_nonlinear if specified.
         system._guess_nonlinear()
@@ -229,7 +233,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform the operations in the iteration loop.
         """
-        system = self._system
+        system = self._system()
         self._solver_info.append_subsolver()
         do_subsolve = self.options['solve_subsystems'] and \
             (self._iter_count < self.options['max_sub_solves'])
@@ -288,9 +292,9 @@ class NewtonSolver(NonlinearSolver):
         """
         Print header text before solving.
         """
-        if (self.options['iprint'] > 0 and self._system.comm.rank == 0):
+        if (self.options['iprint'] > 0 and self._system().comm.rank == 0):
 
-            pathname = self._system.pathname
+            pathname = self._system().pathname
             if pathname:
                 nchar = len(pathname)
                 prefix = self._solver_info.prefix

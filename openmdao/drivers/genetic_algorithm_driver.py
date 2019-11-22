@@ -143,7 +143,7 @@ class SimpleGADriver(Driver):
         super(SimpleGADriver, self)._setup_driver(problem)
 
         model_mpi = None
-        comm = self._problem.comm
+        comm = problem.comm
         if self._concurrent_pop_size > 0:
             model_mpi = (self._concurrent_pop_size, self._concurrent_color)
         elif not self.options['run_parallel']:
@@ -211,7 +211,7 @@ class SimpleGADriver(Driver):
         boolean
             Failure flag; True if failed to converge, False is successful.
         """
-        model = self._problem.model
+        model = self._problem().model
         ga = self._ga
 
         ga.elite = self.options['elitism']
@@ -377,7 +377,7 @@ class SimpleGADriver(Driver):
         int
             Case number, used for identification when run in parallel.
         """
-        model = self._problem.model
+        model = self._problem().model
         success = 1
 
         objs = self.get_objective_values()
@@ -441,13 +441,13 @@ class SimpleGADriver(Driver):
                 for name, val in iteritems(self.get_constraint_values()):
                     con = self._cons[name]
                     # The not used fields will either None or a very large number
-                    if (con['lower'] is not None) and (con['lower'] > -almost_inf):
+                    if (con['lower'] is not None) and np.any(con['lower'] > -almost_inf):
                         diff = val - con['lower']
                         violation = np.array([0. if d >= 0 else abs(d) for d in diff])
-                    elif (con['upper'] is not None) and (con['upper'] < almost_inf):
+                    elif (con['upper'] is not None) and np.any(con['upper'] < almost_inf):
                         diff = val - con['upper']
                         violation = np.array([0. if d <= 0 else abs(d) for d in diff])
-                    elif (con['equals'] is not None) and (abs(con['equals']) < almost_inf):
+                    elif (con['equals'] is not None) and np.any(np.abs(con['equals']) < almost_inf):
                         diff = val - con['equals']
                         violation = np.absolute(diff)
                     constraint_violations = np.hstack((constraint_violations, violation))

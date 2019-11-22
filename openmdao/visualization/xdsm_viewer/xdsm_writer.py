@@ -42,13 +42,10 @@ _OUT_FORMATS = {'tex': 'pyxdsm', 'pdf': 'pyxdsm', 'json': 'xdsmjs', 'html': 'xds
 # Round parenthesis is replaced with subscript syntax, e.g. x(1) --> x_{1}
 _CHAR_SUBS = {
     'pyxdsm': (('_', '\_'), ('(', '_{'), (')', '}'),),
-    'xdsmjs': ((' ', '-'), (':', '')),
+    'xdsmjs': ((' ', '-'), (':', ''), ('_', '\_'),),
 }
 # Variable formatting settings
 _SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't', 'consistency': 'c'}
-# Text constants.
-# "no_data" - showed as the output of an MDA
-_TEXT_CONSTANTS = {'no_data': '(no data)'}
 # Default solver, if no solver is added to a group.
 _DEFAULT_SOLVER_NAMES = {'linear': 'LN: RUNONCE', 'nonlinear': 'NL: RUNONCE'}
 # On which side to place outputs? One of "left", "right"
@@ -124,7 +121,7 @@ class BaseXDSMWriter(object):
         XDSM component type.
     """
 
-    def __init__(self, name):
+    def __init__(self, name, options={}):
         """
         Initialize.
 
@@ -132,6 +129,8 @@ class BaseXDSMWriter(object):
         ----------
         name : str
             Name of this XDSM writer
+        options : dict
+            Writer options.
         """
         self.name = name
         # This should be a dictionary mapping OpenMDAO system types to XDSM component types.
@@ -152,8 +151,6 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         List of systems where the list items are dicts indicating type, id, and name.
     connections : list of dicts
         List of connections where the list items are dicts indicating 'to', 'from', 'name' of edge.
-    ins : dict ???
-        OpenMDAO component type.
     processes : list
         List of process.
     """
@@ -170,7 +167,6 @@ class AbstractXDSMWriter(BaseXDSMWriter):
         super(AbstractXDSMWriter, self).__init__(name=name)
         self.comps = []
         self.connections = []
-        self.ins = {}
         self.processes = []
 
     def add_solver(self, label, name='solver', **kwargs):
@@ -355,7 +351,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         Include class names of components in diagonal blocks.
     """
 
-    def __init__(self, name='xdsmjs', class_names=False):
+    def __init__(self, name='xdsmjs', class_names=False, options={}):
         """
         Initialize.
 
@@ -365,22 +361,23 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Name of this XDSM writer
         class_names : bool
             Include class names of the components in the diagonal
+        options : dict
+            Writer options.
         """
         super(XDSMjsWriter, self).__init__(name=name)
         self.driver = 'opt'  # Driver default name
         self.comp_names = []  # Component names
         self._ul = '_U_'  # Name of the virtual first element
-        self._br = '_E_'  # Name of the virtual last component
         # If component ends with this string, it will be treated as a parallel component
         self._multi_suffix = '_multi'
-        self.reserved_words = self._ul, self._br  # Ignored at text formatting
+        self.reserved_words = self._ul,  # Ignored at text formatting
         # Output file saved with this extension
         self.extension = 'html'
         if self.name in _COMPONENT_TYPE_MAP:
             self.type_map = _COMPONENT_TYPE_MAP[self.name]
         else:  # Use default
             self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
-            msg = 'Name not "{}" found in component type mapping, will default to "{}"'
+            msg = 'Name "{}" not found in component type mapping, will default to "{}"'
             simple_warning(msg.format(self.name, _DEFAULT_WRITER))
         self.class_names = class_names
 
@@ -505,9 +502,9 @@ class XDSMjsWriter(AbstractXDSMWriter):
             Solver info.
         """
         def recurse(solv, nr, process):
-            for i, cmp in enumerate(process):
+            for i, cmp in enumerate(process, start=1):
                 if cmp == solv:
-                    process[i + 1:i + 1 + nr] = [process[i + 1:i + 1 + nr]]
+                    process[i:i + nr] = [process[i:i + nr]]
                     return
                 elif isinstance(cmp, list):
                     recurse(solv, nr, cmp)
@@ -669,7 +666,7 @@ else:
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
                      number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False, class_names=False,
-                     add_component_indices=True):
+                     add_component_indices=True, equations=False, options={}):
             """
             Initialize.
 
@@ -684,14 +681,18 @@ else:
                 Position of number relative to the component label. Possible values
                 are: 'horizontal', 'vertical'.
             legend : bool
-                If true, a legend will be added to the diagram.
+                If True, a legend will be added to the diagram.
             class_names : bool, optional
-                If true, appends class name of groups/components to the component blocks of diagram.
+                If True, appends class name of groups/components to the component blocks of diagram.
                 Defaults to False.
             add_component_indices : bool
-                If true, display components with numbers.
+                If True, display components with numbers.
+            equations : bool
+                If True, show equations for ExecComps.
+            options : dict
+                Keyword argument options of the XDSM class.
             """
-            super(XDSMWriter, self).__init__()
+            super(XDSMWriter, self).__init__(**options)
             self.name = name
             # Formatting options
             self.box_stacking = box_stacking
@@ -745,18 +746,19 @@ else:
                         if loop < i0:
                             i += 1
                     # Step is not None for the driver and solvers, for these a different label
-                    # will be made showing the starting end and step and the index of the next step.
+                    # will be made showing the starting end and step and the index of the next
+                    # step.
                     if step is not None:
                         i = self._make_loop_str(first=i, last=step, start_index=_START_INDEX)
-                    # Add the number
-                    label = self.finalize_label(i, label, self.number_alignment,
-                                                class_name=comp['class'])
                 else:
-                    label = self.finalize_label(None, label, self.number_alignment,
-                                                class_name=comp['class'])
-                # Convert from math mode to regular text
-                comp['label'] = self._textify(label)
-                # Now the label is finished.
+                    i = None
+                label = self.finalize_label(i, label, self.number_alignment,
+                                            class_name=comp['class'])
+
+                # Convert from math mode to regular text, if it is a one liner wrapped in math mode
+                if isinstance(label, string_types):
+                    label = _textify(label)
+                comp['label'] = label  # Now the label is finished.
                 # Now really add the system with the XDSM class' method
                 self.add_system(**comp)
 
@@ -884,10 +886,10 @@ else:
                 # processes
                 for proc in self.processes:
                     process_name = proc[0]
-                    for i, item in enumerate(proc):
+                    for i, item in enumerate(proc, start=1):
                         if solver_name == item:  # solver found in an already added process
                             # Delete items belonging to the new process from the others
-                            proc[i + 1:i + 1 + nr] = []
+                            proc[i:i + nr] = []
                             process_index = index_dct[process_name]
                             # There is a process loop inside, this adds plus one step
                             self._comps[process_index]['step'] += 1
@@ -897,18 +899,13 @@ else:
             self.add_process(comp_names, arrow=_PROCESS_ARROWS)
 
         @staticmethod
-        def _textify(name):
-            # Uses the LaTeX \text{} command to insert plain text in math mode
-            return '\\text{%s}' % name
-
-        @staticmethod
         def format_block(names, stacking='vertical', **kwargs):
             """
             Format a block.
 
             Parameters
             ----------
-            names : str
+            names : list
                 Names to put into block.
             stacking : str
                 Controls the appearance of boxes. Possible values are: 'max_chars','vertical',
@@ -998,7 +995,7 @@ else:
         def _make_loop_str(first, last, start_index=0):
             # Start index shifts all numbers
             i = start_index
-            txt = '{}, {}$ \\rightarrow $ {}'
+            txt = '{}, {} $ \\rightarrow $ {}'
             return txt.format(first + i, last + i, first + i + 1)
 
         def finalize_label(self, number, txt, alignment, class_name=None):
@@ -1019,31 +1016,25 @@ else:
 
             Returns
             -------
-            str
-                Label to be used for this item.
+            str or list(str)
+                Label to be used for this item. List, if it is multiline.
             """
-            def multi_ln(txt, number=None):
-                # Converts text to a multiline block, if an index or class name is added in
-                # separate row.
-                if self.class_names and (class_name is not None):
-                    cls_name = '\\textit{%s}' % class_name  # Makes it italic
-                    txt = '} \\\\ \\text{'.join([txt, cls_name])  # Formatting for multi-line array
-                elif number is None:
-                    return txt  # No number, no classname, just flows through
-                texts = [number, txt] if number is not None else [txt]
-                return _multiline_block(*texts)
+            if isinstance(txt, string_types):
+                txt = [txt]  # Make iterable, it will be converted back if there is only 1 line.
 
+            if self.class_names and (class_name is not None):
+                cls_name = r'\textit{{{}}}'.format(class_name)  # Makes it italic
+                txt.append(cls_name)  # Class name goes to a new line
             if number:  # If number is None or empty string, it won't be inserted
                 number_str = '{}: '.format(number)
                 if alignment == 'horizontal':
-                    txt = '{}{}'.format(number_str, txt)
-                    return multi_ln(txt)
+                    txt[0] = number_str + txt[0]  # Number added to first line
                 elif alignment == 'vertical':
-                    return multi_ln(txt, number_str)
+                    txt.insert(0, number_str)  # Number added to new line
                 else:
-                    return txt  # In case of a wrong setting
-            else:
-                return multi_ln(txt)
+                    msg = '"{}" is an invalid option for number_alignment, it will be ignored.'
+                    simple_warning(msg.format(alignment))
+            return _multiline_block(*txt)
 
         def _make_legend(self, title="Legend"):
             """
@@ -1065,7 +1056,6 @@ else:
                                                    label=style)
             style_strs = [node_str.format(name="style{}".format(i), style=style, label=style)
                           for i, style in enumerate(styles)]
-            # return '};\n\\matrix[MatrixSetup, below left]{' + '  &\n'.join(style_strs) + r'\\'
             title_str = r'\node (legend_title) {{\LARGE \textbf{{{title}}}}};\\'
             return title_str.format(title=title) + '  &\n'.join(style_strs) + r'\\'
 
@@ -1088,7 +1078,8 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                include_external_outputs=True, out_format='tex',
                include_solver=False, subs=_CHAR_SUBS, show_browser=True,
                add_process_conns=True, show_parallel=True, output_side=_DEFAULT_OUTPUT_SIDE,
-               legend=False, class_names=True, **kwargs):
+               legend=False, class_names=True, equations=False,
+               writer_options={}, **kwargs):
     """
     Write XDSM diagram of an optimization problem.
 
@@ -1175,6 +1166,11 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
     class_names : bool, optional
         If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
+    equations : bool, optional
+        If true, for ExecComps their equations are shown in the diagram
+        Defaults to False.
+    writer_options : dict, optional
+        Options passed to the writer class at initialization.
     **kwargs : dict
         Keyword arguments
 
@@ -1260,7 +1256,8 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
                        include_external_outputs=include_external_outputs, show_browser=show_browser,
                        add_process_conns=add_process_conns, build_pdf=build_pdf,
                        show_parallel=show_parallel, driver_type=driver_type,
-                       output_side=output_side, legend=legend, class_names=class_names, **kwargs)
+                       output_side=output_side, legend=legend, class_names=class_names,
+                       writer_options=writer_options, equations=equations, **kwargs)
 
 
 def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanup=True,
@@ -1268,7 +1265,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 include_external_outputs=True, subs=_CHAR_SUBS, writer='pyXDSM', show_browser=False,
                 add_process_conns=True, show_parallel=True, quiet=False, build_pdf=False,
                 output_side=_DEFAULT_OUTPUT_SIDE, driver_type='optimization', legend=False,
-                class_names=False, **kwargs):
+                class_names=False, equations=False, writer_options={}, **kwargs):
     """
     XDSM writer. Components are extracted from the connections of the problem.
 
@@ -1328,8 +1325,13 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     class_names : bool, optional
         If true, appends class name of the groups/components to the component blocks of the diagram.
         Defaults to False.
+    equations : bool, optional
+        If true, for ExecComps their equations are shown in the diagram
+        Defaults to False.
+    writer_options : dict, optional
+        Options passed to the writer class at initialization.
     **kwargs : dict
-        Keyword arguments
+        Keyword arguments, includes writer specific options.
 
     Returns
     -------
@@ -1353,9 +1355,10 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                            number_alignment=number_alignment,
                            add_component_indices=add_component_indices,
                            legend=legend,
-                           class_names=class_names)
+                           class_names=class_names,
+                           options=writer_options)
         elif writer.lower() == 'xdsmjs':  # XDSMjs
-            x = XDSMjsWriter()
+            x = XDSMjsWriter(options=writer_options)
         else:
             raise ValueError(error_msg.format(writer))
     elif isinstance(writer, BaseXDSMWriter):  # Custom writer
@@ -1407,10 +1410,12 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # Uses some vars from the outer scope.
         # Returns True, if it is a non-default linear or nonlinear solver
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
-        solver_label = _format_solver_str(solver_dct,
-                                          stacking=box_stacking,
-                                          add_indices=add_component_indices)
-        solver_label = _replace_chars(solver_label, subs)
+        solver_label = _format_solver_str(solver_dct, stacking=box_stacking)
+
+        if isinstance(solver_label, string_types):
+            solver_label = _replace_chars(solver_label, subs)
+        else:
+            solver_label = [_replace_chars(i, subs) for i in solver_label]
         solver_name = _format_name(solver_dct['abs_name'])
 
         if solver_label:  # At least one non-default solver (default solvers are ignored)
@@ -1469,20 +1474,49 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     # Add components
     solver_dcts = []
+    if equations:
+        try:
+            from pytexit import py2tex
+        except ImportError:
+            equations = False
+            msg = 'The LaTeX equation formatting requires the pytexit package.' \
+                  'The "equations" options was turned off.' \
+                  'To enable this option install the package with "pip install pytexit".'
+            simple_warning(msg)
+
     for comp in comps:  # Driver is 1, so starting from 2
-        label = _replace_chars(comp['name'], substitutes=subs)
+        # The second condition is for backwards compatibility with older data.
+        if equations and comp.get('expressions', None) is not None:
+            # One of the $ signs has to be removed to correctly parse it
+            if isinstance(x, XDSMWriter):
+                def parse(expr):
+                    for (ch, rep) in (('$$', '$'), (r'[', '_'), (r']', '')):
+                        expr = expr.replace(ch, rep)
+                    # One of the $ signs has to be removed to correctly parse it
+                    return py2tex(expr).replace('$$', '$')
+
+                expression = comp['expressions']
+                try:
+                    label = ', '.join(map(parse, expression))
+                except TypeError:
+                    label = _replace_chars(comp['name'], substitutes=subs)
+                    simple_warning('Could not parse "{}"'.format(expression))
+            else:
+                msg = 'The "equations" option is available only with pyXDSM. Set the output ' \
+                      'format to "tex" or "pdf" to enable this option.'
+                simple_warning(msg)
+                label = _replace_chars(comp['name'], substitutes=subs)
+        else:
+            label = _replace_chars(comp['name'], substitutes=subs)
         stack = comp['is_parallel'] and show_parallel
         if include_solver and comp['type'] == 'solver':  # solver
             if add_solver(comp):  # Return value is true, if solver is not the default
                 # If not default solver, add to the solver dictionary
                 solver_dcts.append(comp)
         else:  # component or group
-            if not class_names:
-                x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                           comp_type=comp['component_type'])
-            else:
-                x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                           comp_type=comp['component_type'], cls=comp.get('class', None))
+            cls_name = comp.get('class', None) if class_names else None
+            x.add_comp(name=comp['abs_name'], label=label, stack=stack,
+                       comp_type=comp['component_type'], cls=cls_name)
 
     # Add process connections
     if add_process_conns:
@@ -1601,10 +1635,7 @@ def _make_rel_path(full_path, model_path, sep='.'):
         first_char = len(path)
         if full_path.startswith(path):
             return full_path[first_char:]
-        else:
-            return full_path
-    else:
-        return full_path  # No model path, so return the original
+    return full_path  # No model path, so return the original
 
 
 def _convert_name(name, recurse=True, subs=None):
@@ -1615,7 +1646,7 @@ def _convert_name(name, recurse=True, subs=None):
 
     Parameters
     ----------
-    name : str
+    name : str or list(str)
         Connection absolute path and name
     recurse : bool
         If False, treat the top level of each name as the source/target component.
@@ -1647,7 +1678,7 @@ def _convert_name(name, recurse=True, subs=None):
                 'abs_name': _format_name(name), 'path': _format_name(path)}
 
     if isinstance(name, list):  # If a source has multiple targets
-        return [convert(n) for n in name]
+        return map(convert, name)
     else:  # string
         return convert(name)
 
@@ -1688,29 +1719,29 @@ def _prune_connections(conns, model_path=None, sep='.'):
         to an external target.
 
     """
-    internal_conns = []
     external_inputs = []
     external_outputs = []
 
     if model_path is None:
         return conns, external_inputs, external_outputs
     else:
+        internal_conns = []
+
         path = model_path + sep  # Add separator character
         for conn in conns:
             src = conn['src']
             src_path = _make_rel_path(src, model_path=model_path)
             tgt = conn['tgt']
             tgt_path = _make_rel_path(tgt, model_path=model_path)
+            conn_dct = {'src': src_path, 'tgt': tgt_path}
 
-            if src.startswith(path) and tgt.startswith(path):
-                # Internal connections
-                internal_conns.append({'src': src_path, 'tgt': tgt_path})
-            elif not src.startswith(path) and tgt.startswith(path):
-                # Externally connected input
-                external_inputs.append({'src': src_path, 'tgt': tgt_path})
-            elif src.startswith(path) and not tgt.startswith(path):
-                # Externally connected output
-                external_outputs.append({'src': src_path, 'tgt': tgt_path})
+            if src.startswith(path):
+                if tgt.startswith(path):
+                    internal_conns.append(conn_dct)  # Internal connections
+                else:
+                    external_outputs.append(conn_dct)  # Externally connected output
+            elif tgt.startswith(path):
+                external_inputs.append(conn_dct)  # Externally connected input
         return internal_conns, external_inputs, external_outputs
 
 
@@ -1842,13 +1873,12 @@ def _replace_chars(name, substitutes):
        str
     """
     if substitutes:
-        for (k, v) in substitutes:
+        for k, v in substitutes:
             name = name.replace(k, v)
     return name
 
 
-def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'linear'),
-                       add_indices=False):
+def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'linear')):
     """
     Format solver string.
 
@@ -1874,10 +1904,7 @@ def _format_solver_str(dct, stacking='horizontal', solver_types=('nonlinear', 'l
             solvers.append(solver_name)
     if stacking == 'vertical':
         # Make multiline comp if not numbered
-        if add_indices:  # array is already created for the numbering
-            return '} \\\\ \\text{'.join(solvers)  # With a TeX array this is a line separator
-        else:  # Goes into an array environment
-            return _multiline_block(*solvers)
+        return _multiline_block(*solvers)
     elif stacking in ('horizontal', 'max_chars', 'cut_chars'):
         return ' '.join(solvers)
     else:
@@ -1890,6 +1917,8 @@ def _multiline_block(*texts, **kwargs):
     """
     Make a string for a multiline block.
 
+    A string is returned, if there would be only 1 line.
+
     texts : iterable(str)
         Text strings, each will go to new line
     **kwargs : dict
@@ -1898,10 +1927,15 @@ def _multiline_block(*texts, **kwargs):
 
     Returns
     -------
-       str
+       list(str) or str
     """
     end_char = kwargs.pop('end_char', '')
-    texts = ['\\text{{{}{}}}'.format(t, end_char) for t in texts]
-    template = '$\\begin{{array}}{{{pos}}} {text} \\end{{array}}$'
-    new_line = ' \\\\ '
-    return template.format(text=new_line.join(texts), pos='c' * len(texts))
+    out_txts = [_textify(t + end_char) for t in texts]
+    if len(out_txts) == 1:
+        out_txts = out_txts[0]
+    return out_txts
+
+
+def _textify(name):
+    # Uses the LaTeX \text{} command to insert plain text in math mode
+    return r'\text{{{}}}'.format(name)

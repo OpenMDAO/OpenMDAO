@@ -934,7 +934,7 @@ class MetaModelVisualization(object):
         self._update_all_plots()
 
 
-def view_metamodel(meta_model_comp, resolution, port_number):
+def view_metamodel(meta_model_comp, resolution, port_number, browser):
     """
     Visualize a metamodel.
 
@@ -946,6 +946,8 @@ def view_metamodel(meta_model_comp, resolution, port_number):
         Number of points to control contour plot resolution.
     port_number : int
         Bokeh plot port number.
+    browser : bool
+        Boolean to show the browser
     """
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler
@@ -953,7 +955,10 @@ def view_metamodel(meta_model_comp, resolution, port_number):
     def make_doc(doc):
         MetaModelVisualization(meta_model_comp, resolution, doc=doc)
 
-    # print('Opening Bokeh application on http://localhost:5006/')
     server = Server({'/': Application(FunctionHandler(make_doc))}, port=int(port_number))
-    server.io_loop.add_callback(server.show, "/")
+    if browser:
+        server.io_loop.add_callback(server.show, "/")
+    else:
+        print('Server started, to view go to http://localhost:{}/'.format(port_number))
+
     server.io_loop.start()

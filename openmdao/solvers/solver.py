@@ -8,6 +8,7 @@ import os
 import pprint
 import re
 import sys
+import weakref
 
 import numpy as np
 
@@ -225,7 +226,7 @@ class Solver(object):
         """
         if self._system is None:
             return type(self).__name__
-        return '{} in {}'.format(type(self).__name__, self._system.msginfo)
+        return '{} in {}'.format(type(self).__name__, self._system().msginfo)
 
     def _assembled_jac_solver_iter(self):
         """
@@ -267,7 +268,7 @@ class Solver(object):
         depth : int
             depth of the current system (already incremented).
         """
-        self._system = system
+        self._system = weakref.ref(system)
         self._depth = depth
         self._solver_info = system._solver_info
         self._recording_iter = system._recording_iter
@@ -338,7 +339,7 @@ class Solver(object):
         rel_res : float
             current relative residual norm.
         """
-        if (self.options['iprint'] == 2 and self._system.comm.rank == 0):
+        if (self.options['iprint'] == 2 and self._system().comm.rank == 0):
 
             prefix = self._solver_info.prefix
             solver_name = self.SOLVER
@@ -390,7 +391,8 @@ class Solver(object):
                 norm0 = 1
             self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        if self._system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
+        system = self._system()
+        if system.comm.rank == 0 or os.environ.get('USE_PROC_FILES'):
             prefix = self._solver_info.prefix + self.SOLVER
 
             # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
@@ -399,12 +401,12 @@ class Solver(object):
                 msg = "Solver '{}' on system '{}': residuals contain 'inf' or 'NaN' after {} " + \
                       "iterations."
                 if iprint > -1:
-                    print(prefix + msg.format(self.SOLVER, self._system.pathname,
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
                                               self._iter_count))
 
                 # Raise AnalysisError if requested.
                 if self.options['err_on_non_converge']:
-                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname,
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
                                                    self._iter_count))
 
             # Solver hit maxiter without meeting desired tolerances.
@@ -412,12 +414,12 @@ class Solver(object):
                 msg = "Solver '{}' on system '{}' failed to converge in {} iterations."
 
                 if iprint > -1:
-                    print(prefix + msg.format(self.SOLVER, self._system.pathname,
+                    print(prefix + msg.format(self.SOLVER, system.pathname,
                                               self._iter_count))
 
                 # Raise AnalysisError if requested.
                 if self.options['err_on_non_converge']:
-                    raise AnalysisError(msg.format(self.SOLVER, self._system.pathname,
+                    raise AnalysisError(msg.format(self.SOLVER, system.pathname,
                                                    self._iter_count))
 
             # Solver converged
@@ -493,7 +495,7 @@ class Solver(object):
             'rel': kwargs.get('rel') if self.recording_options['record_rel_error'] else None
         }
 
-        system = self._system
+        system = self._system()
         typ = 'nonlinear' if isinstance(self, NonlinearSolver) else 'linear'
 
         outputs = system._vectors['output'][typ]
@@ -610,9 +612,10 @@ class NonlinearSolver(Solver):
         float
             error at the first iteration.
         """
+        system = self._system()
         if self.options['debug_print']:
-            self._err_cache['inputs'] = self._system._inputs._copy_views()
-            self._err_cache['outputs'] = self._system._outputs._copy_views()
+            self._err_cache['inputs'] = system._inputs._copy_views()
+            self._err_cache['outputs'] = system._outputs._copy_views()
 
         if self.options['maxiter'] > 0:
             self._run_apply()
@@ -628,7 +631,7 @@ class NonlinearSolver(Solver):
         """
         self._recording_iter.stack.append(('_run_apply', 0))
         try:
-            self._system._apply_nonlinear()
+            self._system()._apply_nonlinear()
         finally:
             self._recording_iter.stack.pop()
 
@@ -641,16 +644,16 @@ class NonlinearSolver(Solver):
         float
             norm.
         """
-        return self._system._residuals.get_norm()
+        return self._system()._residuals.get_norm()
 
     def _disallow_discrete_outputs(self):
         """
         Raise an exception if any discrete outputs exist in our System.
         """
-        if self._system._var_allprocs_discrete['output']:
+        if self._system()._var_allprocs_discrete['output']:
             raise RuntimeError("%s has a %s solver and contains discrete outputs %s." %
-                               (self._system.msginfo, type(self).__name__,
-                                sorted(self._system._var_allprocs_discrete['output'])))
+                               (self._system().msginfo, type(self).__name__,
+                                sorted(self._system()._var_allprocs_discrete['output'])))
 
     def _print_exc_debug_info(self):
         coord = self._recording_iter.get_formatted_iteration_coordinate()
@@ -677,7 +680,7 @@ class NonlinearSolver(Solver):
         """
         Perform a Gauss-Seidel iteration over this Solver's subsystems.
         """
-        system = self._system
+        system = self._system()
         for isub, (subsys, local)in enumerate(system._all_subsystem_iter()):
             system._transfer('nonlinear', 'fwd', isub)
 
@@ -776,7 +779,7 @@ class LinearSolver(Solver):
         """
         self._recording_iter.stack.append(('_run_apply', 0))
 
-        system = self._system
+        system = self._system()
         scope_out, scope_in = system._get_scope()
 
         try:
@@ -815,18 +818,20 @@ class BlockLinearSolver(LinearSolver):
 
     def _create_rhs_vecs(self):
         self._rhs_vecs = rhs = {}
-        for vec_name in self._system._lin_rel_vec_name_list:
+        system = self._system()
+        for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                rhs[vec_name] = self._system._vectors['residual'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['residual'][vec_name]._data.copy()
             else:
-                rhs[vec_name] = self._system._vectors['output'][vec_name]._data.copy()
+                rhs[vec_name] = system._vectors['output'][vec_name]._data.copy()
 
     def _update_rhs_vecs(self):
-        for vec_name in self._system._lin_rel_vec_name_list:
+        system = self._system()
+        for vec_name in system._lin_rel_vec_name_list:
             if self._mode == 'fwd':
-                self._rhs_vecs[vec_name][:] = self._system._vectors['residual'][vec_name]._data
+                self._rhs_vecs[vec_name][:] = system._vectors['residual'][vec_name]._data
             else:
-                self._rhs_vecs[vec_name][:] = self._system._vectors['output'][vec_name]._data
+                self._rhs_vecs[vec_name][:] = system._vectors['output'][vec_name]._data
 
     def _set_complex_step_mode(self, active):
         """
@@ -839,7 +844,7 @@ class BlockLinearSolver(LinearSolver):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for vec_name in self._system._lin_rel_vec_name_list:
+        for vec_name in self._system()._lin_rel_vec_name_list:
             if active:
                 self._rhs_vecs[vec_name] = self._rhs_vecs[vec_name].astype(np.complex)
             else:
@@ -877,7 +882,7 @@ class BlockLinearSolver(LinearSolver):
         float
             norm.
         """
-        system = self._system
+        system = self._system()
 
         if self._mode == 'fwd':
             b_vecs = system._vectors['residual']
