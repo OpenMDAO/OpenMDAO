@@ -492,48 +492,25 @@ class Solver(object):
         # Get the data
         data = {
             'abs': kwargs.get('abs') if self.recording_options['record_abs_error'] else None,
-            'rel': kwargs.get('rel') if self.recording_options['record_rel_error'] else None
+            'rel': kwargs.get('rel') if self.recording_options['record_rel_error'] else None,
+            'input': {},
+            'output': {},
+            'residual': {}
         }
 
         system = self._system()
-        typ = 'nonlinear' if isinstance(self, NonlinearSolver) else 'linear'
-
-        outputs = system._vectors['output'][typ]
-        inputs = system._vectors['input'][typ]
-        residuals = system._vectors['residual'][typ]
+        vec_name = 'nonlinear' if isinstance(self, NonlinearSolver) else 'linear'
+        filt = self._filtered_vars_to_record
+        parallel = self._rec_mgr._check_parallel() if system.comm.size > 1 else False
 
         if self.recording_options['record_outputs']:
-            data['output'] = {}
-            if 'output' in self._filtered_vars_to_record:
-                for out in self._filtered_vars_to_record['output']:
-                    if out in outputs._names:
-                        data['output'][out] = outputs._views[out]
-            else:
-                data['output'] = outputs
-        else:
-            data['output'] = None
+            data['output'] = system._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
 
         if self.recording_options['record_inputs']:
-            data['input'] = {}
-            if 'input' in self._filtered_vars_to_record:
-                for inp in self._filtered_vars_to_record['input']:
-                    if inp in inputs._names:
-                        data['input'][inp] = inputs._views[inp]
-            else:
-                data['input'] = inputs
-        else:
-            data['input'] = None
+            data['input'] = system._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
 
         if self.recording_options['record_solver_residuals']:
-            data['residual'] = {}
-            if 'residual' in self._filtered_vars_to_record:
-                for res in self._filtered_vars_to_record['residual']:
-                    if res in residuals._names:
-                        data['residual'][res] = residuals._views[res]
-            else:
-                data['residual'] = residuals
-        else:
-            data['residual'] = None
+            data['residual'] = system._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
 
         self._rec_mgr.record_iteration(self, data, metadata)
 

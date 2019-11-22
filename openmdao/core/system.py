@@ -4165,6 +4165,25 @@ class System(object):
         return val
 
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, parallel=False):
+        """
+        Retrieve variables, either local or remote, in the filtered_vars list.
+
+        Parameters
+        ----------
+        filtered_vars : dict
+            Dictionary containing entries for 'input', 'output', and/or 'residual'.
+        kind : str
+            Either 'input', 'output', or 'residual'.
+        vec_name : str
+            Either 'nonlinear' or 'linear'.
+        parallel : bool
+            If True, recorders are parallel, so only local values should be saved in each proc.
+
+        Returns
+        -------
+        dict
+            Variable values keyed on absolute name.
+        """
         vdict = {}
         variables = filtered_vars.get(kind)
         if variables:
