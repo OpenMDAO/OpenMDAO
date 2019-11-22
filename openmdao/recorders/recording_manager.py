@@ -187,6 +187,16 @@ class RecordingManager(object):
         """
         return True if self._recorders else False
 
+    def _check_parallel(self):
+        pset = {bool(r._parallel) for r in self._recorders}
+
+        # check to make sure we don't have mixed parallel/non-parallel, because that
+        # currently won't work properly.
+        if len(pset) > 1:
+            raise RuntimeError("OpenMDAO currently does not support a mixture of parallel "
+                               "and non-parallel recorders.")
+        return pset.pop()
+
 
 def record_viewer_data(problem):
     """

@@ -1425,59 +1425,54 @@ class System(object):
         return comm
 
     def _setup_recording(self, recurse=True):
-        myinputs = myoutputs = myresiduals = set()
+        if self._rec_mgr._recorders:
+            myinputs = myoutputs = myresiduals = set()
 
-        options = self.recording_options
-        incl = options['includes']
-        excl = options['excludes']
+            options = self.recording_options
+            incl = options['includes']
+            excl = options['excludes']
 
-        # includes and excludes for inputs are specified using _absolute_ names
-        # vectors are keyed on absolute name, discretes on relative/promoted name
-        abs2prom = self._var_abs2prom['input']
+            # includes and excludes for inputs are specified using _absolute_ names
+            # vectors are keyed on absolute name, discretes on relative/promoted name
+            if options['record_inputs']:
+                abs2prom = self._var_allprocs_abs2prom['input']
+                myinputs = {n for n in self._inputs._views if check_path(n, incl, excl)}
 
-        if options['record_inputs']:
-            myinputs = set()
-            if self._inputs:
-                myinputs.update({n for n in self._inputs._names
-                                 if check_path(n, incl, excl)})
+                if len(self._var_discrete['input']) > 0:
+                    for n in self._var_discrete['input']:
+                        abs_name = '.'.join((self.pathname, n)) if self.pathname else n
+                        if check_path(abs_name, incl, excl):
+                            myinputs.add(abs_name)
 
-            if len(self._var_discrete['input']) > 0:
-                for n in self._var_discrete['input']:
-                    abs_name = self.pathname + '.' + n if self.pathname else n
-                    if check_path(abs_name, incl, excl):
-                        myinputs.add(n)
+            # includes and excludes for outputs are specified using _promoted_ names
+            # vectors are keyed on absolute name, discretes on relative/promoted name
+            if options['record_outputs']:
+                abs2prom = self._var_allprocs_abs2prom['output']
+                myoutputs = {n for n in self._outputs._views
+                             if n in abs2prom and check_path(abs2prom[n], incl, excl)}
 
-        # includes and excludes for outputs are specified using _promoted_ names
-        # vectors are keyed on absolute name, discretes on relative/promoted name
-        abs2prom = self._var_abs2prom['output']
+                if len(self._var_discrete['output']) > 0:
+                    # residuals have the same names as the continuous outputs
+                    if options['record_residuals']:
+                        myresiduals = myoutputs.copy()
+                    for n in self._var_discrete['output']:
+                        abs_name = '.'.join((self.pathname, n)) if self.pathname else n
+                        if check_path(n, incl, excl):
+                            myoutputs.add(abs_name)
+                elif options['record_residuals']:
+                    myresiduals = myoutputs
 
-        if options['record_outputs']:
-            myoutputs = set()
-            if self._outputs:
-                myoutputs.update({n for n in self._outputs._names
-                                  if n in abs2prom and check_path(abs2prom[n], incl, excl)})
-
-            if len(self._var_discrete['output']) > 0:
-                myoutputs.update({n for n in self._var_discrete['output']
-                                  if check_path(n, incl, excl)})
-                # residuals have the same names as the continuous outputs
-                if options['record_residuals']:
-                    myresiduals = myoutputs.copy()
             elif options['record_residuals']:
-                myresiduals = myoutputs
-
-        elif options['record_residuals']:
-            if self._residuals:
-                myresiduals = {n for n in self._residuals._names
+                myresiduals = {n for n in self._residuals._views
                                if n in abs2prom and check_path(abs2prom[n], incl, excl)}
 
-        self._filtered_vars_to_record = {
-            'input': myinputs,
-            'output': myoutputs,
-            'residual': myresiduals
-        }
+            self._filtered_vars_to_record = {
+                'input': myinputs,
+                'output': myoutputs,
+                'residual': myresiduals
+            }
 
-        self._rec_mgr.startup(self)
+            self._rec_mgr.startup(self)
 
         # Recursion
         if recurse:
@@ -3717,13 +3712,13 @@ class System(object):
         Record an iteration of the current System.
         """
         if self._rec_mgr._recorders:
+            parallel = self._rec_mgr._check_parallel() if self.comm.size > 1 else False
             options = self.recording_options
-
             metadata = create_local_meta(self.pathname)
 
             # Get the data to record
             stack_top = self._recording_iter.stack[-1][0]
-            method = stack_top.split('.')[-1]
+            method = stack_top.rsplit('.', 1)[-1]
 
             if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
                               '_solve_nonlinear']:
@@ -3732,73 +3727,24 @@ class System(object):
 
             if 'nonlinear' in method:
                 inputs, outputs, residuals = self.get_nonlinear_vectors()
+                vec_name = 'nonlinear'
             else:
                 inputs, outputs, residuals = self.get_linear_vectors()
+                vec_name = 'linear'
 
             discrete_inputs = self._discrete_inputs
             discrete_outputs = self._discrete_outputs
+            filt = self._filtered_vars_to_record
 
-            data = {}
+            data = {'input': {}, 'output': {}, 'residual': {}}
             if options['record_inputs'] and (inputs._names or len(discrete_inputs) > 0):
-                data['input'] = {}
-                if 'input' in self._filtered_vars_to_record:
-                    # use filtered inputs
-                    for inp in self._filtered_vars_to_record['input']:
-                        if inp in inputs._names:
-                            data['input'][inp] = inputs._views[inp]
-                        elif inp in discrete_inputs:
-                            abs_name = self.pathname + '.' + inp if self.pathname else inp
-                            data['input'][abs_name] = discrete_inputs[inp]
-                else:
-                    # use all the inputs
-                    if len(discrete_inputs) > 0:
-                        for inp in inputs:
-                            data['input'][inp] = inputs._views[inp]
-                        for inp in discrete_inputs:
-                            abs_name = self.pathname + '.' + inp if self.pathname else inp
-                            data['input'][abs_name] = discrete_inputs[inp]
-                    else:
-                        data['input'] = inputs._names
-
-            else:
-                data['input'] = None
+                data['input'] = self._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
 
             if options['record_outputs'] and (outputs._names or len(discrete_outputs) > 0):
-                data['output'] = {}
-                if 'output' in self._filtered_vars_to_record:
-                    # use outputs from filtered list.
-                    for out in self._filtered_vars_to_record['output']:
-                        if out in outputs._names:
-                            data['output'][out] = outputs._views[out]
-                        elif out in discrete_outputs:
-                            abs_name = self.pathname + '.' + out if self.pathname else out
-                            data['output'][abs_name] = discrete_outputs[out]
-                else:
-                    # use all the outputs
-                    if len(discrete_outputs) > 0:
-                        for out in outputs:
-                            data['output'][out] = outputs._views[out]
-                        for out in discrete_outputs:
-                            abs_name = self.pathname + '.' + out if self.pathname else out
-                            data['output'][abs_name] = discrete_outputs[out]
-                    else:
-                        data['output'] = outputs._names
-            else:
-                data['output'] = None
+                data['output'] = self._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
 
             if options['record_residuals'] and residuals._names:
-                data['residual'] = {}
-
-                if 'residual' in self._filtered_vars_to_record:
-                    # use filtered residuals
-                    for res in self._filtered_vars_to_record['residual']:
-                        if res in residuals._names:
-                            data['residual'][res] = residuals._views[res]
-                else:
-                    # use all the residuals
-                    data['residual'] = residuals._names
-            else:
-                data['residual'] = None
+                data['residual'] = self._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
 
             self._rec_mgr.record_iteration(self, data, metadata)
 
@@ -4065,7 +4011,8 @@ class System(object):
         return (self._nodup_out_ranges[key], self._nodup2local_out_inds[key],
                 self._local2owned_inds[key], self._noncontig_dis_inds[key])
 
-    def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None):
+    def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
+                     flat=False):
         """
         Return the value of the variable specified by the given absolute name.
 
@@ -4086,6 +4033,8 @@ class System(object):
         kind : str or None
             Kind of variable ('input', 'output', or 'residual').  If None, returned value
             will be either an input or output.
+        flat : bool
+            If True, return the flattened version of the value.
 
         Returns
         -------
@@ -4122,7 +4071,7 @@ class System(object):
         if not discrete:
             vec = self._vectors[kind][vec_name]
             if abs_name in vec._views:
-                val = vec._views[abs_name]
+                val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
         if get_remote:
             owner = self._owning_rank[abs_name]
@@ -4161,13 +4110,13 @@ class System(object):
                         if self.comm.rank == rank:
                             val = vals[owner]
 
-        if val is not System._undefined and not discrete:
+        if not flat and val is not System._undefined and not discrete:
             val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']
 
         return val
 
     def _get_val(self, name, units=None, indices=None, get_remote=False, rank=None,
-                 vec_name='nonlinear', kind=None):
+                 vec_name='nonlinear', kind=None, flat=False):
         """
         Get an output/input/residual variable.
 
@@ -4192,6 +4141,8 @@ class System(object):
         kind : str or None
             Kind of variable ('input', 'output', or 'residual').  If None, returned value
             will be either an input or output.
+        flat : bool
+            If True, return the flattened version of the value.
 
         Returns
         -------
@@ -4202,28 +4153,14 @@ class System(object):
         if abs_name is None:
             raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
 
-        val = self._abs_get_val(abs_name, get_remote, rank, vec_name, kind)
+        val = self._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat)
 
         # TODO: get indexed value BEFORE transferring the variable (might be much smaller)
         if indices is not None:
             val = val[indices]
 
         if units is not None:
-            meta = self._var_allprocs_abs2meta[abs_name]
-
-            base_units = meta['units']
-
-            if base_units is None:
-                msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
-                raise TypeError(msg.format(self.msginfo, name, units))
-
-            try:
-                scale, offset = get_conversion(base_units, units)
-            except TypeError:
-                msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
-                raise TypeError(msg.format(self.msginfo, name, base_units, units))
-
-            val = (val + offset) * scale
+            val = self.convert2units(abs_name, val, units)
 
         return val
 
@@ -4233,21 +4170,42 @@ class System(object):
         if variables:
             views = self._vectors[kind][vec_name]._views
             rank = self.comm.rank
+            discrete_vec = None if kind == 'residual' else self._var_discrete[kind]
+            offset = len(self.pathname) + 1 if self.pathname else 0
+
             if self.comm.size == 1:
-                vdict = {n: views[n] for n in variables}
+                if discrete_vec:
+                    vdict = {}
+                    for n in variables:
+                        if n in views:
+                            vdict[n] = views[n]
+                        else:  # discrete
+                            vdict[n] = discrete_vec[n[offset:]]['value']
+                else:
+                    vdict = {n: views[n] for n in variables}
             elif parallel:
                 sizes = self._var_sizes[vec_name][kind]
                 abs2idx = self._var_allprocs_abs2idx[vec_name]
-                vdict = {n: views[n] for n in variables if sizes[rank, abs2idx[n]] > 0}
+                if discrete_vec:
+                    vdict = {}
+                    for n in variables:
+                        if n in views and sizes[rank, abs2idx[n]] > 0:
+                            vdict[n] = views[n]
+                        elif n[offset:] in discrete_vec and self._owning_rank[n] == rank:
+                            vdict[n] = discrete_vec[n[offset:]]['value']
+                else:
+                    vdict = {n: views[n] for n in variables if sizes[rank, abs2idx[n]] > 0}
             else:
-                owns = self._owning_rank
                 meta = self._var_allprocs_abs2meta
                 for name in variables:
-                    if owns[name] == 0 and not meta[name]['distributed']:
+                    if self._owning_rank[name] == 0 and not meta[name]['distributed']:
                         # if using a serial recorder and rank 0 owns the variable,
                         # use local value on rank 0 and do nothing on other ranks.
                         if rank == 0:
-                            vdict[name] = views[name]
+                            if name in views:
+                                vdict[name] = views[name]
+                            elif name[offset:] in discrete_vec:
+                                vdict[name] = discrete_vec[name[offset:]]['value']
                     else:
                         vdict[name] = self._get_val(name, get_remote=True, rank=0,
                                                     vec_name=vec_name, kind=kind)

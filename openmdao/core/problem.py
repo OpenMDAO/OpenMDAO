@@ -231,10 +231,6 @@ class Problem(object):
 
         _setup_hooks(self)
 
-        from openmdao.utils.general_utils import env_truthy
-        if env_truthy('USE_WING'):
-            import wingdbstub
-
     def _get_var_abs_name(self, name):
         if name in self.model._var_allprocs_abs2meta:
             return name

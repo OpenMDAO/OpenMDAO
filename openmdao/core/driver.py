@@ -129,14 +129,15 @@ class Driver(object):
         self.recording_options.declare('record_desvars', types=bool, default=True,
                                        desc='Set to True to record design variables at the '
                                             'driver level')
+        self.recording_options.declare('record_responses', types=bool, default=False,
+                                       desc='Set True to record constraints and objectives at the '
+                                            'driver level')
+
         self.recording_options.declare('record_objectives', types=bool, default=True,
                                        desc='Set to True to record objectives at the driver level')
         self.recording_options.declare('record_constraints', types=bool, default=True,
                                        desc='Set to True to record constraints at the '
                                             'driver level')
-        self.recording_options.declare('record_responses', types=bool, default=False,
-                                       desc='Set True to record constraints and objectives at the '
-                                            'driver level.')
         self.recording_options.declare('includes', types=list, default=[],
                                        desc='Patterns for variables to include in recording')
         self.recording_options.declare('excludes', types=list, default=[],
@@ -290,15 +291,16 @@ class Driver(object):
             abs2meta = model._var_allprocs_abs2meta
             for i, vname in enumerate(model._var_allprocs_abs_names['output']):
                 if abs2meta[vname]['distributed']:
-                    owner = None
+                    owner = sz = None
                 else:
                     owner = owning_ranks[vname]
+                    sz = sizes[owner, i]
                 if vname in dv_set:
-                    dv_dict[vname] = (owner, sizes[owner, i])
+                    dv_dict[vname] = (owner, sz)
                 if vname in con_set:
-                    con_dict[vname] = (owner, sizes[owner, i])
+                    con_dict[vname] = (owner, sz)
                 if vname in obj_set:
-                    obj_dict[vname] = (owner, sizes[owner, i])
+                    obj_dict[vname] = (owner, sz)
 
         self._remote_responses = self._remote_cons.copy()
         self._remote_responses.update(self._remote_objs)
@@ -436,7 +438,7 @@ class Driver(object):
             owner, size = remote_vois[name]
             # if var is distributed or only gathering to one rank
             if owner is None or rank is not None:
-                val = self._problem.get_val(name, get_remote=True, rank=rank)
+                val = model._get_val(name, get_remote=True, rank=rank, flat=True)
                 if indices is not None:
                     val = val[indices]
             else:
@@ -451,7 +453,6 @@ class Driver(object):
                     val = np.empty(size)
 
                 comm.Bcast(val, root=owner)
-
         else:
             if name in self._designvars_discrete:
                 val = model._discrete_outputs[name]
@@ -508,6 +509,7 @@ class Driver(object):
         """
         problem = self._problem()
 
+        # if the value is not local, don't set the value
         if (name in self._remote_dvs and
                 problem.model._owning_rank[name] != problem.comm.rank):
             return
@@ -1043,66 +1045,15 @@ def record_iteration(requester, prob, case_name):
         return
 
     # Get the data to record (collective calls that get across all ranks)
-    opts = requester.recording_options
     filt = requester._filtered_vars_to_record
-
     model = prob.model
-    rank = model.comm.rank
-    nrank = model.comm.size
-    owns = model._owning_rank
-    views = model._outputs._views
-    meta = model._var_allprocs_abs2meta
 
-    parallel = False
-    if nrank > 1:
-        for r in requester._rec_mgr._recorders:
-            if r._parallel:
-                parallel = True
-                break
-        # check to make sure we don't have mixed parallel/non-parallel, because that
-        # currently won't work properly.
-        for r in requester._rec_mgr._recorders:
-            if r._parallel != parallel:
-                raise RuntimeError("OpenMDAO currently does not support a mixture of parallel "
-                                   "and non-parallel recorders.")
+    parallel = requester._rec_mgr._check_parallel() if model.comm.size > 1 else False
 
     outs = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
-    # outs = {}
-    # if filt['output']:
-    #     if nrank == 1:
-    #         outs = {n: views[n] for n in filt['output']}
-    #     elif parallel:
-    #         sizes = model._var_sizes['nonlinear']['output']
-    #         abs2idx = model._var_allprocs_abs2idx['nonlinear']
-    #         outs = {n: views[n] for n in filt['output'] if sizes[rank, abs2idx[n]] > 0}
-    #     else:
-    #         for name in filt['output']:
-    #             if owns[name] == 0 and not meta[name]['distributed']:
-    #                 if rank == 0:
-    #                     outs[name] = views[name]
-    #             else:
-    #                 outs[name] = prob.model._get_val(name, get_remote=True, rank=0)
-
     ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
-    # ins = {}
-    # if 'input' in filt and filt['input']:
-    #     views = model._inputs._views
-    #     names = model._inputs._names
-    #     if nrank == 1:
-    #         ins = {n: views[n] for n in filt['input'] if n in names}
-    #     elif parallel:
-    #         sizes = model._var_sizes['nonlinear']['input']
-    #         abs2idx = model._var_allprocs_abs2idx['nonlinear']
-    #         ins = {n: views[n] for n in filt['input'] if sizes[n][abs2idx[n]] > 0}
-    #     else:
-    #         for name in filt['input']:
-    #             if name not in names:
-    #                 continue
-    #             if owns[name] == 0 and not meta[name]['distributed']:
-    #                 if rank == 0:
-    #                     ins[name] = views[name]
-    #             else:
-    #                 ins[name] = prob.get_val(name, get_remote=True, rank=0)
+
+    # TODO: need discrete vars as well
 
     data = {
         'output': outs,

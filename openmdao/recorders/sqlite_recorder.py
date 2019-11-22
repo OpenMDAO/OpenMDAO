@@ -461,10 +461,8 @@ class SqliteRecorder(CaseRecorder):
 
             # convert to list so this can be dumped as JSON
             for i_o_r in (inputs, outputs, residuals):
-                if i_o_r is None:
-                    continue
-                for var in i_o_r:
-                    i_o_r[var] = make_serializable(i_o_r[var])
+                for var, dat in i_o_r.items():
+                    i_o_r[var] = make_serializable(dat)
 
             outputs_text = json.dumps(outputs)
             inputs_text = json.dumps(inputs)
