@@ -12,13 +12,16 @@ from six import iteritems
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
-from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.visualization.graph_viewer.graph_viewer_app import _view_graphs_cmd, _view_graphs_setup_parser
+from openmdao.visualization.xdsm_viewer.xdsm_writer import write_xdsm, \
+    _DEFAULT_BOX_STACKING, _DEFAULT_BOX_WIDTH, _MAX_BOX_LINES, _DEFAULT_OUTPUT_SIDE, _CHAR_SUBS
 try:
     import bokeh
     from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
 except ImportError:
     bokeh = None
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
@@ -26,8 +29,6 @@ from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_p
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, \
     _mempost_exec, _mempost_setup_parser
 from openmdao.devtools.iprof_utils import _Options
-from openmdao.visualization.xdsm_viewer.xdsm_writer import write_xdsm, \
-    _DEFAULT_BOX_STACKING, _DEFAULT_BOX_WIDTH, _MAX_BOX_LINES, _DEFAULT_OUTPUT_SIDE, _CHAR_SUBS
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
@@ -667,6 +668,7 @@ _command_map = {
                       'View a colored jacobian.'),
     'view_connections': (_view_connections_setup_parser, _simple_exec, _view_connections_cmd,
                          'View connections showing values and source/target units.'),
+    'view_graphs': (_view_graphs_setup_parser, _simple_exec, _view_graphs_cmd, 'View system graphs.'),
     'view_mm': (_meta_model_parser, _simple_exec, _meta_model_cmd, "View a metamodel."),
     'view_model': (_n2_setup_parser, _view_model_cmd, None,
                    'Display an interactive N2 diagram of the problem. '
