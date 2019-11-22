@@ -14,6 +14,8 @@ class ModelData {
         this.unconnectedParams = 0;
         this.nodePaths = {};
 
+        this.colonVarNameAppend = "["; // Used internally to mark items split by colon vars
+
         startTimer('ModelData._convertToN2TreeNodes');
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
         stopTimer('ModelData._convertToN2TreeNodes');
@@ -97,10 +99,10 @@ class ModelData {
             parent.children = [];
         }
 
-        let parentIdx = indexForMember(parent.children, 'name', name);
+        let parentIdx = indexForMember(parent.children, 'name', name + this.colonVarNameAppend);
         if (parentIdx == -1) { //new name not found in parent, create new
             let newChild = new N2TreeNode({
-                "name": name,
+                "name": name + this.colonVarNameAppend,
                 "type": type,
                 "splitByColon": true,
                 "originalParent": originalParent
@@ -164,7 +166,16 @@ class ModelData {
             node.children.length == 1 &&
             node.children[0].splitByColon) {
             let child = node.children[0];
-            node.name += ":" + child.name;
+            if (node.name.endsWith(this.colonVarNameAppend)) {
+            	node.name = node.name.slice(0,-1);
+            }
+
+            if (child.name.endsWith(this.colonVarNameAppend))
+            {
+            	node.name += ":" + child.name.slice(0,-1);
+            } else {
+            	node.name += ":" + child.name;
+            }
             node.children = (Array.isArray(child.children) &&
                 child.children.length >= 1) ?
                 child.children : null; //absorb childs children
@@ -195,10 +206,27 @@ class ModelData {
 
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
-                node.absPathName += node.parent.absPathName;
+
+                if (node.parent.splitByColon)
+                {
+                    if (node.parent.absPathName.endsWith(this.colonVarNameAppend)){
+                    // if (node.parent.absPathName.endsWith("_")){
+                        node.absPathName += node.parent.absPathName.slice(0, -1);
+                    }
+                    else {
+                        node.absPathName += node.parent.absPathName ;
+                    }
+
+                } else {
+                    node.absPathName += node.parent.absPathName;
+                }
                 node.absPathName += (node.parent.splitByColon) ? ":" : ".";
             }
-            node.absPathName += node.name;
+            if (node.parent.splitByColon) {
+                node.absPathName += node.name.slice(0, -1);
+            } else {
+                node.absPathName += node.name;
+            }
 
             this.nodePaths[node.absPathName] = node;
         }

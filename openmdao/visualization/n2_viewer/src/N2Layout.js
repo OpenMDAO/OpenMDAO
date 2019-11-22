@@ -171,6 +171,10 @@ class N2Layout {
             retVal = this.zoomedElement.promotions[node.absPathName];
         }
 
+        if (node.splitByColon) {
+            retVal = retVal.slice(0,-1);
+        }
+
         if (node.splitByColon && node.hasChildren()) {
             retVal += ":";
         }
