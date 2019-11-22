@@ -114,8 +114,6 @@ class Problem(object):
         Dictionary with problem recording options.
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this problem.
-    _remote_var_set : set
-        Set of variables (absolute names) that require remote data transfer to reach all procs.
     _check : bool
         If True, call check_config at the end of final_setup.
     _recording_iter : _RecIteration
@@ -130,8 +128,6 @@ class Problem(object):
         after a reconfiguration) you may need to set this to True.
     _name : str
         Problem name.
-    __get_remote : bool
-        Flag used to determine when __getitem__ will retrieve remote variables.
     """
 
     def __init__(self, model=None, driver=None, comm=None, root=None, name=None, **options):
@@ -154,9 +150,6 @@ class Problem(object):
         **options : named args
             All remaining named args are converted to options.
         """
-        # used by the get_val function when get_remote is True
-        self.__get_remote = False
-
         self.cite = CITATION
         self._name = name
 
@@ -815,34 +808,6 @@ class Problem(object):
 
         model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
                      derivatives, self.options)
-
-        # get set of all vars that we may need to bcast later
-        self._remote_var_set = remote_var_set = set()
-        if model_comm.size > 1:
-            for type_ in ('input', 'output'):
-                remote_discrete = set()
-                sizes = self.model._var_sizes['nonlinear'][type_]
-                for i, vname in enumerate(self.model._var_allprocs_abs_names[type_]):
-                    if not np.all(sizes[:, i]):
-                        remote_var_set.add(vname)
-
-                if self.model._var_allprocs_discrete[type_]:
-                    local = list(self.model._var_discrete[type_])
-                    byrank = self.comm.gather(local, root=0)
-                    if model_comm.rank == 0:
-                        full = set()
-                        for names in byrank:
-                            full.update(names)
-
-                        for names in byrank:
-                            diff = full.difference(names)
-                            remote_discrete.update(diff)
-
-                        model_comm.bcast(remote_discrete, root=0)
-                    else:
-                        remote_discrete = model_comm.bcast(None, root=0)
-
-                    remote_var_set.update(remote_discrete)
 
         # Cache all args for final setup.
         self._check = check
