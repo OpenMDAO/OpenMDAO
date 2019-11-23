@@ -57,7 +57,7 @@ class Application(tornado.web.Application):
         handlers = [
             (r"/", Index),
             (r"/sysgraph/", Index),
-            (r"/sysgraph/([_a-zA-Z][_a-zA-Z0-9.]*)", SysGraph),
+            (r"/sysgraph/([YN])/([_a-zA-Z][_a-zA-Z0-9.]*)", SysGraph),
         ]
 
         settings = dict(
@@ -72,7 +72,7 @@ class Application(tornado.web.Application):
         self.engine = engine
 
 
-def get_graph_info(prob, group, engine='dot'):
+def get_graph_info(prob, group, engine='dot', show_outside=False):
     """
     Get the system graph from the give group and return the graphviz generated SVG string.
 
@@ -85,6 +85,8 @@ def get_graph_info(prob, group, engine='dot'):
     engine : str
         The graphviz layout engine to use to layout the graph. Should be one of
         ['dot', 'fdp', 'circo'].
+    show_outside : bool
+        If True, show connections from outside the current group.
 
     Returns
     -------
@@ -93,50 +95,63 @@ def get_graph_info(prob, group, engine='dot'):
     """
     graph = group.compute_sys_graph()
     title = group.pathname if group.pathname else 'Model'
+    parent = None if not group.pathname else group.pathname.rsplit('.', 1)[0]
+    if parent == group.pathname:
+        parent = None
 
     g = Digraph(filename=title + '.gv', format='svg', engine=engine)
-    g.attr(rankdir='LR', size='600, 600')
+    g.attr(rankdir='LR', size='600, 600', overlap='false')
 
     # groups
     with g.subgraph(name='cluster_0') as c:
-        c.node_attr.update(style='filled', color='lightblue')
+        c.node_attr.update(style='filled', color='lightblue', shape='rectangle')
         c.attr(label=group.pathname)
 
         groupset = set(group._subgroups_myproc)
         for grp in groupset:
-            c.node(grp.name)
+            c.node(grp.pathname, label=grp.name)
 
     # components
     with g.subgraph(name='cluster_0') as c:
-        c.node_attr.update(color='gray')
+        c.node_attr.update(color='orange', shape='ellipse')
         for s in group._subsystems_myproc:
             if s not in groupset:
-                c.node(s.name)
+                c.node(s.pathname, label=s.name)
         
         for u, v in graph.edges():
-            c.edge(u, v)
+            src = group.pathname + '.' + u if group.pathname else u
+            tgt = group.pathname + '.' + v if group.pathname else v
+            c.edge(src, tgt)
 
     # connections from outside the group
     model = prob.model
-    if group is not model:
-        g.attr('node', color='lightgrey')
+    if group is not model and show_outside == 'Y':
+        out_nodes = set()
+        g.attr('node', color='lightgrey', style='filled')
         g.attr('edge', style='dotted')
         pname = group.pathname + '.'
-        plen = len(group.pathname.split('.'))
+        plen = len(group.pathname.split('.')) + 1 if group.pathname else 1
         conn_set = set()
+        out_depth = 1
         for tgt, src in model._conn_global_abs_in2out.items():
-            tparts = tgt.split('.')
-            sparts = src.split('.')
             if tgt.startswith(pname) and not src.startswith(pname):
-                edge = (src.rsplit('.', 1)[0], tparts[plen])
+                ssys = '.'.join(src.split('.')[:-1][:out_depth])
+                if ssys not in out_nodes:
+                    out_nodes.add(ssys)
+                    g.node(ssys)
+                edge = (ssys, '.'.join(tgt.split('.')[:plen]))
                 if edge not in conn_set:
-                    g.edge(*edge)
                     conn_set.add(edge)
+                    g.edge(*edge)
             elif src.startswith(pname) and not tgt.startswith(pname):
-                edge = (sparts[plen], tgt.rsplit('.', 1)[0])
+                tsys = '.'.join(tgt.split('.')[:-1][:out_depth])
+                if tsys not in out_nodes:
+                    out_nodes.add(tsys)
+                    g.node(tsys)
+                edge = ('.'.join(src.split('.')[:plen]), tsys)
                 if edge not in conn_set:
-                    g.edge(*edge)
                     conn_set.add(edge)
+                    g.edge(*edge)
 
     svg = g.pipe()
 
@@ -145,10 +160,12 @@ def get_graph_info(prob, group, engine='dot'):
 
 
 class SysGraph(tornado.web.RequestHandler):
-    def get(self, pathname=''):
-        self.write_graph(pathname)
+    def get(self, show_outside='N', pathname=''):
+        print("SHOW_OUTSIDE:", show_outside)
+        print("PATHNAME:", pathname)
+        self.write_graph(show_outside, pathname)
 
-    def write_graph(self, pathname):
+    def write_graph(self, show_outside, pathname):
         app = self.application
         model = app.prob.model
 
@@ -161,11 +178,17 @@ class SysGraph(tornado.web.RequestHandler):
             self.write("Components don't have graphs.")
             return
         
-        svg, subgroups = get_graph_info(app.prob, system, app.engine)
+        svg, subgroups = get_graph_info(app.prob, system, app.engine, show_outside)
         pathname = system.pathname
-        parent = '' if not pathname else pathname.rsplit('.', 1)[0]
-        if parent == pathname:
-            parent = ''
+        parent_link = ['/sysgraph']
+        if show_outside:
+            parent_link.append('Y')
+        else:
+            parent_link.append('N')
+        pth = pathname.split('.')[:-1]
+        if pth:
+            parent_link.append('/'.join(pth))
+
         subgroups = [g.name for g in subgroups]
 
         self.write("""\
@@ -181,6 +204,7 @@ class SysGraph(tornado.web.RequestHandler):
 
     var pathnames = %s;
     var subgroups = %s;
+    var show_outside = '%s';
 
     function d3_setup() {
         var svg = d3.select("svg");
@@ -193,13 +217,23 @@ class SysGraph(tornado.web.RequestHandler):
                     if (ptext.startsWith(".")) {
                         ptext = txt;
                     }
-                    window.location = "/sysgraph/" + ptext;
+                    window.location = "/sysgraph/" + show_outside + "/" + ptext;
                 }
             });
 
         window.onresize = function() {
             width = window.innerWidth * .98;
             d3.select("svg").attr("width", width);
+        }
+    }
+
+    function toggle_outside()
+    {
+        if (show_outside == "Y") {
+            location.href = "/sysgraph/N/" + pathnames[0]
+        }
+        else {
+            location.href = "/sysgraph/Y/" + pathnames[0]
         }
     }
 
@@ -215,17 +249,17 @@ class SysGraph(tornado.web.RequestHandler):
     </head>
     <body>
         <input type="button" onclick="location.href='/';" value="Home" />
-        <input type="button" onclick="location.href='/sysgraph/%s';" value="Up" />
-        <input type="button" onclick="location.href='/sysgraph/'+pathnames[0];" value="Show Outside Connections" />
+        <input type="button" onclick="location.href='%s';" value="Up" />
+        <input id='toggle_out' type="checkbox" onclick="toggle_outside();" value="Show Outside Connections" />
     %s
     </body>
     </html>
-    """ % ([pathname], subgroups, parent, svg))
+    """ % ([pathname], subgroups, show_outside, parent_link, svg))
 
 
 class Index(SysGraph):
     def get(self):
-        self.write_graph('')
+        self.write_graph('N', '')
 
 
 def _view_graphs_setup_parser(parser):
@@ -244,7 +278,7 @@ def _view_graphs_setup_parser(parser):
     parser.add_argument('-g', '--group', action='append', default=[], dest='groups',
                         help='Display the graph for the given group.')
     parser.add_argument('-e', '--engine', action='store', dest='engine',
-                        default='dot', help='Specify graph layout engine (dot, circo, fdp)')
+                        default='dot', help='Specify graph layout engine (dot, fdp)')
     parser.add_argument('file', metavar='file', nargs=1,
                         help='profile file to view.')
 
@@ -263,7 +297,7 @@ def _view_graphs_cmd(options):
     function
         The post-setup hook function.
     """
-    if options.engine not in {'dot', 'circo', 'fdp'}:
+    if options.engine not in {'dot', 'circo', 'fdp', 'neato'}:
         raise RuntimeError("Graph layout engine '{}' not supported.".format(options.engine))
 
     def _view_graphs(prob):
