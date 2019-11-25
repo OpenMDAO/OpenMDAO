@@ -89,7 +89,7 @@ class ModelData {
     /** Called by _expandColonVars when splitting an element into children.
      * TODO: Document params and recursive functionality.
      */
-    _addChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
+    _addColonVarChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
         if (arrayOfNames.length == arrayOfNamesIndex) return;
 
         let name = arrayOfNames[arrayOfNamesIndex];
@@ -114,11 +114,11 @@ class ModelData {
             else {
                 parent.children.push(newChild);
             }
-            this._addChildren(originalParent, newChild, arrayOfNames,
+            this._addColonVarChildren(originalParent, newChild, arrayOfNames,
                 arrayOfNamesIndex + 1, type);
         }
         else { // new name already found in parent, keep traversing
-            this._addChildren(originalParent, parent.children[parentIdx],
+            this._addColonVarChildren(originalParent, parent.children[parentIdx],
                 arrayOfNames, arrayOfNamesIndex + 1, type);
         }
     }
@@ -143,7 +143,7 @@ class ModelData {
                 }
                 let type = node.children[i].type;
                 node.children.splice(i--, 1);
-                this._addChildren(node, node, splitArray, 0, type);
+                this._addColonVarChildren(node, node, splitArray, 0, type);
             }
         }
 
