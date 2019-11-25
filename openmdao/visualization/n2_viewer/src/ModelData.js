@@ -209,7 +209,6 @@ class ModelData {
                 if (node.parent.splitByColon)
                 {
                     if (node.parent.absPathName.endsWith(colonVarNameAppend)){
-                    // if (node.parent.absPathName.endsWith("_")){
                         node.absPathName += node.parent.absPathName.slice(0, -1);
                     }
                     else {

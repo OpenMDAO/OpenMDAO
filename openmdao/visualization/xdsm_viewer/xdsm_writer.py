@@ -687,7 +687,10 @@ else:
                 Defaults to False.
             add_component_indices : bool
                 If true, display components with numbers.
-            **options
+            equations : bool, optional
+                If true, for ExecComps their equations are shown in the diagram
+                Defaults to False.
+            options : dict
                 Keyword argument options of the XDSM class.
             """
             super(XDSMWriter, self).__init__(**options)

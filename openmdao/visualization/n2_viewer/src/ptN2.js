@@ -3,7 +3,6 @@ let sharedTransition = null;
 let enterIndex = 0,
     exitIndex = 0;
 
-let gleep = '[';
 let colonVarNameAppend = '['; // Used internally. Appended to vars split by colon vars
                               // Allows user to have inputs like f_approx:f, f_approx:r
                               // and outputs on the same comp as f_approx

@@ -36,8 +36,6 @@ class N2Layout {
         this.zoomedSolverNodes = [];
         this.visibleSolverNodes = [];
 
-        this.colonVarNameAppend = '[';
-
         // Initial size values derived from read-only defaults
         this.size = dims.size;
         this.svg = d3.select("#svgId");
