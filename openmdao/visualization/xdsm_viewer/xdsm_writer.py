@@ -1478,7 +1478,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     if equations:
         try:
             from pytexit import py2tex
-        except ImportError():
+        except ImportError:
             equations = False
             msg = 'The LaTeX equation formatting requires the pytexit package.' \
                   'The "equations" options was turned off.' \
