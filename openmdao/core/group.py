@@ -630,8 +630,6 @@ class Group(System):
             sub_prefix = subsys.name + '.'
 
             for type_ in ['input', 'output']:
-                vmaps = var_maps[type_]
-
                 # Assemble abs_names and allprocs_abs_names
                 allprocs_abs_names[type_].extend(
                     subsys._var_allprocs_abs_names[type_])
@@ -651,18 +649,17 @@ class Group(System):
                 sub_proms = subsys._var_allprocs_abs2prom[type_]
                 for abs_name in chain(subsys._var_allprocs_abs_names[type_],
                                       subsys._var_allprocs_abs_names_discrete[type_]):
-                    prom_name = vmaps[sub_proms[abs_name]]
                     if abs_name in sub_loc_proms:
-                        abs2prom[type_][abs_name] = prom_name
-                    allprocs_abs2prom[type_][abs_name] = prom_name
+                        abs2prom[type_][abs_name] = var_maps[type_][sub_loc_proms[abs_name]]
+
+                    allprocs_abs2prom[type_][abs_name] = var_maps[type_][sub_proms[abs_name]]
 
                 # Assemble allprocs_prom2abs_list
                 for sub_prom, sub_abs in iteritems(subsys._var_allprocs_prom2abs_list[type_]):
-                    prom_name = vmaps[sub_prom]
+                    prom_name = var_maps[type_][sub_prom]
                     if prom_name not in allprocs_prom2abs_list[type_]:
-                        allprocs_prom2abs_list[type_][prom_name] = sub_abs[:]
-                    else:
-                        allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
+                        allprocs_prom2abs_list[type_][prom_name] = []
+                    allprocs_prom2abs_list[type_][prom_name].extend(sub_abs)
 
         for prom_name, abs_list in iteritems(allprocs_prom2abs_list['output']):
             if len(abs_list) > 1:
@@ -715,9 +712,8 @@ class Group(System):
                     # Assemble in parallel allprocs_prom2abs_list
                     for prom_name, abs_names_list in iteritems(myproc_prom2abs_list[type_]):
                         if prom_name not in allprocs_prom2abs_list[type_]:
-                            allprocs_prom2abs_list[type_][prom_name] = abs_names_list[:]
-                        else:
-                            allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
+                            allprocs_prom2abs_list[type_][prom_name] = []
+                        allprocs_prom2abs_list[type_][prom_name].extend(abs_names_list)
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
