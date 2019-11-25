@@ -842,6 +842,17 @@ class System(object):
         # Recurse model from top to bottom for remaining setup.
         self._post_configure(mode, recurse)
 
+        # For updating variable and connection data, setup needs to be performed only
+        # in the current system, by gathering data from immediate subsystems,
+        # and no recursion is necessary.
+        self._setup_var_data(recurse=recurse)
+        self._setup_vec_names(mode, self._vec_names, self._vois)
+        self._setup_global_connections(recurse=recurse)
+        self._setup_relevance(mode, self._relevant)
+        self._setup_var_index_ranges(recurse=recurse)
+        self._setup_var_sizes(recurse=recurse)
+        self._setup_connections(recurse=recurse)
+
     def _post_configure(self, mode, recurse):
         """
         Do any remaining setup that had to wait until after final user configuration.
@@ -854,16 +865,7 @@ class System(object):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        # For updating variable and connection data, setup needs to be performed only
-        # in the current system, by gathering data from immediate subsystems,
-        # and no recursion is necessary.
-        self._setup_var_data(recurse=recurse)
-        self._setup_vec_names(mode, self._vec_names, self._vois)
-        self._setup_global_connections(recurse=recurse)
-        self._setup_relevance(mode, self._relevant)
-        self._setup_var_index_ranges(recurse=recurse)
-        self._setup_var_sizes(recurse=recurse)
-        self._setup_connections(recurse=recurse)
+        pass
 
     def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
         """

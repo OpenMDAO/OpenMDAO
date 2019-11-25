@@ -23,10 +23,7 @@ class IndepVarComp(ExplicitComponent):
     _indep : tuple
         List of tuples of the form [(str, value, kwargs), ...].
         The value can be float or ndarray, and kwargs is a dictionary
-    _indep_external : list
-        list of this component's independent variables that are declared externally
-        via the add_output method.
-    _indep_external_discrete : list
+    _indep_discrete : list
         list of this component's discrete independent variables that are declared externally
         via the add_discrete_output method.
     """
@@ -49,8 +46,7 @@ class IndepVarComp(ExplicitComponent):
         """
         super(IndepVarComp, self).__init__()
         self._indep = []
-        self._indep_external = []
-        self._indep_external_discrete = []
+        self._indep_discrete = []
 
         if 'tags' not in kwargs:
             kwargs['tags'] = {'indep_var'}
@@ -108,13 +104,16 @@ class IndepVarComp(ExplicitComponent):
         # set static mode to False because we are doing things that would normally be done in setup
         self._static_mode = False
 
-        for (name, val, kwargs) in self._indep + self._indep_external:
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2meta = {}
+
+        for (name, val, kwargs) in self._indep:
             super(IndepVarComp, self).add_output(name, val, **kwargs)
 
-        for (name, val, kwargs) in self._indep_external_discrete:
+        for (name, val, kwargs) in self._indep_discrete:
             super(IndepVarComp, self).add_discrete_output(name, val, **kwargs)
 
-        if len(self._indep) + len(self._indep_external) + len(self._indep_external_discrete) == 0:
+        if len(self._indep) + len(self._indep_discrete) == 0:
             raise RuntimeError("{}: No outputs (independent variables) have been declared. "
                                "They must either be declared during "
                                "instantiation or by calling add_output or add_discrete_output "
@@ -182,7 +181,7 @@ class IndepVarComp(ExplicitComponent):
                   'lower': lower, 'upper': upper, 'ref': ref, 'ref0': ref0,
                   'res_ref': res_ref, 'tags': tags
                   }
-        self._indep_external.append((name, val, kwargs))
+        self._indep.append((name, val, kwargs))
 
     def add_discrete_output(self, name, val, desc='', tags=None):
         """
@@ -206,7 +205,7 @@ class IndepVarComp(ExplicitComponent):
             tags = make_set(tags, name='tags') | {'indep_var'}
 
         kwargs = {'desc': desc, 'tags': tags}
-        self._indep_external_discrete.append((name, val, kwargs))
+        self._indep_discrete.append((name, val, kwargs))
 
     def _linearize(self, jac=None, sub_do_ln=False):
         """
