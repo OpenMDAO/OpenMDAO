@@ -129,13 +129,18 @@ def get_graph_info(prob, group, engine='dot', show_outside=False):
         out_nodes = set()
         g.attr('node', color='lightgrey', style='filled')
         g.attr('edge', style='dotted')
-        pname = group.pathname + '.'
+        gname = group.pathname + '.'
+        pname = '.'.join(group.pathname.split('.')[:-1]) + '.'
         plen = len(group.pathname.split('.')) + 1 if group.pathname else 1
         conn_set = set()
-        out_depth = 1
+        out_depth = len(group.pathname.split('.'))
         for tgt, src in model._conn_global_abs_in2out.items():
-            if tgt.startswith(pname) and not src.startswith(pname):
-                ssys = '.'.join(src.split('.')[:-1][:out_depth])
+            if tgt.startswith(gname) and not src.startswith(gname):
+                if src.startswith(pname):
+                    depth = out_depth
+                else:
+                    depth = out_depth - 1 if out_depth > 1 else out_depth
+                ssys = '.'.join(src.split('.')[:-1][:depth])
                 if ssys not in out_nodes:
                     out_nodes.add(ssys)
                     g.node(ssys)
@@ -143,8 +148,12 @@ def get_graph_info(prob, group, engine='dot', show_outside=False):
                 if edge not in conn_set:
                     conn_set.add(edge)
                     g.edge(*edge)
-            elif src.startswith(pname) and not tgt.startswith(pname):
-                tsys = '.'.join(tgt.split('.')[:-1][:out_depth])
+            elif src.startswith(gname) and not tgt.startswith(gname):
+                if tgt.startswith(pname):
+                    depth = out_depth
+                else:
+                    depth = out_depth - 1 if out_depth > 1 else out_depth
+                tsys = '.'.join(tgt.split('.')[:-1][:depth])
                 if tsys not in out_nodes:
                     out_nodes.add(tsys)
                     g.node(tsys)
@@ -161,8 +170,6 @@ def get_graph_info(prob, group, engine='dot', show_outside=False):
 
 class SysGraph(tornado.web.RequestHandler):
     def get(self, show_outside='N', pathname=''):
-        print("SHOW_OUTSIDE:", show_outside)
-        print("PATHNAME:", pathname)
         self.write_graph(show_outside, pathname)
 
     def write_graph(self, show_outside, pathname):
@@ -179,15 +186,18 @@ class SysGraph(tornado.web.RequestHandler):
             return
         
         svg, subgroups = get_graph_info(app.prob, system, app.engine, show_outside)
+        # print("\n\n\n\n")
+        # print(svg)
         pathname = system.pathname
         parent_link = ['/sysgraph']
         if show_outside:
             parent_link.append('Y')
         else:
             parent_link.append('N')
-        pth = pathname.split('.')[:-1]
+        pth = '.'.join(pathname.split('.')[:-1])
         if pth:
-            parent_link.append('/'.join(pth))
+            parent_link.append(pth)
+        parent_link = '/'.join(parent_link)
 
         subgroups = [g.name for g in subgroups]
 
@@ -250,7 +260,7 @@ class SysGraph(tornado.web.RequestHandler):
     <body>
         <input type="button" onclick="location.href='/';" value="Home" />
         <input type="button" onclick="location.href='%s';" value="Up" />
-        <input id='toggle_out' type="checkbox" onclick="toggle_outside();" value="Show Outside Connections" />
+        <input type="checkbox" onclick="toggle_outside();"  value="N"> Show Outside Connections <br>
     %s
     </body>
     </html>
