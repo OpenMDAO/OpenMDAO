@@ -437,6 +437,12 @@ class TestPyXDSMViewer(unittest.TestCase):
         # Check if file was created
         self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
 
+        # Including the expression from the ExecComp formatted in LaTeX
+        om.write_xdsm(prob, filename=filename + "2", out_format=out_format, quiet=QUIET,
+                      show_browser=SHOW, show_parallel=True, equations=True)
+        # Check if file was created
+        self.assertTrue(os.path.isfile('.'.join([filename, out_format])))
+
     def test_doe(self):
         filename = 'pyxdsm_doe'
         out_format = PYXDSM_OUT
