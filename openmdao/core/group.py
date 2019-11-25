@@ -3,10 +3,13 @@ from __future__ import division
 
 import os
 from collections import Counter, OrderedDict, defaultdict
+
+# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
 try:
     from collections.abc import Iterable
 except ImportError:
     from collections import Iterable
+
 from itertools import product, chain
 from numbers import Number
 import inspect
