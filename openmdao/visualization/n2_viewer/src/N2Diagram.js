@@ -104,6 +104,7 @@ class N2Diagram {
             'solver': { 'x': 0, 'y': 0 }
         };
 
+        this.colonVarNameAppend = '[';
     }
 
     /**

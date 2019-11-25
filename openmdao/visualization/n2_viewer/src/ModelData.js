@@ -14,8 +14,6 @@ class ModelData {
         this.unconnectedParams = 0;
         this.nodePaths = {};
 
-        this.colonVarNameAppend = "["; // Used internally to mark items split by colon vars
-
         startTimer('ModelData._convertToN2TreeNodes');
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
         stopTimer('ModelData._convertToN2TreeNodes');
@@ -99,10 +97,10 @@ class ModelData {
             parent.children = [];
         }
 
-        let parentIdx = indexForMember(parent.children, 'name', name + this.colonVarNameAppend);
+        let parentIdx = indexForMember(parent.children, 'name', name + colonVarNameAppend);
         if (parentIdx == -1) { //new name not found in parent, create new
             let newChild = new N2TreeNode({
-                "name": name + this.colonVarNameAppend,
+                "name": name + colonVarNameAppend,
                 "type": type,
                 "splitByColon": true,
                 "originalParent": originalParent
@@ -166,11 +164,11 @@ class ModelData {
             node.children.length == 1 &&
             node.children[0].splitByColon) {
             let child = node.children[0];
-            if (node.name.endsWith(this.colonVarNameAppend)) {
+            if (node.name.endsWith(colonVarNameAppend)) {
             	node.name = node.name.slice(0,-1);
             }
 
-            if (child.name.endsWith(this.colonVarNameAppend))
+            if (child.name.endsWith(colonVarNameAppend))
             {
             	node.name += ":" + child.name.slice(0,-1);
             } else {
@@ -209,7 +207,7 @@ class ModelData {
 
                 if (node.parent.splitByColon)
                 {
-                    if (node.parent.absPathName.endsWith(this.colonVarNameAppend)){
+                    if (node.parent.absPathName.endsWith(colonVarNameAppend)){
                     // if (node.parent.absPathName.endsWith("_")){
                         node.absPathName += node.parent.absPathName.slice(0, -1);
                     }

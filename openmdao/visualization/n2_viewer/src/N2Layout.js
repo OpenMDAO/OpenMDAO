@@ -36,6 +36,8 @@ class N2Layout {
         this.zoomedSolverNodes = [];
         this.visibleSolverNodes = [];
 
+        this.colonVarNameAppend = '[';
+
         // Initial size values derived from read-only defaults
         this.size = dims.size;
         this.svg = d3.select("#svgId");
@@ -172,7 +174,9 @@ class N2Layout {
         }
 
         if (node.splitByColon) {
-            retVal = retVal.slice(0,-1);
+            if (retVal.endsWith(colonVarNameAppend)) {
+                retVal = retVal.slice(0,-1);
+            }
         }
 
         if (node.splitByColon && node.hasChildren()) {
