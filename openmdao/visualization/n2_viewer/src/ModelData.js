@@ -422,8 +422,11 @@ class ModelData {
 
             for (let srcParent of srcObjParents) {
                 for (let tgtParent of tgtObjParents) {
-                    srcParent.targetParentSet.add(tgtParent);
-                    tgtParent.sourceParentSet.add(srcParent);
+                    if (tgtParent.absPathName != "")
+                        srcParent.targetParentSet.add(tgtParent);
+
+                    if (srcParent.absPathName != "")
+                        tgtParent.sourceParentSet.add(srcParent);
                 }
             }
 
