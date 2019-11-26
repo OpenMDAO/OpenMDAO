@@ -89,7 +89,7 @@ class ModelData {
     /** Called by _expandColonVars when splitting an element into children.
      * TODO: Document params and recursive functionality.
      */
-    _addChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
+    _addColonVarChildren(originalParent, parent, arrayOfNames, arrayOfNamesIndex, type) {
         if (arrayOfNames.length == arrayOfNamesIndex) return;
 
         let name = arrayOfNames[arrayOfNamesIndex];
@@ -98,10 +98,10 @@ class ModelData {
             parent.children = [];
         }
 
-        let parentIdx = indexForMember(parent.children, 'name', name);
+        let parentIdx = indexForMember(parent.children, 'name', name + colonVarNameAppend);
         if (parentIdx == -1) { //new name not found in parent, create new
             let newChild = new N2TreeNode({
-                "name": name,
+                "name": name + colonVarNameAppend,
                 "type": type,
                 "splitByColon": true,
                 "originalParent": originalParent
@@ -114,11 +114,11 @@ class ModelData {
             else {
                 parent.children.push(newChild);
             }
-            this._addChildren(originalParent, newChild, arrayOfNames,
+            this._addColonVarChildren(originalParent, newChild, arrayOfNames,
                 arrayOfNamesIndex + 1, type);
         }
         else { // new name already found in parent, keep traversing
-            this._addChildren(originalParent, parent.children[parentIdx],
+            this._addColonVarChildren(originalParent, parent.children[parentIdx],
                 arrayOfNames, arrayOfNamesIndex + 1, type);
         }
     }
@@ -143,7 +143,7 @@ class ModelData {
                 }
                 let type = node.children[i].type;
                 node.children.splice(i--, 1);
-                this._addChildren(node, node, splitArray, 0, type);
+                this._addColonVarChildren(node, node, splitArray, 0, type);
             }
         }
 
@@ -165,7 +165,16 @@ class ModelData {
             node.children.length == 1 &&
             node.children[0].splitByColon) {
             let child = node.children[0];
-            node.name += ":" + child.name;
+            if (node.name.endsWith(colonVarNameAppend)) {
+            	node.name = node.name.slice(0,-1);
+            }
+
+            if (child.name.endsWith(colonVarNameAppend))
+            {
+            	node.name += ":" + child.name.slice(0,-1);
+            } else {
+            	node.name += ":" + child.name;
+            }
             node.children = (Array.isArray(child.children) &&
                 child.children.length >= 1) ?
                 child.children : null; //absorb childs children
@@ -196,10 +205,26 @@ class ModelData {
 
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
-                node.absPathName += node.parent.absPathName;
+
+                if (node.parent.splitByColon)
+                {
+                    if (node.parent.absPathName.endsWith(colonVarNameAppend)){
+                        node.absPathName += node.parent.absPathName.slice(0, -1);
+                    }
+                    else {
+                        node.absPathName += node.parent.absPathName ;
+                    }
+
+                } else {
+                    node.absPathName += node.parent.absPathName;
+                }
                 node.absPathName += (node.parent.splitByColon) ? ":" : ".";
             }
-            node.absPathName += node.name;
+            if (node.parent.splitByColon) {
+                node.absPathName += node.name.slice(0, -1);
+            } else {
+                node.absPathName += node.name;
+            }
 
             this.nodePaths[node.absPathName] = node;
         }
