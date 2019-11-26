@@ -166,14 +166,13 @@ class ModelData {
             node.children[0].splitByColon) {
             let child = node.children[0];
             if (node.name.endsWith(colonVarNameAppend)) {
-            	node.name = node.name.slice(0,-1);
+                node.name = node.name.slice(0, -1);
             }
 
-            if (child.name.endsWith(colonVarNameAppend))
-            {
-            	node.name += ":" + child.name.slice(0,-1);
+            if (child.name.endsWith(colonVarNameAppend)) {
+                node.name += ":" + child.name.slice(0, -1);
             } else {
-            	node.name += ":" + child.name;
+                node.name += ":" + child.name;
             }
             node.children = (Array.isArray(child.children) &&
                 child.children.length >= 1) ?
@@ -206,13 +205,12 @@ class ModelData {
         if (node.parent) { // not root node? node.parent.absPathName : "";
             if (node.parent.absPathName != "") {
 
-                if (node.parent.splitByColon)
-                {
-                    if (node.parent.absPathName.endsWith(colonVarNameAppend)){
+                if (node.parent.splitByColon) {
+                    if (node.parent.absPathName.endsWith(colonVarNameAppend)) {
                         node.absPathName += node.parent.absPathName.slice(0, -1);
                     }
                     else {
-                        node.absPathName += node.parent.absPathName ;
+                        node.absPathName += node.parent.absPathName;
                     }
 
                 } else {
@@ -410,35 +408,51 @@ class ModelData {
         for (let conn of this.conns) {
             // Process sources
             let srcObj = this.nodePaths[conn.src];
-            if (!srcObj)
-                throw (throwLbl + "Cannot find connection source " + conn.src);
+
+            if (!srcObj) {
+                console.warn(throwLbl + "Cannot find connection source " + conn.src);
+                continue;
+            }
 
             let srcObjParents = [srcObj];
-            if (!srcObj.isUnknown()) // source obj must be unknown
-                throw (throwLbl + "Found a source that is not an unknown.");
+            if (!srcObj.isUnknown()) { // source obj must be unknown
+                console.warn(throwLbl + "Found a source that is not an unknown.");
+                continue;
+            }
 
-            if (srcObj.hasChildren())
-                throw (throwLbl + "Found a source that has children.");
+            if (srcObj.hasChildren()) {
+                console.warn(throwLbl + "Found a source that has children.");
+                continue;
+            }
 
             for (let obj = srcObj.parent; obj != null; obj = obj.parent) {
                 srcObjParents.push(obj);
             }
 
+
             // Process targets
             let tgtObj = this.nodePaths[conn.tgt];
-            if (!tgtObj)
-                throw (throwLbl + "Cannot find connection target " + conn.tgt);
 
+            if (!tgtObj) {
+                console.warn(throwLbl + "Cannot find connection target " + conn.tgt);
+                continue;
+            }
 
             // Target obj must be a param
-            if (!tgtObj.isParam())
-                throw (throwLbl + "Found a target that is NOT a param.");
-            if (tgtObj.hasChildren())
-                throw (throwLbl + "Found a target that has children.");
+            if (!tgtObj.isParam()) {
+                console.warn(throwLbl + "Found a target that is NOT a param.");
+                continue;
+            }
+            if (tgtObj.hasChildren()) {
+                console.warn(throwLbl + "Found a target that has children.");
+                continue;
+            }
 
-            if (!tgtObj.parentComponent)
-                throw (throwLbl + "Target object " + conn.tgt +
+            if (!tgtObj.parentComponent) {
+                console.warn(throwLbl + "Target object " + conn.tgt +
                     " is missing a parentComponent.");
+                continue;
+            }
 
             let tgtObjParents = [tgtObj];
             for (let parentObj = tgtObj.parent; parentObj != null; parentObj = parentObj.parent) {
@@ -456,28 +470,34 @@ class ModelData {
             }
 
             /*
-            * The cycle_arrows object in each connection is an array of length-2 arrays,
-            * each of which is an index into the sysPathnames array. Using that array we
-            * can resolve the indexes to pathnames to the associated objects.
+             * The cycle_arrows object in each connection is an array of length-2 arrays,
+             * each of which is an index into the sysPathnames array. Using that array we
+             * can resolve the indexes to pathnames to the associated objects.
             */
             if (Array.isPopulatedArray(conn.cycle_arrows)) {
                 let cycleArrowsArray = [];
                 let cycleArrows = conn.cycle_arrows;
                 for (let cycleArrow of cycleArrows) {
-                    if (cycleArrow.length != 2)
-                        throw (throwLbl + "cycleArrowsSplitArray length not 2, got " +
+                    if (cycleArrow.length != 2) {
+                        console.warn(throwLbl + "cycleArrowsSplitArray length not 2, got " +
                             cycleArrow.length + ": " + cycleArrow);
+                        continue;
+                    }
 
                     let srcPathname = sysPathnames[cycleArrow[0]];
                     let tgtPathname = sysPathnames[cycleArrow[1]];
 
                     let arrowBeginObj = this.nodePaths[srcPathname];
-                    if (!arrowBeginObj)
-                        throw (throwLbl + "Cannot find cycle arrows begin object " + srcPathname);
+                    if (!arrowBeginObj) {
+                        console.warn(throwLbl + "Cannot find cycle arrows begin object " + srcPathname);
+                        continue;
+                    }
 
                     let arrowEndObj = this.nodePaths[tgtPathname];
-                    if (!arrowEndObj)
-                        throw (throwLbl + "Cannot find cycle arrows end object " + tgtPathname);
+                    if (!arrowEndObj) {
+                        console.warn(throwLbl + "Cannot find cycle arrows end object " + tgtPathname);
+                        continue;
+                    }
 
                     cycleArrowsArray.push({ "begin": arrowBeginObj, "end": arrowEndObj });
                 }
@@ -496,10 +516,10 @@ class ModelData {
      * @param {N2TreeNode} node The tree node to work on.
      */
     identifyUnconnectedParam(node) { // Formerly updateRootTypes
-        if (!node.hasOwnProperty('absPathName'))
-            throw ("identifyUnconnectedParam error: absPathName not set for ", node);
-
-        if (node.isParam() && !this.hasAnyConnection(node.absPathName))
+        if (!node.hasOwnProperty('absPathName')) {
+            console.warn("identifyUnconnectedParam error: absPathName not set for ", node);
+        }
+        else if (node.isParam() && !this.hasAnyConnection(node.absPathName))
             node.type = "unconnected_param";
     }
 }
