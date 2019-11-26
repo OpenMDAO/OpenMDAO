@@ -687,7 +687,10 @@ else:
                 Defaults to False.
             add_component_indices : bool
                 If true, display components with numbers.
-            **options
+            equations : bool, optional
+                If true, for ExecComps their equations are shown in the diagram
+                Defaults to False.
+            options : dict
                 Keyword argument options of the XDSM class.
             """
             super(XDSMWriter, self).__init__(**options)
@@ -1475,7 +1478,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
     if equations:
         try:
             from pytexit import py2tex
-        except ImportError():
+        except ImportError:
             equations = False
             msg = 'The LaTeX equation formatting requires the pytexit package.' \
                   'The "equations" options was turned off.' \
