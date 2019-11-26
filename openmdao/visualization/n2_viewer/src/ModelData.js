@@ -401,35 +401,41 @@ class ModelData {
 
             // Process targets
             let tgtObj = this.nodePaths[conn.tgt];
+
+            /*
             if (!tgtObj)
                 throw (throwLbl + "Cannot find connection target " + conn.tgt);
+            */
 
+            if (tgtObj) {
+                // Target obj must be a param
+                if (!tgtObj.isParam())
+                    throw (throwLbl + "Found a target that is NOT a param.");
+                if (tgtObj.hasChildren())
+                    throw (throwLbl + "Found a target that has children.");
 
-            // Target obj must be a param
-            if (!tgtObj.isParam())
-                throw (throwLbl + "Found a target that is NOT a param.");
-            if (tgtObj.hasChildren())
-                throw (throwLbl + "Found a target that has children.");
+                if (!tgtObj.parentComponent)
+                    throw (throwLbl + "Target object " + conn.tgt +
+                        " is missing a parentComponent.");
 
-            if (!tgtObj.parentComponent)
-                throw (throwLbl + "Target object " + conn.tgt +
-                    " is missing a parentComponent.");
+                let tgtObjParents = [tgtObj];
+                for (let parentObj = tgtObj.parent; parentObj != null; parentObj = parentObj.parent) {
+                    tgtObjParents.push(parentObj);
+                }
 
-            let tgtObjParents = [tgtObj];
-            for (let parentObj = tgtObj.parent; parentObj != null; parentObj = parentObj.parent) {
-                tgtObjParents.push(parentObj);
-            }
+                for (let srcParent of srcObjParents) {
+                    for (let tgtParent of tgtObjParents) {
+                        if (tgtParent.absPathName != "")
+                            srcParent.targetParentSet.add(tgtParent);
 
-            for (let srcParent of srcObjParents) {
-                for (let tgtParent of tgtObjParents) {
-                    if (tgtParent.absPathName != "")
-                        srcParent.targetParentSet.add(tgtParent);
-
-                    if (srcParent.absPathName != "")
-                        tgtParent.sourceParentSet.add(srcParent);
+                        if (srcParent.absPathName != "")
+                            tgtParent.sourceParentSet.add(srcParent);
+                    }
                 }
             }
-
+            else {
+                console.warn(throwLbl + "Cannot find connection target " + conn.tgt);
+            }
             /*
             * The cycle_arrows object in each connection is an array of length-2 arrays,
             * each of which is an index into the sysPathnames array. Using that array we
