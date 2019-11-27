@@ -161,13 +161,14 @@ class ModelData {
     _flattenColonGroups(node) {
         if (!Array.isPopulatedArray(node.children)) return;
 
+        if (node.name.endsWith(colonVarNameAppend)) {
+            node.name = node.name.slice(0,-1);
+        }
+
         while (node.splitByColon && exists(node.children) &&
             node.children.length == 1 &&
             node.children[0].splitByColon) {
             let child = node.children[0];
-            if (node.name.endsWith(colonVarNameAppend)) {
-            	node.name = node.name.slice(0,-1);
-            }
 
             if (child.name.endsWith(colonVarNameAppend))
             {
@@ -220,7 +221,7 @@ class ModelData {
                 }
                 node.absPathName += (node.parent.splitByColon) ? ":" : ".";
             }
-            if (node.parent.splitByColon) {
+            if (node.name.endsWith(colonVarNameAppend)) {
                 node.absPathName += node.name.slice(0, -1);
             } else {
                 node.absPathName += node.name;
