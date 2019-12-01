@@ -678,6 +678,8 @@ else:
             Index of last components in a process.
         _nr_comps : int
             Number of components.
+        _pyxdsm_version : str
+            Version of the installed pyXDSM package.
         """
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
@@ -733,8 +735,8 @@ else:
 
             try:
                 type_map_name = self.name
-                if LooseVersion(pyxdsm_version) <= LooseVersion('1.0.0'):
-                    type_map_name += ' ' + pyxdsm_version
+                if LooseVersion(pyxdsm_version) < LooseVersion('2.0.0'):
+                    type_map_name += ' 1.0'
                 self.type_map = _COMPONENT_TYPE_MAP[type_map_name]
             except KeyError:
                 self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
