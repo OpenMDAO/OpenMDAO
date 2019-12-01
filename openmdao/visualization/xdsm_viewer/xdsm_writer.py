@@ -57,12 +57,26 @@ _DEFAULT_WRITER = 'pyxdsm'
 # For pyXDSM check the "diagram_styles" file for style definitions.
 # For XDSMjs check the CSS style sheets.
 _COMPONENT_TYPE_MAP = {
-    'pyxdsm': {
+    'pyxdsm': {  # Newest release
+        'indep': 'Function',
+        'explicit': 'Function',
+        'implicit': 'ImplicitFunction',
+        'exec': 'Function',
+        'metamodel': 'Metamodel',
+        'group': 'Group',
+        'implicit_group': 'ImplicitGroup',
+        'optimization': 'Optimization',
+        'doe': 'DOE',
+        'solver': 'MDA',
+    },
+    'pyxdsm 1.0': {  # Legacy color scheme
         'indep': 'Function',
         'explicit': 'Function',
         'implicit': 'ImplicitAnalysis',
         'exec': 'Function',
         'metamodel': 'Metamodel',
+        'group': 'Function',
+        'implicit_group': 'ImplicitAnalysis',
         'optimization': 'Optimization',
         'doe': 'DOE',
         'solver': 'MDA',
@@ -73,6 +87,8 @@ _COMPONENT_TYPE_MAP = {
         'implicit': 'analysis',
         'exec': 'function',
         'metamodel': 'metamodel',
+        'group': 'function',
+        'implicit_group': 'analysis',
         'optimization': 'optimization',
         'doe': 'doe',
         'solver': 'mda',
@@ -441,7 +457,7 @@ class XDSMjsWriter(AbstractXDSMWriter):
         **kwargs : dict
             Keyword args
         """
-        style = self.type_map.get(comp_type, 'analysis')
+        style = self.type_map.get(comp_type, 'function')
         self.comp_names.append(self._format_id(name))
         self.add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
 
@@ -652,6 +668,9 @@ else:
             Output file saved with this extension. Value fixed at 'pdf' for this class.
         type_map : str
             XDSM component type.
+        pyxdsm_version :str
+            If a string version number is added, the component type mapping for the given
+            pyXDSM version will be used (if exists).
         _comp_indices : dict
             Maps the component names to their index (position on the matrix diagonal).
         _styles_used : set
@@ -666,7 +685,7 @@ else:
 
         def __init__(self, name='pyxdsm', box_stacking=_DEFAULT_BOX_STACKING,
                      number_alignment=_DEFAULT_NUMBER_ALIGNMENT, legend=False, class_names=False,
-                     add_component_indices=True, equations=False, options={}):
+                     add_component_indices=True, options={}):
             """
             Initialize.
 
@@ -687,14 +706,12 @@ else:
                 Defaults to False.
             add_component_indices : bool
                 If true, display components with numbers.
-            equations : bool, optional
-                If true, for ExecComps their equations are shown in the diagram
-                Defaults to False.
             options : dict
                 Keyword argument options of the XDSM class.
             """
             super(XDSMWriter, self).__init__(**options)
             self.name = name
+            self.pyxdsm_version = ''
             # Formatting options
             self.box_stacking = box_stacking
             self.class_names = class_names
@@ -704,10 +721,18 @@ else:
             # Output file saved with this extension
             self.extension = 'pdf'
             if self.name in _COMPONENT_TYPE_MAP:
-                self.type_map = _COMPONENT_TYPE_MAP[self.name]
+                pyxdsm_version = self.name
+                if self.pyxdsm_version:
+                    pyxdsm_version += ' ' + self.pyxdsm_version
+                try:
+                    self.type_map = _COMPONENT_TYPE_MAP[pyxdsm_version]
+                except KeyError:
+                    msg = 'Settings for "{}" not found.  will default to "{}"'
+                    self.type_map = _COMPONENT_TYPE_MAP[self.name]
+                    simple_warning(msg.format(pyxdsm_version, _DEFAULT_WRITER))
             else:
                 self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
-                msg = 'Name not "{}" found in component type mapping, will default to "{}"'
+                msg = 'Name "{}" not found in component type mapping, will default to "{}"'
                 simple_warning(msg.format(self.name, _DEFAULT_WRITER))
             # Number of components
             self._nr_comps = 0
@@ -835,7 +860,7 @@ else:
             **kwargs : dict
                 Keyword args
             """
-            style = self.type_map.get(comp_type, 'Analysis')
+            style = self.type_map.get(comp_type, 'Function')
             self._add_system(node_name=name, style=style, label=label, stack=stack, **kwargs)
 
         def add_driver(self, name, label=None, driver_type='Optimization', **kwargs):
@@ -1199,7 +1224,7 @@ def write_xdsm(data_source, filename, model_path=None, recurse=True,
     driver = viewer_data.get('driver', None)
     if driver:
         driver_name = driver.get('name', None)
-        driver_type = driver.get('name', 'optimization')
+        driver_type = driver.get('type', 'optimization')
     else:
         driver_name = None
         driver_type = 'optimization'
@@ -1516,8 +1541,11 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 solver_dcts.append(comp)
         else:  # component or group
             cls_name = comp.get('class', None) if class_names else None
+            comp_type = comp['component_type']
+            if comp.get('subsystem_type', None) == 'group':
+                comp_type = 'group'
             x.add_comp(name=comp['abs_name'], label=label, stack=stack,
-                       comp_type=comp['component_type'], cls=cls_name)
+                       comp_type=comp_type, cls=cls_name)
 
     # Add process connections
     if add_process_conns:
