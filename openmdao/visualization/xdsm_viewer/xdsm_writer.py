@@ -18,16 +18,16 @@ from __future__ import print_function
 
 import json
 import os
+from distutils.version import LooseVersion
 
+from numpy.distutils.exec_command import find_executable
 from six import iteritems, string_types
 
 from openmdao.core.problem import Problem
 from openmdao.utils.general_utils import simple_warning
-from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.utils.webview import webview
+from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data
 from openmdao.visualization.xdsm_viewer.html_writer import write_html
-
-from numpy.distutils.exec_command import find_executable
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _XDSMJS_PATH = os.path.join(_DIR, 'XDSMjs')
@@ -668,9 +668,6 @@ else:
             Output file saved with this extension. Value fixed at 'pdf' for this class.
         type_map : str
             XDSM component type.
-        pyxdsm_version :str
-            If a string version number is added, the component type mapping for the given
-            pyXDSM version will be used (if exists).
         _comp_indices : dict
             Maps the component names to their index (position on the matrix diagonal).
         _styles_used : set
@@ -709,9 +706,22 @@ else:
             options : dict
                 Keyword argument options of the XDSM class.
             """
-            super(XDSMWriter, self).__init__(**options)
+            try:
+                from pyxdsm import __version__ as pyxdsm_version
+                self._pyxdsm_version = pyxdsm_version
+            except ImportError:
+                self._pyxdsm_version = pyxdsm_version = '1.0.0'
+
+            if LooseVersion(pyxdsm_version) > LooseVersion('1.0.0'):
+                super(XDSMWriter, self).__init__(**options)
+            else:
+                if options:
+                    msg = 'pyXDSM {} does not take keyword arguments. Consider upgrading this ' \
+                          'package. Writer options "{}" will be ignored'
+                    simple_warning(msg.format(pyxdsm_version, options.keys()))
+                super(XDSMWriter, self).__init__()
+
             self.name = name
-            self.pyxdsm_version = ''
             # Formatting options
             self.box_stacking = box_stacking
             self.class_names = class_names
@@ -720,17 +730,13 @@ else:
             self.has_legend = legend  # If true, a legend will be added to the diagram
             # Output file saved with this extension
             self.extension = 'pdf'
-            if self.name in _COMPONENT_TYPE_MAP:
-                pyxdsm_version = self.name
-                if self.pyxdsm_version:
-                    pyxdsm_version += ' ' + self.pyxdsm_version
-                try:
-                    self.type_map = _COMPONENT_TYPE_MAP[pyxdsm_version]
-                except KeyError:
-                    msg = 'Settings for "{}" not found.  will default to "{}"'
-                    self.type_map = _COMPONENT_TYPE_MAP[self.name]
-                    simple_warning(msg.format(pyxdsm_version, _DEFAULT_WRITER))
-            else:
+
+            try:
+                type_map_name = self.name
+                if LooseVersion(pyxdsm_version) <= LooseVersion('1.0.0'):
+                    type_map_name += ' ' + pyxdsm_version
+                self.type_map = _COMPONENT_TYPE_MAP[type_map_name]
+            except KeyError:
                 self.type_map = _COMPONENT_TYPE_MAP[_DEFAULT_WRITER]
                 msg = 'Name "{}" not found in component type mapping, will default to "{}"'
                 simple_warning(msg.format(self.name, _DEFAULT_WRITER))
@@ -759,7 +765,10 @@ else:
                 Keyword args
             """
             build = kwargs.pop('build', False)
-            cleanup = kwargs.pop('cleanup', True)
+            if LooseVersion(self._pyxdsm_version) <= LooseVersion('1.0.0'):
+                kwargs = {}
+            else:
+                kwargs.setdefault('cleanup', True)
 
             for comp in self._comps:
                 label = comp['label']
@@ -788,8 +797,7 @@ else:
                 # Now really add the system with the XDSM class' method
                 self.add_system(**comp)
 
-            super(XDSMWriter, self).write(file_name=filename, build=build, cleanup=cleanup,
-                                          **kwargs)
+            super(XDSMWriter, self).write(file_name=filename, build=build, **kwargs)
 
         def add_system(self, node_name, style, label, stack=False, faded=False, **kwargs):
             """
@@ -892,37 +900,38 @@ else:
                 List of component names.
                 Defaults to None.
             """
-            index_dct = self._comp_indices
+            if hasattr(self, 'processes'):  # Not available in versions <= 1.0.0
+                index_dct = self._comp_indices
 
-            if solver is None:
-                # Add driver
-                idx = 0
-                comp_names = [c['node_name'] for c in self._comps]  # Driver process
-                step = len(self._comps) + 1
-                self._comps[idx]['step'] = step
-            else:
-                solver_name = solver['abs_name']
-                comp_names = [c['abs_name'] for c in solver['comps']]
-                nr = len(comp_names)
-                idx = index_dct[solver_name]
-                self._comps[idx]['step'] = nr + idx + 1
-                comp_names = [solver_name] + comp_names
-                # Loop through all processes added so far
-                # Assumes, that processes are added in the right order, first the higher level
-                # processes
-                for proc in self.processes:
-                    process_name = proc[0]
-                    for i, item in enumerate(proc, start=1):
-                        if solver_name == item:  # solver found in an already added process
-                            # Delete items belonging to the new process from the others
-                            proc[i:i + nr] = []
-                            process_index = index_dct[process_name]
-                            # There is a process loop inside, this adds plus one step
-                            self._comps[process_index]['step'] += 1
-            self._loop_ends.append(self._comp_indices[comp_names[-1]])
-            # Close the loop by
-            comp_names.append(comp_names[0])
-            self.add_process(comp_names, arrow=_PROCESS_ARROWS)
+                if solver is None:
+                    # Add driver
+                    idx = 0
+                    comp_names = [c['node_name'] for c in self._comps]  # Driver process
+                    step = len(self._comps) + 1
+                    self._comps[idx]['step'] = step
+                else:
+                    solver_name = solver['abs_name']
+                    comp_names = [c['abs_name'] for c in solver['comps']]
+                    nr = len(comp_names)
+                    idx = index_dct[solver_name]
+                    self._comps[idx]['step'] = nr + idx + 1
+                    comp_names = [solver_name] + comp_names
+                    # Loop through all processes added so far
+                    # Assumes, that processes are added in the right order, first the higher level
+                    # processes
+                    for proc in self.processes:
+                        process_name = proc[0]
+                        for i, item in enumerate(proc, start=1):
+                            if solver_name == item:  # solver found in an already added process
+                                # Delete items belonging to the new process from the others
+                                proc[i:i + nr] = []
+                                process_index = index_dct[process_name]
+                                # There is a process loop inside, this adds plus one step
+                                self._comps[process_index]['step'] += 1
+                self._loop_ends.append(self._comp_indices[comp_names[-1]])
+                # Close the loop by
+                comp_names.append(comp_names[0])
+                self.add_process(comp_names, arrow=_PROCESS_ARROWS)
 
         @staticmethod
         def format_block(names, stacking='vertical', **kwargs):
