@@ -681,14 +681,15 @@ else:
                 Position of number relative to the component label. Possible values
                 are: 'horizontal', 'vertical'.
             legend : bool
-                If True, a legend will be added to the diagram.
+                If true, a legend will be added to the diagram.
             class_names : bool, optional
-                If True, appends class name of groups/components to the component blocks of diagram.
+                If true, appends class name of groups/components to the component blocks of diagram.
                 Defaults to False.
             add_component_indices : bool
-                If True, display components with numbers.
-            equations : bool
-                If True, show equations for ExecComps.
+                If true, display components with numbers.
+            equations : bool, optional
+                If true, for ExecComps their equations are shown in the diagram
+                Defaults to False.
             options : dict
                 Keyword argument options of the XDSM class.
             """
