@@ -42,7 +42,12 @@ let N2TransitionDefaults = {
 
 let DebugFlags = {
     'timings': false,
-    'info': true
+    'info': false
 }
+
+let colonVarNameAppend = ' '; // Used internally. Appended to vars split by colon vars
+                              // Allows user to have inputs like f_approx:f, f_approx:r
+                              // and outputs on the same comp as f_approx
+
 
 // Object.freeze(N2TransitionDefaults);

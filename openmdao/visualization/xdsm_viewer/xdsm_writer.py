@@ -687,8 +687,9 @@ else:
                 Defaults to False.
             add_component_indices : bool
                 If true, display components with numbers.
-            equations : bool
-                If true, display equations of ExecComps.
+            equations : bool, optional
+                If true, for ExecComps their equations are shown in the diagram
+                Defaults to False.
             options : dict
                 Keyword argument options of the XDSM class.
             """
