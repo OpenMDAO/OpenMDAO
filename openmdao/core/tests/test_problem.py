@@ -1584,6 +1584,9 @@ class TestProblem(unittest.TestCase):
                 self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
                 self.add_subsystem('mcomp', MyComp(), promotes=['*'])
 
+                self.add_subsystem('sub', om.Group(), promotes_inputs=['*'])
+                self.sub.add_subsystem('mcomp', MyComp(), promotes=['*'])
+
                 self.indep.add_output('a', val=2.0)
 
             def configure(self):
@@ -1593,6 +1596,9 @@ class TestProblem(unittest.TestCase):
                     self.mcomp.add_input('b', val=0.)
                     self.mcomp.add_output('b2', val=0.)
 
+                    self.sub.mcomp.add_input('b', val=0.)
+                    self.sub.mcomp.add_output('b2', val=0.)
+
         # add inputs/outputs in setup only
         p = om.Problem(Model(add_b2=False))
         p.setup()
@@ -1600,13 +1606,15 @@ class TestProblem(unittest.TestCase):
 
         inputs = p.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('mcomp.a', {'value': [2.]}),
+            ('mcomp.a',     {'value': [2.]}),
+            ('sub.mcomp.a', {'value': [2.]}),
         ])
 
         outputs = p.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('indep.a',  {'value': [2.]}),
-            ('mcomp.a2', {'value': [4.]}),
+            ('indep.a',      {'value': [2.]}),
+            ('mcomp.a2',     {'value': [4.]}),
+            ('sub.mcomp.a2', {'value': [4.]}),
         ])
 
         # add inputs/outputs in configure
@@ -1616,16 +1624,20 @@ class TestProblem(unittest.TestCase):
 
         inputs = p.model.list_inputs(out_stream=None)
         self.assertEqual(sorted(inputs), [
-            ('mcomp.a', {'value': [2.]}),
-            ('mcomp.b', {'value': [3.]}),
+            ('mcomp.a',     {'value': [2.]}),
+            ('mcomp.b',     {'value': [3.]}),
+            ('sub.mcomp.a', {'value': [2.]}),
+            ('sub.mcomp.b', {'value': [3.]}),
         ])
 
         outputs= p.model.list_outputs(out_stream=None)
         self.assertEqual(sorted(outputs), [
-            ('indep.a',  {'value': [2.]}),
-            ('indep.b',  {'value': [3.]}),
-            ('mcomp.a2', {'value': [4.]}),
-            ('mcomp.b2', {'value': [6.]}),
+            ('indep.a',      {'value': [2.]}),
+            ('indep.b',      {'value': [3.]}),
+            ('mcomp.a2',     {'value': [4.]}),
+            ('mcomp.b2',     {'value': [6.]}),
+            ('sub.mcomp.a2', {'value': [4.]}),
+            ('sub.mcomp.b2', {'value': [6.]}),
         ])
 
     def test_feature_system_configure(self):
