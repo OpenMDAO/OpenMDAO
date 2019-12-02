@@ -96,6 +96,16 @@ class N2TreeNode {
         return (this.type == 'subsystem');
     }
 
+    /** Not connectable if this is a param group, or parents are minimized,
+     * or this is a minimized variable that was split by a colon.
+     */
+    isConnectable() {
+        if (this.isParamOrUnknown() && !(this.hasChildren() ||
+            this.parent.isMinimized || this.parentComponent.isMinimized)) return true;
+    
+        return (this.isMinimized && !this.splitByColon);
+    }
+
     /**
      * Compare the supplied node, and recurse through children if it doesn't match.
      * @returns {Boolean} True if a match is found.

@@ -122,7 +122,7 @@ class N2UserInterface {
     leftClick(node) {
         testThis(this, 'N2UserInterface', 'leftClick');
 
-        if (!node.hasChildren()) return;
+        if (!node.hasChildren() || node.isParam()) return;
         if (d3.event.button != 0) return;
         this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
         this.forwardButtonHistory = [];
