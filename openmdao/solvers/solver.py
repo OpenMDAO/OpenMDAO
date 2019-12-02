@@ -606,11 +606,11 @@ class NonlinearSolver(Solver):
         """
         Run the apply_nonlinear method on the system.
         """
-        self._recording_iter.stack.append(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
         try:
             self._system()._apply_nonlinear()
         finally:
-            self._recording_iter.stack.pop()
+            self._recording_iter.pop()
 
     def _iter_get_norm(self):
         """
@@ -754,7 +754,7 @@ class LinearSolver(Solver):
         """
         Run the apply_linear method on the system.
         """
-        self._recording_iter.stack.append(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
 
         system = self._system()
         scope_out, scope_in = system._get_scope()
@@ -763,7 +763,7 @@ class LinearSolver(Solver):
             system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems,
                                  self._mode, scope_out, scope_in)
         finally:
-            self._recording_iter.stack.pop()
+            self._recording_iter.pop()
 
 
 class BlockLinearSolver(LinearSolver):

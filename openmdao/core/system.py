@@ -79,6 +79,9 @@ _DEFAULT_COLORING_META.update(_DEF_COMP_SPARSITY_ARGS)
 
 _full_slice = slice(None)
 
+_recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_linear',
+                               '_solve_nonlinear'])
+
 
 class System(object):
     """
@@ -3711,6 +3714,8 @@ class System(object):
         """
         Record an iteration of the current System.
         """
+        global _recordable_funcs
+
         if self._rec_mgr._recorders:
             parallel = self._rec_mgr._check_parallel() if self.comm.size > 1 else False
             options = self.recording_options
@@ -3720,10 +3725,9 @@ class System(object):
             stack_top = self._recording_iter.stack[-1][0]
             method = stack_top.rsplit('.', 1)[-1]
 
-            if method not in ['_apply_linear', '_apply_nonlinear', '_solve_linear',
-                              '_solve_nonlinear']:
-                raise ValueError("{}: {} must be one of: '_apply_linear, _apply_nonlinear, "
-                                 "_solve_linear, _solve_nonlinear'".format(self.msginfo, method))
+            if method not in _recordable_funcs:
+                raise ValueError("{}: {} must be one of: {}".format(self.msginfo, method,
+                                                                    sorted(_recordable_funcs)))
 
             if 'nonlinear' in method:
                 inputs, outputs, residuals = self.get_nonlinear_vectors()
