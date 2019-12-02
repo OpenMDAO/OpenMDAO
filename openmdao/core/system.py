@@ -4025,9 +4025,8 @@ class System(object):
         abs_name : str
             The absolute name of the variable.
         get_remote : bool
-            If True, return the value even if the variable is remote. NOTE: this requires a
-            collective MPI call so this function must be called in all procs in the Problem's
-            MPI communicator.
+            If True, return the value even if the variable is remote. NOTE: This function must be
+            called in all procs in the Problem's MPI communicator.
         rank : int or None
             If not None, specifies that the value is to be gathered to the given rank only.
             Otherwise, if get_remote is specified, the value will be broadcast to all procs
@@ -4106,13 +4105,16 @@ class System(object):
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                 else:
                     if rank != owner:
-                        # if self.comm.rank == owner:
-                        #     self.comm.send(val, dest=rank, tag=INT_DTYPE(hash(abs_name)))
-                        # elif self.comm.rank == rank:
-                        #     val = self.comm.recv(source=owner, tag=INT_DTYPE(hash(abs_name)))
-                        vals = self.comm.gather(val, root=rank)
-                        if self.comm.rank == rank:
-                            val = vals[owner]
+                        tag = self._var_allprocs_abs2idx[vec_name][abs_name]
+                        # avoid tag collisions between inputs, outputs, and resids
+                        if kind != 'output':
+                            tag += len(self._var_allprocs_abs_names['output'])
+                            if kind == 'residual':
+                                tag += len(self._var_allprocs_abs_names['input'])
+                        if self.comm.rank == owner:
+                            self.comm.send(val, dest=rank, tag=tag)
+                        elif self.comm.rank == rank:
+                            val = self.comm.recv(source=owner, tag=tag)
 
         if not flat and val is not System._undefined and not discrete:
             val.shape = meta['global_shape'] if get_remote and distrib else meta['shape']

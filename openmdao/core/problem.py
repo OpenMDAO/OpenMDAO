@@ -386,10 +386,10 @@ class Problem(object):
         """
         if self._setup_status == 1:
             val = self._get_cached_val(name)
-            if units is not None:
-                val = self.model.convert2units(name, val, units)
             if indices is not None:
                 val = val[indices]
+            if units is not None:
+                val = self.model.convert2units(name, val, units)
             return val
 
         val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote)
