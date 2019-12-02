@@ -35,6 +35,8 @@ class N2UserInterface {
         // TODO: Refactor search, remove from global
         document.getElementById("searchButtonId").onclick = SearchButtonClicked;
         this._setupToolbar();
+
+        this.legend = new N2Legend();
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
@@ -66,12 +68,14 @@ class N2UserInterface {
      * the diagram drawing.
      */
     collapse() {
+        testThis(this, 'N2UserInterface', 'collapse');
+
         let node = this.leftClickedNode;
 
         if (!node.hasChildren()) return;
 
         // Don't allow minimizing of root node
-        if (node.depth > this.n2Diag.zoomedElement.depth) { 
+        if (node.depth > this.n2Diag.zoomedElement.depth) {
             this.rightClickedNode = node;
             this.findRootOfChangeFunction =
                 this.findRootOfChangeForRightClick.bind(this);
@@ -84,9 +88,12 @@ class N2UserInterface {
 
     /** When a node is right-clicked, collapse it. */
     rightClick(node1, node2) {
+        testThis(this, 'N2UserInterface', 'rightClick');
+
         this.leftClickedNode = node1;
         this.rightClickedNode = node2;
         d3.event.preventDefault();
+        d3.event.stopPropagation();
         this.collapse();
     }
 
@@ -95,7 +102,7 @@ class N2UserInterface {
      * actually happened.
      * @param {N2TreeNode} node The node that was targetted.
      */
-    setupLeftClick(node) {
+    _setupLeftClick(node) {
         this.leftClickedNode = node;
         this.lastClickWasLeft = true;
         if (this.leftClickedNode.depth > this.n2Diag.zoomedElement.depth) {
@@ -113,14 +120,16 @@ class N2UserInterface {
      * @param {N2TreeNode} node The targetted node.
      */
     leftClick(node) {
+        testThis(this, 'N2UserInterface', 'leftClick');
+
         if (!node.hasChildren()) return;
         if (d3.event.button != 0) return;
         this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
         this.forwardButtonHistory = [];
-        this.setupLeftClick(node);
-        this.n2Diag.update();
+        this._setupLeftClick(node);
         d3.event.preventDefault();
         d3.event.stopPropagation();
+        this.n2Diag.update();
     }
 
     /**
@@ -147,6 +156,8 @@ class N2UserInterface {
      * Add the previous zoomed node to the forward history stack.
      */
     backButtonPressed() {
+        testThis(this, 'N2UserInterface', 'backButtonPressed');
+
         if (this.backButtonHistory.length == 0) return;
         let node = this.backButtonHistory.pop().node;
         this.n2Diag.dom.parentDiv.querySelector("#backButtonId").disabled =
@@ -155,7 +166,7 @@ class N2UserInterface {
             if (obj.isMinimized) return;
         }
         this.forwardButtonHistory.push({ "node": this.n2Diag.zoomedElement });
-        this.setupLeftClick(node);
+        this._setupLeftClick(node);
         this.n2Diag.update();
     }
 
@@ -166,6 +177,8 @@ class N2UserInterface {
      * Add the previous zoomed node to the back history stack.
      */
     forwardButtonPressed() {
+        testThis(this, 'N2UserInterface', 'forwardButtonPressed');
+
         if (this.forwardButtonHistory.length == 0) return;
         let node = this.forwardButtonHistory.pop().node;
         this.n2Diag.dom.parentDiv.querySelector("#forwardButtonId").disabled =
@@ -174,7 +187,7 @@ class N2UserInterface {
             if (obj.isMinimized) return;
         }
         this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
-        this.setupLeftClick(node);
+        this._setupLeftClick(node);
         this.n2Diag.update();
     }
 
@@ -215,9 +228,11 @@ class N2UserInterface {
      * to the root node.
      */
     homeButtonClick() {
+        testThis(this, 'N2UserInterface', 'homeButtonClick');
+
         this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
         this.forwardButtonHistory = [];
-        this.setupLeftClick(this.n2Diag.model.root);
+        this._setupLeftClick(this.n2Diag.model.root);
         this.n2Diag.update();
     }
 
@@ -226,10 +241,12 @@ class N2UserInterface {
      * back button history, and zoom to its parent.
      */
     upOneLevelButtonClick() {
+        testThis(this, 'N2UserInterface', 'upOneLevelButtonClick');
+
         if (this.n2Diag.zoomedElement === this.n2Diag.model.root) return;
         this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
         this.forwardButtonHistory = [];
-        this.setupLeftClick(this.n2Diag.zoomedElement.parent);
+        this._setupLeftClick(this.n2Diag.zoomedElement.parent);
         this.n2Diag.update();
     }
 
@@ -253,6 +270,8 @@ class N2UserInterface {
      * @param {N2TreeNode} node The initial node, usually the currently zoomed element.
      */
     collapseOutputsButtonClick(startNode) {
+        testThis(this, 'N2UserInterface', 'collapseOutputsButtonClick');
+
         this.findRootOfChangeFunction =
             this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
@@ -280,6 +299,8 @@ class N2UserInterface {
      * @param {N2TreeNode} startNode The initial node.
      */
     uncollapseButtonClick(startNode) {
+        testThis(this, 'N2UserInterface', 'uncollapseButtonClick');
+
         this.findRootOfChangeFunction =
             this.findRootOfChangeForCollapseUncollapseOutputs;
         N2TransitionDefaults.duration = N2TransitionDefaults.durationSlow;
@@ -310,6 +331,8 @@ class N2UserInterface {
      * @param {Number} newChosenCollapseDepth Selected depth to collapse to.
      */
     collapseToDepthSelectChange(newChosenCollapseDepth) {
+        testThis(this, 'N2UserInterface', 'collapseToDepthSelectChange');
+
         this.n2Diag.chosenCollapseDepth = newChosenCollapseDepth;
         if (this.n2Diag.chosenCollapseDepth > this.n2Diag.zoomedElement.depth) {
             this._collapseToDepth(this.n2Diag.model.root,
@@ -327,10 +350,13 @@ class N2UserInterface {
      * is currently shown, and vice-versa.
      */
     toggleSolverNamesCheckboxChange() {
+        testThis(this, 'N2UserInterface', 'toggleSolverNamesCheckboxChange');
+
         this.n2Diag.toggleSolverNameType();
         this.n2Diag.dom.parentDiv.querySelector("#toggleSolverNamesButtonId").className =
             !this.n2Diag.showLinearSolverNames ? "myButton myButtonToggledOn" : "myButton";
-        SetupLegend(d3, this.n2Diag.dom.d3ContentDiv);
+        if (this.legend.shown)
+            this.legend.show(this.n2Diag.showLinearSolverNames, this.n2Diag.style.solvers);
         this.n2Diag.update();
     }
 
@@ -339,6 +365,8 @@ class N2UserInterface {
      * show, and vice-versa.
      */
     showPathCheckboxChange() {
+        testThis(this, 'N2UserInterface', 'showPathCheckboxChange');
+
         this.n2Diag.showPath = !this.n2Diag.showPath;
         this.n2Diag.dom.parentDiv.querySelector("#currentPathId").style.display =
             this.n2Diag.showPath ? "block" : "none";
@@ -348,11 +376,12 @@ class N2UserInterface {
 
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {
-        // TODO: Refactor legend
-        showLegend = !showLegend;
+        testThis(this, 'N2UserInterface', 'toggleLegend');
+        this.legend.toggle(this.n2Diag.showLinearSolverNames, this.n2Diag.style.solvers);
+
         this.n2Diag.dom.parentDiv.querySelector("#showLegendButtonId").className =
-            showLegend ? "myButton myButtonToggledOn" : "myButton";
-        SetupLegend(d3, n2Diag.dom.d3ContentDiv);
+            (this.legend.shown) ? "myButton myButtonToggledOn" : "myButton";
+
     }
 
     /** Associate all of the buttons on the toolbar with a method in N2UserInterface. */
@@ -409,12 +438,14 @@ class N2UserInterface {
         }
 
         toolbar.querySelector("#saveSvgButtonId").onclick =
-            function() { self.n2Diag.saveSvg(); } 
+            function () { self.n2Diag.saveSvg(); }
         toolbar.querySelector("#helpButtonId").onclick = DisplayModal;
     }
 
     /** Make sure UI controls reflect history and current reality. */
     update() {
+        testThis(this, 'N2UserInterface', 'update');
+
         this.n2Diag.dom.parentDiv.querySelector('#currentPathId').innerHTML =
             'PATH: root' + ((this.n2Diag.zoomedElement.parent) ? '.' : '') +
             this.n2Diag.zoomedElement.absPathName;

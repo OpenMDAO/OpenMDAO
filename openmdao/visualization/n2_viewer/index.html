@@ -13,15 +13,25 @@
         <div id="currentPathId" class="path_string" style="display:none"></div>
         <div id="d3_content_div">
             <div class="ptN2ChartClass" id="svgDiv">
-                <svg id="svgId">
+                  <svg id="svgId">
                     <defs>
-                        <!-- Arrowhead for connection lines -->
-                        <marker id="arrow" viewBox="0 -5 10 10" refX="5" refY="0" markerWidth="1" markerHeight="1" orient="auto">
-                            <path d="M0,-5L10,0L0,5" class="arrowHead"></path>
+                        <marker id="arrow" viewBox="0 -5 10 10" refX="5" refY="0" markerWidth="1" markerHeight="1"
+                            orient="auto">
+                            <path d="M0,-5L10,0L0,5L0,-5" class="arrowHead"></path>
                         </marker>
+                        <clipPath id="partitionTreeClip">
+                            <rect x="0" y="0" width="1200" height="600" />
+                        </clipPath>
+                        <clipPath id="n2MatrixClip">
+                            <rect x="-1" y="-1" width="602" height="602" />
+                        </clipPath>
+                        <clipPath id="solverTreeClip">
+                            <rect x="0" y="0" width="1200" height="600" />
+                        </clipPath>
                     </defs>
                 </svg>
             </div>
+            <div class='ptN2LegendClass' id='legend'></div>
         </div>
         <div id="connectionId">
         </div>
@@ -29,6 +39,10 @@
 </div>
 
 <div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
+<div id="top" class='offgrid' style="visibility: hidden;"></div>
+<div id="left" class='offgrid' style="visibility: hidden;"></div>
+<div id="right" class='offgrid' style="visibility: hidden;"></div>
+<div id="bottom" class='offgrid' style="visibility: hidden;"></div>
 
 <nav id="context-menu" class="context-menu">
     <ul class="context-menu__items">
@@ -53,7 +67,6 @@
 {{model_data}}
 {modal_lib}
 {search_lib}
-{legend_lib}
 {utils_lib}
 {symboltype_lib}
 {n2treenode_lib}
@@ -61,6 +74,7 @@
 {n2style_lib}
 {n2layout_lib}
 {n2matrixcell_lib}
+{n2legend_lib}
 {n2matrix_lib}
 {n2arrow_lib}
 {n2diagram_lib}
