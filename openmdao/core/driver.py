@@ -382,8 +382,8 @@ class Driver(object):
 
         if incl:
             vars2record['output'].extend(n for n in model._var_allprocs_abs_names['output']
-                                         if n in abs2prom and check_path(abs2prom[n], incl, excl)
-                                         and n not in skip)
+                                         if n in abs2prom and n not in skip and
+                                         check_path(abs2prom[n], incl, excl))
             # remove dups and make sure order is the same on all procs
             vars2record['output'] = sorted(set(vars2record['output']))
 
