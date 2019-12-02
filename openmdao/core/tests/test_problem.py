@@ -1513,6 +1513,7 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
     def test_configure_add_output(self):
+        # add outputs to an IndepVarComp in Group configure
 
         class Model(om.Group):
             def initialize(self):
@@ -1553,7 +1554,7 @@ class TestProblem(unittest.TestCase):
                 ('comp3.b', {'value': [3.]})
             ], "Inputs don't match when added in %s." % where)
 
-            outputs= p.model.list_outputs(out_stream=None)
+            outputs = p.model.list_outputs(out_stream=None)
             self.assertEqual(sorted(outputs), [
                 ('comp1.a',   {'value': [2.]}),
                 ('comp1.foo', {'value': [1.]}),
@@ -1561,6 +1562,71 @@ class TestProblem(unittest.TestCase):
                 ('comp2.foo', {'value': [1.]}),
                 ('comp3.y',   {'value': [5.]})
             ], "Outputs don't match when added in %s." % where)
+
+    def test_configure_add_input_output(self):
+        # add inputs and outputs to an ExplicitComponent in Group configure
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', val=0.)
+                self.add_output('a2', val=0.)
+
+            def compute(self, inputs, outputs):
+                outputs['a2'] = inputs['a'] * 2.
+                if 'b' in inputs:
+                    outputs['b2'] = inputs['b'] * 2.
+
+        class Model(om.Group):
+            def initialize(self):
+                self.options.declare('add_b2', default=False)
+
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('mcomp', MyComp(), promotes=['*'])
+
+                self.indep.add_output('a', val=2.0)
+
+            def configure(self):
+                if self.options['add_b2']:
+                    self.indep.add_output('b', val=3.0)
+
+                    self.mcomp.add_input('b', val=0.)
+                    self.mcomp.add_output('b2', val=0.)
+
+        # add inputs/outputs in setup only
+        p = om.Problem(Model(add_b2=False))
+        p.setup()
+        p.run_model()
+
+        inputs = p.model.list_inputs(out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('mcomp.a', {'value': [2.]}),
+        ])
+
+        outputs = p.model.list_outputs(out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('indep.a',  {'value': [2.]}),
+            ('mcomp.a2', {'value': [4.]}),
+        ])
+
+        # add inputs/outputs in configure
+        p = om.Problem(Model(add_b2=True))
+        p.setup()
+        p.run_model()
+
+        inputs = p.model.list_inputs(out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('mcomp.a', {'value': [2.]}),
+            ('mcomp.b', {'value': [3.]}),
+        ])
+
+        outputs= p.model.list_outputs(out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('indep.a',  {'value': [2.]}),
+            ('indep.b',  {'value': [3.]}),
+            ('mcomp.a2', {'value': [4.]}),
+            ('mcomp.b2', {'value': [6.]}),
+        ])
 
     def test_feature_system_configure(self):
         import openmdao.api as om
