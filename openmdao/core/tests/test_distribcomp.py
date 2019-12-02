@@ -171,6 +171,9 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
         arr_size = self.options['arr_size']
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
+        self.sizes = sizes
+        self.offsets = offsets
+
         start = offsets[rank]
         end = start + sizes[rank]
 
@@ -318,9 +321,6 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem()
         top = p.model
-
-        import wingdbstub
-
         C1 = top.add_subsystem("C1", InOutArrayComp(arr_size=size))
         C2 = top.add_subsystem("C2", DistribInputComp(arr_size=size))
         top.connect('C1.outvec', 'C2.invec')
@@ -547,7 +547,7 @@ class ProbRemoteTests(unittest.TestCase):
 
     N_PROCS = 4
 
-    def test_prob_getitem_err(self):
+    def test_prob_getval_dist_par(self):
         size = 3
 
         p = om.Problem()
@@ -555,7 +555,6 @@ class ProbRemoteTests(unittest.TestCase):
         par = top.add_subsystem('par', om.ParallelGroup())
         C1 = par.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
         C2 = par.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
-
         p.setup()
 
         # Conclude setup but don't run model.
@@ -569,11 +568,32 @@ class ProbRemoteTests(unittest.TestCase):
 
         p.run_model()
 
-        # test that getitem from Problem on a distrib var raises an exception
         ans = p.get_val('par.C2.invec', get_remote=True)
         np.testing.assert_allclose(ans, np.array([6, 3,3], dtype=float))
         ans = p.get_val('par.C2.outvec', get_remote=True)
         np.testing.assert_allclose(ans, np.array([12, 6, 6], dtype=float))
+        ans = p.get_val('par.C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
+        ans = p.get_val('par.C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4, 2, 2], dtype=float))
+
+    def test_prob_getval_dist(self):
+        size = 14
+
+        p = om.Problem()
+        top = p.model
+        C1 = top.add_subsystem("C1", DistribInputDistribOutputComp(arr_size=size))
+        p.setup()
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        rank = p.comm.rank
+
+        C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float) * (rank + 1)
+
+        p.run_model()
+
         ans = p.get_val('par.C1.invec', get_remote=True)
         np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
         ans = p.get_val('par.C1.outvec', get_remote=True)

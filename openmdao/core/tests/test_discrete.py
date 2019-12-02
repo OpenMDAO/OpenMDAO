@@ -536,16 +536,16 @@ class DiscreteTestCase(unittest.TestCase):
 
         prob.setup(check=['unconnected_inputs'], logger=testlogger)
         prob.run_model()
-        
+
         expected_warning_1 = (
             "The following inputs are not connected:\n"
             "   x  (p):\n"
             "      c1.x  c1\n"
             "      c2.x  c2\n"
         )
-        
+
         self.assertTrue(testlogger.contains('warning', expected_warning_1))
-        
+
 
     def test_discrete_deriv_implicit(self):
         prob = om.Problem()
@@ -704,9 +704,6 @@ class DiscretePromTestCase(unittest.TestCase):
         prob['indep.x'] = 'foobar/'
         prob.run_model()
 
-        from openmdao.utils.name_maps import name2abs_name
-        t = name2abs_name(prob.model, 'G.G1.C1_2.y')
-        
         self.assertEqual(prob['C3.y'], 'foobar/G.G1.C1_1/G.G1.C1_2/C3/')
         self.assertEqual(prob['C4.y'], 'foobar/G.G2.C2_1/G.G2.C2_2/C4/')
 
