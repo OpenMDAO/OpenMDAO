@@ -239,7 +239,7 @@ class Component(System):
         else:
             self._vector_class = self._local_vector_class
 
-    def _post_configure(self, mode, recurse):
+    def _post_configure(self):
         """
         Do any remaining setup that had to wait until after final user configuration.
 
@@ -265,7 +265,7 @@ class Component(System):
                                "using default metadata and method='%s'." % (self.msginfo, method))
                 self.declare_partials('*', '*', method=method)
 
-        super(Component, self)._post_configure(mode, recurse)
+        super(Component, self)._post_configure()
 
     def _setup_var_data(self, recurse=True):
         """

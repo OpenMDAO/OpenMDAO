@@ -93,7 +93,7 @@ class IndepVarComp(ExplicitComponent):
                 raise ValueError("IndepVarComp init: '%s' is not supported "
                                  "in IndepVarComp." % illegal)
 
-    def _post_configure(self, mode, recurse):
+    def _post_configure(self):
         """
         Do any remaining setup that had to wait until after final user configuration.
 
@@ -125,7 +125,7 @@ class IndepVarComp(ExplicitComponent):
 
         self._static_mode = True
 
-        super(IndepVarComp, self)._post_configure(mode, recurse)
+        super(IndepVarComp, self)._post_configure()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):

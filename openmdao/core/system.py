@@ -839,7 +839,7 @@ class System(object):
             self._configure()
 
         # Recurse model from top to bottom for remaining setup.
-        self._post_configure(mode, recurse)
+        self._post_configure()
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
@@ -852,7 +852,7 @@ class System(object):
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
 
-    def _post_configure(self, mode, recurse):
+    def _post_configure(self):
         """
         Do any remaining setup that had to wait until after final user configuration.
 

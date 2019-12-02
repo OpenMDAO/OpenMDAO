@@ -425,7 +425,7 @@ class Group(System):
 
         self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
 
-    def _post_configure(self, mode, recurse):
+    def _post_configure(self):
         """
         Do any remaining setup that had to wait until after final user configuration.
 
@@ -438,9 +438,9 @@ class Group(System):
             Whether to call this method in subsystems.
         """
         for subsys in self._subsystems_myproc:
-            subsys._post_configure(mode, recurse)
+            subsys._post_configure()
 
-        super(Group, self)._post_configure(mode, recurse)
+        super(Group, self)._post_configure()
 
     def _check_child_reconf(self, subsys=None):
         """
