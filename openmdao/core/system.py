@@ -834,10 +834,9 @@ class System(object):
             self._setup_procs(self.pathname, comm, mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
-        # Set static_mode to False because additional inputs & outputs may be created.
-        self._static_mode = False
-        self._configure()
-        self._static_mode = True
+        # Set static_mode to False in all subsystems because inputs & outputs may be created.
+        with self._static_mode_all(False):
+            self._configure()
 
         # Recurse model from top to bottom for remaining setup.
         self._post_configure(mode, recurse)
@@ -2198,6 +2197,19 @@ class System(object):
         if self._has_resid_scaling:
             for vec in self._vectors['residual'].values():
                 vec.scale('phys')
+
+    @contextmanager
+    def _static_mode_all(self, static_mode):
+        """
+        Context manager that temporarily sets the static mode of all subsystems.
+        """
+        for system in self.system_iter(include_self=True, recurse=True):
+            system._static_mode = static_mode
+
+        yield
+
+        for system in self.system_iter(include_self=True, recurse=True):
+            system._static_mode = not static_mode
 
     @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):

@@ -284,7 +284,6 @@ class Group(System):
         Highest system's settings take precedence.
         """
         for subsys in self._subsystems_myproc:
-            subsys._static_mode = False
             subsys._configure()
 
             if subsys._has_guess:
@@ -294,14 +293,7 @@ class Group(System):
             if subsys.matrix_free:
                 self.matrix_free = True
 
-        self._static_mode = False
-        try:
-            self.configure()
-        finally:
-            self._static_mode = True
-
-        for subsys in self._subsystems_myproc:
-            subsys._static_mode = True
+        self.configure()
 
     def _setup_procs(self, pathname, comm, mode, prob_options):
         """
