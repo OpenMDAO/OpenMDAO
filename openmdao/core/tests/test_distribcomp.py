@@ -594,10 +594,31 @@ class ProbRemoteTests(unittest.TestCase):
 
         p.run_model()
 
-        ans = p.get_val('par.C1.invec', get_remote=True)
-        np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
-        ans = p.get_val('par.C1.outvec', get_remote=True)
-        np.testing.assert_allclose(ans, np.array([4, 2, 2], dtype=float))
+        if rank == 0:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([4,3,2,1], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([8,6,4,2], dtype=float))
+        elif rank == 1:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([8,6,4,2], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([16,12,8,4], dtype=float))
+        elif rank == 2:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([9,6,3], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([18,12,6], dtype=float))
+        elif rank == 3:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([12,8,4], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([24,16,8], dtype=float))
+
+        ans = p.get_val('C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4,3,2,1,8,6,4,2,9,6,3,12,8,4], dtype=float))
+        ans = p.get_val('C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([8,6,4,2,16,12,8,4,18,12,6,24,16,8], dtype=float))
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
