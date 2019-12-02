@@ -96,14 +96,6 @@ class IndepVarComp(ExplicitComponent):
     def _post_configure(self):
         """
         Do any remaining setup that had to wait until after final user configuration.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd', or 'rev', or 'auto'
-
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         # set static mode to False because we are doing things that would normally be done in setup
         self._static_mode = False

@@ -242,14 +242,6 @@ class Component(System):
     def _post_configure(self):
         """
         Do any remaining setup that had to wait until after final user configuration.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd', or 'rev', or 'auto'
-
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         # check here if declare_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll

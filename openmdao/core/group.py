@@ -428,14 +428,6 @@ class Group(System):
     def _post_configure(self):
         """
         Do any remaining setup that had to wait until after final user configuration.
-
-        Parameters
-        ----------
-        mode : str
-            Derivative direction, either 'fwd', or 'rev', or 'auto'
-
-        recurse : bool
-            Whether to call this method in subsystems.
         """
         for subsys in self._subsystems_myproc:
             subsys._post_configure()
