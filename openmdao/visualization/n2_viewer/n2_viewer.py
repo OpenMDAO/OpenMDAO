@@ -392,7 +392,6 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
                'vk_beautify': 'vkBeautify'}
     libs = read_files(itervalues(lib_dct), libs_dir, 'js')
     src_names = \
-        'legend', \
         'modal', \
         'utils', \
         'SymbolType', \
@@ -401,6 +400,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         'N2Style', \
         'N2Layout', \
         'N2MatrixCell', \
+        'N2Legend', \
         'N2Matrix', \
         'N2Arrow', \
         'N2Diagram', \
