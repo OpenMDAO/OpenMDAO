@@ -65,7 +65,7 @@ class TestExternalCodeComp(unittest.TestCase):
 
     def test_normal(self):
         self.extcode.options['command'] = [
-            'python', 'extcode_example.py', 'extcode.out'
+            sys.executable, 'extcode_example.py', 'extcode.out'
         ]
 
         self.extcode.options['external_input_files'] = ['extcode_example.py']
@@ -108,7 +108,7 @@ class TestExternalCodeComp(unittest.TestCase):
 
     def test_timeout_raise(self):
         self.extcode.options['command'] = [
-            'python', 'extcode_example.py', 'extcode.out', '--delay', '3'
+            sys.executable, 'extcode_example.py', 'extcode.out', '--delay', '3'
         ]
         self.extcode.options['timeout'] = 1.0
 
@@ -124,7 +124,7 @@ class TestExternalCodeComp(unittest.TestCase):
 
     def test_error_code_raise(self):
         self.extcode.options['command'] = [
-            'python', 'extcode_example.py', 'extcode.out', '--delay', '-3'
+            sys.executable, 'extcode_example.py', 'extcode.out', '--delay', '-3'
         ]
         self.extcode.options['timeout'] = 1.0
 
@@ -142,7 +142,7 @@ class TestExternalCodeComp(unittest.TestCase):
 
     def test_error_code_soft(self):
         self.extcode.options['command'] = [
-            'python', 'extcode_example.py', 'extcode.out', '--delay', '-3'
+            sys.executable, 'extcode_example.py', 'extcode.out', '--delay', '-3'
         ]
         self.extcode.options['timeout'] = 1.0
         self.extcode.options['fail_hard'] = False
@@ -163,7 +163,7 @@ class TestExternalCodeComp(unittest.TestCase):
     def test_allowed_return_code(self):
         self.extcode.options['allowed_return_codes'] = set(range(5))
         self.extcode.options['command'] = [
-            'python', 'extcode_example.py', 'extcode.out', '--return_code', '4'
+            sys.executable, 'extcode_example.py', 'extcode.out', '--return_code', '4'
         ]
 
         self.extcode.options['external_input_files'] = ['extcode_example.py']
@@ -174,7 +174,7 @@ class TestExternalCodeComp(unittest.TestCase):
     def test_disallowed_return_code(self):
         self.extcode.options['allowed_return_codes'] = list(range(5))
         self.extcode.options['command'] = [
-            'python', 'extcode_example.py', 'extcode.out', '--return_code', '7'
+            sys.executable, 'extcode_example.py', 'extcode.out', '--return_code', '7'
         ]
 
         self.extcode.options['external_input_files'] = ['extcode_example.py']
@@ -220,7 +220,7 @@ class TestExternalCodeComp(unittest.TestCase):
     def test_env_vars(self):
         self.extcode.options['env_vars'] = {'TEST_ENV_VAR': 'SOME_ENV_VAR_VALUE'}
         self.extcode.options['command'] = [
-            'python', 'extcode_example.py', 'extcode.out', '--write_test_env_var'
+            sys.executable, 'extcode_example.py', 'extcode.out', '--write_test_env_var'
         ]
 
         self.prob.setup(check=True)
@@ -274,7 +274,7 @@ class ParaboloidExternalCodeComp(om.ExternalCodeComp):
         self.options['external_output_files'] = [self.output_file]
 
         self.options['command'] = [
-            'python', 'extcode_paraboloid.py', self.input_file, self.output_file
+            sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
         ]
 
     def compute(self, inputs, outputs):
@@ -311,7 +311,7 @@ class ParaboloidExternalCodeCompFD(om.ExternalCodeComp):
         self.options['external_output_files'] = [self.output_file]
 
         self.options['command'] = [
-            'python', 'extcode_paraboloid.py', self.input_file, self.output_file
+            sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
         ]
 
         # this external code does not provide derivatives, use finite difference
@@ -352,7 +352,7 @@ class ParaboloidExternalCodeCompDerivs(om.ExternalCodeComp):
         self.options['external_output_files'] = [self.output_file, self.derivs_file]
 
         self.options['command'] = [
-            'python', 'extcode_paraboloid_derivs.py',
+            sys.executable, 'extcode_paraboloid_derivs.py',
             self.input_file, self.output_file, self.derivs_file
         ]
 
@@ -548,7 +548,7 @@ class TestDeprecatedExternalCode(unittest.TestCase):
 
     def test_normal(self):
         self.extcode.options['command'] = [
-            'python', 'extcode_example.py', 'extcode.out'
+            sys.executable, 'extcode_example.py', 'extcode.out'
         ]
 
         self.extcode.options['external_input_files'] = ['extcode_example.py']
@@ -610,10 +610,10 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 self.options['external_output_files'] = [self.output_file]
 
                 self.options['command_apply'] = [
-                    'python', 'extcode_mach.py', self.input_file, self.output_file,
+                    sys.executable, 'extcode_mach.py', self.input_file, self.output_file,
                 ]
                 self.options['command_solve'] = [
-                    'python', 'extcode_mach.py', self.input_file, self.output_file,
+                    sys.executable, 'extcode_mach.py', self.input_file, self.output_file,
                 ]
 
             def apply_nonlinear(self, inputs, outputs, residuals):
