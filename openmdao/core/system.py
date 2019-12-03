@@ -4068,7 +4068,7 @@ class System(object):
             if abs_name in vec._views:
                 val = vec._views_flat[abs_name] if flat else vec._views[abs_name]
 
-        if get_remote:
+        if get_remote and self.comm.size > 1:
             owner = self._owning_rank[abs_name]
             loc_val = val if val is not System._undefined else np.zeros(0)
             if rank is None:   # bcast
