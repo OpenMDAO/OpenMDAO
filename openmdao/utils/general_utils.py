@@ -888,4 +888,4 @@ def env_truthy(env_var):
     bool
         True if the specified environment variable is 'truthy'.
     """
-    return os.environ.get(env_var, '0').lower() not in ('0', 'false', 'no')
+    return os.environ.get(env_var, '0').lower() not in ('0', 'false', 'no', '')

@@ -86,7 +86,7 @@ def _n2_cmd(options, user_args):
 
         options.func = lambda options: _viewmod
 
-        hooks._register_hook('final_setup', 'Problem', post=_viewmod)
+        hooks._register_hook('final_setup', 'Problem', pre=_viewmod)
 
         _simple_exec(options, user_args)
     else:

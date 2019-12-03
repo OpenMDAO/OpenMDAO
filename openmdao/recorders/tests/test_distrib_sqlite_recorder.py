@@ -7,7 +7,7 @@ from tempfile import mkdtemp
 
 import numpy as np
 
-from openmdao.utils.general_utils import set_pyoptsparse_opt, env_truthy
+from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
 
 from openmdao.api import ExecComp, ExplicitComponent, Problem, \
@@ -154,9 +154,6 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.setup()
 
-        if env_truthy('USE_WING'):
-            import wingdbstub
-
         prob['x'] = np.ones(size)
 
         t0, t1 = run_driver(prob)
@@ -174,7 +171,6 @@ class DistributedRecorderTest(unittest.TestCase):
 
         expected_outputs = expected_desvars.copy()
         expected_outputs['plus.y'] = prob.get_val('plus.y', get_remote=True)
-        print('y', len(expected_outputs['plus.y']))
 
         if prob.comm.rank == 0:
             expected_outputs.update(expected_objectives)
@@ -194,9 +190,6 @@ class DistributedRecorderTest(unittest.TestCase):
 
         model.add_subsystem('Obj', ExecComp('obj=y1+y2'))
         model.add_objective('Obj.obj')
-
-        if env_truthy('USE_WING'):
-            import wingdbstub
 
         # Configure driver to record VOIs on both procs
         driver = ScipyOptimizeDriver(disp=False)

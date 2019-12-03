@@ -582,9 +582,7 @@ class Driver(object):
            Dictionary containing values of each constraint.
         """
         con_dict = {}
-        for name in self._cons:
-            meta = self._cons[name]
-
+        for name, meta in self._cons.items():
             if lintype == 'linear' and not meta['linear']:
                 continue
 
@@ -1056,8 +1054,6 @@ def record_iteration(requester, prob, case_name):
 
     outs = model._retrieve_data_of_kind(filt, 'output', 'nonlinear', parallel)
     ins = model._retrieve_data_of_kind(filt, 'input', 'nonlinear', parallel)
-
-    # TODO: need discrete vars as well
 
     data = {
         'output': outs,

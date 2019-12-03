@@ -4258,7 +4258,7 @@ class System(object):
 
         try:
             scale, offset = get_conversion(base_units, units)
-        except TypeError:
+        except Exception:
             msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
             raise TypeError(msg.format(self.msginfo, name, base_units, units))
 

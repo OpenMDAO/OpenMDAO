@@ -675,7 +675,8 @@ class Case(object):
         ----------
         var_type : str
             String indicating which value for 'type' should be accepted for a variable
-            to be included in the returned map.
+            to be included in the returned map.  Allowed values are: ['desvar', 'objective',
+            'constraint', 'response'].
         scaled : bool
             If True, then return scaled values.
         use_indices : bool

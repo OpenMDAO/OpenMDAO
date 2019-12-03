@@ -289,19 +289,22 @@ class Solver(object):
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
 
+        # doesn't matter if we're a linear or nonlinear solver.  The names for
+        # inputs, outputs, and residuals are the same for both the 'linear' and 'nonlinear'
+        # vectors.
         if self.recording_options['record_solver_residuals']:
-            myresiduals = [n for n in system._residuals._names if check_path(n, incl, excl)]
+            myresiduals = [n for n in system._residuals._views if check_path(n, incl, excl)]
 
         if self.recording_options['record_outputs']:
-            myoutputs = [n for n in system._outputs._names if check_path(n, incl, excl)]
+            myoutputs = [n for n in system._outputs._views if check_path(n, incl, excl)]
 
         if self.recording_options['record_inputs']:
-            myinputs = [n for n in system._inputs._names if check_path(n, incl, excl)]
+            myinputs = [n for n in system._inputs._views if check_path(n, incl, excl)]
 
         self._filtered_vars_to_record = {
-            'input': sorted(myinputs),
-            'output': sorted(myoutputs),
-            'residual': sorted(myresiduals)
+            'input': myinputs,
+            'output': myoutputs,
+            'residual': myresiduals
         }
 
         # Raise a deprecation warning for changed option.
