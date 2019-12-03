@@ -339,7 +339,7 @@ class Driver(object):
         Returns
         -------
         dict
-           Dictionary containing sets of variables to record.
+           Dictionary containing lists of variables to record.
         """
         problem = self._problem()
         model = problem.model
