@@ -65,7 +65,7 @@ class UserRequestedException(Exception):
     User Requested Exception.
 
     This exception indicates that the user has requested that SNOPT/pyoptsparse ceases
-    model execution and report to SNOPT that execution should be terminated.
+    model execution and reports to SNOPT that execution should be terminated.
     """
 
     pass
