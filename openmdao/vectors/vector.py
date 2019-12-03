@@ -8,7 +8,7 @@ import weakref
 
 import numpy as np
 
-from openmdao.utils.name_maps import name2abs_name, prom_name2abs_name, rel_name2abs_name
+from openmdao.utils.name_maps import prom_name2abs_name, rel_name2abs_name
 
 
 _full_slice = slice(None)

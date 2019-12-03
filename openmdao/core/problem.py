@@ -33,7 +33,7 @@ from openmdao.utils.record_util import create_local_meta
 from openmdao.utils.general_utils import warn_deprecation, ContainsAll, pad_name, simple_warning
 from openmdao.utils.mpi import FakeComm
 from openmdao.utils.mpi import MPI
-from openmdao.utils.name_maps import prom_name2abs_name, name2abs_name
+from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
