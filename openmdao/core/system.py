@@ -1429,7 +1429,7 @@ class System(object):
 
     def _setup_recording(self, recurse=True):
         if self._rec_mgr._recorders:
-            myinputs = myoutputs = myresiduals = set()
+            myinputs = myoutputs = myresiduals = []
 
             options = self.recording_options
             incl = options['includes']
@@ -1438,36 +1438,28 @@ class System(object):
             # includes and excludes for inputs are specified using _absolute_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_inputs']:
-                abs2prom = self._var_allprocs_abs2prom['input']
-                myinputs = {n for n in self._inputs._views if check_path(n, incl, excl)}
-
-                if len(self._var_discrete['input']) > 0:
-                    for n in self._var_discrete['input']:
-                        abs_name = '.'.join((self.pathname, n)) if self.pathname else n
-                        if check_path(abs_name, incl, excl):
-                            myinputs.add(abs_name)
+                views = self._inputs._views
+                myinputs = sorted([n for n in self._var_abs2prom['input']
+                                   if check_path(n, incl, excl)])
 
             # includes and excludes for outputs are specified using _promoted_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_outputs']:
-                abs2prom = self._var_allprocs_abs2prom['output']
-                myoutputs = {n for n in self._outputs._views
-                             if n in abs2prom and check_path(abs2prom[n], incl, excl)}
+                views = self._outputs._views
+                myoutputs = sorted([n for n, prom in self._var_abs2prom['output'].items()
+                                    if check_path(prom, incl, excl)])
 
-                if len(self._var_discrete['output']) > 0:
-                    # residuals have the same names as the continuous outputs
+                if self._var_discrete['output']:
+                    # if we have discrete outputs then residual name set doesn't match output one
                     if options['record_residuals']:
-                        myresiduals = myoutputs.copy()
-                    for n in self._var_discrete['output']:
-                        abs_name = '.'.join((self.pathname, n)) if self.pathname else n
-                        if check_path(n, incl, excl):
-                            myoutputs.add(abs_name)
+                        myresiduals = [n for n in myoutputs if n in views]
                 elif options['record_residuals']:
                     myresiduals = myoutputs
 
             elif options['record_residuals']:
-                myresiduals = {n for n in self._residuals._views
-                               if n in abs2prom and check_path(abs2prom[n], incl, excl)}
+                abs2prom = self._var_abs2prom['output']
+                myresiduals = [n for n in self._residuals._views
+                               if check_path(abs2prom[n], incl, excl)]
 
             self._filtered_vars_to_record = {
                 'input': myinputs,
@@ -4214,8 +4206,9 @@ class System(object):
                 if discrete_vec:
                     vdict = {}
                     for n in variables:
-                        if n in views and sizes[rank, abs2idx[n]] > 0:
-                            vdict[n] = views[n]
+                        if n in views:
+                            if sizes[rank, abs2idx[n]] > 0:
+                                vdict[n] = views[n]
                         elif n[offset:] in discrete_vec and self._owning_rank[n] == rank:
                             vdict[n] = discrete_vec[n[offset:]]['value']
                 else:

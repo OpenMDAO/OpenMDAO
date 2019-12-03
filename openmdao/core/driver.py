@@ -349,11 +349,13 @@ class Driver(object):
         excl = recording_options['excludes']
 
         # includes and excludes for outputs are specified using promoted names
-        # NOTE: only local var names are in abs2prom, all will be gathered later
         abs2prom = model._var_allprocs_abs2prom['output']
 
         allvars = []
+        # if desvars, etc. are not wanted, we need to exclude them from the outputs even if
+        # they match the includes list.
         skip = set()
+
         if recording_options['record_desvars']:
             allvars.extend(self._designvars)
         else:
@@ -372,18 +374,20 @@ class Driver(object):
                        if n in abs2prom and check_path(abs2prom[n], incl, excl, True)]
         }
 
-        # inputs (if in options)
+        # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
             if recording_options['record_inputs']:
-                vars2record['input'] = [n for n in model._var_allprocs_abs_names['input']
-                                        if check_path(n, incl, excl)]
+                # sort the results since _var_allprocs_abs2prom isn't ordered
+                vars2record['input'] = sorted([n for n in model._var_allprocs_abs2prom['input']
+                                               if check_path(n, incl, excl)])
             else:
                 vars2record['input'] = []
 
         if incl:
-            vars2record['output'].extend(n for n in model._var_allprocs_abs_names['output']
-                                         if n in abs2prom and n not in skip and
-                                         check_path(abs2prom[n], incl, excl))
+            # loop over abs2prom (which includes both continuous and discrete outputs) since
+            # the order doesn't matter (we're sorting it at the end).
+            vars2record['output'].extend(n for n, prom in abs2prom.items() if n not in skip and
+                                         check_path(prom, incl, excl))
             # remove dups and make sure order is the same on all procs
             vars2record['output'] = sorted(set(vars2record['output']))
 

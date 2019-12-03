@@ -285,23 +285,23 @@ class Solver(object):
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 
-        myoutputs = myresiduals = myinputs = set()
+        myoutputs = myresiduals = myinputs = []
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
 
         if self.recording_options['record_solver_residuals']:
-            myresiduals = {n for n in system._residuals._names if check_path(n, incl, excl)}
+            myresiduals = [n for n in system._residuals._names if check_path(n, incl, excl)]
 
         if self.recording_options['record_outputs']:
-            myoutputs = {n for n in system._outputs._names if check_path(n, incl, excl)}
+            myoutputs = [n for n in system._outputs._names if check_path(n, incl, excl)]
 
         if self.recording_options['record_inputs']:
-            myinputs = {n for n in system._inputs._names if check_path(n, incl, excl)}
+            myinputs = [n for n in system._inputs._names if check_path(n, incl, excl)]
 
         self._filtered_vars_to_record = {
-            'input': myinputs,
-            'output': myoutputs,
-            'residual': myresiduals
+            'input': sorted(myinputs),
+            'output': sorted(myoutputs),
+            'residual': sorted(myresiduals)
         }
 
         # Raise a deprecation warning for changed option.
