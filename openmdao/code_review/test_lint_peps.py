@@ -118,7 +118,10 @@ class LintTestCase(unittest.TestCase):
     @unittest.skipUnless(pydocstyle, "requires 'pydocstyle', install openmdao[test]")
     def test_pep257(self):
         failures = [str(fail) for fail in pydocstyle.check(_get_files(),
-                                                      ignore=ignores['pep257'])]
+                                                           ignore=ignores['pep257'] + \
+                                                            list(pydocstyle.conventions['google'])
+                                                           )
+                    ]
         if failures:
             self.fail('{} PEP 257 Failure(s):\n'.format(len(failures)) + '\n'.join(failures))
 
