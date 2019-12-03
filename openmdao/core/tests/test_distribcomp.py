@@ -443,16 +443,28 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        input_vec = np.array(range(size, 0, -1), float)
+        C1._inputs['invec'] = input_vec
+
+        # C1 (an InOutArrayComp) doubles the input_vec
+        check_vec = input_vec * 2
 
         p.run_model()
 
-        self.assertTrue(all(C2._outputs['outvec'][:4] == np.array(range(size, 0, -1), float)[:4]*4))
-        self.assertTrue(all(C2._outputs['outvec'][8:] == np.array(range(size, 0, -1), float)[8:]*4))
+        np.testing.assert_allclose(C2._outputs['outvec'][:4], check_vec[:4]*2)
+        np.testing.assert_allclose(C2._outputs['outvec'][8:], check_vec[8:]*2)
 
         # overlapping part should be double size of the rest
-        self.assertTrue(all(C2._outputs['outvec'][4:8] ==
-                            np.array(range(size, 0, -1), float)[4:8]*8))
+        np.testing.assert_allclose(C2._outputs['outvec'][4:8], check_vec[4:8]*4)
+
+        np.testing.assert_allclose(p.get_val('C2.invec', get_remote=True),
+                                   np.hstack((check_vec[0:8], check_vec[4:11])))
+
+        dist_out = p.get_val('C2.outvec', get_remote=True)
+        np.testing.assert_allclose(dist_out[:11], dist_out[11:])
+        np.testing.assert_allclose(dist_out[:4], check_vec[:4] * 2)
+        np.testing.assert_allclose(dist_out[8:11], check_vec[8:] * 2)
+        np.testing.assert_allclose(dist_out[4:8], check_vec[4:8] * 4)
 
     def test_nondistrib_gather(self):
         # regular comp --> distrib comp --> regular comp.  last comp should
