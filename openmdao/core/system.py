@@ -34,7 +34,6 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
-from openmdao.utils.general_utils import make_set, var_name_match_includes_excludes, simple_warning
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -42,7 +41,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
-    simple_warning
+    simple_warning, make_set, var_name_match_includes_excludes
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -3169,20 +3168,35 @@ class System(object):
             list of input names and other optional information about those inputs
         """
         if self._inputs is None:
-            raise RuntimeError("{}: Unable to list inputs until model has "
-                               "been run.".format(self.msginfo))
+            if hasattr(self, '_local_system_set'):
+                raise RuntimeError("{}: Unable to list inputs on a Group until model has "
+                                   "been run.".format(self.msginfo))
 
-        meta = self._var_abs2meta
+            msg = "{}: list_inputs called before model has been run. Filters are ignored."
+            simple_warning(msg.format(self.msginfo))
+
+            meta = self._var_rel2meta
+            var_names = meta.keys()
+            abs2prom = dict()
+        else:
+            # Only gathering up values and metadata from this proc, if MPI
+            meta = self._var_abs2meta  # This only includes metadata for this process.
+            var_names = self._inputs._views.keys()
+            abs2prom = self._var_abs2prom['input']
+
         inputs = []
 
-        for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
+        for var_name in var_names:
             # Filter based on tags
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
-            if not var_name_match_includes_excludes(var_name, self._var_abs2prom['input'][var_name],
-                                                    includes, excludes):
+            if abs2prom and not var_name_match_includes_excludes(var_name,
+                                                                 abs2prom[var_name],
+                                                                 includes, excludes):
                 continue
+
+            val = self._inputs._views[var_name] if self._inputs else meta[var_name]['value']
 
             var_meta = {}
             if values:
@@ -3204,9 +3218,9 @@ class System(object):
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
-                if not var_name_match_includes_excludes(var_name,
-                                                        self._var_abs2prom['input'][var_name],
-                                                        includes, excludes):
+                if abs2prom and not var_name_match_includes_excludes(var_name,
+                                                                     abs2prom[var_name],
+                                                                     includes, excludes):
                     continue
 
                 var_meta = {}
@@ -3308,35 +3322,49 @@ class System(object):
             list of output names and other optional information about those outputs
         """
         if self._outputs is None:
-            raise RuntimeError("{}: Unable to list outputs until model has "
-                               "been run.".format(self.msginfo))
+            if hasattr(self, '_local_system_set'):
+                raise RuntimeError("{}: Unable to list outputs on a Group until model has "
+                                   "been run.".format(self.msginfo))
 
-        # Only gathering up values and metadata from this proc, if MPI
-        meta = self._var_abs2meta  # This only includes metadata for this process.
+            msg = "{}: list_outputs called before model has been run. Filters are ignored."
+            simple_warning(msg.format(self.msginfo))
+
+            meta = self._var_rel2meta
+            var_names = meta.keys()
+            abs2prom = dict()
+        else:
+            # Only gathering up values and metadata from this proc, if MPI
+            meta = self._var_abs2meta  # This only includes metadata for this process.
+            var_names = self._outputs._views.keys()
+            abs2prom = self._var_abs2prom['output']
+
         states = self._list_states()
 
         # Go though the hierarchy. Printing Systems
         # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
-        for var_name, val in iteritems(self._outputs._views):
+        for var_name in var_names:
             # Filter based on tags
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
-            if not var_name_match_includes_excludes(var_name,
-                                                    self._var_abs2prom['output'][var_name],
-                                                    includes, excludes):
+            if abs2prom and not var_name_match_includes_excludes(var_name,
+                                                                 abs2prom[var_name],
+                                                                 includes, excludes):
                 continue
 
-            if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
+            if residuals_tol and self._residuals and \
+               np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
                 continue
+
+            val = self._outputs._views[var_name] if self._outputs else meta[var_name]['value']
 
             var_meta = {}
             if values:
                 var_meta['value'] = val
-            if prom_name:
-                var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
+            if prom_name and var_name in abs2prom:
+                var_meta['prom_name'] = abs2prom[var_name]
             if residuals:
                 var_meta['resids'] = self._residuals._views[var_name]
             if units:
@@ -3364,16 +3392,16 @@ class System(object):
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
-                if not var_name_match_includes_excludes(var_name,
-                                                        self._var_abs2prom['output'][var_name],
-                                                        includes, excludes):
+                if abs2prom and not var_name_match_includes_excludes(var_name,
+                                                                     abs2prom[var_name],
+                                                                     includes, excludes):
                     continue
 
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
-                if prom_name:
-                    var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
+                if prom_name and var_name in abs2prom:
+                    var_meta['prom_name'] = abs2prom[var_name]
                 # remaining items do not apply for discrete vars
                 if residuals:
                     var_meta['resids'] = ''
