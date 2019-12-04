@@ -88,6 +88,14 @@ Solver Recording Options
 .. note::
     Note that the :code:`excludes` option takes precedence over the :code:`includes` option.
 
+.. note::
+    The paths given in the :code:`includes` and :code:`excludes` options are relative to the `Group` that the solver
+    is attached to.
+
+.. note::
+    It is currently not possible to record linear solvers.
+
+
 Solver Recording Example
 ^^^^^^^^^^^^^^^^^^^^^^^^
 .. embed-code::
@@ -114,11 +122,17 @@ differentiate the cases.  This prefix can be specified when calling :code:`run_m
     In this example, we have disabled the saving of data needed by the standalone :math:`N^2` 
     visualizer and debugging tool by setting :code:`record_viewer_data` to :code:`False`.
 
+Recording Options Include and Exclude Matching
+----------------------------------------------
+
+The :code:`includes` and :code:`excludes` recording options provide support for Unix shell-style wildcards,
+which are not the same as regular expressions. The documentation for the :code:`fnmatchcase` function from the Python
+standard library documents the wildcards: https://docs.python.org/2/library/fnmatch.html#fnmatch.fnmatchcase.
 
 Recording Options Precedence
 ----------------------------
 
-The recording options that determine what gets recorded can sometime be a little confusing. Here is
+The recording options precedence that determine what gets recorded can sometime be a little confusing. Here is
 an example that might help. The code shows how the :code:`record_desvars` and :code:`includes` options interact.
 
 .. embed-code::

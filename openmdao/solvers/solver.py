@@ -194,10 +194,15 @@ class Solver(object):
         self.recording_options.declare('record_metadata', types=bool, desc='Record metadata',
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
-                                       desc='Patterns for variables to include in recording')
+                                       desc="Patterns for variables to include in recording. \
+                                       Paths are relative to solver's Group. \
+                                       Uses fnmatch wildcards")
         self.recording_options.declare('excludes', types=list, default=[],
-                                       desc='Patterns for vars to exclude in recording '
-                                            '(processed post-includes)')
+                                       desc="Patterns for vars to exclude in recording. \
+                                       (processed post-includes) \
+                                       Paths are relative to solver's Group. \
+                                       Uses fnmatch wildcards"
+                                       )
         # Case recording related
         self._filtered_vars_to_record = {}
         self._norm0 = 0.0
@@ -288,6 +293,24 @@ class Solver(object):
         myoutputs = myresiduals = myinputs = set()
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
+
+        new_incl = []
+        for i in incl:
+            if i != '*':
+                new_incl.append(system.pathname + '.' + i)
+            else:
+                new_incl.append(i)
+
+        incl = new_incl
+
+        new_excl = []
+        for i in excl:
+            if i != '*':
+                new_excl.append(system.pathname + '.' + i)
+            else:
+                new_excl.append(i)
+
+        excl = new_excl
 
         if self.recording_options['record_solver_residuals']:
             if isinstance(self, NonlinearSolver):
