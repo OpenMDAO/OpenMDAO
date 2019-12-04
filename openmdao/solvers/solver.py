@@ -294,23 +294,9 @@ class Solver(object):
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
 
-        new_incl = []
-        for i in incl:
-            if i != '*':
-                new_incl.append(system.pathname + '.' + i)
-            else:
-                new_incl.append(i)
-
-        incl = new_incl
-
-        new_excl = []
-        for i in excl:
-            if i != '*':
-                new_excl.append(system.pathname + '.' + i)
-            else:
-                new_excl.append(i)
-
-        excl = new_excl
+        if system.pathname:
+            incl = [ system.pathname + '.' + i for i in incl  ]
+            excl = [ system.pathname + '.' + i for i in excl  ]
 
         if self.recording_options['record_solver_residuals']:
             if isinstance(self, NonlinearSolver):
