@@ -15,6 +15,11 @@ class ModelData {
         this.unconnectedParams = 0;
         this.nodePaths = {};
 
+        if (modelJSON.options.use_declare_partial_info &&
+            this.declarePartialsList.length == 0) {
+            console.warn("Declare partial list is empty, but --use_declare_partial_info specified.")
+        }
+
         startTimer('ModelData._convertToN2TreeNodes');
         this.root = this.tree = modelJSON.tree = this._convertToN2TreeNodes(modelJSON.tree);
         stopTimer('ModelData._convertToN2TreeNodes');
@@ -94,26 +99,25 @@ class ModelData {
 
         let name = arrayOfNames[arrayOfNamesIndex];
 
-        if (!parent.hasOwnProperty("children")) {
-            parent.children = [];
-        }
+        if (!parent.hasChildren()) parent.children = [];
 
-        let parentIdx = indexForMember(parent.children, 'name', name + colonVarNameAppend);
-        if (parentIdx == -1) { //new name not found in parent, create new
+        let newChildName = name + colonVarNameAppend;
+        let parentIdx = indexForMember(parent.children, 'name', newChildName);
+        if (parentIdx == -1) { // new name not found in parent, create new
             let newChild = new N2TreeNode({
-                "name": name + colonVarNameAppend,
+                "name": newChildName,
                 "type": type,
                 "splitByColon": true,
                 "originalParent": originalParent
             });
 
-            // Was originally && instead of ||, which wouldn't ever work?
             if (type.match(paramRegex)) {
                 parent.children.splice(0, 0, newChild);
             }
             else {
                 parent.children.push(newChild);
             }
+
             this._addColonVarChildren(originalParent, newChild, arrayOfNames,
                 arrayOfNamesIndex + 1, type);
         }
@@ -141,6 +145,7 @@ class ModelData {
                     node.subsystem_type != "component") {
                     throw ("There is a colon-named object whose parent is not a component.");
                 }
+
                 let type = node.children[i].type;
                 node.children.splice(i--, 1);
                 this._addColonVarChildren(node, node, splitArray, 0, type);
@@ -162,7 +167,7 @@ class ModelData {
         if (!Array.isPopulatedArray(node.children)) return;
 
         if (node.name.endsWith(colonVarNameAppend)) {
-            node.name = node.name.slice(0,-1);
+            node.name = node.name.slice(0, -1);
         }
 
         while (node.splitByColon && exists(node.children) &&
@@ -179,6 +184,7 @@ class ModelData {
                 child.children.length >= 1) ?
                 child.children : null; //absorb childs children
             if (node.children == null) delete node.children;
+            node.splitByColon = false;
         }
 
         if (!Array.isArray(node.children)) return;
@@ -214,14 +220,17 @@ class ModelData {
                         node.absPathName += node.parent.absPathName;
                     }
 
-                } else {
+                }
+                else {
                     node.absPathName += node.parent.absPathName;
                 }
                 node.absPathName += (node.parent.splitByColon) ? ":" : ".";
             }
+
             if (node.name.endsWith(colonVarNameAppend)) {
                 node.absPathName += node.name.slice(0, -1);
-            } else {
+            }
+            else {
                 node.absPathName += node.name;
             }
 
@@ -341,9 +350,7 @@ class ModelData {
     isDeclaredPartial(srcObj, tgtObj) {
         let partialsString = tgtObj.absPathName + " > " + srcObj.absPathName;
 
-        if (this.declarePartialsList.includes(partialsString)) return true;
-
-        return false;
+        return this.declarePartialsList.includes(partialsString);
     }
 
     /**
@@ -520,7 +527,7 @@ class ModelData {
         if (!node.hasOwnProperty('absPathName')) {
             console.warn("identifyUnconnectedParam error: absPathName not set for ", node);
         }
-        else if (node.isParam() && !this.hasAnyConnection(node.absPathName))
+        else if (node.isParam() && !node.hasChildren() && !this.hasAnyConnection(node.absPathName))
             node.type = "unconnected_param";
     }
 }
