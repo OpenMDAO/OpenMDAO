@@ -132,7 +132,7 @@ standard library documents the wildcards: https://docs.python.org/2/library/fnma
 Recording Options Precedence
 ----------------------------
 
-The recording options precedence that determine what gets recorded can sometime be a little confusing. Here is
+The recording options precedence that determines what gets recorded can sometime be a little confusing. Here is
 an example that might help. The code shows how the :code:`record_desvars` and :code:`includes` options interact.
 
 .. embed-code::
