@@ -202,16 +202,13 @@ setup(
             'metamodelunstructuredcomp=openmdao.components.meta_model_unstructured_comp:MetaModelUnStructuredComp',
             'muxcomp=openmdao.components.mux_comp:MuxComp',
             'vectormagnitudecomp=openmdao.components.vector_magnitude_comp:VectorMagnitudeComp',
-            'indepvarcomp=openmdao.components.indepvarcomp:IndepVarComp',
-            'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
-            'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
-            'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
-        ]
+            'indepvarcomp=openmdao.core.indepvarcomp:IndepVarComp',
+        ],
         'openmdao_case_recorders': [
             'sqliterecorder=openmdao.recorders.sqlite_recorder:SqliteRecorder',
-        ]
+        ],
         'openmdao_case_readers': [
-            'sqlitereader=openmdao.recorders.sqlite_recorder:SqliteReader',
+            'sqlitereader=openmdao.recorders.sqlite_reader:SqliteCaseReader',
         ]
     },
     extras_require=optional_dependencies,

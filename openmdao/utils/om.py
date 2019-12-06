@@ -6,6 +6,11 @@ from __future__ import print_function
 import sys
 import os
 import argparse
+try:
+    import pkg_resources
+except ImportError:
+    pkg_resources = None
+
 from itertools import chain
 from six import iteritems
 
@@ -549,7 +554,7 @@ def _cite_setup_parser(parser):
 
 def _cite_cmd(options, user_args):
     """
-    Return the post setup hook function for `openmdao cite`.
+    Run the `openmdao cite` command.
 
     Parameters
     ----------
@@ -581,6 +586,78 @@ def _cite_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
+_allowed_types = {
+    'component': 'openmdao_components',
+    'linear_solver': 'openmdao_lin_solvers',
+    'nonlinear_solver': 'openmdao_nl_solvers',
+    'line_search': 'openmdao_line_search_solvers',
+    'driver': 'openmdao_drivers',
+    'case_recorder': 'openmdao_case_recorders',
+    'case_reader': 'openmdao_case_readers',
+}
+
+
+def _list_types_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao list_types' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('-t', '--type', action='append', default=[], dest='types',
+                        help='List these types of classes.  Allowed types are {}.'
+                        .format(sorted(_allowed_types)))
+    parser.add_argument('-d', '--docs', action='store_true', dest='show_docs',
+                        help="Display the class docstrings.")
+
+
+def _list_types_cmd(options, user_args):
+    """
+    Run the `openmdao list_types` command.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+
+    Returns
+    -------
+    function
+        The hook function.
+    """
+    if pkg_resources is None:
+        print("You must install pkg_resources in order to use this command.")
+        sys.exit(0)
+
+    for type_ in options.types:
+        if type_ not in _allowed_types:
+            raise RuntimeError("Type '{}' is not a valid type.  Try one of {}."
+                               .format(type_, sorted(_allowed_types)))
+        print("Installed classes in the {} entry point group:\n".format(_allowed_types[type_]))
+        epdict = {}
+        cwid = 0
+        for ep in pkg_resources.iter_entry_points(group=_allowed_types[type_]):
+            klass = ep.load()
+            epdict[klass.__name__] = klass
+            if len(klass.__name__) > cwid:
+                cwid = len(klass.__name__)
+
+        if epdict:
+            print("  {:<{cwid}} {}".format('Class Name', 'Module', cwid=cwid))
+            print("  {:<{cwid}} {}".format('----------', '------', cwid=cwid))
+        for cname, klass in sorted(epdict.items(), key=lambda x: x[0]):
+            line = "  {:<{cwid}} ({})".format(cname, klass.__module__, cwid=cwid)
+            print(line)
+            if options.show_docs and klass.__doc__:
+                print(klass.__doc__)
+
+        print()
+
+
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
 _command_map = {
@@ -594,6 +671,7 @@ _command_map = {
               'Profile calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
                      'Generate total timings of calls to particular object instances.'),
+    'list_types': (_list_types_setup_parser, _list_types_cmd, 'List installed types.'),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec,
             'Profile memory used by OpenMDAO related functions.'),
     'mempost': (_mempost_setup_parser, _mempost_exec, 'Post-process memory profile output.'),
@@ -630,8 +708,6 @@ def openmdao_cmd():
     """
     Wrap a number of Problem viewing/debugging command line functions.
     """
-    import pkg_resources
-
     # pre-parse sys.argv to split between before and after '--'
     if '--' in sys.argv:
         idx = sys.argv.index('--')
@@ -654,26 +730,29 @@ def openmdao_cmd():
         parser_setup_func(subp)
         subp.set_defaults(executor=executor)
 
-    # now add any plugin openmdao commands
-    epdict = {}
-    for ep in pkg_resources.iter_entry_points(group='openmdao_commands'):
-        p = ep.name
-        func = ep.load()
-        # don't let plugins override the builtin commands
-        if p in _command_map:
-            raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
-                               "builtin command.".format(p, func.__module__))
-        elif p in epdict:
-            raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
-                               "another plugin command defined in {}.".format(p, func.__module__,
-                                                                              epdict[p].__module__))
-        epdict[p] = func
+    if pkg_resources is None:
+        print("\npkg_resources was not found, so no plugin entry points can be loaded.\n")
+    else:
+        # now add any plugin openmdao commands
+        epdict = {}
+        for ep in pkg_resources.iter_entry_points(group='openmdao_commands'):
+            p = ep.name
+            func = ep.load()
+            # don't let plugins override the builtin commands
+            if p in _command_map:
+                raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
+                                   "builtin command.".format(p, func.__module__))
+            elif p in epdict:
+                raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
+                                   "another plugin command defined in {}."
+                                   .format(p, func.__module__, epdict[p].__module__))
+            epdict[p] = func
 
-    for p, func in epdict.items():
-        parser_setup_func, executor, help_str = func()
-        subp = subs.add_parser(p, help='(plugin) ' + help_str)
-        parser_setup_func(subp)
-        subp.set_defaults(executor=executor)
+        for p, func in epdict.items():
+            parser_setup_func, executor, help_str = func()
+            subp = subs.add_parser(p, help='(plugin) ' + help_str)
+            parser_setup_func(subp)
+            subp.set_defaults(executor=executor)
 
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
