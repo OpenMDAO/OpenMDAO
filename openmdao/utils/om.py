@@ -85,7 +85,7 @@ def _n2_cmd(options, user_args):
                use_declare_partial_info=options.use_declare_partial_info)
             exit()  # could make this command line selectable later
 
-        hooks._register_hook('final_setup', 'Problem', pre=_viewmod)
+        hooks._register_hook('final_setup', 'Problem', post=_viewmod)
 
         _load_and_exec(filename, user_args)
     else:

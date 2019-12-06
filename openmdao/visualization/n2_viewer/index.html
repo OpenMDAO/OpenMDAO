@@ -31,6 +31,7 @@
                     </defs>
                 </svg>
             </div>
+            <div class='ptN2LegendClass' id='legend'></div>
         </div>
         <div id="connectionId">
         </div>
@@ -38,10 +39,10 @@
 </div>
 
 <div class="tool-tip" style="position: absolute; visibility: hidden;"></div>
-<div id="top" class='offgrid' style="position: absolute; visibility: hidden;"></div>
-<div id="left" class='offgrid' style="position: absolute; visibility: hidden;"></div>
-<div id="right" class='offgrid' style="position: absolute; visibility: hidden;"></div>
-<div id="bottom" class='offgrid' style="position: absolute; visibility: hidden;"></div>
+<div id="top" class='offgrid' style="visibility: hidden;"></div>
+<div id="left" class='offgrid' style="visibility: hidden;"></div>
+<div id="right" class='offgrid' style="visibility: hidden;"></div>
+<div id="bottom" class='offgrid' style="visibility: hidden;"></div>
 
 <nav id="context-menu" class="context-menu">
     <ul class="context-menu__items">
@@ -66,7 +67,6 @@
 {{model_data}}
 {modal_lib}
 {search_lib}
-{legend_lib}
 {utils_lib}
 {symboltype_lib}
 {n2treenode_lib}
@@ -74,6 +74,7 @@
 {n2style_lib}
 {n2layout_lib}
 {n2matrixcell_lib}
+{n2legend_lib}
 {n2matrix_lib}
 {n2arrow_lib}
 {n2diagram_lib}

@@ -108,8 +108,8 @@ install:
     pip install git+https://github.com/swryan/coveralls-python@work;
 
     echo " >> Installing pyOptSparse";
-    echo "  > Cloning pyOptSparse from OpenMDAO's fork";
-    git clone https://github.com/OpenMDAO/pyoptsparse.git;
+    echo "  > Cloning pyOptSparse from mdolab";
+    git clone https://github.com/mdolab/pyoptsparse.git;
     cd pyoptsparse;
 
     if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then

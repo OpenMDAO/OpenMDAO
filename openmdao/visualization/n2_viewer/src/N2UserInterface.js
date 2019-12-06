@@ -35,6 +35,8 @@ class N2UserInterface {
         // TODO: Refactor search, remove from global
         document.getElementById("searchButtonId").onclick = SearchButtonClicked;
         this._setupToolbar();
+
+        this.legend = new N2Legend();
     }
 
     /** Set up the menu for selecting an arbitrary depth to collapse to. */
@@ -73,7 +75,7 @@ class N2UserInterface {
         if (!node.hasChildren()) return;
 
         // Don't allow minimizing of root node
-        if (node.depth > this.n2Diag.zoomedElement.depth) { 
+        if (node.depth > this.n2Diag.zoomedElement.depth) {
             this.rightClickedNode = node;
             this.findRootOfChangeFunction =
                 this.findRootOfChangeForRightClick.bind(this);
@@ -120,7 +122,7 @@ class N2UserInterface {
     leftClick(node) {
         testThis(this, 'N2UserInterface', 'leftClick');
 
-        if (!node.hasChildren()) return;
+        if (!node.hasChildren() || node.isParam()) return;
         if (d3.event.button != 0) return;
         this.backButtonHistory.push({ "node": this.n2Diag.zoomedElement });
         this.forwardButtonHistory = [];
@@ -353,7 +355,8 @@ class N2UserInterface {
         this.n2Diag.toggleSolverNameType();
         this.n2Diag.dom.parentDiv.querySelector("#toggleSolverNamesButtonId").className =
             !this.n2Diag.showLinearSolverNames ? "myButton myButtonToggledOn" : "myButton";
-        SetupLegend(d3, this.n2Diag.dom.d3ContentDiv);
+        if (this.legend.shown)
+            this.legend.show(this.n2Diag.showLinearSolverNames, this.n2Diag.style.solvers);
         this.n2Diag.update();
     }
 
@@ -374,12 +377,11 @@ class N2UserInterface {
     /** React to the toggle legend button, and show or hide the legend below the N2. */
     toggleLegend() {
         testThis(this, 'N2UserInterface', 'toggleLegend');
+        this.legend.toggle(this.n2Diag.showLinearSolverNames, this.n2Diag.style.solvers);
 
-        // TODO: Refactor legend
-        showLegend = !showLegend;
         this.n2Diag.dom.parentDiv.querySelector("#showLegendButtonId").className =
-            showLegend ? "myButton myButtonToggledOn" : "myButton";
-        SetupLegend(d3, n2Diag.dom.d3ContentDiv);
+            (this.legend.shown) ? "myButton myButtonToggledOn" : "myButton";
+
     }
 
     /** Associate all of the buttons on the toolbar with a method in N2UserInterface. */
@@ -436,7 +438,7 @@ class N2UserInterface {
         }
 
         toolbar.querySelector("#saveSvgButtonId").onclick =
-            function() { self.n2Diag.saveSvg(); } 
+            function () { self.n2Diag.saveSvg(); }
         toolbar.querySelector("#helpButtonId").onclick = DisplayModal;
     }
 
