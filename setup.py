@@ -154,12 +154,19 @@ setup(
         'six'
     ],
     # scripts=['bin/om-pylint.sh']
-    entry_points="""
-    [console_scripts]
-    wingproj=openmdao.devtools.wingproj:run_wing
-    webview=openmdao.utils.webview:webview_argv
-    run_test=openmdao.devtools.run_test:run_test
-    openmdao=openmdao.utils.om:openmdao_cmd
-    """,
+    entry_points={
+        'console_scripts': [
+            'wingproj=openmdao.devtools.wingproj:run_wing',
+            'webview=openmdao.utils.webview:webview_argv',
+            'run_test=openmdao.devtools.run_test:run_test',
+            'openmdao=openmdao.utils.om:openmdao_cmd',
+        ],
+        'openmdao_drivers': [
+            'doedriver=openmdao.drivers.doe_driver:DOEDriver',
+            'simplegadriver=openmdao.drivers.genetic_algorithm_driver:SimpleGADriver',
+            'pyoptsparsedriver=openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver',
+            'scipydriver=openmdao.drivers.scipy_optimizer:ScipyOptimizeDriver',
+        ],
+    },
     extras_require=optional_dependencies,
 )

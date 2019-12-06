@@ -2217,12 +2217,3 @@ class Group(System):
                 graph.add_edge(src_sys, tgt_sys, conns=edge_data[key])
 
         return graph
-
-    def view_sys_graph(self):
-        from openmdao.visualization.graph_viewer.graph_viewer_app import get_graph_info
-        from openmdao.utils.webview import webview
-        svg, _ = get_graph_info(self, 'System Graph for {}'.format(self.pathname))
-        outfile = '{}_graph.svg'.format(self.pathname.replace('.', '_'))
-        with open(outfile, 'w') as f:
-            f.write(svg)
-        webview(outfile)
