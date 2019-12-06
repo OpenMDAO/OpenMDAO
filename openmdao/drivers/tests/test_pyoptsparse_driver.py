@@ -2120,6 +2120,17 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         output = output.split('\n')
         self.assertEqual(output[-2], ('NL: NLBGS Converged'))
 
+    def test_signal_set(self):
+        import openmdao.api as om
+        import signal
+
+        prob = om.Problem()
+        model = prob.model
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "SNOPT"
+        prob.driver.options['user_teriminate_signal'] = signal.SIGUSR2
+
 
 if __name__ == "__main__":
     unittest.main()
