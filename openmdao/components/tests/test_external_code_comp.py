@@ -589,6 +589,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
             pass
 
     def test_simple_external_code_implicit_comp(self):
+        import sys
         import openmdao.api as om
 
         class MachExternalCodeComp(om.ExternalCodeImplicitComp):
