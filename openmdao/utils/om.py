@@ -506,7 +506,7 @@ def _dump_dist_idxs_setup_parser(parser):
                         help='Name of vectors to show indices for.  Default is "nonlinear".')
 
 
-def _dump_dist_idxs_cmd(options):
+def _dump_dist_idxs_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao dump_idxs'.
 
@@ -514,11 +514,8 @@ def _dump_dist_idxs_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The hook function.
+    user_args : list of str
+        Args to be passed to the user script.
     """
     if options.outfile is None:
         out = sys.stdout
@@ -531,7 +528,7 @@ def _dump_dist_idxs_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=_dumpdist)
 
-    return _dumpdist
+    _load_and_exec(options.file[0], user_args)
 
 
 def _cite_setup_parser(parser):
@@ -623,8 +620,8 @@ _command_map = {
 
 
 # add any dev specific command here that users probably don't want to see
-if os.environ.get('OPENMDAO_DEV', '').lower() in {'1', 'true', 'yes'}:
-    _command_map['dump_idxs'] = (_dump_dist_idxs_setup_parser, _simple_exec,
+if os.environ.get('OPENMDAO_DEV', '').lower() not in {'0', 'false', 'no', ''}:
+    _command_map['dump_idxs'] = (_dump_dist_idxs_setup_parser,
                                  _dump_dist_idxs_cmd,
                                  'Show distributed index information.')
 

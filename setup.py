@@ -153,7 +153,6 @@ setup(
         'scipy',
         'six'
     ],
-    # scripts=['bin/om-pylint.sh']
     entry_points={
         'console_scripts': [
             'wingproj=openmdao.devtools.wingproj:run_wing',
@@ -167,6 +166,53 @@ setup(
             'pyoptsparsedriver=openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver',
             'scipydriver=openmdao.drivers.scipy_optimizer:ScipyOptimizeDriver',
         ],
+        'openmdao_lin_solvers': [
+            'directsolver=openmdao.solvers.linear.direct:DirectSolver',
+            'linearblockgs=openmdao.solvers.linear.linear_block_gs:LinearBlockGS',
+            'linearblockjac=openmdao.solvers.linear.linear_block_jac:LinearBlockJac',
+            'linearrunoncec=openmdao.solvers.linear.linear_runonce:LinearRunOnce',
+            'petsckrylov=openmdao.solvers.linear.petsc_ksp:PETScKrylov',
+            'scipykrylov=openmdao.solvers.linear.scipy_iter_solver:ScipyKrylov',
+            'userdefined=openmdao.solvers.linear.user_defined:LinearUserDefined',
+        ],
+        'openmdao_nl_solvers': [
+            'broydensolver=openmdao.solvers.nonlinear.broyden:BroydenSolver',
+            'newtonsolver=openmdao.solvers.nonlinear.newton:NewtonSolver',
+            'nonlinearblockgs=openmdao.solvers.nonlinear.nonlinear_block_gs:NonlinearBlockGS',
+            'nonlinearblockjac=openmdao.solvers.nonlinear.nonlinear_block_jac:NonlinearBlockJac',
+            'nonlinearrunonce=openmdao.solvers.nonlinear.nonlinear_runonce:NonlinearRunOnce',
+        ],
+        'openmdao_line_search_solvers': [
+            'boundsenforcels=openmdao.solvers.linesearch.backtracking:BoundsEnforceLS',
+            'armijogoldsteinls=openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS',
+        ],
+        'openmdao_components': [
+            'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
+            'akimasplinecomp=openmdao.components.akima_spline_comp:AkimaSplineComp',
+            'bsplinescomp=openmdao.components.bsplines_comp:BsplinesComp',
+            'crossproductcomp=openmdao.components.cross_product_comp:CrossProductComp',
+            'demuxcomp=openmdao.components.demux_comp:DemuxComp',
+            'dotproductcomp=openmdao.components.dot_product_comp:DotProductComp',
+            'eqconstraintcomp=openmdao.components.eq_constraint_comp:EQConstraintComp',
+            'execcomp=openmdao.components.exec_comp:ExecComp',
+            'externalcodecomp=openmdao.components.external_code_comp:ExternalCodeComp',
+            'kscomp=openmdao.components.ks_comp:KSComp',
+            'matrixvectorproductcomp=openmdao.components.matrix_vector_product_comp:MatrixVectorProductComp',
+            'metamodelstructuredcomp=openmdao.components.meta_model_structured_comp:MetaModelStructuredComp',
+            'metamodelunstructuredcomp=openmdao.components.meta_model_unstructured_comp:MetaModelUnStructuredComp',
+            'muxcomp=openmdao.components.mux_comp:MuxComp',
+            'vectormagnitudecomp=openmdao.components.vector_magnitude_comp:VectorMagnitudeComp',
+            'indepvarcomp=openmdao.components.indepvarcomp:IndepVarComp',
+            'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
+            'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
+            'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
+        ]
+        'openmdao_case_recorders': [
+            'sqliterecorder=openmdao.recorders.sqlite_recorder:SqliteRecorder',
+        ]
+        'openmdao_case_readers': [
+            'sqlitereader=openmdao.recorders.sqlite_recorder:SqliteReader',
+        ]
     },
     extras_require=optional_dependencies,
 )
