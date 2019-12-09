@@ -9,7 +9,7 @@ from six.moves import cStringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
 # Note: The following class definitions are used in feature docs
@@ -155,6 +155,7 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
     def test_list_inputs_before_run(self):
+        # cannot list_inputs on a Group before setup
         msg = "Group (<model>): Unable to list inputs on a Group until model has been run."
         try:
             self.prob.model.list_inputs()
@@ -163,7 +164,33 @@ class ImplicitCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
+        # list_inputs on a component before setup is okay
+        c2_inputs = self.prob.model.comp2.list_inputs(out_stream=None)
+        expected = {
+            'a': {'value': [1.]},
+            'b': {'value': [1.]},
+            'c': {'value': [1.]}
+        }
+        self.assertEqual(dict(c2_inputs), expected)
+
+        # listing component inputs based on tags is okay
+        c2_inputs = self.prob.model.comp2.list_inputs(tags='tag_a', out_stream=None)
+        self.assertEqual(dict(c2_inputs), {'a': {'value': [1.]}})
+
+        # but includes and excludes are ignored (with a warning)
+        msg = "{}: list_inputs called before model has been run. Filters are ignored."
+        msg = msg.format(self.prob.model.comp2.msginfo)
+
+        with assert_warning(UserWarning, msg):
+            c2_inputs = self.prob.model.comp2.list_inputs(includes='a', out_stream=None)
+            self.assertEqual(dict(c2_inputs), expected)
+
+        with assert_warning(UserWarning, msg):
+            c2_inputs = self.prob.model.comp2.list_inputs(excludes='x', out_stream=None)
+            self.assertEqual(dict(c2_inputs), expected)
+
     def test_list_outputs_before_run(self):
+        # cannot list_outputs on a Group before setup
         msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
         try:
             self.prob.model.list_outputs()
@@ -171,6 +198,29 @@ class ImplicitCompTestCase(unittest.TestCase):
             self.assertEqual(str(err), msg)
         else:
             self.fail("Exception expected")
+
+        # list_outputs on a component before setup is okay
+        c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
+        expected = {
+            'x': {'value': [0.]}
+        }
+        self.assertEqual(dict(c2_outputs), expected)
+
+        # listing component outputs based on tags is okay
+        c2_outputs = self.prob.model.comp2.list_outputs(tags='tag_x', out_stream=None)
+        self.assertEqual(dict(c2_outputs), expected)
+
+        # but includes and excludes are ignored (with a warning)
+        msg = "{}: list_outputs called before model has been run. Filters are ignored."
+        msg = msg.format(self.prob.model.comp2.msginfo)
+
+        with assert_warning(UserWarning, msg):
+            c2_outputs = self.prob.model.comp2.list_outputs(includes='x', out_stream=None)
+            self.assertEqual(dict(c2_outputs), expected)
+
+        with assert_warning(UserWarning, msg):
+            c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
+            self.assertEqual(dict(c2_outputs), expected)
 
     def test_list_inputs(self):
         self.prob.run_model()

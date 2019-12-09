@@ -434,13 +434,20 @@ class ImplicitComponent(Component):
         """
         Return list of all states at and below this system.
 
+        If setup has not been performed yet, will return relative names for this system only.
+
         Returns
         -------
         list
             List of all states.
         """
-        return [name for name in self._outputs._names] + \
-               [name for name in self._var_allprocs_discrete['output']]
+        if self._outputs is not None:
+            # setup has been performed, return absolute names
+            return [name for name in self._outputs._names] + \
+                   [name for name in self._var_allprocs_discrete['output']]
+        else:
+            # setup has not been performed, return relative names for this system
+            return [name for name in self._var_rel_names['output']]
 
     def _list_states_allprocs(self):
         """

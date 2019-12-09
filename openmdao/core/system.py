@@ -3172,16 +3172,16 @@ class System(object):
                 raise RuntimeError("{}: Unable to list inputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
-            if (tags or includes or excludes):
+            if (includes or excludes):
                 msg = "{}: list_inputs called before model has been run. Filters are ignored."
                 simple_warning(msg.format(self.msginfo))
 
             meta = self._var_rel2meta
-            var_names = meta.keys()
+            var_names = self._var_rel_names['input']
             abs2prom = dict()
         else:
             # Only gathering up values and metadata from this proc, if MPI
-            meta = self._var_abs2meta  # This only includes metadata for this process.
+            meta = self._var_abs2meta
             var_names = self._inputs._views.keys()
             abs2prom = self._var_abs2prom['input']
 
@@ -3327,16 +3327,16 @@ class System(object):
                 raise RuntimeError("{}: Unable to list outputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
-            if (tags or includes or excludes):
+            if (includes or excludes):
                 msg = "{}: list_outputs called before model has been run. Filters are ignored."
                 simple_warning(msg.format(self.msginfo))
 
             meta = self._var_rel2meta
-            var_names = meta.keys()
+            var_names = self._var_rel_names['output']
             abs2prom = dict()
         else:
             # Only gathering up values and metadata from this proc, if MPI
-            meta = self._var_abs2meta  # This only includes metadata for this process.
+            meta = self._var_abs2meta
             var_names = self._outputs._views.keys()
             abs2prom = self._var_abs2prom['output']
 
