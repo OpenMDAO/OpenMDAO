@@ -581,7 +581,6 @@ class DiscreteTestCase(unittest.TestCase):
 
         self.assertTrue(testlogger.contains('warning', expected_warning_1))
 
-
     def test_discrete_deriv_implicit(self):
         prob = om.Problem()
         model = prob.model

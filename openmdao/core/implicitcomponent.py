@@ -434,7 +434,7 @@ class ImplicitComponent(Component):
         """
         Return list of all states at and below this system.
 
-        If setup has not been performed yet, will return relative names for this system only.
+        If final setup has not been performed yet, return relative names for this system only.
 
         Returns
         -------
@@ -442,11 +442,11 @@ class ImplicitComponent(Component):
             List of all states.
         """
         if self._outputs is not None:
-            # setup has been performed, return absolute names
+            # final setup has been performed, return absolute names
             return [name for name in self._outputs._names] + \
                    [name for name in self._var_allprocs_discrete['output']]
         else:
-            # setup has not been performed, return relative names for this system only
+            # final setup has not been performed, return relative names for this system only
             return [name for name in self._var_rel_names['output']] + \
                    [name for name in self._var_discrete['output']]
 

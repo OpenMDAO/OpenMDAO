@@ -3168,6 +3168,7 @@ class System(object):
             list of input names and other optional information about those inputs
         """
         if self._inputs is None:
+            # final setup has not been performed
             if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
                 raise RuntimeError("{}: Unable to list inputs on a Group until model has "
                                    "been run.".format(self.msginfo))
@@ -3176,10 +3177,13 @@ class System(object):
                 msg = "{}: list_inputs called before model has been run. Filters are ignored."
                 simple_warning(msg.format(self.msginfo))
 
+            # this is a component; use relative names, including discretes
             meta = self._var_rel2meta
             var_names = self._var_rel_names['input'] + list(self._var_discrete['input'].keys())
             abs2prom = None
         else:
+            # final setup has been performed
+            # use absolute names, discretes handled separately
             # Only gathering up values and metadata from this proc, if MPI
             meta = self._var_abs2meta
             var_names = self._inputs._views.keys()
@@ -3323,6 +3327,7 @@ class System(object):
             list of output names and other optional information about those outputs
         """
         if self._outputs is None:
+            # final setup has not been performed
             if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
                 raise RuntimeError("{}: Unable to list outputs on a Group until model has "
                                    "been run.".format(self.msginfo))
@@ -3331,10 +3336,13 @@ class System(object):
                 msg = "{}: list_outputs called before model has been run. Filters are ignored."
                 simple_warning(msg.format(self.msginfo))
 
+            # this is a component; use relative names, including discretes
             meta = self._var_rel2meta
             var_names = self._var_rel_names['output'] + list(self._var_discrete['output'].keys())
             abs2prom = None
         else:
+            # final setup has been performed
+            # use absolute names, discretes handled separately
             # Only gathering up values and metadata from this proc, if MPI
             meta = self._var_abs2meta
             var_names = self._outputs._views.keys()
