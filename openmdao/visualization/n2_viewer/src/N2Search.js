@@ -15,6 +15,7 @@ class N2Search {
             'value': "",
             'containsDot': false,
             'baseName': ""
+            
         }
         this.filterSet = {};
 
@@ -23,12 +24,8 @@ class N2Search {
         this.wordIndex = 0;
         this.searchVals0 = [];
         this.inDataFunction = true;
-        
-        this.autoCompleteListNames = [];
-        this.autoCompleteListPathNames = [];
-        this.autoCompleteSetNames = {};
-        this.autoCompleteSetPathNames = {};
-        this.searchCollapsedUndo = [];
+
+        this.searchCollapsedUndo = []; // Non-matching nodes to be minimized/hidden.
 
         this.numMatches = 0;
         this.searchInputDiv = d3.select("#awesompleteId").node();
@@ -108,6 +105,14 @@ class N2Search {
         window.addEventListener('input', self.searchInputEventListener.bind(self), true);
     }
 
+    /**
+     * Recurse through the tree and find nodes with pathnames that match
+     * the computed regular expression. Minimize/hide nodes that don't match.
+     * @param {N2TreeNode} node The current node to operate on.
+     * @param {RegExp} regexMatch A regular expression assembled from the search values.
+     * @param {Array} undoList List of nodes that have been hidden/minimized.
+     * @returns {Boolean} True if a match was found, false otherwise.
+     */
     _doSearch(node, regexMatch, undoList) {
         let didMatch = false;
 
@@ -142,24 +147,18 @@ class N2Search {
         return didMatch;
     }
 
+    /**
+     * Reset the number of matches to zero and execute the search with a null value
+     * for undoList, so it's not changed.
+     */
     _countMatches() {
-        for (let node of this.searchCollapsedUndo) {
-            if (!node.hasChildren() && node.isParamOrUnknown()) node.varIsHidden = true;
-            else node.isMinimized = true;
-        }
-
         this.numMatches = 0;
 
         if (this.searchVals0.length != 0)
-            this._doSearch(this.zoomedElement,
-                this._getSearchRegExp(this.searchVals0), null);
-
-        for (let node of this.searchCollapsedUndo) {
-            if (!node.hasChildren() && node.isParamOrUnknown()) node.varIsHidden = true;
-            else node.isMinimized = true;
-        }
+            this._doSearch(this.zoomedElement, this._getSearchRegExp(this.searchVals0), null);
     }
 
+    /** Undo results of the previous search, and perform a new one. */
     performSearch() {
         for (let node of this.searchCollapsedUndo) {
             //auto undo on successive searches
@@ -175,6 +174,7 @@ class N2Search {
 
     }
 
+    /** Do some escaping and replacing of globbing with regular expressions. */
     _getSearchRegExp(searchValsArray) {
         let regexStr = new String("(^" + searchValsArray.join("$|^") + "$)")
             .replace(/\./g, "\\.") //convert . to regex
@@ -187,57 +187,64 @@ class N2Search {
 
     _isValid(value) { return value.length > 0; }
 
+    /**
+     * React to each value entered into the search input box.
+     * @param {Event} e The object describing the keypress event.
+     */
     searchInputEventListener(e) {
         testThis(this, 'N2Search', 'searchInputEventListener');
 
         let target = e.target;
-        if (target.id == "awesompleteId") {
-            //valid characters AlphaNumeric : _ ? * space .
-            let newVal = target.value.replace(/([^a-zA-Z0-9:_\?\*\s\.])/g, "");
+        if (target.id != "awesompleteId") return;
 
-            if (newVal != target.value) {
-                target.value = newVal; // won't trigger new event
-            }
+        //valid characters AlphaNumeric : _ ? * space .
+        let newVal = target.value.replace(/([^a-zA-Z0-9:_\?\*\s\.])/g, "");
 
-            this.searchVals0 = target.value.split(" ");
-
-            let filtered = this.searchVals0.filter(this._isValid);
-            this.searchVals0 = filtered;
-
-            let lastLetterTypedIndex = target.selectionStart - 1;
-
-            let endIndex = target.value.indexOf(" ", lastLetterTypedIndex);
-            if (endIndex == -1) endIndex = target.value.length;
-
-            let startIndex = target.value.lastIndexOf(" ", lastLetterTypedIndex);
-            if (startIndex == -1) startIndex = 0;
-
-            let sub = target.value.substring(startIndex, endIndex).trim();
-            // valid openmdao character types: AlphaNumeric : _ .
-            this.filteredWord.value =
-                sub.replace(/([^a-zA-Z0-9:_\.])/g, "");
-
-            let i = 0;
-            for (let val of this.searchVals0) {
-                if (val.replace(/([^a-zA-Z0-9:_\.])/g, "") ==
-                    this.filteredWord.value) {
-                    this.wordIndex = i;
-                    break;
-                }
-                ++i;
-            }
-
-            this.filteredWord.containsDot = (this.filteredWord.value.indexOf(".") != -1);
-            this.searchAwesomplete.list = this.filteredWord.containsDot ?
-                    this.autoCompleteListPathNames : this.autoCompleteListNames;
-            this.filteredWord.baseName = this.filteredWord.containsDot ?
-                    this.filteredWord.value.split(".")[0].trim() : "";
-
-            this._countMatches();
-            this.searchCountDiv.innerHTML = "" + this.numMatches + " matches";
+        if (newVal != target.value) {
+            target.value = newVal; // won't trigger new event
         }
+
+        this.searchVals0 = target.value.split(" ");
+
+        let filtered = this.searchVals0.filter(this._isValid);
+        this.searchVals0 = filtered;
+
+        let lastLetterTypedIndex = target.selectionStart - 1;
+
+        let endIndex = target.value.indexOf(" ", lastLetterTypedIndex);
+        if (endIndex == -1) endIndex = target.value.length;
+
+        let startIndex = target.value.lastIndexOf(" ", lastLetterTypedIndex);
+        if (startIndex == -1) startIndex = 0;
+
+        let sub = target.value.substring(startIndex, endIndex).trim();
+        // valid openmdao character types: AlphaNumeric : _ .
+        this.filteredWord.value = sub.replace(/([^a-zA-Z0-9:_\.])/g, "");
+
+        let i = 0;
+        for (let val of this.searchVals0) {
+            if (val.replace(/([^a-zA-Z0-9:_\.])/g, "") == this.filteredWord.value) {
+                this.wordIndex = i;
+                break;
+            }
+            ++i;
+        }
+
+        this.filteredWord.containsDot = (this.filteredWord.value.indexOf(".") != -1);
+        this.searchAwesomplete.list = this.filteredWord.containsDot ?
+            this.autoComplete.paths.list : this.autoComplete.names.list;
+        this.filteredWord.baseName = this.filteredWord.containsDot ?
+            this.filteredWord.value.split(".")[0].trim() : "";
+
+        this._countMatches();
+        this.searchCountDiv.innerHTML = "" + this.numMatches + " matches";
     }
 
+    /**
+     * Find the earliest minimized parent of the specified node.
+     * @param {N2TreeNode} node The node to search from.
+     * @returns {N2TreeNode} The earliest mimimized parent node.
+     */
     findRootOfChangeForSearch(node) {
         let earliestObj = node;
         for (let obj = node; obj != null; obj = obj.parent) {
@@ -248,7 +255,7 @@ class N2Search {
 
     /**
      * Recurse through the children of the node and add their names to the
-     * autocomplete list of names if they're not already in it.
+     * autocomplete list of names, if they're not already in it.
      * @param {N2TreeNode} node The node to search from.
      */
     _populateAutoCompleteList(node) {
@@ -270,21 +277,26 @@ class N2Search {
             ((node.hasChildren()) ? ":" : ""));
 
         for (let name of namesToAdd) {
-            if (!this.autoCompleteSetNames.hasOwnProperty(name)) {
-                this.autoCompleteSetNames[name] = true;
-                this.autoCompleteListNames.push(name);
+            if (!this.autoComplete.names.set.hasOwnProperty(name)) {
+                this.autoComplete.names.set[name] = true;
+                this.autoComplete.names.list.push(name);
             }
         }
 
         let localPathName = (this.zoomedElement === this.modelRoot) ?
             node.absPathName : node.absPathName.slice(this.zoomedElement.absPathName.length + 1);
 
-        if (!this.autoCompleteSetPathNames.hasOwnProperty(localPathName)) {
-            this.autoCompleteSetPathNames[localPathName] = true;
-            this.autoCompleteListPathNames.push(localPathName);
+        if (!this.autoComplete.paths.set.hasOwnProperty(localPathName)) {
+            this.autoComplete.paths.set[localPathName] = true;
+            this.autoComplete.paths.list.push(localPathName);
         }
     }
 
+    /**
+     * If the zoomed element has changed, update the auto complete lists.
+     * @param {N2TreeNode} zoomedElement The selected node in the model tree.
+     * @param {N2TreeNode} root The base element of the model tree.
+     */
     update(zoomedElement, root) {
         this.zoomedElement = zoomedElement;
         this.modelRoot = root;
@@ -294,11 +306,16 @@ class N2Search {
             return;
         }
 
-        this.autoCompleteSetNames = {};
-        this.autoCompleteSetPathNames = {};
-
-        this.autoCompleteListNames = [];
-        this.autoCompleteListPathNames = [];
+        this.autoComplete = {
+            'names': {
+                'list': [],
+                'set': {}
+            },
+            'paths': {
+                'list': [],
+                'set': {}
+            }
+        }
 
         this._populateAutoCompleteList(this.zoomedElement);
     }
