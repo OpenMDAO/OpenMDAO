@@ -834,16 +834,16 @@ def make_set(str_data, name=None):
         raise TypeError("The argument should be str, set, or list: {}".format(str_data))
 
 
-def var_name_match_includes_excludes(name, prom_name, includes, excludes):
+def match_includes_excludes(name, prom_name, includes, excludes):
     """
-    Check to see if the name passes thru the includes and excludes filter.
+    Check to see if the variable names pass through the includes and excludes filter.
 
     Parameters
     ----------
     name : str
-        Unpromoted var name to be checked for match.
+        Unpromoted variable name to be checked for match.
     prom_name : str
-        Promoted var name to be checked for match.
+        Promoted variable name to be checked for match.
     includes : None or list_like
         List of glob patterns for name to include in the filtering.
     excludes : None or list_like

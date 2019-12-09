@@ -9,7 +9,7 @@ from six.moves import cStringIO
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning
+from openmdao.utils.assert_utils import assert_rel_error
 
 
 # Note: The following class definitions are used in feature docs
@@ -173,21 +173,17 @@ class ImplicitCompTestCase(unittest.TestCase):
         }
         self.assertEqual(dict(c2_inputs), expected)
 
-        # listing component inputs based on tags is okay
+        # listing component inputs based on tags should work
         c2_inputs = self.prob.model.comp2.list_inputs(tags='tag_a', out_stream=None)
         self.assertEqual(dict(c2_inputs), {'a': {'value': [1.]}})
 
-        # but includes and excludes are ignored (with a warning)
-        msg = "{}: list_inputs called before model has been run. Filters are ignored."
-        msg = msg.format(self.prob.model.comp2.msginfo)
+        # includes and excludes based on relative names should work
+        c2_inputs = self.prob.model.comp2.list_inputs(includes='a', out_stream=None)
+        self.assertEqual(dict(c2_inputs), {'a': {'value': [1.]}})
 
-        with assert_warning(UserWarning, msg):
-            c2_inputs = self.prob.model.comp2.list_inputs(includes='a', out_stream=None)
-            self.assertEqual(dict(c2_inputs), expected)
-
-        with assert_warning(UserWarning, msg):
-            c2_inputs = self.prob.model.comp2.list_inputs(excludes='x', out_stream=None)
-            self.assertEqual(dict(c2_inputs), expected)
+        c2_inputs = self.prob.model.comp2.list_inputs(excludes='c', out_stream=None)
+        del expected['c']
+        self.assertEqual(dict(c2_inputs), expected)
 
     def test_list_outputs_before_run(self):
         # cannot list_outputs on a Group before running
@@ -206,25 +202,20 @@ class ImplicitCompTestCase(unittest.TestCase):
         }
         self.assertEqual(dict(c2_outputs), expected)
 
-        # listing component outputs based on tags is okay
+        # listing component outputs based on tags should work
         c2_outputs = self.prob.model.comp2.list_outputs(tags='tag_x', out_stream=None)
         self.assertEqual(dict(c2_outputs), expected)
 
-        # but includes and excludes are ignored (with a warning)
-        msg = "{}: list_outputs called before model has been run. Filters are ignored."
-        msg = msg.format(self.prob.model.comp2.msginfo)
+        # includes and excludes based on relative names should work
+        c2_outputs = self.prob.model.comp2.list_outputs(includes='x', out_stream=None)
+        self.assertEqual(dict(c2_outputs), expected)
 
-        with assert_warning(UserWarning, msg):
-            c2_outputs = self.prob.model.comp2.list_outputs(includes='x', out_stream=None)
-            self.assertEqual(dict(c2_outputs), expected)
+        c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
+        self.assertEqual(dict(c2_outputs), {})
 
-        with assert_warning(UserWarning, msg):
-            c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
-            self.assertEqual(dict(c2_outputs), expected)
-
-        with assert_warning(UserWarning, msg):
-            c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
-            self.assertEqual(dict(c2_outputs), expected)
+        # specifying residuals_tol should not cause an error
+        c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
+        self.assertEqual(dict(c2_outputs), expected)
 
     def test_list_inputs(self):
         self.prob.run_model()

@@ -41,7 +41,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
-    simple_warning, make_set, var_name_match_includes_excludes
+    simple_warning, make_set, match_includes_excludes
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
@@ -3173,10 +3173,6 @@ class System(object):
                 raise RuntimeError("{}: Unable to list inputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
-            if (includes or excludes):
-                msg = "{}: list_inputs called before model has been run. Filters are ignored."
-                simple_warning(msg.format(self.msginfo))
-
             # this is a component; use relative names, including discretes
             meta = self._var_rel2meta
             var_names = self._var_rel_names['input'] + list(self._var_discrete['input'].keys())
@@ -3196,9 +3192,12 @@ class System(object):
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
-            if abs2prom and not var_name_match_includes_excludes(var_name,
-                                                                 abs2prom[var_name],
-                                                                 includes, excludes):
+            if abs2prom:
+                var_name_prom = abs2prom[var_name]
+            else:
+                var_name_prom = var_name
+
+            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                 continue
 
             val = self._inputs._views[var_name] if self._inputs else meta[var_name]['value']
@@ -3207,7 +3206,7 @@ class System(object):
             if values:
                 var_meta['value'] = val
             if prom_name:
-                var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                var_meta['prom_name'] = var_name_prom
             if units:
                 var_meta['units'] = meta[var_name]['units']
             if shape:
@@ -3223,16 +3222,17 @@ class System(object):
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
-                if abs2prom and not var_name_match_includes_excludes(var_name,
-                                                                     abs2prom[var_name],
-                                                                     includes, excludes):
+                var_name_prom = abs2prom[var_name]
+
+                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                     continue
 
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
                 if prom_name:
-                    var_meta['prom_name'] = abs2prom[var_name]
+                    var_meta['prom_name'] = var_name_prom
+
                 # remaining items do not apply for discrete vars
                 if units:
                     var_meta['units'] = ''
@@ -3332,10 +3332,6 @@ class System(object):
                 raise RuntimeError("{}: Unable to list outputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
-            if (includes or excludes or residuals_tol):
-                msg = "{}: list_outputs called before model has been run. Filters are ignored."
-                simple_warning(msg.format(self.msginfo))
-
             # this is a component; use relative names, including discretes
             meta = self._var_rel2meta
             var_names = self._var_rel_names['output'] + list(self._var_discrete['output'].keys())
@@ -3359,9 +3355,12 @@ class System(object):
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
-            if abs2prom and not var_name_match_includes_excludes(var_name,
-                                                                 abs2prom[var_name],
-                                                                 includes, excludes):
+            if abs2prom:
+                var_name_prom = abs2prom[var_name]
+            else:
+                var_name_prom = var_name
+
+            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                 continue
 
             if residuals_tol and self._residuals and \
@@ -3374,8 +3373,8 @@ class System(object):
             if values:
                 var_meta['value'] = val
             if prom_name and var_name in abs2prom:
-                var_meta['prom_name'] = abs2prom[var_name]
-            if residuals:
+                var_meta['prom_name'] = var_name_prom
+            if residuals and self._residuals:
                 var_meta['resids'] = self._residuals._views[var_name]
             if units:
                 var_meta['units'] = meta[var_name]['units']
@@ -3402,16 +3401,17 @@ class System(object):
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
-                if abs2prom and not var_name_match_includes_excludes(var_name,
-                                                                     abs2prom[var_name],
-                                                                     includes, excludes):
+                var_name_prom = abs2prom[var_name]
+
+                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                     continue
 
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
                 if prom_name and var_name in abs2prom:
-                    var_meta['prom_name'] = abs2prom[var_name]
+                    var_meta['prom_name'] = var_name_prom
+
                 # remaining items do not apply for discrete vars
                 if residuals:
                     var_meta['resids'] = ''
