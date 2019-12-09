@@ -242,7 +242,7 @@ class DiscreteTestCase(unittest.TestCase):
         #
         # list vars before model has been run
         #
-        # list_inputs on a component before setup is okay
+        # list_inputs on a component before running is okay
         expl_inputs = prob.model.expl.list_inputs(out_stream=None)
         expected = {
             'a': {'value': [10.]},
@@ -256,7 +256,7 @@ class DiscreteTestCase(unittest.TestCase):
         }
         self.assertEqual(dict(impl_inputs), expected)
 
-        # list_outputs on a component before setup is okay
+        # list_outputs on a component before running is okay
         expl_outputs = prob.model.expl.list_outputs(out_stream=None)
         expected = {
             'b': {'value': [0.]},

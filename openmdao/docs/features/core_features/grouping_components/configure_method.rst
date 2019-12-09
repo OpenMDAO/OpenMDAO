@@ -27,6 +27,8 @@ different one in the top-most system.
     openmdao.core.tests.test_problem.TestProblem.test_feature_system_configure
     :layout: code, output
 
+.. _feature_configure_IO:
+
 Configuring Setup-Dependent I/O
 -------------------------------
 

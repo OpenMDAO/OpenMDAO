@@ -201,6 +201,16 @@ The format is affected by the values set with :code:`numpy.set_printoptions`.
     :layout: interleave
 
 
+.. note::
+
+   It is normally required to run the model before :code:`list_inputs()` and :code:`list_outputs()` can be used.
+   This is because the final setup that occurs just before execution determines the hierarchy and builds the
+   data structures and connections.  In some cases however, it can be useful to call these functions on a 
+   component prior to execution to assist in configuring your model. Advanced features like filtering are not 
+   available, but basic metadata about a component's inputs and outputs is available.  
+   See the documentation for the :ref:`configure() method<feature_configure_IO>` for one such use case.
+
+
 *Listing Problem Variables*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
