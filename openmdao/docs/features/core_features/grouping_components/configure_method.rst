@@ -17,12 +17,18 @@ that runs after the :code:`setup` on all subsystems has completed. While :code:`
 from the top down, :code:`configure` recurses from the bottom up, so that the highest
 system in the hierarchy takes precedence over all lower ones for any modifications.
 
+Configuring Solvers
+-------------------
+
 Here is a simple example where a lower system sets a solver, but we want to change it to a 
 different one in the top-most system.
 
 .. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_system_configure
     :layout: code, output
+
+Configuring Setup-Dependent I/O
+-------------------------------
 
 Another situation in which the :code:`configure` method might be useful is if the inputs
 and outputs of a component or subsystem are dependent on the :code:`setup` of another system.  

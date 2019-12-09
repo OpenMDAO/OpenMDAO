@@ -3168,12 +3168,13 @@ class System(object):
             list of input names and other optional information about those inputs
         """
         if self._inputs is None:
-            if hasattr(self, '_local_system_set'):
+            if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
                 raise RuntimeError("{}: Unable to list inputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
-            msg = "{}: list_inputs called before model has been run. Filters are ignored."
-            simple_warning(msg.format(self.msginfo))
+            if (tags or includes or excludes):
+                msg = "{}: list_inputs called before model has been run. Filters are ignored."
+                simple_warning(msg.format(self.msginfo))
 
             meta = self._var_rel2meta
             var_names = meta.keys()
@@ -3322,12 +3323,13 @@ class System(object):
             list of output names and other optional information about those outputs
         """
         if self._outputs is None:
-            if hasattr(self, '_local_system_set'):
+            if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
                 raise RuntimeError("{}: Unable to list outputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
-            msg = "{}: list_outputs called before model has been run. Filters are ignored."
-            simple_warning(msg.format(self.msginfo))
+            if (tags or includes or excludes):
+                msg = "{}: list_outputs called before model has been run. Filters are ignored."
+                simple_warning(msg.format(self.msginfo))
 
             meta = self._var_rel2meta
             var_names = meta.keys()
