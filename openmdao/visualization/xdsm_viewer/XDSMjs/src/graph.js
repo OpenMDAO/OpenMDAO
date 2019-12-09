@@ -1,9 +1,9 @@
-'use strict';
-var UID = "_U_";
-var UNAME = "User";
-var MULTI_TYPE = "_multi";
 
-var STATUS = {
+const UID = '_U_';
+const UNAME = 'User';
+const MULTI_TYPE = '_multi';
+
+const STATUS = {
   UNKNOWN: 'UNKNOWN',
   PENDING: 'PENDING',
   RUNNING: 'RUNNING',
@@ -12,94 +12,97 @@ var STATUS = {
 };
 
 // *** Node *******************************************************************
-function Node(id, name, type, status) {
-  if (typeof (name) === 'undefined') {
-    name = id;
-  }
-  if (typeof (type) === 'undefined') {
-    type = 'analysis';
-  }
-  if (typeof (status) === 'undefined') {
-    status = STATUS.UNKNOWN;
-  }
+function Node(id, pname, ptype, pstatus, psubxdsm) {
+  const name = pname || id;
+  const type = ptype || 'analysis';
+  const status = pstatus || STATUS.UNKNOWN;
   if (typeof STATUS[status] === 'undefined') {
-    throw Error("Unknown status '" + status + "' for node " + name + "(id="
-        + id + ")");
+    throw Error(`Unknown status '${status}' for node ${name}(id=${id})`);
   }
   this.id = id;
   this.name = name;
   this.isMulti = (type.search(/_multi$/) >= 0);
   this.type = this.isMulti ? type.substr(0, type.length - MULTI_TYPE.length)
-      : type;
+    : type;
   this.status = status;
+  this.subxdsm = psubxdsm;
 }
 
-Node.prototype.isMdo = function() {
-  return this.type === "mdo";
+Node.prototype.isComposite = function isComposite() {
+  return this.type === 'mdo' || this.type === 'sub-optimization'
+    || this.type === 'group' || this.type === 'implicit-group';
 };
 
-Node.prototype.getScenarioId = function() {
-  if (this.isMdo()) {
-    var idxscn = this.name.indexOf("_scn-");
+Node.prototype.getSubXdsmId = function getSubXdsmId() {
+  if (this.isComposite()) {
+    // Deprecated
+    const idxscn = this.name.indexOf('_scn-');
     if (idxscn === -1) {
-      console.log("Warning: MDO Scenario not found. "
-          + "Bad type or name for node: " + JSON.stringify(this));
-      return null;
+      // console.log(`${'Warning: MDO Scenario not found. '
+      //   + 'Bad type or name for node: '}${JSON.stringify(this)}`);
+    } else {
+      console.log("Use of <name>_scn-<id> pattern in node.name to detect sub scenario 'scn-<id>'"
+        + ' is deprecated. Use node.subxdsm property instead (i.e. node.subxdsm = <id>)');
+      return this.name.substr(idxscn + 1);
     }
-    return this.name.substr(idxscn + 1);
+    if (this.subxdsm) {
+      return this.subxdsm;
+    }
+    console.log(`${'Warning: Sub XDSM id not found. '
+        + 'Bad type or name for node: '}${JSON.stringify(this)}`);
   }
   return null;
 };
 
 // *** Edge *******************************************************************
 function Edge(from, to, nameOrVars, row, col, isMulti) {
-  this.id = "link_" + from + "_" + to;
-  if (typeof (nameOrVars) === "string") {
+  this.id = `link_${from}_${to}`;
+  if (typeof (nameOrVars) === 'string') {
     this.name = nameOrVars;
     this.vars = {};
     const vars = this.name.split(',');
-    vars.forEach((n, i) => this.vars[i] = n.trim());
+    vars.forEach((n, i) => { this.vars[i] = n.trim(); });
   } else { // vars = {id: name, ...}
     this.vars = nameOrVars;
     const names = [];
     for (const k in this.vars) {
-      if (this.vars.hasOwnProperty(k)) {
+      if (Object.prototype.hasOwnProperty.call(this.vars, k)) {
         names.push(this.vars[k]);
       }
     }
-    this.name = names.join(", ");
+    this.name = names.join(', ');
   }
   this.row = row;
   this.col = col;
-  this.iotype = row < col ? "in" : "out";
+  this.iotype = row < col ? 'in' : 'out';
   this.isMulti = isMulti;
 }
 
-Edge.prototype.addVar = function(nameOrVar) {
-  if (typeof(nameOrVar) === "string") {
-    if (this.name==="") {
-      this.name=nameOrVar;
+Edge.prototype.addVar = function addVar(nameOrVar) {
+  if (typeof (nameOrVar) === 'string') {
+    if (this.name === '') {
+      this.name = nameOrVar;
     } else {
-      this.name+=", "+nameOrVar;
+      this.name += `, ${nameOrVar}`;
     }
     this.vars[this.vars.length] = nameOrVar;
   } else {
     for (const k in nameOrVar) {
-      if (nameOrVar.hasOwnProperty(k)) {
+      if (Object.prototype.hasOwnProperty.call(nameOrVar, k)) {
         this.vars[k] = nameOrVar[k];
         const names = [];
-        for (const k in this.vars) {
-          if (this.vars.hasOwnProperty(k)) {
-            names.push(this.vars[k]);
+        for (const v in this.vars) {
+          if (Object.prototype.hasOwnProperty.call(this.vars, v)) {
+            names.push(this.vars[v]);
           }
         }
-        this.name = names.join(", ");
+        this.name = names.join(', ');
       }
     }
   }
 };
 
-Edge.prototype.removeVar = function(nameOrId) {
+Edge.prototype.removeVar = function removeVar(nameOrId) {
   let found = false;
   for (const k in this.vars) {
     if (k === nameOrId) {
@@ -121,39 +124,39 @@ Edge.prototype.removeVar = function(nameOrId) {
   if (found) {
     const names = [];
     for (const k in this.vars) {
-      if (this.vars.hasOwnProperty(k)) {
+      if (Object.prototype.hasOwnProperty.call(this.vars, k)) {
         names.push(this.vars[k]);
       }
     }
-    this.name = names.join(", ");
+    this.name = names.join(', ');
   }
 };
 
 // *** Graph ******************************************************************
 function Graph(mdo, refname, noDefaultDriver) {
-  this.nodes = [new Node(UID, UNAME, "driver")];
+  this.nodes = [new Node(UID, UNAME, 'driver')];
   if (noDefaultDriver) {
     this.nodes = [];
   }
 
   this.edges = [];
   this.chains = [];
-  this.refname = refname || "";
+  this.refname = refname || '';
 
-  var numbering = Graph.number(mdo.workflow);
-  var numPrefixes = numbering.toNum;
+  const numbering = Graph.number(mdo.workflow);
+  const numPrefixes = numbering.toNum;
   this.nodesByStep = numbering.toNode;
 
-  mdo.nodes.forEach(function(item) {
-    var num = numPrefixes[item.id];
-    this.nodes.push(new Node(item.id, num ? num + ":" + item.name : item.name,
-        item.type, item.status));
+  mdo.nodes.forEach((item) => {
+    const num = numPrefixes[item.id];
+    this.nodes.push(new Node(item.id, num ? `${num}:${item.name}` : item.name,
+      item.type, item.status, item.subxdsm));
   }, this);
   this.uid = this.nodes[0].id;
 
   if (mdo.edges) {
-    mdo.edges.forEach(function(item) {
-      this.addEdge(item.from, item.to, item.vars?item.vars:item.name);
+    mdo.edges.forEach((item) => {
+      this.addEdge(item.from, item.to, item.vars ? item.vars : item.name);
     }, this);
   }
 
@@ -164,27 +167,23 @@ function Graph(mdo, refname, noDefaultDriver) {
 
 Graph.NODE_STATUS = STATUS;
 
-Graph.prototype._makeChaining = function(workflow) {
-  var echain = Graph.expand(workflow);
-  echain.forEach(function(leafChain) {
+Graph.prototype._makeChaining = function _makeChaining(workflow) {
+  const echain = Graph.expand(workflow);
+  echain.forEach((leafChain) => {
     if (leafChain.length < 2) {
-      throw new Error("Bad process chain (" + leafChain.length + "elt)");
+      throw new Error(`Bad process chain (${leafChain.length}elt)`);
     } else {
       this.chains.push([]);
-      var ids = this.nodes.map(function(elt) {
-        return elt.id;
-      });
-      leafChain.forEach(function(item, j) {
+      const ids = this.nodes.map((elt) => elt.id);
+      leafChain.forEach((item, j) => {
         if (j !== 0) {
-          var idA = ids.indexOf(leafChain[j - 1]);
+          const idA = ids.indexOf(leafChain[j - 1]);
           if (idA < 0) {
-            throw new Error("Process chain element (" + leafChain[j - 1]
-                + ") not found");
+            throw new Error(`Process chain element (${leafChain[j - 1]}) not found`);
           }
-          var idB = ids.indexOf(leafChain[j]);
+          const idB = ids.indexOf(leafChain[j]);
           if (idB < 0) {
-            throw new Error("Process chain element (" + leafChain[j]
-                + ") not found");
+            throw new Error(`Process chain element (${leafChain[j]}) not found`);
           }
           if (idA !== idB) {
             this.chains[this.chains.length - 1].push([idA, idB]);
@@ -195,19 +194,17 @@ Graph.prototype._makeChaining = function(workflow) {
   }, this);
 };
 
-Graph.prototype.idxOf = function(nodeId) {
-  const idx = this.nodes.map(function(elt) {
-    return elt.id;
-  }).indexOf(nodeId);
-  if (idx<0) {
-    throw new Error("Graph.idxOf: "+nodeId+" not found in "+JSON.stringify(this.nodes));
+Graph.prototype.idxOf = function idxOf(nodeId) {
+  const idx = this.nodes.map((elt) => elt.id).indexOf(nodeId);
+  if (idx < 0) {
+    throw new Error(`Graph.idxOf: ${nodeId} not found in ${JSON.stringify(this.nodes)}`);
   }
   return idx;
 };
 
-Graph.prototype.getNode = function(nodeId) {
-  var theNode;
-  this.nodes.forEach(function(node) {
+Graph.prototype.getNode = function getNode(nodeId) {
+  let theNode;
+  this.nodes.forEach((node) => {
     if (node.id === nodeId) {
       theNode = node;
     }
@@ -215,36 +212,38 @@ Graph.prototype.getNode = function(nodeId) {
   return theNode;
 };
 
-Graph.prototype.getNodeFromIndex = function(idx) {
-  var node;
+Graph.prototype.getNodeFromIndex = function getNodeFromIndex(idx) {
+  let node;
   if (idx >= 0 && idx < this.nodes.length) {
     node = this.nodes[idx];
   } else {
-    throw new Error("Index out of range : " + idx + " not in [0, "
-        + (this.nodes.length - 1) + "]");
+    throw new Error(`Index out of range : ${idx} not in [0, ${
+      this.nodes.length - 1}]`);
   }
   return node;
 };
 
-Graph.prototype.addNode = function(node) {
-  this.nodes.push(new Node(node['id'], node['name'], node['kind']));
+Graph.prototype.addNode = function addNode(node) {
+  this.nodes.push(new Node(node.id, node.name, node.kind));
 };
 
-Graph.prototype.removeNode = function(index) {
-  var self = this;
+Graph.prototype.removeNode = function removeNode(index) {
+  const self = this;
   // Update edges
-  var edges = this.findEdgesOf(index);
-  edges.toRemove.forEach(function(edge) {
-    var idx = self.edges.indexOf(edge);
+  const edges = this.findEdgesOf(index);
+  edges.toRemove.forEach((edge) => {
+    const idx = self.edges.indexOf(edge);
     if (idx > -1) {
       self.edges.splice(idx, 1);
     }
   }, this);
-  edges.toShift.forEach(function(edge) {
+  edges.toShift.forEach((edge) => {
     if (edge.row > 1) {
+      // eslint-disable-next-line no-param-reassign
       edge.row -= 1;
     }
     if (edge.col > 1) {
+      // eslint-disable-next-line no-param-reassign
       edge.col -= 1;
     }
   }, this);
@@ -253,36 +252,36 @@ Graph.prototype.removeNode = function(index) {
   this.nodes.splice(index, 1);
 };
 
-Graph.prototype.moveLeft = function(index) {
-  if (index>1) {
-    const tmp = this.nodes[index-1];
-    this.nodes[index-1] = this.nodes[index];
+Graph.prototype.moveLeft = function moveLeft(index) {
+  if (index > 1) {
+    const tmp = this.nodes[index - 1];
+    this.nodes[index - 1] = this.nodes[index];
     this.nodes[index] = tmp;
   }
 };
 
-Graph.prototype.moveRight = function(index) {
-  if (index<this.nodes.length-1) {
-    const tmp = this.nodes[index+1];
-    this.nodes[index+1] = this.nodes[index];
+Graph.prototype.moveRight = function moveRight(index) {
+  if (index < this.nodes.length - 1) {
+    const tmp = this.nodes[index + 1];
+    this.nodes[index + 1] = this.nodes[index];
     this.nodes[index] = tmp;
   }
 };
 
-Graph.prototype.addEdge = function(nodeIdFrom, nodeIdTo, nameOrVar) {
-  var idA = this.idxOf(nodeIdFrom);
-  var idB = this.idxOf(nodeIdTo);
-  var isMulti = this.nodes[idA].isMulti || this.nodes[idB].isMulti;
+Graph.prototype.addEdge = function addEdge(nodeIdFrom, nodeIdTo, nameOrVar) {
+  const idA = this.idxOf(nodeIdFrom);
+  const idB = this.idxOf(nodeIdTo);
+  const isMulti = this.nodes[idA].isMulti || this.nodes[idB].isMulti;
   this.edges
-      .push(new Edge(nodeIdFrom, nodeIdTo, nameOrVar, idA, idB, isMulti));
+    .push(new Edge(nodeIdFrom, nodeIdTo, nameOrVar, idA, idB, isMulti));
 };
 
-Graph.prototype.removeEdge = function(nodeIdFrom, nodeIdTo) {
+Graph.prototype.removeEdge = function removeEdge(nodeIdFrom, nodeIdTo) {
   const edge = this.findEdge(nodeIdFrom, nodeIdTo);
   this.edges.splice(edge.index, 1);
 };
 
-Graph.prototype.addEdgeVar = function(nodeIdFrom, nodeIdTo, nameOrVar) {
+Graph.prototype.addEdgeVar = function addEdgeVar(nodeIdFrom, nodeIdTo, nameOrVar) {
   const edge = this.findEdge(nodeIdFrom, nodeIdTo).element;
   if (edge) {
     console.log(nameOrVar);
@@ -292,22 +291,22 @@ Graph.prototype.addEdgeVar = function(nodeIdFrom, nodeIdTo, nameOrVar) {
   }
 };
 
-Graph.prototype.removeEdgeVar = function(nodeIdFrom, nodeIdTo, nameOrId) {
+Graph.prototype.removeEdgeVar = function removeEdgeVar(nodeIdFrom, nodeIdTo, nameOrId) {
   const ret = this.findEdge(nodeIdFrom, nodeIdTo);
   const edge = ret.element;
-  const index = ret.index;
+  const { index } = ret;
   if (edge) {
     edge.removeVar(nameOrId);
   }
-  if (edge.name === "") {
+  if (edge.name === '') {
     this.edges.splice(index, 1);
   }
 };
 
-Graph.prototype.findEdgesOf = function(nodeIdx) {
-  var toRemove = [];
-  var toShift = [];
-  this.edges.forEach(function(edge) {
+Graph.prototype.findEdgesOf = function findEdgesOf(nodeIdx) {
+  const toRemove = [];
+  const toShift = [];
+  this.edges.forEach((edge) => {
     if ((edge.row === nodeIdx) || (edge.col === nodeIdx)) {
       toRemove.push(edge);
     } else if ((edge.row > nodeIdx) || (edge.col > nodeIdx)) {
@@ -315,44 +314,44 @@ Graph.prototype.findEdgesOf = function(nodeIdx) {
     }
   }, this);
   return {
-    toRemove: toRemove,
-    toShift: toShift,
+    toRemove,
+    toShift,
   };
 };
 
-Graph.prototype.findEdge = function(nodeIdFrom, nodeIdTo) {
+Graph.prototype.findEdge = function findEdge(nodeIdFrom, nodeIdTo) {
   let element;
   let index = -1;
   const idxFrom = this.idxOf(nodeIdFrom);
   const idxTo = this.idxOf(nodeIdTo);
-  this.edges.some(function(edge, i) {
+  this.edges.some((edge, i) => {
     if ((edge.row === idxFrom) && (edge.col === idxTo)) {
       if (element) {
-        throw Error('edge have be uniq between two nodes, but got: '+
-            JSON.stringify(element)+ ' and '+JSON.stringify(edge));
+        throw Error(`edge have be uniq between two nodes, but got: ${
+          JSON.stringify(element)} and ${JSON.stringify(edge)}`);
       }
       element = edge;
       index = i;
       return true;
     }
+    return false;
   }, this);
-  return {element, index};
+  return { element, index };
 };
 
 function _expand(workflow) {
-  var ret = [];
-  var prev;
-  workflow.forEach(function(item) {
+  let ret = [];
+  let prev;
+  workflow.forEach((item) => {
     if (item instanceof Array) {
-      if (item[0].hasOwnProperty('parallel')) {
+      if (Object.prototype.hasOwnProperty.call(item[0], 'parallel')) {
         if (prev) {
           ret = ret.slice(0, ret.length - 1).concat(
-              item[0].parallel.map(function(elt) {
-                return [prev].concat(_expand([elt]), prev);
-              }));
+            item[0].parallel.map((elt) => [prev].concat(_expand([elt]), prev)),
+          );
         } else {
-          throw new Error("Bad workflow structure : "
-              + "cannot parallel loop without previous starting point.");
+          throw new Error('Bad workflow structure : '
+            + 'cannot parallel loop without previous starting point.');
         }
       } else if (prev) {
         ret = ret.concat(_expand(item), prev);
@@ -360,21 +359,18 @@ function _expand(workflow) {
         ret = ret.concat(_expand(item));
       }
       prev = ret[ret.length - 1];
-    } else if (item.hasOwnProperty('parallel')) {
+    } else if (Object.prototype.hasOwnProperty.call(item, 'parallel')) {
       if (prev) {
         ret = ret.slice(0, ret.length - 1).concat(
-            item.parallel.map(function(elt) {
-              return [prev].concat(_expand([elt]));
-            }));
+          item.parallel.map((elt) => [prev].concat(_expand([elt]))),
+        );
       } else {
-        ret = ret.concat(item.parallel.map(function(elt) {
-          return _expand([elt]);
-        }));
+        ret = ret.concat(item.parallel.map((elt) => _expand([elt])));
       }
       prev = undefined;
     } else {
-      var i = ret.length - 1;
-      var flagParallel = false;
+      let i = ret.length - 1;
+      let flagParallel = false;
       while (i >= 0 && (ret[i] instanceof Array)) {
         ret[i] = ret[i].concat(item);
         i -= 1;
@@ -389,12 +385,10 @@ function _expand(workflow) {
   return ret;
 }
 
-Graph._isPatchNeeded = function(toBePatched) {
-  var lastElts = toBePatched.map(function(arr) {
-    return arr[arr.length - 1];
-  });
-  var lastElt = lastElts[0];
-  for (var i = 0; i < lastElts.length; i++) {
+Graph._isPatchNeeded = function _isPatchNeeded(toBePatched) {
+  const lastElts = toBePatched.map((arr) => arr[arr.length - 1]);
+  const lastElt = lastElts[0];
+  for (let i = 0; i < lastElts.length; i += 1) {
     if (lastElts[i] !== lastElt) {
       return true;
     }
@@ -402,29 +396,29 @@ Graph._isPatchNeeded = function(toBePatched) {
   return false;
 };
 
-Graph._patchParallel = function(expanded) {
-  var toBePatched = [];
-  expanded.forEach(function(elt) {
+Graph._patchParallel = function _patchParallel(expanded) {
+  const toBePatched = [];
+  expanded.forEach((elt) => {
     if (elt instanceof Array) {
       toBePatched.push(elt);
     } else if (Graph._isPatchNeeded(toBePatched)) {
-      toBePatched.forEach(function(arr) {
+      toBePatched.forEach((arr) => {
         arr.push(elt);
       }, this);
     }
   }, this);
 };
 
-Graph.expand = function(item) {
-  var expanded = _expand(item);
-  var result = [];
-  var current = [];
+Graph.expand = function expand(item) {
+  const expanded = _expand(item);
+  const result = [];
+  let current = [];
   // first pass to add missing 'end link' in case of parallel branches at the
   // end of a loop
   // [a, [b, d], [b, c], a] -> [a, [b, d, a], [b, c, a], a]
   Graph._patchParallel(expanded);
   // [a, aa, [b, c], d] -> [[a, aa, b], [b,c], [c, d]]
-  expanded.forEach(function(elt) {
+  expanded.forEach((elt) => {
     if (elt instanceof Array) {
       if (current.length > 0) {
         current.push(elt[0]);
@@ -434,8 +428,8 @@ Graph.expand = function(item) {
       result.push(elt);
     } else {
       if (result.length > 0 && current.length === 0) {
-        var lastChain = result[result.length - 1];
-        var lastElt = lastChain[lastChain.length - 1];
+        const lastChain = result[result.length - 1];
+        const lastElt = lastChain[lastChain.length - 1];
         current.push(lastElt);
       }
       current.push(elt);
@@ -447,10 +441,10 @@ Graph.expand = function(item) {
   return result;
 };
 
-Graph.number = function(workflow, num) {
-  num = (typeof num === 'undefined') ? 0 : num;
-  var toNum = {};
-  var toNode = [];
+Graph.number = function number(workflow, pnum) {
+  let num = (typeof pnum === 'undefined') ? 0 : pnum;
+  const toNum = {};
+  const toNode = [];
 
   function setStep(step, nodeId) {
     if (step in toNode) {
@@ -465,29 +459,29 @@ Graph.number = function(workflow, num) {
       num = String(beg);
       setStep(beg, nodeId);
     } else {
-      num = end + "-" + beg;
+      num = `${end}-${beg}`;
       setStep(end, nodeId);
     }
     if (nodeId in toNum) {
-      toNum[nodeId] += "," + num;
+      toNum[nodeId] += `,${num}`;
     } else {
       toNum[nodeId] = num;
     }
   }
 
-  function _number(wks, num) {
-    var ret = 0;
+  function _number(wks, nb) {
+    let ret = 0;
     if (wks instanceof Array) {
       if (wks.length === 0) {
-        ret = num;
+        ret = nb;
       } else if (wks.length === 1) {
-        ret = _number(wks[0], num);
+        ret = _number(wks[0], nb);
       } else {
-        var head = wks[0];
-        var tail = wks.slice(1);
-        var beg = _number(head, num);
+        const head = wks[0];
+        const tail = wks.slice(1);
+        let beg = _number(head, nb);
         if (tail[0] instanceof Array) {
-          var end = _number(tail[0], beg);
+          const end = _number(tail[0], beg);
           setNum(head, beg, end);
           beg = end + 1;
           tail.shift();
@@ -495,13 +489,11 @@ Graph.number = function(workflow, num) {
         ret = _number(tail, beg);
       }
     } else if ((wks instanceof Object) && 'parallel' in wks) {
-      var nums = wks.parallel.map(function(branch) {
-        return _number(branch, num);
-      });
+      const nums = wks.parallel.map((branch) => _number(branch, nb));
       ret = Math.max.apply(null, nums);
     } else {
-      setNum(wks, num);
-      ret = num + 1;
+      setNum(wks, nb);
+      ret = nb + 1;
     }
     return ret;
   }
@@ -510,8 +502,8 @@ Graph.number = function(workflow, num) {
   // console.log('toNodes=', JSON.stringify(toNode));
   // console.log('toNum=',JSON.stringify(toNum));
   return {
-    toNum: toNum,
-    toNode: toNode,
+    toNum,
+    toNode,
   };
 };
 

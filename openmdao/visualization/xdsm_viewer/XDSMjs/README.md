@@ -2,7 +2,7 @@
 XDSM diagram generator written in javascript.
 
 [![Build Status](https://travis-ci.org/OneraHub/XDSMjs.svg?branch=master)](https://travis-ci.org/OneraHub/XDSMjs)
-[![Language grade: JavaScript](https://img.shields.io/lgtm/grade/javascript/g/OneraHub/XDSMjs.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/OneraHub/XDSMjs/context:javascript)
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/4b639cf0ec404fb38e7b2c776bd21fc3)](https://www.codacy.com/manual/relf/XDSMjs?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=OneraHub/XDSMjs&amp;utm_campaign=Badge_Grade)
 
 ## XDSM
 The XDSM (eXtended Design Structure Matrix) is a notation used to visualize MDO processes.
@@ -15,8 +15,17 @@ XDSM permissions:
 ## Description
 XDSMjs is a javascript generator allowing to display a XDSM diagram within a web page.
 It is based on [D3](https://d3js.org/).
-It uses the <code>xdsm.json</code> file as input which contains required MDO information to generate the XDSM diagram. See the dedicated Wiki page for a description of the [XDSMjs json format](https://github.com/OneraHub/XDSMjs/wiki/XDMSjs-JSON-format).
+It uses the <code>xdsm.json</code> file as input which contains required MDO information to generate the XDSM diagram. See the dedicated Wiki page for a description of the [XDSMjs JSON format](https://github.com/OneraHub/XDSMjs/wiki/XDSMjs-JSON-format).
+
 As of 0.6.0, the MDO data can be specified through data attribute. 
+
+As of 0.7.0, XDSMjs supports also [XDSM v2](https://github.com/mdolab/pyXDSM/releases/tag/v2.0). See [Upgrade to 0.7.0 notes](https://github.com/OneraHub/XDSMjs/wiki/Upgrade-to-XDSMjs-0.7.0).
+
+![](gallery/xdsm_v1_v2.gif)
+
+## Citation
+If you happen to find XDSMjs useful for research and include diagrams generated with it, it will be appreciated if you cite the following paper which describes the project that lead to XDSMjs development:
+> Rémi  Lafage,  Sébastien  Defoort,  and  Thierry  Lefèbvre. Whatsopt: a web application for multidisciplinary design analysis and optimization. In 20th AIAA/ISSMO Multidisciplinary Analysis and Optimization Conference, Dallas, United States, 2019
 
 ## Usage
 Open `xdsm.html` in your browser. To see other diagrams, copy a json example from `examples` directory as xdsm.json and reload the page.
@@ -46,8 +55,13 @@ or use the attribute <code>data-mdo-file</code> to specify another MDO filename
 ```html
   <div class="xdsm" data-mdo-file="examples/mdf.json"></div>
 ```
-
 If no data attribute is specified, the default file <code>xdsm.json</code> is expected.
+
+As of 0.7.0, you can use XDSM v2 notation by using <code>xdsm2</code> class instead of <code>xdsm</code>.
+
+```html
+  <div class="xdsm2"></div>
+```
 
 ## Example
 Below an example describing BLISS formulation inspired from XDSM description given in [Martins and Lambe MDO architecture survey](http://arc.aiaa.org/doi/pdf/10.2514/1.J051895). While the formulation could have been described in one diagram as in the survey, the example below use XDSMjs multi-level diagram capability to separate system and discipline optimization levels.
@@ -57,15 +71,16 @@ The corresponding [xdsm.json](./examples/bliss.json) file is available in the ex
 
 ## Troubleshooting
 * If you don't see the diagram, may be you need to serve the files with your favourite HTTP server ('same origin' policy of your browser). An example with Python HTTP simple server:
-```
+
+``` bash
 > cd <install-dir>/XDSMjs
 ```
 With Python 2:
-```
+``` bash
 > python -m SimpleHTTPServer 8020
 ```
 With Python 3:
-```
+``` bash
 > python -m http.server 8020
 ```
 

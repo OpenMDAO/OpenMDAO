@@ -1,33 +1,33 @@
-'use strict';
-function Labelizer() {}
 
-Labelizer.strParse = function(str, subSupScript) {
-  if (str === "") {
-    return [{base: '', sub: undefined, sup: undefined}];
+function Labelizer() { }
+
+Labelizer.strParse = function strParse(str, subSupScript) {
+  if (str === '') {
+    return [{ base: '', sub: undefined, sup: undefined }];
   }
-  var lstr = str.split(',');
+  const lstr = str.split(',');
   if (subSupScript === false) {
-    return lstr.map((s) => {return {base: s, sub: undefined, sup: undefined};});
+    return lstr.map((s) => ({ base: s, sub: undefined, sup: undefined }));
   }
 
-  var underscores = /_/g;
-  var rg = /([0-9\-]+:)?([&#;A-Za-z0-9\-\.]+)(_[&#;A-Za-z0-9\-\._]+)?(\^.+)?/;
+  const underscores = /_/g;
+  const rg = /([0-9-]+:)?([&#;A-Za-z0-9-.]+)(_[&#;A-Za-z0-9-._]+)?(\^.+)?/;
 
-  var res = lstr.map(function(s) {
-    var base;
-    var sub;
-    var sup;
+  const res = lstr.map((s) => {
+    let base;
+    let sub;
+    let sup;
 
     if ((s.match(underscores) || []).length > 1) {
-      var mu = s.match(/(.+)\^(.+)/);
+      const mu = s.match(/(.+)\^(.+)/);
       if (mu) {
-        return {base: mu[1], sub: undefined, sup: mu[2]};
+        return { base: mu[1], sub: undefined, sup: mu[2] };
       }
-      return {base: s, sub: undefined, sup: undefined};
+      return { base: s, sub: undefined, sup: undefined };
     }
-    var m = s.match(rg);
+    const m = s.match(rg);
     if (m) {
-      base = (m[1] ? m[1] : "") + m[2];
+      base = (m[1] ? m[1] : '') + m[2];
       if (m[3]) {
         sub = m[3].substring(1);
       }
@@ -35,74 +35,76 @@ Labelizer.strParse = function(str, subSupScript) {
         sup = m[4].substring(1);
       }
     } else {
-      throw new Error("Labelizer.strParse: Can not parse '" + s + "'");
+      throw new Error(`Labelizer.strParse: Can not parse '${s}'`);
     }
-    return {base: base, sub: sub, sup: sup};
+    return { base, sub, sup };
   }, this);
 
   return res;
 };
 
-Labelizer._createVarListLabel = function(selection, name, text, ellipsis, subSupScript) {
-  var tokens = Labelizer.strParse(name, subSupScript);
+Labelizer._createVarListLabel = function _createVarListLabel(
+  selection, name, text, ellipsis, subSupScript,
+) {
+  const tokens = Labelizer.strParse(name, subSupScript);
 
-  tokens.every(function(token, i, ary) {
-    var offsetSub = 0;
-    var offsetSup = 0;
+  tokens.every((token, i, ary) => {
+    let offsetSub = 0;
+    let offsetSup = 0;
     if (ellipsis < 1 || (i < 5 && text.nodes()[0].getBBox().width < 100)) {
-      text.append("tspan").html(token.base);
+      text.append('tspan').html(token.base);
       if (token.sub) {
         offsetSub = 10;
-        text.append("tspan")
-            .attr("class", "sub")
-            .attr("dy", offsetSub)
-            .html(token.sub);
+        text.append('tspan')
+          .attr('class', 'sub')
+          .attr('dy', offsetSub)
+          .html(token.sub);
       }
       if (token.sup) {
         offsetSup = -10;
-        text.append("tspan")
-            .attr("class", "sup")
-            .attr("dx", -5)
-            .attr("dy", -offsetSub + offsetSup)
-            .html(token.sup);
+        text.append('tspan')
+          .attr('class', 'sup')
+          .attr('dx', -5)
+          .attr('dy', -offsetSub + offsetSup)
+          .html(token.sup);
         offsetSub = 0;
       }
     } else {
-      text.append("tspan")
-          .attr("dy", -offsetSub - offsetSup)
-          .html("...");
-      selection.classed("ellipsized", true);
+      text.append('tspan')
+        .attr('dy', -offsetSub - offsetSup)
+        .html('...');
+      selection.classed('ellipsized', true);
       return false;
     }
     if (i < ary.length - 1) {
-      text.append("tspan")
-          .attr("dy", -offsetSub - offsetSup)
-          .html(", ");
+      text.append('tspan')
+        .attr('dy', -offsetSub - offsetSup)
+        .html(', ');
     }
     return true;
   }, this);
 };
 
-Labelizer._createLinkNbLabel = function(selection, name, text) {
-  var lstr = name.split(',');
-  var str = lstr.length + " var";
+Labelizer._createLinkNbLabel = function _createLinkNbLabel(selection, name, text) {
+  const lstr = name.split(',');
+  let str = `${lstr.length} var`;
   if (lstr.length > 1) {
     str += 's';
   }
-  text.append("tspan").html(str);
-  selection.classed("ellipsized", true); // activate tooltip
+  text.append('tspan').html(str);
+  selection.classed('ellipsized', true); // activate tooltip
 };
 
-Labelizer.labelize = function() {
-  var ellipsis = 0;
-  var subSupScript = true;
-  var linkNbOnly = false;
-  var labelKind = 'node';
+Labelizer.labelize = function labelize() {
+  let ellipsis = 0;
+  let subSupScript = true;
+  let linkNbOnly = false;
+  let labelKind = 'node';
 
   function createLabel(selection) {
-    selection.each(function(d) {
-      var text = selection.append("text");
-      if (linkNbOnly && labelKind !== "node") { // show connexion nb
+    selection.each((d) => {
+      const text = selection.append('text');
+      if (linkNbOnly && labelKind !== 'node') { // show connexion nb
         Labelizer._createLinkNbLabel(selection, d.name, text);
       } else {
         Labelizer._createVarListLabel(selection, d.name, text, ellipsis, subSupScript);
@@ -110,7 +112,7 @@ Labelizer.labelize = function() {
     });
   }
 
-  createLabel.ellipsis = function(value) {
+  createLabel.ellipsis = function ellips(value) {
     if (!arguments.length) {
       return ellipsis;
     }
@@ -118,7 +120,7 @@ Labelizer.labelize = function() {
     return createLabel;
   };
 
-  createLabel.subSupScript = function(value) {
+  createLabel.subSupScript = function subsupscript(value) {
     if (!arguments.length) {
       return subSupScript;
     }
@@ -126,7 +128,7 @@ Labelizer.labelize = function() {
     return createLabel;
   };
 
-  createLabel.linkNbOnly = function(value) {
+  createLabel.linkNbOnly = function linknbonly(value) {
     if (!arguments.length) {
       return linkNbOnly;
     }
@@ -134,7 +136,7 @@ Labelizer.labelize = function() {
     return createLabel;
   };
 
-  createLabel.labelKind = function(value) {
+  createLabel.labelKind = function labelkind(value) {
     if (!arguments.length) {
       return labelKind;
     }
@@ -145,31 +147,31 @@ Labelizer.labelize = function() {
   return createLabel;
 };
 
-Labelizer.tooltipize = function() {
-  var text = "";
-  var subSupScript = false;
+Labelizer.tooltipize = function tooltipz() {
+  let text = '';
+  let subSupScript = false;
 
   function createTooltip(selection) {
-    var html = [];
+    let html = [];
     if (subSupScript) {
-      var tokens = Labelizer.strParse(text);
-      tokens.forEach(function(token) {
-        var item = token.base;
+      const tokens = Labelizer.strParse(text);
+      tokens.forEach((token) => {
+        let item = token.base;
         if (token.sub) {
-          item += "<sub>" + token.sub + "</sub>";
+          item += `<sub>${token.sub}</sub>`;
         }
         if (token.sup) {
-          item += "<sup>" + token.sup + "</sup>";
+          item += `<sup>${token.sup}</sup>`;
         }
         html.push(item);
       });
     } else {
       html = text.split(',');
     }
-    selection.html(html.join(", "));
+    selection.html(html.join(', '));
   }
 
-  createTooltip.text = function(value) {
+  createTooltip.text = function txt(value) {
     if (!arguments.length) {
       return text;
     }
@@ -177,7 +179,7 @@ Labelizer.tooltipize = function() {
     return createTooltip;
   };
 
-  createTooltip.subSupScript = function(value) {
+  createTooltip.subSupScript = function supsub(value) {
     if (!arguments.length) {
       return subSupScript;
     }
