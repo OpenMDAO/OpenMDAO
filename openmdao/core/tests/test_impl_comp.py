@@ -222,6 +222,10 @@ class ImplicitCompTestCase(unittest.TestCase):
             c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
             self.assertEqual(dict(c2_outputs), expected)
 
+        with assert_warning(UserWarning, msg):
+            c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
+            self.assertEqual(dict(c2_outputs), expected)
+
     def test_list_inputs(self):
         self.prob.run_model()
 

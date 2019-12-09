@@ -446,8 +446,9 @@ class ImplicitComponent(Component):
             return [name for name in self._outputs._names] + \
                    [name for name in self._var_allprocs_discrete['output']]
         else:
-            # setup has not been performed, return relative names for this system
-            return [name for name in self._var_rel_names['output']]
+            # setup has not been performed, return relative names for this system only
+            return [name for name in self._var_rel_names['output']] + \
+                   [name for name in self._var_discrete['output']]
 
     def _list_states_allprocs(self):
         """

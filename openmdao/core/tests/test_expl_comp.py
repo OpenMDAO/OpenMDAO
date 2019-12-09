@@ -12,7 +12,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
     TestExplCompSimpleDense
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import printoptions
 
 
@@ -192,6 +192,58 @@ class ExplCompTestCase(unittest.TestCase):
         model.connect('p2.y', 'comp.y')
 
         prob.setup()
+
+        # list outputs before model has been run will raise an exception
+        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
+        try:
+            prob.model.list_outputs()
+        except Exception as err:
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail("Exception expected")
+
+        # list_inputs on a component before run is okay, but filters are ignored
+        expl_inputs = prob.model.comp.list_inputs(out_stream=None)
+        expected = {
+            'x': {'value': 0.},
+            'y': {'value': 0.}
+        }
+        self.assertEqual(dict(expl_inputs), expected)
+
+        msg = "{}: list_inputs called before model has been run. Filters are ignored."
+        msg = msg.format(prob.model.comp.msginfo)
+
+        with assert_warning(UserWarning, msg):
+            c2_inputs = prob.model.comp.list_inputs(includes='x', out_stream=None)
+            self.assertEqual(dict(expl_inputs), expected)
+
+        with assert_warning(UserWarning, msg):
+            c2_inputs = prob.model.comp.list_inputs(excludes='x', out_stream=None)
+            self.assertEqual(dict(expl_inputs), expected)
+
+        # list_outputs on a component before run is okay, but filters are ignored
+        expl_outputs = prob.model.p1.list_outputs(out_stream=None)
+        expected = {
+            'x': {'value': 12.}
+        }
+        self.assertEqual(dict(expl_outputs), expected)
+
+        msg = "{}: list_outputs called before model has been run. Filters are ignored."
+        msg = msg.format(prob.model.p1.msginfo)
+
+        with assert_warning(UserWarning, msg):
+            c2_outputs = prob.model.p1.list_outputs(includes='x', out_stream=None)
+            self.assertEqual(dict(expl_outputs), expected)
+
+        with assert_warning(UserWarning, msg):
+            c2_outputs = prob.model.p1.list_outputs(excludes='x', out_stream=None)
+            self.assertEqual(dict(expl_outputs), expected)
+
+        with assert_warning(UserWarning, msg):
+            c2_outputs = prob.model.p1.list_outputs(residuals_tol=.01, out_stream=None)
+            self.assertEqual(dict(expl_outputs), expected)
+
+        # run model
         prob.set_solver_print(level=0)
         prob.run_model()
 

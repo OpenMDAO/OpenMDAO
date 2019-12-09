@@ -3177,8 +3177,8 @@ class System(object):
                 simple_warning(msg.format(self.msginfo))
 
             meta = self._var_rel2meta
-            var_names = self._var_rel_names['input']
-            abs2prom = dict()
+            var_names = self._var_rel_names['input'] + list(self._var_discrete['input'].keys())
+            abs2prom = None
         else:
             # Only gathering up values and metadata from this proc, if MPI
             meta = self._var_abs2meta
@@ -3211,7 +3211,7 @@ class System(object):
 
             inputs.append((var_name, var_meta))
 
-        if self._discrete_inputs:
+        if self._inputs is not None and self._discrete_inputs:
             disc_meta = self._discrete_inputs._dict
 
             for var_name, val in iteritems(self._discrete_inputs):
@@ -3228,7 +3228,7 @@ class System(object):
                 if values:
                     var_meta['value'] = val
                 if prom_name:
-                    var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                    var_meta['prom_name'] = abs2prom[var_name]
                 # remaining items do not apply for discrete vars
                 if units:
                     var_meta['units'] = ''
@@ -3327,13 +3327,13 @@ class System(object):
                 raise RuntimeError("{}: Unable to list outputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
-            if (includes or excludes):
+            if (includes or excludes or residuals_tol):
                 msg = "{}: list_outputs called before model has been run. Filters are ignored."
                 simple_warning(msg.format(self.msginfo))
 
             meta = self._var_rel2meta
-            var_names = self._var_rel_names['output']
-            abs2prom = dict()
+            var_names = self._var_rel_names['output'] + list(self._var_discrete['output'].keys())
+            abs2prom = None
         else:
             # Only gathering up values and metadata from this proc, if MPI
             meta = self._var_abs2meta
@@ -3386,7 +3386,7 @@ class System(object):
             else:
                 expl_outputs.append((var_name, var_meta))
 
-        if self._discrete_outputs and not residuals_tol:
+        if self._outputs is not None and self._discrete_outputs and not residuals_tol:
             disc_meta = self._discrete_outputs._dict
 
             for var_name, val in iteritems(self._discrete_outputs):
