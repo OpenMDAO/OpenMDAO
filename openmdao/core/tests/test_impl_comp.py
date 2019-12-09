@@ -185,6 +185,14 @@ class ImplicitCompTestCase(unittest.TestCase):
         del expected['c']
         self.assertEqual(dict(c2_inputs), expected)
 
+        # specifying prom_name should not cause an error
+        c2_inputs = self.prob.model.comp2.list_inputs(prom_name=True, out_stream=None)
+        self.assertEqual(dict(c2_inputs), {
+            'a': {'value': [1.], 'prom_name': 'a'},
+            'b': {'value': [1.], 'prom_name': 'b'},
+            'c': {'value': [1.], 'prom_name': 'c'}
+        })
+
     def test_list_outputs_before_run(self):
         # cannot list_outputs on a Group before running
         msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
@@ -216,6 +224,12 @@ class ImplicitCompTestCase(unittest.TestCase):
         # specifying residuals_tol should not cause an error
         c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
         self.assertEqual(dict(c2_outputs), expected)
+
+        # specifying prom_name should not cause an error
+        c2_outputs = self.prob.model.comp2.list_outputs(prom_name=True, out_stream=None)
+        self.assertEqual(dict(c2_outputs), {
+            'x': {'value': 0., 'prom_name': 'x'}
+        })
 
     def test_list_inputs(self):
         self.prob.run_model()

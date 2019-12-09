@@ -240,7 +240,7 @@ class DiscreteTestCase(unittest.TestCase):
         prob.setup()
 
         #
-        # list vars before model has been run, using relative names
+        # list vars before model has been run (relative names)
         #
         expl_inputs = prob.model.expl.list_inputs(out_stream=None)
         expected = {

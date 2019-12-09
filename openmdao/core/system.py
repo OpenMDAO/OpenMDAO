@@ -3176,7 +3176,7 @@ class System(object):
             # this is a component; use relative names, including discretes
             meta = self._var_rel2meta
             var_names = self._var_rel_names['input'] + list(self._var_discrete['input'].keys())
-            abs2prom = None
+            abs2prom = {}
         else:
             # final setup has been performed
             # use absolute names, discretes handled separately
@@ -3335,7 +3335,7 @@ class System(object):
             # this is a component; use relative names, including discretes
             meta = self._var_rel2meta
             var_names = self._var_rel_names['output'] + list(self._var_discrete['output'].keys())
-            abs2prom = None
+            abs2prom = {}
         else:
             # final setup has been performed
             # use absolute names, discretes handled separately
@@ -3372,7 +3372,7 @@ class System(object):
             var_meta = {}
             if values:
                 var_meta['value'] = val
-            if prom_name and var_name in abs2prom:
+            if prom_name:
                 var_meta['prom_name'] = var_name_prom
             if residuals and self._residuals:
                 var_meta['resids'] = self._residuals._views[var_name]

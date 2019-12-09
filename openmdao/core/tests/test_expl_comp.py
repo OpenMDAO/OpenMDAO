@@ -216,6 +216,13 @@ class ExplCompTestCase(unittest.TestCase):
         expl_inputs = prob.model.comp.list_inputs(excludes='x', out_stream=None)
         self.assertEqual(dict(expl_inputs), {'y': {'value': 0.}})
 
+        # specifying prom_name should not cause an error
+        expl_inputs = prob.model.comp.list_inputs(prom_name=True, out_stream=None)
+        self.assertEqual(dict(expl_inputs), {
+            'x': {'value': 0., 'prom_name': 'x'},
+            'y': {'value': 0., 'prom_name': 'y'},
+        })
+
         # list_outputs on a component before run is okay, using relative names
         expl_outputs = prob.model.p1.list_outputs(out_stream=None)
         expected = {
@@ -229,8 +236,15 @@ class ExplCompTestCase(unittest.TestCase):
         expl_outputs = prob.model.p1.list_outputs(excludes='x', out_stream=None)
         self.assertEqual(dict(expl_outputs), {})
 
+        # specifying residuals_tol should not cause an error
         expl_outputs = prob.model.p1.list_outputs(residuals_tol=.01, out_stream=None)
         self.assertEqual(dict(expl_outputs), expected)
+
+        # specifying prom_name should not cause an error
+        expl_outputs = prob.model.p1.list_outputs(prom_name=True, out_stream=None)
+        self.assertEqual(dict(expl_outputs), {
+            'x': {'value': 12., 'prom_name': 'x'}
+        })
 
         # run model
         prob.set_solver_print(level=0)
