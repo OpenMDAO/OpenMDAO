@@ -11,6 +11,7 @@ from openmdao.utils.mpi import MPI
 # set DEBUG to True if you want to view the generated HTML file(s)
 DEBUG = False
 
+# Test model derived from one contributed by Anil Yildirim at U-Mich MDO lab
 class myComp(om.ExplicitComponent):
     def initialize(self):
         self.options['distributed'] = True
