@@ -597,25 +597,24 @@ _allowed_types = {
 }
 
 
-def _list_types_setup_parser(parser):
+def _list_installed_setup_parser(parser):
     """
-    Set up the openmdao subparser for the 'openmdao list_types' command.
+    Set up the openmdao subparser for the 'openmdao list_installed' command.
 
     Parameters
     ----------
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('-t', '--type', action='append', default=[], dest='types',
-                        help='List these types of classes.  Allowed types are {}.'
-                        .format(sorted(_allowed_types)))
+    parser.add_argument('types', nargs='*', help='List these types of installed classes. '
+                        'Allowed types are {}.'.format(sorted(_allowed_types)))
     parser.add_argument('-d', '--docs', action='store_true', dest='show_docs',
                         help="Display the class docstrings.")
 
 
-def _list_types_cmd(options, user_args):
+def _list_installed_cmd(options, user_args):
     """
-    Run the `openmdao list_types` command.
+    Run the `openmdao list_installed` command.
 
     Parameters
     ----------
@@ -633,27 +632,30 @@ def _list_types_cmd(options, user_args):
         print("You must install pkg_resources in order to use this command.")
         sys.exit(0)
 
+    if not options.types:
+        options.types = list(_allowed_types)
+
     for type_ in options.types:
         if type_ not in _allowed_types:
             raise RuntimeError("Type '{}' is not a valid type.  Try one of {}."
                                .format(type_, sorted(_allowed_types)))
-        print("Installed classes in the {} entry point group:\n".format(_allowed_types[type_]))
+        print("Installed {} types:\n".format(type_))
         epdict = {}
         cwid = 0
         for ep in pkg_resources.iter_entry_points(group=_allowed_types[type_]):
             klass = ep.load()
-            epdict[klass.__name__] = klass
+            epdict[klass.__name__] = (klass.__module__, klass.__doc__)
             if len(klass.__name__) > cwid:
                 cwid = len(klass.__name__)
 
         if epdict:
             print("  {:<{cwid}} {}".format('Class Name', 'Module', cwid=cwid))
             print("  {:<{cwid}} {}".format('----------', '------', cwid=cwid))
-        for cname, klass in sorted(epdict.items(), key=lambda x: x[0]):
-            line = "  {:<{cwid}} ({})".format(cname, klass.__module__, cwid=cwid)
+        for cname, (mod, doc) in sorted(epdict.items(), key=lambda x: x[1][0]+x[0]):
+            line = "  {:<{cwid}} ({})".format(cname, mod, cwid=cwid)
             print(line)
-            if options.show_docs and klass.__doc__:
-                print(klass.__doc__)
+            if options.show_docs and doc:
+                print(doc)
 
         print()
 
@@ -671,7 +673,7 @@ _command_map = {
               'Profile calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
                      'Generate total timings of calls to particular object instances.'),
-    'list_types': (_list_types_setup_parser, _list_types_cmd, 'List installed types.'),
+    'list_installed': (_list_installed_setup_parser, _list_installed_cmd, 'List installed types.'),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec,
             'Profile memory used by OpenMDAO related functions.'),
     'mempost': (_mempost_setup_parser, _mempost_exec, 'Post-process memory profile output.'),
