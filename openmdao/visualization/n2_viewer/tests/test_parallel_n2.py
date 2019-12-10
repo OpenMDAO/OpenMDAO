@@ -8,7 +8,7 @@ import openmdao.api as om
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.utils.mpi import MPI
 
-# set DEBUG to True if you want to view the generated HTML file(s)
+# set DEBUG to True if you want to view the generated HTML file
 DEBUG = False
 
 # Test model derived from one contributed by Anil Yildirim at U-Mich MDO lab
