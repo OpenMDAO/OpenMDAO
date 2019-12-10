@@ -1703,7 +1703,6 @@ class TestProblem(unittest.TestCase):
         assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'),
                          np.array([[100, 200, 300], [0, -1, -2]]).T)
 
-
     def test_feature_system_configure(self):
         import openmdao.api as om
 
