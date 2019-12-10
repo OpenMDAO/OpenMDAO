@@ -1,6 +1,7 @@
 import unittest
 import subprocess
 import os
+import sys
 
 import openmdao.test_suite.scripts
 
@@ -22,7 +23,7 @@ class TestCircuitWithUnconnectedInputScript(unittest.TestCase):
         script_path = os.path.join(os.path.dirname(openmdao.test_suite.scripts.__file__),
                               'circuit_with_unconnected_input.py')
 
-        output = self._run_command('python {}'.format(script_path))
+        output = self._run_command('{} {}'.format(sys.executable, script_path))
 
         self.assertTrue('The following inputs are not connected' in output,
                         msg="Should have gotten error about unconnected input")

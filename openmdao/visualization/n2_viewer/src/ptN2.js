@@ -7,3 +7,4 @@ let enterIndex = 0,
 let n2Diag = new N2Diagram(modelData);
 let n2MouseFuncs = n2Diag.getMouseFuncs();
 n2Diag.update(false);
+
