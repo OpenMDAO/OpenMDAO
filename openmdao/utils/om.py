@@ -651,7 +651,7 @@ def _list_installed_cmd(options, user_args):
         if epdict:
             print("  {:<{cwid}} {}".format('Class Name', 'Module', cwid=cwid))
             print("  {:<{cwid}} {}".format('----------', '------', cwid=cwid))
-        for cname, (mod, doc) in sorted(epdict.items(), key=lambda x: x[1][0]+x[0]):
+        for cname, (mod, doc) in sorted(epdict.items(), key=lambda x: x[1][0] + x[0]):
             line = "  {:<{cwid}} ({})".format(cname, mod, cwid=cwid)
             print(line)
             if options.show_docs and doc:
