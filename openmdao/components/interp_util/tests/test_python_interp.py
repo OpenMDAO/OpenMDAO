@@ -6,10 +6,9 @@ from copy import deepcopy
 import unittest
 
 import numpy as np
-from numpy.testing import assert_array_almost_equal, assert_allclose
 
-from openmdao.components.structured_metamodel_util.python_interp import PythonGridInterp
-from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
+from openmdao.components.interp_util.python_interp import PythonGridInterp
+from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
 
 def rel_error(actual, computed):
@@ -127,6 +126,17 @@ class TestPythonGridInterpolator(unittest.TestCase):
             #print(method, computed, actual, r_err)
             assert r_err < self.tol[method]
 
+    def test_spline_xi3d_akima_delta_x(self):
+        points, values, func, df = self. _get_sample_2d()
+        np.random.seed(1)
+        test_pt = np.random.uniform(0, 3, 6).reshape(3, 2)
+        actual = func(*test_pt.T)
+        interp = PythonGridInterp(points, values, 'akima', delta_x=0.01)
+        computed = interp.interpolate(test_pt)
+        r_err = rel_error(actual, computed)
+        #print('akima', computed, actual, r_err)
+        assert r_err < self.tol['akima']
+
     def test_NaN_exception(self):
         np.random.seed(1234)
         x = np.linspace(0, 2, 5)
@@ -196,6 +206,13 @@ class TestPythonGridInterpolator(unittest.TestCase):
 
         methods = set(interp._interp_methods()[0])
         self.assertEqual(methods, set(["cubic", "slinear", 'lagrange2', 'lagrange3', 'akima']))
+
+        with self.assertRaises(KeyError) as cm:
+            interp = PythonGridInterp(points, values.tolist(), interp_method="slinear",
+                                      bad_arg=1)
+
+        msg = ("\"InterpLinear: Option 'bad_arg' cannot be set because it has not been declared.")
+        self.assertTrue(str(cm.exception).startswith(msg))
 
 
 if __name__ == "__main__":

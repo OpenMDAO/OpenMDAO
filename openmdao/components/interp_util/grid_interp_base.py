@@ -3,7 +3,7 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 
-from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
+from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
 
 class GridInterpBase(object):
