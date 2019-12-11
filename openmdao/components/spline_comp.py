@@ -35,6 +35,8 @@ class SplineComp(InterpBase):
 
         super(SplineComp, self).add_input(name=self.options['x_interp_name'],
                                           val=self.options['x_interp'])
+        super(SplineComp, self).add_input(name=self.options['x_cp_name'],
+                                          val=self.options['x_cp_val'])
 
         self.pnames.append(self.options['x_interp_name'])
         self.params.append(np.asarray(self.options['x_cp_val']))
@@ -90,5 +92,7 @@ class SplineComp(InterpBase):
 
         super(SplineComp, self).add_output(y_interp_name, 1.0 * np.ones(self.options['vec_size']),
                                            units=y_units)
+        super(SplineComp, self).add_input(name=y_cp_name,
+                                          val=y_cp_val)
 
         self.training_outputs[y_interp_name] = y_cp_val
