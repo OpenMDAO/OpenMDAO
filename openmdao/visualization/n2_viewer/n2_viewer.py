@@ -368,12 +368,13 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
         is assumed.
 
     """
+    # grab the model viewer data
+    model_data = _get_viewer_data(data_source)
+
     # if MPI is active only display one copy of the viewer
     if MPI and MPI.COMM_WORLD.rank != 0:
         return
 
-    # grab the model viewer data
-    model_data = _get_viewer_data(data_source)
     options = {'use_declare_partial_info': use_declare_partial_info}
     model_data['options'] = options
 
