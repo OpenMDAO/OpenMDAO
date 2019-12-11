@@ -48,6 +48,8 @@ def dv_abs_smooth_complex(x, x_deriv, delta_x):
         Input array, used for determining which elements to negate.
     x_deriv : ndarray
         Incoming partial derivative array, may have one additional dimension.
+    delta_x : float
+        Half width of the rounded section.
 
     Returns
     -------
@@ -114,6 +116,7 @@ class InterpAkima(InterpTableBase):
     """
     Interpolate using an Akima polynomial.
     """
+
     def __init__(self, grid, values, interp, **kwargs):
         """
         Initialize table and subtables.
@@ -130,7 +133,6 @@ class InterpAkima(InterpTableBase):
             Interpolator-specific options to pass onward.
         """
         super(InterpAkima, self).__init__(grid, values, interp, **kwargs)
-        self.second_derivs = None
 
     def initialize(self):
         """
