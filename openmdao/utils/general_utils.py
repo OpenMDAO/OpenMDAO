@@ -11,10 +11,13 @@ import unittest
 from fnmatch import fnmatchcase
 from six import string_types, PY2, reraise
 from six.moves import range, cStringIO as StringIO
+
+# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
 try:
     from collections.abc import Iterable
 except ImportError:
     from collections import Iterable
+
 import numbers
 import json
 import importlib
@@ -739,7 +742,7 @@ def remove_whitespace(s, right=False, left=False):
     if not left and not right:
         return re.sub(r"\s+", "", s, flags=re.UNICODE)
     elif right and left:
-        return re.sub("^\s+|\s+$", "", s, flags=re.UNICODE)
+        return re.sub(r"^\s+|\s+$", "", s, flags=re.UNICODE)
     elif right:
         return re.sub(r"\s+$", "", s, flags=re.UNICODE)
     else:  # left

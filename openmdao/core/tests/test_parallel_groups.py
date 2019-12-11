@@ -5,6 +5,12 @@ from __future__ import division, print_function
 import unittest
 import itertools
 
+# note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
+
 import numpy as np
 
 import openmdao.api as om
@@ -39,11 +45,14 @@ class Noisy(ConvergeDiverge):
 def _test_func_name(func, num, param):
     args = []
     for p in param.args:
-        try:
-            arg = p.__name__
-        except:
-            arg = str(p)
-        args.append(arg)
+        if not isinstance(p, Iterable):
+            p = {p}
+        for item in p:
+            try:
+                arg = item.__name__
+            except:
+                arg = str(item)
+            args.append(arg)
     return func.__name__ + '_' + '_'.join(args)
 
 

@@ -374,8 +374,8 @@ class N2MatrixCell {
         this.renderer = this._newRenderer();
 
         this.offScreen = {
-            'top': { 'incoming': [], 'outgoing': []},
-            'bottom': { 'incoming': [], 'outgoing': []},
+            'top': { 'incoming': new Set(), 'outgoing': new Set() },
+            'bottom': { 'incoming': new Set(), 'outgoing': new Set() },
             'total': 0
         }
     }
@@ -430,12 +430,12 @@ class N2MatrixCell {
             if (srcNode.rootIndex < tgtNode.rootIndex) {
                 // Top
                 debugInfo("New offscreen outgoing connection on top" + debugStr);
-                this.offScreen.top.outgoing.push(tgtNode);
+                this.offScreen.top.outgoing.add(tgtNode);
             }
             else {
                 // Bottom
                 debugInfo("New offscreen outgoing connection on bottom" + debugStr);
-                this.offScreen.bottom.outgoing.push(tgtNode);
+                this.offScreen.bottom.outgoing.add(tgtNode);
             }
         }
         else {
@@ -443,12 +443,12 @@ class N2MatrixCell {
             if (srcNode.rootIndex < tgtNode.rootIndex) {
                 // Top
                 debugInfo("New offscreen incoming connection on top" + debugStr);
-                this.offScreen.top.incoming.push(srcNode);
+                this.offScreen.top.incoming.add(srcNode);
             }
             else {
                 // Bottom
                 debugInfo("New offscreen incoming connection on bottom" + debugStr);
-                this.offScreen.bottom.incoming.push(srcNode);
+                this.offScreen.bottom.incoming.add(srcNode);
             }
         }
 

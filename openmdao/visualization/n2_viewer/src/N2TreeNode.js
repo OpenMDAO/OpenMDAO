@@ -20,6 +20,7 @@ class N2TreeNode {
         Object.assign(this, origNode);
 
         // From old ClearConnections():
+        this.sourceParentSet = new Set();
         this.targetParentSet = new Set();
 
         // Solver names may be empty, so set them to "None" instead.
@@ -93,6 +94,16 @@ class N2TreeNode {
     /** True is this.type is 'subsystem' */
     isSubsystem() {
         return (this.type == 'subsystem');
+    }
+
+    /** Not connectable if this is a param group, or parents are minimized,
+     * or this is a minimized variable that was split by a colon.
+     */
+    isConnectable() {
+        if (this.isParamOrUnknown() && !(this.hasChildren() ||
+            this.parent.isMinimized || this.parentComponent.isMinimized)) return true;
+    
+        return (this.isMinimized && !this.splitByColon);
     }
 
     /**

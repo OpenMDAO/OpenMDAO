@@ -272,3 +272,13 @@ body {
   background-color: #fff;
   border: solid 1px #dfdfdf;   
 }
+
+div.offgrid {
+  z-index: 10;
+  font-size: 11px;
+  padding: 5;
+  background-color: #fff;
+  border: solid 1px #dfdfdf;
+  position: absolute;
+  opacity: 0.7;
+}
