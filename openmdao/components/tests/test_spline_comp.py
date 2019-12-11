@@ -88,7 +88,7 @@ def my_test_func():
 
     prob = om.Problem()
 
-    comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp=x, vec_size=n, interp_options={'delta_x': 0.0})
+    comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp=x, vec_size=n, interp_options={'delta_x': 0.10})
 
     comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=y_cp, y_units='km')
     # comp.add_spline(y_cp_name='ycp2', y_interp_name='y_val2', y_cp_val=y_cp2)
