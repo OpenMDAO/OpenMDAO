@@ -225,6 +225,24 @@ class Component(System):
                                                                 self._approx_schemes):
             raise RuntimeError("%s: num_par_fd is > 1 but no FD is active." % self.msginfo)
 
+        self._static_mode = True
+
+        if self.options['distributed']:
+            if self._distributed_vector_class is not None:
+                self._vector_class = self._distributed_vector_class
+            else:
+                simple_warning("The 'distributed' option is set to True for Component %s, "
+                               "but there is no distributed vector implementation (MPI/PETSc) "
+                               "available. The default non-distributed vectors will be used."
+                               % pathname)
+                self._vector_class = self._local_vector_class
+        else:
+            self._vector_class = self._local_vector_class
+
+    def _post_configure(self):
+        """
+        Do any remaining setup that had to wait until after final user configuration.
+        """
         # check here if declare_coloring was called during setup but declare_partials
         # wasn't.  If declare partials wasn't called, call it with of='*' and wrt='*' so we'll
         # have something to color.
@@ -239,19 +257,7 @@ class Component(System):
                                "using default metadata and method='%s'." % (self.msginfo, method))
                 self.declare_partials('*', '*', method=method)
 
-        self._static_mode = True
-
-        if self.options['distributed']:
-            if self._distributed_vector_class is not None:
-                self._vector_class = self._distributed_vector_class
-            else:
-                simple_warning("The 'distributed' option is set to True for Component %s, "
-                               "but there is no distributed vector implementation (MPI/PETSc) "
-                               "available. The default non-distributed vectors will be used."
-                               % pathname)
-                self._vector_class = self._local_vector_class
-        else:
-            self._vector_class = self._local_vector_class
+        super(Component, self)._post_configure()
 
     def _setup_var_data(self, recurse=True):
         """
@@ -310,7 +316,8 @@ class Component(System):
                 abs2prom[type_][abs_name] = prom_name
 
                 # Compute allprocs_discrete (metadata for discrete vars)
-                self._var_allprocs_discrete[type_][abs_name] = val
+                self._var_allprocs_discrete[type_][abs_name] = v = val.copy()
+                del v['value']
 
         self._var_allprocs_abs2prom = abs2prom
 

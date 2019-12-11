@@ -3,6 +3,8 @@ import weakref
 
 from openmdao.utils.mpi import MPI
 
+_norec_funcs = frozenset(['_run_apply', '_compute_totals'])
+
 
 class _RecIteration(object):
     """
@@ -25,6 +27,7 @@ class _RecIteration(object):
         """
         self.stack = []
         self.prefix = None
+        self._norec_refcount = 0
 
     def print_recording_iteration_stack(self):
         """
@@ -57,24 +60,34 @@ class _RecIteration(object):
             prefix = 'rank{}:'.format(rank)
 
         return prefix + '|'.join('|'.join((name, str(iter_count)))
-                                          for name, iter_count in self.stack)
+                                 for name, iter_count in self.stack)
 
+    def push(self, iter_coord):
+        """
+        Push the current iteration coordinate onto the stack.
 
-def get_iteration_coord_parent(iter_coord):
-    """
-    Given an iteration coordinate string, return its parent as a string.
+        Parameters
+        ----------
+        iter_coord : tuple
+            (func_name, iter_count) for the current iteration.
+        """
+        self.stack.append(iter_coord)
+        if iter_coord[0] in _norec_funcs:
+            self._norec_refcount += 1
 
-    Parameters
-    ----------
-    iter_coord : str
-        The iteration coordinate.
+    def pop(self):
+        """
+        Pop the current iteration coordinate off of the stack.
 
-    Returns
-    -------
-    str
-        The iteration coordinate of the parent.
-    """
-    return iter_coord.rsplit('|', 1)[0]
+        Returns
+        -------
+        tuple
+            (function_name, iter_count) for current iteration.
+        """
+        iter_coord = self.stack.pop()
+        if iter_coord[0] in _norec_funcs:
+            self._norec_refcount -= 1
+        return iter_coord
 
 
 class Recording(object):
@@ -133,7 +146,7 @@ class Recording(object):
         self : object
             self
         """
-        self.recording_requester()._recording_iter.stack.append((self.name, self.iter_count))
+        self.recording_requester()._recording_iter.push((self.name, self.iter_count))
         return self
 
     def __exit__(self, *args):
@@ -146,14 +159,7 @@ class Recording(object):
             Solver recording requires extra args.
         """
         requester = self.recording_requester()
-        stack = requester._recording_iter.stack
-
-        # Determine if recording is justified.
-        for stack_item in stack:
-            if stack_item[0] in ('_run_apply', '_compute_totals'):
-                do_recording = False
-                break
-        else:
+        if requester._recording_iter._norec_refcount == 0:
             if self._is_solver:
                 requester.record_iteration(abs=self.abs, rel=self.rel)
             else:
@@ -162,4 +168,21 @@ class Recording(object):
         # Enable the following line for stack debugging.
         # print_recording_iteration_stack()
 
-        stack.pop()
+        requester._recording_iter.pop()
+
+
+def get_iteration_coord_parent(iter_coord):
+    """
+    Given an iteration coordinate string, return its parent as a string.
+
+    Parameters
+    ----------
+    iter_coord : str
+        The iteration coordinate.
+
+    Returns
+    -------
+    str
+        The iteration coordinate of the parent.
+    """
+    return iter_coord.rsplit('|', 1)[0]

@@ -742,7 +742,7 @@ def remove_whitespace(s, right=False, left=False):
     if not left and not right:
         return re.sub(r"\s+", "", s, flags=re.UNICODE)
     elif right and left:
-        return re.sub("^\s+|\s+$", "", s, flags=re.UNICODE)
+        return re.sub(r"^\s+|\s+$", "", s, flags=re.UNICODE)
     elif right:
         return re.sub(r"\s+$", "", s, flags=re.UNICODE)
     else:  # left
@@ -793,12 +793,12 @@ def make_serializable(o):
     """
     if isinstance(o, _container_classes):
         return [make_serializable(item) for item in o]
+    elif isinstance(o, np.ndarray):
+        return o.tolist()
     elif isinstance(o, np.number):
         return o.item()
-    elif isinstance(o, np.ndarray):
-        return make_serializable(o.tolist())
     elif hasattr(o, '__dict__'):
-        return make_serializable(o.__class__.__name__)
+        return o.__class__.__name__
     else:
         return o
 
@@ -834,16 +834,16 @@ def make_set(str_data, name=None):
         raise TypeError("The argument should be str, set, or list: {}".format(str_data))
 
 
-def var_name_match_includes_excludes(name, prom_name, includes, excludes):
+def match_includes_excludes(name, prom_name, includes, excludes):
     """
-    Check to see if the name passes thru the includes and excludes filter.
+    Check to see if the variable names pass through the includes and excludes filter.
 
     Parameters
     ----------
     name : str
-        Unpromoted var name to be checked for match.
+        Unpromoted variable name to be checked for match.
     prom_name : str
-        Promoted var name to be checked for match.
+        Promoted variable name to be checked for match.
     includes : None or list_like
         List of glob patterns for name to include in the filtering.
     excludes : None or list_like
@@ -874,17 +874,18 @@ def var_name_match_includes_excludes(name, prom_name, includes, excludes):
     return True
 
 
-def excludes_filter(name_iter, excludes):
-    for name in name_iter:
-        for pattern in excludes:
-            if fnmatchcase(name, pattern):
-                break
-        else:
-            yield name
+def env_truthy(env_var):
+    """
+    Return True if the given environment variable is 'truthy'.
 
+    Parameters
+    ----------
+    env_var : str
+        The name of the environment variable.
 
-def includes_filter(name_iter, includes):
-    for name in name_iter:
-        for pattern in includes:
-            if fnmatchcase(name, pattern):
-                yield name
+    Returns
+    -------
+    bool
+        True if the specified environment variable is 'truthy'.
+    """
+    return os.environ.get(env_var, '0').lower() not in ('0', 'false', 'no', '')

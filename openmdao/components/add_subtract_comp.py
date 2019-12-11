@@ -165,10 +165,13 @@ class AddSubtractComp(ExplicitComponent):
         raise NotImplementedError(self.msginfo + ': Use add_equation method, not add_output '
                                   'method to create an addition/subtraction relation')
 
-    def setup(self):
+    def _post_configure(self):
         """
         Set up the addition/subtraction system at run time.
         """
+        # set static mode to False because we are doing things that would normally be done in setup
+        self._static_mode = False
+
         for (output_name, input_names, vec_size, length, val,
              scaling_factors, kwargs) in self._add_systems:
             if isinstance(input_names, string_types):
@@ -196,6 +199,10 @@ class AddSubtractComp(ExplicitComponent):
                 sf = scaling_factors[i]
                 self.declare_partials([output_name], [input_name],
                                       val=sf * sp.eye(vec_size * length, format='csc'))
+
+        self._static_mode = True
+
+        super(AddSubtractComp, self)._post_configure()
 
     def compute(self, inputs, outputs):
         """

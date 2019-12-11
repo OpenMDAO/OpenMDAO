@@ -193,7 +193,7 @@ def deserialize(json_data, abs2meta):
 
     for name, value in iteritems(values):
         if isinstance(value, list) and 'shape' in abs2meta[name]:
-            values[name] = np.resize(np.array(value), abs2meta[name]['shape'])
+            values[name] = np.asarray(value)  # array will be proper shape based on list structure
         else:
             all_array = False
 

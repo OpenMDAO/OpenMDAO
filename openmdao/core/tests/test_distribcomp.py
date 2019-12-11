@@ -76,7 +76,7 @@ class DistribCompSimple(om.ExplicitComponent):
 
 
 class DistribInputComp(om.ExplicitComponent):
-    """Uses 2 procs and takes input var slices"""
+    """Uses all procs and takes input var slices"""
 
     def initialize(self):
         self.options['distributed'] = True
@@ -171,12 +171,28 @@ class DistribInputDistribOutputComp(om.ExplicitComponent):
         arr_size = self.options['arr_size']
 
         sizes, offsets = evenly_distrib_idxs(comm.size, arr_size)
+        self.sizes = sizes
+        self.offsets = offsets
+
         start = offsets[rank]
         end = start + sizes[rank]
 
         self.add_input('invec', np.ones(sizes[rank], float),
                        src_indices=np.arange(start, end, dtype=int))
         self.add_output('outvec', np.ones(sizes[rank], float))
+
+
+class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
+
+    def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+        super(DistribInputDistribOutputDiscreteComp, self).compute(inputs, outputs)
+        discrete_outputs['disc_out'] = discrete_inputs['disc_in'] + 'bar'
+
+    def setup(self):
+        super(DistribInputDistribOutputDiscreteComp, self).setup()
+        self.add_discrete_input('disc_in', 'foo')
+        self.add_discrete_output('disc_out', 'foobar')
+
 
 
 class DistribNoncontiguousComp(om.ExplicitComponent):
@@ -427,16 +443,28 @@ class MPITests(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
-        C1._inputs['invec'] = np.array(range(size, 0, -1), float)
+        input_vec = np.array(range(size, 0, -1), float)
+        C1._inputs['invec'] = input_vec
+
+        # C1 (an InOutArrayComp) doubles the input_vec
+        check_vec = input_vec * 2
 
         p.run_model()
 
-        self.assertTrue(all(C2._outputs['outvec'][:4] == np.array(range(size, 0, -1), float)[:4]*4))
-        self.assertTrue(all(C2._outputs['outvec'][8:] == np.array(range(size, 0, -1), float)[8:]*4))
+        np.testing.assert_allclose(C2._outputs['outvec'][:4], check_vec[:4]*2)
+        np.testing.assert_allclose(C2._outputs['outvec'][8:], check_vec[8:]*2)
 
         # overlapping part should be double size of the rest
-        self.assertTrue(all(C2._outputs['outvec'][4:8] ==
-                            np.array(range(size, 0, -1), float)[4:8]*8))
+        np.testing.assert_allclose(C2._outputs['outvec'][4:8], check_vec[4:8]*4)
+
+        np.testing.assert_allclose(p.get_val('C2.invec', get_remote=True),
+                                   np.hstack((check_vec[0:8], check_vec[4:11])))
+
+        dist_out = p.get_val('C2.outvec', get_remote=True)
+        np.testing.assert_allclose(dist_out[:11], dist_out[11:])
+        np.testing.assert_allclose(dist_out[:4], check_vec[:4] * 2)
+        np.testing.assert_allclose(dist_out[8:11], check_vec[8:] * 2)
+        np.testing.assert_allclose(dist_out[4:8], check_vec[4:8] * 4)
 
     def test_nondistrib_gather(self):
         # regular comp --> distrib comp --> regular comp.  last comp should
@@ -544,7 +572,7 @@ class ProbRemoteTests(unittest.TestCase):
 
     N_PROCS = 4
 
-    def test_prob_getitem_err(self):
+    def test_prob_getval_dist_par(self):
         size = 3
 
         p = om.Problem()
@@ -565,23 +593,122 @@ class ProbRemoteTests(unittest.TestCase):
 
         p.run_model()
 
-        # test that getitem from Problem on a distrib var raises an exception
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C2.invec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C2.invec' is not supported.")
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C2.outvec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C2.outvec' is not supported.")
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C1.invec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C1.invec' is not supported.")
-        with self.assertRaises(Exception) as context:
-            ans = p.get_val('par.C1.outvec', get_remote=True)
-        self.assertEqual(str(context.exception),
-                         "Problem: Retrieval of the full distributed variable 'par.C1.outvec' is not supported.")
+        ans = p.get_val('par.C2.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([6, 3,3], dtype=float))
+        ans = p.get_val('par.C2.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([12, 6, 6], dtype=float))
+        ans = p.get_val('par.C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
+        ans = p.get_val('par.C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4, 2, 2], dtype=float))
+
+    def test_prob_getval_dist_par_disc(self):
+        size = 3
+
+        p = om.Problem()
+        top = p.model
+        par = top.add_subsystem('par', om.ParallelGroup())
+        C1 = par.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
+        C2 = par.add_subsystem("C2", DistribInputDistribOutputDiscreteComp(arr_size=size))
+        p.setup()
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        if C1 in p.model.par._subsystems_myproc:
+            C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float)
+            C1._discrete_inputs['disc_in'] = 'C1foo'
+
+        if C2 in p.model.par._subsystems_myproc:
+            C2._inputs['invec'] = np.array(range(C2._inputs._data.size, 0, -1), float) * 3
+            C2._discrete_inputs['disc_in'] = 'C2foo'
+
+        p.run_model()
+
+        ans = p.get_val('par.C2.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([6, 3,3], dtype=float))
+        ans = p.get_val('par.C2.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([12, 6, 6], dtype=float))
+        ans = p.get_val('par.C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([2, 1, 1], dtype=float))
+        ans = p.get_val('par.C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4, 2, 2], dtype=float))
+
+        if C1 in p.model.par._subsystems_myproc:
+            ans = p.get_val('par.C1.disc_in', get_remote=False)
+            self.assertEqual(ans, 'C1foo')
+            ans = p.get_val('par.C1.disc_out', get_remote=False)
+            self.assertEqual(ans, 'C1foobar')
+
+        if C2 in p.model.par._subsystems_myproc:
+            ans = p.get_val('par.C2.disc_in', get_remote=False)
+            self.assertEqual(ans, 'C2foo')
+            ans = p.get_val('par.C2.disc_out', get_remote=False)
+            self.assertEqual(ans, 'C2foobar')
+
+        ans = p.get_val('par.C1.disc_in', get_remote=True)
+        self.assertEqual(ans, 'C1foo')
+        ans = p.get_val('par.C2.disc_in', get_remote=True)
+        self.assertEqual(ans, 'C2foo')
+        ans = p.get_val('par.C1.disc_out', get_remote=True)
+        self.assertEqual(ans, 'C1foobar')
+        ans = p.get_val('par.C2.disc_out', get_remote=True)
+        self.assertEqual(ans, 'C2foobar')
+
+
+    def test_prob_getval_dist_disc(self):
+        size = 14
+
+        p = om.Problem()
+
+        top = p.model
+        C1 = top.add_subsystem("C1", DistribInputDistribOutputDiscreteComp(arr_size=size))
+        p.setup()
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        rank = p.comm.rank
+
+        C1._inputs['invec'] = np.array(range(C1._inputs._data.size, 0, -1), float) * (rank + 1)
+        C1._discrete_inputs['disc_in'] = 'boo'
+
+        p.run_model()
+
+        if rank == 0:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([4,3,2,1], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([8,6,4,2], dtype=float))
+        elif rank == 1:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([8,6,4,2], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([16,12,8,4], dtype=float))
+        elif rank == 2:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([9,6,3], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([18,12,6], dtype=float))
+        elif rank == 3:
+            ans = p.get_val('C1.invec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([12,8,4], dtype=float))
+            ans = p.get_val('C1.outvec', get_remote=False)
+            np.testing.assert_allclose(ans, np.array([24,16,8], dtype=float))
+
+        ans = p.get_val('C1.invec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([4,3,2,1,8,6,4,2,9,6,3,12,8,4], dtype=float))
+        ans = p.get_val('C1.outvec', get_remote=True)
+        np.testing.assert_allclose(ans, np.array([8,6,4,2,16,12,8,4,18,12,6,24,16,8], dtype=float))
+
+        ans = p.get_val('C1.disc_in', get_remote=False)
+        self.assertEqual(ans, 'boo')
+        ans = p.get_val('C1.disc_in', get_remote=True)
+        self.assertEqual(ans, 'boo')
+        ans = p.get_val('C1.disc_out', get_remote=False)
+        self.assertEqual(ans, 'boobar')
+        ans = p.get_val('C1.disc_out', get_remote=True)
+        self.assertEqual(ans, 'boobar')
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
