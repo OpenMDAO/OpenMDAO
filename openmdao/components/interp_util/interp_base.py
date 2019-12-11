@@ -16,6 +16,8 @@ class InterpTableBase(object):
         Tuple containing x grid locations for this dimension.
     last_index : integer
         Index of previous evluation, used to start search for current index.
+    options : <OptionsDictionary>
+        Dictionary with general pyoptsparse options.
     subtable : <InterpTableBase>
         Table interpolation that handles child dimensions.
     values : ndarray
