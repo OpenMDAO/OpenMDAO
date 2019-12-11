@@ -536,16 +536,16 @@ class DiscreteTestCase(unittest.TestCase):
 
         prob.setup(check=['unconnected_inputs'], logger=testlogger)
         prob.run_model()
-        
+
         expected_warning_1 = (
             "The following inputs are not connected:\n"
             "   x  (p):\n"
             "      c1.x  c1\n"
             "      c2.x  c2\n"
         )
-        
+
         self.assertTrue(testlogger.contains('warning', expected_warning_1))
-        
+
 
     def test_discrete_deriv_implicit(self):
         prob = om.Problem()
