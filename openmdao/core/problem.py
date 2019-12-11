@@ -224,10 +224,11 @@ class Problem(object):
                                        desc='Set True to record constraints and objectives at the '
                                             'problem level.')
         self.recording_options.declare('includes', types=list, default=['*'],
-                                       desc='Patterns for variables to include in recording')
+                                       desc='Patterns for variables to include in recording. \
+                                       Uses fnmatch wildcards')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                            '(processed post-includes)')
+                                            '(processed post-includes). Uses fnmatch wildcards')
 
         _setup_hooks(self)
 

@@ -374,8 +374,8 @@ class N2MatrixCell {
         this.renderer = this._newRenderer();
 
         this.offScreen = {
-            'top': { 'incoming': new Set(), 'outgoing': new Set()},
-            'bottom': { 'incoming': new Set(), 'outgoing': new Set()},
+            'top': { 'incoming': new Set(), 'outgoing': new Set() },
+            'bottom': { 'incoming': new Set(), 'outgoing': new Set() },
             'total': 0
         }
     }

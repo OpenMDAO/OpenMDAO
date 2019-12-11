@@ -697,7 +697,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
             env['OPENMDAO_CURRENT_MODULE'] = module.__name__
             env['OPENMDAO_CODE_TO_RUN'] = code_to_run
 
-            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), 'python', _sub_runner],
+            p = subprocess.Popen(['mpirun', '-n', str(N_PROCS), sys.executable, _sub_runner],
                                  env=env)
             p.wait()
 
@@ -715,7 +715,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
                 with os.fdopen(fd, 'w') as tmp:
                     tmp.write(code_to_run)
                 try:
-                    p = subprocess.Popen(['python', code_to_run_path],
+                    p = subprocess.Popen([sys.executable, code_to_run_path],
                                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=os.environ)
                     output, _ = p.communicate()
                     if p.returncode != 0:
@@ -729,7 +729,7 @@ def run_code(code_to_run, path, module=None, cls=None, shows_plot=False, imports
                 env['OPENMDAO_CURRENT_MODULE'] = module.__name__
                 env['OPENMDAO_CODE_TO_RUN'] = code_to_run
 
-                p = subprocess.Popen(['python', _sub_runner],
+                p = subprocess.Popen([sys.executable, _sub_runner],
                                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
                 output, _ = p.communicate()
                 if p.returncode != 0:

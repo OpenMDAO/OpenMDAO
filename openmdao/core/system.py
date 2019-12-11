@@ -369,10 +369,11 @@ class System(object):
                                        desc='Record metadata for all sub systems in the model',
                                        default=True)
         self.recording_options.declare('includes', types=list, default=['*'],
-                                       desc='Patterns for variables to include in recording')
+                                       desc='Patterns for variables to include in recording. \
+                                       Uses fnmatch wildcards')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes)')
+                                       '(processed post-includes). Uses fnmatch wildcards')
         self.recording_options.declare('options_excludes', types=list, default=[],
                                        desc='User-defined metadata to exclude in recording')
 

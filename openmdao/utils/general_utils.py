@@ -742,7 +742,7 @@ def remove_whitespace(s, right=False, left=False):
     if not left and not right:
         return re.sub(r"\s+", "", s, flags=re.UNICODE)
     elif right and left:
-        return re.sub("^\s+|\s+$", "", s, flags=re.UNICODE)
+        return re.sub(r"^\s+|\s+$", "", s, flags=re.UNICODE)
     elif right:
         return re.sub(r"\s+$", "", s, flags=re.UNICODE)
     else:  # left
