@@ -56,8 +56,8 @@ class N2Diagram {
         this.showLinearSolverNames = true;
 
         this.style = new N2Style(this.dom.svgStyle, this.dims.size.font);
-
         this.layout = new N2Layout(this.model, this.zoomedElement, this.showLinearSolverNames, this.dims);
+        this.search = new N2Search(this.zoomedElement, this.model.root);
 
         this.ui = new N2UserInterface(this);
 
@@ -622,6 +622,7 @@ class N2Diagram {
      */
     update(computeNewTreeLayout = true) {
         this.ui.update();
+        this.search.update(this.zoomedElement, this.model.root);
 
         // Compute the new tree layout if necessary.
         if (computeNewTreeLayout) {

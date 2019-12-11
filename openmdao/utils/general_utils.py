@@ -742,7 +742,7 @@ def remove_whitespace(s, right=False, left=False):
     if not left and not right:
         return re.sub(r"\s+", "", s, flags=re.UNICODE)
     elif right and left:
-        return re.sub("^\s+|\s+$", "", s, flags=re.UNICODE)
+        return re.sub(r"^\s+|\s+$", "", s, flags=re.UNICODE)
     elif right:
         return re.sub(r"\s+$", "", s, flags=re.UNICODE)
     else:  # left
@@ -793,12 +793,12 @@ def make_serializable(o):
     """
     if isinstance(o, _container_classes):
         return [make_serializable(item) for item in o]
+    elif isinstance(o, np.ndarray):
+        return o.tolist()
     elif isinstance(o, np.number):
         return o.item()
-    elif isinstance(o, np.ndarray):
-        return make_serializable(o.tolist())
     elif hasattr(o, '__dict__'):
-        return make_serializable(o.__class__.__name__)
+        return o.__class__.__name__
     else:
         return o
 
@@ -872,3 +872,20 @@ def match_includes_excludes(name, prom_name, includes, excludes):
         return not match
 
     return True
+
+
+def env_truthy(env_var):
+    """
+    Return True if the given environment variable is 'truthy'.
+
+    Parameters
+    ----------
+    env_var : str
+        The name of the environment variable.
+
+    Returns
+    -------
+    bool
+        True if the specified environment variable is 'truthy'.
+    """
+    return os.environ.get(env_var, '0').lower() not in ('0', 'false', 'no', '')

@@ -14,7 +14,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-    SellarProblem, SellarStateConnection, SellarProblemWithArrays
+    SellarProblem, SellarStateConnection, SellarProblemWithArrays, SellarDis1, SellarDis2
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.solvers.linesearch.tests.test_backtracking import ImplCompTwoStates
 
@@ -54,6 +54,42 @@ class ParaboloidProblem(om.Problem):
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
 
+class Cycle(om.Group):
+
+    def setup(self):
+        self.add_subsystem('d1', SellarDis1())
+        self.add_subsystem('d2', SellarDis2())
+        self.connect('d1.y1', 'd2.y1')
+
+        self.nonlinear_solver = om.NonlinearBlockGS()
+        self.nonlinear_solver.options['iprint'] = 2
+        self.nonlinear_solver.options['maxiter'] = 20
+        self.linear_solver = om.DirectSolver()
+
+        # paths are relative, not absolute like for Driver and Problem
+        self.nonlinear_solver.recording_options['includes'] = ['d1*']
+        self.nonlinear_solver.recording_options['excludes'] = ['*z']
+
+class SellarMDAConnect(om.Group):
+
+    def setup(self):
+        indeps = self.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', 1.0)
+        indeps.add_output('z', np.array([5.0, 2.0]))
+
+        self.add_subsystem('cycle', Cycle())
+
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z=np.array([0.0, 0.0]), x=0.0))
+
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'))
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'))
+
+        self.connect('indeps.x', ['cycle.d1.x', 'obj_cmp.x'])
+        self.connect('indeps.z', ['cycle.d1.z', 'cycle.d2.z', 'obj_cmp.z'])
+        self.connect('cycle.d1.y1', ['obj_cmp.y1', 'con_cmp1.y1'])
+        self.connect('cycle.d2.y2', ['obj_cmp.y2', 'con_cmp2.y2'])
+
 
 @use_tempdirs
 class TestSqliteRecorder(unittest.TestCase):
@@ -69,7 +105,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -90,7 +125,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -112,7 +146,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = False
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -134,7 +167,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = False
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = []
@@ -159,7 +191,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
@@ -206,7 +237,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = False
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = []
@@ -235,7 +265,6 @@ class TestSqliteRecorder(unittest.TestCase):
         driver.options['print_results'] = False
         driver.opt_settings['ACC'] = 1e-9
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
@@ -282,7 +311,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
@@ -616,7 +644,6 @@ class TestSqliteRecorder(unittest.TestCase):
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['*']
@@ -662,7 +689,6 @@ class TestSqliteRecorder(unittest.TestCase):
         # Set up recorder after intitial setup.
         driver.add_recorder(self.recorder)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['*']
@@ -831,6 +857,94 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_data, self.eps, prefix='run_again')
+
+    def test_record_solver_includes_excludes(self):
+        prob = om.Problem()
+
+        prob.model = SellarMDAConnect()
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-8
+
+        prob.set_solver_print(level=0)
+
+        prob.model.add_design_var('indeps.x', lower=0, upper=10)
+        prob.model.add_design_var('indeps.z', lower=0, upper=10)
+        prob.model.add_objective('obj_cmp.obj')
+        prob.model.add_constraint('con_cmp1.con1', upper=0)
+        prob.model.add_constraint('con_cmp2.con2', upper=0)
+
+        prob.setup()
+
+        nl = prob.model._get_subsystem('cycle').nonlinear_solver
+        nl.add_recorder(self.recorder)
+
+        prob['indeps.x'] = 2.
+        prob['indeps.z'] = [-1., -1.]
+
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+        solver_cases = cr.list_cases('root.cycle.nonlinear_solver')
+
+        # Test values from cases
+        last_case = cr.get_case(solver_cases[-1])
+
+        self.assertEqual(sorted(last_case.inputs.keys()), ['d1.x', 'd1.y2'])
+        self.assertEqual(sorted(last_case.outputs.keys()), ['d1.y1'])
+
+        rec = om.SqliteRecorder(os.path.join(self.tempdir, "gleep.sql"), record_viewer_data=False)
+        nl.add_recorder(rec)
+
+        nl.recording_options['includes'] = ['*']
+        nl.recording_options['excludes'] = []
+        prob.setup()
+
+
+        # Make sure default includes and excludes still works
+        prob = om.Problem()
+
+        prob.model = SellarMDAConnect()
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-8
+
+        prob.set_solver_print(level=0)
+
+        prob.model.add_design_var('indeps.x', lower=0, upper=10)
+        prob.model.add_design_var('indeps.z', lower=0, upper=10)
+        prob.model.add_objective('obj_cmp.obj')
+        prob.model.add_constraint('con_cmp1.con1', upper=0)
+        prob.model.add_constraint('con_cmp2.con2', upper=0)
+
+        prob.setup()
+
+        nl = prob.model._get_subsystem('cycle').nonlinear_solver
+        # Default includes and excludes
+        nl.recording_options['includes'] = ['*']
+        nl.recording_options['excludes'] = []
+
+        filename = "sqlite2"
+        recorder = om.SqliteRecorder(filename, record_viewer_data=False)
+        nl.add_recorder(recorder)
+
+        prob['indeps.x'] = 2.
+        prob['indeps.z'] = [-1., -1.]
+
+        prob.run_driver()
+
+        cr = om.CaseReader(filename)
+        solver_cases = cr.list_cases('root.cycle.nonlinear_solver')
+
+        # Test values from cases
+        last_case = cr.get_case(solver_cases[-1])
+
+        self.assertEqual(sorted(last_case.inputs.keys()),
+                         ['d1.x', 'd1.y2', 'd1.z', 'd2.y1', 'd2.z'])
+        self.assertEqual(sorted(last_case.outputs.keys()), ['d1.y1', 'd2.y2'])
+
 
     def test_record_line_search_armijo_goldstein(self):
         prob = om.Problem()
@@ -1123,7 +1237,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         # Driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.add_recorder(self.recorder)
@@ -1433,7 +1546,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver = om.ScipyOptimizeDriver(disp=False, tol=1e-9)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_inputs'] = False
@@ -1479,7 +1591,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -1494,7 +1605,6 @@ class TestSqliteRecorder(unittest.TestCase):
 
         driver = prob.driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['includes'] = []
@@ -1688,7 +1798,6 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
 
         prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
 
@@ -1753,7 +1862,6 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         driver.options['tol'] = 1e-9
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
 
@@ -2311,6 +2419,71 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         assert_rel_error(self, objectives['obj'], case.get_objectives()['obj'], 1e-1)
         assert_rel_error(self, design_vars, case.get_design_vars(), 1e-1)
         assert_rel_error(self, constraints, case.get_constraints(), 1e-1)
+
+    def test_recorder_resetup(self):
+        vec_size = 7
+        prob = om.Problem(model=om.Group())
+
+        class _TestSys(om.Group):
+
+            def initialize(self):
+                self.options.declare('vec_size', types=int)
+
+            def setup(self):
+                nn = self.options['vec_size']
+
+                ivc = self.add_subsystem('ivc', subsys=om.IndepVarComp(), promotes_outputs=['*'])
+                ivc.add_output('x', shape=(nn,), units=None)
+
+                self.add_subsystem('mag',
+                                   subsys=om.ExecComp('y=x**2',
+                                                      y={'shape': (nn,)},
+                                                      x={'shape': (nn,)}),
+                                   promotes_inputs=['*'], promotes_outputs=['*'])
+
+                self.add_subsystem('sum',
+                                   subsys=om.ExecComp('z=sum(y)',
+                                                      y={'shape': (nn,)},
+                                                      z={'shape': (1,)}),
+                                   promotes_inputs=['*'], promotes_outputs=['*'])
+
+                self.add_design_var('x', lower=0, upper=100)
+                self.add_objective('z')
+
+        test_sys = prob.model.add_subsystem('test_sys', subsys=_TestSys(vec_size=vec_size))
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9)
+
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.driver.recording_options['includes'] = ['*y*']
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        prob.driver.recording_options['record_desvars'] = True
+
+        prob.setup()
+
+        prob.set_val('test_sys.x', np.random.rand(vec_size))
+
+        prob.run_driver()
+
+        y0 = prob.get_val('test_sys.y')
+
+        test_sys.options['vec_size'] = 10
+
+        prob.setup()
+
+        prob.set_val('test_sys.x', np.random.rand(test_sys.options['vec_size']))
+
+        prob.run_driver()
+
+        y1 = prob.get_val('test_sys.y')
+
+        case = om.CaseReader('cases.sql').get_case(-1)
+
+        y_recorded = case.get_val('test_sys.y')
+
+        assert_rel_error(self, y_recorded, y1)
 
 
 @use_tempdirs

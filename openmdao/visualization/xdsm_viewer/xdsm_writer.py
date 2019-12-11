@@ -41,8 +41,8 @@ _OUT_FORMATS = {'tex': 'pyxdsm', 'pdf': 'pyxdsm', 'json': 'xdsmjs', 'html': 'xds
 # Underscore is replaced with a skipped underscore
 # Round parenthesis is replaced with subscript syntax, e.g. x(1) --> x_{1}
 _CHAR_SUBS = {
-    'pyxdsm': (('_', '\_'), ('(', '_{'), (')', '}'),),
-    'xdsmjs': ((' ', '-'), (':', ''), ('_', '\_'),),
+    'pyxdsm': (('_', r'\_'), ('(', '_{'), (')', '}'),),
+    'xdsmjs': ((' ', '-'), (':', ''), ('_', r'\_'),),
 }
 # Variable formatting settings
 _SUPERSCRIPTS = {'optimal': '*', 'initial': '(0)', 'target': 't', 'consistency': 'c'}
