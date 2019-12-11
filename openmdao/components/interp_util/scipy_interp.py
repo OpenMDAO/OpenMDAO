@@ -49,7 +49,7 @@ class ScipyGridInterp(GridInterpBase):
         Cache of current evaluation point.
     """
 
-    def __init__(self, points, values, interp_method="slinear", bounds_error=True):
+    def __init__(self, points, values, interp_method="slinear", bounds_error=True, **kwargs):
         """
         Initialize instance of interpolation class.
 
@@ -65,7 +65,12 @@ class ScipyGridInterp(GridInterpBase):
             If True, when interpolated values are requested outside of the domain of the input
             data, a ValueError is raised. If False, then the methods are allowed to extrapolate.
             Default is True (raise an exception).
+        **kwargs : dict
+            Interpolator-specific options to pass onward.
         """
+        if kwargs:
+            raise KeyError("SciPy interpolator does not support {} options.".format([x for x in kwargs]))
+
         super(ScipyGridInterp, self).__init__(points, values, interp_method=interp_method,
                                               bounds_error=bounds_error)
 

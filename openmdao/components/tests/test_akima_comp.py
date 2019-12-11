@@ -53,6 +53,7 @@ class AkimaTestCase(unittest.TestCase):
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
     def test_fixed_grid(self):
+        # Unsupported
         ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         ncp = len(ycp)
         n = 11

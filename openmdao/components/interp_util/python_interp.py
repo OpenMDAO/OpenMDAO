@@ -6,6 +6,7 @@ implementations.
 """
 from __future__ import division, print_function, absolute_import
 from six.moves import range
+from six import iteritems
 
 import numpy as np
 
@@ -96,6 +97,7 @@ class PythonGridInterp(GridInterpBase):
             interp = InterpAkima
 
         self._interp = interp
+        self._interp_options = kwargs
         self.table = interp(self.grid, self.values, interp, **kwargs)
 
     def _interp_methods(self):
@@ -147,7 +149,7 @@ class PythonGridInterp(GridInterpBase):
         for j in range(n_nodes):
             if self.training_data_gradients:
                 # If the table values are inputs, then we need to create a new table each time.
-                self.table = interp(self.grid, self.values, interp)
+                self.table = interp(self.grid, self.values, interp, **self._interp_options)
 
             val, deriv = self.table.evaluate(xi[j, :])
             result[j] = val
@@ -182,7 +184,7 @@ class PythonGridInterp(GridInterpBase):
 
             for j in range(ngrid):
                 values[j] = 1.0
-                table = interp([grid[i]], values, self._interp)
+                table = interp([grid[i]], values, self._interp, **self._interp_options)
                 deriv_i[j], _ = table.evaluate(pt[i:i + 1])
                 values[j] = 0.0
 

@@ -133,6 +133,102 @@ class MetaModelStructuredComp(InterpBase):
             super(MetaModelStructuredComp, self).add_input("%s_train" % name,
                                                            val=training_data, **kwargs)
 
+    def _setup_partials(self, recurse=True):
+        """
+        Process all partials and approximations that the user declared.
+
+        Metamodel needs to declare its partials after inputs and outputs are known.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        super(InterpBase, self)._setup_partials()
+        arange = np.arange(self.options['vec_size'])
+        pnames = tuple(self.pnames)
+        dct = {
+            'rows': arange,
+            'cols': arange,
+            'dependent': True,
+        }
+
+        for name in self._outputs:
+            self._declare_partials(of=name, wrt=pnames, dct=dct)
+            if self.options['training_data_gradients']:
+                self._declare_partials(of=name, wrt="%s_train" % name, dct={'dependent': True})
+
+        # The scipy methods do not support complex step.
+        if self.options['method'].startswith('scipy'):
+            self.set_check_partial_options('*', method='fd')
+
+
+    def compute(self, inputs, outputs):
+        """
+        Perform the interpolation at run time.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        outputs : Vector
+            unscaled, dimensional output variables read via outputs[key]
+        """
+        pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
+        for out_name, interp in iteritems(self.interps):
+            if self.options['training_data_gradients']:
+                # Training point values may have changed every time we compute.
+                interp.values = inputs["%s_train" % out_name]
+                interp.training_data_gradients = True
+
+            try:
+                val = interp.interpolate(pt)
+
+            except OutOfBoundsError as err:
+                varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))
+                errmsg = "{}: Error interpolating output '{}' because input '{}' " \
+                    "was out of bounds ('{}', '{}') with " \
+                    "value '{}'".format(self.msginfo, out_name, varname_causing_error,
+                                        err.lower, err.upper, err.value)
+                raise_from(AnalysisError(errmsg), None)
+
+            except ValueError as err:
+                raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
+                                                                                   out_name,
+                                                                                   str(err)))
+            outputs[out_name] = val
+
+
+    def compute_partials(self, inputs, partials):
+        """
+        Collect computed partial derivatives and return them.
+
+        Checks if the needed derivatives are cached already based on the
+        inputs vector. Refreshes the cache by re-computing the current point
+        if necessary.
+
+        Parameters
+        ----------
+        inputs : Vector
+            unscaled, dimensional input variables read via inputs[key]
+        partials : Jacobian
+            sub-jac components written to partials[output_name, input_name]
+        """
+        pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
+        if self.options['training_data_gradients']:
+            dy_ddata = np.zeros(self.grad_shape)
+            interp = next(itervalues(self.interps))
+            for j in range(self.options['vec_size']):
+                val = interp.training_gradients(pt[j, :])
+                dy_ddata[j] = val.reshape(self.grad_shape[1:])
+
+        for out_name in self.interps:
+            dval = self.interps[out_name].gradient(pt).T
+            for i, p in enumerate(self.pnames):
+                partials[out_name, p] = dval[i, :]
+
+            if self.options['training_data_gradients']:
+                partials[out_name, "%s_train" % out_name] = dy_ddata
 
 class MetaModelStructured(MetaModelStructuredComp):
     """
