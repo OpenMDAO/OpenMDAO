@@ -14,7 +14,7 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 from openmdao.test_suite.components.ae_tests import AEComp
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDerivativesGrouped, \
-    SellarProblem, SellarStateConnection, SellarProblemWithArrays
+    SellarProblem, SellarStateConnection, SellarProblemWithArrays, SellarDis1, SellarDis2
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.solvers.linesearch.tests.test_backtracking import ImplCompTwoStates
 
@@ -53,6 +53,42 @@ class ParaboloidProblem(om.Problem):
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
         model.add_constraint('c', upper=-15.0)
+
+class Cycle(om.Group):
+
+    def setup(self):
+        self.add_subsystem('d1', SellarDis1())
+        self.add_subsystem('d2', SellarDis2())
+        self.connect('d1.y1', 'd2.y1')
+
+        self.nonlinear_solver = om.NonlinearBlockGS()
+        self.nonlinear_solver.options['iprint'] = 2
+        self.nonlinear_solver.options['maxiter'] = 20
+        self.linear_solver = om.DirectSolver()
+
+        # paths are relative, not absolute like for Driver and Problem
+        self.nonlinear_solver.recording_options['includes'] = ['d1*']
+        self.nonlinear_solver.recording_options['excludes'] = ['*z']
+
+class SellarMDAConnect(om.Group):
+
+    def setup(self):
+        indeps = self.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', 1.0)
+        indeps.add_output('z', np.array([5.0, 2.0]))
+
+        self.add_subsystem('cycle', Cycle())
+
+        self.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)',
+                                                  z=np.array([0.0, 0.0]), x=0.0))
+
+        self.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1'))
+        self.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0'))
+
+        self.connect('indeps.x', ['cycle.d1.x', 'obj_cmp.x'])
+        self.connect('indeps.z', ['cycle.d1.z', 'cycle.d2.z', 'obj_cmp.z'])
+        self.connect('cycle.d1.y1', ['obj_cmp.y1', 'con_cmp1.y1'])
+        self.connect('cycle.d2.y2', ['obj_cmp.y2', 'con_cmp2.y2'])
 
 
 @use_tempdirs
@@ -831,6 +867,94 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
                           expected_solver_output, expected_solver_residuals),)
         assertSolverIterDataRecorded(self, expected_data, self.eps, prefix='run_again')
+
+    def test_record_solver_includes_excludes(self):
+        prob = om.Problem()
+
+        prob.model = SellarMDAConnect()
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-8
+
+        prob.set_solver_print(level=0)
+
+        prob.model.add_design_var('indeps.x', lower=0, upper=10)
+        prob.model.add_design_var('indeps.z', lower=0, upper=10)
+        prob.model.add_objective('obj_cmp.obj')
+        prob.model.add_constraint('con_cmp1.con1', upper=0)
+        prob.model.add_constraint('con_cmp2.con2', upper=0)
+
+        prob.setup()
+
+        nl = prob.model._get_subsystem('cycle').nonlinear_solver
+        nl.add_recorder(self.recorder)
+
+        prob['indeps.x'] = 2.
+        prob['indeps.z'] = [-1., -1.]
+
+        prob.run_driver()
+
+        cr = om.CaseReader(self.filename)
+        solver_cases = cr.list_cases('root.cycle.nonlinear_solver')
+
+        # Test values from cases
+        last_case = cr.get_case(solver_cases[-1])
+
+        self.assertEqual(sorted(last_case.inputs.keys()), ['d1.x', 'd1.y2'])
+        self.assertEqual(sorted(last_case.outputs.keys()), ['d1.y1'])
+
+        rec = om.SqliteRecorder(os.path.join(self.tempdir, "gleep.sql"), record_viewer_data=False)
+        nl.add_recorder(rec)
+
+        nl.recording_options['includes'] = ['*']
+        nl.recording_options['excludes'] = []
+        prob.setup()
+
+
+        # Make sure default includes and excludes still works
+        prob = om.Problem()
+
+        prob.model = SellarMDAConnect()
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-8
+
+        prob.set_solver_print(level=0)
+
+        prob.model.add_design_var('indeps.x', lower=0, upper=10)
+        prob.model.add_design_var('indeps.z', lower=0, upper=10)
+        prob.model.add_objective('obj_cmp.obj')
+        prob.model.add_constraint('con_cmp1.con1', upper=0)
+        prob.model.add_constraint('con_cmp2.con2', upper=0)
+
+        prob.setup()
+
+        nl = prob.model._get_subsystem('cycle').nonlinear_solver
+        # Default includes and excludes
+        nl.recording_options['includes'] = ['*']
+        nl.recording_options['excludes'] = []
+
+        filename = "sqlite2"
+        recorder = om.SqliteRecorder(filename, record_viewer_data=False)
+        nl.add_recorder(recorder)
+
+        prob['indeps.x'] = 2.
+        prob['indeps.z'] = [-1., -1.]
+
+        prob.run_driver()
+
+        cr = om.CaseReader(filename)
+        solver_cases = cr.list_cases('root.cycle.nonlinear_solver')
+
+        # Test values from cases
+        last_case = cr.get_case(solver_cases[-1])
+
+        self.assertEqual(sorted(last_case.inputs.keys()),
+                         ['d1.x', 'd1.y2', 'd1.z', 'd2.y1', 'd2.z'])
+        self.assertEqual(sorted(last_case.outputs.keys()), ['d1.y1', 'd2.y2'])
+
 
     def test_record_line_search_armijo_goldstein(self):
         prob = om.Problem()
