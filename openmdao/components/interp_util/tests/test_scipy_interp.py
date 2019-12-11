@@ -18,8 +18,8 @@ except ImportError:
     scipy_gte_019 = False
 
 if scipy_gte_019:
-    from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
-    from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
+    from openmdao.components.interp_util.scipy_interp import ScipyGridInterp
+    from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
 
 def rel_error(actual, computed):

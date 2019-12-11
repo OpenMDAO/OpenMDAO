@@ -14,7 +14,7 @@ except ImportError:
 
 import numpy as np
 
-from openmdao.components.structured_metamodel_util.grid_interp_base import GridInterpBase
+from openmdao.components.interp_util.grid_interp_base import GridInterpBase
 
 
 class ScipyGridInterp(GridInterpBase):

@@ -6,9 +6,9 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
-from openmdao.components.structured_metamodel_util.python_interp import PythonGridInterp
-from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
+from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
+from openmdao.components.interp_util.python_interp import PythonGridInterp
+from openmdao.components.interp_util.scipy_interp import ScipyGridInterp
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.components.interp_base import InterpBase
