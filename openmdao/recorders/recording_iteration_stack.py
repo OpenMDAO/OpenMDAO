@@ -48,25 +48,33 @@ class _RecIteration(object):
         str :
             the iteration coordinate formatted in our proprietary way.
         """
-        separator = '|'
+        rank = MPI.COMM_WORLD.rank if MPI else 0
 
         # prefix
         if self.prefix:
-            prefix = '%s_' % self.prefix
+            prefix = '{}_rank{}:'.format(self.prefix, rank)
         else:
-            prefix = ''
+            prefix = 'rank{}:'.format(rank)
 
-        if MPI:
-            prefix += 'rank%d:' % MPI.COMM_WORLD.rank
-        else:
-            prefix += 'rank0:'
+        return prefix + '|'.join('|'.join((name, str(iter_count)))
+                                          for name, iter_count in self.stack)
 
-        # iteration hierarchy
-        coord_list = []
-        for name, iter_count in self.stack:
-            coord_list.append('{}{}{}'.format(name, separator, iter_count))
 
-        return prefix + separator.join(coord_list)
+def get_iteration_coord_parent(iter_coord):
+    """
+    Given an iteration coordinate string, return its parent as a string.
+
+    Parameters
+    ----------
+    iter_coord : str
+        The iteration coordinate.
+
+    Returns
+    -------
+    str
+        The iteration coordinate of the parent.
+    """
+    return iter_coord.rsplit('|', 1)[0]
 
 
 class Recording(object):

@@ -872,3 +872,19 @@ def var_name_match_includes_excludes(name, prom_name, includes, excludes):
         return not match
 
     return True
+
+
+def excludes_filter(name_iter, excludes):
+    for name in name_iter:
+        for pattern in excludes:
+            if fnmatchcase(name, pattern):
+                break
+        else:
+            yield name
+
+
+def includes_filter(name_iter, includes):
+    for name in name_iter:
+        for pattern in includes:
+            if fnmatchcase(name, pattern):
+                yield name
