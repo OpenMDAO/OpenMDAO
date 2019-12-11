@@ -34,7 +34,6 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.array_utils import evenly_distrib_idxs, sizes2offsets
-from openmdao.utils.general_utils import make_set, var_name_match_includes_excludes, simple_warning
 from openmdao.utils.graph_utils import all_connected_nodes
 from openmdao.utils.name_maps import rel_name2abs_name, name2abs_name
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -42,7 +41,7 @@ from openmdao.utils.coloring import _compute_coloring, Coloring, \
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import determine_adder_scaler, find_matches, \
     format_as_float_or_array, warn_deprecation, ContainsAll, all_ancestors, \
-    simple_warning
+    simple_warning, make_set, match_includes_excludes
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.utils.units import get_conversion
@@ -841,7 +840,12 @@ class System(object):
             self._setup_procs(self.pathname, comm, mode, self._problem_options)
 
         # Recurse model from the bottom to the top for configuring.
-        self._configure()
+        # Set static_mode to False in all subsystems because inputs & outputs may be created.
+        with self._static_mode_all(False):
+            self._configure()
+
+        # Recurse model from top to bottom for remaining setup.
+        self._post_configure()
 
         # For updating variable and connection data, setup needs to be performed only
         # in the current system, by gathering data from immediate subsystems,
@@ -853,6 +857,12 @@ class System(object):
         self._setup_var_index_ranges(recurse=recurse)
         self._setup_var_sizes(recurse=recurse)
         self._setup_connections(recurse=recurse)
+
+    def _post_configure(self):
+        """
+        Do any remaining setup that had to wait until after final user configuration.
+        """
+        pass
 
     def _final_setup(self, comm, setup_mode, force_alloc_complex=False):
         """
@@ -2176,6 +2186,19 @@ class System(object):
                 vec.scale('phys')
 
     @contextmanager
+    def _static_mode_all(self, static_mode):
+        """
+        Context manager that temporarily sets the static mode of all subsystems.
+        """
+        for system in self.system_iter(include_self=True, recurse=True):
+            system._static_mode = static_mode
+
+        yield
+
+        for system in self.system_iter(include_self=True, recurse=True):
+            system._static_mode = not static_mode
+
+    @contextmanager
     def _matvec_context(self, vec_name, scope_out, scope_in, mode, clear=True):
         """
         Context manager for vectors.
@@ -3141,26 +3164,45 @@ class System(object):
             list of input names and other optional information about those inputs
         """
         if self._inputs is None:
-            raise RuntimeError("{}: Unable to list inputs until model has "
-                               "been run.".format(self.msginfo))
+            # final setup has not been performed
+            if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
+                raise RuntimeError("{}: Unable to list inputs on a Group until model has "
+                                   "been run.".format(self.msginfo))
 
-        meta = self._var_abs2meta
+            # this is a component; use relative names, including discretes
+            meta = self._var_rel2meta
+            var_names = self._var_rel_names['input'] + list(self._var_discrete['input'].keys())
+            abs2prom = {}
+        else:
+            # final setup has been performed
+            # use absolute names, discretes handled separately
+            # Only gathering up values and metadata from this proc, if MPI
+            meta = self._var_abs2meta
+            var_names = self._inputs._views.keys()
+            abs2prom = self._var_abs2prom['input']
+
         inputs = []
 
-        for var_name, val in iteritems(self._inputs._views):  # This is only over the locals
+        for var_name in var_names:
             # Filter based on tags
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
-            if not var_name_match_includes_excludes(var_name, self._var_abs2prom['input'][var_name],
-                                                    includes, excludes):
+            if abs2prom:
+                var_name_prom = abs2prom[var_name]
+            else:
+                var_name_prom = var_name
+
+            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                 continue
+
+            val = self._inputs._views[var_name] if self._inputs else meta[var_name]['value']
 
             var_meta = {}
             if values:
                 var_meta['value'] = val
             if prom_name:
-                var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                var_meta['prom_name'] = var_name_prom
             if units:
                 var_meta['units'] = meta[var_name]['units']
             if shape:
@@ -3168,7 +3210,7 @@ class System(object):
 
             inputs.append((var_name, var_meta))
 
-        if self._discrete_inputs:
+        if self._inputs is not None and self._discrete_inputs:
             disc_meta = self._discrete_inputs._dict
 
             for var_name, val in iteritems(self._discrete_inputs):
@@ -3176,16 +3218,17 @@ class System(object):
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
-                if not var_name_match_includes_excludes(var_name,
-                                                        self._var_abs2prom['input'][var_name],
-                                                        includes, excludes):
+                var_name_prom = abs2prom[var_name]
+
+                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                     continue
 
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
                 if prom_name:
-                    var_meta['prom_name'] = self._var_abs2prom['input'][var_name]
+                    var_meta['prom_name'] = var_name_prom
+
                 # remaining items do not apply for discrete vars
                 if units:
                     var_meta['units'] = ''
@@ -3280,36 +3323,54 @@ class System(object):
             list of output names and other optional information about those outputs
         """
         if self._outputs is None:
-            raise RuntimeError("{}: Unable to list outputs until model has "
-                               "been run.".format(self.msginfo))
+            # final setup has not been performed
+            if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
+                raise RuntimeError("{}: Unable to list outputs on a Group until model has "
+                                   "been run.".format(self.msginfo))
 
-        # Only gathering up values and metadata from this proc, if MPI
-        meta = self._var_abs2meta  # This only includes metadata for this process.
+            # this is a component; use relative names, including discretes
+            meta = self._var_rel2meta
+            var_names = self._var_rel_names['output'] + list(self._var_discrete['output'].keys())
+            abs2prom = {}
+        else:
+            # final setup has been performed
+            # use absolute names, discretes handled separately
+            # Only gathering up values and metadata from this proc, if MPI
+            meta = self._var_abs2meta
+            var_names = self._outputs._views.keys()
+            abs2prom = self._var_abs2prom['output']
+
         states = self._list_states()
 
         # Go though the hierarchy. Printing Systems
         # If the System owns an output directly, show its output
         expl_outputs = []
         impl_outputs = []
-        for var_name, val in iteritems(self._outputs._views):
+        for var_name in var_names:
             # Filter based on tags
             if tags and not (make_set(tags) & meta[var_name]['tags']):
                 continue
 
-            if not var_name_match_includes_excludes(var_name,
-                                                    self._var_abs2prom['output'][var_name],
-                                                    includes, excludes):
+            if abs2prom:
+                var_name_prom = abs2prom[var_name]
+            else:
+                var_name_prom = var_name
+
+            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                 continue
 
-            if residuals_tol and np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
+            if residuals_tol and self._residuals and \
+               np.linalg.norm(self._residuals._views[var_name]) < residuals_tol:
                 continue
+
+            val = self._outputs._views[var_name] if self._outputs else meta[var_name]['value']
 
             var_meta = {}
             if values:
                 var_meta['value'] = val
             if prom_name:
-                var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
-            if residuals:
+                var_meta['prom_name'] = var_name_prom
+            if residuals and self._residuals:
                 var_meta['resids'] = self._residuals._views[var_name]
             if units:
                 var_meta['units'] = meta[var_name]['units']
@@ -3328,7 +3389,7 @@ class System(object):
             else:
                 expl_outputs.append((var_name, var_meta))
 
-        if self._discrete_outputs and not residuals_tol:
+        if self._outputs is not None and self._discrete_outputs and not residuals_tol:
             disc_meta = self._discrete_outputs._dict
 
             for var_name, val in iteritems(self._discrete_outputs):
@@ -3336,16 +3397,17 @@ class System(object):
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue
 
-                if not var_name_match_includes_excludes(var_name,
-                                                        self._var_abs2prom['output'][var_name],
-                                                        includes, excludes):
+                var_name_prom = abs2prom[var_name]
+
+                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                     continue
 
                 var_meta = {}
                 if values:
                     var_meta['value'] = val
-                if prom_name:
-                    var_meta['prom_name'] = self._var_abs2prom['output'][var_name]
+                if prom_name and var_name in abs2prom:
+                    var_meta['prom_name'] = var_name_prom
+
                 # remaining items do not apply for discrete vars
                 if residuals:
                     var_meta['resids'] = ''

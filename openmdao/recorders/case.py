@@ -14,7 +14,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import warn_deprecation, make_set, \
-    var_name_match_includes_excludes
+    match_includes_excludes
 from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
@@ -445,16 +445,16 @@ class Case(object):
                 if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                     continue
 
-                if not var_name_match_includes_excludes(var_name,
-                                                        self._abs2prom['input'][var_name],
-                                                        includes, excludes):
+                var_name_prom = self._abs2prom['input'][var_name]
+
+                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                     continue
 
                 var_meta = {}
                 if values:
                     var_meta['value'] = self.inputs[var_name]
                 if prom_name:
-                    var_meta['prom_name'] = self._abs2prom['input'][var_name]
+                    var_meta['prom_name'] = var_name_prom
                 if units:
                     var_meta['units'] = meta[var_name]['units']
                 if shape:
@@ -555,8 +555,9 @@ class Case(object):
             if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                 continue
 
-            if not var_name_match_includes_excludes(var_name, self._abs2prom['output'][var_name],
-                                                    includes, excludes):
+            var_name_prom = self._abs2prom['output'][var_name]
+
+            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                 continue
 
             # check if residuals were recorded, skip if within specifed tolerance
@@ -571,7 +572,7 @@ class Case(object):
             if values:
                 var_meta['value'] = self.outputs[var_name]
             if prom_name:
-                var_meta['prom_name'] = self._abs2prom['output'][var_name]
+                var_meta['prom_name'] = var_name_prom
             if residuals:
                 var_meta['resids'] = resids
             if units:

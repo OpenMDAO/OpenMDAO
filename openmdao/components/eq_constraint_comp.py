@@ -106,10 +106,13 @@ class EQConstraintComp(ExplicitComponent):
                                use_mult, mult_name, mult_val, normalize, add_constraint, ref, ref0,
                                adder, scaler, **kwargs)
 
-    def setup(self):
+    def _post_configure(self):
         """
         Define the independent variables, output variables, and partials.
         """
+        # set static mode to False because we are doing things that would normally be done in setup
+        self._static_mode = False
+
         for name, options in iteritems(self._output_vars):
 
             meta = self.add_output(name, **options['kwargs'])
@@ -146,6 +149,10 @@ class EQConstraintComp(ExplicitComponent):
             if options['add_constraint']:
                 self.add_constraint(name, equals=0., ref0=options['ref0'], ref=options['ref'],
                                     adder=options['adder'], scaler=options['scaler'])
+
+        self._static_mode = True
+
+        super(EQConstraintComp, self)._post_configure()
 
     def compute(self, inputs, outputs):
         """
