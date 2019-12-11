@@ -10,6 +10,7 @@ from openmdao.utils.mpi import MPI
 
 # set DEBUG to True if you want to view the generated HTML file(s)
 DEBUG = False
+OUTFILE = 'n2test.html'
 
 # Test model derived from one contributed by Anil Yildirim at U-Mich MDO lab
 class myComp(om.ExplicitComponent):
@@ -33,7 +34,7 @@ class Top(om.Group):
 
         self.connect('indep_var.x1', 'myComp.x2')
 
-@unittest.skipUnless(MPI and MPI.COMM_WORLD.size > 1, "MPI with more than 1 process is required.")
+@unittest.skipUnless(MPI, "MPI is required to test N2 parallel generation.")
 class N2ParallelTestCase(unittest.TestCase):
     N_PROCS = 2
 
@@ -43,11 +44,18 @@ class N2ParallelTestCase(unittest.TestCase):
         self.p.setup()
 
     def test_n2_parallel(self):
-        om.n2(self.p, show_browser=False)
+        """
+        Verify that allgather() is called from all ranks and doesn't sit there blocking.
+        """
+        om.n2(self.p, show_browser=False, outfile=OUTFILE)
 
     def tearDown(self):
         if not DEBUG:
-            os.remove("n2.html")
+            try:
+                os.remove(OUTFILE)
+            except:
+                # Don't want the test to fail if the test file is already removed
+                pass
 
 if __name__ == "__main__":
     unittest.main()
