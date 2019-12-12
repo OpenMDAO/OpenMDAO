@@ -154,23 +154,16 @@ def check_path(path, includes, excludes, include_all_path=False):
     boolean
         True if path should be recorded, False if it's been excluded.
     """
-    # First see if it's included
-    for pattern in includes:
-        if fnmatchcase(path, pattern) or include_all_path:
-            # We found a match. Check to see if it is excluded.
-            for ex_pattern in excludes:
-                if fnmatchcase(path, ex_pattern):
-                    return False
-            return True
+    for ex_pattern in excludes:
+        if fnmatchcase(path, ex_pattern):
+            return False
 
-    # the case where includes is empty but include_all_path is True
-    if include_all_path:
-        for ex_pattern in excludes:
-            if fnmatchcase(path, ex_pattern):
-                return False
-        return True
+    if not include_all_path:
+        for pattern in includes:
+            if fnmatchcase(path, pattern):
+                return True
 
-    return False
+    return include_all_path
 
 
 def deserialize(json_data, abs2meta):
@@ -200,7 +193,7 @@ def deserialize(json_data, abs2meta):
 
     for name, value in iteritems(values):
         if isinstance(value, list) and 'shape' in abs2meta[name]:
-            values[name] = np.resize(np.array(value), abs2meta[name]['shape'])
+            values[name] = np.asarray(value)  # array will be proper shape based on list structure
         else:
             all_array = False
 

@@ -104,10 +104,11 @@ class ExperimentalDriver(object):
                                        desc='Set to True to record constraints at the \
                                        driver level')
         self.recording_options.declare('includes', types=list, default=[],
-                                       desc='Patterns for variables to include in recording')
+                                       desc='Patterns for variables to include in recording. \
+                                       Uses fnmatch wildcards')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                       '(processed post-includes)')
+                                       '(processed post-includes). Uses fnmatch wildcards')
         self.recording_options.declare('record_derivatives', types=bool, default=False,
                                        desc='Set to True to record derivatives at the driver \
                                        level')

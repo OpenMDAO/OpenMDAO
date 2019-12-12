@@ -1057,12 +1057,7 @@ class BroydenMPITestCase(unittest.TestCase):
 
         prob.run_model()
 
-        # TODO - prob.get not working correctly on distributed vars. Once this is fixed, we can
-        # test all values on all ranks.
-        if model.comm.rank == 0:
-            assert_rel_error(self, prob.get_val('y1', get_remote=True), 25.58830237, .00001)
-        elif model.comm.rank == 1:
-            assert_rel_error(self, prob.get_val('y1', get_remote=True), 17.75721382, .00001)
+        np.testing.assert_allclose(prob.get_val('y1', get_remote=True), np.array([25.58830237, 17.75721382]), .00001)
 
     def test_distributed_comp_states(self):
         prob = om.Problem()
@@ -1083,12 +1078,7 @@ class BroydenMPITestCase(unittest.TestCase):
 
         prob.run_model()
 
-        # TODO - prob.get not working correctly on distributed vars. Once this is fixed, we can
-        # test all values on all ranks.
-        if model.comm.rank == 0:
-            assert_rel_error(self, prob.get_val('y1', get_remote=True), 25.58830237, .00001)
-        elif model.comm.rank == 1:
-            assert_rel_error(self, prob.get_val('y1', get_remote=True), 17.75721382, .00001)
+        np.testing.assert_allclose(prob.get_val('y1', get_remote=True), np.array([25.58830237, 17.75721382]), .00001)
 
 if __name__ == "__main__":
     unittest.main()

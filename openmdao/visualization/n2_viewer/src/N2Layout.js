@@ -6,7 +6,6 @@
  * @property {N2TreeNode[]} zoomedNodes  Child workNodes of the current zoomed element.
  * @property {N2TreeNode[]} visibleNodes Zoomed workNodes that are actually drawn.
  * @property {N2TreeNode[]} zoomedSolverNodes Child solver workNodes of the current zoomed element.
- * @property {Boolean} updateRecomputesAutoComplete Zoomed solver workNodes that are actually drawn.
  * @property {Object} svg Reference to the top-level SVG element in the document.
  * @property {Object} size The dimensions of the model and solver trees.
  */
@@ -26,8 +25,6 @@ class N2Layout {
         this.zoomedElement = newZoomedElement;
         this.showLinearSolverNames = showLinearSolverNames;
 
-        this.updateRecomputesAutoComplete = true;
-        this._updateAutoCompleteIfNecessary();
 
         this.outputNamingType = "Absolute";
         this.zoomedNodes = [];
@@ -467,69 +464,6 @@ class N2Layout {
     }
 
     /**
-     * Recurse through the children of the node and add their names to the
-     * autocomplete list of names if they're not already in it.
-     * @param {N2TreeNode} node The node to search from.
-     */
-    _populateAutoCompleteList(node) {
-        // Depth first, don't go into minimized children
-        if (node.hasChildren() && !node.isMinimized) {
-            for (let child of node.children) {
-                this._populateAutoCompleteList(child);
-            }
-        }
-
-        if (node === this.zoomedElement) return;
-
-        let curName = node.name;
-        if (node.splitByColon && node.hasChildren()) curName += ":";
-
-        if (!node.isParamOrUnknown()) curName += ".";
-        let namesToAdd = [curName];
-
-        if (node.splitByColon)
-            namesToAdd.push(node.colonName +
-                ((node.hasChildren()) ? ":" : ""));
-
-        for (let name of namesToAdd) {
-            if (!this.autoCompleteSetNames.hasOwnProperty(name)) {
-                this.autoCompleteSetNames[name] = true;
-                autoCompleteListNames.push(name);
-            }
-        };
-
-        let localPathName = (this.zoomedElement === this.model.root) ?
-            node.absPathName :
-            node.absPathName.slice(this.zoomedElement.absPathName.length + 1);
-
-        if (!this.autoCompleteSetPathNames.hasOwnProperty(localPathName)) {
-            this.autoCompleteSetPathNames[localPathName] = true;
-            autoCompleteListPathNames.push(localPathName);
-        }
-    }
-
-    /**
-     * If this.updateRecomputesAutoComplete is true, update the autocomplete
-     * list. If false, set it to true and return.
-     */
-    _updateAutoCompleteIfNecessary() {
-        if (!this.updateRecomputesAutoComplete) {
-            this.updateRecomputesAutoComplete = true;
-            return;
-        }
-        this.autoCompleteSetNames = {};
-        this.autoCompleteSetPathNames = {};
-
-        autoCompleteListNames = [];
-        autoCompleteListPathNames = [];
-
-        this._populateAutoCompleteList(this.zoomedElement);
-
-        delete this.autoCompleteSetNames;
-        delete this.autoCompleteSetPathNames;
-    }
-
-    /**
      * Calculate new dimensions for the div element enclosing the main SVG element.
      * @returns {Object} Members width and height as strings with the unit appended.
      */
@@ -617,9 +551,5 @@ class N2Layout {
                 innerDims.height +
                 innerDims.margin) + " " +
                 innerDims.margin + ")");
-    }
-
-    setupOffgridLabels() {
-
     }
 }

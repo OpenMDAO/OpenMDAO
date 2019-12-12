@@ -238,6 +238,39 @@ class DiscreteTestCase(unittest.TestCase):
         model.connect('indep.x', ['expl.x', 'impl.x'])
 
         prob.setup()
+
+        #
+        # list vars before model has been run (relative names)
+        #
+        expl_inputs = prob.model.expl.list_inputs(out_stream=None)
+        expected = {
+            'a': {'value': [10.]},
+            'x': {'value': 10}
+        }
+        self.assertEqual(dict(expl_inputs), expected)
+
+        impl_inputs = prob.model.impl.list_inputs(out_stream=None)
+        expected = {
+            'x': {'value': 10}
+        }
+        self.assertEqual(dict(impl_inputs), expected)
+
+        expl_outputs = prob.model.expl.list_outputs(out_stream=None)
+        expected = {
+            'b': {'value': [0.]},
+            'y': {'value': 0}
+        }
+        self.assertEqual(dict(expl_outputs), expected)
+
+        impl_outputs = prob.model.impl.list_outputs(out_stream=None)
+        expected = {
+            'y': {'value': 0}
+        }
+        self.assertEqual(dict(impl_outputs), expected)
+
+        #
+        # run model
+        #
         prob.run_model()
 
         #
@@ -536,16 +569,15 @@ class DiscreteTestCase(unittest.TestCase):
 
         prob.setup(check=['unconnected_inputs'], logger=testlogger)
         prob.run_model()
-        
+
         expected_warning_1 = (
             "The following inputs are not connected:\n"
             "   x  (p):\n"
             "      c1.x  c1\n"
             "      c2.x  c2\n"
         )
-        
+
         self.assertTrue(testlogger.contains('warning', expected_warning_1))
-        
 
     def test_discrete_deriv_implicit(self):
         prob = om.Problem()
