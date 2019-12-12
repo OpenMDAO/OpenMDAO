@@ -147,10 +147,13 @@ class BalanceComp(ImplicitComponent):
             self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
                              use_mult, mult_name, mult_val, normalize, **kwargs)
 
-    def setup(self):
+    def _post_configure(self):
         """
         Define the independent variables, output variables, and partials.
         """
+        # set static mode to False because we are doing things that would normally be done in setup
+        self._static_mode = False
+
         for name, options in iteritems(self._state_vars):
 
             meta = self.add_output(name, **options['kwargs'])
@@ -183,6 +186,10 @@ class BalanceComp(ImplicitComponent):
 
             if options['use_mult']:
                 self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
+
+        self._static_mode = True
+
+        super(BalanceComp, self)._post_configure()
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

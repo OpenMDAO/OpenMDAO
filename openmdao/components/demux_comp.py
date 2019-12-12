@@ -65,10 +65,13 @@ class DemuxComp(ExplicitComponent):
         """
         self._vars[name] = {'val': val, 'shape': shape, 'units': units, 'desc': desc, 'axis': axis}
 
-    def setup(self):
+    def _post_configure(self):
         """
         Declare inputs, outputs, and derivatives for the demux component.
         """
+        # set static mode to False because we are doing things that would normally be done in setup
+        self._static_mode = False
+
         opts = self.options
         vec_size = opts['vec_size']
 
@@ -111,6 +114,10 @@ class DemuxComp(ExplicitComponent):
                 cs = np.atleast_1d(np.take(template, indices=i, axis=axis))
 
                 self.declare_partials(of=out_name, wrt=var, rows=rs, cols=cs, val=1.0)
+
+        self._static_mode = True
+
+        super(DemuxComp, self)._post_configure()
 
     def compute(self, inputs, outputs):
         """

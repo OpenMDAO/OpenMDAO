@@ -142,7 +142,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver = prob.driver
 
         driver.recording_options['record_desvars'] = False
-        driver.recording_options['record_responses'] = False
         driver.recording_options['record_objectives'] = False
         driver.recording_options['record_constraints'] = False
         driver.recording_options['record_derivatives'] = False
@@ -185,7 +184,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver = prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['record_derivatives'] = True
@@ -425,7 +423,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver = prob.driver = om.ScipyOptimizeDriver(tol=1e-9, disp=False)
 
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.recording_options['includes'] = ['y2']
@@ -452,7 +449,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         driver = prob.driver = pyOptSparseDriver(optimizer='SLSQP', print_results=False)
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.add_recorder(self.recorder)
@@ -1691,7 +1687,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.options['tol'] = 1e-9
         driver.options['disp'] = False
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
 
@@ -1809,7 +1804,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver.options['tol'] = 1e-9
         driver.options['disp'] = False
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
 
@@ -2243,7 +2237,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.driver.options['disp'] = False
 
         prob.driver.recording_options['record_desvars'] = True
-        prob.driver.recording_options['record_responses'] = True
         prob.driver.recording_options['record_objectives'] = True
         prob.driver.recording_options['record_constraints'] = True
         recorder = om.SqliteRecorder("cases.sql")
@@ -2291,7 +2284,6 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         # driver
         driver.recording_options['record_desvars'] = True
-        driver.recording_options['record_responses'] = True
         driver.recording_options['record_objectives'] = True
         driver.recording_options['record_constraints'] = True
         driver.add_recorder(self.recorder)
