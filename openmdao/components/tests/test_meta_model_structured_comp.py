@@ -1033,6 +1033,35 @@ class TestMetaModelStructuredPython(unittest.TestCase):
 
         self.run_and_check_derivs(prob)
 
+    def test_training_gradient_akima(self):
+        model = om.Group()
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        outs = mapdata.output_data
+
+        ivc.add_output('x', np.array([.33]))
+
+        ivc.add_output('f_train', np.array([.3, .7, .5, .6, .3, .4, .2]))
+
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          method='akima', vec_size=1)
+        comp.add_input('x', 0.0, np.array([.1, .2, .3, .4, .5, .6, .7]))
+        comp.add_output('f', 0.0, np.array([.3, .7, .5, .6, .3, .4, .2]))
+
+        model.add_subsystem('ivc', ivc, promotes=["*"])
+        model.add_subsystem('comp',
+                            comp,
+                            promotes=["*"])
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+
+        self.run_and_check_derivs(prob)
+
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
 class TestMetaModelStructuredCompFeature(unittest.TestCase):
