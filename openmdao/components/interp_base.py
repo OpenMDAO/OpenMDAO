@@ -56,13 +56,16 @@ class InterpBase(ExplicitComponent):
         else:
             interp = PythonGridInterp
 
+        opts = {}
+        if 'interp_options' in self.options:
+            opts = self.options['interp_options']
         for name, train_data in iteritems(self.training_outputs):
             # self.params is equal to the x_cp_val data
             # train_data is equal to y_cp_val data
             self.interps[name] = interp(self.params, train_data,
                                         interp_method=interp_method,
                                         bounds_error=not self.options['extrapolate'],
-                                        **self.options['interp_options'])
+                                        **opts)
 
         if self.options['training_data_gradients']:
             self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
