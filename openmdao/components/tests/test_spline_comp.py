@@ -56,16 +56,15 @@ class SplineTestCase(unittest.TestCase):
 
     def test_akima_backward_compatibility(self):
 
-        prob = om.Problem()
 
         comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp=self.x, vec_size=self.n,
                              interp_options={'delta_x': 0.1})
         comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=self.y_cp)
 
-        prob.model.add_subsystem('akima1', comp)
+        self.prob.model.add_subsystem('akima1', comp)
 
-        prob.setup(force_alloc_complex=True)
-        prob.run_model()
+        self.prob.setup(force_alloc_complex=True)
+        self.prob.run_model()
 
         # Verification array from AkimaSplineComp
         akima_y = np.array([[ 5.        ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
@@ -82,7 +81,6 @@ class SplineTestCase(unittest.TestCase):
         assert_array_almost_equal(akima_y.flatten(), prob['akima1.y_val'])
 
         # derivs = prob.check_partials(compact_print=False, method='cs')
-
         # assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
     def test_scipy_kwargs_error(self):
