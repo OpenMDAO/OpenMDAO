@@ -78,7 +78,7 @@ class SplineTestCase(unittest.TestCase):
                             20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
                             24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
 
-        assert_array_almost_equal(akima_y.flatten(), prob['akima1.y_val'])
+        assert_array_almost_equal(akima_y.flatten(), self.prob['akima1.y_val'])
 
         # derivs = prob.check_partials(compact_print=False, method='cs')
         # assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
