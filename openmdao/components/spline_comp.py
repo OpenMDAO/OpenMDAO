@@ -89,17 +89,21 @@ class SplineComp(InterpBase):
             msg = "{}: y_cp_name cannot be an empty string."
             raise ValueError(msg.format(self.msginfo))
         elif not y_interp_name:
-            msg = "{}: y_interp cannot be an empty string."
+            msg = "{}: y_interp_name cannot be an empty string."
             raise ValueError(msg.format(self.msginfo))
 
         self.add_output(y_interp_name, 1.0 * np.ones(self.options['vec_size']),
                                            units=y_units)
-        self.add_input(name=y_cp_name, val=y_cp_val)
+        if y_cp_val is None:
+            y_cp_val = self.options['x_cp_val']
 
-        self.training_outputs[y_interp_name] = y_cp_val
+            self.add_input(name=y_cp_name, val=np.linspace(0., 1., len(y_cp_val)))
+            self.training_outputs[y_interp_name] = y_cp_val
+        else:
+            self.add_input(name=y_cp_name, val=y_cp_val)
+            self.training_outputs[y_interp_name] = y_cp_val
 
         self.interp_to_cp[y_interp_name] = y_cp_name
-
 
     def _setup_partials(self, recurse=True):
         """

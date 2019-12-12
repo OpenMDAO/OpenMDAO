@@ -98,8 +98,15 @@ class SplineTestCase(unittest.TestCase):
         msg = '"SciPy interpolator does not support [\'delta_x\'] options."'
         self.assertEqual(msg, str(cm.exception))
 
+    def test_no_ycp_val(self):
 
+        comp = om.SplineComp(method='akima', vec_size=self.n, x_cp_val=self.x_cp, x_interp=self.x)
 
+        comp.add_spline(y_cp_name='ycp', y_interp_name='y_val')
+        self.prob.model.add_subsystem('akima1', comp)
+
+        self.prob.setup(force_alloc_complex=True)
+        self.prob.run_model()
 
     # def test_bspline_interp_options(self):
 

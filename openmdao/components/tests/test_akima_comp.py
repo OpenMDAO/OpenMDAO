@@ -124,6 +124,7 @@ class AkimaTestCase(unittest.TestCase):
 class TestAkimaFeature(unittest.TestCase):
 
     def test_input_grid(self):
+        # Same as test_basic
         import numpy as np
 
         import openmdao.api as om
@@ -164,6 +165,7 @@ class TestAkimaFeature(unittest.TestCase):
         assert_rel_error(self, prob['akima.chord:y'], y, 1e-6)
 
     def test_fixed_grid(self):
+        # Unsupported
         import numpy as np
 
         import openmdao.api as om
