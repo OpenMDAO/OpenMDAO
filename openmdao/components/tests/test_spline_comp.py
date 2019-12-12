@@ -67,12 +67,6 @@ class SplineTestCase(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        # print('XCP: \n', prob['akima1.x_cp'])
-        # print('YCP: \n', prob['akima1.ycp'])
-        # print('\n')
-        # print('X_Interp: \n', prob['akima1.x_interp'])
-        # print('Y_interp: \n', prob['akima1.y_val'])
-
         # Verification array from AkimaSplineComp
         akima_y = np.array([[ 5.        ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
                             12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
@@ -106,8 +100,8 @@ class SplineTestCase(unittest.TestCase):
         msg = '"SciPy interpolator does not support [\'delta_x\'] options."'
         self.assertEqual(msg, str(cm.exception))
 
-# "SciPy interpolator does not support ['delta_x'] options."
-# "SciPy interpolator does not support ['delta_x'] options."
+
+
 
     # def test_bspline_interp_options(self):
 
