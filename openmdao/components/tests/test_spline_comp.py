@@ -7,90 +7,71 @@ import numpy as np
 from numpy.testing import assert_array_almost_equal
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_check_partials
 
 class SplineTestCase(unittest.TestCase):
 
+    def setUp(self):
+        self.x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        self.y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        self.y_cp2 = np.array([1.0, 5.0, 7.0, 8.0, 13.0, 16.0])
+        self.n = 50
+        self.x = np.linspace(1.0, 12.0, self.n)
+
+        self.prob = om.Problem()
+
     def test_simple_spline(self):
 
-        x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
-        y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
-        x = np.linspace(1.0, 12.0, 20)
+        comp = om.SplineComp(method='akima', vec_size=self.n, x_cp_val=self.x_cp, x_interp=self.x)
+        self.prob.model.add_subsystem('akima1', comp)
 
-        prob = om.Problem()
+        comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=self.y_cp)
 
-        comp = om.SplineComp(method='akima', vec_size=50, x_cp_val=x_cp, x_interp=x)
-        prob.model.add_subsystem('akima1', comp)
-
-        comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=y_cp)
-
-        print('done')
-        # y_interp = prob['akima1.y_val']
+        self.prob.setup(force_alloc_complex=True)
+        self.prob.run_model()
 
     def test_multiple_splines(self):
 
-        x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
-        y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
-        y_cp2 = np.array([1.0, 5.0, 7.0, 8.0, 13.0, 16.0])
-        x = np.linspace(1.0, 12.0, 50)
+        comp = om.SplineComp(method='akima', vec_size=50, x_cp_val=self.x_cp, x_interp=self.x, x_interp_name='x_val')
+        self.prob.model.add_subsystem('akima1', comp)
 
-        prob = om.Problem()
+        comp.add_spline(y_cp_name='ycp1', y_interp_name='y_val1', y_cp_val=self.y_cp)
+        comp.add_spline(y_cp_name='ycp2', y_interp_name='y_val2', y_cp_val=self.y_cp2)
 
-        comp = om.SplineComp(method='akima', vec_size=50, x_cp_val=x_cp, x_interp=x, x_interp_name='x_val')
-        prob.model.add_subsystem('akima1', comp)
-
-        comp.add_spline(y_cp_name='ycp1', y_interp_name='y_val1', y_cp_val=y_cp)
-        comp.add_spline(y_cp_name='ycp2', y_interp_name='y_val2', y_cp_val=y_cp2)
-
-        prob.setup(force_alloc_complex=True)
-        prob.run_model()
-
-        y_interp = prob['akima1.y_val1']
+        self.prob.setup(force_alloc_complex=True)
+        self.prob.run_model()
 
     def test_akima_interp_options(self):
 
-        x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
-        y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
-        x = np.linspace(1.0, 12.0, 50)
-
-        prob = om.Problem()
-
         akima_option = {'delta_x': 0.1, 'eps': 1e-30}
-        comp = om.SplineComp(method='akima', x_cp_val=x_cp, vec_size=50, x_interp=x, x_cp_name='xcp',
+        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, vec_size=50, x_interp=self.x, x_cp_name='xcp',
                             x_interp_name='x_val', x_units='km', interp_options=akima_option)
 
-        prob.model.add_subsystem('atmosphere', comp)
+        self.prob.model.add_subsystem('atmosphere', comp)
 
-        comp.add_spline(y_cp_name='alt_cp', y_interp_name='alt', y_cp_val=y_cp, y_units='kft')
+        comp.add_spline(y_cp_name='alt_cp', y_interp_name='alt', y_cp_val=self.y_cp, y_units='kft')
 
-        prob.setup(force_alloc_complex=True)
-        prob.run_model()
-
-        y_interp = prob['atmosphere.alt']
+        self.prob.setup(force_alloc_complex=True)
+        self.prob.run_model()
 
     def test_akima_backward_compatibility(self):
 
-        x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
-        y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
-        n = 50
-        x = np.linspace(1.0, 12.0, n)
-
         prob = om.Problem()
 
-        comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp=x, vec_size=n,
+        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp=self.x, vec_size=self.n,
                              interp_options={'delta_x': 0.1})
-        comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=y_cp)
+        comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=self.y_cp)
 
         prob.model.add_subsystem('akima1', comp)
 
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        print('XCP: \n', prob['akima1.x_cp'])
-        print('YCP: \n', prob['akima1.ycp'])
-        print('\n')
-        print('X_Interp: \n', prob['akima1.x_interp'])
-        print('Y_interp: \n', prob['akima1.y_val'])
+        # print('XCP: \n', prob['akima1.x_cp'])
+        # print('YCP: \n', prob['akima1.ycp'])
+        # print('\n')
+        # print('X_Interp: \n', prob['akima1.x_interp'])
+        # print('Y_interp: \n', prob['akima1.y_val'])
 
         # Verification array from AkimaSplineComp
         akima_y = np.array([[ 5.        ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
@@ -110,6 +91,23 @@ class SplineTestCase(unittest.TestCase):
 
         # assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
+    def test_scipy_kwargs_error(self):
+
+        comp = om.SplineComp(method='scipy_cubic', vec_size=self.n, x_cp_val=self.x_cp,
+                             x_interp=self.x, interp_options={'delta_x': 0.1})
+        self.prob.model.add_subsystem('akima1', comp)
+
+        comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=self.y_cp)
+
+        with self.assertRaises(KeyError) as cm:
+            self.prob.setup(force_alloc_complex=True)
+            self.prob.run_model()
+
+        msg = '"SciPy interpolator does not support [\'delta_x\'] options."'
+        self.assertEqual(msg, str(cm.exception))
+
+# "SciPy interpolator does not support ['delta_x'] options."
+# "SciPy interpolator does not support ['delta_x'] options."
 
     # def test_bspline_interp_options(self):
 
@@ -120,7 +118,7 @@ class SplineTestCase(unittest.TestCase):
     #     prob = om.Problem()
 
     #     bspline_options = {'order': 5}
-    #     comp = om.SplineComp(method='bspline', x_cp_val=x_cp, x_interp=x, x_cp_name='xcp',
+    #     comp = om.SplineComp(method='bspline', x_cp_val=self.x_cp, x_interp=x, x_cp_name='xcp',
     #                         x_interp_name='x_val', x_units='km',
     #                         interp_options=bspline_options)
 
