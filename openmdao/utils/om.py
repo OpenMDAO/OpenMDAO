@@ -587,13 +587,13 @@ def _cite_cmd(options, user_args):
 
 
 _allowed_types = {
-    'component': 'openmdao_components',
-    'linear_solver': 'openmdao_lin_solvers',
-    'nonlinear_solver': 'openmdao_nl_solvers',
-    'line_search': 'openmdao_line_search_solvers',
-    'driver': 'openmdao_drivers',
-    'case_recorder': 'openmdao_case_recorders',
-    'case_reader': 'openmdao_case_readers',
+    'components': 'openmdao_components',
+    'lin_solvers': 'openmdao_lin_solvers',
+    'nl_solvers': 'openmdao_nl_solvers',
+    'drivers': 'openmdao_drivers',
+    'case_recorders': 'openmdao_case_recorders',
+    'case_readers': 'openmdao_case_readers',
+    'commands': 'openmdao_commands',
 }
 
 
@@ -639,7 +639,7 @@ def _list_installed_cmd(options, user_args):
         if type_ not in _allowed_types:
             raise RuntimeError("Type '{}' is not a valid type.  Try one of {}."
                                .format(type_, sorted(_allowed_types)))
-        print("Installed {} types:\n".format(type_))
+        print("Installed {}:\n".format(type_))
         epdict = {}
         cwid = 0
         for ep in pkg_resources.iter_entry_points(group=_allowed_types[type_]):
