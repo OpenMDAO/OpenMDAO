@@ -123,7 +123,14 @@ class SplineTestCase(unittest.TestCase):
         self.prob.setup(force_alloc_complex=True)
         self.prob.run_model()
 
-        print(self.prob['akima1.y_val'])
+        y = np.array([[ 5.        , 12.        , 13.01239669, 14.        , 14.99888393,
+                        16.        , 17.06891741, 18.26264881, 19.5750558 , 21.        ,
+                        24.026042, 29.        ],
+                      [ 7.        , 13.        , 11.02673797,  9.        ,  7.09090909,
+                        6.        ,  6.73660714,  8.46428571, 10.45982143, 12.        ,
+                        13.08035714, 14.        ]])
+
+        # assert_array_almost_equal(y, self.prob['akima1.y_val'])
 
     # def test_bspline_interp_options(self):
 

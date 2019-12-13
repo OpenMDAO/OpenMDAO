@@ -133,8 +133,6 @@ class AkimaTestCase(unittest.TestCase):
             comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n,
                                       name='chord', input_x=True, input_xcp=True)
 
-            prob.model.add_subsystem('akima', comp)
-
 
 class TestAkimaFeature(unittest.TestCase):
 
