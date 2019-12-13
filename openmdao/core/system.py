@@ -3494,7 +3494,6 @@ class System(object):
             else:
                 meta = self._var_rel2meta
 
-
             var_dict = all_var_dicts[0]  # start with rank 0
 
             for proc_vars in all_var_dicts[1:]:  # In rank order go through rest of the procs
