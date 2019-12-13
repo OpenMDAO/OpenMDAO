@@ -194,7 +194,6 @@ class DistribInputDistribOutputDiscreteComp(DistribInputDistribOutputComp):
         self.add_discrete_output('disc_out', 'foobar')
 
 
-
 class DistribNoncontiguousComp(om.ExplicitComponent):
     """Uses 2 procs and takes non-contiguous input var slices and has output
     var slices as well
@@ -328,6 +327,61 @@ class MPITests(unittest.TestCase):
         p.run_model()
 
         self.assertTrue(all(C2._outputs['outvec'] == np.ones(size, float)*7.5))
+
+    def test_distrib_list_inputs_outputs(self):
+        size = 11
+
+        test = self
+
+        def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False):
+            test.assertEqual(len(inputs), 1)
+            name, meta = inputs[0]
+            test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
+            test.assertTrue(meta['shape'] == (size,))
+            print(meta['value'])
+            test.assertTrue(all(meta['value'] == in_vals*np.ones(size)))
+
+            test.assertEqual(len(outputs), 1)
+            name, meta = outputs[0]
+            test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
+            test.assertTrue(meta['shape'] == (size,))
+            test.assertTrue(all(meta['value'] == out_vals*np.ones(size)))
+
+        class Model(om.Group):
+            def setup(self):
+                C1 = self.add_subsystem("C1", InOutArrayComp(arr_size=size))
+                C2 = self.add_subsystem("C2", DistribCompSimple(arr_size=size))
+                self.connect('C1.outvec', 'C2.invec')
+
+            def configure(self):
+                # verify list_inputs/list_outputs work in configure for distributed comp
+                inputs = self.C2.list_inputs(shape=True, values=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, values=True, out_stream=None)
+                verify(inputs, outputs, pathnames=False)
+
+        p = om.Problem(Model())
+        p.setup()
+
+        # verify list_inputs/list_outputs work before final_setup for distributed comp
+        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, pathnames=False)
+
+        p.final_setup()
+
+        p['C1.invec'] = np.ones(size, float) * 5.0
+
+        # verify list_inputs/list_outputs work before run for distributed comp
+        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, pathnames=True)
+
+        p.run_model()
+
+        # verify list_inputs/list_outputs work after run for distributed comp
+        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, in_vals=10., out_vals=7.5, pathnames=True)
 
     def test_distrib_idx_in_full_out(self):
         size = 11
@@ -654,7 +708,6 @@ class ProbRemoteTests(unittest.TestCase):
         self.assertEqual(ans, 'C1foobar')
         ans = p.get_val('par.C2.disc_out', get_remote=True)
         self.assertEqual(ans, 'C2foobar')
-
 
     def test_prob_getval_dist_disc(self):
         size = 14

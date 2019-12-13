@@ -3480,7 +3480,7 @@ class System(object):
             var_dict[name] = vals
 
         # If parallel, gather up the vars.
-        if MPI:
+        if MPI and self.comm:
             # All procs must call this. Returns a list, one per proc.
             all_var_dicts = self.comm.gather(var_dict, root=0)
 
@@ -3488,7 +3488,12 @@ class System(object):
                 return
 
             # rest of this only done on rank 0
-            meta = self._var_abs2meta
+            if self._outputs is not None:
+                # setup has been performed
+                meta = self._var_abs2meta
+            else:
+                meta = self._var_rel2meta
+
 
             var_dict = all_var_dicts[0]  # start with rank 0
 
