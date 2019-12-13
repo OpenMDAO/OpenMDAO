@@ -40,36 +40,34 @@ class InterpBase(ExplicitComponent):
                              desc='Spline interpolation method to use for all outputs.')
 
 
-    def _setup_var_data(self, recurse=True):
-        """
-        Instantiate surrogates for the output variables that use the default surrogate.
+    # def _setup_var_data(self, recurse=True):
+    #     """
+    #     Instantiate surrogates for the output variables that use the default surrogate.
 
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        interp_method = self.options['method']
-        if interp_method.startswith('scipy'):
-            interp = ScipyGridInterp
-            interp_method = interp_method[6:]
-        else:
-            interp = PythonGridInterp
+    #     Parameters
+    #     ----------
+    #     recurse : bool
+    #         Whether to call this method in subsystems.
+    #     """
+    #     interp_method = self.options['method']
+    #     if interp_method.startswith('scipy'):
+    #         interp = ScipyGridInterp
+    #         interp_method = interp_method[6:]
+    #     else:
+    #         interp = PythonGridInterp
 
-        opts = {}
-        if 'interp_options' in self.options:
-            opts = self.options['interp_options']
-        for name, train_data in iteritems(self.training_outputs):
-            # self.params is equal to the x_cp_val data
-            # train_data is equal to y_cp_val data
-            self.interps[name] = interp(self.params, train_data,
-                                        interp_method=interp_method,
-                                        bounds_error=not self.options['extrapolate'],
-                                        **opts)
+    #     opts = {}
+    #     if 'interp_options' in self.options:
+    #         opts = self.options['interp_options']
+    #     for name, train_data in iteritems(self.training_outputs):
+    #         self.interps[name] = interp(self.params, train_data,
+    #                                     interp_method=interp_method,
+    #                                     bounds_error=not self.options['extrapolate'],
+    #                                     **opts)
 
-        if self.options['training_data_gradients']:
-            self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
+    #     if self.options['training_data_gradients']:
+    #         self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
 
-        super(InterpBase, self)._setup_var_data(recurse=recurse)
+    #     super(InterpBase, self)._setup_var_data(recurse=recurse)
 
 

@@ -1,6 +1,8 @@
 from six import iteritems, itervalues
 import numpy as np
 
+from openmdao.components.interp_util.python_interp import PythonGridInterp
+from openmdao.components.interp_util.scipy_interp import ScipyGridInterp
 from openmdao.components.interp_base import InterpBase
 
 
@@ -48,6 +50,7 @@ class SplineComp(InterpBase):
 
         self.options['extrapolate'] = True
         self.options['training_data_gradients'] = True
+        self.n_interp = len(self.options['x_interp'])
 
         self.interp_to_cp = {}
 
@@ -92,7 +95,7 @@ class SplineComp(InterpBase):
             msg = "{}: y_interp_name cannot be an empty string."
             raise ValueError(msg.format(self.msginfo))
 
-        self.add_output(y_interp_name, 1.0 * np.ones(self.options['vec_size']),
+        self.add_output(y_interp_name, np.ones((self.options['vec_size'], self.n_interp)),
                                            units=y_units)
         if y_cp_val is None:
             y_cp_val = self.options['x_cp_val']
@@ -105,11 +108,45 @@ class SplineComp(InterpBase):
 
         self.interp_to_cp[y_interp_name] = y_cp_name
 
+    def _setup_var_data(self, recurse=True):
+        """
+        Instantiate surrogates for the output variables that use the default surrogate.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        interp_method = self.options['method']
+        if interp_method.startswith('scipy'):
+            interp = ScipyGridInterp
+            interp_method = interp_method[6:]
+        else:
+            interp = PythonGridInterp
+
+        opts = {}
+        if 'interp_options' in self.options:
+            opts = self.options['interp_options']
+        for name, cp_points in iteritems(self.training_outputs):
+            if self.options['vec_size'] > 1:
+                cp_points = cp_points[0, :]
+            self.interps[name] = interp(self.params, cp_points,
+                                        interp_method=interp_method,
+                                        bounds_error=not self.options['extrapolate'],
+                                        **opts)
+
+        if self.options['training_data_gradients']:
+            self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
+
+        super(SplineComp, self)._setup_var_data(recurse=recurse)
+
+
+
     def _setup_partials(self, recurse=True):
         """
         Process all partials and approximations that the user declared.
 
-        Metamodel needs to declare its partials after inputs and outputs are known.
+        SplineComp needs to declare its partials after inputs and outputs are known.
 
         Parameters
         ----------
@@ -147,18 +184,21 @@ class SplineComp(InterpBase):
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         for out_name, interp in iteritems(self.interps):
-            interp.values = inputs[self.interp_to_cp[out_name]]
-            interp.training_data_gradients = True
+            for i in range(0, self.options['vec_size']):
+                if self.options['vec_size'] > 1:
+                    interp.values = inputs[self.interp_to_cp[out_name]][i]
+                else:
+                    interp.values = inputs[self.interp_to_cp[out_name]]
+                interp.training_data_gradients = True
 
-            try:
-                val = interp.interpolate(pt)
+                try:
+                    val = interp.interpolate(pt)
+                    outputs[out_name][i, :] = val
 
-            except ValueError as err:
-                raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
-                                                                                   out_name,
-                                                                                   str(err)))
-            outputs[out_name] = val
-
+                except ValueError as err:
+                    raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
+                                                                                    out_name,
+                                                                                    str(err)))
 
     def compute_partials(self, inputs, partials):
         """
