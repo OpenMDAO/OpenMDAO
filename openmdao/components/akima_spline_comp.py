@@ -11,6 +11,7 @@ from six import string_types
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.utils.general_utils import warn_deprecation
 
 
 def abs_smooth_dv(x, x_deriv, delta_x):
@@ -79,6 +80,8 @@ class AkimaSplineComp(ExplicitComponent):
 
         self.x_grid = None
         self.x_cp_grid = None
+
+        warn_deprecation("'AkimaSplineComp' has been deprecated. Use 'SplineComp' instead.")
 
     def initialize(self):
         """
