@@ -56,7 +56,6 @@ class SplineTestCase(unittest.TestCase):
 
     def test_akima_backward_compatibility(self):
 
-
         comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp=self.x,
                              interp_options={'delta_x': 0.1})
         comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=self.y_cp)

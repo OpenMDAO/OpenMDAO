@@ -32,18 +32,6 @@ class MetaModelStructuredComp(InterpBase):
     Extrapolation is supported, but disabled by default. It can be enabled via initialization
     option.
 
-    Attributes
-    ----------
-    grad_shape : tuple
-        Cached shape of the gradient of the outputs wrt the training inputs.
-    interps : dict
-        Dictionary of interpolations for each output.
-    params : list
-        List containing training data for each input.
-    pnames : list
-        Cached list of input names.
-    training_outputs : dict
-        Dictionary of training data each output.
     """
 
     def __init__(self, **kwargs):
@@ -133,6 +121,36 @@ class MetaModelStructuredComp(InterpBase):
             super(MetaModelStructuredComp, self).add_input("%s_train" % name,
                                                            val=training_data, **kwargs)
 
+    def _setup_var_data(self, recurse=True):
+        """
+        Instantiate surrogates for the output variables that use the default surrogate.
+
+        Parameters
+        ----------
+        recurse : bool
+            Whether to call this method in subsystems.
+        """
+        interp_method = self.options['method']
+        if interp_method.startswith('scipy'):
+            interp = ScipyGridInterp
+            interp_method = interp_method[6:]
+        else:
+            interp = PythonGridInterp
+
+        opts = {}
+        if 'interp_options' in self.options:
+            opts = self.options['interp_options']
+        for name, train_data in iteritems(self.training_outputs):
+            self.interps[name] = interp(self.params, train_data,
+                                        interp_method=interp_method,
+                                        bounds_error=not self.options['extrapolate'],
+                                        **opts)
+
+        if self.options['training_data_gradients']:
+            self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
+
+        super(MetaModelStructuredComp, self)._setup_var_data(recurse=recurse)
+
     def _setup_partials(self, recurse=True):
         """
         Process all partials and approximations that the user declared.
@@ -144,7 +162,7 @@ class MetaModelStructuredComp(InterpBase):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        super(InterpBase, self)._setup_partials()
+        super(MetaModelStructuredComp, self)._setup_partials()
         arange = np.arange(self.options['vec_size'])
         pnames = tuple(self.pnames)
         dct = {
@@ -161,7 +179,6 @@ class MetaModelStructuredComp(InterpBase):
         # The scipy methods do not support complex step.
         if self.options['method'].startswith('scipy'):
             self.set_check_partial_options('*', method='fd')
-
 
     def compute(self, inputs, outputs):
         """
@@ -198,7 +215,6 @@ class MetaModelStructuredComp(InterpBase):
                                                                                    str(err)))
             outputs[out_name] = val
 
-
     def compute_partials(self, inputs, partials):
         """
         Collect computed partial derivatives and return them.
@@ -229,6 +245,7 @@ class MetaModelStructuredComp(InterpBase):
 
             if self.options['training_data_gradients']:
                 partials[out_name, "%s_train" % out_name] = dy_ddata
+
 
 class MetaModelStructured(MetaModelStructuredComp):
     """

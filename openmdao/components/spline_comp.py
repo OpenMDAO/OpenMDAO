@@ -1,3 +1,4 @@
+"""Define the SplineComp class."""
 from six import iteritems, itervalues
 import numpy as np
 
@@ -14,6 +15,8 @@ class SplineComp(InterpBase):
     ----------
     interp_to_cp : dict
         Dictionary of relationship between the interpolated data and its control points.
+    n_interp : int
+        Number of points to interpolate at
     """
 
     def __init__(self, **kwargs):
@@ -22,24 +25,9 @@ class SplineComp(InterpBase):
 
         Parameters
         ----------
-        method : str
-            Interpolation method. Valid values are ['akima', 'bspline', (more to come)]
-        x_cp_val : list or ndarray
-            List/array of x control point values, must be monotonically increasing.
-        x_interp : list or ndarray
-            List/array of x interpolated point values.
-        x_cp_name : str
-            Name for the x control points input.
-        x_interp_name : str
-            Name of the x interpolated points input.
-        x_units : str or None
-            Units of the x variable.
-        vec_size : int
-            The number of independent splines to interpolate.
-        interp_options : dict
-            Dict contains the name and value of options specific to the chosen interpolation method.
+        **kwargs : dict
+            Interpolator options to pass onward.
         """
-
         super(SplineComp, self).__init__(**kwargs)
 
         self.add_input(name=self.options['x_interp_name'], val=self.options['x_interp'])
@@ -87,7 +75,6 @@ class SplineComp(InterpBase):
         y_units : str or None
             Units of the y variable.
         """
-
         if not y_cp_name:
             msg = "{}: y_cp_name cannot be an empty string."
             raise ValueError(msg.format(self.msginfo))
@@ -96,7 +83,7 @@ class SplineComp(InterpBase):
             raise ValueError(msg.format(self.msginfo))
 
         self.add_output(y_interp_name, np.ones((self.options['vec_size'], self.n_interp)),
-                                           units=y_units)
+                        units=y_units)
         if y_cp_val is None:
             y_cp_val = self.options['x_cp_val']
 
@@ -140,8 +127,6 @@ class SplineComp(InterpBase):
 
         super(SplineComp, self)._setup_var_data(recurse=recurse)
 
-
-
     def _setup_partials(self, recurse=True):
         """
         Process all partials and approximations that the user declared.
@@ -170,7 +155,6 @@ class SplineComp(InterpBase):
         if self.options['method'].startswith('scipy'):
             self.set_check_partial_options('*', method='fd')
 
-
     def compute(self, inputs, outputs):
         """
         Perform the interpolation at run time.
@@ -197,8 +181,8 @@ class SplineComp(InterpBase):
 
                 except ValueError as err:
                     raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
-                                                                                    out_name,
-                                                                                    str(err)))
+                                                                                       out_name,
+                                                                                       str(err)))
 
     def compute_partials(self, inputs, partials):
         """

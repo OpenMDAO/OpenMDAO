@@ -50,6 +50,8 @@ class PythonGridInterp(GridInterpBase):
         Class specified as interpolation algorithm, used to regenerate if needed.
     _xi : ndarray
         Cache of current evaluation point.
+    _interp_options : dict
+        Dictionary of interpolator options
     """
 
     def __init__(self, points, values, interp_method="slinear", bounds_error=True, **kwargs):

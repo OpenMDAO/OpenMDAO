@@ -69,7 +69,8 @@ class ScipyGridInterp(GridInterpBase):
             Interpolator-specific options to pass onward.
         """
         if kwargs:
-            raise KeyError("SciPy interpolator does not support {} options.".format([x for x in kwargs]))
+            msg = "SciPy interpolator does not support {} options."
+            raise KeyError(msg.format([x for x in kwargs]))
 
         super(ScipyGridInterp, self).__init__(points, values, interp_method=interp_method,
                                               bounds_error=bounds_error)
