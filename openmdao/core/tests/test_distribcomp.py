@@ -328,7 +328,7 @@ class MPITests(unittest.TestCase):
 
         self.assertTrue(all(C2._outputs['outvec'] == np.ones(size, float)*7.5))
 
-    def test_distrib_list_inputs_outputs(self):
+    def test_list_inputs_outputs(self):
         size = 11
 
         test = self
@@ -354,7 +354,7 @@ class MPITests(unittest.TestCase):
                 self.connect('C1.outvec', 'C2.invec')
 
             def configure(self):
-                # verify list_inputs/list_outputs work in configure for distributed comp
+                # verify list_inputs/list_outputs work in configure
                 inputs = self.C2.list_inputs(shape=True, values=True, out_stream=None)
                 outputs = self.C2.list_outputs(shape=True, values=True, out_stream=None)
                 verify(inputs, outputs, pathnames=False)
@@ -362,7 +362,7 @@ class MPITests(unittest.TestCase):
         p = om.Problem(Model())
         p.setup()
 
-        # verify list_inputs/list_outputs work before final_setup for distributed comp
+        # verify list_inputs/list_outputs work before final_setup
         inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
         verify(inputs, outputs, pathnames=False)
@@ -371,17 +371,79 @@ class MPITests(unittest.TestCase):
 
         p['C1.invec'] = np.ones(size, float) * 5.0
 
-        # verify list_inputs/list_outputs work before run for distributed comp
+        # verify list_inputs/list_outputs work before run
         inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
         verify(inputs, outputs, pathnames=True)
 
         p.run_model()
 
-        # verify list_inputs/list_outputs work after run for distributed comp
+        # verify list_inputs/list_outputs work after run
         inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
         verify(inputs, outputs, in_vals=10., out_vals=7.5, pathnames=True)
+
+    def test_distrib_list_inputs_outputs(self):
+        size = 11
+
+        test = self
+
+        def verify(inputs, outputs, in_vals=1., out_vals=1., pathnames=False, comm=None):
+            if comm is not None:
+                sizes, offsets = evenly_distrib_idxs(comm.size, size)
+                local_size = sizes[comm.rank]
+            else:
+                local_size = size
+
+            test.assertEqual(len(inputs), 1)
+            name, meta = inputs[0]
+            test.assertEqual(name, 'C2.invec' if pathnames else 'invec')
+            test.assertEqual(meta['shape'], (local_size,))
+            test.assertTrue(all(meta['value'] == in_vals*np.ones(local_size)))
+
+            test.assertEqual(len(outputs), 1)
+            name, meta = outputs[0]
+            test.assertEqual(name, 'C2.outvec' if pathnames else 'outvec')
+            test.assertEqual(meta['shape'], (local_size,))
+            test.assertTrue(all(meta['value'] == out_vals*np.ones(local_size)))
+
+        class Model(om.Group):
+            def setup(self):
+                self.add_subsystem("C1", InOutArrayComp(arr_size=size))
+                self.add_subsystem("C2", DistribInputDistribOutputComp(arr_size=size))
+                self.add_subsystem("C3", DistribGatherComp(arr_size=size))
+                self.connect('C1.outvec', 'C2.invec')
+                self.connect('C2.outvec', 'C3.invec')
+
+            def configure(self):
+                # verify list_inputs/list_outputs work in configure for distributed comp
+                inputs = self.C2.list_inputs(shape=True, values=True, out_stream=None)
+                outputs = self.C2.list_outputs(shape=True, values=True, out_stream=None)
+                verify(inputs, outputs, pathnames=False, comm=self.comm)
+
+        p = om.Problem(Model())
+        p.setup()
+
+        # verify list_inputs/list_outputs work before final_setup for distributed comp
+        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, pathnames=False, comm=p.comm)
+
+        p.final_setup()
+
+        p['C1.invec'] = np.ones(size, float) * 5.0
+
+        # verify list_inputs/list_outputs work before run for distributed comp
+        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, pathnames=True, comm=p.comm)
+
+        p.run_model()
+
+        # verify list_inputs/list_outputs work after run for distributed comp
+        inputs = p.model.C2.list_inputs(shape=True, values=True, out_stream=None)
+        outputs = p.model.C2.list_outputs(shape=True, values=True, out_stream=None)
+        verify(inputs, outputs, in_vals=10., out_vals=20., pathnames=True, comm=p.comm)
 
     def test_distrib_idx_in_full_out(self):
         size = 11
