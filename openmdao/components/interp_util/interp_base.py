@@ -8,14 +8,14 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 
 class InterpTableBase(object):
     """
-    Base class for interpolation over a single dimension of an n-dimensional table.
+    Base class for interpolation over data in an n-dimensional table.
 
     Attributes
     ----------
     grid : tuple(ndarray)
         Tuple containing x grid locations for this dimension.
     last_index : integer
-        Index of previous evluation, used to start search for current index.
+        Index of previous evaluation, used to start search for current index.
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
     subtable : <InterpTableBase>
@@ -31,9 +31,9 @@ class InterpTableBase(object):
         Parameters
         ----------
         grid : tuple(ndarray)
-            Tuple containing x grid locations for this dimension and all subtable dimensions.
+            Tuple containing ndarray of x grid locations for each table dimension.
         values : ndarray
-            Array containing the table values for all dimensions.
+            Array containing the values at all points in grid.
         interp : class
             Interpolation class to be used for subsequent table dimensions.
         **kwargs : dict
