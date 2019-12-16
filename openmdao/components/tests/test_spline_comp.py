@@ -130,7 +130,7 @@ class SplineTestCase(unittest.TestCase):
                         6.        ,  6.73660714,  8.46428571, 10.45982143, 12.        ,
                         13.08035714, 14.        ]])
 
-        # assert_array_almost_equal(y, self.prob['akima1.y_val'])
+        # assert_array_almost_equal(y.flatten(), self.prob['akima1.y_val'].flatten())
 
     # def test_bspline_interp_options(self):
 
