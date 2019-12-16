@@ -1,15 +1,20 @@
-"""Helper function to create non uniform distributions for SplineComp"""
+"""Helper function to create non uniform distributions for SplineComp."""
 
 import numpy as np
 
-class SplineDistribution(object):
 
-    def __init__(self):
-        pass
+class SplineDistribution(object):
+    """
+    Class to provide helper functions for distribution of interpolation points.
+
+    Attributes
+    ----------
+    None
+    """
 
     def cell_centered(self, input_points, num_points):
         """
-        Distribute control points
+        Cell centered distribution of control points.
 
         Parameters
         ----------
@@ -32,7 +37,7 @@ class SplineDistribution(object):
 
     def sine_distribution(self, input_points, num_points, phase=np.pi):
         """
-        Sine distribution of control points
+        Sine distribution of control points.
 
         Parameters
         ----------
@@ -54,7 +59,7 @@ class SplineDistribution(object):
 
     def node_centered(self, input_points, num_points):
         """
-        Distribute control points
+        Distribute control points.
 
         Parameters
         ----------
