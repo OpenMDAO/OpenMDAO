@@ -14,7 +14,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table
 from openmdao.utils.general_utils import warn_deprecation, make_set, \
-    var_name_match_includes_excludes
+    match_includes_excludes
 from openmdao.utils.units import get_conversion
 
 _DEFAULT_OUT_STREAM = object()
@@ -138,7 +138,7 @@ class Case(object):
             else:
                 inputs = data['inputs']
             if inputs is not None:
-                self.inputs = PromAbsDict(inputs, prom2abs, abs2prom, output=False)
+                self.inputs = PromAbsDict(inputs, prom2abs['input'], abs2prom['input'])
 
         if 'outputs' in data.keys():
             if data_format >= 3:
@@ -150,7 +150,7 @@ class Case(object):
             else:
                 outputs = data['outputs']
             if outputs is not None:
-                self.outputs = PromAbsDict(outputs, prom2abs, abs2prom)
+                self.outputs = PromAbsDict(outputs, prom2abs['output'], abs2prom['output'])
 
         if 'residuals' in data.keys():
             if data_format >= 3:
@@ -162,7 +162,7 @@ class Case(object):
             else:
                 residuals = data['residuals']
             if residuals is not None:
-                self.residuals = PromAbsDict(residuals, prom2abs, abs2prom)
+                self.residuals = PromAbsDict(residuals, prom2abs['output'], abs2prom['output'])
 
         if 'jacobian' in data.keys():
             if data_format >= 2:
@@ -172,7 +172,7 @@ class Case(object):
             else:
                 jacobian = data['jacobian']
             if jacobian is not None:
-                self.jacobian = PromAbsDict(jacobian, prom2abs, abs2prom, output=True)
+                self.jacobian = PromAbsDict(jacobian, prom2abs['output'], abs2prom['output'])
 
         # save var name & meta dict references for use by self._get_variables_of_type()
         self._prom2abs = prom2abs
@@ -326,11 +326,7 @@ class Case(object):
         PromAbsDict
             Map of variables to their values.
         """
-        vals = self._get_variables_of_type('desvar')
-        if scaled:
-            return self._apply_var_settings(vals, scaled, use_indices)
-        else:
-            return vals
+        return self._get_variables_of_type('desvar', scaled, use_indices)
 
     def get_objectives(self, scaled=True, use_indices=True):
         """
@@ -348,11 +344,7 @@ class Case(object):
         PromAbsDict
             Map of variables to their values.
         """
-        vals = self._get_variables_of_type('objective')
-        if scaled:
-            return self._apply_var_settings(vals, scaled, use_indices)
-        else:
-            return vals
+        return self._get_variables_of_type('objective', scaled, use_indices)
 
     def get_constraints(self, scaled=True, use_indices=True):
         """
@@ -370,11 +362,7 @@ class Case(object):
         PromAbsDict
             Map of variables to their values.
         """
-        vals = self._get_variables_of_type('constraint')
-        if scaled:
-            return self._apply_var_settings(vals, scaled, use_indices)
-        else:
-            return vals
+        return self._get_variables_of_type('constraint', scaled, use_indices)
 
     def get_responses(self, scaled=True, use_indices=True):
         """
@@ -392,11 +380,7 @@ class Case(object):
         PromAbsDict
             Map of variables to their values.
         """
-        vals = self._get_variables_of_type('response')
-        if scaled:
-            return self._apply_var_settings(vals, scaled, use_indices)
-        else:
-            return vals
+        return self._get_variables_of_type('response', scaled, use_indices)
 
     def list_inputs(self,
                     values=True,
@@ -461,16 +445,16 @@ class Case(object):
                 if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                     continue
 
-                if not var_name_match_includes_excludes(var_name,
-                                                        self._abs2prom['input'][var_name],
-                                                        includes, excludes):
+                var_name_prom = self._abs2prom['input'][var_name]
+
+                if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                     continue
 
                 var_meta = {}
                 if values:
                     var_meta['value'] = self.inputs[var_name]
                 if prom_name:
-                    var_meta['prom_name'] = self._abs2prom['input'][var_name]
+                    var_meta['prom_name'] = var_name_prom
                 if units:
                     var_meta['units'] = meta[var_name]['units']
                 if shape:
@@ -571,8 +555,9 @@ class Case(object):
             if tags and not (make_set(tags) & make_set(meta[var_name]['tags'])):
                 continue
 
-            if not var_name_match_includes_excludes(var_name, self._abs2prom['output'][var_name],
-                                                    includes, excludes):
+            var_name_prom = self._abs2prom['output'][var_name]
+
+            if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                 continue
 
             # check if residuals were recorded, skip if within specifed tolerance
@@ -587,7 +572,7 @@ class Case(object):
             if values:
                 var_meta['value'] = self.outputs[var_name]
             if prom_name:
-                var_meta['prom_name'] = self._abs2prom['output'][var_name]
+                var_meta['prom_name'] = var_name_prom
             if residuals:
                 var_meta['resids'] = resids
             if units:
@@ -683,7 +668,7 @@ class Case(object):
         write_var_table(pathname, var_list, var_type, var_dict,
                         hierarchical, print_arrays, out_stream)
 
-    def _get_variables_of_type(self, var_type):
+    def _get_variables_of_type(self, var_type, scaled=False, use_indices=False):
         """
         Get the variables of a given type and their values.
 
@@ -691,7 +676,12 @@ class Case(object):
         ----------
         var_type : str
             String indicating which value for 'type' should be accepted for a variable
-            to be included in the returned map.
+            to be included in the returned map.  Allowed values are: ['desvar', 'objective',
+            'constraint', 'response'].
+        scaled : bool
+            If True, then return scaled values.
+        use_indices : bool
+            If True, apply indices.
 
         Returns
         -------
@@ -702,44 +692,22 @@ class Case(object):
             return PromAbsDict({}, self._prom2abs, self._abs2prom)
 
         ret_vars = {}
-        for var in self.outputs.absolute_names():
-            if var_type in self._abs2meta[var]['type']:
-                ret_vars[var] = self.outputs[var]
+        update_vals = scaled or use_indices
+        for name in self.outputs.absolute_names():
+            if var_type in self._abs2meta[name]['type']:
+                ret_vars[name] = val = self.outputs[name]
+                if update_vals and name in self._var_info:
+                    meta = self._var_info[name]
+                    if use_indices and meta['indices'] is not None:
+                        val = val[meta['indices']]
+                    if scaled:
+                        if meta['adder'] is not None:
+                            val += meta['adder']
+                        if meta['scaler'] is not None:
+                            val *= meta['scaler']
+                    ret_vars[name] = val
 
-        return PromAbsDict(ret_vars, self._prom2abs, self._abs2prom)
-
-    def _apply_var_settings(self, vals, scaled=True, use_indices=True):
-        """
-        Scale the values array and apply indices from _var_info per the arguments.
-
-        Parameters
-        ----------
-        vals : PromAbsDict
-            Map of variables to their values.
-        scaled : bool
-            If True, then return scaled values.
-        use_indices : bool
-            If True, apply indices.
-
-        Returns
-        -------
-        PromAbsDict
-            Map of variables to their scaled values.
-        """
-        for name in vals.absolute_names():
-            if name in self._var_info:
-                meta = self._var_info[name]
-                if scaled:
-                    # physical to scaled
-                    if meta['adder'] is not None:
-                        vals[name] = vals[name] + meta['adder']
-                    if meta['scaler'] is not None:
-                        vals[name] = vals[name] * meta['scaler']
-                if use_indices:
-                    if meta['indices'] is not None:
-                        vals[name] = vals[name][meta['indices']]
-
-        return vals
+        return PromAbsDict(ret_vars, self._prom2abs['output'], self._abs2prom['output'])
 
 
 class PromAbsDict(dict):
@@ -752,15 +720,13 @@ class PromAbsDict(dict):
         Array or dict of values accessible via absolute variable name.
     _keys : array
         Absolute variable names that map to the values in the _values array.
-    _prom2abs : {'input': dict, 'output': dict}
+    _prom2abs : dict
         Dictionary mapping promoted names to absolute names.
-    _abs2prom : {'input': dict, 'output': dict}
+    _abs2prom : dict
         Dictionary mapping absolute names to promoted names.
-    _is_output : bool
-        True if this should map using output variable names, False for input variable names.
     """
 
-    def __init__(self, values, prom2abs, abs2prom, output=True):
+    def __init__(self, values, prom2abs, abs2prom):
         """
         Initialize.
 
@@ -768,48 +734,36 @@ class PromAbsDict(dict):
         ----------
         values : array or dict
             Numpy structured array or dictionary of values.
-        prom2abs : {'input': dict, 'output': dict}
+        prom2abs : dict
             Dictionary mapping promoted names to absolute names.
-        abs2prom : {'input': dict, 'output': dict}
+        abs2prom : dict
             Dictionary mapping absolute names to promoted names.
-        output : bool
-            True if this should map using output variable names, False for input variable names.
         """
         super(PromAbsDict, self).__init__()
 
-        self._is_output = output
-
         self._prom2abs = prom2abs
         self._abs2prom = abs2prom
-
-        if output:
-            prom2abs = self._prom2abs['output']
-            abs2prom = self._abs2prom['output']
-        else:
-            prom2abs = self._prom2abs['input']
-            abs2prom = self._abs2prom['input']
 
         if isinstance(values, dict):
             # dict of values, keyed on either absolute or promoted names
             self._values = {}
             for key in values.keys():
-                if isinstance(key, tuple) or ',' in key:
+                if key in abs2prom:
+                    # key is absolute name
+                    self._values[key] = values[key]
+                    prom_key = abs2prom[key]
+                    super(PromAbsDict, self).__setitem__(prom_key, values[key])
+                elif key in prom2abs:
+                    # key is promoted name
+                    for abs_key in prom2abs[key]:
+                        self._values[abs_key] = values[key]
+                    super(PromAbsDict, self).__setitem__(key, values[key])
+                elif isinstance(key, tuple) or ',' in key:
                     # derivative keys can be either (of, wrt) or 'of,wrt'
                     abs_keys, prom_key = self._deriv_keys(key)
                     for abs_key in abs_keys:
                         self._values[abs_key] = values[key]
                     super(PromAbsDict, self).__setitem__(prom_key, values[key])
-                else:
-                    if key in abs2prom:
-                        # key is absolute name
-                        self._values[key] = values[key]
-                        prom_key = abs2prom[key]
-                        super(PromAbsDict, self).__setitem__(prom_key, values[key])
-                    elif key in prom2abs:
-                        # key is promoted name
-                        for abs_key in prom2abs[key]:
-                            self._values[abs_key] = values[key]
-                        super(PromAbsDict, self).__setitem__(key, values[key])
             self._keys = self._values.keys()
         else:
             # numpy structured array, which will always use absolute names
@@ -857,8 +811,8 @@ class PromAbsDict(dict):
         tuple :
             (of, wrt) mapping the provided key to promoted names.
         """
-        prom2abs = self._prom2abs['output']
-        abs2prom = self._abs2prom['output']
+        prom2abs = self._prom2abs
+        abs2prom = self._abs2prom
 
         # derivative could be tuple or string, using absolute or promoted names
         if isinstance(key, tuple):
@@ -902,7 +856,7 @@ class PromAbsDict(dict):
                 msg = "The promoted name '%s' is invalid because it refers to multiple " + \
                       "inputs: %s. Access the value using an absolute path name or the " + \
                       "connected output variable instead."
-                raise RuntimeError(msg % (key, str(self._prom2abs['input'][key])))
+                raise RuntimeError(msg % (key, str(self._prom2abs[key])))
             else:
                 return val
 
@@ -924,13 +878,6 @@ class PromAbsDict(dict):
         value : any
             value for variable
         """
-        if self._is_output:
-            prom2abs = self._prom2abs['output']
-            abs2prom = self._abs2prom['output']
-        else:
-            prom2abs = self._prom2abs['input']
-            abs2prom = self._abs2prom['input']
-
         if isinstance(key, tuple) or ',' in key:
             # derivative keys can be either (of, wrt) or 'of,wrt'
             abs_keys, prom_key = self._deriv_keys(key)
@@ -943,10 +890,10 @@ class PromAbsDict(dict):
         elif key in self._keys:
             # absolute name
             self._values[key] = value
-            super(PromAbsDict, self).__setitem__(abs2prom[key], value)
+            super(PromAbsDict, self).__setitem__(self._abs2prom[key], value)
         else:
             # promoted name, propagate to all connected absolute names
-            for abs_key in prom2abs[key]:
+            for abs_key in self._prom2abs[key]:
                 if abs_key in self._keys:
                     self._values[abs_key] = value
             super(PromAbsDict, self).__setitem__(key, value)

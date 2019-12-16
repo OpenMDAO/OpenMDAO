@@ -109,7 +109,7 @@ class ExplCompTestCase(unittest.TestCase):
         prob = om.Problem(RectangleGroup())
         prob.setup()
 
-        msg = "RectangleGroup (<model>): Unable to list inputs until model has been run."
+        msg = "RectangleGroup (<model>): Unable to list inputs on a Group until model has been run."
         try:
             prob.model.list_inputs()
         except Exception as err:
@@ -117,7 +117,7 @@ class ExplCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
-        msg = "RectangleGroup (<model>): Unable to list outputs until model has been run."
+        msg = "RectangleGroup (<model>): Unable to list outputs on a Group until model has been run."
         try:
             prob.model.list_outputs()
         except Exception as err:
@@ -192,6 +192,61 @@ class ExplCompTestCase(unittest.TestCase):
         model.connect('p2.y', 'comp.y')
 
         prob.setup()
+
+        # list outputs before model has been run will raise an exception
+        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
+        try:
+            prob.model.list_outputs()
+        except Exception as err:
+            self.assertEqual(str(err), msg)
+        else:
+            self.fail("Exception expected")
+
+        # list_inputs on a component before run is okay, using relative names
+        expl_inputs = prob.model.comp.list_inputs(out_stream=None)
+        expected = {
+            'x': {'value': 0.},
+            'y': {'value': 0.}
+        }
+        self.assertEqual(dict(expl_inputs), expected)
+
+        expl_inputs = prob.model.comp.list_inputs(includes='x', out_stream=None)
+        self.assertEqual(dict(expl_inputs), {'x': {'value': 0.}})
+
+        expl_inputs = prob.model.comp.list_inputs(excludes='x', out_stream=None)
+        self.assertEqual(dict(expl_inputs), {'y': {'value': 0.}})
+
+        # specifying prom_name should not cause an error
+        expl_inputs = prob.model.comp.list_inputs(prom_name=True, out_stream=None)
+        self.assertEqual(dict(expl_inputs), {
+            'x': {'value': 0., 'prom_name': 'x'},
+            'y': {'value': 0., 'prom_name': 'y'},
+        })
+
+        # list_outputs on a component before run is okay, using relative names
+        expl_outputs = prob.model.p1.list_outputs(out_stream=None)
+        expected = {
+            'x': {'value': 12.}
+        }
+        self.assertEqual(dict(expl_outputs), expected)
+
+        expl_outputs = prob.model.p1.list_outputs(includes='x', out_stream=None)
+        self.assertEqual(dict(expl_outputs), expected)
+
+        expl_outputs = prob.model.p1.list_outputs(excludes='x', out_stream=None)
+        self.assertEqual(dict(expl_outputs), {})
+
+        # specifying residuals_tol should not cause an error
+        expl_outputs = prob.model.p1.list_outputs(residuals_tol=.01, out_stream=None)
+        self.assertEqual(dict(expl_outputs), expected)
+
+        # specifying prom_name should not cause an error
+        expl_outputs = prob.model.p1.list_outputs(prom_name=True, out_stream=None)
+        self.assertEqual(dict(expl_outputs), {
+            'x': {'value': 12., 'prom_name': 'x'}
+        })
+
+        # run model
         prob.set_solver_print(level=0)
         prob.run_model()
 

@@ -148,7 +148,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Run the apply_nonlinear method on the system.
         """
-        self._recording_iter.stack.append(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
 
         system = self._system()
 
@@ -159,7 +159,7 @@ class NewtonSolver(NonlinearSolver):
         try:
             system._apply_nonlinear()
         finally:
-            self._recording_iter.stack.pop()
+            self._recording_iter.pop()
 
         # Enable local fd
         system._owns_approx_jac = approx_status

@@ -122,7 +122,7 @@ def _get_color_printer(stream=sys.stdout, colors=True, rank=0):
         def color_print(s, **kwargs):
             pass
     else:
-        def color_print(s, fore='', color='', end=''):
+        def color_print(s, color='', end=''):
             """
             """
             print(color + s, file=stream, end='')

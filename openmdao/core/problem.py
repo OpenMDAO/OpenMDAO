@@ -18,10 +18,9 @@ import numpy as np
 import scipy.sparse as sparse
 
 from openmdao.core.component import Component
-from openmdao.core.driver import Driver
+from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.group import Group
-from openmdao.core.group import System
+from openmdao.core.group import Group, System
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.approximation_schemes.complex_step import ComplexStep
@@ -39,6 +38,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import get_conversion
 from openmdao.utils import coloring as coloring_mod
 from openmdao.utils.name_maps import abs_key2rel_key
+from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.default_vector import DefaultVector
 from openmdao.utils.logger_utils import get_logger, TestLogger
 import openmdao.utils.coloring as coloring_mod
@@ -114,8 +114,6 @@ class Problem(object):
         Dictionary with problem recording options.
     _rec_mgr : <RecordingManager>
         Object that manages all recorders added to this problem.
-    _remote_var_set : set
-        Set of variables (absolute names) that require remote data transfer to reach all procs.
     _check : bool
         If True, call check_config at the end of final_setup.
     _recording_iter : _RecIteration
@@ -130,8 +128,6 @@ class Problem(object):
         after a reconfiguration) you may need to set this to True.
     _name : str
         Problem name.
-    __get_remote : bool
-        Flag used to determine when __getitem__ will retrieve remote variables.
     """
 
     def __init__(self, model=None, driver=None, comm=None, root=None, name=None, **options):
@@ -154,9 +150,6 @@ class Problem(object):
         **options : named args
             All remaining named args are converted to options.
         """
-        # used by the get_val function when get_remote is True
-        self.__get_remote = False
-
         self.cite = CITATION
         self._name = name
 
@@ -227,11 +220,15 @@ class Problem(object):
         self.recording_options.declare('record_constraints', types=bool, default=True,
                                        desc='Set to True to record constraints at the '
                                             'problem level')
+        self.recording_options.declare('record_responses', types=bool, default=False,
+                                       desc='Set True to record constraints and objectives at the '
+                                            'problem level.')
         self.recording_options.declare('includes', types=list, default=['*'],
-                                       desc='Patterns for variables to include in recording')
+                                       desc='Patterns for variables to include in recording. \
+                                       Uses fnmatch wildcards')
         self.recording_options.declare('excludes', types=list, default=[],
                                        desc='Patterns for vars to exclude in recording '
-                                            '(processed post-includes)')
+                                            '(processed post-includes). Uses fnmatch wildcards')
 
         _setup_hooks(self)
 
@@ -250,7 +247,7 @@ class Problem(object):
                                                                                       name,
                                                                                       abs_names))
 
-        raise KeyError("{}: Variable '{}' not found.".format(self.msginfo, name))
+        raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
 
     @property
     def msginfo(self):
@@ -301,6 +298,53 @@ class Problem(object):
         # variable exists, but may be remote
         return abs_name in self.model._var_abs2meta
 
+    def _get_cached_val(self, name):
+        # We have set and cached already
+        if name in self._initial_condition_cache:
+            return self._initial_condition_cache[name]
+
+        # Vector not setup, so we need to pull values from saved metadata request.
+        else:
+            proms = self.model._var_allprocs_prom2abs_list
+            meta = self.model._var_abs2meta
+            if name in meta:
+                if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
+                    src_name = self.model._conn_abs_in2out[name]
+                    val = meta[src_name]['value']
+                else:
+                    val = meta[name]['value']
+
+            elif name in proms['output']:
+                abs_name = prom_name2abs_name(self.model, name, 'output')
+                if abs_name in meta:
+                    val = meta[abs_name]['value']
+
+            elif name in proms['input']:
+                abs_name = proms['input'][name][0]
+                conn = self.model._conn_abs_in2out
+                if abs_name in meta:
+                    if isinstance(self.model, Group) and abs_name in conn:
+                        src_name = self.model._conn_abs_in2out[abs_name]
+                        # So, if the inputs and outputs are promoted to the same name, then we
+                        # allow getitem, but if they aren't, then we raise an error due to non
+                        # uniqueness.
+                        if name not in proms['output']:
+                            # This triggers a check for unconnected non-unique inputs, and
+                            # raises the same error as vector access.
+                            abs_name = prom_name2abs_name(self.model, name, 'input')
+                        val = meta[src_name]['value']
+                    else:
+                        # This triggers a check for unconnected non-unique inputs, and
+                        # raises the same error as vector access.
+                        abs_name = prom_name2abs_name(self.model, name, 'input')
+                        val = meta[abs_name]['value']
+
+            if val is not _undefined:
+                # Need to cache the "get" in case the user calls in-place numpy operations.
+                self._initial_condition_cache[name] = val
+
+        return val
+
     def __getitem__(self, name):
         """
         Get an output/input variable.
@@ -315,114 +359,7 @@ class Problem(object):
         float or ndarray or any python object
             the requested output/input variable.
         """
-        # Caching only needed if vectors aren't allocated yet.
-        proms = self.model._var_allprocs_prom2abs_list
-        meta = self.model._var_abs2meta
-
-        val = _undefined
-        abs_name = None
-
-        if self._setup_status == 1:
-
-            # We have set and cached already
-            if name in self._initial_condition_cache:
-                return self._initial_condition_cache[name]
-
-            # Vector not setup, so we need to pull values from saved metadata request.
-            else:
-                if name in meta:
-                    if isinstance(self.model, Group) and name in self.model._conn_abs_in2out:
-                        src_name = self.model._conn_abs_in2out[name]
-                        val = meta[src_name]['value']
-                    else:
-                        val = meta[name]['value']
-
-                elif name in proms['output']:
-                    abs_name = prom_name2abs_name(self.model, name, 'output')
-                    if abs_name in meta:
-                        val = meta[abs_name]['value']
-
-                elif name in proms['input']:
-                    abs_name = proms['input'][name][0]
-                    conn = self.model._conn_abs_in2out
-                    if abs_name in meta:
-                        if isinstance(self.model, Group) and abs_name in conn:
-                            src_name = self.model._conn_abs_in2out[abs_name]
-                            # So, if the inputs and outputs are promoted to the same name, then we
-                            # allow getitem, but if they aren't, then we raise an error due to non
-                            # uniqueness.
-                            if name not in proms['output']:
-                                # This triggers a check for unconnected non-unique inputs, and
-                                # raises the same error as vector access.
-                                abs_name = prom_name2abs_name(self.model, name, 'input')
-                            val = meta[src_name]['value']
-                        else:
-                            # This triggers a check for unconnected non-unique inputs, and
-                            # raises the same error as vector access.
-                            abs_name = prom_name2abs_name(self.model, name, 'input')
-                            val = meta[abs_name]['value']
-
-                if val is not _undefined:
-                    # Need to cache the "get" in case the user calls in-place numpy operations.
-                    self._initial_condition_cache[name] = val
-
-        else:
-            if name in proms['output']:
-                name = proms['output'][name][0]
-            elif name in proms['input']:
-                name = prom_name2abs_name(self.model, name, 'input')
-
-            if name in meta:   # local var
-                if name in self.model._outputs._views:
-                    val = self.model._outputs[name]
-                else:
-                    val = self.model._inputs[name]
-
-            elif name in self.model._discrete_outputs:
-                val = self.model._discrete_outputs[name]
-
-            elif name in self.model._discrete_inputs:
-                val = self.model._discrete_inputs[name]
-
-        if self.model.comm.size > 1:
-            allprocs_meta = self.model._var_allprocs_abs2meta
-            # check for remote var
-            if name in allprocs_meta:
-                abs_name = name
-            elif name in proms['output']:
-                abs_name = proms['output'][name][0]
-            elif name in proms['input']:
-                abs_name = proms['input'][name][0]
-
-            if abs_name in self._remote_var_set:
-                if self.__get_remote:
-                    if abs_name in allprocs_meta and allprocs_meta[abs_name]['distributed']:
-                        raise RuntimeError("%s: Retrieval of the full distributed variable '%s' "
-                                           "is not supported." % (self.msginfo, abs_name))
-                    loc_val = val
-                    owner = self.model._owning_rank[abs_name]
-                    if owner != self.model.comm.rank:
-                        val = None
-                    else:
-                        owner = self.model._owning_rank[abs_name]
-                        if val is _undefined:
-                            val = None
-                    new_val = self.model.comm.bcast(val, root=owner)
-                    if loc_val is not None and loc_val is not _undefined:
-                        val = loc_val
-                    else:
-                        val = new_val
-                elif val is _undefined:
-                    raise RuntimeError(
-                        "{}: Variable '{}' is not local to rank {}. You can retrieve values from "
-                        "other processes using "
-                        "`problem.get_val(<name>, get_remote=True)`.".format(self.msginfo, name,
-                                                                             self.comm.rank))
-
-        if val is _undefined:
-            raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
-
-        return val
+        return self.get_val(name)
 
     def get_val(self, name, units=None, indices=None, get_remote=False):
         """
@@ -445,69 +382,30 @@ class Problem(object):
 
         Returns
         -------
-        float or ndarray
-            The requested output/input variable.
+        object
+            The value of the requested output/input variable.
         """
-        if get_remote:
-            self.__get_remote = True
-            try:
-                val = self[name]
-            finally:
-                self.__get_remote = False
-        else:
-            val = self[name]
+        if self._setup_status == 1:
+            val = self._get_cached_val(name)
+            if indices is not None:
+                val = val[indices]
+            if units is not None:
+                val = self.model.convert2units(name, val, units)
+            return val
 
-        if indices is not None:
-            val = val[indices]
+        val = self.model._get_val(name, units=units, indices=indices, get_remote=get_remote)
 
-        if units is not None:
-            base_units = self._get_units(name)
-
-            if base_units is None:
-                msg = "{}: Can't express variable '{}' with units of 'None' in units of '{}'."
-                raise TypeError(msg.format(self.msginfo, name, units))
-
-            try:
-                scale, offset = get_conversion(base_units, units)
-            except TypeError:
-                msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
-                raise TypeError(msg.format(self.msginfo, name, base_units, units))
-
-            val = (val + offset) * scale
+        if val is System._undefined:
+            if get_remote:
+                raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
+            else:
+                raise RuntimeError(
+                    "{}: Variable '{}' is not local to rank {}. You can retrieve values from "
+                    "other processes using "
+                    "`problem.get_val(<name>, get_remote=True)`.".format(self.msginfo, name,
+                                                                         self.comm.rank))
 
         return val
-
-    def _get_units(self, name):
-        """
-        Get the units for a variable name.
-
-        Parameters
-        ----------
-        name : str
-            Promoted or relative variable name in the root system's namespace.
-
-        Returns
-        -------
-        str
-            Unit string.
-        """
-        meta = self.model._var_allprocs_abs2meta
-        if name in meta:
-            return meta[name]['units']
-
-        proms = self.model._var_allprocs_prom2abs_list
-        if self._setup_status >= 1:
-
-            if name in proms['output']:
-                abs_name = prom_name2abs_name(self.model, name, 'output')
-                return meta[abs_name]['units']
-            elif name in proms['input']:
-                # This triggers a check for unconnected non-unique inputs, and
-                # raises the same error as vector access.
-                abs_name = prom_name2abs_name(self.model, name, 'input')
-                return meta[abs_name]['units']
-
-        raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
 
     def __setitem__(self, name, value):
         """
@@ -547,7 +445,7 @@ class Problem(object):
                     print("Variable '{}' is remote on rank {}.  "
                           "Local assignment ignored.".format(name, self.comm.rank))
                 else:
-                    raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
+                    raise KeyError('{}: Variable "{}" not found.'.format(self.model.msginfo, name))
 
     def set_val(self, name, value, units=None, indices=None):
         """
@@ -567,7 +465,7 @@ class Problem(object):
             Indices or slice to set to specified value.
         """
         if units is not None:
-            base_units = self._get_units(name)
+            base_units = self.model._get_var_meta(name)['units']
 
             if base_units is None:
                 msg = "{}: Can't set variable '{}' with units 'None' to value with units '{}'."
@@ -777,7 +675,6 @@ class Problem(object):
         Set up case recording.
         """
         self._filtered_vars_to_record = self.driver._get_vars_to_record(self.recording_options)
-
         self._rec_mgr.startup(self)
 
     def add_recorder(self, recorder):
@@ -812,59 +709,23 @@ class Problem(object):
         case_name : str
             Name used to identify this Problem case.
         """
-        if not self._rec_mgr._recorders:
-            return
+        record_iteration(self, self, case_name)
 
-        # Get the data to record (collective calls that get across all ranks)
-        opts = self.recording_options
-        filt = self._filtered_vars_to_record
+    def _get_recorder_metadata(self, case_name):
+        """
+        Return metadata from the latest iteration for use in the recorder.
 
-        model = self.model
-        driver = self.driver
+        Parameters
+        ----------
+        case_name : str
+            Name of current case.
 
-        if opts['record_desvars']:
-            des_vars = driver.get_design_var_values()
-        else:
-            des_vars = {}
-
-        if opts['record_objectives']:
-            obj_vars = driver.get_objective_values()
-        else:
-            obj_vars = {}
-
-        if opts['record_constraints']:
-            con_vars = driver.get_constraint_values()
-        else:
-            con_vars = {}
-
-        des_vars = {name: des_vars[name] for name in filt['des']}
-        obj_vars = {name: obj_vars[name] for name in filt['obj']}
-        con_vars = {name: con_vars[name] for name in filt['con']}
-
-        names = model._outputs._names
-        views = model._outputs._views
-        sys_vars = {name: views[name] for name in names if name in filt['sys']}
-
-        if MPI:
-            des_vars = driver._gather_vars(model, des_vars)
-            obj_vars = driver._gather_vars(model, obj_vars)
-            con_vars = driver._gather_vars(model, con_vars)
-            sys_vars = driver._gather_vars(model, sys_vars)
-
-        outs = {}
-        if not MPI or model.comm.rank == 0:
-            outs.update(des_vars)
-            outs.update(obj_vars)
-            outs.update(con_vars)
-            outs.update(sys_vars)
-
-        data = {
-            'out': outs,
-        }
-
-        metadata = create_local_meta(case_name)
-
-        self._rec_mgr.record_iteration(self, data, metadata)
+        Returns
+        -------
+        dict
+            Metadata dictionary for the recorder.
+        """
+        return create_local_meta(case_name)
 
     def setup(self, vector_class=None, check=False, logger=None, mode='auto',
               force_alloc_complex=False, distributed_vector_class=PETScVector,
@@ -944,34 +805,6 @@ class Problem(object):
 
         model._setup(model_comm, 'full', mode, distributed_vector_class, local_vector_class,
                      derivatives, self.options)
-
-        # get set of all vars that we may need to bcast later
-        self._remote_var_set = remote_var_set = set()
-        if model_comm.size > 1:
-            for type_ in ('input', 'output'):
-                remote_discrete = set()
-                sizes = self.model._var_sizes['nonlinear'][type_]
-                for i, vname in enumerate(self.model._var_allprocs_abs_names[type_]):
-                    if not np.all(sizes[:, i]):
-                        remote_var_set.add(vname)
-
-                if self.model._var_allprocs_discrete[type_]:
-                    local = list(self.model._var_discrete[type_])
-                    byrank = self.comm.gather(local, root=0)
-                    if model_comm.rank == 0:
-                        full = set()
-                        for names in byrank:
-                            full.update(names)
-
-                        for names in byrank:
-                            diff = full.difference(names)
-                            remote_discrete.update(diff)
-
-                        model_comm.bcast(remote_discrete, root=0)
-                    else:
-                        remote_discrete = model_comm.bcast(None, root=0)
-
-                    remote_var_set.update(remote_discrete)
 
         # Cache all args for final setup.
         self._check = check

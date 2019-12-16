@@ -55,7 +55,6 @@ class CaseRecorder(object):
         # For Systems
         self._inputs = None
         self._outputs = None
-        self._resids = None
 
         # For Solvers
         self._abs_error = 0.0

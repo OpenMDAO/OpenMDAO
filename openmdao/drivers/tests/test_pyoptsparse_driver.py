@@ -21,7 +21,7 @@ from openmdao.utils.testing_utils import use_tempdirs
 OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT')
 
 if OPTIMIZER:
-    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
+    from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, UserRequestedException
 
 
 class ParaboloidAE(om.ExplicitComponent):
@@ -1681,6 +1681,62 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertEqual(exception.args[0], msg)
 
+    def test_signal_handler_SNOPT(self):
+        _, local_opt = set_pyoptsparse_opt('SNOPT')
+        if local_opt != 'SNOPT':
+            raise unittest.SkipTest("pyoptsparse is not providing SNOPT")
+
+        class ParaboloidSIG(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+
+                self.add_output('f_xy', val=0.0)
+
+                self.declare_partials('*', '*')
+
+                self.iter_count = 0
+
+            def compute(self, inputs, outputs):
+                self.iter_count += 1
+                if self.iter_count == 1:
+                    # Pretends that this was raised by a signal handler triggered by the user.
+                    raise UserRequestedException('This is expected.')
+                elif self.iter_count > 3:
+                    raise RuntimeError('SNOPT should have stopped.')
+                else:
+                    # Post optimization run with optimal params.
+                    pass
+
+            def compute_partials(self, inputs, partials):
+                x = inputs['x']
+                y = inputs['y']
+
+                partials['f_xy', 'x'] = 2.0*x - 6.0 + y
+                partials['f_xy', 'y'] = 2.0*y + 8.0 + x
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('x', om.IndepVarComp('x', 2.0), promotes=['*'])
+        model.add_subsystem('f_x', ParaboloidSIG(), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'SNOPT'
+
+        prob.model.add_design_var('x', lower=0)
+        model.add_objective('f_xy')
+        prob.model.add_constraint('x', lower=0)
+
+        prob.setup()
+
+        prob.run_driver()
+
+        # SNOPT return code 71 is a user-requested termination.
+        code = prob.driver.pyopt_solution.optInform['value']
+        self.assertEqual(code, 71)
+
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
@@ -2063,6 +2119,17 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         # Checking that iprint stack gets routinely cleaned.
         output = output.split('\n')
         self.assertEqual(output[-2], ('NL: NLBGS Converged'))
+
+    def test_signal_set(self):
+        import openmdao.api as om
+        import signal
+
+        prob = om.Problem()
+        model = prob.model
+
+        prob.driver = om.pyOptSparseDriver()
+        prob.driver.options['optimizer'] = "SNOPT"
+        prob.driver.options['user_teriminate_signal'] = signal.SIGUSR2
 
 
 if __name__ == "__main__":
