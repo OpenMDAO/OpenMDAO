@@ -7,6 +7,7 @@ import numpy as np
 from numpy.testing import assert_array_almost_equal
 
 import openmdao.api as om
+from openmdao.components.spline_comp import interp
 from openmdao.utils.assert_utils import assert_check_partials
 
 class SplineTestCase(unittest.TestCase):
@@ -131,6 +132,25 @@ class SplineTestCase(unittest.TestCase):
                         13.08035714, 14.        ]])
 
         # assert_array_almost_equal(y.flatten(), self.prob['akima1.y_val'].flatten())
+
+    def test_standalone_interp(self):
+
+        standalone = interp('akima', self.x_cp, self.y_cp, self.x)
+
+        spline_comp_y_array = np.array([[
+            5.        ,  7.21095802,  9.2182764 , 10.8183155 , 11.80743568,
+            12.12244898, 12.34693878, 12.57142857, 12.79591837, 13.02040816,
+            13.24489796, 13.46938776, 13.69387755, 13.91836735, 14.14285714,
+            14.36734694, 14.59183673, 14.81632653, 15.04081633, 15.26530612,
+            15.48979592, 15.71428571, 15.93877551, 16.16506444, 16.39785941,
+            16.63732612, 16.8833762 , 17.13592126, 17.3948729 , 17.66014276,
+            17.93164243, 18.20928355, 18.49297771, 18.78263654, 19.07817165,
+            19.37949466, 19.68651717, 19.99915081, 20.31730719, 20.64089793,
+            20.96983463, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
+            24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
+
+        assert_array_almost_equal(spline_comp_y_array.flatten(), standalone[0].flatten())
+
 
     # def test_bspline_interp_options(self):
 

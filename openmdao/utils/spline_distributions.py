@@ -7,9 +7,6 @@ class SplineDistribution(object):
     """
     Class to provide helper functions for distribution of interpolation points.
 
-    Attributes
-    ----------
-    None
     """
 
     def cell_centered(self, input_points, num_points):

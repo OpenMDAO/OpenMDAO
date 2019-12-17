@@ -5,6 +5,7 @@ import numpy as np
 from openmdao.components.interp_util.python_interp import PythonGridInterp
 from openmdao.components.interp_util.scipy_interp import ScipyGridInterp
 from openmdao.components.interp_base import InterpBase
+from openmdao.core.problem import Problem
 
 
 class SplineComp(InterpBase):
@@ -212,3 +213,44 @@ class SplineComp(InterpBase):
                 partials[out_name, p] = dval[i, :]
 
             partials[out_name, self.interp_to_cp[out_name]] = dy_ddata
+
+
+def interp(method, x_data, y_data, x):
+    """
+    Compute y and its derivatives for a given x by interpolating on x_data and y_data.
+
+    Parameters
+    ----------
+    method : str
+        Method to use, choose from all available openmmdao methods.
+    x_data : ndarray or list
+        Input data for x, should be monotonically increasing. For higher dimensional grids,
+        x_data should be a list containing the x data for each dimension.
+    y_data : ndarray
+        Input values for y. For higher dimensional grids, the index order should be the same as
+        in x_data.
+    x : float or iterable or ndarray
+        Location(s) at which to interpolate.
+
+    Returns
+    -------
+    float or ndarray
+        Interpolated values y
+    ndarray
+        Derivative of y with respect to x
+    ndarray
+        Derivative of y with respect to x_data
+    ndarray
+        Derivative of y with respect to y_data
+    """
+    prob = Problem()
+
+    comp = SplineComp(method=method, x_cp_val=x_data, x_cp_name='xcp', x_interp=x,
+                      x_interp_name='x')
+    comp.add_spline(y_cp_name='ycp', y_interp_name='y', y_cp_val=y_data)
+
+    prob.model.add_subsystem('spline1', comp)
+    prob.setup(force_alloc_complex=True)
+    prob.run_model()
+
+    return prob['spline1.y'], prob['spline1.x'], prob['spline1.xcp'], prob['spline1.ycp']
