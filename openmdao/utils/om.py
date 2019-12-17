@@ -610,6 +610,10 @@ def _list_installed_setup_parser(parser):
                         'Allowed types are {}.'.format(sorted(_allowed_types)))
     parser.add_argument('-d', '--docs', action='store_true', dest='show_docs',
                         help="Display the class docstrings.")
+    parser.add_argument('-x', '--exclude', default=[], action='append', dest='excludes',
+                        help='Package to exclude.')
+    parser.add_argument('-i', '--include', default=[], action='append', dest='includes',
+                        help='Package to include.')
 
 
 def _list_installed_cmd(options, user_args):
@@ -644,9 +648,21 @@ def _list_installed_cmd(options, user_args):
         cwid = 0
         for ep in pkg_resources.iter_entry_points(group=_allowed_types[type_]):
             klass = ep.load()
-            epdict[klass.__name__] = (klass.__module__, klass.__doc__)
-            if len(klass.__name__) > cwid:
-                cwid = len(klass.__name__)
+            for ex in options.excludes:
+                if klass.__module__.startswith(ex + '.'):
+                    break
+            else:
+                found = True
+                if options.includes:
+                    for inc in options.includes:
+                        if klass.__module__.startswith(inc + '.'):
+                            break
+                    else:
+                        found = False
+                if found:
+                    epdict[klass.__name__] = (klass.__module__, klass.__doc__)
+                    if len(klass.__name__) > cwid:
+                        cwid = len(klass.__name__)
 
         if epdict:
             print("  {:<{cwid}} {}".format('Class Name', 'Module', cwid=cwid))

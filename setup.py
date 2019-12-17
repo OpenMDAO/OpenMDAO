@@ -18,7 +18,8 @@ optional_dependencies = {
         'sphinx>=1.8.5',
     ],
     'visualization': [
-        'bokeh>=1.3.4'
+        'bokeh>=1.3.4',
+        'colorama',
     ],
     'test': [
         'coverage',
@@ -35,7 +36,7 @@ optional_dependencies['all'] = sorted([
     dependency
     for dependencies in optional_dependencies.values()
     for dependency in dependencies
-] + ['colorama'])
+])
 
 
 setup(
@@ -89,6 +90,8 @@ setup(
         'openmdao.solvers.linear',
         'openmdao.solvers.linesearch',
         'openmdao.solvers.nonlinear',
+        'openmdao.surrogate_models',
+        'openmdao.surrogate_models.nn_interpolators',
         'openmdao.test_suite',
         'openmdao.test_suite.components',
         'openmdao.test_suite.groups',
@@ -103,8 +106,6 @@ setup(
         'openmdao.visualization.n2_viewer',
         'openmdao.visualization.xdsm_viewer',
         'openmdao.visualization.meta_model_viewer',
-        'openmdao.surrogate_models',
-        'openmdao.surrogate_models.nn_interpolators'
     ],
     package_data={
         'openmdao.devtools': ['*.wpr',],
@@ -157,7 +158,7 @@ setup(
         'console_scripts': [
             'wingproj=openmdao.devtools.wingproj:run_wing',
             'webview=openmdao.utils.webview:webview_argv',
-            'run_test=openmdao.devtools.run_test:run_test',
+            'run_om_test=openmdao.devtools.run_test:run_test',
             'openmdao=openmdao.utils.om:openmdao_cmd',
         ],
         'openmdao_drivers': [
