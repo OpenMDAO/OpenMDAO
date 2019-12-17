@@ -593,6 +593,7 @@ _allowed_types = {
     'drivers': 'openmdao_drivers',
     'case_recorders': 'openmdao_case_recorders',
     'case_readers': 'openmdao_case_readers',
+    'surrogate_models': 'openmdao_surrogate_models',
     'commands': 'openmdao_commands',
 }
 
@@ -645,33 +646,54 @@ def _list_installed_cmd(options, user_args):
                                .format(type_, sorted(_allowed_types)))
         print("Installed {}:\n".format(type_))
         epdict = {}
-        cwid = 0
+        cwid_t = len('Class or Function')
+        cwid_n = len('Entry Point Name')
         for ep in pkg_resources.iter_entry_points(group=_allowed_types[type_]):
-            klass = ep.load()
+            epstr = str(ep)
+            name, rest = epstr.split('=', 1)
+            name = name.strip()
+            rest = rest.strip()
+            module, target = rest.split(':', 1)
             for ex in options.excludes:
-                if klass.__module__.startswith(ex + '.'):
+                if module.startswith(ex + '.'):
                     break
             else:
                 found = True
                 if options.includes:
                     for inc in options.includes:
-                        if klass.__module__.startswith(inc + '.'):
+                        if module.startswith(inc + '.'):
                             break
                     else:
                         found = False
                 if found:
-                    epdict[klass.__name__] = (klass.__module__, klass.__doc__)
-                    if len(klass.__name__) > cwid:
-                        cwid = len(klass.__name__)
+                    # we need to actually load the entry point if docs are requested
+                    if options.show_docs:
+                        klass = ep.load()
+                        docs = klass.__doc__
+                    else:
+                        docs = ''
+                    epdict[target] = (name, module, docs)
+                    if len(name) > cwid_n:
+                        cwid_n = len(name)
+                    if len(target) > cwid_t:
+                        cwid_t = len(target)
 
         if epdict:
-            print("  {:<{cwid}} {}".format('Class Name', 'Module', cwid=cwid))
-            print("  {:<{cwid}} {}".format('----------', '------', cwid=cwid))
-        for cname, (mod, doc) in sorted(epdict.items(), key=lambda x: x[1][0] + x[0]):
-            line = "  {:<{cwid}} ({})".format(cname, mod, cwid=cwid)
+            print("  {:<{cwid_n}} {:<{cwid_t}} {}".format('Entry Point Name', 'Class or Function',
+                                                          'Module',
+                                                          cwid_n=cwid_n, cwid_t=cwid_t))
+            print("  {:<{cwid_n}} {:<{cwid_t}} {}".format('----------------', '-----------------',
+                                                          '------',
+                                                          cwid_n=cwid_n, cwid_t=cwid_t))
+
+        # sort displayed values by module_name + target so that entry points will be grouped
+        # by module and sorted by target name within each module.
+        for target, (name, module, docs) in sorted(epdict.items(), key=lambda x: x[1][1] + x[0]):
+            line = "  {:<{cwid_n}} {:<{cwid_t}} ({})".format(name, target, module,
+                                                             cwid_n=cwid_n, cwid_t=cwid_t)
             print(line)
-            if options.show_docs and doc:
-                print(doc)
+            if options.show_docs and docs:
+                print(docs)
 
         print()
 

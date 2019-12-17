@@ -210,6 +210,12 @@ setup(
         ],
         'openmdao_case_readers': [
             'sqlitereader=openmdao.recorders.sqlite_reader:SqliteCaseReader',
+        ],
+        'openmdao_surrogate_models': [
+            'kriging=openmdao.surrogate_models.kriging:KrigingSurrogate',
+            'nearest_neighbor=openmdao.surrogate_models.nearest_neighbor:NearestNeighbor',
+            'response_surface=openmdao.surrogate_models.response_surface:ResponseSurface',
+            'multifi_cokriging=openmdao.surrogate_models.multifi_cokriging:MultiFiCoKrigingSurrogate',
         ]
     },
     extras_require=optional_dependencies,
