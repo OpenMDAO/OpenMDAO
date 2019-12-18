@@ -1,0 +1,45 @@
+
+
+from openmdao.solvers.solver import LinearSolver
+
+
+class {class_name}(LinearSolver):
+    """
+    {class_name} solver.
+
+    Describe the solver here...
+    """
+
+    SOLVER = 'LN: ????'  # replace ???? with an abbreviated solver name
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            Options dictionary.
+        """
+        super({class_name}, self).__init__(**kwargs)
+
+        # initialize needed atributes here...
+
+
+    def solve(self, vec_names, mode, rel_systems=None):
+        """
+        Solve the linear system for the problem in self._system().
+
+        The full solution vector is returned.
+
+        Parameters
+        ----------
+        vec_names : list
+            list of vector names.
+        mode : string
+            Derivative mode, can be 'fwd' or 'rev'.
+        rel_systems : set of str
+            Set of names of relevant systems based on the current linear solve.
+        """
+        # solver the linear system here...
+        pass
