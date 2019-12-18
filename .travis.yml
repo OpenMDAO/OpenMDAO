@@ -128,6 +128,13 @@ install:
       pip install mpi4py;
       pip install petsc4py==$PETSc;
     fi
+
+    echo " >> Installing Node.js";
+    pip install npm;
+    echo "  > Install Puppeteer";
+    npm i puppeteer
+    echo "  > Install yargs"
+    npm i yargs
   fi
 
 # install OpenMDAO and its development and documentation dependencies

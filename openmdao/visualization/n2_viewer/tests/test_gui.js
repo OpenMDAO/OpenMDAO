@@ -4,10 +4,9 @@ const argv = require('yargs').argv;
 const puppeteer = require('puppeteer');
 // const urlPrefix = 'file://' + process.cwd() + '/gui_test_models/';
 const urlPrefix = 'file://';
-console.log("Working from " + process.cwd());
+// console.log("Working from " + process.cwd());
 
-// Milliseconds to allow for the last transition animation to finish:
-const transitionWait = 1600;
+var transitionWait;
 
 // The amount to wait when there's no transition:
 const normalWait = 10;
@@ -41,6 +40,10 @@ async function doGenericToolbarTests(page) {
   }
 }
 
+/**
+ * Set up the event handlers that are critical for catching errors. When
+ * an error is encountered, exit with status > 0 to indicate a failure.
+ */
 function setupErrorHandlers(page) {
   page.on('console', msg => {
     switch (msg.type()) {
@@ -85,6 +88,9 @@ async function runTests() {
     // Without waitUntil: 'networkidle0', processing will begin before the page
     // is fully rendered
     await page.goto(urlPrefix + n2Filename, { 'waitUntil': 'networkidle0' });
+
+    // Milliseconds to allow for the last transition animation to finish:
+    transitionWait = await page.evaluate(() => N2TransitionDefaults.durationSlow + 100)
     await doGenericToolbarTests(page);
   }
 

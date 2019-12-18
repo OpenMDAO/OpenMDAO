@@ -1,18 +1,12 @@
 """Test N2 GUI with multiple models using Node.js."""
-
-from __future__ import division, print_function
-
 import os
 import shutil
 import unittest
-import openmdao.api as om
-# from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
-# from openmdao.utils.mpi import MPI
 
 # set DEBUG to True if you want to view the generated HTML file
 GUI_TEST_SUBDIR = 'gui_test_models'
 GUI_TEST_EXE = 'test_gui.js'
-DEBUG = False
+DEBUG = True
 
 @unittest.skipUnless(shutil.which('node') != None, "Node.js is required to test the N2 GUI.")
 class N2ParallelTestCase(unittest.TestCase):
@@ -37,8 +31,13 @@ class N2ParallelTestCase(unittest.TestCase):
         Perform a set of generic tests against generated N2 files.
         """
         testCmd = self.parentDir + '/' + GUI_TEST_EXE
-        n2html_files = ','.join(map(str, self.n2files))
-        os.system(testCmd + ' --n2files=' + n2html_files)
+        # n2html_files = ','.join(map(str, self.n2files))
+
+        for n2file in self.n2files:
+        # The Node.js script will exit with a non-zero value if it
+        # detects an error.
+            self.assertEqual(os.system(testCmd + ' --n2files=' + n2file), 0,
+                'N2 common test failed with ' + n2file)
 
     def tearDown(self):
         if not DEBUG:
