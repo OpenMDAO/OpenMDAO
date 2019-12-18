@@ -21,6 +21,7 @@ _common_bases = {
     'BaseCaseReader': 'openmdao_case_readers',
 }
 
+
 def _scaffold_setup_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao scaffold' command.
@@ -68,6 +69,8 @@ def _write_template(outfile, prefix, **kwargs):
 
     with open(outfile, 'w') as f:
         f.write(contents)
+
+    return contents
 
 
 def _scaffold_exec(options, user_args):

@@ -4,12 +4,12 @@ import unittest
 from six import iteritems
 
 import openmdao.api as om
-from openmdao.utils.scaffold import _camel_case_split, _get_template
+from openmdao.utils.scaffold import _camel_case_split, _write_template
 
 
 class TestScaffold(unittest.TestCase):
     def test_explicit_comp(self):
-        template = _get_template('explicit_comp_template', class_name='ExplicitFooBar')
+        template = _write_template('explicitfoobar', 'ExplicitComponent', class_name='ExplicitFooBar')
         expected = [
             'class ExplicitFooBar(ExplicitComponent):',
             'def compute(',
@@ -21,7 +21,7 @@ class TestScaffold(unittest.TestCase):
             self.assertTrue(exp in template, 'template is missing %s' % exp)
 
     def test_implicit_comp(self):
-        template = _get_template('implicit_comp_template', class_name='ImplicitFooBar')
+        template = _write_template('implicitfoobar', 'ImplicitComponent', class_name='ImplicitFooBar')
         expected = [
             'class ImplicitFooBar(ImplicitComponent):',
             'def apply_nonlinear(',
