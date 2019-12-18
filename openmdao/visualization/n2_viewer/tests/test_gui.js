@@ -2,8 +2,9 @@
 
 const argv = require('yargs').argv;
 const puppeteer = require('puppeteer');
-const urlPrefix = 'file://' + process.cwd() + '/gui_test_models/';
-console.log("Working from " + urlPrefix);
+// const urlPrefix = 'file://' + process.cwd() + '/gui_test_models/';
+const urlPrefix = 'file://';
+console.log("Working from " + process.cwd());
 
 // Milliseconds to allow for the last transition animation to finish:
 const transitionWait = 1600;

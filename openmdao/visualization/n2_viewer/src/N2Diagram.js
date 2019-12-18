@@ -105,7 +105,6 @@ class N2Diagram {
             'model': { 'x': 0, 'y': 0 },
             'solver': { 'x': 0, 'y': 0 }
         };
-
     }
 
     /**
