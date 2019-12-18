@@ -153,9 +153,8 @@ def _scaffold_exec(options, user_args):
 
             finally:
                 os.chdir(start_dir)
-
+        else:
+            _write_template(compfile, options.base, class_name=options.class_name)
+            _write_template(testfile, 'test', class_name=options.class_name)
     else:
-        simple_warning("Unrecognized base class.")
-        _write_template(outfile, options.class_name, class_name=options.class_name,
-                        base=options.base)
-        _write_template('test_' + outfile, 'test_comp', class_name=options.class_name)
+        raise RuntimeError("Unrecognized base class '{}'.".format(base))
