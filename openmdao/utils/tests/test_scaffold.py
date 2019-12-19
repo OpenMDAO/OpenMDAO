@@ -1,15 +1,25 @@
 
 import unittest
+import os
+import importlib
+from subprocess import check_call
 
 from six import iteritems
 
 import openmdao.api as om
 from openmdao.utils.scaffold import _camel_case_split, _write_template
+from openmdao.utils.testing_utils import use_tempdirs
+
+try:
+    import pip
+except ImportError:
+    pip = None
 
 
+@use_tempdirs
 class TestScaffold(unittest.TestCase):
     def test_explicit_comp(self):
-        template = _write_template('explicitfoobar', 'ExplicitComponent', class_name='ExplicitFooBar')
+        template = _write_template(None, 'ExplicitComponent', class_name='ExplicitFooBar')
         expected = [
             'class ExplicitFooBar(ExplicitComponent):',
             'def compute(',
@@ -21,7 +31,7 @@ class TestScaffold(unittest.TestCase):
             self.assertTrue(exp in template, 'template is missing %s' % exp)
 
     def test_implicit_comp(self):
-        template = _write_template('implicitfoobar', 'ImplicitComponent', class_name='ImplicitFooBar')
+        template = _write_template(None, 'ImplicitComponent', class_name='ImplicitFooBar')
         expected = [
             'class ImplicitFooBar(ImplicitComponent):',
             'def apply_nonlinear(',
@@ -45,3 +55,46 @@ class TestScaffold(unittest.TestCase):
 
         for ccase, expected in pairs:
             self.assertEqual(expected, _camel_case_split(ccase))
+
+    @unittest.skipIf(pip is None, 'pip must be installed to test scaffolding packages.')
+    def test_packages(self):
+        bases = [
+            ('CaseRecorder', ('../rec.out',)),
+            ('BaseCaseReader', ('../rec.out',)),
+            ('Driver', ()),
+            ('ExplicitComponent', ()),
+            ('Group', ()),
+            ('ImplicitComponent', ()),
+            ('LinearSolver', ()),
+            ('NonlinearSolver', ()),
+            ('SurrogateModel', ())
+        ]
+
+        startdir = os.getcwd()
+
+        for base, args in bases:
+            os.chdir(startdir)
+            cname = 'My' + base
+            pkgname = 'my_' + base.lower() + '999'
+            check_call(['openmdao', 'scaffold', '-c', cname, '-b', base, '-p', pkgname])
+            os.chdir(pkgname)
+
+            # install it
+            check_call(['pip', 'install', '-q', '--no-cache-dir', '--no-deps', '.'])
+
+            try:
+                modname = _camel_case_split(cname)
+
+                # try to instantiate it
+                mod = importlib.import_module('.'.join((pkgname, modname)))
+                klass = getattr(mod, cname)
+                instance = klass(*args)
+
+            finally:
+
+                try:
+                    # uninstall it
+                    check_call(['pip', 'uninstall', '-q', '-y', pkgname])
+                except CalledProcessError:
+                    self.fail("Package '{}' failed to uninstall.  "
+                              "You'll have to do it manually.".format(pkgname))

@@ -18,14 +18,14 @@ class {class_name}(Driver):
         super({class_name}, self).__init__(**kwargs)
 
         # Specify what we support and what we don't
-        self.supports['integer_design_vars'] = ???
-        self.supports['inequality_constraints'] = ???
-        self.supports['equality_constraints'] = ???
-        self.supports['multiple_objectives'] = ???
-        self.supports['two_sided_constraints'] = ???
-        self.supports['linear_constraints'] = ???
-        self.supports['simultaneous_derivatives'] = ???
-        self.supports['active_set'] = ???
+        self.supports['integer_design_vars'] = False
+        self.supports['inequality_constraints'] = False
+        self.supports['equality_constraints'] = False
+        self.supports['multiple_objectives'] = False
+        self.supports['two_sided_constraints'] = False
+        self.supports['linear_constraints'] = False
+        self.supports['simultaneous_derivatives'] = False
+        self.supports['active_set'] = False
 
         # other initialization here...
 

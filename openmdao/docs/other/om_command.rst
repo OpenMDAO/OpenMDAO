@@ -125,8 +125,8 @@ Below is an example of a connection viewer for a pycycle propulsor model obtaine
    An example of a connection viewer.
 
 
-By default the promoted names columns of both inputs and outputs are shown, but in the example
-above, the absolute input names are shown and the promoted input names are hidden.
+By default the promoted names columns of both inputs and outputs are shown and their absolute
+names are hidden.
 
 Unconnected inputs can easily be identified by typing '[NO CONNECTION]' or '[', into
 the filter field of either the absolute or promoted *output* column.  Unconnected outputs can
@@ -298,15 +298,18 @@ openmdao scaffold
 #################
 
 The :code:`openmdao scaffold` command generates simple scaffolding, or 'skeleton' code for
-an explicit or implicit component.  In addition, it will generate the scaffolding for a simple
-test file of that component.  The available options are as follows:
+a class that inherits from an allowed OpenMDAO base class.  The allowed base classes are shown as
+part of the description of the `--base` arg below:
 
 .. embed-shell-cmd::
     :cmd: openmdao scaffold -h
 
 
-This command is only an initial attempt to provide this sort of functionality and any user
-feedback describing how to improve it is welcome.
+In addition, the command will generate the scaffolding for a simple
+test file for that class, and if the `--package` option is used, it will generate the directory
+structure for a simple installable python package and will declare an entry point in the
+`setup.py` file so that the given class can be discoverable as an OpenMDAO plugin when installed.
+
 
 
 Using Commands under MPI

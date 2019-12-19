@@ -36,7 +36,7 @@ def _scaffold_setup_parser(parser):
                         required=True, help='Name of the class.  If an output file '
                         'is not provided, this name will be used to generate the output file name.')
     parser.add_argument('-b', '--base', action='store', dest='base',
-                        required=True, help='Name of the base class for the new class. Typical '
+                        required=True, help='Name of the base class for the new class. Allowed '
                         'base classes are: {}'.format(sorted(_common_bases)))
     parser.add_argument('-p', '--package', action='store', dest='package',
                         help="Specify name of python package.  If this is specified, the directory"
@@ -67,8 +67,9 @@ def _write_template(outfile, prefix, **kwargs):
     else:
         contents = template
 
-    with open(outfile, 'w') as f:
-        f.write(contents)
+    if outfile is not None:
+        with open(outfile, 'w') as f:
+            f.write(contents)
 
     return contents
 
@@ -120,7 +121,7 @@ def _scaffold_exec(options, user_args):
                     'keywords': keywords,
                     'license': '???',
                     'packages': [pkg_name, pkg_name + '.' + 'test'],
-                    'install_requires': ['openmdao>=2.9'],
+                    'install_requires': ['openmdao>=2.9.1'],
                 }
 
                 if entry_pt_group:

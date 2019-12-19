@@ -40,7 +40,7 @@ class {class_name}(ExplicitComponent):
         # self.add_output(name='bar', shape=None, units=None)
 
         # self.declare_partials(of='bar', wrt='foo', rows=None, cols=None, val=None)
-       pass
+        pass
 
     def compute(self, inputs, outputs):
         """

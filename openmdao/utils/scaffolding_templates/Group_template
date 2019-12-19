@@ -26,3 +26,4 @@ class {class_name}(Group):
         # self.add_design_var('indeps.x', lower=.5, upper=10)
         # self.add_constraint('comp1.y', lower=-3.)
         # self.add_objective('comp2.y')
+        pass
