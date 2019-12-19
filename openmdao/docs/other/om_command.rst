@@ -310,6 +310,7 @@ test file for that class, and if the `--package` option is used, it will generat
 structure for a simple installable python package and will declare an entry point in the
 `setup.py` file so that the given class can be discoverable as an OpenMDAO plugin when installed.
 
+To build scaffolding for an OpenMDAO command line tool plugin, use the `--cmd` option.
 
 
 Using Commands under MPI
