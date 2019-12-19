@@ -59,6 +59,7 @@ class TestScaffold(unittest.TestCase):
     @unittest.skipIf(pip is None, 'pip must be installed to test scaffolding packages.')
     def test_packages(self):
         bases = [
+            ('command', ()),
             ('CaseRecorder', ('../rec.out',)),
             ('BaseCaseReader', ('../rec.out',)),
             ('Driver', ()),
@@ -76,7 +77,13 @@ class TestScaffold(unittest.TestCase):
             os.chdir(startdir)
             cname = 'My' + base
             pkgname = 'my_' + base.lower() + '999'
-            check_call(['openmdao', 'scaffold', '-c', cname, '-b', base, '-p', pkgname])
+            if base == 'command':
+                check_call(['openmdao', 'scaffold', '--cmd', cname.lower(), '-p', pkgname])
+                tgtname = '_' + cname.lower() + '_setup'
+            else:
+                check_call(['openmdao', 'scaffold', '-c', cname, '-b', base, '-p', pkgname])
+                tgtname = cname
+
             os.chdir(pkgname)
 
             # install it
@@ -87,7 +94,7 @@ class TestScaffold(unittest.TestCase):
 
                 # try to instantiate it
                 mod = importlib.import_module('.'.join((pkgname, modname)))
-                klass = getattr(mod, cname)
+                klass = getattr(mod, tgtname)
                 instance = klass(*args)
 
             finally:
