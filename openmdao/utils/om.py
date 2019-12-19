@@ -43,6 +43,7 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.file_utils import _load_and_exec
+from openmdao.utils.list_installed import _list_installed_setup_parser, _list_installed_cmd
 from openmdao.core.component import Component
 
 
@@ -586,118 +587,6 @@ def _cite_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
-_allowed_types = {
-    'components': 'openmdao_components',
-    'lin_solvers': 'openmdao_lin_solvers',
-    'nl_solvers': 'openmdao_nl_solvers',
-    'drivers': 'openmdao_drivers',
-    'case_recorders': 'openmdao_case_recorders',
-    'case_readers': 'openmdao_case_readers',
-    'surrogate_models': 'openmdao_surrogate_models',
-    'commands': 'openmdao_commands',
-}
-
-
-def _list_installed_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao list_installed' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('types', nargs='*', help='List these types of installed classes. '
-                        'Allowed types are {}.'.format(sorted(_allowed_types)))
-    parser.add_argument('-d', '--docs', action='store_true', dest='show_docs',
-                        help="Display the class docstrings.")
-    parser.add_argument('-x', '--exclude', default=[], action='append', dest='excludes',
-                        help='Package to exclude.')
-    parser.add_argument('-i', '--include', default=[], action='append', dest='includes',
-                        help='Package to include.')
-
-
-def _list_installed_cmd(options, user_args):
-    """
-    Run the `openmdao list_installed` command.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-    user_args : list of str
-        Args to be passed to the user script.
-
-    Returns
-    -------
-    function
-        The hook function.
-    """
-    if pkg_resources is None:
-        print("You must install pkg_resources in order to use this command.")
-        sys.exit(0)
-
-    if not options.types:
-        options.types = list(_allowed_types)
-
-    for type_ in options.types:
-        if type_ not in _allowed_types:
-            raise RuntimeError("Type '{}' is not a valid type.  Try one of {}."
-                               .format(type_, sorted(_allowed_types)))
-        print("Installed {}:\n".format(type_))
-        epdict = {}
-        cwid_t = len('Class or Function')
-        cwid_n = len('Entry Point Name')
-        for ep in pkg_resources.iter_entry_points(group=_allowed_types[type_]):
-            epstr = str(ep)
-            name, rest = epstr.split('=', 1)
-            name = name.strip()
-            rest = rest.strip()
-            module, target = rest.split(':', 1)
-            for ex in options.excludes:
-                if module.startswith(ex + '.'):
-                    break
-            else:
-                found = True
-                if options.includes:
-                    for inc in options.includes:
-                        if module.startswith(inc + '.'):
-                            break
-                    else:
-                        found = False
-                if found:
-                    # we need to actually load the entry point if docs are requested
-                    if options.show_docs:
-                        klass = ep.load()
-                        docs = klass.__doc__
-                    else:
-                        docs = ''
-                    epdict[target] = (name, module, docs)
-                    if len(name) > cwid_n:
-                        cwid_n = len(name)
-                    if len(target) > cwid_t:
-                        cwid_t = len(target)
-
-        if epdict:
-            print("  {:<{cwid_n}} {:<{cwid_t}} {}".format('Entry Point Name', 'Class or Function',
-                                                          'Module',
-                                                          cwid_n=cwid_n, cwid_t=cwid_t))
-            print("  {:<{cwid_n}} {:<{cwid_t}} {}".format('----------------', '-----------------',
-                                                          '------',
-                                                          cwid_n=cwid_n, cwid_t=cwid_t))
-
-        # sort displayed values by module_name + target so that entry points will be grouped
-        # by module and sorted by target name within each module.
-        for target, (name, module, docs) in sorted(epdict.items(), key=lambda x: x[1][1] + x[0]):
-            line = "  {:<{cwid_n}} {:<{cwid_t}} ({})".format(name, target, module,
-                                                             cwid_n=cwid_n, cwid_t=cwid_t)
-            print(line)
-            if options.show_docs and docs:
-                print(docs)
-
-        print()
-
-
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
 _command_map = {
@@ -711,7 +600,8 @@ _command_map = {
               'Profile calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
                      'Generate total timings of calls to particular object instances.'),
-    'list_installed': (_list_installed_setup_parser, _list_installed_cmd, 'List installed types.'),
+    'list_installed': (_list_installed_setup_parser, _list_installed_cmd,
+                       'List installed types recognized by OpenMDAO.'),
     'mem': (_mem_prof_setup_parser, _mem_prof_exec,
             'Profile memory used by OpenMDAO related functions.'),
     'mempost': (_mempost_setup_parser, _mempost_exec, 'Post-process memory profile output.'),

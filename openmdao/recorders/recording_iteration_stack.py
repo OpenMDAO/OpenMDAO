@@ -169,20 +169,3 @@ class Recording(object):
         # print_recording_iteration_stack()
 
         requester._recording_iter.pop()
-
-
-def get_iteration_coord_parent(iter_coord):
-    """
-    Given an iteration coordinate string, return its parent as a string.
-
-    Parameters
-    ----------
-    iter_coord : str
-        The iteration coordinate.
-
-    Returns
-    -------
-    str
-        The iteration coordinate of the parent.
-    """
-    return iter_coord.rsplit('|', 1)[0]

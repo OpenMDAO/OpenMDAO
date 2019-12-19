@@ -313,6 +313,31 @@ structure for a simple installable python package and will declare an entry poin
 To build scaffolding for an OpenMDAO command line tool plugin, use the `--cmd` option.
 
 
+
+.. _om-command-list-installed:
+
+openmdao list_installed
+#######################
+
+The :code:`openmdao list_installed` command lists installed classes of the specified type(s).
+Its options are shown below:
+
+
+.. embed-shell-cmd::
+    :cmd: openmdao list_installed -h
+
+
+By default, installed types from all installed packages are shown, but the output can be filtered
+by the use of the `-i` option to include only specified packages, or the `-x` option
+to exclude specified packages.
+
+For example, to show only those linear and nonlinear solver types that are part of the `openmdao`
+package, do the following:
+
+.. embed-shell-cmd::
+    :cmd: openmdao list_installed lin_solvers nl_solvers -i openmdao
+
+
 Using Commands under MPI
 ------------------------
 
