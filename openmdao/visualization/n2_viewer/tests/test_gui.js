@@ -2,9 +2,7 @@
 
 const argv = require('yargs').argv;
 const puppeteer = require('puppeteer');
-// const urlPrefix = 'file://' + process.cwd() + '/gui_test_models/';
 const urlPrefix = 'file://';
-// console.log("Working from " + process.cwd());
 
 var transitionWait;
 
