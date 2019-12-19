@@ -68,7 +68,7 @@ class SplineTestCase(unittest.TestCase):
         self.prob.run_model()
 
         # Verification array from AkimaSplineComp
-        akima_y = np.array([[ 5.        ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
+        akima_y = np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
                             12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
                             13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,
                             14.36710105, 14.59128625, 14.81544619, 15.03965664, 15.26399335,
@@ -197,7 +197,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         prob.setup(force_alloc_complex=True)
         prob.run_model()
 
-        akima_y = np.array([[ 5.        ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
+        akima_y = np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
                             12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
                             13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,
                             14.36710105, 14.59128625, 14.81544619, 15.03965664, 15.26399335,
@@ -209,6 +209,29 @@ class SplineCompFeatureTestCase(unittest.TestCase):
                             24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
 
         assert_array_almost_equal(akima_y.flatten(), prob['akima1.y_val'].flatten())
+
+    def test_multi_splines(self):
+
+        import numpy as np
+
+        import openmdao.api as om
+
+        x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        y_cp2 = np.array([1.0, 5.0, 7.0, 8.0, 13.0, 16.0])
+        n = 50
+        x = np.linspace(1.0, 12.0, n)
+
+        prob = om.Problem()
+
+        comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp=x, x_interp_name='x_val')
+        prob.model.add_subsystem('akima1', comp)
+
+        comp.add_spline(y_cp_name='ycp1', y_interp_name='y_val1', y_cp_val=y_cp)
+        comp.add_spline(y_cp_name='ycp2', y_interp_name='y_val2', y_cp_val=y_cp2)
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
 
     def test_spline_distribution_example(self):
 

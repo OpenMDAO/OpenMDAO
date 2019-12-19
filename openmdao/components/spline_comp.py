@@ -1,5 +1,6 @@
 """Define the SplineComp class."""
 from six import iteritems, itervalues
+from six import string_types
 import numpy as np
 
 from openmdao.components.interp_util.python_interp import PythonGridInterp
@@ -31,32 +32,36 @@ class SplineComp(InterpBase):
         """
         super(SplineComp, self).__init__(**kwargs)
 
+        self.options['extrapolate'] = True
+        self.options['training_data_gradients'] = True
+
+        self.interp_to_cp = {}
+
+    def setup(self):
+        """
+        Set up the spline component.
+        """
         self.add_input(name=self.options['x_interp_name'], val=self.options['x_interp'])
         self.add_input(name=self.options['x_cp_name'], val=self.options['x_cp_val'])
 
         self.pnames.append(self.options['x_interp_name'])
         self.params.append(np.asarray(self.options['x_cp_val']))
 
-        self.options['extrapolate'] = True
-        self.options['training_data_gradients'] = True
-        self.n_interp = len(self.options['x_interp'])
-
-        self.interp_to_cp = {}
-
     def _declare_options(self):
         """
         Declare options.
         """
         super(SplineComp, self)._declare_options()
-        self.options.declare('x_cp_val', default=None, desc='List/array of x control'
+        self.options.declare('x_cp_val', types=(list, np.ndarray), desc='List/array of x control'
                              'point values, must be monotonically increasing.')
-        self.options.declare('x_interp', default=None, desc='List/array of x '
+        self.options.declare('x_interp', types=(list, np.ndarray), desc='List/array of x '
                              'interpolated point values.')
-        self.options.declare('x_cp_name', default='x_cp',
+        self.options.declare('x_cp_name', types=string_types, default="'x_cp'",
                              desc='Name for the x control points input.')
-        self.options.declare('x_interp_name', default='x_interp',
+        self.options.declare('x_interp_name', types=str, default="'x_interp'",
                              desc='Name of the x interpolated points input.')
-        self.options.declare('x_units', default=None, desc='Units of the x variable.')
+        self.options.declare('x_units', types=string_types, default=None, allow_none=True,
+                             desc='Units of the x variable.')
         self.options.declare('interp_options', types=dict, default={},
                              desc='Dict contains the name and value of options specific to the '
                              'chosen interpolation method.')
@@ -83,8 +88,9 @@ class SplineComp(InterpBase):
             msg = "{}: y_interp_name cannot be an empty string."
             raise ValueError(msg.format(self.msginfo))
 
-        self.add_output(y_interp_name, np.ones((self.options['vec_size'], self.n_interp)),
-                        units=y_units)
+        self.add_output(y_interp_name, np.ones((self.options['vec_size'],
+                        len(self.options['x_interp']))), units=y_units)
+
         if y_cp_val is None:
             y_cp_val = self.options['x_cp_val']
 
