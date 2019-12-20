@@ -30,6 +30,18 @@ calling the `add_spline` method and passing `y_cp` into the argument `y_cp_val` 
 `SplineComp` calculates the `y_interp` values and gives the output of interpolated points
 (Figure 3).
 
+.. image:: images/figure_1.png
+  :width: 900
+
+.. image:: images/figure_2.png
+  :width: 900
+
+.. image:: images/figure_3.png
+  :width: 900
+
+.. image:: images/figure_4.png
+  :width: 900
+
 .. embed-code::
     openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_basic_example
     :layout: code

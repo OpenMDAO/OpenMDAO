@@ -52,7 +52,7 @@ class SplineComp(InterpBase):
         Declare options.
         """
         super(SplineComp, self)._declare_options()
-        self.options.declare('x_cp_val', types=(list, np.ndarray), desc='List/array of x control'
+        self.options.declare('x_cp_val', types=(list, np.ndarray), desc='List/array of x control '
                              'point values, must be monotonically increasing.')
         self.options.declare('x_interp', types=(list, np.ndarray), desc='List/array of x '
                              'interpolated point values.')
