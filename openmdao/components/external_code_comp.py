@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import os
 import sys
+import re
 
 import numpy.distutils
 from numpy.distutils.exec_command import find_executable
@@ -194,7 +195,7 @@ class ExternalCodeDelegate(object):
         comp = self._comp
 
         if isinstance(command, str):
-            program_to_execute = command
+            program_to_execute = re.findall("^([\w\-]+)", command)[0]
         else:
             program_to_execute = command[0]
 
