@@ -211,7 +211,7 @@ class ExternalCodeDelegate(object):
             if isinstance(program_to_execute, list):
                 command_for_shell_proc = ['cmd.exe', '/c'] + command
             else:
-                command_for_shell_proc = 'cmd.exe /c ' + command
+                command_for_shell_proc = 'cmd.exe /c ' + str(command)
 
         else:
             if not find_executable(program_to_execute):
