@@ -274,7 +274,7 @@ class ParaboloidExternalCodeComp(om.ExternalCodeComp):
         self.options['external_output_files'] = [self.output_file]
 
         # If you want to write your own string command, the code below will also work.
-        # self.options['command'] = 'python extcode_mach.py mach_input.dat mach_output.dat'
+        # self.options['command'] = 'python extcode_paraboloid.py paraboloid_input.dat paraboloid_output.dat'
 
         self.options['command'] = [
             sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
