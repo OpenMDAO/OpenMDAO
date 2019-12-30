@@ -208,7 +208,7 @@ class ExternalCodeDelegate(object):
                 if missing:
                     raise ValueError("The command to be executed, '%s', "
                                      "cannot be found" % program_to_execute)
-            if isinstance(program_to_execute, list):
+            if isinstance(command, list):
                 command_for_shell_proc = ['cmd.exe', '/c'] + command
             else:
                 command_for_shell_proc = 'cmd.exe /c ' + str(command)
