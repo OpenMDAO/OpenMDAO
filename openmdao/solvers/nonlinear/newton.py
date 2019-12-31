@@ -68,7 +68,7 @@ class NewtonSolver(NonlinearSolver):
         """
         super(NewtonSolver, self)._declare_options()
 
-        self.options.declare('solve_subsystems', types=bool, default=False,
+        self.options.declare('solve_subsystems', types=bool,
                              desc='Set to True to turn on sub-solvers (Hybrid Newton).')
         self.options.declare('max_sub_solves', types=int, default=10,
                              desc='Maximum number of subsystem solves.')
