@@ -43,7 +43,8 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.file_utils import _load_and_exec
-from openmdao.utils.list_installed import _list_installed_setup_parser, _list_installed_cmd
+from openmdao.utils.list_installed import _list_installed_setup_parser, _list_installed_cmd, \
+    split_ep
 from openmdao.core.component import Component
 
 
@@ -666,19 +667,19 @@ def openmdao_cmd():
         # now add any plugin openmdao commands
         epdict = {}
         for ep in pkg_resources.iter_entry_points(group='openmdao_commands'):
-            p = ep.name
-            func = ep.load()
+            p, module, target = split_ep(ep)
             # don't let plugins override the builtin commands
             if p in _command_map:
-                raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
-                                   "builtin command.".format(p, func.__module__))
+                raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with "
+                                   "builtin command '{}'.".format(p, module, p))
             elif p in epdict:
                 raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
                                    "another plugin command defined in {}."
-                                   .format(p, func.__module__, epdict[p].__module__))
-            epdict[p] = func
+                                   .format(p, module, epdict[p][1]))
+            epdict[p] = (ep, module)
 
-        for p, func in epdict.items():
+        for p, (ep, module) in epdict.items():
+            func = ep.load()
             parser_setup_func, executor, help_str = func()
             subp = subs.add_parser(p, help='(plugin) ' + help_str)
             parser_setup_func(subp)

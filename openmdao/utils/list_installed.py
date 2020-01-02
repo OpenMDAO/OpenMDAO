@@ -39,12 +39,47 @@ def _list_installed_setup_parser(parser):
                         help='Package to include.')
 
 
+def split_ep(entry_point):
+    """
+    Split an entry point string into name, module, target.
+
+    Parameters
+    ----------
+    entry_point : EntryPoint
+        Entry point object.
+
+    Returns
+    -------
+    tuple
+        (entry_point_name, module_name, target_name)
+    """
+    epstr = str(entry_point)
+    name, rest = epstr.split('=', 1)
+    name = name.strip()
+    module, target = rest.strip().split(':', 1)
+    return name, module, target
+
+
 def _filtered_ep_iter(epgroup, includes=None, excludes=()):
+    """
+    Yield a filtered list of entry points and their attributes.
+
+    Parameters
+    ----------
+    epgroup : str
+        Entry point group name.
+    includes : iter of str or None
+        Sequence of package names to include.
+    excludes : iter of str or None
+        Sequence of package names to exclude.
+
+    Yields
+    ------
+    tuples
+        (EntryPoint, name, module, target)
+    """
     for ep in pkg_resources.iter_entry_points(group=epgroup):
-        epstr = str(ep)
-        name, rest = epstr.split('=', 1)
-        name = name.strip()
-        module, target = rest.strip().split(':', 1)
+        name, module, target = split_ep(ep)
         for ex in excludes:
             if module.startswith(ex + '.'):
                 break
@@ -59,6 +94,23 @@ def _filtered_ep_iter(epgroup, includes=None, excludes=()):
 
 def _list_installed(types=None, includes=None, excludes=None, show_docs=False):
     """
+    Print a table of installed entry points.
+
+    Parameters
+    ----------
+    types : iter of str or None
+        Sequence of entry point type names, e.g., components, groups, drivers, etc.
+    includes : iter of str or None
+        Sequence of packages to include.
+    excludes : iter of str or None
+        Sequence of packages to exclude.
+    show_docs : bool
+        If True, display docstring after each entry.
+
+    Returns
+    -------
+    dict
+        Nested dict of the form  dct[eptype][target] = (name, module, docs)
     """
     if pkg_resources is None:
         raise RuntimeError("You must install pkg_resources in order to list installed types.")
