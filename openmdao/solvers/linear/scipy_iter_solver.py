@@ -52,8 +52,7 @@ class ScipyKrylov(LinearSolver):
         if self.options['assemble_jac']:
             yield self
         if self.precon is not None:
-            for s in self.precon._assembled_jac_solver_iter():
-                yield s
+            yield from self.precon._assembled_jac_solver_iter()
 
     def _declare_options(self):
         """

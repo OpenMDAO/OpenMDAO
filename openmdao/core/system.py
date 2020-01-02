@@ -2475,8 +2475,7 @@ class System(object):
             if typ is None or isinstance(s, typ):
                 yield s
             if recurse:
-                for sub in s.system_iter(recurse=True, typ=typ):
-                    yield sub
+                yield from s.system_iter(recurse=True, typ=typ)
 
     def _all_subsystem_iter(self):
         """

@@ -11,23 +11,30 @@ from openmdao.docs.config_params import IGNORE_LIST
 package = openmdao
 
 om_classes = {}
-for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
-                                                      prefix=package.__name__ + '.',
-                                                      onerror=lambda x: None):
-    if not ispkg:
-        if 'docs' not in modname:
-            if any(ignore in modname for ignore in IGNORE_LIST):
-                continue
-            module = importer.find_module(modname).load_module(modname)
-            for classname, class_object in inspect.getmembers(module, inspect.isclass):
-                if class_object.__module__.startswith("openmdao"):
-                    om_classes[classname] = class_object.__module__ + "." + classname
+
+def build_dict():
+    global om_classes
+    for importer, modname, ispkg in pkgutil.walk_packages(path=package.__path__,
+                                                        prefix=package.__name__ + '.',
+                                                        onerror=lambda x: None):
+        if not ispkg:
+            if 'docs' not in modname:
+                if any(ignore in modname for ignore in IGNORE_LIST):
+                    continue
+                module = importer.find_module(modname).load_module(modname)
+                for classname, class_object in inspect.getmembers(module, inspect.isclass):
+                    if class_object.__module__.startswith("openmdao"):
+                        om_classes[classname] = class_object.__module__ + "." + classname
 
 
 def om_process_docstring(app, what, name, obj, options, lines):
     """
     our process_docstring
     """
+    global om_classes
+    if not om_classes:
+        build_dict()
+
     for i in range(len(lines)):
         # create a regex pattern to match <linktext>
         pat = r'(<.*?>)'
