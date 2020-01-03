@@ -273,12 +273,12 @@ class ParaboloidExternalCodeComp(om.ExternalCodeComp):
         self.options['external_input_files'] = [self.input_file]
         self.options['external_output_files'] = [self.output_file]
 
-        # If you want to write your own string command, the code below will also work.
-        # self.options['command'] = 'python extcode_paraboloid.py paraboloid_input.dat paraboloid_output.dat'
+        # If you want to write your command as a list, the code below will also work.
+        # self.options['command'] = [
+        #     sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
+        # ]
 
-        self.options['command'] = [
-            sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
-        ]
+        self.options['command'] = 'python extcode_paraboloid.py paraboloid_input.dat paraboloid_output.dat'
 
     def compute(self, inputs, outputs):
         x = inputs['x']
@@ -676,86 +676,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         mach_comp.options['super_sonic'] = super_sonic
         prob.run_model()
         assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
-
-    def test_string_command(self):
-        import sys
-        import openmdao.api as om
-
-        class MachExternalCodeComp(om.ExternalCodeImplicitComp):
-
-            def initialize(self):
-                self.options.declare('super_sonic', types=bool)
-
-            def setup(self):
-                self.add_input('area_ratio', val=1.0, units=None)
-                self.add_output('mach', val=1., units=None)
-                self.declare_partials(of='mach', wrt='area_ratio', method='fd')
-
-                self.input_file = 'mach_input.dat'
-                self.output_file = 'mach_output.dat'
-
-                # providing these are optional; the component will verify that any input
-                # files exist before execution and that the output files exist after.
-                self.options['external_input_files'] = [self.input_file]
-                self.options['external_output_files'] = [self.output_file]
-
-                self.options['command_apply'] = 'python extcode_mach.py mach_input.dat mach_output.dat'
-
-                self.options['command_solve'] = 'python extcode_mach.py mach_input.dat mach_output.dat'
-
-            def apply_nonlinear(self, inputs, outputs, residuals):
-                with open(self.input_file, 'w') as input_file:
-                    input_file.write('residuals\n')
-                    input_file.write('{}\n'.format(inputs['area_ratio'][0]))
-                    input_file.write('{}\n'.format(outputs['mach'][0]))
-
-                # the parent apply_nonlinear function actually runs the external code
-                super(MachExternalCodeComp, self).apply_nonlinear(inputs, outputs, residuals)
-
-                # parse the output file from the external code and set the value of mach
-                with open(self.output_file, 'r') as output_file:
-                    mach = float(output_file.read())
-                residuals['mach'] = mach
-
-            def solve_nonlinear(self, inputs, outputs):
-                with open(self.input_file, 'w') as input_file:
-                    input_file.write('outputs\n')
-                    input_file.write('{}\n'.format(inputs['area_ratio'][0]))
-                    input_file.write('{}\n'.format(self.options['super_sonic']))
-                # the parent apply_nonlinear function actually runs the external code
-                super(MachExternalCodeComp, self).solve_nonlinear(inputs, outputs)
-
-                # parse the output file from the external code and set the value of mach
-                with open(self.output_file, 'r') as output_file:
-                    mach = float(output_file.read())
-                outputs['mach'] = mach
-
-        group = om.Group()
-        group.add_subsystem('ar', om.IndepVarComp('area_ratio', 0.5))
-        mach_comp = group.add_subsystem('comp', MachExternalCodeComp(), promotes=['*'])
-        prob = om.Problem(model=group)
-        group.nonlinear_solver = om.NewtonSolver()
-        group.nonlinear_solver.options['solve_subsystems'] = True
-        group.nonlinear_solver.options['iprint'] = 0
-        group.nonlinear_solver.options['maxiter'] = 20
-        group.linear_solver = om.DirectSolver()
-
-        prob.setup()
-
-        area_ratio = 1.3
-        super_sonic = False
-        prob['area_ratio'] = area_ratio
-        mach_comp.options['super_sonic'] = super_sonic
-        prob.run_model()
-        assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
-
-        area_ratio = 1.3
-        super_sonic = True
-        prob['area_ratio'] = area_ratio
-        mach_comp.options['super_sonic'] = super_sonic
-        prob.run_model()
-        assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
-
 
 if __name__ == "__main__":
     unittest.main()
