@@ -22,8 +22,8 @@ def get_module_path(fpath):
 
     Returns
     -------
-    str
-        Full module path of the given file.
+    str or None
+        Full module path of the given file.  Returns None if the file is not part of a package.
     """
     fpath = abspath(fpath)
     if basename(fpath).startswith('__init__.'):
@@ -32,9 +32,14 @@ def get_module_path(fpath):
         pnames = [splitext(basename(fpath))[0]]
     path = dirname(fpath)
 
-    while isfile(join(path, '__init__.py')):
-            path, pname = split(path)
-            pnames.append(pname)
+    initfile = join(path, '__init__.py')
+    if not isfile(initfile):
+        return None
+
+    while isfile(initfile):
+        path, pname = split(path)
+        pnames.append(pname)
+        initfile = join(path, '__init__.py')
 
     return '.'.join(pnames[::-1])
 

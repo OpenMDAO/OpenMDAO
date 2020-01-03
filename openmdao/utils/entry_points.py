@@ -1,5 +1,5 @@
 """
-A command to list OpenMDAO recognized types that are installed in the current environment.
+Various functions for working with entry points.
 """
 from __future__ import print_function
 
@@ -157,7 +157,7 @@ def compute_entry_points(package, outstream=sys.stdout):
         def printfunc(*args, **kwargs):
             print(*args, **kwargs)
 
-    # do out own printing here instead of using pprint so we can control sort order
+    # do our own printing here instead of using pprint so we can control sort order
     dct = {}
     printfunc("entry_points={", file=outstream)
     for g, eps in sorted(groups.items(), key=lambda x: x[0]):

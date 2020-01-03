@@ -101,7 +101,7 @@ def _scaffold_exec(options, user_args):
         tgtname = '_' + epname + '_setup'
         if options.file is None:
             outfile = _camel_case_split(options.command_name)
-    elif options.class_name is None or options.base is None:
+    elif options.class_name is None or base is None:
         raise RuntimeError("One of [--class, --base] was not specified.")
     else:
         epname = options.class_name.lower()
