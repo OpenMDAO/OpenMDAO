@@ -784,6 +784,40 @@ class TestNewton(unittest.TestCase):
         msg = "Solver 'NL: Newton' on system '' failed to converge in 1 iterations."
         self.assertEqual(str(context.exception), msg)
 
+    def test_reraise_child_analysiserror(self):
+        # Raise AnalysisError when it fails to converge
+
+        prob = om.Problem(model=DoubleSellar())
+        model = prob.model
+
+        g1 = model.g1
+        g1.nonlinear_solver = om.NewtonSolver()
+        g1.nonlinear_solver.options['maxiter'] = 1
+        g1.nonlinear_solver.options['err_on_non_converge'] = True
+        g1.nonlinear_solver.options['solve_subsystems'] = True
+        g1.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        g2 = model.g2
+        g2.nonlinear_solver = om.NewtonSolver()
+        g2.nonlinear_solver.options['maxiter'] = 1
+        g2.nonlinear_solver.options['err_on_non_converge'] = True
+        g2.nonlinear_solver.options['solve_subsystems'] = True
+        g2.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        model.nonlinear_solver = om.NewtonSolver()
+        model.linear_solver = om.ScipyKrylov(assemble_jac=True)
+        model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['err_on_non_converge'] = True
+        model.nonlinear_solver.options['reraise_child_analysiserror'] = True
+
+        prob.setup()
+
+        with self.assertRaises(om.AnalysisError) as context:
+            prob.run_model()
+
+        msg = "Solver 'NL: Newton' on system 'g1' failed to converge in 1 iterations."
+        self.assertEqual(str(context.exception), msg)
+
     def test_err_message_inf_nan(self):
 
         prob = om.Problem()
