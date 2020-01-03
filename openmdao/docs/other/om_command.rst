@@ -338,6 +338,106 @@ package, do the following:
     :cmd: openmdao list_installed lin_solvers nl_solvers -i openmdao
 
 
+.. _om-command-compute-entry-points:
+
+openmdao compute_entry_points
+#############################
+
+The :code:`openmdao compute_entry_points` command prints out an `entry_points` dict that, if
+passed as the `entry_points` arg to the `setup` call in your `setup.py` file, will define all
+of the expected openmdao entry points based on any classes found in your package source files.
+
+For example, running the command on the pycycle package as follows
+
+.. code-block:: none
+
+    openmdao compute_entry_points pycycle
+
+
+would generate output similar to this:
+
+
+.. code-block:: none
+
+    entry_points={
+        'openmdao_components': [
+            'chemeq = pycycle.cea.chem_eq:ChemEq',
+            'propscalcs = pycycle.cea.props_calcs:PropsCalcs',
+            'propsrhs = pycycle.cea.props_rhs:PropsRHS',
+            'pscalc = pycycle.cea.static_ps_calc:PsCalc',
+            'psresid = pycycle.cea.static_ps_resid:PsResid',
+            'engunitprops = pycycle.cea.unit_comps:EngUnitProps',
+            'engunitstaticprops = pycycle.cea.unit_comps:EngUnitStaticProps',
+            'unitcompbase = pycycle.cea.unit_comps:UnitCompBase',
+            'usatm1976comp = pycycle.elements.US1976:USatm1976Comp',
+            'deltats = pycycle.elements.ambient:DeltaTs',
+            'bleedcalcs = pycycle.elements.bleed_out:BleedCalcs',
+            'mixfuel = pycycle.elements.combustor:MixFuel',
+            'bleedsandpower = pycycle.elements.compressor:BleedsAndPower',
+            'correctedinputscalc = pycycle.elements.compressor:CorrectedInputsCalc',
+            'enthalpyrise = pycycle.elements.compressor:EnthalpyRise',
+            'power = pycycle.elements.compressor:Power',
+            'pressurerise = pycycle.elements.compressor:PressureRise',
+            'mapscalars = pycycle.elements.compressor_map:MapScalars',
+            'scaledmapvalues = pycycle.elements.compressor_map:ScaledMapValues',
+            'stallcalcs = pycycle.elements.compressor_map:StallCalcs',
+            'eff_poly_calc = pycycle.elements.compressor:eff_poly_calc',
+            'combinecooling = pycycle.elements.cooling:CombineCooling',
+            'coolingcalcs = pycycle.elements.cooling:CoolingCalcs',
+            'machpressurelossmap = pycycle.elements.duct:MachPressureLossMap',
+            'pressureloss = pycycle.elements.duct:PressureLoss',
+            'qcalc = pycycle.elements.duct:qCalc',
+            'gearbox = pycycle.elements.gearbox:Gearbox',
+            'calcs = pycycle.elements.inlet:Calcs',
+            'areasum = pycycle.elements.mixer:AreaSum',
+            'impulse = pycycle.elements.mixer:Impulse',
+            'mixflow = pycycle.elements.mixer:MixFlow',
+            'mux = pycycle.elements.nozzle:Mux',
+            'pr_bal = pycycle.elements.nozzle:PR_bal',
+            'performancecalcs = pycycle.elements.nozzle:PerformanceCalcs',
+            'pressurecalcs = pycycle.elements.nozzle:PressureCalcs',
+            'performance = pycycle.elements.performance:Performance',
+            'shaft = pycycle.elements.shaft:Shaft',
+            'bprcalc = pycycle.elements.splitter:BPRcalc',
+            'bleeds = pycycle.elements.turbine:Bleeds',
+            'correctedinputscalc = pycycle.elements.turbine:CorrectedInputsCalc',
+            'enthalpyandpower = pycycle.elements.turbine:EnthalpyAndPower',
+            'enthalpydrop = pycycle.elements.turbine:EnthalpyDrop',
+            'pressuredrop = pycycle.elements.turbine:PressureDrop',
+            'mapscalars = pycycle.elements.turbine_map:MapScalars',
+            'scaledmapvalues = pycycle.elements.turbine_map:ScaledMapValues',
+            'eff_poly_calc = pycycle.elements.turbine:eff_poly_calc',
+            'flowin = pycycle.flow_in:FlowIn',
+            'passthrough = pycycle.passthrough:PassThrough',
+        ],
+        'openmdao_groups': [
+            'setstatic = pycycle.cea.set_static:SetStatic',
+            'properties = pycycle.cea.set_total:Properties',
+            'settotal = pycycle.cea.set_total:SetTotal',
+            'ambient = pycycle.elements.ambient:Ambient',
+            'bleedout = pycycle.elements.bleed_out:BleedOut',
+            'cfdstart = pycycle.elements.cfd_start:CFDStart',
+            'combustor = pycycle.elements.combustor:Combustor',
+            'compressor = pycycle.elements.compressor:Compressor',
+            'compressormap = pycycle.elements.compressor_map:CompressorMap',
+            'row = pycycle.elements.cooling:Row',
+            'turbinecooling = pycycle.elements.cooling:TurbineCooling',
+            'duct = pycycle.elements.duct:Duct',
+            'flightconditions = pycycle.elements.flight_conditions:FlightConditions',
+            'flowstart = pycycle.elements.flow_start:FlowStart',
+            'inlet = pycycle.elements.inlet:Inlet',
+            'mixer = pycycle.elements.mixer:Mixer',
+            'nozzle = pycycle.elements.nozzle:Nozzle',
+            'splitter = pycycle.elements.splitter:Splitter',
+            'turbine = pycycle.elements.turbine:Turbine',
+            'turbinemap = pycycle.elements.turbine_map:TurbineMap',
+        ],
+    }
+
+You can copy-and-paste this dict (generated for your own package instead of pycycle) into the
+`setup` call in your `setup.py` file in order to properly define your openmdao entry points.
+
+
 Using Commands under MPI
 ------------------------
 
