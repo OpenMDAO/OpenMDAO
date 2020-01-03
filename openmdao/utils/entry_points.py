@@ -9,6 +9,17 @@ from os.path import join, basename, dirname, isfile, split, splitext, abspath, e
 from inspect import getmembers, isclass
 
 from openmdao.utils.file_utils import package_iter, get_module_path
+from openmdao.core.component import Component
+from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.implicitcomponent import ImplicitComponent
+from openmdao.core.group import Group
+from openmdao.core.driver import Driver
+from openmdao.solvers.solver import Solver, LinearSolver, NonlinearSolver, BlockLinearSolver
+from openmdao.recorders.base_case_reader import BaseCaseReader
+from openmdao.recorders.case_recorder import CaseRecorder
+from openmdao.surrogate_models.surrogate_model import SurrogateModel
+from openmdao.solvers.linesearch.backtracking import LinesearchSolver
+
 
 try:
     import pkg_resources
@@ -16,16 +27,19 @@ except ImportError:
     pkg_resources = None
 
 
-_allowed_types = {
-    'components': 'openmdao_components',
-    'lin_solvers': 'openmdao_lin_solvers',
-    'nl_solvers': 'openmdao_nl_solvers',
-    'drivers': 'openmdao_drivers',
-    'case_recorders': 'openmdao_case_recorders',
-    'case_readers': 'openmdao_case_readers',
-    'surrogate_models': 'openmdao_surrogate_models',
-    'commands': 'openmdao_commands',
+_epgroup_bases = {
+    Component: 'openmdao_components',
+    Group: 'openmdao_groups',
+    SurrogateModel: 'openmdao_surrogate_models',
+    LinearSolver: 'openmdao_lin_solvers',
+    NonlinearSolver: 'openmdao_nl_solvers',
+    Driver: 'openmdao_drivers',
+    BaseCaseReader: 'openmdao_case_readers',
+    CaseRecorder: 'openmdao_case_recorders',
 }
+
+_allowed_types = {g.split('_', 1)[1]: g for g in _epgroup_bases.values()}
+_allowed_types['commands'] = 'openmdao_commands'
 
 
 def split_ep(entry_point):
@@ -91,28 +105,19 @@ def compute_entry_points(package, outstream=sys.stdout):
         The package name.
     outstream : file-like
         Output stream.  Defaults to stdout.
-    """
-    from openmdao.api import ExplicitComponent, ImplicitComponent, Group, SurrogateModel
-    from openmdao.core.component import Component
-    from openmdao.core.driver import Driver
-    from openmdao.solvers.solver import Solver, LinearSolver, NonlinearSolver, BlockLinearSolver
-    from openmdao.recorders.base_case_reader import BaseCaseReader
-    from openmdao.recorders.case_recorder import CaseRecorder
 
-    epgroup_info = {
-        Component: 'openmdao_components',
-        Group: 'openmdao_groups',
-        SurrogateModel: 'openmdao_surrogate_models',
-        LinearSolver: 'openmdao_lin_solvers',
-        NonlinearSolver: 'openmdao_nl_solvers',
-        Driver: 'openmdao_drivers',
-        BaseCaseReader: 'openmdao_case_readers',
-        CaseRecorder: 'openmdao_case_recorders',
-    }
-    check = tuple(epgroup_info)
+    Returns
+    -------
+    dict
+        Mapping of entry point groups to entry point strings.
+    """
+    check = tuple(_epgroup_bases)
 
     seen = set(check)
-    seen.update((ImplicitComponent, ExplicitComponent, BlockLinearSolver))
+    seen.update((ImplicitComponent, ExplicitComponent, BlockLinearSolver, LinesearchSolver))
+    # Driver and Group are instantiatable, so we should have entry points for them
+    seen.remove(Driver)
+    seen.remove(Group)
 
     groups = defaultdict(list)
 
@@ -134,22 +139,36 @@ def compute_entry_points(package, outstream=sys.stdout):
             continue
 
         for cname, c in getmembers(mod, isclass):
-            if not c.__module__.startswith(pkgpath):
+            # if class isn't defined in this module, skip it
+            if not c.__module__ == modpath:
                 continue
             if issubclass(c, check) and c not in seen:
                 seen.add(c)
-                for klass, epgroup in epgroup_info.items():
+                for klass, epgroup in _epgroup_bases.items():
                     if issubclass(c, klass):
                         groups[epgroup].append((modpath, cname))
                         break
 
-    print("entry_points={", file=outstream)
+    if outstream is None:
+        def printfunc(*args, **kwargs):
+            pass
+    else:
+        def printfunc(*args, **kwargs):
+            print(*args, **kwargs)
+
+    # do out own printing here instead of using pprint so we can control sort order
+    dct = {}
+    printfunc("entry_points={", file=outstream)
     for g, eps in sorted(groups.items(), key=lambda x: x[0]):
-        print("    '{}': [".format(g), file=outstream)
+        dct[g] = eplist = []
+        printfunc("    '{}': [".format(g), file=outstream)
         for modpath, cname in sorted(eps, key=lambda x: x[0] + x[1]):
-            print("        '{}={}:{}',".format(cname.lower(), modpath, cname), file=outstream)
-        print("    ],", file=outstream)
-    print("}", file=outstream)
+            eplist.append("{} = {}:{}".format(cname.lower(), modpath, cname))
+            printfunc("        '{}',".format(eplist[-1]), file=outstream)
+        printfunc("    ],", file=outstream)
+    printfunc("}", file=outstream)
+
+    return dct
 
 
 def _compute_entry_points_setup_parser(parser):

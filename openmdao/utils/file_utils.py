@@ -73,9 +73,10 @@ def package_iter(start_dir='.', dir_includes=None, dir_excludes=(), file_include
     dir_excludes = set() if dir_excludes is None else set(dir_excludes)
     dir_excludes.update(('test', 'tests'))
 
-    yield from files_iter(start_dir, dir_includes=dir_includes, dir_excludes=dir_excludes,
-                          file_includes=file_includes, file_excludes=file_excludes,
-                          package_only=True)
+    for f in files_iter(start_dir, dir_includes=dir_includes, dir_excludes=dir_excludes,
+                        file_includes=file_includes, file_excludes=file_excludes,
+                        package_only=True):
+        yield f
 
 
 def files_iter(start_dir='.', dir_includes=None, dir_excludes=(),
