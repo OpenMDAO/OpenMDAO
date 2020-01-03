@@ -1,6 +1,7 @@
 """
 A command to list OpenMDAO recognized types that are installed in the current environment.
 """
+from __future__ import print_function
 
 import sys
 from collections import defaultdict
