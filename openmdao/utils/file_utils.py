@@ -1,80 +1,42 @@
 """
 Utilities for working with files.
 """
+from __future__ import print_function
 
 import sys
 import os
-import ast
-from collections import defaultdict, OrderedDict
-from importlib import import_module
 from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
-from inspect import getmembers, isclass
-
-import networkx as nx
 
 
 def get_module_path(fpath):
-    """Given a module filename, return its full Python name including
-    enclosing packages. (based on existence of ``__init__.py`` files)
     """
+    Given a module filename, return its full Python module path.
+
+    This includes enclosing packages and is based on existence of ``__init__.py`` files.
+
+    Parameters
+    ----------
+    fpath : str
+        Pathname of file.
+
+    Returns
+    -------
+    str
+        Full module path of the given file.
+    """
+    fpath = abspath(fpath)
     if basename(fpath).startswith('__init__.'):
         pnames = []
     else:
         pnames = [splitext(basename(fpath))[0]]
-    path = dirname(abspath(fpath))
+    path = dirname(fpath)
+
     while isfile(join(path, '__init__.py')):
             path, pname = split(path)
             pnames.append(pname)
+
     return '.'.join(pnames[::-1])
-
-
-def get_class_graph(start_dir):
-    from openmdao.api import ExplicitComponent, ImplicitComponent, Group, SurrogateModel
-    from openmdao.core.component import Component
-    from openmdao.core.driver import Driver
-    from openmdao.solvers.solver import Solver, LinearSolver, NonlinearSolver
-    from openmdao.recorders.base_case_reader import BaseCaseReader
-    from openmdao.recorders.case_recorder import CaseRecorder
-
-    epgroup_info = {
-        Component: 'openmdao_components',
-        Group: 'openmdao_groups',
-        SurrogateModel: 'openmdao_surrogate_models',
-        LinearSolver: 'openmdao_lin_solvers',
-        NonlinearSolver: 'openmdao_nl_solvers',
-        Driver: 'openmdao_drivers',
-        BaseCaseReader: 'openmdao_case_readers',
-        CaseRecorder: 'openmdao_case_recorders',
-    }
-    check = tuple(epgroup_info)
-
-    seen = set(check)
-    seen.update((ImplicitComponent, ExplicitComponent))
-
-    groups = defaultdict(list)
-
-    for f in package_iter(start_dir, dir_excludes=('test_suite',)):
-        modpath = get_module_path(f)
-        try:
-            mod = import_module(modpath)
-        except Exception:
-            print("failed to import {} (file {}).".format(modpath, f))
-            continue
-
-        for cname, c in getmembers(mod, isclass):
-            if issubclass(c, check) and c not in seen:
-                seen.add(c)
-                for klass, epgroup in epgroup_info.items():
-                    if issubclass(c, klass):
-                        groups[epgroup].append("{}={}:{}".format(cname.lower(), modpath, cname))
-
-    final = OrderedDict()
-    for g, eps in sorted(groups.items(), key=lambda x: x[0]):
-        final[g] = sorted(eps)
-
-    import pprint
-    pprint.pprint(final)
 
 
 def package_iter(start_dir='.', dir_includes=None, dir_excludes=(), file_includes=None,

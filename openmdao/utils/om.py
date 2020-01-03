@@ -43,8 +43,8 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.file_utils import _load_and_exec
-from openmdao.utils.list_installed import _list_installed_setup_parser, _list_installed_cmd, \
-    split_ep
+from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
+    split_ep, _compute_entry_points_setup_parser, _compute_entry_points_cmd
 from openmdao.core.component import Component
 
 
@@ -596,7 +596,9 @@ _command_map = {
                   "methods it calls."),
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
-    'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem'),
+    'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem.'),
+    'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_cmd,
+                             'Compute what entry points should be for the specified package.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,
               'Profile calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
@@ -637,7 +639,7 @@ if os.environ.get('OPENMDAO_DEV', '').lower() not in {'0', 'false', 'no', ''}:
 
 def openmdao_cmd():
     """
-    Wrap a number of Problem viewing/debugging command line functions.
+    Run an 'openmdao' sub-command or list help info for 'openmdao' command or sub-commands.
     """
     # pre-parse sys.argv to split between before and after '--'
     if '--' in sys.argv:
