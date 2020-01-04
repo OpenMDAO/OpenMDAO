@@ -125,8 +125,8 @@ Below is an example of a connection viewer for a pycycle propulsor model obtaine
    An example of a connection viewer.
 
 
-By default the promoted names columns of both inputs and outputs are shown, but in the example
-above, the absolute input names are shown and the promoted input names are hidden.
+By default the promoted names columns of both inputs and outputs are shown and their absolute
+names are hidden.
 
 Unconnected inputs can easily be identified by typing '[NO CONNECTION]' or '[', into
 the filter field of either the absolute or promoted *output* column.  Unconnected outputs can
@@ -298,15 +298,144 @@ openmdao scaffold
 #################
 
 The :code:`openmdao scaffold` command generates simple scaffolding, or 'skeleton' code for
-an explicit or implicit component.  In addition, it will generate the scaffolding for a simple
-test file of that component.  The available options are as follows:
+a class that inherits from an allowed OpenMDAO base class.  The allowed base classes are shown as
+part of the description of the `--base` arg below:
 
 .. embed-shell-cmd::
     :cmd: openmdao scaffold -h
 
 
-This command is only an initial attempt to provide this sort of functionality and any user
-feedback describing how to improve it is welcome.
+In addition, the command will generate the scaffolding for a simple
+test file for that class, and if the `--package` option is used, it will generate the directory
+structure for a simple installable python package and will declare an entry point in the
+`setup.py` file so that the given class can be discoverable as an OpenMDAO plugin when installed.
+
+To build scaffolding for an OpenMDAO command line tool plugin, use the `--cmd` option.
+
+
+
+.. _om-command-list-installed:
+
+openmdao list_installed
+#######################
+
+The :code:`openmdao list_installed` command lists installed classes of the specified type(s).
+Its options are shown below:
+
+
+.. embed-shell-cmd::
+    :cmd: openmdao list_installed -h
+
+
+By default, installed types from all installed packages are shown, but the output can be filtered
+by the use of the `-i` option to include only specified packages, or the `-x` option
+to exclude specified packages.
+
+For example, to show only those linear and nonlinear solver types that are part of the `openmdao`
+package, do the following:
+
+.. embed-shell-cmd::
+    :cmd: openmdao list_installed lin_solvers nl_solvers -i openmdao
+
+
+.. _om-command-compute-entry-points:
+
+openmdao compute_entry_points
+#############################
+
+The :code:`openmdao compute_entry_points` command prints out an `entry_points` dict that, if
+passed as the `entry_points` arg to the `setup` call in your `setup.py` file, will define all
+of the expected openmdao entry points based on any classes found in your package source files.
+
+For example, running the command on the pycycle package as follows
+
+.. code-block:: none
+
+    openmdao compute_entry_points pycycle
+
+
+would generate output similar to this:
+
+
+.. code-block:: none
+
+    entry_points={
+        'openmdao_components': [
+            'chemeq = pycycle.cea.chem_eq:ChemEq',
+            'propscalcs = pycycle.cea.props_calcs:PropsCalcs',
+            'propsrhs = pycycle.cea.props_rhs:PropsRHS',
+            'pscalc = pycycle.cea.static_ps_calc:PsCalc',
+            'psresid = pycycle.cea.static_ps_resid:PsResid',
+            'engunitprops = pycycle.cea.unit_comps:EngUnitProps',
+            'engunitstaticprops = pycycle.cea.unit_comps:EngUnitStaticProps',
+            'unitcompbase = pycycle.cea.unit_comps:UnitCompBase',
+            'usatm1976comp = pycycle.elements.US1976:USatm1976Comp',
+            'deltats = pycycle.elements.ambient:DeltaTs',
+            'bleedcalcs = pycycle.elements.bleed_out:BleedCalcs',
+            'mixfuel = pycycle.elements.combustor:MixFuel',
+            'bleedsandpower = pycycle.elements.compressor:BleedsAndPower',
+            'correctedinputscalc = pycycle.elements.compressor:CorrectedInputsCalc',
+            'enthalpyrise = pycycle.elements.compressor:EnthalpyRise',
+            'power = pycycle.elements.compressor:Power',
+            'pressurerise = pycycle.elements.compressor:PressureRise',
+            'mapscalars = pycycle.elements.compressor_map:MapScalars',
+            'scaledmapvalues = pycycle.elements.compressor_map:ScaledMapValues',
+            'stallcalcs = pycycle.elements.compressor_map:StallCalcs',
+            'eff_poly_calc = pycycle.elements.compressor:eff_poly_calc',
+            'combinecooling = pycycle.elements.cooling:CombineCooling',
+            'coolingcalcs = pycycle.elements.cooling:CoolingCalcs',
+            'machpressurelossmap = pycycle.elements.duct:MachPressureLossMap',
+            'pressureloss = pycycle.elements.duct:PressureLoss',
+            'qcalc = pycycle.elements.duct:qCalc',
+            'gearbox = pycycle.elements.gearbox:Gearbox',
+            'calcs = pycycle.elements.inlet:Calcs',
+            'areasum = pycycle.elements.mixer:AreaSum',
+            'impulse = pycycle.elements.mixer:Impulse',
+            'mixflow = pycycle.elements.mixer:MixFlow',
+            'mux = pycycle.elements.nozzle:Mux',
+            'pr_bal = pycycle.elements.nozzle:PR_bal',
+            'performancecalcs = pycycle.elements.nozzle:PerformanceCalcs',
+            'pressurecalcs = pycycle.elements.nozzle:PressureCalcs',
+            'performance = pycycle.elements.performance:Performance',
+            'shaft = pycycle.elements.shaft:Shaft',
+            'bprcalc = pycycle.elements.splitter:BPRcalc',
+            'bleeds = pycycle.elements.turbine:Bleeds',
+            'correctedinputscalc = pycycle.elements.turbine:CorrectedInputsCalc',
+            'enthalpyandpower = pycycle.elements.turbine:EnthalpyAndPower',
+            'enthalpydrop = pycycle.elements.turbine:EnthalpyDrop',
+            'pressuredrop = pycycle.elements.turbine:PressureDrop',
+            'mapscalars = pycycle.elements.turbine_map:MapScalars',
+            'scaledmapvalues = pycycle.elements.turbine_map:ScaledMapValues',
+            'eff_poly_calc = pycycle.elements.turbine:eff_poly_calc',
+            'flowin = pycycle.flow_in:FlowIn',
+            'passthrough = pycycle.passthrough:PassThrough',
+        ],
+        'openmdao_groups': [
+            'setstatic = pycycle.cea.set_static:SetStatic',
+            'properties = pycycle.cea.set_total:Properties',
+            'settotal = pycycle.cea.set_total:SetTotal',
+            'ambient = pycycle.elements.ambient:Ambient',
+            'bleedout = pycycle.elements.bleed_out:BleedOut',
+            'cfdstart = pycycle.elements.cfd_start:CFDStart',
+            'combustor = pycycle.elements.combustor:Combustor',
+            'compressor = pycycle.elements.compressor:Compressor',
+            'compressormap = pycycle.elements.compressor_map:CompressorMap',
+            'row = pycycle.elements.cooling:Row',
+            'turbinecooling = pycycle.elements.cooling:TurbineCooling',
+            'duct = pycycle.elements.duct:Duct',
+            'flightconditions = pycycle.elements.flight_conditions:FlightConditions',
+            'flowstart = pycycle.elements.flow_start:FlowStart',
+            'inlet = pycycle.elements.inlet:Inlet',
+            'mixer = pycycle.elements.mixer:Mixer',
+            'nozzle = pycycle.elements.nozzle:Nozzle',
+            'splitter = pycycle.elements.splitter:Splitter',
+            'turbine = pycycle.elements.turbine:Turbine',
+            'turbinemap = pycycle.elements.turbine_map:TurbineMap',
+        ],
+    }
+
+You can copy-and-paste this dict (generated for your own package instead of pycycle) into the
+`setup` call in your `setup.py` file in order to properly define your openmdao entry points.
 
 
 Using Commands under MPI

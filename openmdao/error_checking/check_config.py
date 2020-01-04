@@ -18,6 +18,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.hooks import _register_hook
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.units import convert_units
+from openmdao.utils.file_utils import _load_and_exec
 
 
 _UNSET = object()
@@ -613,7 +614,7 @@ def _check_config_setup_parser(parser):
                         (sorted(_default_checks), sorted(set(_all_checks) - set(_default_checks))))
 
 
-def _check_config_cmd(options):
+def _check_config_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao check'.
 
@@ -621,6 +622,8 @@ def _check_config_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
 
     Returns
     -------
@@ -647,7 +650,7 @@ def _check_config_cmd(options):
     # register the hook
     _register_hook('final_setup', class_name='Problem', inst_id=options.problem, post=_check_config)
 
-    return _check_config
+    _load_and_exec(options.file[0], user_args)
 
 
 def check_allocate_complex_ln(model, under_cs):

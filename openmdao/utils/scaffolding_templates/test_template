@@ -14,14 +14,14 @@ class Test{class_name}(unittest.TestCase):
     def test_basic(self):
         pass
 
-    def test_partials(self):
-        p = om.Problem()
+    # for component classes ...
+    # def test_partials(self):
+        # p = om.Problem()
 
         # populate problem here...
 
         # partials = p.check_partials(method='fd', out_stream=None)
         # assert_check_partials(partials)
-        pass
 
 
 if __name__ == "__main__":

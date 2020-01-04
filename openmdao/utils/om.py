@@ -6,19 +6,26 @@ from __future__ import print_function
 import sys
 import os
 import argparse
+try:
+    import pkg_resources
+except ImportError:
+    pkg_resources = None
+
 from itertools import chain
 from six import iteritems
 
 import openmdao.utils.hooks as hooks
 from openmdao.visualization.n2_viewer.n2_viewer import n2
 from openmdao.visualization.connection_viewer.viewconns import view_connections
-from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
+from openmdao.visualization.xdsm_viewer.xdsm_writer import write_xdsm, \
+    _DEFAULT_BOX_STACKING, _DEFAULT_BOX_WIDTH, _MAX_BOX_LINES, _DEFAULT_OUTPUT_SIDE, _CHAR_SUBS
 try:
     import bokeh
     from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
 except ImportError:
     bokeh = None
+from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
 from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
@@ -26,8 +33,6 @@ from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_p
 from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, \
     _mempost_exec, _mempost_setup_parser
 from openmdao.devtools.iprof_utils import _Options
-from openmdao.visualization.xdsm_viewer.xdsm_writer import write_xdsm, \
-    _DEFAULT_BOX_STACKING, _DEFAULT_BOX_WIDTH, _MAX_BOX_LINES, _DEFAULT_OUTPUT_SIDE, _CHAR_SUBS
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.utils.mpi import MPI
 from openmdao.utils.find_cite import print_citations
@@ -37,6 +42,9 @@ from openmdao.utils.coloring import _total_coloring_setup_parser, _total_colorin
     _view_coloring_setup_parser, _view_coloring_exec
 from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.file_utils import _load_and_exec
+from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
+    split_ep, _compute_entry_points_setup_parser, _compute_entry_points_cmd
 from openmdao.core.component import Component
 
 
@@ -84,11 +92,9 @@ def _n2_cmd(options, user_args):
                use_declare_partial_info=options.use_declare_partial_info)
             exit()  # could make this command line selectable later
 
-        options.func = lambda options: _viewmod
-
         hooks._register_hook('final_setup', 'Problem', post=_viewmod)
 
-        _simple_exec(options, user_args)
+        _load_and_exec(filename, user_args)
     else:
         # assume the file is a recording, run standalone
         n2(filename, outfile=options.outfile, title=options.title,
@@ -196,11 +202,9 @@ def _xdsm_cmd(options, user_args):
                        **kwargs)
             exit()
 
-        options.func = lambda options: _xdsm
-
         hooks._register_hook('setup', 'Problem', post=_xdsm)
 
-        _simple_exec(options, user_args)
+        _load_and_exec(filename, user_args)
     else:
         # assume the file is a recording, run standalone
         write_xdsm(filename, filename=options.outfile, model_path=options.model_path,
@@ -237,7 +241,7 @@ def _view_connections_setup_parser(parser):
     parser.add_argument('-p', '--problem', action='store', dest='problem', help='Problem name')
 
 
-def _view_connections_cmd(options):
+def _view_connections_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao view_connections'.
 
@@ -245,11 +249,8 @@ def _view_connections_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The hook function.
+    user_args : list of str
+        Args to be passed to the user script.
     """
     def _viewconns(prob):
         if options.title:
@@ -267,7 +268,7 @@ def _view_connections_cmd(options):
         funcname = 'setup'
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns)
 
-    return _viewconns
+    _load_and_exec(options.file[0], user_args)
 
 
 def _meta_model_parser(parser):
@@ -291,7 +292,7 @@ def _meta_model_parser(parser):
                         help='Bokeh server will start server without browser')
 
 
-def _meta_model_cmd(options):
+def _meta_model_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao meta_model'.
 
@@ -299,11 +300,8 @@ def _meta_model_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The hook function.
+    user_args : list of str
+        Args to be passed to the user script.
     """
     def _view_metamodel(prob):
         if bokeh is None:
@@ -354,7 +352,7 @@ def _meta_model_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=_view_metamodel)
 
-    return _view_metamodel
+    _load_and_exec(options.file[0], user_args)
 
 
 def _config_summary_setup_parser(parser):
@@ -369,7 +367,7 @@ def _config_summary_setup_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
 
 
-def _config_summary_cmd(options):
+def _config_summary_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao summary'.
 
@@ -377,11 +375,8 @@ def _config_summary_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The hook function.
+    user_args : list of str
+        Args to be passed to the user script.
     """
     def summary(prob):
         config_summary(prob)
@@ -389,7 +384,7 @@ def _config_summary_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=summary)
 
-    return summary
+    _load_and_exec(options.file[0], user_args)
 
 
 def _tree_setup_parser(parser):
@@ -465,7 +460,7 @@ def _get_tree_filter(attrs, vecvars):
     return _finder
 
 
-def _tree_cmd(options):
+def _tree_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao tree'.
 
@@ -473,11 +468,8 @@ def _tree_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The hook function.
+    user_args : list of str
+        Args to be passed to the user script.
     """
     if options.outfile is None:
         out = sys.stdout
@@ -502,7 +494,7 @@ def _tree_cmd(options):
         funcname = 'setup'
     hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_tree)
 
-    return _tree
+    _load_and_exec(options.file[0], user_args)
 
 
 def _dump_dist_idxs_setup_parser(parser):
@@ -521,7 +513,7 @@ def _dump_dist_idxs_setup_parser(parser):
                         help='Name of vectors to show indices for.  Default is "nonlinear".')
 
 
-def _dump_dist_idxs_cmd(options):
+def _dump_dist_idxs_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao dump_idxs'.
 
@@ -529,11 +521,8 @@ def _dump_dist_idxs_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The hook function.
+    user_args : list of str
+        Args to be passed to the user script.
     """
     if options.outfile is None:
         out = sys.stdout
@@ -546,7 +535,7 @@ def _dump_dist_idxs_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=_dumpdist)
 
-    return _dumpdist
+    _load_and_exec(options.file[0], user_args)
 
 
 def _cite_setup_parser(parser):
@@ -565,14 +554,16 @@ def _cite_setup_parser(parser):
                         help='Find citation for this class.')
 
 
-def _cite_cmd(options):
+def _cite_cmd(options, user_args):
     """
-    Return the post setup hook function for `openmdao cite`.
+    Run the `openmdao cite` command.
 
     Parameters
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
 
     Returns
     -------
@@ -594,98 +585,61 @@ def _cite_cmd(options):
 
     hooks._register_hook('setup', 'Problem', post=_cite)
 
-    return _cite
+    _load_and_exec(options.file[0], user_args)
 
-
-def _simple_exec(options, user_args):
-    """
-    Use this as executor for commands that run as Problem commands.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-    """
-    progname = options.file[0]
-
-    sys.path.insert(0, os.path.dirname(progname))
-
-    sys.argv[:] = [progname] + user_args
-
-    with open(progname, 'rb') as fp:
-        code = compile(fp.read(), progname, 'exec')
-
-    globals_dict = {
-        '__file__': progname,
-        '__name__': '__main__',
-        '__package__': None,
-        '__cached__': None,
-    }
-
-    if options.func is not None:
-        # calling this func sets up the hook(s)
-        options.func(options)
-
-    exec(code, globals_dict)
-
-
-# NOTE: any commands using _simple_exec as their executor must handle their own exit behavior.
-# If you want them to exit after running, exit() must be called from within your function.  This
-# also gives you the option of controlling the exit behavior via a command line argument.
 
 # this dict should contain names mapped to tuples of the form:
-#   (setup_parser_func, executor, func, description)
-# 'func' will typically be None unless 'executor' is _simple_exec.
+#   (setup_parser_func, executor, description)
 _command_map = {
-    'call_tree': (_calltree_setup_parser, _calltree_exec, None,
+    'call_tree': (_calltree_setup_parser, _calltree_exec,
                   "Display the call tree for the specified class method and all 'self' class "
                   "methods it calls."),
-    'check': (_check_config_setup_parser, _simple_exec, _check_config_cmd,
+    'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
-    'cite': (_cite_setup_parser, _simple_exec, _cite_cmd,
-             'Print citations referenced by the problem'),
-    'iprof': (_iprof_setup_parser, _iprof_exec, None,
+    'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem.'),
+    'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_cmd,
+                             'Compute what entry points should be for the specified package.'),
+    'iprof': (_iprof_setup_parser, _iprof_exec,
               'Profile calls to particular object instances.'),
-    'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec, None,
+    'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
                      'Generate total timings of calls to particular object instances.'),
-    'mem': (_mem_prof_setup_parser, _mem_prof_exec, None,
+    'list_installed': (_list_installed_setup_parser, _list_installed_cmd,
+                       'List installed types recognized by OpenMDAO.'),
+    'mem': (_mem_prof_setup_parser, _mem_prof_exec,
             'Profile memory used by OpenMDAO related functions.'),
-    'mempost': (_mempost_setup_parser, _mempost_exec, None,
-                'Post-process memory profile output.'),
-    'n2': (_n2_setup_parser, _n2_cmd, None, 'Display an interactive N2 diagram of the problem.'),
-    'partial_coloring': (_partial_coloring_setup_parser, _simple_exec, _partial_coloring_cmd,
+    'mempost': (_mempost_setup_parser, _mempost_exec, 'Post-process memory profile output.'),
+    'n2': (_n2_setup_parser, _n2_cmd, 'Display an interactive N2 diagram of the problem.'),
+    'partial_coloring': (_partial_coloring_setup_parser, _partial_coloring_cmd,
                          'Compute coloring(s) for specified partial jacobians.'),
-    'scaffold': (_scaffold_setup_parser, _scaffold_exec, None,
+    'scaffold': (_scaffold_setup_parser, _scaffold_exec,
                  'Generate a simple scaffold for a component.'),
-    'summary': (_config_summary_setup_parser, _simple_exec, _config_summary_cmd,
+    'summary': (_config_summary_setup_parser, _config_summary_cmd,
                 'Print a short top-level summary of the problem.'),
-    'total_coloring': (_total_coloring_setup_parser, _simple_exec, _total_coloring_cmd,
+    'total_coloring': (_total_coloring_setup_parser, _total_coloring_cmd,
                        'Compute a coloring for the total jacobian.'),
-    'trace': (_itrace_setup_parser, _itrace_exec, None, 'Dump trace output.'),
-    'tree': (_tree_setup_parser, _simple_exec, _tree_cmd, 'Print the system tree.'),
-    'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, None,
-                      'View a colored jacobian.'),
-    'view_connections': (_view_connections_setup_parser, _simple_exec, _view_connections_cmd,
+    'trace': (_itrace_setup_parser, _itrace_exec, 'Dump trace output.'),
+    'tree': (_tree_setup_parser, _tree_cmd, 'Print the system tree.'),
+    'view_coloring': (_view_coloring_setup_parser, _view_coloring_exec, 'View a colored jacobian.'),
+    'view_connections': (_view_connections_setup_parser, _view_connections_cmd,
                          'View connections showing values and source/target units.'),
-    'view_mm': (_meta_model_parser, _simple_exec, _meta_model_cmd, "View a metamodel."),
-    'view_model': (_n2_setup_parser, _view_model_cmd, None,
+    'view_mm': (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
+    'view_model': (_n2_setup_parser, _view_model_cmd,
                    'Display an interactive N2 diagram of the problem. '
                    '(Deprecated, please use n2 instead.)'),
-    'xdsm': (_xdsm_setup_parser, _xdsm_cmd, None,
-             'Generate an XDSM diagram of a model.'),
+    'xdsm': (_xdsm_setup_parser, _xdsm_cmd, 'Generate an XDSM diagram of a model.'),
 }
 
 
 # add any dev specific command here that users probably don't want to see
-if os.environ.get('OPENMDAO_DEV', '').lower() in {'1', 'true', 'yes'}:
-    _command_map['dump_idxs'] = (_dump_dist_idxs_setup_parser, _simple_exec,
+if os.environ.get('OPENMDAO_DEV', '').lower() not in {'0', 'false', 'no', ''}:
+    _command_map['dump_idxs'] = (_dump_dist_idxs_setup_parser,
                                  _dump_dist_idxs_cmd,
                                  'Show distributed index information.')
 
 
 def openmdao_cmd():
     """
-    Wrap a number of Problem viewing/debugging command line functions.
+    Run an 'openmdao' sub-command or list help info for 'openmdao' command or sub-commands.
     """
     # pre-parse sys.argv to split between before and after '--'
     if '--' in sys.argv:
@@ -704,15 +658,39 @@ def openmdao_cmd():
 
     # setting 'dest' here will populate the Namespace with the active subparser name
     subs = parser.add_subparsers(title='Tools', metavar='', dest="subparser_name")
-    for p, (parser_setup_func, executor, func, help_str) in sorted(_command_map.items()):
+    for p, (parser_setup_func, executor, help_str) in sorted(_command_map.items()):
         subp = subs.add_parser(p, help=help_str)
         parser_setup_func(subp)
-        subp.set_defaults(executor=executor, func=func)
+        subp.set_defaults(executor=executor)
+
+    if pkg_resources is None:
+        print("\npkg_resources was not found, so no plugin entry points can be loaded.\n")
+    else:
+        # now add any plugin openmdao commands
+        epdict = {}
+        for ep in pkg_resources.iter_entry_points(group='openmdao_commands'):
+            p, module, target = split_ep(ep)
+            # don't let plugins override the builtin commands
+            if p in _command_map:
+                raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with "
+                                   "builtin command '{}'.".format(p, module, p))
+            elif p in epdict:
+                raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
+                                   "another plugin command defined in {}."
+                                   .format(p, module, epdict[p][1]))
+            epdict[p] = (ep, module)
+
+        for p, (ep, module) in epdict.items():
+            func = ep.load()
+            parser_setup_func, executor, help_str = func()
+            subp = subs.add_parser(p, help='(plugin) ' + help_str)
+            parser_setup_func(subp)
+            subp.set_defaults(executor=executor)
 
     # handle case where someone just runs `openmdao <script> [dashed-args]`
     args = [a for a in sys.argv[1:] if not a.startswith('-')]
     if not set(args).intersection(subs.choices) and len(args) == 1 and os.path.isfile(args[0]):
-        _simple_exec(_Options(file=[args[0]], func=None), user_args)
+        _load_and_exec(args[0], user_args)
     else:
         hooks.use_hooks = True
         # we do a parse_known_args here instead of parse_args so that we can associate errors with

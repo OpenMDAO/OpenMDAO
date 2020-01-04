@@ -29,6 +29,7 @@ from openmdao.utils.array_utils import array_viz
 from openmdao.utils.general_utils import simple_warning
 import openmdao.utils.hooks as hooks
 from openmdao.utils.mpi import MPI
+from openmdao.utils.file_utils import _load_and_exec
 
 
 CITATIONS = """
@@ -1853,7 +1854,7 @@ def _total_coloring_setup_parser(parser):
                         help="Do profiling on the coloring process.")
 
 
-def _total_coloring_cmd(options):
+def _total_coloring_cmd(options, user_args):
     """
     Return the post_setup hook function for 'openmdao total_coloring'.
 
@@ -1861,11 +1862,8 @@ def _total_coloring_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
-
-    Returns
-    -------
-    function
-        The hook function.
+    user_args : list of str
+        Args to be passed to the user script.
     """
     from openmdao.core.problem import Problem
     from openmdao.devtools.debug import profiling
@@ -1910,7 +1908,7 @@ def _total_coloring_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=_total_coloring)
 
-    return _total_coloring
+    _load_and_exec(options.file[0], user_args)
 
 
 def _partial_coloring_setup_parser(parser):
@@ -1981,7 +1979,7 @@ def _get_partial_coloring_kwargs(system, options):
     return kwargs
 
 
-def _partial_coloring_cmd(options):
+def _partial_coloring_cmd(options, user_args):
     """
     Return the hook function for 'openmdao partial_color'.
 
@@ -1989,11 +1987,9 @@ def _partial_coloring_cmd(options):
     ----------
     options : argparse Namespace
         Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
 
-    Returns
-    -------
-    function
-        The hook function.
     """
     from openmdao.core.problem import Problem
     from openmdao.core.component import Component
@@ -2084,7 +2080,7 @@ def _partial_coloring_cmd(options):
 
     hooks._register_hook('final_setup', 'Problem', post=_partial_coloring)
 
-    return _partial_coloring
+    _load_and_exec(options.file[0], user_args)
 
 
 def _view_coloring_setup_parser(parser):
