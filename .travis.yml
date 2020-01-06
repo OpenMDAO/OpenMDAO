@@ -132,9 +132,9 @@ install:
     echo " >> Installing Node.js";
     pip install npm;
     echo "  > Install Puppeteer";
-    npm i puppeteer
-    echo "  > Install yargs"
-    npm i yargs
+    npm i puppeteer;
+    echo "  > Install yargs";
+    npm i yargs;
   fi
 
 # install OpenMDAO and its development and documentation dependencies
