@@ -4,7 +4,6 @@ import shutil
 import unittest
 
 # set DEBUG to True if you want to view the generated HTML file
-GUI_TEST_SUBDIR = 'gui_test_models'
 GUI_TEST_EXE = 'test_gui.js'
 DEBUG = True
 
@@ -15,14 +14,13 @@ class N2GUITestCase(unittest.TestCase):
         Generate the N2 HTML files from all models in GUI_TEST_SUBDIR.
         """
         self.parentDir = os.path.dirname(os.path.realpath(__file__))
-        self.modelDir = self.parentDir + '/' + GUI_TEST_SUBDIR
-        models = filter(lambda x: x.endswith('.py'), os.listdir(self.modelDir))
+        models = filter(lambda x: x.startswith('gui_test_'), os.listdir(self.parentDir))
         self.basenames = map(lambda x: x[:-3], models)
         self.n2files = []
 
         for n in self.basenames:
-            n2file = self.modelDir + '/' + n + '_N2_TEST.html'
-            pyfile = self.modelDir + '/' + n + '.py'
+            n2file = self.parentDir + '/' + n + '_N2_TEST.html'
+            pyfile = self.parentDir + '/' + n + '.py'
             self.n2files.append(n2file)
             os.system('openmdao n2 -o ' + n2file + ' --no_browser ' + pyfile)
         
