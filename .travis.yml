@@ -36,6 +36,8 @@ addons:
     - liblapack-dev
     - libopenmpi-dev
     - openmpi-bin
+    - nodejs
+    - npm
     ssh_known_hosts:
     - web543.webfaction.com
 
@@ -129,8 +131,6 @@ install:
       pip install petsc4py==$PETSc;
     fi
 
-    echo " >> Installing Node.js";
-    pip install npm;
     echo "  > Install Puppeteer";
     npm i puppeteer;
     echo "  > Install yargs";
