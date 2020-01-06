@@ -113,6 +113,8 @@ setup(
             'src/*.js',
             'style/*.css',
             'style/*.woff',
+            'tests/*.js',
+            'tests/gui_test_models/*.py',
             '*.html'
         ],
         'openmdao.visualization.connection_viewer': [
