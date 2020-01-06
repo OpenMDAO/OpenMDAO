@@ -1686,6 +1686,11 @@ class TestPyoptSparse(unittest.TestCase):
         if local_opt != 'SNOPT':
             raise unittest.SkipTest("pyoptsparse is not providing SNOPT")
 
+        import pyoptsparse
+        if not hasattr(pyoptsparse, '__version__') or \
+           LooseVersion(pyoptsparse.__version__) < LooseVersion('1.1.0'):
+            raise unittest.SkipTest("pyoptsparse needs to be updated to 1.1.0")
+
         class ParaboloidSIG(om.ExplicitComponent):
 
             def setup(self):
