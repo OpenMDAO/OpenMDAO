@@ -9,7 +9,7 @@ GUI_TEST_EXE = 'test_gui.js'
 DEBUG = True
 
 @unittest.skipUnless(shutil.which('node') != None, "Node.js is required to test the N2 GUI.")
-class N2ParallelTestCase(unittest.TestCase):
+class N2GUITestCase(unittest.TestCase):
     def setUp(self):
         """
         Generate the N2 HTML files from all models in GUI_TEST_SUBDIR.
