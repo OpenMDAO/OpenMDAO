@@ -72,6 +72,9 @@ before_install:
     rm -rf $HOME/miniconda;
   fi
 
+- npm install -g puppeteer
+- npm install -g yargs
+
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
 - if [ "$encrypted_74d70a284b7d_key" ]; then
@@ -131,10 +134,6 @@ install:
       pip install petsc4py==$PETSc;
     fi
 
-    echo "  > Install Puppeteer";
-    npm i puppeteer;
-    echo "  > Install yargs";
-    npm i yargs;
   fi
 
 # install OpenMDAO and its development and documentation dependencies
