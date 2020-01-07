@@ -11,8 +11,6 @@ filter_secrets: false
 os:
 - linux
 
-dist: bionic
-
 language: generic
 
 env:
@@ -74,8 +72,10 @@ before_install:
     rm -rf $HOME/miniconda;
   fi
 
-- sudo npm install -g yargs
-- sudo npm install -g puppeteer
+- curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+  sudo apt-get install -y nodejs
+  sudo npm install -g puppeteer
+  sudo npm install -g yargs
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
