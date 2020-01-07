@@ -11,6 +11,8 @@ filter_secrets: false
 os:
 - linux
 
+dist: bionic
+
 language: generic
 
 env:
@@ -72,8 +74,8 @@ before_install:
     rm -rf $HOME/miniconda;
   fi
 
-- sudo npm install -g puppeteer
 - sudo npm install -g yargs
+- sudo npm install -g puppeteer
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
