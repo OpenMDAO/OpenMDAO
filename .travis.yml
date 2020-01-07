@@ -145,7 +145,7 @@ install:
 
 before_script:
 - for nodepkg in yargs puppeteer; do
-    /usr/bin/npm install -g $nodepkg;
+    /usr/bin/npm install $nodepkg;
   done
 
 script:
