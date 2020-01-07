@@ -36,8 +36,6 @@ addons:
     - liblapack-dev
     - libopenmpi-dev
     - openmpi-bin
-    - nodejs
-    - npm
     ssh_known_hosts:
     - web543.webfaction.com
 
