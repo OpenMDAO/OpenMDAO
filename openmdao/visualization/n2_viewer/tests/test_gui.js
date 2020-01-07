@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env /usr/bin/node
 
 const argv = require('yargs').argv;
 const puppeteer = require('puppeteer');
