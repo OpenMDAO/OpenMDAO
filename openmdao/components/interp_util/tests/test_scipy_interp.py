@@ -18,7 +18,7 @@ except ImportError:
     scipy_gte_019 = False
 
 if scipy_gte_019:
-    from openmdao.components.interp_util.scipy_interp import ScipyGridInterp
+    from openmdao.components.interp_util.interp import InterpND
     from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
 
@@ -32,15 +32,15 @@ class TestScipyGridInterpolator(unittest.TestCase):
 
     def setUp(self):
         self.interp_configs = {
-            "slinear": 1,
-            "cubic": 3,
-            "quintic": 5,
+            "scipy_slinear": 1,
+            "scipy_cubic": 3,
+            "scipy_quintic": 5,
         }
         self.valid_methods = self.interp_configs.keys()
         self.tol = {
-            "slinear": 5e-2,
-            "cubic": 1e-4,
-            "quintic": 1e-6,
+            "scipy_slinear": 5e-2,
+            "scipy_cubic": 1e-4,
+            "scipy_quintic": 1e-6,
         }
 
     def _get_sample_4d_large(self):
@@ -92,26 +92,25 @@ class TestScipyGridInterpolator(unittest.TestCase):
         points = [x, y, z]
         values = np.random.randn(2, 10, 20)
 
-        interp = ScipyGridInterp(
-            points, values, interp_method='cubic')
+        interp = InterpND(points, values, interp_method='scipy_cubic')
 
         # first dimension (x) should be reduced to k=1 (linear)
-        self.assertEqual(interp._ki[0], 1)
+        self.assertEqual(interp.table._ki[0], 1)
 
         # should operate as normal
         x = np.array([0.5, 0, 1001])
         result = interp.interpolate(x)
         assert_almost_equal(result, -0.046325695741704434, decimal=5)
 
-        interp = ScipyGridInterp(points, values, interp_method='slinear')
+        interp = InterpND(points, values, interp_method='scipy_slinear')
         value1 = interp.interpolate(x)
 
         # cycle through different methods that require order reduction
         # in the first dimension
-        interp = ScipyGridInterp(points, values, interp_method='quintic')
+        interp = InterpND(points, values, interp_method='scipy_quintic')
         value2 = interp.interpolate(x)
         interp.gradient(x)
-        interp = ScipyGridInterp(points, values, interp_method='cubic')
+        interp = InterpND(points, values, interp_method='scipy_cubic')
         value3 = interp.interpolate(x)
         interp.gradient(x)
 
@@ -126,7 +125,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
 
         # spline methods dont support complex values
         for method in self.valid_methods:
-            self.assertRaises(ValueError, ScipyGridInterp, points, values,
+            self.assertRaises(ValueError, InterpND, points, values,
                               method)
 
     def test_spline_deriv_xi1d(self):
@@ -136,7 +135,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
         test_pt = np.random.uniform(0, 3, 2)
         actual = np.array(df(*test_pt))
         for method in self.valid_methods:
-            interp = ScipyGridInterp(points, values, method)
+            interp = InterpND(points, values, method)
             computed = interp.gradient(test_pt)
             r_err = rel_error(actual, computed)
             assert r_err < self.tol[method]
@@ -151,7 +150,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
         points, values, func, df = self. _get_sample_2d()
         np.random.seed(4321)
         for method in self.valid_methods:
-            interp = ScipyGridInterp(points, values, method)
+            interp = InterpND(points, values, method)
             x = np.array([0.9, 0.1])
             interp._xi = x
             dy = np.array([0.997901, 0.08915])
@@ -165,7 +164,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
         test_pt = np.random.uniform(0, 3, 2)
         actual = func(*test_pt)
         for method in self.valid_methods:
-            interp = ScipyGridInterp(points, values, method)
+            interp = InterpND(points, values, method)
             computed = interp.interpolate(test_pt)
             r_err = rel_error(actual, computed)
             assert r_err < self.tol[method]
@@ -178,8 +177,8 @@ class TestScipyGridInterpolator(unittest.TestCase):
         gradient = np.array(df(*test_pt))
         for method in self.valid_methods:
             k = self.interp_configs[method]
-            interp = ScipyGridInterp(points, values, method,
-                                        bounds_error=False)
+            interp = InterpND(points, values, method,
+                              bounds_error=False)
             computed = interp.interpolate(test_pt)
             computed_grad = interp.gradient(test_pt)
             r_err = rel_error(actual, computed)
@@ -195,7 +194,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
         test_pt = np.random.uniform(0, 3, 6).reshape(3, 2)
         actual = func(*test_pt.T)
         for method in self.valid_methods:
-            interp = ScipyGridInterp(points, values, method)
+            interp = InterpND(points, values, method)
             computed = interp.interpolate(test_pt)
             r_err = rel_error(actual, computed)
             assert r_err < self.tol[method]
@@ -205,7 +204,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
         x = np.linspace(0, 2, 5)
         y = np.linspace(0, 1, 7)
         values = np.random.rand(5, 7)
-        interp = ScipyGridInterp((x, y), values)
+        interp = InterpND((x, y), values)
 
         with self.assertRaises(OutOfBoundsError) as cm:
             interp.interpolate(np.array([1, np.nan]))
@@ -224,13 +223,13 @@ class TestScipyGridInterpolator(unittest.TestCase):
         points, values = self._get_sample_4d_large()
 
         with self.assertRaises(ValueError) as cm:
-            interp = ScipyGridInterp(points, values.tolist(), interp_method='junk')
+            interp = InterpND(points, values.tolist(), interp_method='junk')
 
         msg = ('Interpolation method "junk" is not defined. Valid methods are')
         self.assertTrue(str(cm.exception).startswith(msg))
 
         with self.assertRaises(ValueError) as cm:
-            interp = ScipyGridInterp(points, values.tolist()[1])
+            interp = InterpND(points, values.tolist()[1])
 
         msg = ('There are 4 point arrays, but values has 3 dimensions')
         self.assertEqual(str(cm.exception), msg)
@@ -238,37 +237,34 @@ class TestScipyGridInterpolator(unittest.TestCase):
         badpoints = deepcopy(points)
         badpoints[0][0] = 55.0
         with self.assertRaises(ValueError) as cm:
-            interp = ScipyGridInterp(badpoints, values.tolist())
+            interp = InterpND(badpoints, values.tolist())
 
         msg = ('The points in dimension 0 must be strictly ascending')
         self.assertEqual(str(cm.exception), msg)
 
         badpoints[0] = np.vstack((np.arange(6), np.arange(6)))
         with self.assertRaises(ValueError) as cm:
-            interp = ScipyGridInterp(badpoints, values.tolist())
+            interp = InterpND(badpoints, values.tolist())
 
         msg = ('The points in dimension 0 must be 1-dimensional')
         self.assertEqual(str(cm.exception), msg)
 
         badpoints[0] = (np.arange(4))
         with self.assertRaises(ValueError) as cm:
-            interp = ScipyGridInterp(badpoints, values.tolist())
+            interp = InterpND(badpoints, values.tolist())
 
         msg = ('There are 4 points and 6 values in dimension 0')
         self.assertEqual(str(cm.exception), msg)
 
         badvalues = np.array(values, dtype=np.complex)
         with self.assertRaises(ValueError) as cm:
-            interp = ScipyGridInterp(badpoints, badvalues.tolist())
+            interp = InterpND(badpoints, badvalues.tolist(), interp_method='scipy_slinear')
 
-        msg = ("Interpolation method 'slinear' does not support complex values.")
+        msg = ("Interpolation method 'scipy_slinear' does not support complex values.")
         self.assertEqual(str(cm.exception), msg)
 
-        interp = ScipyGridInterp(points, values.tolist())
+        interp = InterpND(points, values.tolist())
         x = [0.5, 0, 0.5, 0.9]
-
-        methods = set(interp._interp_methods()[0])
-        self.assertEqual(methods, set(["quintic", "cubic", "slinear"]))
 
 
 if __name__ == "__main__":

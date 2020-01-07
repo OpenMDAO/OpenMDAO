@@ -14,10 +14,17 @@ except ImportError:
 
 import numpy as np
 
-from openmdao.components.interp_util.grid_interp_base import GridInterpBase
+from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
+from openmdao.utils.options_dictionary import OptionsDictionary
+
+scipy_orders = {
+    "scipy_slinear": 2,
+    "scipy_cubic": 4,
+    "scipy_quintic": 6,
+}
 
 
-class ScipyGridInterp(GridInterpBase):
+class InterpScipy(InterpAlgorithm):
     """
     Interpolation on a regular grid in arbitrary dimensions.
 
@@ -28,16 +35,6 @@ class ScipyGridInterp(GridInterpBase):
 
     Attributes
     ----------
-    bounds_error : bool
-        If True, when interpolated values are requested outside of the domain of the input data,
-        a ValueError is raised. If False, then the methods are allowed to extrapolate.
-        Default is True (raise an exception).
-    grid : tuple
-        Collection of points that determine the regular grid.
-    order : string
-        Name of interpolation order.
-    values : array_like, shape (m1, ..., mn, ...)
-        The data on the regular grid in n dimensions.
     _all_gradients : ndarray
         Cache of computed gradients.
     _interp_config : dict
@@ -49,80 +46,119 @@ class ScipyGridInterp(GridInterpBase):
         Cache of current evaluation point.
     """
 
-    def __init__(self, points, values, interp_method="slinear", bounds_error=True, **kwargs):
+    def __init__(self, grid, values, interp=None, **kwargs):
         """
-        Initialize instance of interpolation class.
+        Initialize table and subtables.
 
         Parameters
         ----------
-        points : tuple of ndarray of float, with shapes (m1, ), ..., (mn, )
-            The points defining the regular grid in n dimensions.
-        values : array_like, shape (m1, ..., mn, ...)
-            The data on the regular grid in n dimensions.
-        interp_method : str, optional
-            Name of interpolation method.
-        bounds_error : bool, optional
-            If True, when interpolated values are requested outside of the domain of the input
-            data, a ValueError is raised. If False, then the methods are allowed to extrapolate.
-            Default is True (raise an exception).
+        grid : tuple(ndarray)
+            Tuple containing x grid locations for this dimension and all subtable dimensions.
+        values : ndarray
+            Array containing the table values for all dimensions.
+        interp : class
+            Interpolation class to be used for subsequent table dimensions.
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        if kwargs:
-            raise KeyError("SciPy interpolator does not support {} options.".format([x for x in kwargs]))
+        self.options = OptionsDictionary(parent_name=type(self).__name__)
+        self.initialize()
+        self.options.update(kwargs)
 
-        super(ScipyGridInterp, self).__init__(points, values, interp_method=interp_method,
-                                              bounds_error=bounds_error)
+        self._vectorized = True
 
-        # ScipyGridInterp supports automatic order reduction.
+        interp_method = self.options['interp_method']
+        self._name = interp_method
+
+        self.grid = grid
+        self.values = values
+
+        # InterpScipy supports automatic order reduction.
         self._ki = []
+
         # Order is the number of required points minus one.
-        k = self._interp_config[interp_method] - 1
-        for p in points:
+        k = scipy_orders[interp_method] - 1
+        for p in grid:
             n_p = len(p)
             self._ki.append(k)
             if n_p <= k:
                 self._ki[-1] = n_p - 1
 
-    def _interp_methods(self):
+    def initialize(self):
         """
-        Method-specific settings for interpolation and for testing.
-
-        Returns
-        -------
-        list
-            Valid interpolation name strings.
-        dict
-            Configuration object that stores the number of points required for each method.
+        Declare options.
         """
-        interpolator_configs = {
-            "slinear": 2,
-            "cubic": 4,
-            "quintic": 6,
-        }
+        self.options.declare('interp_method', default='scipy_slinear',
+                             values=["scipy_slinear", "scipy_cubic", "scipy_quintic"],
+                             desc='Interpolation method to use for scipy.')
 
-        all_methods = list(interpolator_configs.keys())
-        return all_methods, interpolator_configs
-
-    def interpolate(self, xi):
+    def check_config(self):
         """
-        Interpolate at the sample coordinates.
+        Verify that we have enough points for this interpolation algorithm.
+        """
+        # Scipy supports automatic order reduction, so don't raise an error.
+        # TODO - Make the auto order reduction an option so it can be turned off.
+        pass
+
+    def evaluate_vectorized(self, x):
+        """
+        Interpolate across all table dimensions for all requested samples.
 
         Parameters
         ----------
-        xi : ndarray of shape (..., ndim)
-            The coordinates to sample the gridded data.
+        x : ndarray
+            The coordinates to sample the gridded data at. First array element is the point to
+            interpolate here. Remaining elements are interpolated on sub tables.
 
         Returns
         -------
         ndarray
-            Value of interpolant at all sample points.
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to this independents.
+        ndarray
+            Derivative of interpolated values with respect to values.
+        ndarray
+            Derivative of interpolated values with respect to grid.
         """
-        super(ScipyGridInterp, self).interpolate(xi)
+        result, d_dx, d_values, d_grid = self.interpolate(x)
 
-        result = self._evaluate_splines(self.values[:].T, xi, self._ki)
+        return result, d_dx, d_values, d_grid
 
-        return result
+    def interpolate(self, x, idx=None, slice_idx=None):
+        """
+        Compute the interpolated value over this grid dimension.
+
+        This method must be defined by child classes.
+
+        Parameters
+        ----------
+        x : ndarray
+            The coordinates to sample the gridded data at. First array element is the point to
+            interpolate here. Remaining elements are interpolated on sub tables.
+        idx : integer
+            Interval index for x.
+        slice_idx : List of <slice>
+            Slice object containing indices of data points requested by parent interpolating
+            tables.
+
+        Returns
+        -------
+        ndarray
+            Interpolated values.
+        ndarray
+            Derivative of interpolated values with respect to this independent and child
+            independents.
+        ndarray
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions.
+        ndarray
+            Derivative of interpolated values with respect to grid for this and subsequent table
+            dimensions.
+        """
+        result = self._evaluate_splines(self.values[:].T, x, self._ki)
+
+        return result, self._all_gradients, None, None
 
     def _evaluate_splines(self, data_values, xi, ki, compute_gradients=True):
         """

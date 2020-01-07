@@ -1,14 +1,39 @@
-"""Base class for grid interpolation methods."""
+"""
+Base class for interpolation methods that calculate values for each dimension independently.
+
+Based on Tables in NPSS, and was added to bridge the gap between some of the slower scipy
+implementations.
+"""
 from __future__ import division, print_function, absolute_import
+from six.moves import range
+from six import iteritems
 
 import numpy as np
 
+from openmdao.components.interp_util.interp_akima import InterpAkima
+from openmdao.components.interp_util.interp_cubic import InterpCubic
+from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2
+from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3
+from openmdao.components.interp_util.interp_scipy import InterpScipy
+from openmdao.components.interp_util.interp_slinear import InterpLinear
+
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
+interp_methods = {
+    'slinear': InterpLinear,
+    'lagrange2': InterpLagrange2,
+    'lagrange3': InterpLagrange3,
+    'cubic': InterpCubic,
+    'akima': InterpAkima,
+    'scipy_cubic': InterpScipy,
+    'scipy_slinear': InterpScipy,
+    'scipy_quintic': InterpScipy,
+}
 
-class GridInterpBase(object):
+
+class InterpND(object):
     """
-    Interpolation on a regular grid in arbitrary dimensions.
+    Interpolation on a regular grid of arbitrary dimensions.
 
     The data must be defined on a regular grid; the grid spacing however may be uneven. Several
     interpolation methods are supported. These are defined in the child classes. Gradients are
@@ -28,18 +53,24 @@ class GridInterpBase(object):
     training_data_gradients : bool
         Flag that tells interpolation objects wether to compute gradients with respect to the
         grid values.
+    table : <InterpTable>
+        Table object that contains algorithm that performs the interpolation.
     values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
     _all_gradients : ndarray
         Cache of computed gradients.
+    _interp : class
+        Class specified as interpolation algorithm, used to regenerate if needed.
     _interp_config : dict
         Configuration object that stores the number of points required for each interpolation
         method.
+    _interp_options : dict
+        Dictionary of cached interpolator-specific options.
     _xi : ndarray
         Cache of current evaluation point.
     """
 
-    def __init__(self, points, values, interp_method="slinear", bounds_error=True):
+    def __init__(self, points, values, interp_method="slinear", bounds_error=True, **kwargs):
         """
         Initialize instance of interpolation class.
 
@@ -49,17 +80,17 @@ class GridInterpBase(object):
             The points defining the regular grid in n dimensions.
         values : array_like, shape (m1, ..., mn, ...)
             The data on the regular grid in n dimensions.
-        interp_method : str, optional
-            Name of interpolation method.
+        interp_method : str or list of str, optional
+            Name of interpolation method(s).
         bounds_error : bool, optional
             If True, when interpolated values are requested outside of the domain of the input
             data, a ValueError is raised. If False, then the methods are allowed to extrapolate.
             Default is True (raise an exception).
+        **kwargs : dict
+            Interpolator-specific options to pass onward.
         """
-        configs = self._interp_methods()
-        self._all_methods, self._interp_config = configs
-        if interp_method not in self._all_methods:
-            all_m = ', '.join(['"' + m + '"' for m in self._all_methods])
+        if interp_method not in interp_methods:
+            all_m = ', '.join(['"' + m + '"' for m in interp_methods])
             raise ValueError('Interpolation method "%s" is not defined. Valid methods are '
                              '%s.' % (interp_method, all_m))
         self.interp_method = interp_method
@@ -99,18 +130,17 @@ class GridInterpBase(object):
         self._all_gradients = None
         self.training_data_gradients = False
 
-    def _interp_methods(self):
-        """
-        Method-specific settings for interpolation and for testing.
+        # Cache spline coefficients.
+        interp = interp_methods[interp_method]
 
-        Returns
-        -------
-        list
-            Valid interpolation name strings.
-        dict
-            Configuration object that stores the number of points required for each method.
-        """
-        return None
+        if interp_method.startswith('scipy'):
+            kwargs['interp_method'] = interp_method
+
+        table = interp(self.grid, self.values, interp, **kwargs)
+        table.check_config()
+        self.table = table
+        self._interp = interp
+        self._interp_options = kwargs
 
     def interpolate(self, xi):
         """
@@ -145,7 +175,33 @@ class GridInterpBase(object):
                     value = p[violated_idx]
                     raise OutOfBoundsError("One of the requested xi is out of bounds",
                                            i, value, self.grid[i][0], self.grid[i][-1])
-        return None
+
+        if self.training_data_gradients:
+            # If the table grid or values are component inputs, then we need to create a new table
+            # each iteration.
+            interp = self._interp
+            self.table = interp(self.grid, self.values, interp, **self._interp_options)
+
+        table = self.table
+        if table._vectorized:
+            result, derivs, d_values, d_grid = table.evaluate_vectorized(xi)
+
+        else:
+            xi = np.atleast_2d(xi)
+            n_nodes, nx = xi.shape
+            result = np.empty((n_nodes, ), dtype=xi.dtype)
+            derivs = np.empty((n_nodes, nx), dtype=xi.dtype)
+
+            # TODO: it might be possible to vectorize over n_nodes.
+            for j in range(n_nodes):
+                val, d_x, d_values, d_grid = table.evaluate(xi[j, :])
+                result[j] = val
+                derivs[j, :] = d_x.flatten()
+
+        # Cache derivatives
+        self._all_gradients = derivs
+
+        return result
 
     def gradient(self, xi):
         """
@@ -188,4 +244,27 @@ class GridInterpBase(object):
         ndarray
             Gradient of output with respect to training point values.
         """
-        pass
+        grid = self.grid
+        interp = self._interp
+
+        if self.table._vectorized:
+            return self.table.training_gradients(pt)
+
+        else:
+            for i, axis in enumerate(self.grid):
+                ngrid = axis.size
+                values = np.zeros(ngrid)
+                deriv_i = np.zeros(ngrid)
+
+                for j in range(ngrid):
+                    values[j] = 1.0
+                    table = interp([grid[i]], values, self._interp, **self._interp_options)
+                    deriv_i[j], _, _, _ = table.evaluate(pt[i:i + 1])
+                    values[j] = 0.0
+
+                if i == 0:
+                    deriv_running = deriv_i.copy()
+                else:
+                    deriv_running = np.outer(deriv_running, deriv_i)
+
+        return deriv_running

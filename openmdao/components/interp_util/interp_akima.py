@@ -8,7 +8,7 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.components.interp_util.interp_base import InterpTableBase
+from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
 from openmdao.utils.array_utils import abs_complex, dv_abs_complex
 
 
@@ -112,7 +112,7 @@ def abs_smooth_dv(x, x_deriv, delta_x):
     return y, y_deriv
 
 
-class InterpAkima(InterpTableBase):
+class InterpAkima(InterpAlgorithm):
     """
     Interpolate using an Akima polynomial.
     """
@@ -133,6 +133,8 @@ class InterpAkima(InterpTableBase):
             Interpolator-specific options to pass onward.
         """
         super(InterpAkima, self).__init__(grid, values, interp, **kwargs)
+        self.k = 4
+        self._name = 'akima'
 
     def initialize(self):
         """
@@ -168,7 +170,13 @@ class InterpAkima(InterpTableBase):
             Interpolated values.
         ndarray
             Derivative of interpolated values with respect to this independent and child
-            independents
+            independents.
+        ndarray
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions.
+        ndarray
+            Derivative of interpolated values with respect to grid for this and subsequent table
+            dimensions.
         """
         grid = self.grid
         subtable = self.subtable
@@ -220,7 +228,7 @@ class InterpAkima(InterpTableBase):
             nshape.append(nx)
             derivs = np.empty(tuple(nshape), dtype=x.dtype)
 
-            subval, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
+            subval, subderiv, _, _ = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
             j = 0
             if idx >= 2:
@@ -492,4 +500,4 @@ class InterpAkima(InterpTableBase):
         np.seterr(**old_settings)
 
         # Evaluate dependent value and exit
-        return a + dx * (b + dx * (c + dx * d)), derivs
+        return a + dx * (b + dx * (c + dx * d)), derivs, None, None

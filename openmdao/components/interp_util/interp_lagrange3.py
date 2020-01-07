@@ -7,13 +7,32 @@ from __future__ import division, print_function, absolute_import
 
 import numpy as np
 
-from openmdao.components.interp_util.interp_base import InterpTableBase
+from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
 
 
-class InterpLagrange3(InterpTableBase):
+class InterpLagrange3(InterpAlgorithm):
     """
     Interpolate using a third order Lagrange polynomial.
     """
+
+    def __init__(self, grid, values, interp, **kwargs):
+        """
+        Initialize table and subtables.
+
+        Parameters
+        ----------
+        grid : tuple(ndarray)
+            Tuple containing x grid locations for this dimension and all subtable dimensions.
+        values : ndarray
+            Array containing the table values for all dimensions.
+        interp : class
+            Interpolation class to be used for subsequent table dimensions.
+        **kwargs : dict
+            Interpolator-specific options to pass onward.
+        """
+        super(InterpLagrange3, self).__init__(grid, values, interp, **kwargs)
+        self.k = 4
+        self._name = 'lagrange3'
 
     def interpolate(self, x, idx, slice_idx):
         """
@@ -36,7 +55,13 @@ class InterpLagrange3(InterpTableBase):
             Interpolated values.
         ndarray
             Derivative of interpolated values with respect to this independent and child
-            independents
+            independents.
+        ndarray
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions.
+        ndarray
+            Derivative of interpolated values with respect to grid for this and subsequent table
+            dimensions.
         """
         grid = self.grid
         subtable = self.subtable
@@ -78,7 +103,7 @@ class InterpLagrange3(InterpTableBase):
             c24 = p2 - p4
             c34 = p3 - p4
 
-            subval, subderiv = subtable.evaluate(x[1:], slice_idx=slice_idx)
+            subval, subderiv, _, _ = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
             q1 = subval[..., 0] / (c12 * c13 * c14)
             q2 = subval[..., 1] / (c12 * c23 * c24)
@@ -121,4 +146,5 @@ class InterpLagrange3(InterpTableBase):
             q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) +
                   p1 * (p2 + p3) + p2 * p3)
 
-        return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, derivs
+        return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, derivs, \
+            None, None

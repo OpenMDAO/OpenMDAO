@@ -7,8 +7,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.components.interp_util.python_interp import PythonGridInterp
-from openmdao.components.interp_util.scipy_interp import ScipyGridInterp
+from openmdao.components.interp_util.interp import InterpND
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
@@ -150,16 +149,11 @@ class MetaModelStructuredComp(ExplicitComponent):
             Whether to call this method in subsystems.
         """
         interp_method = self.options['method']
-        if interp_method.startswith('scipy'):
-            interp = ScipyGridInterp
-            interp_method = interp_method[6:]
-        else:
-            interp = PythonGridInterp
 
         for name, train_data in iteritems(self.training_outputs):
-            self.interps[name] = interp(self.params, train_data,
-                                        interp_method=interp_method,
-                                        bounds_error=not self.options['extrapolate'])
+            self.interps[name] = InterpND(self.params, train_data,
+                                          interp_method=interp_method,
+                                          bounds_error=not self.options['extrapolate'])
 
         if self.options['training_data_gradients']:
             self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
