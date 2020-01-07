@@ -72,8 +72,8 @@ before_install:
     rm -rf $HOME/miniconda;
   fi
 
-- npm install -g puppeteer
-- npm install -g yargs
+- sudo npm install -g puppeteer
+- sudo npm install -g yargs
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
