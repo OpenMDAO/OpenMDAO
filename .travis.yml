@@ -72,9 +72,6 @@ before_install:
 
 - curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -;
   sudo apt-get install -y nodejs;
-- for nodepkg in yargs puppeteer; do
-    npm install -g $nodepkg;
-  done
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
@@ -144,6 +141,10 @@ install:
 
 # display summary of installed packages and their versions
 - conda list
+
+- for nodepkg in yargs puppeteer; do
+    /usr/bin/npm install -g $nodepkg;
+  done
 
 script:
 # prevent OpenMPI warning messages
