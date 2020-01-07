@@ -70,10 +70,10 @@ before_install:
     rm -rf $HOME/miniconda;
   fi
 
-- curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-  sudo apt-get install -y nodejs
-  sudo npm install -g puppeteer
-  sudo npm install -g yargs
+- curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -;
+  sudo apt-get install -y nodejs;
+  sudo npm install -g puppeteer;
+  sudo npm install -g yargs;
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
