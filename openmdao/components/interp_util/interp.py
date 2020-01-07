@@ -6,7 +6,6 @@ implementations.
 """
 from __future__ import division, print_function, absolute_import
 from six.moves import range
-from six import iteritems
 
 import numpy as np
 
@@ -19,7 +18,7 @@ from openmdao.components.interp_util.interp_slinear import InterpLinear
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 
-interp_methods = {
+INTERP_METHODS = {
     'slinear': InterpLinear,
     'lagrange2': InterpLagrange2,
     'lagrange3': InterpLagrange3,
@@ -48,8 +47,6 @@ class InterpND(object):
         Default is True (raise an exception).
     grid : tuple
         Collection of points that determine the regular grid.
-    interp_method : string
-        Name of interpolation method.
     training_data_gradients : bool
         Flag that tells interpolation objects wether to compute gradients with respect to the
         grid values.
@@ -57,8 +54,12 @@ class InterpND(object):
         Table object that contains algorithm that performs the interpolation.
     values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
-    _all_gradients : ndarray
-        Cache of computed gradients.
+    _d_dx : ndarray
+        Cache of computed gradients with respect to evaluation point.
+    _d_dgrid : ndarray
+        Cache of computed gradients with respect to grid.
+    _d_dvalues : ndarray
+        Cache of computed gradients with respect to table values.
     _interp : class
         Class specified as interpolation algorithm, used to regenerate if needed.
     _interp_config : dict
@@ -89,11 +90,10 @@ class InterpND(object):
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        if interp_method not in interp_methods:
-            all_m = ', '.join(['"' + m + '"' for m in interp_methods])
+        if interp_method not in INTERP_METHODS:
+            all_m = ', '.join(['"' + m + '"' for m in INTERP_METHODS])
             raise ValueError('Interpolation method "%s" is not defined. Valid methods are '
                              '%s.' % (interp_method, all_m))
-        self.interp_method = interp_method
         self.bounds_error = bounds_error
 
         if not hasattr(values, 'ndim'):
@@ -127,11 +127,13 @@ class InterpND(object):
         self.grid = tuple([np.asarray(p) for p in points])
         self.values = values
         self._xi = None
-        self._all_gradients = None
+        self._d_dx = None
+        self._d_dgrid = None
+        self._d_dvalues = None
         self.training_data_gradients = False
 
         # Cache spline coefficients.
-        interp = interp_methods[interp_method]
+        interp = INTERP_METHODS[interp_method]
 
         if interp_method.startswith('scipy'):
             kwargs['interp_method'] = interp_method
@@ -199,7 +201,7 @@ class InterpND(object):
                 derivs[j, :] = d_x.flatten()
 
         # Cache derivatives
-        self._all_gradients = derivs
+        self._d_dx = derivs
 
         return result
 
@@ -228,7 +230,7 @@ class InterpND(object):
             # If inputs have changed since last computation, then re-interpolate.
             self.interpolate(xi)
 
-        return self._all_gradients.reshape(np.asarray(xi).shape)
+        return self._d_dx.reshape(np.asarray(xi).shape)
 
     def training_gradients(self, pt):
         """

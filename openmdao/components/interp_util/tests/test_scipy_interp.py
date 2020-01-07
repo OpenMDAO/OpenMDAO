@@ -143,7 +143,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
             # test that gradients have been cached
             assert_array_equal(interp._xi, test_pt)
             assert_array_equal(
-                interp._all_gradients.flatten(), computed.flatten())
+                interp._d_dx.flatten(), computed.flatten())
 
     def test_gradients_returned_by_xi(self):
         # verifies that gradients with respect to xi are returned if cached
@@ -154,7 +154,7 @@ class TestScipyGridInterpolator(unittest.TestCase):
             x = np.array([0.9, 0.1])
             interp._xi = x
             dy = np.array([0.997901, 0.08915])
-            interp._all_gradients = dy
+            interp._d_dx = dy
             assert_almost_equal(interp.gradient(x), dy)
 
     def test_spline_xi1d(self):

@@ -17,7 +17,7 @@ import numpy as np
 from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
 from openmdao.utils.options_dictionary import OptionsDictionary
 
-scipy_orders = {
+SCIPY_ORDERS = {
     "scipy_slinear": 2,
     "scipy_cubic": 4,
     "scipy_quintic": 6,
@@ -35,8 +35,8 @@ class InterpScipy(InterpAlgorithm):
 
     Attributes
     ----------
-    _all_gradients : ndarray
-        Cache of computed gradients.
+    _d_dx : ndarray
+        Cache of computed gradients with respect to evaluation point.
     _interp_config : dict
         Configuration object that stores the number of points required for each interpolation
         method.
@@ -77,7 +77,7 @@ class InterpScipy(InterpAlgorithm):
         self._ki = []
 
         # Order is the number of required points minus one.
-        k = scipy_orders[interp_method] - 1
+        k = SCIPY_ORDERS[interp_method] - 1
         for p in grid:
             n_p = len(p)
             self._ki.append(k)
@@ -158,7 +158,7 @@ class InterpScipy(InterpAlgorithm):
         """
         result = self._evaluate_splines(self.values[:].T, x, self._ki)
 
-        return result, self._all_gradients, None, None
+        return result, self._d_dx, None, None
 
     def _evaluate_splines(self, data_values, xi, ki, compute_gradients=True):
         """
@@ -258,7 +258,7 @@ class InterpScipy(InterpAlgorithm):
 
         # Cache the computed gradients for return by the gradient method
         if compute_gradients:
-            self._all_gradients = all_gradients
+            self._d_dx = all_gradients
             # indicate what order was used to compute these
 
         return result
