@@ -41,6 +41,7 @@ addons:
 
 cache:
   apt: true
+  npm: false
   timeout: 300
   directories:
     - $HOME/.cache/pip
@@ -142,6 +143,7 @@ install:
 # display summary of installed packages and their versions
 - conda list
 
+before_script:
 - for nodepkg in yargs puppeteer; do
     /usr/bin/npm install -g $nodepkg;
   done
