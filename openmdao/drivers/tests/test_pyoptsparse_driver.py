@@ -3,7 +3,6 @@
 import copy
 import sys
 import unittest
-from contextlib import contextmanager
 
 from distutils.version import LooseVersion
 
