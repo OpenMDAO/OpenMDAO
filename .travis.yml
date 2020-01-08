@@ -149,9 +149,12 @@ install:
 - conda list
 
 before_script:
-- for nodepkg in yargs puppeteer; do
+- npm cache clean;
+  for nodepkg in yargs puppeteer; do
     npm install -g $nodepkg;
-  done
+    npm list $nodepkg
+  done;
+  npm config list;
 
 script:
 # prevent OpenMPI warning messages
