@@ -21,12 +21,11 @@ optional_dependencies = {
         'bokeh>=1.3.4'
     ],
     'test': [
-        'coverage',
         'parameterized',
         'numpydoc>=0.9.1',
         'pycodestyle==2.3.1',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.4',
+        'testflo>=1.3.5',
     ],
 }
 
