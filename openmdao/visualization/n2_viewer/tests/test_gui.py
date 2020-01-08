@@ -20,6 +20,9 @@ class N2GUITestCase(unittest.TestCase):
         self.basenames = map(lambda x: x[:-3], models)
         self.n2files = []
 
+        os.system('npm i yargs')
+        os.system('npm i puppeteer')
+        
         for n in self.basenames:
             n2file = self.modelDir + '/' + n + '_N2_TEST.html'
             pyfile = self.modelDir + '/' + n + '.py'
