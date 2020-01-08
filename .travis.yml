@@ -151,10 +151,10 @@ install:
 before_script:
 - npm cache clean;
   for nodepkg in yargs puppeteer; do
-    npm install -g $nodepkg;
+    npm install $nodepkg;
     npm list $nodepkg;
   done;
-  npm config list;
+  npm config ls -l;
 
 script:
 # prevent OpenMPI warning messages
