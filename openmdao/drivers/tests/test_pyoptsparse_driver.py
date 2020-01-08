@@ -106,7 +106,6 @@ class DataSave(om.ExplicitComponent):
 
         partials['y', 'x'] = 2.0*x - 6.0
 
-@contextmanager
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
@@ -136,10 +135,9 @@ class TestMPIScatter(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        design_vars = MPI.COMM_WORLD.gather([prob['x'], prob['y'], prob['c'], prob['f_xy']], root=0)
+        design_vars = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']], root=0)
         expected_vals = [7.16666667, -7.833334, -15, -27.083333, 7.16666667, -7.833334, -15, -27.083333]
-        if design_vars:
-            np.testing.assert_array_almost_equal(np.array(design_vars).flatten(), expected_vals)
+        np.testing.assert_array_almost_equal(np.array(design_vars).flatten(), expected_vals)
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
