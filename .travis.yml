@@ -152,7 +152,7 @@ before_script:
 - npm cache clean;
   for nodepkg in yargs puppeteer; do
     npm install -g $nodepkg;
-    npm list $nodepkg
+    npm list $nodepkg;
   done;
   npm config list;
 
