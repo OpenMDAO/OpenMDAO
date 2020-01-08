@@ -22,6 +22,9 @@ class InterpAlgorithm(object):
         Dictionary with general pyoptsparse options.
     subtable : <InterpAlgorithm>
         Table interpolation that handles child dimensions.
+    training_data_gradients : bool
+        Flag that tells interpolation objects wether to compute gradients with respect to the
+        grid values.
     values : ndarray
         Array containing the table values for all dimensions.
     _name : str
@@ -61,6 +64,7 @@ class InterpAlgorithm(object):
         self.k = None
         self._name = None
         self._vectorized = False
+        self.training_data_gradients = False
 
     def initialize(self):
         """

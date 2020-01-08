@@ -183,6 +183,7 @@ class InterpND(object):
             # each iteration.
             interp = self._interp
             self.table = interp(self.grid, self.values, interp, **self._interp_options)
+            self.table.training_data_gradients = True
 
         table = self.table
         if table._vectorized:
@@ -261,6 +262,7 @@ class InterpND(object):
                 for j in range(ngrid):
                     values[j] = 1.0
                     table = interp([grid[i]], values, self._interp, **self._interp_options)
+                    table.training_data_gradients = False
                     deriv_i[j], _, _, _ = table.evaluate(pt[i:i + 1])
                     values[j] = 0.0
 

@@ -226,7 +226,7 @@ class InterpAkima(InterpAlgorithm):
             tshape = self.values[tuple(slice_idx)].shape
             nshape = list(tshape[:-nx])
             nshape.append(nx)
-            derivs = np.empty(tuple(nshape), dtype=x.dtype)
+            deriv_dx = np.empty(tuple(nshape), dtype=x.dtype)
 
             subval, subderiv, _, _ = subtable.evaluate(x[1:], slice_idx=slice_idx)
 
@@ -258,7 +258,12 @@ class InterpAkima(InterpAlgorithm):
 
             nshape = list(values.shape[:-1])
             nshape.append(1)
-            derivs = np.empty(tuple(nshape), dtype=x.dtype)
+            deriv_dx = np.empty(tuple(nshape), dtype=x.dtype)
+            if self.training_data_gradients:
+                nshape = list(values.shape[:-1])
+                nshape.extend(self.values.shape)
+                deriv_dgrid = np.empty(tuple(nshape), dtype=x.dtype)
+                deriv_dval = np.empty(tuple(nshape), dtype=x.dtype)
 
             if idx >= 2:
                 val1 = values[..., idx - 2]
@@ -366,7 +371,7 @@ class InterpAkima(InterpAlgorithm):
             a = val3
             dx = x[0] - grid[0]
 
-        derivs[..., 0] = b + dx * (2.0 * c + 3.0 * d * dx)
+        deriv_dx[..., 0] = b + dx * (2.0 * c + 3.0 * d * dx)
 
         # Propagate derivatives from sub table.
         if subtable is not None:
@@ -494,10 +499,10 @@ class InterpAkima(InterpAlgorithm):
             else:
                 da = dval3
 
-            derivs[..., 1:] = da + dx * (db + cd_term)
+            deriv_dx[..., 1:] = da + dx * (db + cd_term)
 
         # Restore numpy warnings to previous setting.
         np.seterr(**old_settings)
 
         # Evaluate dependent value and exit
-        return a + dx * (b + dx * (c + dx * d)), derivs, None, None
+        return a + dx * (b + dx * (c + dx * d)), deriv_dx, None, None
