@@ -143,14 +143,15 @@ install:
 # display summary of installed packages and their versions
 - conda list
 
-before_script:
-- for nodepkg in yargs puppeteer; do
-    /usr/bin/npm install $nodepkg;
-  done
+# before_script:
 
 script:
 # prevent OpenMPI warning messages
 - export OMPI_MCA_btl=^openib
+
+- for nodepkg in yargs puppeteer; do
+    npm install $nodepkg;
+  done
 
 # make docs first
 - cd openmdao/docs;
