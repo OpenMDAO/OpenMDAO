@@ -8,17 +8,15 @@ Tests for absolute and promoted connections, for different nonlinear solvers.
 
 from __future__ import division
 
-import numpy as np
 import unittest
 
-from openmdao.api import Problem, Group, IndepVarComp, ExplicitComponent
-from openmdao.solvers.linear.direct import DirectSolver
-from openmdao.solvers.nonlinear.newton import NewtonSolver
-from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
+import numpy as np
+
+import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
 
-class ReconfComp1(ExplicitComponent):
+class ReconfComp1(om.ExplicitComponent):
 
     def initialize(self):
         self.size = 1
@@ -65,12 +63,11 @@ class ReconfComp2(ReconfComp1):
 
 class TestReconfConnections(unittest.TestCase):
 
-    @unittest.expectedFailure
     def test_promoted_connections(self):
-        p = Problem()
+        p = om.Problem()
 
-        p.model = model = Group()
-        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        p.model = model = om.Group()
+        model.add_subsystem('c1', om.IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
         model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'],
                             promotes_outputs=['f'])
@@ -91,12 +88,11 @@ class TestReconfConnections(unittest.TestCase):
         p.run_model()  # Fails with ValueError
         self.assertEqual(len(p['y']), 2)
 
-    @unittest.expectedFailure
     def test_abs_connections(self):
-        p = Problem()
+        p = om.Problem()
 
-        p.model = model = Group()
-        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        p.model = model = om.Group()
+        model.add_subsystem('c1', om.IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
         model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
         model.connect('c2.y', 'c3.y')
@@ -113,14 +109,13 @@ class TestReconfConnections(unittest.TestCase):
         self.assertEqual(len(p['c2.y']), 2)
         self.assertEqual(len(p['c3.y']), 2)
 
-    @unittest.expectedFailure
     def test_reconf_comp_connections_newton_solver(self):
-        p = Problem()
+        p = om.Problem()
 
-        p.model = model = Group()
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver()
-        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        p.model = model = om.Group()
+        model.linear_solver = om.DirectSolver()
+        model.nonlinear_solver = om.NewtonSolver()
+        model.add_subsystem('c1', om.IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
         model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
         model.connect('c2.y', 'c3.y')
@@ -139,14 +134,13 @@ class TestReconfConnections(unittest.TestCase):
         self.assertEqual(len(p['c3.y']), 2)
         assert_rel_error(self, p['c3.y'], [6., 6.])
 
-    @unittest.expectedFailure
     def test_reconf_comp_connections_nlbgs_solver(self):
-        p = Problem()
+        p = om.Problem()
 
-        p.model = model = Group()
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NonlinearBlockGS()
-        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        p.model = model = om.Group()
+        model.linear_solver = om.DirectSolver()
+        model.nonlinear_solver = om.NonlinearBlockGS()
+        model.add_subsystem('c1', om.IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
         model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
         model.connect('c2.y', 'c3.y')
@@ -165,14 +159,13 @@ class TestReconfConnections(unittest.TestCase):
         self.assertEqual(len(p['c3.y']), 2)
         assert_rel_error(self, p['c3.y'], [6., 6.])
 
-    @unittest.expectedFailure
     def test_promoted_connections_newton_solver(self):
-        p = Problem()
+        p = om.Problem()
 
-        p.model = model = Group()
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NewtonSolver()
-        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        p.model = model = om.Group()
+        model.linear_solver = om.DirectSolver()
+        model.nonlinear_solver = om.NewtonSolver()
+        model.add_subsystem('c1', om.IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
         model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
         p.setup()
@@ -187,14 +180,13 @@ class TestReconfConnections(unittest.TestCase):
         self.assertEqual(len(p['y']), 2)
         assert_rel_error(self, p['y'], [6., 6.])
 
-    @unittest.expectedFailure
     def test_test_promoted_connections_nlbgs_solver(self):
-        p = Problem()
+        p = om.Problem()
 
-        p.model = model = Group()
-        model.linear_solver = DirectSolver()
-        model.nonlinear_solver = NonlinearBlockGS()
-        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        p.model = model = om.Group()
+        model.linear_solver = om.DirectSolver()
+        model.nonlinear_solver = om.NonlinearBlockGS()
+        model.add_subsystem('c1', om.IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
         model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
         p.setup()
@@ -210,10 +202,10 @@ class TestReconfConnections(unittest.TestCase):
         assert_rel_error(self, p['y'], [6., 6.])
 
     def test_reconf_comp_not_connected(self):
-        p = Problem()
+        p = om.Problem()
 
-        p.model = model = Group()
-        model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
+        p.model = model = om.Group()
+        model.add_subsystem('c1', om.IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'])
         model.add_subsystem('c3', ReconfComp2(), promotes_outputs=['f'])
         # c2.y not connected to c3.y
