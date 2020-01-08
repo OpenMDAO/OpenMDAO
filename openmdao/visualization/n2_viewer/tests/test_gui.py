@@ -38,10 +38,10 @@ class N2GUITestCase(unittest.TestCase):
         for n2file in self.n2files:
         # The Node.js script will exit with a non-zero value if it
         # detects an error.
-            self.assertEqual(os.system(testCmd + ' --n2files=' + n2file), 0,
-                'N2 common test failed with ' + n2file)
-        #    self.assertEqual(subprocess.call([testCmd, '--n2files=' + n2file]), 0,
+        #    self.assertEqual(os.system(testCmd + ' --n2files=' + n2file), 0,
         #        'N2 common test failed with ' + n2file)
+            self.assertEqual(subprocess.call([testCmd, '--n2files=' + n2file]), 0,
+                'N2 common test failed with ' + n2file)
 
     def tearDown(self):
         if not DEBUG:
