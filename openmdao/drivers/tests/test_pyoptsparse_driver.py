@@ -135,9 +135,10 @@ class TestMPIScatter(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        design_vars = MPI.COMM_WORLD.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']], root=0)
-        expected_vals = [7.16666667, -7.833334, -15, -27.083333, 7.16666667, -7.833334, -15, -27.083333]
-        np.testing.assert_array_almost_equal(np.array(design_vars).flatten(), expected_vals)
+        np.testing.assert_array_almost_equal(prob['x'], 7.16666667)
+        np.testing.assert_array_almost_equal(prob['y'], -7.833334)
+        np.testing.assert_array_almost_equal(prob['c'], -15)
+        np.testing.assert_array_almost_equal(prob['f_xy'], -27.083333)
 
 @unittest.skipIf(OPT is None or OPTIMIZER is None, "only run if pyoptsparse is installed.")
 @use_tempdirs
