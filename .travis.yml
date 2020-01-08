@@ -13,6 +13,11 @@ os:
 
 language: generic
 
+language: node_js
+
+node_js:
+  - node
+
 env:
   matrix:
     # pinning Python 3.7.3, seems to be an issue with the python 3.7.4 installed by conda
@@ -71,8 +76,8 @@ before_install:
     rm -rf $HOME/miniconda;
   fi
 
-- curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -;
-  sudo apt-get install -y nodejs;
+# - curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -;
+#   sudo apt-get install -y nodejs;
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
