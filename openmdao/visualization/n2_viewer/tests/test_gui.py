@@ -2,6 +2,7 @@
 import os
 import shutil
 import unittest
+import subprocess
 
 # set DEBUG to True if you want to view the generated HTML file
 GUI_TEST_SUBDIR = 'gui_test_models'
@@ -20,14 +21,12 @@ class N2GUITestCase(unittest.TestCase):
         self.basenames = map(lambda x: x[:-3], models)
         self.n2files = []
 
-        os.system('npm i yargs')
-        os.system('npm i puppeteer')
-        
         for n in self.basenames:
             n2file = self.modelDir + '/' + n + '_N2_TEST.html'
             pyfile = self.modelDir + '/' + n + '.py'
             self.n2files.append(n2file)
             os.system('openmdao n2 -o ' + n2file + ' --no_browser ' + pyfile)
+            # subprocess.call(['openmdao', 'n2', '-o ' + n2file,  '--no_browser', pyfile])
         
     def test_n2_common(self):
         """
@@ -39,7 +38,9 @@ class N2GUITestCase(unittest.TestCase):
         for n2file in self.n2files:
         # The Node.js script will exit with a non-zero value if it
         # detects an error.
-            self.assertEqual(os.system(testCmd + ' --n2files=' + n2file), 0,
+        #    self.assertEqual(os.system(testCmd + ' --n2files=' + n2file), 0,
+        #        'N2 common test failed with ' + n2file)
+            self.assertEqual(subprocess.call([testCmd, '--n2files=' + n2file]), 0,
                 'N2 common test failed with ' + n2file)
 
     def tearDown(self):

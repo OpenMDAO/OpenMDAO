@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/local/bin/node
 
 const argv = require('yargs').argv;
 const puppeteer = require('puppeteer');
@@ -13,6 +13,7 @@ const normalWait = 10;
 
 // The models to create N2 files from:
 const n2Files = argv.n2files.split(',');
+// const n2Files = [ '/Users/tkollar/work/om/n2/openmdao/visualization/n2_viewer/tests/gui_test_models/double_sellar_N2_TEST.html'];
 
 // Updated at each test to describe the current action:
 let currentTestDesc = '';
