@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const puppeteer = require('puppeteer');
 const argv = require('yargs').argv;
 const urlPrefix = 'file://';

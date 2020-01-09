@@ -25,7 +25,6 @@ class N2GUITestCase(unittest.TestCase):
             n2file = self.modelDir + '/' + n + '_N2_TEST.html'
             pyfile = self.modelDir + '/' + n + '.py'
             self.n2files.append(n2file)
-            # os.system('openmdao n2 -o ' + n2file + ' --no_browser ' + pyfile)
             subprocess.call(['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile])
         
     def test_n2_common(self):
@@ -38,9 +37,7 @@ class N2GUITestCase(unittest.TestCase):
         for n2file in self.n2files:
         # The Node.js script will exit with a non-zero value if it
         # detects an error.
-        #    self.assertEqual(os.system(testCmd + ' --n2files=' + n2file), 0,
-        #        'N2 common test failed with ' + n2file)
-            self.assertEqual(subprocess.call(['node', testCmd, '--n2files=' + n2file]), 0,
+            self.assertEqual(subprocess.call([testCmd, '--n2files=' + n2file]), 0,
                 'N2 common test failed with ' + n2file)
 
     def tearDown(self):

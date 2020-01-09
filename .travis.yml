@@ -15,8 +15,7 @@ language: generic
 
 language: node_js
 
-node_js:
-  - node
+node_js: node
 
 env:
   matrix:
@@ -149,16 +148,11 @@ install:
 - conda list
 
 before_script:
-#- pushd $HOME;
-#  for nodepkg in yargs puppeteer; do
-#    npm install $nodepkg;
-#  done;
-#  popd;
-- nvm use node;
+- pushd $HOME;
   for nodepkg in yargs puppeteer; do
     npm install $nodepkg;
   done;
-
+  popd;
 
 script:
 # prevent OpenMPI warning messages
