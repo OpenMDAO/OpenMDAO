@@ -1,15 +1,15 @@
 """Test N2 GUI with multiple models using Node.js."""
 import os
-import shutil
 import unittest
 import subprocess
+import distutils.spawn
 
 # set DEBUG to True if you want to view the generated HTML file
 GUI_TEST_SUBDIR = 'gui_test_models'
 GUI_TEST_EXE = 'test_gui.js'
 DEBUG = True
 
-@unittest.skipUnless(shutil.which('node') != None, "Node.js is required to test the N2 GUI.")
+@unittest.skipUnless(distutils.spawn.find_executable('node') != None, "Node.js is required to test the N2 GUI.")
 class N2GUITestCase(unittest.TestCase):
     def setUp(self):
         """
