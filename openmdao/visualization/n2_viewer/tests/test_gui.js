@@ -1,7 +1,5 @@
-#!/usr/bin/env node
-
-const argv = require('yargs').argv;
 const puppeteer = require('puppeteer');
+const argv = require('yargs').argv;
 const urlPrefix = 'file://';
 
 // Amount to wait when expecting a transition.

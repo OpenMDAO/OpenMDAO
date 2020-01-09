@@ -40,7 +40,7 @@ class N2GUITestCase(unittest.TestCase):
         # detects an error.
         #    self.assertEqual(os.system(testCmd + ' --n2files=' + n2file), 0,
         #        'N2 common test failed with ' + n2file)
-            self.assertEqual(subprocess.call([testCmd, '--n2files=' + n2file]), 0,
+            self.assertEqual(subprocess.call(['node', testCmd, '--n2files=' + n2file]), 0,
                 'N2 common test failed with ' + n2file)
 
     def tearDown(self):
