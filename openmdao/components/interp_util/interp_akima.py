@@ -75,43 +75,6 @@ def dv_abs_smooth_complex(x, x_deriv, delta_x):
     return y_deriv
 
 
-def abs_smooth_dv(x, x_deriv, delta_x):
-    """
-    Compute the absolute value in a smooth differentiable manner.
-
-    The valley is rounded off using a quadratic function.
-
-    Parameters
-    ----------
-    x : float
-        Quantity value
-    x_deriv : float
-        Derivative value
-    delta_x : float
-        Half width of the rounded section.
-
-    Returns
-    -------
-    float
-        Smooth absolute value of the quantity.
-    float
-        Smooth absolute value of the derivative.
-    """
-    if x >= delta_x:
-        y_deriv = x_deriv
-        y = x
-
-    elif x <= -delta_x:
-        y_deriv = -x_deriv
-        y = -x
-
-    else:
-        y_deriv = 2.0 * x * x_deriv / (2.0 * delta_x)
-        y = x**2 / (2.0 * delta_x) + delta_x / 2.0
-
-    return y, y_deriv
-
-
 class InterpAkima(InterpAlgorithm):
     """
     Interpolate using an Akima polynomial.
@@ -191,6 +154,7 @@ class InterpAkima(InterpAlgorithm):
         m4 = 0.0
         m5 = 0.0
         extrap = 0
+        deriv_dv = None
 
         # Check for extrapolation conditions. if off upper end of table (idx = ient-1)
         # reset idx to interval lower bracket (ient-2). if off lower end of table
@@ -260,21 +224,34 @@ class InterpAkima(InterpAlgorithm):
             nshape.append(1)
             deriv_dx = np.empty(tuple(nshape), dtype=x.dtype)
             if self.training_data_gradients:
+                n_this = high_idx - low_idx
                 nshape = list(values.shape[:-1])
-                nshape.extend(self.values.shape)
-                deriv_dgrid = np.empty(tuple(nshape), dtype=x.dtype)
-                deriv_dval = np.empty(tuple(nshape), dtype=x.dtype)
+                nshape.append(n_this)
+                #deriv_dv = np.empty(tuple(nshape), dtype=x.dtype)
+                deriv_dv = np.eye(n_this, dtype=x.dtype)
 
+            j = 0
             if idx >= 2:
                 val1 = values[..., idx - 2]
+                idx_val1 = j
+                j += 1
             if idx >= 1:
                 val2 = values[..., idx - 1]
+                idx_val2 = j
+                j += 1
             val3 = values[..., idx]
+            idx_val3 = j
+            j += 1
             val4 = values[..., idx + 1]
+            idx_val4 = j
+            j += 1
             if idx < ngrid - 2:
                 val5 = values[..., idx + 2]
+                idx_val5 = j
+                j += 1
             if idx < ngrid - 3:
                 val6 = values[..., idx + 3]
+                idx_val6 = j
 
         # Calculate interval slope values
         #
@@ -288,32 +265,57 @@ class InterpAkima(InterpAlgorithm):
         # depending on the value of idx
 
         m3 = (val4 - val3) / (grid[idx + 1] - grid[idx])
+        if self.training_data_gradients:
+            dm3_dv = (deriv_dv[idx_val4, :] - deriv_dv[idx_val3, :]) / \
+                (grid[idx + 1] - grid[idx])
 
         if idx >= 2:
             m1 = (val2 - val1) / (grid[idx - 1] - grid[idx - 2])
+            if self.training_data_gradients:
+                dm1_dv = (deriv_dv[idx_val2, :] - deriv_dv[idx_val1, :]) / \
+                    (grid[idx - 1] - grid[idx - 2])
 
         if idx >= 1:
             m2 = (val3 - val2) / (grid[idx] - grid[idx - 1])
+            if self.training_data_gradients:
+                dm2_dv = (deriv_dv[idx_val3, :] - deriv_dv[idx_val2, :]) / \
+                    (grid[idx] - grid[idx - 1])
 
         if idx < ngrid - 2:
             m4 = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
+            if self.training_data_gradients:
+                dm4_dv = (deriv_dv[idx_val5, :] - deriv_dv[idx_val4, :]) / \
+                    (grid[idx + 2] - grid[idx + 1])
 
         if idx < ngrid - 3:
             m5 = (val6 - val5) / (grid[idx + 3] - grid[idx + 2])
+            if self.training_data_gradients:
+                dm5_dv = (deriv_dv[idx_val6, :] - deriv_dv[idx_val5, :]) / \
+                    (grid[idx + 3] - grid[idx + 2])
 
         if idx == 0:
             m2 = 2 * m3 - m4
             m1 = 2 * m2 - m3
+            if self.training_data_gradients:
+                dm2_dv = 2.0 * deriv_dv[idx_val3, :] - deriv_dv[idx_val4, :]
+                dm1_dv = 2.0 * deriv_dv[idx_val2, :] - deriv_dv[idx_val3, :]
 
         elif idx == 1:
             m1 = 2 * m2 - m3
+            if self.training_data_gradients:
+                dm1_dv = 2.0 * deriv_dv[idx_val2, :] - deriv_dv[idx_val3, :]
 
         elif idx == ngrid - 3:
             m5 = 2 * m4 - m3
+            if self.training_data_gradients:
+                dm5_dv = 2.0 * deriv_dv[idx_val4, :] - deriv_dv[idx_val3, :]
 
         elif idx == ngrid - 2:
             m4 = 2 * m3 - m2
             m5 = 2 * m4 - m3
+            if self.training_data_gradients:
+                dm4_dv = 2.0 * deriv_dv[idx_val3, :] - deriv_dv[idx_val2, :]
+                dm5_dv = 2.0 * deriv_dv[idx_val4, :] - deriv_dv[idx_val3, :]
 
         m1 = np.atleast_1d(m1)
         m2 = np.atleast_1d(m2)
@@ -326,12 +328,19 @@ class InterpAkima(InterpAlgorithm):
             w2 = abs_smooth_complex(m4 - m3, delta_x)
             w31 = abs_smooth_complex(m2 - m1, delta_x)
         else:
-            w2 = abs_complex(m4 - m3)
-            w31 = abs_complex(m2 - m1)
+            if self.training_data_gradients:
+                w2, dw2_dv = dv_abs_complex(m4 - m3, dm4_dv - dm3_dv)
+                w31, dw31_dv = dv_abs_complex(m2 - m1, dm2_dv - dm1_dv)
+            else:
+                w2 = abs_complex(m4 - m3)
+                w31 = abs_complex(m2 - m1)
 
         # Special case to avoid divide by zero.
         jj1 = np.where(w2 + w31 > eps)
         b = 0.5 * (m2 + m3)
+        if self.training_data_gradients:
+            db_dv = 0.5 * (dm2_dv + dm3_dv)
+            db_dv = np.atleast_2d(db_dv)
 
         # We need to suppress some warnings that occur when we divide by zero.  We replace all
         # values where this happens, so it never affects the result.
@@ -339,21 +348,41 @@ class InterpAkima(InterpAlgorithm):
         np.seterr(invalid='ignore', divide='ignore')
 
         bpos = np.atleast_1d((m2 * w2 + m3 * w31) / (w2 + w31))
+        if self.training_data_gradients:
+            dbpos_dv = ((m2 * dw2_dv + dm2_dv * w2 + m3 * dw31_dv + dm3_dv * w31) * (w2 + w31) - \
+                        (m2 * w2 + m3 * w31) * (dw2_dv + dw31_dv)) / (w2 + w31) ** 2
+            dbpos_dv = np.atleast_2d(dbpos_dv)
+
         b[jj1] = bpos[jj1]
+        if self.training_data_gradients:
+            db_dv[jj1] = dbpos_dv[jj1]
 
         if delta_x > 0:
             w32 = abs_smooth_complex(m5 - m4, delta_x)
             w4 = abs_smooth_complex(m3 - m2, delta_x)
         else:
-            w32 = abs_complex(m5 - m4)
-            w4 = abs_complex(m3 - m2)
+            if self.training_data_gradients:
+                w32, dw32_dv = dv_abs_complex(m5 - m4, dm5_dv - dm4_dv)
+                w4, dw4_dv = dv_abs_complex(m3 - m2, dm3_dv - dm2_dv)
+            else:
+                w32 = abs_complex(m5 - m4)
+                w4 = abs_complex(m3 - m2)
 
         # Special case to avoid divide by zero.
         jj2 = np.where(w32 + w4 > eps)
         bp1 = 0.5 * (m3 + m4)
+        if self.training_data_gradients:
+            dbp1_dv = 0.5 * (dm3_dv + dm4_dv)
+            dbp1_dv = np.atleast_2d(dbp1_dv)
 
         bp1pos = np.atleast_1d((m3 * w32 + m4 * w4) / (w32 + w4))
+        if self.training_data_gradients:
+            dbp1pos_dv = ((m3 * dw32_dv + dm3_dv * w32 + m4 * dw4_dv + dm4_dv * w4) * (w32 + w4) - \
+                          (m3 * w32 + m4 * w4) * (dw32_dv + dw4_dv)) / (w32 + w4) ** 2
+            dbp1pos_dv = np.atleast_2d(dbp1pos_dv)
         bp1[jj2] = bp1pos[jj2]
+        if self.training_data_gradients:
+            dbp1_dv[jj2] = dbp1pos_dv[jj2]
 
         if extrap == 0:
             h = 1.0 / (grid[idx + 1] - grid[idx])
@@ -362,16 +391,32 @@ class InterpAkima(InterpAlgorithm):
             d = (b + bp1 - 2 * m3) * h * h
             dx = x[0] - grid[idx]
 
+            if self.training_data_gradients:
+                da_dv = deriv_dv[idx_val3, :]
+                dc_dv = (3 * dm3_dv - 2 * db_dv - dbp1_dv) * h
+                dd_dv = (db_dv + dbp1_dv - 2 * dm3_dv) * h * h
+
         elif extrap == 1:
             a = val4
             b = bp1
             dx = x[0] - grid[idx + 1]
 
+            if self.training_data_gradients:
+                da_dv = deriv_dv[idx_val4, :]
+                db_dv = dbp1_dv
+                dc_dv = dd_dv = 0
+
         else:
             a = val3
             dx = x[0] - grid[0]
 
+            if self.training_data_gradients:
+                da_dv = deriv_dv[idx_val3, :]
+                dc_dv = dd_dv = 0
+
         deriv_dx[..., 0] = b + dx * (2.0 * c + 3.0 * d * dx)
+        if self.training_data_gradients:
+            deriv_dv = da_dv + dx * (db_dv + dx * (dc_dv + dx * dd_dv))
 
         # Propagate derivatives from sub table.
         if subtable is not None:
@@ -419,8 +464,8 @@ class InterpAkima(InterpAlgorithm):
                 dw2 = dv_abs_smooth_complex(m4 - m3, dm4 - dm3, delta_x)
                 dw3 = dv_abs_smooth_complex(m2 - m1, dm2 - dm1, delta_x)
             else:
-                dw2 = dv_abs_complex(m4 - m3, dm4 - dm3)
-                dw3 = dv_abs_complex(m2 - m1, dm2 - dm1)
+                _, dw2 = dv_abs_complex(m4 - m3, dm4 - dm3)
+                _, dw3 = dv_abs_complex(m2 - m1, dm2 - dm1)
 
             # Special case to avoid divide by zero.
 
@@ -455,8 +500,8 @@ class InterpAkima(InterpAlgorithm):
                 dw3 = dv_abs_smooth_complex(m5 - m4, dm5 - dm4, delta_x)
                 dw4 = dv_abs_smooth_complex(m3 - m2, dm3 - dm2, delta_x)
             else:
-                dw3 = dv_abs_complex(m5 - m4, dm5 - dm4)
-                dw4 = dv_abs_complex(m3 - m2, dm3 - dm2)
+                _, dw3 = dv_abs_complex(m5 - m4, dm5 - dm4)
+                _, dw4 = dv_abs_complex(m3 - m2, dm3 - dm2)
 
             # Special case to avoid divide by zero.
             if len(nshape) > 1:
@@ -505,4 +550,4 @@ class InterpAkima(InterpAlgorithm):
         np.seterr(**old_settings)
 
         # Evaluate dependent value and exit
-        return a + dx * (b + dx * (c + dx * d)), deriv_dx, None, None
+        return a + dx * (b + dx * (c + dx * d)), deriv_dx, deriv_dv, None

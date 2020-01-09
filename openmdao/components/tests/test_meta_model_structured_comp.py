@@ -709,7 +709,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
-        derivs = prob.check_partials(out_stream=None)
+        derivs = prob.check_partials() #out_stream=None)
 
         for i in derivs['comp'].keys():
             if verbose:

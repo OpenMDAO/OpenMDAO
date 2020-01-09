@@ -218,10 +218,10 @@ class MetaModelStructuredComp(ExplicitComponent):
                                         err.lower, err.upper, err.value)
                 raise_from(AnalysisError(errmsg), None)
 
-            except ValueError as err:
-                raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
-                                                                                   out_name,
-                                                                                   str(err)))
+            #except ValueError as err:
+                #raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
+                                                                                   #out_name,
+                                                                                   #str(err)))
             outputs[out_name] = val
 
     def compute_partials(self, inputs, partials):
