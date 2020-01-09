@@ -150,10 +150,8 @@ install:
 
 before_script:
 - for nodepkg in yargs puppeteer; do
-    npm install $nodepkg;
-    npm list $nodepkg;
+    npm install -g $nodepkg;
   done;
-  npm config ls -l;
   env;
 
 script:
