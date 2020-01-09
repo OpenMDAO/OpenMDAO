@@ -1,17 +1,17 @@
 {
-  "name": "n2_gui_test",
-  "version": "1.0.0",
-  "description": "Test the N2 UI in a headless web browser",
-  "dependencies": {
-    "yargs": ">=15.0.0",
-    "puppeteer": ">=2.0.0"
-  },
-  "files": [
-    "openmdao/visualization/n2_viewer/tests/test_gui.js"
-  ],
-  "license": "Apache-2.0",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/OpenMDAO/OpenMDAO"
-  }
+    "name": "n2_gui_test",
+    "version": "1.0.0",
+    "description": "Test the N2 UI in a headless web browser",
+    "dependencies": {
+        "yargs": ">=15.0.0",
+        "puppeteer": ">=2.0.0"
+    },
+    "bin": {
+        "n2_gui_test": "./openmdao/visualization/n2_viewer/tests/test_gui.js"
+    },
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/OpenMDAO/OpenMDAO"
+    }
 }
