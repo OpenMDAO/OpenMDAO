@@ -1,0 +1,9 @@
+{
+  "name": "n2_gui_test",
+  "version": "1.0.0",
+  "description": "Test the N2 UI in a headless web browser",
+  "dependencies": {
+    "yargs": "^15.0.0",
+    "puppeteer": "^2.0.0"
+  }
+}
