@@ -11,20 +11,20 @@ filter_secrets: false
 os:
 - linux
 
-language: generic
-
 language: node_js
 
 node_js: node
 
+language: generic
+
 env:
   matrix:
     # pinning Python 3.7.3, seems to be an issue with the python 3.7.4 installed by conda
-    # - PY=3.7.3 NUMPY=1.16 SCIPY=1.2   PETSc=3.11
-    - PY=3.6 NUMPY=1.15 SCIPY=1.1
-    # - PY=3.6 NUMPY=1.14 SCIPY=1.0.1 PETSc=3.10.1 UPLOAD_DOCS=1
-    # - PY=2.7 NUMPY=1.13 SCIPY=1.1   PETSc=3.9.1
-    # - PY=2.7 NUMPY=1.12 SCIPY=1.1
+    - PY=3.7.3 NUMPY=1.16 SCIPY=1.2   PETSc=3.11
+    - PY=3.6   NUMPY=1.15 SCIPY=1.1
+    - PY=3.6   NUMPY=1.14 SCIPY=1.0.1 PETSc=3.10.1 UPLOAD_DOCS=1
+    - PY=2.7   NUMPY=1.13 SCIPY=1.1   PETSc=3.9.1
+    - PY=2.7   NUMPY=1.12 SCIPY=1.1
 
 git:
   depth: 99999
@@ -45,7 +45,6 @@ addons:
 
 cache:
   apt: true
-  npm: false
   timeout: 300
   directories:
     - $HOME/.cache/pip
@@ -74,9 +73,6 @@ before_install:
     echo "cached miniconda environment not found";
     rm -rf $HOME/miniconda;
   fi
-
-# - curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -;
-#   sudo apt-get install -y nodejs;
 
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
