@@ -149,11 +149,16 @@ install:
 - conda list
 
 before_script:
-- pushd $HOME;
+#- pushd $HOME;
+#  for nodepkg in yargs puppeteer; do
+#    npm install $nodepkg;
+#  done;
+#  popd;
+- nvm use node;
   for nodepkg in yargs puppeteer; do
     npm install $nodepkg;
   done;
-  popd;
+
 
 script:
 # prevent OpenMPI warning messages
