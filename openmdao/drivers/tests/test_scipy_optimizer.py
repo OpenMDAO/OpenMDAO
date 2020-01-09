@@ -16,7 +16,77 @@ from openmdao.test_suite.components.simple_comps import NonSquareArrayComp
 from openmdao.test_suite.groups.sin_fitter import SineFitter
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import run_driver
+from openmdao.utils.mpi import MPI
 
+
+class DummyComp(om.ExecComp):
+    """
+    Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3.
+    """
+
+    def setup(self):
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
+
+        self.add_output('c', val=0.0)
+
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        """
+        f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+
+        Optimal solution (minimum): x = 6.6667; y = -7.3333
+        """
+        x = inputs['x']
+        y = inputs['y']
+
+        noise = 1e-10
+        if self.comm.rank == 0:
+            outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+        if self.comm.rank == 1:
+            outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 + noise
+
+    def compute_partials(self, inputs, partials):
+        """
+        Jacobian for our paraboloid.
+        """
+        x = inputs['x']
+        y = inputs['y']
+
+        partials['c', 'x'] = 2.0*x - 6.0 + y
+        partials['c', 'y'] = 2.0*y + 8.0 + x
+
+class TestMPIScatter(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_design_vars_on_all_procs_scipy(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', DummyComp(), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-6
+        prob.driver.options['disp'] = False
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=-15.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        proc_vals = MPI.COMM_WORLD.allgather(prob['c'])
+        self.assertNotEqual(proc_vals[0], proc_vals[1])
 
 class TestScipyOptimizeDriver(unittest.TestCase):
 
