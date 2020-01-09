@@ -148,11 +148,11 @@ install:
 # display summary of installed packages and their versions
 - conda list
 
-before_script:
-- for nodepkg in yargs puppeteer; do
-    npm install --save $nodepkg;
-  done;
-  env;
+before_script: npm install .
+# - for nodepkg in yargs puppeteer; do
+#    npm install --save $nodepkg;
+#  done;
+#  env;
 
 script:
 # prevent OpenMPI warning messages
