@@ -2,7 +2,7 @@
 
 const puppeteer = require('puppeteer');
 const argv = require('yargs').argv;
-const path = require('path');
+// const path = require('path');
 const fs = require('fs');
 const urlPrefix = 'file://';
 
@@ -46,7 +46,35 @@ async function doGenericToolbarTests(page) {
         const btnHandle = await page.$('#' + test.id);
         await btnHandle.click({ 'button': 'left', 'delay': 5 });
         await page.waitFor(test.wait);
-        // await page.screenshot({ path: 'circuit_' + test.x + '.png' }, { 'fullPage': true });
+        // await page.screenshot({ path: 'circuit_' + test.id + '.png' }, { 'fullPage': true });
+    }
+}
+
+async function doCircuitModelTests(page) {
+    await page.reload({ 'waitUntil': 'networkidle0' });
+    await page.waitFor(transitionWait);
+
+    // Hover over a specific cell and make sure the number of arrows is correct.
+    // When it was broken, this diagram would show an arrow going offscreen to
+    // an element that didn't exist.
+    let hndl_24_24 = await page.$("rect#cellShape_24_24.vMid");
+    if (!hndl_24_24) {
+        console.log("Error: Could not find matrix cell in circuit diagram.");
+        process.exit(1);
+    }
+
+    await hndl_24_24.hover();
+    await page.waitFor(normalWait); // Give it a chance to draw the arrows
+
+    const EXPECTED_ARROWS = 4;
+    let arrows = await page.$$('g#n2arrows > path');
+    if (!arrows) {
+        console.log("Error: Could not find any arrows after hover.");
+        process.exit(1);
+    }
+    if ( arrows.length != EXPECTED_ARROWS ) {
+        console.log('Found ' + arrows.length + ' arrows after hover, expected ' + EXPECTED_ARROWS);
+        process.exit(1);
     }
 }
 
@@ -99,6 +127,38 @@ function findFiles() {
 }
 
 /**
+ * Run tests on arbitrary list of discovered N2 HTML files.
+ * @param {Page} page Reference to a page that's been initialized, but not loaded.
+ */
+async function runGenericTests(page) {
+    for (let n2Filename of n2Files) {
+        
+        console.log(
+            "\n----------------------------------------\n" +
+            n2Filename +
+            "\n----------------------------------------"
+        );
+
+        // Without waitUntil: 'networkidle0', processing will begin before the page
+        // is fully rendered
+        await page.goto(urlPrefix + argv.n2dir + '/' + n2Filename, { 'waitUntil': 'networkidle0' });
+
+        // Milliseconds to allow for the last transition animation to finish:
+        transitionWait = await page.evaluate(() => N2TransitionDefaults.durationSlow + 100)
+        await doGenericToolbarTests(page);
+
+        n2Basename = n2Filename.replace(argv.suffix, '');
+        switch (n2Basename) {
+            case 'circuit':
+                await doCircuitModelTests(page);
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+/**
  * Start the browser, load the page, and call all the testing functions.
  */
 async function runTests() {
@@ -113,23 +173,8 @@ async function runTests() {
     const page = await browser.newPage();
     setupErrorHandlers(page);
 
-    for (let n2Filename of n2Files) {
-        console.log(
-            "\n----------------------------------------\n" +
-            n2Filename +
-            "\n----------------------------------------"
-        );
-
-        // Without waitUntil: 'networkidle0', processing will begin before the page
-        // is fully rendered
-        await page.goto(urlPrefix + argv.n2dir + '/' + n2Filename, { 'waitUntil': 'networkidle0' });
-
-        // Milliseconds to allow for the last transition animation to finish:
-        transitionWait = await page.evaluate(() => N2TransitionDefaults.durationSlow + 100)
-        await doGenericToolbarTests(page);
-    }
-
-    await browser.close();
+    await runGenericTests(page);
+    await browser.close(); // Don't forget this or the script will wait forever!
 };
 
 let n2Files = findFiles();
