@@ -57,6 +57,7 @@ class DummyComp(om.ExecComp):
         partials['c', 'x'] = 2.0*x - 6.0 + y
         partials['c', 'y'] = 2.0*y + 8.0 + x
 
+@unittest.skipUnless(MPI, "MPI is required.")
 class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
 
