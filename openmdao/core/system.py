@@ -3112,6 +3112,7 @@ class System(object):
                     prom_name=False,
                     units=False,
                     shape=False,
+                    desc=False,
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
@@ -3207,6 +3208,8 @@ class System(object):
                 var_meta['units'] = meta[var_name]['units']
             if shape:
                 var_meta['shape'] = val.shape
+            if desc:
+                var_meta['desc'] = meta[var_name]['desc']
 
             inputs.append((var_name, var_meta))
 
@@ -3257,6 +3260,7 @@ class System(object):
                      shape=False,
                      bounds=False,
                      scaling=False,
+                     desc=False,
                      hierarchical=True,
                      print_arrays=False,
                      tags=None,
@@ -3518,6 +3522,10 @@ class System(object):
                                 var_dict[name]['resids'] = \
                                     np.append(var_dict[name]['resids'],
                                               proc_vars[name]['resids'])
+                            if 'desc' in var_dict[name]:
+                                var_dict[name]['desc'] = \
+                                    np.append(var_dict[name]['desc'],
+                                              proc_vars[name]['desc'])
 
         inputs = var_type is 'input'
         outputs = not inputs
