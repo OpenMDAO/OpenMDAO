@@ -709,7 +709,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
-        derivs = prob.check_partials() #out_stream=None)
+        derivs = prob.check_partials(method='cs') #out_stream=None)
 
         for i in derivs['comp'].keys():
             if verbose:
@@ -998,7 +998,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         # Derivs are large, so ignore atol.
         assert_check_partials(partials, atol=1e10, rtol=1e-10)
 
-    def test_training_gradient(self):
+    def test_training_gradient_lagrange3(self):
         model = om.Group()
         ivc = om.IndepVarComp()
 
@@ -1042,6 +1042,42 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         params = mapdata.param_data
         outs = mapdata.output_data
 
+        ivc.add_output('x', np.array([-0.3, 0.7, 1.2]))
+        ivc.add_output('y', np.array([0.14, 0.313, 1.41]))
+        ivc.add_output('z', np.array([-2.11, -1.2, 2.01]))
+
+        ivc.add_output('f_train', outs[0]['values'])
+        ivc.add_output('g_train', outs[1]['values'])
+
+        comp = om.MetaModelStructuredComp(training_data_gradients=True,
+                                          method='akima', vec_size=3)
+        for param in params:
+            comp.add_input(param['name'], param['default'], param['values'])
+
+        for out in outs:
+            comp.add_output(out['name'], out['default'], out['values'])
+
+        model.add_subsystem('ivc', ivc, promotes=["*"])
+        model.add_subsystem('comp',
+                            comp,
+                            promotes=["*"])
+
+        prob = om.Problem(model)
+        prob.setup()
+        prob.run_model()
+
+        self.run_and_check_derivs(prob)
+
+    def test_training_gradient_akima_basic(self):
+        # Mimics usage as an order-reducing interpolating polynomial.
+        model = om.Group()
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        outs = mapdata.output_data
+
         ivc.add_output('x', np.array([.33]))
 
         ivc.add_output('f_train', np.array([.3, .7, .5, .6, .3, .4, .2]))
@@ -1057,7 +1093,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
                             promotes=["*"])
 
         prob = om.Problem(model)
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
         prob.run_model()
 
         self.run_and_check_derivs(prob)

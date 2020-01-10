@@ -29,6 +29,8 @@ class InterpAlgorithm(object):
         Array containing the table values for all dimensions.
     _name : str
         Algorithm name for error messages.
+    _full_slice : tuple of <Slice>
+        Used to cache the full slice if training derivatives are computed.
     _vectorized :bool
         If True, this method is vectorized and can simultaneously solve multiple interpolations.
     """
@@ -65,6 +67,7 @@ class InterpAlgorithm(object):
         self._name = None
         self._vectorized = False
         self.training_data_gradients = False
+        self._full_slice = None
 
     def initialize(self):
         """
@@ -191,6 +194,9 @@ class InterpAlgorithm(object):
         self.last_index = idx
         if slice_idx is None:
             slice_idx = []
+
+        if self.subtable is not None:
+            self.subtable.training_data_gradients = self.training_data_gradients
 
         result, d_dx, d_values, d_grid = self.interpolate(x, idx, slice_idx)
 

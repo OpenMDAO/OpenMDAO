@@ -69,6 +69,7 @@ class InterpScipy(InterpAlgorithm):
 
         interp_method = self.options['interp_method']
         self._name = interp_method
+        self._full_slice = None
 
         self.grid = grid
         self.values = values

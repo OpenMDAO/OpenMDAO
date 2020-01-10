@@ -187,22 +187,33 @@ class InterpND(object):
 
         table = self.table
         if table._vectorized:
-            result, derivs, d_values, d_grid = table.evaluate_vectorized(xi)
+            result, derivs_x, derivs_values, derivs_grid = table.evaluate_vectorized(xi)
 
         else:
             xi = np.atleast_2d(xi)
             n_nodes, nx = xi.shape
             result = np.empty((n_nodes, ), dtype=xi.dtype)
-            derivs = np.empty((n_nodes, nx), dtype=xi.dtype)
+            derivs_x = np.empty((n_nodes, nx), dtype=xi.dtype)
+            derivs_val = None
 
             # TODO: it might be possible to vectorize over n_nodes.
             for j in range(n_nodes):
                 val, d_x, d_values, d_grid = table.evaluate(xi[j, :])
                 result[j] = val
-                derivs[j, :] = d_x.flatten()
+                derivs_x[j, :] = d_x.flatten()
+                if d_values is not None:
+                    if derivs_val is None:
+                        dv_shape = [n_nodes]
+                        dv_shape.extend(self.values.shape)
+                        derivs_val = np.zeros(dv_shape, dtype=xi.dtype)
+                    in_slice = table._full_slice
+                    full_slice = [slice(j, j+1)]
+                    full_slice.extend(in_slice)
+                    derivs_val[tuple(full_slice)] = d_values
 
         # Cache derivatives
-        self._d_dx = derivs
+        self._d_dx = derivs_x
+        self._d_dvalues = derivs_val
 
         return result
 
@@ -210,7 +221,7 @@ class InterpND(object):
         """
         Compute the gradients at the specified point.
 
-        The gradients are computed as the interpolation itself is performed,
+        Most of the gradients are computed as the interpolation itself is performed,
         but are cached and returned separately by this method.
 
         If the point for evaluation differs from the point used to produce
@@ -253,6 +264,9 @@ class InterpND(object):
         if self.table._vectorized:
             return self.table.training_gradients(pt)
 
+        elif self._d_dvalues is not None:
+            return self._d_dvalues
+
         else:
             for i, axis in enumerate(self.grid):
                 ngrid = axis.size
@@ -271,4 +285,4 @@ class InterpND(object):
                 else:
                     deriv_running = np.outer(deriv_running, deriv_i)
 
-        return deriv_running
+            return deriv_running
