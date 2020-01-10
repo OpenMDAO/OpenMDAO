@@ -5,48 +5,49 @@ class N2CellRenderer {
      * @param {string} color The color to render all shapes in.
      * @param {string} className The CSS class to tag primary shapes with, used for selecting.
      */
-    constructor(color, className) {
+    constructor(color, className, id) {
         this.color = color;
         this.className = className;
+        this.id = id;
     }
 
     static updateDims(baseWidth, baseHeight) {
         if (!N2CellRenderer.dims) {
             N2CellRenderer.prevDims = {
-                'size': { 'width': 0, 'height': 0 },
-                'bottomRight': { 'x': 0, 'y': 0 },
-                'topLeft': { 'x': 0, 'y': 0 }
+                "size": { "width": 0, "height": 0 },
+                "bottomRight": { "x": 0, "y": 0 },
+                "topLeft": { "x": 0, "y": 0 }
             }
         }
         else {
-            for (let prop of ['size', 'bottomRight', 'topLeft']) {
+            for (let prop of ["size", "bottomRight", "topLeft"]) {
                 Object.assign(N2CellRenderer.prevDims[prop],
                     N2CellRenderer.dims[prop]);
             }
         }
 
         N2CellRenderer.dims = {
-            'size': {
-                'width': baseWidth,
-                'height': baseHeight
+            "size": {
+                "width": baseWidth,
+                "height": baseHeight
             },
-            'bottomRight': {
-                'x': baseWidth * .5,
-                'y': baseHeight * .5
+            "bottomRight": {
+                "x": baseWidth * .5,
+                "y": baseHeight * .5
             },
-            'topLeft': {
-                'x': baseWidth * -.5,
-                'y': baseHeight * -.5
+            "topLeft": {
+                "x": baseWidth * -.5,
+                "y": baseHeight * -.5
             }
         }
     }
 
-    /** Enable access to the static dims variable through 'this'. */
+    /** Enable access to the static dims variable through "this". */
     get dims() {
         return N2CellRenderer.dims;
     }
 
-    /** Enable access to the static prevDims variable through 'this'. */
+    /** Enable access to the static prevDims variable through "this". */
     get prevDims() {
         return N2CellRenderer.prevDims;
     }
@@ -91,8 +92,8 @@ class N2ScalarBase extends N2CellRenderer {
      * @param {Object} prevDims Layout and dimensions for the previous cell spec.
      * @param {string} color The color to render all shapes in.
      */
-    constructor(color) {
-        super(color, "sMid");
+    constructor(color, id) {
+        super(color, "sMid", id);
     }
 
     /**
@@ -103,7 +104,7 @@ class N2ScalarBase extends N2CellRenderer {
      * @param {selection} [d3Elem = null ] The selection created in render().
      */
     update(svgGroup, dims, d3Elem = null) {
-        if (!d3Elem) d3Elem = d3.select(svgGroup).select('.' + this.className)
+        if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
             .transition(sharedTransition);
         return d3Elem
             .attr("rx", dims.bottomRight.x * .6)
@@ -117,7 +118,9 @@ class N2ScalarBase extends N2CellRenderer {
      */
     render(svgGroup, dims) {
         let d3Elem = d3.select(svgGroup)
-            .append("ellipse").attr("class", this.className)
+            .append("ellipse")
+            .attr("class", this.className)
+            .attr("id", this.id)
             .style("fill", this.color);
 
         return this.update(svgGroup, dims, d3Elem)
@@ -133,8 +136,8 @@ class N2VectorBase extends N2CellRenderer {
      * @param {Object} prevDims Layout and dimensions for the previous cell spec.
      * @param {string} color The color to render all shapes in.
      */
-    constructor(color) {
-        super(color, "vMid");
+    constructor(color, id) {
+        super(color, "vMid", id);
     }
 
     /**
@@ -145,7 +148,7 @@ class N2VectorBase extends N2CellRenderer {
      * @param {selection} [d3Elem = null ] The selection created in render().
      */
     update(svgGroup, dims, d3Elem = null) {
-        if (!d3Elem) d3Elem = d3.select(svgGroup).select('.' + this.className)
+        if (!d3Elem) d3Elem = d3.select(svgGroup).select("." + this.className)
             .transition(sharedTransition);
 
         let ret = d3Elem
@@ -164,7 +167,9 @@ class N2VectorBase extends N2CellRenderer {
      */
     render(svgGroup, dims) {
         let d3Elem = d3.select(svgGroup)
-            .append("rect").attr("class", this.className)
+            .append("rect")
+            .attr("class", this.className)
+            .attr("id", this.id)
             .style("fill", this.color);
         return this.update(svgGroup, dims, d3Elem)
     }
@@ -178,8 +183,8 @@ class N2GroupBase extends N2CellRenderer {
      * @param {Object} prevDims Layout and dimensions for the previous cell spec.
      * @param {string} color The color to render all shapes in.
      */
-    constructor(color) {
-        super(color, "gMid");
+    constructor(color, id) {
+        super(color, "gMid", id);
     }
 
     /**
@@ -242,7 +247,7 @@ class N2GroupBase extends N2CellRenderer {
      */
     update(svgGroup, dims, d3Elem = null, border = null) {
         let d3Group = d3.select(svgGroup);
-        if (!d3Elem) d3Elem = d3Group.select('.' + this.className)
+        if (!d3Elem) d3Elem = d3Group.select("." + this.className)
             .transition(sharedTransition);
 
         this._updateBorder(dims, d3Group, border);
@@ -264,80 +269,84 @@ class N2GroupBase extends N2CellRenderer {
         let d3Group = d3.select(svgGroup);
         let border = this._renderBorder(d3Group);
         let d3Elem = d3Group
-            .append("rect").attr("class", this.className).style("fill", this.color);
+            .append("rect")
+            .attr("class", this.className)
+            .attr("id", this.id)
+            .style("fill", this.color);
+            
         return this.update(svgGroup, dims, d3Elem, border);
     }
 }
 
 class N2ScalarCell extends N2ScalarBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2VectorCell extends N2VectorBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2GroupCell extends N2GroupBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2ScalarScalarCell extends N2ScalarBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2ScalarVectorCell extends N2VectorBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2VectorScalarCell extends N2VectorBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2VectorVectorCell extends N2VectorBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2ScalarGroupCell extends N2GroupBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2GroupScalarCell extends N2GroupBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2VectorGroupCell extends N2GroupBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2GroupVectorCell extends N2GroupBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
 class N2GroupGroupCell extends N2GroupBase {
-    constructor(color) {
-        super(color);
+    constructor(color, id) {
+        super(color, id);
     }
 }
 
@@ -374,9 +383,9 @@ class N2MatrixCell {
         this.renderer = this._newRenderer();
 
         this.offScreen = {
-            'top': { 'incoming': new Set(), 'outgoing': new Set() },
-            'bottom': { 'incoming': new Set(), 'outgoing': new Set() },
-            'total': 0
+            "top": { "incoming": new Set(), "outgoing": new Set() },
+            "bottom": { "incoming": new Set(), "outgoing": new Set() },
+            "total": 0
         }
     }
 
@@ -389,7 +398,7 @@ class N2MatrixCell {
     }
 
     /**
-     * Select the mouseover callback depending on whether we're on the diagonal.
+     * Select the mouseover callback depending on whether we"re on the diagonal.
      * TODO: Remove these globals
      */
     mouseover() {
@@ -423,7 +432,7 @@ class N2MatrixCell {
      * @param {N2TreeNode} tgtNode Where the connection ends.
      */
     addOffScreenConn(srcNode, tgtNode) {
-        let debugStr = ': ' + srcNode.absPathName + ' -> ' + tgtNode.absPathName;
+        let debugStr = ": " + srcNode.absPathName + " -> " + tgtNode.absPathName;
 
         if (srcNode === this.tgtObj) {
             // Outgoing
@@ -462,18 +471,18 @@ class N2MatrixCell {
      */
     _newRenderer() {
         switch (this.symbolType.name) {
-            case 'scalar': return new N2ScalarCell(this.color());
-            case 'vector': return new N2VectorCell(this.color());
-            case 'group': return new N2GroupCell(this.color());
-            case 'scalarScalar': return new N2ScalarScalarCell(this.color());
-            case 'scalarVector': return new N2ScalarVectorCell(this.color());
-            case 'vectorScalar': return new N2VectorScalarCell(this.color());
-            case 'vectorVector': return new N2VectorVectorCell(this.color());
-            case 'scalarGroup': return new N2ScalarGroupCell(this.color());
-            case 'groupScalar': return new N2GroupScalarCell(this.color());
-            case 'vectorGroup': return new N2VectorGroupCell(this.color());
-            case 'groupVector': return new N2GroupVectorCell(this.color());
-            case 'groupGroup': return new N2GroupGroupCell(this.color());
+            case "scalar": return new N2ScalarCell(this.color(), this.id);
+            case "vector": return new N2VectorCell(this.color(), this.id);
+            case "group": return new N2GroupCell(this.color(), this.id);
+            case "scalarScalar": return new N2ScalarScalarCell(this.color(), this.id);
+            case "scalarVector": return new N2ScalarVectorCell(this.color(), this.id);
+            case "vectorScalar": return new N2VectorScalarCell(this.color(), this.id);
+            case "vectorVector": return new N2VectorVectorCell(this.color(), this.id);
+            case "scalarGroup": return new N2ScalarGroupCell(this.color(), this.id);
+            case "groupScalar": return new N2GroupScalarCell(this.color(), this.id);
+            case "vectorGroup": return new N2VectorGroupCell(this.color(), this.id);
+            case "groupVector": return new N2GroupVectorCell(this.color(), this.id);
+            case "groupGroup": return new N2GroupGroupCell(this.color(), this.id);
         }
     }
 }

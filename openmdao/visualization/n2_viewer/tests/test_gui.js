@@ -2,6 +2,8 @@
 
 const puppeteer = require('puppeteer');
 const argv = require('yargs').argv;
+const path = require('path');
+const fs = require('fs');
 const urlPrefix = 'file://';
 
 // Amount to wait when expecting a transition.
@@ -11,34 +13,38 @@ let transitionWait = -1;
 // The amount to wait when there's no transition:
 const normalWait = 10;
 
-// The models to create N2 files from:
-const n2Files = argv.n2files.split(',');
-// const n2Files = [ '/Users/tkollar/work/om/n2/openmdao/visualization/n2_viewer/tests/gui_test_models/double_sellar_N2_TEST.html'];
+const expectedModels = ['bug_arrow', 'circuit', 'double_sellar'];
 
 // Updated at each test to describe the current action:
 let currentTestDesc = '';
 
+/**
+ * Click most of the toolbar buttons to see if an error occurs.
+ * @param {Page} page Reference to the page that's already been loaded.
+ */
 async function doGenericToolbarTests(page) {
+
     const genericToolbarTests = [
-        { 'desc': 'Collapse All Outputs button', 'x': 275, 'y': 22, 'wait': transitionWait },
-        { 'desc': 'Uncollapse All button', 'x': 205, 'y': 22, 'wait': transitionWait },
-        { 'desc': 'Collapse Outputs in View Only button', 'x': 240, 'y': 22, 'wait': transitionWait },
-        { 'desc': 'Uncollapse In View Only button', 'x': 165, 'y': 22, 'wait': transitionWait },
-        { 'desc': 'Show Legend (on) button', 'x': 430, 'y': 22, 'wait': normalWait },
-        { 'desc': 'Show Legend (off) button', 'x': 431, 'y': 22, 'wait': normalWait },
-        { 'desc': 'Show Path (on) button', 'x': 390, 'y': 22, 'wait': normalWait },
-        { 'desc': 'Show Path (off) button', 'x': 391, 'y': 22, 'wait': normalWait },
-        { 'desc': 'Toggle Solver Names (on) button', 'x': 465, 'y': 22, 'wait': transitionWait },
-        { 'desc': 'Toggle Solver Names (off) button', 'x': 466, 'y': 22, 'wait': transitionWait },
-        { 'desc': 'Clear Arrows and Connection button', 'x': 355, 'y': 22, 'wait': normalWait },
-        { 'desc': 'Help (on) button', 'x': 615, 'y': 22, 'wait': normalWait },
-        { 'desc': 'Help (off) button', 'x': 616, 'y': 22, 'wait': normalWait },
+        { "desc": "Collapse All Outputs button", "id": "collapseAllButtonId", "wait": transitionWait },
+        { "desc": "Uncollapse All button", "id": "uncollapseAllButtonId", "wait": transitionWait },
+        { "desc": "Collapse Outputs in View Only button", "id": "collapseInViewButtonId", "wait": transitionWait },
+        { "desc": "Uncollapse In View Only button", "id": "uncollapseInViewButtonId", "wait": transitionWait },
+        { "desc": "Show Legend (on) button", "id": "showLegendButtonId", "wait": normalWait },
+        { "desc": "Show Legend (off) button", "id": "showLegendButtonId", "wait": normalWait },
+        { "desc": "Show Path (on) button", "id": "showCurrentPathButtonId", "wait": normalWait },
+        { "desc": "Show Path (off) button", "id": "showCurrentPathButtonId", "wait": normalWait },
+        { "desc": "Toggle Solver Names (on) button", "id": "toggleSolverNamesButtonId", "wait": transitionWait },
+        { "desc": "Toggle Solver Names (off) button", "id": "toggleSolverNamesButtonId", "wait": transitionWait },
+        { "desc": "Clear Arrows and Connection button", "id": "clearArrowsAndConnectsButtonId", "wait": normalWait },
+        { "desc": "Help (on) button", "id": "helpButtonId", "wait": normalWait },
+        { "desc": "Help (off) button", "id": "helpButtonId", "wait": normalWait },
     ];
 
     for (let test of genericToolbarTests) {
         currentTestDesc = test.desc;
         console.log("  Testing " + test.desc);
-        await page.mouse.click(test.x, test.y, { 'button': 'left', 'delay': 5 });
+        const btnHandle = await page.$('#' + test.id);
+        await btnHandle.click({ 'button': 'left', 'delay': 5 });
         await page.waitFor(test.wait);
         // await page.screenshot({ path: 'circuit_' + test.x + '.png' }, { 'fullPage': true });
     }
@@ -47,6 +53,7 @@ async function doGenericToolbarTests(page) {
 /**
  * Set up the event handlers that are critical for catching errors. When
  * an error is encountered, exit with status > 0 to indicate a failure.
+ * @param {Page} page Reference to the page that's already been loaded.
  */
 function setupErrorHandlers(page) {
     page.on('console', msg => {
@@ -71,7 +78,31 @@ function setupErrorHandlers(page) {
     });
 }
 
+/**
+ * Using the value of the --n2dir command line arg and --suffix arg, find
+ * all the files in that directory that end with that suffix.
+ * @returns {Array} The list of discovered filenames.
+ */
+function findFiles() {
+    let n2HtmlRegex = new RegExp('^.+' + argv.suffix + '$');
+    files = fs.readdirSync(argv.n2dir);
+
+    let n2Files = [];
+    for (let filename of files) {
+        if ( n2HtmlRegex.test(filename) ) {
+            console.log('Found ' + filename);
+            n2Files.push(filename);
+        }
+    }
+
+    return n2Files;
+}
+
+/**
+ * Start the browser, load the page, and call all the testing functions.
+ */
 async function runTests() {
+
     const browser = await puppeteer.launch({
         'defaultViewport': {
             'width': 1280,
@@ -91,7 +122,7 @@ async function runTests() {
 
         // Without waitUntil: 'networkidle0', processing will begin before the page
         // is fully rendered
-        await page.goto(urlPrefix + n2Filename, { 'waitUntil': 'networkidle0' });
+        await page.goto(urlPrefix + argv.n2dir + '/' + n2Filename, { 'waitUntil': 'networkidle0' });
 
         // Milliseconds to allow for the last transition animation to finish:
         transitionWait = await page.evaluate(() => N2TransitionDefaults.durationSlow + 100)
@@ -101,4 +132,5 @@ async function runTests() {
     await browser.close();
 };
 
+let n2Files = findFiles();
 (async () => { await runTests(); })();
