@@ -557,6 +557,10 @@ class System(object):
         ----------
         subsys : System or None
             ignored
+
+        Returns
+        -------
+            bool
         """
         return False
 
