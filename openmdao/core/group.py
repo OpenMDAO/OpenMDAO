@@ -441,7 +441,7 @@ class Group(System):
         Parameters
         ----------
         subsys : System or None
-            If not None, check only if the given subsystem has reconfigured.
+            If not None, check only if the given subsystem has reconfigured. Defaults to None.
 
         Returns
         -------
@@ -470,7 +470,7 @@ class Group(System):
         Parameters
         ----------
         subsys : System or None
-            If not None, check only if the given subsystem has reconfigured.
+            If not None, check only if the given subsystem has reconfigured. Defaults to None.
         """
         if self._check_child_reconf(subsys):
             # Perform an update setup

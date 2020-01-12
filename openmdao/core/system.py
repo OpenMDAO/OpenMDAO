@@ -556,7 +556,7 @@ class System(object):
         Parameters
         ----------
         subsys : System or None
-            ignored
+            If not None, check only if the given subsystem has reconfigured. Defaults to None.
 
         Returns
         -------
@@ -571,7 +571,7 @@ class System(object):
         Parameters
         ----------
         subsys : System or None
-            ignored
+            If not None, check only if the given subsystem has reconfigured. Defaults to None.
         """
         self._reconfigured = self._check_child_reconf(subsys)
 
