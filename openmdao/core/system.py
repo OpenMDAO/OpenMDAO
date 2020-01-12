@@ -551,6 +551,17 @@ class System(object):
 
     def _check_child_reconf(self, subsys=None):
         """
+        Check if any subsystem has reconfigured.
+
+        Parameters
+        ----------
+        subsys : System or None
+            ignored
+        """
+        return False
+
+    def _perform_reconf(self, subsys=None):
+        """
         Check if any subsystem has reconfigured and if so, perform the necessary update setup.
 
         Parameters
@@ -558,7 +569,7 @@ class System(object):
         subsys : System or None
             ignored
         """
-        self._reconfigured = False
+        self._reconfigured = self._check_child_reconf(subsys)
 
     def reconfigure(self):
         """

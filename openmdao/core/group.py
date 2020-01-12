@@ -141,7 +141,7 @@ class Group(System):
         """
         Configure this group to assign children settings.
 
-        This method may optionally be overidden by your Group's method.
+        This method may optionally be overridden by your Group's method.
 
         You may only use this method to change settings on your children subsystems. This includes
         setting solvers in cases where you want to override the defaults.
@@ -154,7 +154,7 @@ class Group(System):
             pathname
             comm
             options
-            system hieararchy with attribute access
+            system hierarchy with attribute access
         """
         pass
 
@@ -436,6 +436,35 @@ class Group(System):
 
     def _check_child_reconf(self, subsys=None):
         """
+        Check if any subsystem has reconfigured.
+
+        Parameters
+        ----------
+        subsys : System or None
+            If not None, check only if the given subsystem has reconfigured.
+
+        Returns
+        -------
+            bool
+        """
+        if subsys is None:
+            # See if any local subsystem has reconfigured
+            for subsys in self._subsystems_myproc:
+                if subsys._reconfigured:
+                    reconf = True
+                    break
+            else:
+                reconf = False
+        else:
+            reconf = subsys._reconfigured if subsys.name in self._loc_subsys_map else False
+
+        # See if any subsystem on this or any other processor has configured
+        if self.comm.size > 1:
+            reconf = self.comm.allreduce(reconf) > 0
+        return reconf
+
+    def _perform_reconf(self, subsys=None):
+        """
         Check if any subsystem has reconfigured and if so, perform the necessary update setup.
 
         Parameters
@@ -443,22 +472,7 @@ class Group(System):
         subsys : System or None
             If not None, check only if the given subsystem has reconfigured.
         """
-        if subsys is None:
-            # See if any local subsystem has reconfigured
-            for subsys in self._subgroups_myproc:
-                if subsys._reconfigured:
-                    reconf = 1
-                    break
-            else:
-                reconf = 0
-        else:
-            reconf = int(subsys._reconfigured) if subsys.name in self._loc_subsys_map else 0
-
-        # See if any subsystem on this or any other processor has configured
-        if self.comm.size > 1:
-            reconf = self.comm.allreduce(reconf) > 0
-
-        if reconf:
+        if self._check_child_reconf(subsys):
             # Perform an update setup
             with self._unscaled_context_all():
                 self.resetup('update')
@@ -1079,7 +1093,7 @@ class Group(System):
 
                 self._has_input_scaling = needs_input_scaling
 
-        # check compatability for any discrete connections
+        # check compatibility for any discrete connections
         for abs_in, abs_out in iteritems(self._conn_discrete_in2out):
             in_type = self._var_allprocs_discrete['input'][abs_in]['type']
             try:
@@ -1129,16 +1143,17 @@ class Group(System):
                 src_indices = abs2meta[abs_in]['src_indices']
                 flat = abs2meta[abs_in]['flat_src_indices']
 
-                if src_indices is None and out_shape != in_shape:
+                if (not self._check_child_reconf()
+                        and (src_indices is None and out_shape != in_shape)):
                     # out_shape != in_shape is allowed if
-                    # there's no ambiguity in storage order
+                    # there's no ambiguity in storage order or a reconfiguration is being performed
                     if not array_connection_compatible(in_shape, out_shape):
                         msg = ("%s: The source and target shapes do not match or are ambiguous"
                                " for the connection '%s' to '%s'. "
                                "The source shape is %s but the target shape is %s.")
                         raise ValueError(msg % (self.msginfo, abs_out, abs_in,
-                                                tuple([int(s) for s in out_shape]),
-                                                tuple([int(s) for s in in_shape]),
+                                                tuple(map(int, out_shape)),
+                                                tuple(map(int, in_shape)),
                                                 ))
 
                 if src_indices is not None:

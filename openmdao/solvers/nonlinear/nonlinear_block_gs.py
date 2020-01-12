@@ -225,7 +225,7 @@ class NonlinearBlockGS(NonlinearSolver):
                 system._transfer('nonlinear', 'fwd', isub)
                 if local:
                     subsys._solve_nonlinear()
-                    system._check_child_reconf()
+                    system._perform_reconf()
 
             self._solver_info.pop()
             with system._unscaled_context(residuals=[residuals]):
