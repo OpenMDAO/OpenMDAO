@@ -518,7 +518,8 @@ class N2Diagram {
             })
             .attr("height", function (d) {
                 return d.prevSolverDims.height * self.prevTransitCoords.solver.y;
-            });
+            })
+            .attr("id", function(d) { return d.absPathName.replace(/\./g, '_'); });
 
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
