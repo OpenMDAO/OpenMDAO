@@ -8,7 +8,7 @@ class N2CellRenderer {
     constructor(color, className, id) {
         this.color = color;
         this.className = className;
-        this.id = id;
+        this.id = 'cellShape_' + id; // To ensure it doesn't start with a number
     }
 
     static updateDims(baseWidth, baseHeight) {
@@ -273,7 +273,7 @@ class N2GroupBase extends N2CellRenderer {
             .attr("class", this.className)
             .attr("id", this.id)
             .style("fill", this.color);
-            
+
         return this.update(svgGroup, dims, d3Elem, border);
     }
 }

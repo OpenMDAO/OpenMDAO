@@ -64,8 +64,8 @@ async function doCircuitModelTests(page) {
     currentTestDesc = "Hover on circuit.R2.I and check arrow count";
 
     console.log("  Testing: " + currentTestDesc);
-    const src = await page.content();
-    console.log(src);
+    // const src = await page.content();
+    // console.log(src);
 
     let hndl_24_24 = await page.$("rect#cellShape_24_24.vMid");
     if (!hndl_24_24) {
