@@ -54,7 +54,7 @@ async function doCircuitModelTests(page) {
     console.log("Performing diagram-specific tests...")
     await page.reload({ 'waitUntil': 'networkidle0' });
     console.log("  Waiting " + transitionWait + "ms for page to reload...")
-    await page.waitFor(transitionWait);
+    await page.waitFor(transitionWait * 5);
 
     // Hover over a specific cell and make sure the number of arrows is correct.
     // When it was broken, this diagram would show an arrow going offscreen to
