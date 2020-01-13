@@ -282,10 +282,9 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list_outputs tests
 
-        # list outputs with out_stream - just check to see if it was logged to
-        stream = cStringIO()
-        outputs = prob.model.list_outputs(out_stream=stream)
-        text = stream.getvalue()
+        # list outputs for implicit comps - should get none
+        outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
+        self.assertEqual(outputs, [])
 
         # list outputs with out_stream and all the optional display values True
         stream = cStringIO()
