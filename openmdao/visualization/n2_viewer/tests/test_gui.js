@@ -18,6 +18,8 @@ const expectedModels = ['bug_arrow', 'circuit', 'double_sellar'];
 // Updated at each test to describe the current action:
 let currentTestDesc = '';
 
+const lineStr = '-'.repeat(78);
+
 /**
  * Click most of the toolbar buttons to see if an error occurs.
  * @param {Page} page Reference to the page that's already been loaded.
@@ -54,7 +56,7 @@ async function doCircuitModelTests(page) {
     console.log("Performing diagram-specific tests...")
     await page.reload({ 'waitUntil': 'networkidle0' });
     console.log("  Waiting " + transitionWait + "ms for page to reload...")
-    await page.waitFor(transitionWait * 5);
+    await page.waitFor(transitionWait);
 
     // Hover over a specific cell and make sure the number of arrows is correct.
     // When it was broken, this diagram would show an arrow going offscreen to
@@ -62,6 +64,8 @@ async function doCircuitModelTests(page) {
     currentTestDesc = "Hover on circuit.R2.I and check arrow count";
 
     console.log("  Testing: " + currentTestDesc);
+    const src = await page.content();
+    console.log(src);
 
     let hndl_24_24 = await page.$("rect#cellShape_24_24.vMid");
     if (!hndl_24_24) {
@@ -139,11 +143,7 @@ function findFiles() {
 async function runGenericTests(page) {
     for (let n2Filename of n2Files) {
         
-        console.log(
-            "\n----------------------------------------\n" +
-            n2Filename +
-            "\n----------------------------------------"
-        );
+        console.log("\n" + lineStr + "\n" + n2Filename + "\n" + lineStr);
 
         // Without waitUntil: 'networkidle0', processing will begin before the page
         // is fully rendered
@@ -176,6 +176,9 @@ async function runTests() {
         }
     });
 
+    const userAgentStr = await browser.userAgent();
+    console.log("Browser: " + userAgentStr);
+
     const page = await browser.newPage();
     setupErrorHandlers(page);
 
@@ -183,5 +186,6 @@ async function runTests() {
     await browser.close(); // Don't forget this or the script will wait forever!
 };
 
+console.log("\n" + lineStr + "\n" + "PERFORMING N2 GUI TESTS" + "\n" + lineStr);
 let n2Files = findFiles();
 (async () => { await runTests(); })();
