@@ -42,7 +42,7 @@ async function doGenericToolbarTests(page) {
 
     for (let test of genericToolbarTests) {
         currentTestDesc = test.desc;
-        console.log("  Testing " + test.desc);
+        console.log("  Testing: " + test.desc);
         const btnHandle = await page.$('#' + test.id);
         await btnHandle.click({ 'button': 'left', 'delay': 5 });
         await page.waitFor(test.wait);
@@ -51,15 +51,21 @@ async function doGenericToolbarTests(page) {
 }
 
 async function doCircuitModelTests(page) {
+    console.log("Performing diagram-specific tests...")
     await page.reload({ 'waitUntil': 'networkidle0' });
+    console.log("  Waiting " + transitionWait + "ms for page to reload...")
     await page.waitFor(transitionWait);
 
     // Hover over a specific cell and make sure the number of arrows is correct.
     // When it was broken, this diagram would show an arrow going offscreen to
     // an element that didn't exist.
+    currentTestDesc = "Hover on circuit.R2.I and check arrow count";
+
+    console.log("  Testing: " + currentTestDesc);
+
     let hndl_24_24 = await page.$("rect#cellShape_24_24.vMid");
     if (!hndl_24_24) {
-        console.log("Error: Could not find matrix cell in circuit diagram.");
+        console.log("Error: Could not find matrix cell element in circuit diagram.");
         process.exit(1);
     }
 
