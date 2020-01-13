@@ -187,7 +187,7 @@ class InterpND(object):
 
         table = self.table
         if table._vectorized:
-            result, derivs_x, derivs_values, derivs_grid = table.evaluate_vectorized(xi)
+            result, derivs_x, derivs_val, derivs_grid = table.evaluate_vectorized(xi)
 
         else:
             xi = np.atleast_2d(xi)
@@ -209,7 +209,7 @@ class InterpND(object):
                     in_slice = table._full_slice
                     full_slice = [slice(j, j+1)]
                     full_slice.extend(in_slice)
-                    derivs_val[tuple(full_slice)] = d_values
+                    derivs_val[tuple(full_slice)] = d_values.reshape(derivs_val[tuple(full_slice)].shape)
 
         # Cache derivatives
         self._d_dx = derivs_x
