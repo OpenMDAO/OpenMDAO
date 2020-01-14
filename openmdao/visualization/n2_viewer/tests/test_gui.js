@@ -2,7 +2,6 @@
 
 const puppeteer = require('puppeteer');
 const argv = require('yargs').argv;
-// const path = require('path');
 const fs = require('fs');
 const urlPrefix = 'file://';
 
@@ -13,16 +12,168 @@ let transitionWait = -1;
 // The amount to wait when there's no transition:
 const normalWait = 10;
 
-const expectedModels = ['bug_arrow', 'circuit', 'double_sellar'];
-
 // Updated at each test to describe the current action:
 let currentTestDesc = '';
 
+// A long line for visually separating console text areas
 const lineStr = '-'.repeat(78);
 
+/**
+ * First set global currentTestDesc, which is printed if there's an error
+ * on the page so we know where the error happened. Then print the message.
+ * @param {String} msg The text to print to the console.
+ */
 function logTest(msg) {
     currentTestDesc = msg;
     console.log("  Test: " + msg);
+}
+
+// These tests can be run on the toolbar of any model
+const genericToolbarTests = [
+    {
+        "desc": "Collapse All Outputs button",
+        "id": "collapseAllButtonId",
+        "wait": transitionWait
+    },
+    {
+        "desc": "Uncollapse All button",
+        "id": "uncollapseAllButtonId",
+        "wait": transitionWait
+    },
+    {
+        "desc": "Collapse Outputs in View Only button",
+        "id": "collapseInViewButtonId",
+        "wait": transitionWait
+    },
+    {
+        "desc": "Uncollapse In View Only button",
+        "id": "uncollapseInViewButtonId",
+        "wait": transitionWait
+    },
+    {
+        "desc": "Show Legend (on) button",
+        "id": "showLegendButtonId",
+        "wait": normalWait
+    },
+    {
+        "desc": "Show Legend (off) button",
+        "id": "showLegendButtonId",
+        "wait": normalWait
+    },
+    {
+        "desc": "Show Path (on) button",
+        "id": "showCurrentPathButtonId",
+        "wait": normalWait
+    },
+    {
+        "desc": "Show Path (off) button",
+        "id": "showCurrentPathButtonId",
+        "wait": normalWait
+    },
+    {
+        "desc": "Toggle Solver Names (on) button",
+        "id": "toggleSolverNamesButtonId",
+        "wait": transitionWait
+    },
+    {
+        "desc": "Toggle Solver Names (off) button",
+        "id": "toggleSolverNamesButtonId",
+        "wait": transitionWait
+    },
+    {
+        "desc": "Clear Arrows and Connection button",
+        "id": "clearArrowsAndConnectsButtonId",
+        "wait": normalWait
+    },
+    {
+        "desc": "Help (on) button",
+        "id": "helpButtonId",
+        "wait": normalWait
+    },
+    {
+        "desc": "Help (off) button",
+        "id": "helpButtonId",
+        "wait": normalWait
+    },
+];
+
+const specificModelScripts = {
+    'circuit': [
+        {
+            'desc': 'Hover on N2 matrix element and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_24_24.vMid",
+            'arrowCount': 4
+        },
+        {
+            'desc': 'Left-click on partition tree element to zoom',
+            'test': 'click',
+            'selector': "g#tree rect#circuit_R2",
+            'button': 'left'
+        },
+        {
+            'desc': 'Hover on N2 matrix element and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_24_24.vMid",
+            'arrowCount': 4
+        },
+        {
+            // Return to root diagram
+            'test': 'root'
+        },
+        {
+            'desc': 'Right-click on partition tree element to collapse',
+            'test': 'click',
+            'selector': "g#tree rect#circuit_n1",
+            'button': 'right'
+        },
+        {
+            'desc': 'Hover over collapsed N2 matrix element and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_7_7.gMid",
+            'arrowCount': 5
+        },
+        {
+            'desc': 'Right-click on partition tree element to uncollapse',
+            'test': 'click',
+            'selector': "g#tree rect#circuit_n1",
+            'button': 'right'
+        },
+        {
+            'desc': 'Left-click to zoom on solver element',
+            'test': 'click',
+            'selector': "g#solver_tree rect#circuit_n1",
+            'button': 'left'
+        },
+        {
+            'desc': 'Hover over zoomed N2 cell and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_12_12.vMid",
+            'arrowCount': 5
+        },
+        {
+            // Return to root diagram
+            'test': 'root'
+        },
+        {
+            'desc': 'Right-click on solver element to collapse',
+            'test': 'click',
+            'selector': "g#solver_tree rect#circuit_n1",
+            'button': 'right'
+        },
+        {
+            'desc': 'Hover over collapsed N2 cell and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_7_7.gMid",
+            'arrowCount': 5
+        },
+        {
+            'desc': 'Right-click again on solver element to uncollapse',
+            'test': 'click',
+            'selector': "g#solver_tree rect#circuit_n1",
+            'button': 'right'
+        },
+    ]
 }
 
 /**
@@ -31,28 +182,12 @@ function logTest(msg) {
  */
 async function doGenericToolbarTests(page) {
 
-    const genericToolbarTests = [
-        { "desc": "Collapse All Outputs button", "id": "collapseAllButtonId", "wait": transitionWait },
-        { "desc": "Uncollapse All button", "id": "uncollapseAllButtonId", "wait": transitionWait },
-        { "desc": "Collapse Outputs in View Only button", "id": "collapseInViewButtonId", "wait": transitionWait },
-        { "desc": "Uncollapse In View Only button", "id": "uncollapseInViewButtonId", "wait": transitionWait },
-        { "desc": "Show Legend (on) button", "id": "showLegendButtonId", "wait": normalWait },
-        { "desc": "Show Legend (off) button", "id": "showLegendButtonId", "wait": normalWait },
-        { "desc": "Show Path (on) button", "id": "showCurrentPathButtonId", "wait": normalWait },
-        { "desc": "Show Path (off) button", "id": "showCurrentPathButtonId", "wait": normalWait },
-        { "desc": "Toggle Solver Names (on) button", "id": "toggleSolverNamesButtonId", "wait": transitionWait },
-        { "desc": "Toggle Solver Names (off) button", "id": "toggleSolverNamesButtonId", "wait": transitionWait },
-        { "desc": "Clear Arrows and Connection button", "id": "clearArrowsAndConnectsButtonId", "wait": normalWait },
-        { "desc": "Help (on) button", "id": "helpButtonId", "wait": normalWait },
-        { "desc": "Help (off) button", "id": "helpButtonId", "wait": normalWait },
-    ];
-
     for (let test of genericToolbarTests) {
         logTest(test.desc);
         const btnHandle = await page.$('#' + test.id);
         await btnHandle.click({ 'button': 'left', 'delay': 5 });
         await page.waitFor(test.wait);
-        // await page.screenshot({ path: 'circuit_' + test.id + '.png' }, { 'fullPage': true });
+        // await page.screenshot({ path: 'test_' + test.id + '.png' }, { 'fullPage': true });
     }
 }
 
@@ -68,7 +203,7 @@ async function assertArrowCount(page, expectedArrows) {
         console.log("Error: Could not find n2arrows <g> element.");
         process.exit(1);
     }
-    else if ( arrows.length != expectedArrows ) {
+    else if (arrows.length != expectedArrows) {
         console.log('Error: Found ' + arrows.length + ' arrows, expected ' + expectedArrows);
         process.exit(1);
     }
@@ -98,16 +233,33 @@ async function getHandle(page, selector) {
  * @param {String} selector Unique path to a page element.
  * @param {Number} expectedArrowCount The number of arrows to check.
  */
-async function hoverAndCheckArrowCount(page, selector, expectedArrowCount) {
-    let hndl = await getHandle(page, selector)
+async function hoverAndCheckArrowCount(page, options) {
+    logTest(options.desc? options.desc :
+        "Hover over '" + options.selector + "' and checking arrow count");
+    let hndl = await getHandle(page, options.selector)
 
     await hndl.hover();
     await page.waitFor(normalWait); // Give it a chance to draw the arrows
 
-    await assertArrowCount(page, expectedArrowCount); // Make sure there are enough arrows
-    await page.mouse.move(0,0); // Get the mouse off the element
+    await assertArrowCount(page, options.arrowCount); // Make sure there are enough arrows
+    await page.mouse.move(0, 0); // Get the mouse off the element
     await page.waitFor(normalWait);
     await assertArrowCount(page, 0); // Make sure there are no arrows left
+}
+
+/**
+ * Perform a click of the type specified by options.button on the
+ * element specified by options.selector.
+ * @param {Object} options
+ * @param {String} options.button Use the left or right mouse button
+ * @param {String} options.selector The CSS selector for the element
+ */
+async function click(page, options) {
+    logTest(options.desc? options.desc :
+        options.button + "-click on '" + options.selector + "'");
+    let hndl = await getHandle(page, options.selector);
+    await hndl.click({ 'button': options.button });
+    await page.waitFor(transitionWait);
 }
 
 /**
@@ -121,62 +273,24 @@ async function returnToRoot(page) {
     await page.waitFor(transitionWait);
 }
 
-async function doCircuitModelTests(page) {
+async function runModelScript(page, scriptArr) {
     console.log("Performing diagram-specific tests...")
     await page.reload({ 'waitUntil': 'networkidle0' });
     await page.waitFor(transitionWait);
 
-    // Hover over a specific cell and make sure the number of arrows is correct.
-    // When it was broken, this diagram would show an arrow going offscreen to
-    // an element that didn't exist.
-    logTest("Hover on circuit.R2.I and check arrow count");
-    await hoverAndCheckArrowCount(page, "g#n2elements rect#cellShape_24_24.vMid", 4);
-
-    logTest("Left-click on circuit.R2 to zoom");
-    let hndl = await getHandle(page, "g#tree rect#circuit_R2");
-    await hndl.click();
-    await page.waitFor(transitionWait);
-
-    logTest("Hover over zoomed circuit.R2.I and check arrow count");
-    await hoverAndCheckArrowCount(page, "g#n2elements rect#cellShape_24_24.vMid", 4);
-
-    await returnToRoot(page);
-
-    logTest("Right-click on circuit.N1 to collapse")
-    hndl = await getHandle(page, "g#tree rect#circuit_n1");
-    await hndl.click({'button': 'right'});
-    await page.waitFor(transitionWait);
-
-    logTest("Hover over collapsed cell and check arrow count");
-    await hoverAndCheckArrowCount(page, "g#n2elements rect#cellShape_7_7.gMid", 5);
-
-    logTest("Right-click on circuit.N1 again to uncollapse");
-    hndl = await getHandle(page, "g#tree rect#circuit_n1");
-    await hndl.click({'button': 'right'});
-    await page.waitFor(transitionWait);
-
-    logTest("Left-click to zoom on solver element");
-    hndl = await getHandle(page, "g#solver_tree rect#circuit_n1");
-    await hndl.click();
-    await page.waitFor(transitionWait);
-
-    logTest("Hover over zoomed circuit.N1.V and check arrow count");
-    await hoverAndCheckArrowCount(page, "g#n2elements rect#cellShape_12_12.vMid", 5);
-
-    await returnToRoot(page);
-
-    logTest("Right-click on solver element to collapse")
-    hndl = await getHandle(page, "g#solver_tree rect#circuit_n1");
-    await hndl.click({'button': 'right'});
-    await page.waitFor(transitionWait);
-
-    logTest("Hover over collapsed cell and check arrow count");
-    await hoverAndCheckArrowCount(page, "g#n2elements rect#cellShape_7_7.gMid", 5);
-
-    logTest("Right-click on solver element again to uncollapse")
-    hndl = await getHandle(page, "g#solver_tree rect#circuit_n1");
-    await hndl.click({'button': 'right'});
-    await page.waitFor(transitionWait);
+    for (let scriptItem of scriptArr) {
+        switch (scriptItem.test) {
+            case 'hoverArrow':
+                await hoverAndCheckArrowCount(page, scriptItem);
+                break;
+            case 'click':
+                await click(page, scriptItem);
+                break;
+            case 'root':
+                await returnToRoot(page);
+                break;
+        }
+    }
 }
 
 /**
@@ -218,41 +332,13 @@ function findFiles() {
 
     let n2Files = [];
     for (let filename of files) {
-        if ( n2HtmlRegex.test(filename) ) {
+        if (n2HtmlRegex.test(filename)) {
             console.log('Found ' + filename);
             n2Files.push(filename);
         }
     }
 
     return n2Files;
-}
-
-/**
- * Run tests on arbitrary list of discovered N2 HTML files.
- * @param {Page} page Reference to a page that's been initialized, but not loaded.
- */
-async function runGenericTests(page) {
-    for (let n2Filename of n2Files) {
-        
-        console.log("\n" + lineStr + "\n" + n2Filename + "\n" + lineStr);
-
-        // Without waitUntil: 'networkidle0', processing will begin before the page
-        // is fully rendered
-        await page.goto(urlPrefix + argv.n2dir + '/' + n2Filename, { 'waitUntil': 'networkidle0' });
-
-        // Milliseconds to allow for the last transition animation to finish:
-        transitionWait = await page.evaluate(() => N2TransitionDefaults.durationSlow + 100)
-        await doGenericToolbarTests(page);
-
-        n2Basename = n2Filename.replace(argv.suffix, '');
-        switch (n2Basename) {
-            case 'circuit':
-                await doCircuitModelTests(page);
-                break;
-            default:
-                break;
-        }
-    }
 }
 
 /**
@@ -273,10 +359,32 @@ async function runTests() {
     const page = await browser.newPage();
     setupErrorHandlers(page);
 
-    await runGenericTests(page);
+    const knownModelNames = Object.keys(specificModelScripts);
+
+    for (let n2Filename of n2Files) {
+        console.log("\n" + lineStr + "\n" + n2Filename + "\n" + lineStr);
+
+        // Without waitUntil: 'networkidle0', processing will begin before the page
+        // is fully rendered
+        await page.goto(urlPrefix + argv.n2dir + '/' + n2Filename,
+            { 'waitUntil': 'networkidle0' });
+
+        // Milliseconds to allow for the last transition animation to finish.
+        // Obtain value defined in N2 code.
+        transitionWait = await page.evaluate(() => N2TransitionDefaults.durationSlow + 100)
+        await doGenericToolbarTests(page);
+
+        // If this model has an associated script, run it:
+        n2Basename = n2Filename.replace(argv.suffix, '');
+        if (knownModelNames.includes(n2Basename)) {
+            await runModelScript(page, specificModelScripts[n2Basename]);
+        }
+    }
+
     await browser.close(); // Don't forget this or the script will wait forever!
 };
 
 console.log("\n" + lineStr + "\n" + "PERFORMING N2 GUI TESTS" + "\n" + lineStr);
+
 let n2Files = findFiles();
 (async () => { await runTests(); })();
