@@ -29,6 +29,13 @@ class N2GUITestCase(unittest.TestCase):
             self.n2files.append(n2file)
             subprocess.call(
                 ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile])
+            
+            # Create an N2 using declared partials
+            if (n == 'circuit'):
+                n2file = self.modelDir + '/udpi_' + n + GUI_N2_SUFFIX
+                subprocess.call(
+                  ['openmdao', 'n2', '-o', n2file,  '--no_browser',
+                    '--use_declare_partial_info', pyfile])
 
     def test_n2_common(self):
         """
@@ -39,8 +46,8 @@ class N2GUITestCase(unittest.TestCase):
 
         # The Node.js script will exit with a non-zero value if it
         # detects an error.
-        self.assertEqual(subprocess.call([testCmd, '--n2dir=' + self.modelDir, '--suffix=' + GUI_N2_SUFFIX]), 0,
-                         'N2 GUI test failed.')
+        self.assertEqual(subprocess.call([testCmd, '--n2dir=' + self.modelDir,
+            '--suffix=' + GUI_N2_SUFFIX]), 0, 'N2 GUI test failed.')
 
     def tearDown(self):
         if not DEBUG:

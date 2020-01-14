@@ -18,6 +18,22 @@ let currentTestDesc = '';
 // A long line for visually separating console text areas
 const lineStr = '-'.repeat(78);
 
+// Track which test # we're on
+let currentTest = 1;
+
+/**
+ * Add some zeroes to the front of a number if it's too short,
+ * ala printf("%0d")
+ * @param {Number} num The number to modify.
+ * @param {Number} size The min number of digits.
+ * @returns {String} Number with zeroes prepended, if necessary.
+ */
+function zeroPad(num, size) {
+    let s = String(num);
+    while (s.length < (size || 2)) { s = "0" + s; }
+    return s;
+}
+
 /**
  * First set global currentTestDesc, which is printed if there's an error
  * on the page so we know where the error happened. Then print the message.
@@ -25,7 +41,8 @@ const lineStr = '-'.repeat(78);
  */
 function logTest(msg) {
     currentTestDesc = msg;
-    console.log("  Test: " + msg);
+    console.log("  Test " + zeroPad(currentTest, 4) + ": " + msg);
+    currentTest++;
 }
 
 // These tests can be run on the toolbar of any model
@@ -97,6 +114,11 @@ const genericToolbarTests = [
     },
 ];
 
+/**
+ * Provides scripts for specific models, where certain elements have to be
+ * identified and results of actions are known. Each script is an array so
+ * the order is maintained.
+ */
 const specificModelScripts = {
     'circuit': [
         {
@@ -173,6 +195,11 @@ const specificModelScripts = {
             'selector': "g#solver_tree rect#circuit_n1",
             'button': 'right'
         },
+        {
+            'test': 'search',
+            'searchString': 'R1.I',
+            'n2ElementCount': 16
+        }
     ],
     'bug_arrow': [
         {
@@ -249,6 +276,11 @@ const specificModelScripts = {
             'selector': "g#solver_tree rect#design_fan_map_scalars",
             'button': 'right'
         },
+        {
+            'test': 'search',
+            'searchString': 's_Nc',
+            'n2ElementCount': 4
+        }
     ],
     'double_sellar': [
         {
@@ -325,6 +357,19 @@ const specificModelScripts = {
             'selector': "g#solver_tree rect#g1_d1",
             'button': 'right'
         },
+        {
+            'test': 'search',
+            'searchString': 'd2.y2',
+            'n2ElementCount': 8
+        }
+    ],
+    'udpi_circuit': [ // The circuit model with --use_declare_partial_info
+        {
+            'desc': 'Check the number of cells in the N2 Matrix',
+            'test': 'count',
+            'selector': 'g#n2elements > g.n2cell',
+            'count': 29
+        }
     ]
 }
 
@@ -339,9 +384,29 @@ async function doGenericToolbarTests(page) {
         const btnHandle = await page.$('#' + test.id);
         await btnHandle.click({ 'button': 'left', 'delay': 5 });
 
-        const waitTime = test.waitForTransition? transitionWait : normalWait;
+        const waitTime = test.waitForTransition ? transitionWait : normalWait;
         await page.waitFor(waitTime);
         // await page.screenshot({ path: 'test_' + test.id + '.png' }, { 'fullPage': true });
+    }
+}
+
+/**
+ * Count the number of elements located by the selector and make
+ * sure it matches the supplied value.
+ * @param {Page} page Reference to the page that's already been loaded.
+ * @param {String} selector CSS selector to find multiple elements.
+ * @param {Number} expectedArrows The number to compare to.
+ */
+async function assertElementCount(page, selector, expectedFound) {
+    const hndlArray = await page.$$(selector);
+    if (!hndlArray) {
+        console.log("Error: Could not find any '" + selector + "' elements.");
+        process.exit(1);
+    }
+    else if (hndlArray.length != expectedFound) {
+        console.log('Error: Found ' + hndlArray.length +
+            ' elements, expected ' + expectedFound);
+        process.exit(1);
     }
 }
 
@@ -352,15 +417,7 @@ async function doGenericToolbarTests(page) {
  * @param {Number} expectedArrows The number to compare to.
  */
 async function assertArrowCount(page, expectedArrows) {
-    let arrows = await page.$$('g#n2arrows > path');
-    if (!arrows) {
-        console.log("Error: Could not find n2arrows <g> element.");
-        process.exit(1);
-    }
-    else if (arrows.length != expectedArrows) {
-        console.log('Error: Found ' + arrows.length + ' arrows, expected ' + expectedArrows);
-        process.exit(1);
-    }
+    await assertElementCount(page, 'g#n2arrows > path', expectedArrows);
 }
 
 /**
@@ -387,8 +444,8 @@ async function getHandle(page, selector) {
  * @param {String} selector Unique path to a page element.
  * @param {Number} expectedArrowCount The number of arrows to check.
  */
-async function hoverAndCheckArrowCount(page, options) {
-    logTest(options.desc? options.desc :
+async function testHoverAndArrowCount(page, options) {
+    logTest(options.desc ? options.desc :
         "Hover over '" + options.selector + "' and checking arrow count");
     let hndl = await getHandle(page, options.selector)
 
@@ -409,9 +466,9 @@ async function hoverAndCheckArrowCount(page, options) {
  * @param {String} options.selector The CSS selector for the element
  */
 async function click(page, options) {
-    logTest(options.desc? options.desc :
+    logTest(options.desc ? options.desc :
         options.button + "-click on '" + options.selector + "'");
-    let hndl = await getHandle(page, options.selector);
+    const hndl = await getHandle(page, options.selector);
     await hndl.click({ 'button': options.button });
     await page.waitFor(transitionWait);
 }
@@ -422,11 +479,39 @@ async function click(page, options) {
  */
 async function returnToRoot(page) {
     logTest("Return to root")
-    let hndl = await getHandle(page, "button#returnToRootButtonId.myButton");
+    const hndl = await getHandle(page, "button#returnToRootButtonId.myButton");
     await hndl.click();
     await page.waitFor(transitionWait);
 }
 
+/**
+ * Enter a string in the search textbox and check that the expected
+ * number of elements are shown in the N2 matrix.
+ * @param {Page} page Reference to the page that's already been loaded.
+ * @param {Object} options
+ * @param {String} options.desc Description of the current test.
+ * @param {String} options.searchString The path name to search for.
+ * @param {Number} options.n2ElementCount N2 elements to expect.
+ */
+async function testSearchAndResult(page, options) {
+    logTest(options.desc ? options.desc :
+        "Searching for '" + options.searchString + "' and checking for " +
+        options.n2ElementCount + " N2 elements after.");
+
+    const hndl = await getHandle(page, "div#toolbarLoc input#awesompleteId");
+    await hndl.type(options.searchString);
+    await hndl.press('Enter');
+    await page.waitFor(transitionWait + 500);
+
+    await assertElementCount(page, "g#n2elements > g.n2cell", options.n2ElementCount);
+}
+
+/**
+ * Iterate through the supplied script array and perform each
+ * action/test.
+ * @param {Page} page Reference to the page that's already been loaded.
+ * @param {Array} scriptArr Reference to the array of tests.
+ */
 async function runModelScript(page, scriptArr) {
     console.log("Performing diagram-specific tests...")
     await page.reload({ 'waitUntil': 'networkidle0' });
@@ -435,13 +520,23 @@ async function runModelScript(page, scriptArr) {
     for (let scriptItem of scriptArr) {
         switch (scriptItem.test) {
             case 'hoverArrow':
-                await hoverAndCheckArrowCount(page, scriptItem);
+                await testHoverAndArrowCount(page, scriptItem);
                 break;
             case 'click':
                 await click(page, scriptItem);
                 break;
             case 'root':
                 await returnToRoot(page);
+                break;
+            case 'search':
+                await testSearchAndResult(page, scriptItem);
+                break;
+            case 'count':
+                logTest(scriptItem.desc? scriptItem.desc : 
+                    "Checking for " + scriptItem.count + "' instances of '" +
+                    scriptItem.selector + "'" );
+                await assertElementCount(page, scriptItem.selector,
+                    scriptItem.count);
                 break;
         }
     }
