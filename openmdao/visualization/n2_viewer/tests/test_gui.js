@@ -33,67 +33,67 @@ const genericToolbarTests = [
     {
         "desc": "Collapse All Outputs button",
         "id": "collapseAllButtonId",
-        "wait": transitionWait
+        "waitForTransition": true
     },
     {
         "desc": "Uncollapse All button",
         "id": "uncollapseAllButtonId",
-        "wait": transitionWait
+        "waitForTransition": true
     },
     {
         "desc": "Collapse Outputs in View Only button",
         "id": "collapseInViewButtonId",
-        "wait": transitionWait
+        "waitForTransition": true
     },
     {
         "desc": "Uncollapse In View Only button",
         "id": "uncollapseInViewButtonId",
-        "wait": transitionWait
+        "waitForTransition": true
     },
     {
         "desc": "Show Legend (on) button",
         "id": "showLegendButtonId",
-        "wait": normalWait
+        "waitForTransition": false
     },
     {
         "desc": "Show Legend (off) button",
         "id": "showLegendButtonId",
-        "wait": normalWait
+        "waitForTransition": false
     },
     {
         "desc": "Show Path (on) button",
         "id": "showCurrentPathButtonId",
-        "wait": normalWait
+        "waitForTransition": false
     },
     {
         "desc": "Show Path (off) button",
         "id": "showCurrentPathButtonId",
-        "wait": normalWait
+        "waitForTransition": false
     },
     {
         "desc": "Toggle Solver Names (on) button",
         "id": "toggleSolverNamesButtonId",
-        "wait": transitionWait
+        "waitForTransition": true
     },
     {
         "desc": "Toggle Solver Names (off) button",
         "id": "toggleSolverNamesButtonId",
-        "wait": transitionWait
+        "waitForTransition": true
     },
     {
         "desc": "Clear Arrows and Connection button",
         "id": "clearArrowsAndConnectsButtonId",
-        "wait": normalWait
+        "waitForTransition": false
     },
     {
         "desc": "Help (on) button",
         "id": "helpButtonId",
-        "wait": normalWait
+        "waitForTransition": false
     },
     {
         "desc": "Help (off) button",
         "id": "helpButtonId",
-        "wait": normalWait
+        "waitForTransition": false
     },
 ];
 
@@ -173,6 +173,158 @@ const specificModelScripts = {
             'selector': "g#solver_tree rect#circuit_n1",
             'button': 'right'
         },
+    ],
+    'bug_arrow': [
+        {
+            'desc': 'Hover on N2 matrix element and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_11_11.vMid",
+            'arrowCount': 2
+        },
+        {
+            'desc': 'Left-click on partition tree element to zoom',
+            'test': 'click',
+            'selector': "g#tree rect#design_fan_map_scalars",
+            'button': 'left'
+        },
+        {
+            'desc': 'Hover on N2 matrix element and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_11_11.vMid",
+            'arrowCount': 2
+        },
+        {
+            // Return to root diagram
+            'test': 'root'
+        },
+        {
+            'desc': 'Right-click on partition tree element to collapse',
+            'test': 'click',
+            'selector': "g#tree rect#design_fan_map_scalars",
+            'button': 'right'
+        },
+        {
+            'desc': 'Hover over collapsed N2 matrix element and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_10_10.gMid",
+            'arrowCount': 1
+        },
+        {
+            'desc': 'Right-click on partition tree element to uncollapse',
+            'test': 'click',
+            'selector': "g#tree rect#design_fan_map_scalars",
+            'button': 'right'
+        },
+        {
+            'desc': 'Left-click to zoom on solver element',
+            'test': 'click',
+            'selector': "g#solver_tree rect#design_fan_map_d1",
+            'button': 'left'
+        },
+        {
+            'desc': 'Hover over zoomed N2 cell and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_9_9.vMid",
+            'arrowCount': 1
+        },
+        {
+            // Return to root diagram
+            'test': 'root'
+        },
+        {
+            'desc': 'Right-click on solver element to collapse',
+            'test': 'click',
+            'selector': "g#solver_tree rect#design_fan_map_scalars",
+            'button': 'right'
+        },
+        {
+            'desc': 'Hover over collapsed N2 cell and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_10_10.gMid",
+            'arrowCount': 1
+        },
+        {
+            'desc': 'Right-click again on solver element to uncollapse',
+            'test': 'click',
+            'selector': "g#solver_tree rect#design_fan_map_scalars",
+            'button': 'right'
+        },
+    ],
+    'double_sellar': [
+        {
+            'desc': 'Hover on N2 matrix element and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_11_11.vMid",
+            'arrowCount': 4
+        },
+        {
+            'desc': 'Left-click on partition tree element to zoom',
+            'test': 'click',
+            'selector': "g#tree rect#g1_d2_y2",
+            'button': 'left'
+        },
+        {
+            'desc': 'Hover on N2 matrix element and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_11_11.vMid",
+            'arrowCount': 4
+        },
+        {
+            // Return to root diagram
+            'test': 'root'
+        },
+        {
+            'desc': 'Right-click on partition tree element to collapse',
+            'test': 'click',
+            'selector': "g#tree rect#g2_d1",
+            'button': 'right'
+        },
+        {
+            'desc': 'Hover over collapsed N2 matrix element and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_13_13.gMid",
+            'arrowCount': 3
+        },
+        {
+            'desc': 'Right-click on partition tree element to uncollapse',
+            'test': 'click',
+            'selector': "g#tree rect#g2_d1",
+            'button': 'right'
+        },
+        {
+            'desc': 'Left-click to zoom on solver element',
+            'test': 'click',
+            'selector': "g#solver_tree rect#g2_d2",
+            'button': 'left'
+        },
+        {
+            'desc': 'Hover over zoomed N2 cell and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_21_21.vMid",
+            'arrowCount': 4
+        },
+        {
+            // Return to root diagram
+            'test': 'root'
+        },
+        {
+            'desc': 'Right-click on solver element to collapse',
+            'test': 'click',
+            'selector': "g#solver_tree rect#g1_d1",
+            'button': 'right'
+        },
+        {
+            'desc': 'Hover over collapsed N2 cell and check arrow count',
+            'test': 'hoverArrow',
+            'selector': "g#n2elements rect#cellShape_3_3.gMid",
+            'arrowCount': 3
+        },
+        {
+            'desc': 'Right-click again on solver element to uncollapse',
+            'test': 'click',
+            'selector': "g#solver_tree rect#g1_d1",
+            'button': 'right'
+        },
     ]
 }
 
@@ -186,7 +338,9 @@ async function doGenericToolbarTests(page) {
         logTest(test.desc);
         const btnHandle = await page.$('#' + test.id);
         await btnHandle.click({ 'button': 'left', 'delay': 5 });
-        await page.waitFor(test.wait);
+
+        const waitTime = test.waitForTransition? transitionWait : normalWait;
+        await page.waitFor(waitTime);
         // await page.screenshot({ path: 'test_' + test.id + '.png' }, { 'fullPage': true });
     }
 }
