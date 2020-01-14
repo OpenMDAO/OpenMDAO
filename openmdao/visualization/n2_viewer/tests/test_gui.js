@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 const puppeteer = require('puppeteer');
-const argv = require('yargs').argv;
 const fs = require('fs');
+const path = require('path');
 const urlPrefix = 'file://';
 
 // Amount to wait when expecting a transition.
@@ -20,6 +20,9 @@ const lineStr = '-'.repeat(78);
 
 // Track which test # we're on
 let currentTest = 1;
+
+const n2dir = __dirname + '/gui_test_models';
+const n2suffix = '_N2_TEST.html';
 
 /**
  * Add some zeroes to the front of a number if it's too short,
@@ -571,13 +574,13 @@ function setupErrorHandlers(page) {
 }
 
 /**
- * Using the value of the --n2dir command line arg and --suffix arg, find
- * all the files in that directory that end with that suffix.
+ * Find all the files in n2dir that end with n2suffix.
  * @returns {Array} The list of discovered filenames.
  */
 function findFiles() {
-    let n2HtmlRegex = new RegExp('^.+' + argv.suffix + '$');
-    files = fs.readdirSync(argv.n2dir);
+    let n2HtmlRegex = new RegExp('^.+' + n2suffix + '$');
+    
+    files = fs.readdirSync(n2dir);
 
     let n2Files = [];
     for (let filename of files) {
@@ -615,7 +618,7 @@ async function runTests() {
 
         // Without waitUntil: 'networkidle0', processing will begin before the page
         // is fully rendered
-        await page.goto(urlPrefix + argv.n2dir + '/' + n2Filename,
+        await page.goto(urlPrefix + n2dir + '/' + n2Filename,
             { 'waitUntil': 'networkidle0' });
 
         // Milliseconds to allow for the last transition animation to finish.
@@ -624,7 +627,7 @@ async function runTests() {
         await doGenericToolbarTests(page);
 
         // If this model has an associated script, run it:
-        n2Basename = n2Filename.replace(argv.suffix, '');
+        n2Basename = n2Filename.replace(n2suffix, '');
         if (knownModelNames.includes(n2Basename)) {
             await runModelScript(page, specificModelScripts[n2Basename]);
         }
