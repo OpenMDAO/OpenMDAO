@@ -215,7 +215,7 @@ class InterpAkima(InterpAlgorithm):
             dval4 = subderiv[..., j + 1, :]
             if self.training_data_gradients:
                 dval3_dv = deriv_dv[..., j, :]
-                dval4_dv = deriv_dv[..., j, :]
+                dval4_dv = deriv_dv[..., j + 1, :]
 
             j += 2
             if idx < ngrid - 2:
@@ -314,7 +314,7 @@ class InterpAkima(InterpAlgorithm):
         if idx < ngrid - 2:
             m4 = (val5 - val4) / (grid[idx + 2] - grid[idx + 1])
             if compute_local_train:
-                dm4_dv = (deriv_dv[..., idx_val5, :] - deriv_dv[..., idx_val5, :]) / \
+                dm4_dv = (deriv_dv[..., idx_val5, :] - deriv_dv[..., idx_val4, :]) / \
                     (grid[idx + 2] - grid[idx + 1])
 
         if idx < ngrid - 3:
@@ -355,8 +355,12 @@ class InterpAkima(InterpAlgorithm):
 
         # Calculate cubic fit coefficients
         if delta_x > 0:
-            w2 = abs_smooth_complex(m4 - m3, delta_x)
-            w31 = abs_smooth_complex(m2 - m1, delta_x)
+            if compute_local_train:
+                w2, dw2_dv = dv_abs_smooth_complex(m4 - m3, dm4 - dm3, delta_x)
+                w3, dw31_dv = dv_abs_smooth_complex(m2 - m1, dm2 - dm1, delta_x)
+            else:
+                w2 = abs_smooth_complex(m4 - m3, delta_x)
+                w31 = abs_smooth_complex(m2 - m1, delta_x)
         else:
             if compute_local_train:
                 w2, dw2_dv = dv_abs_complex(m4 - m3, dm4_dv - dm3_dv)
@@ -380,12 +384,20 @@ class InterpAkima(InterpAlgorithm):
         bpos = np.atleast_1d((m2 * w2 + m3 * w31) / (w2 + w31))
         if compute_local_train:
             if len(m2.shape) > 1:
-                fact = 1.0 / (w2 + w31)
-                dbpos_dv = np.dot(fact, np.dot(m2, dw2_dv) + np.dot(w2, dm2_dv) + np.dot(m3, dw31_dv) + np.dot(w31, dm3_dv)) - \
-                            np.dot((m2 * w2 + m3 * w31) * fact ** 2, dw2_dv + dw31_dv)
+
+                w2n = w2[..., np.newaxis]
+                w31n = w31[..., np.newaxis]
+                m2n = m2[..., np.newaxis]
+                m3n = m3[..., np.newaxis]
+
+                dbpos_dv = ((m2n * dw2_dv + dm2_dv * w2n + m3n * dw31_dv + dm3_dv * w31n) *
+                            (w2n + w31n) -
+                            (m2n * w2n + m3n * w31n) * (dw2_dv + dw31_dv)) / (w2n + w31n) ** 2
                 dbpos_dv = np.atleast_2d(dbpos_dv)
+
             else:
-                dbpos_dv = ((m2 * dw2_dv + dm2_dv * w2 + m3 * dw31_dv + dm3_dv * w31) * (w2 + w31) - \
+                dbpos_dv = ((m2 * dw2_dv + dm2_dv * w2 + m3 * dw31_dv + dm3_dv * w31) *
+                            (w2 + w31) -
                             (m2 * w2 + m3 * w31) * (dw2_dv + dw31_dv)) / (w2 + w31) ** 2
                 dbpos_dv = np.atleast_2d(dbpos_dv)
 
@@ -394,8 +406,12 @@ class InterpAkima(InterpAlgorithm):
             db_dv[jj1] = dbpos_dv[jj1]
 
         if delta_x > 0:
-            w32 = abs_smooth_complex(m5 - m4, delta_x)
-            w4 = abs_smooth_complex(m3 - m2, delta_x)
+            if compute_local_train:
+                w32, dw32_dv = dv_abs_smooth_complex(m5 - m4, dm5_dv - dm4_dv, delta_x)
+                w4, dw4_dv = dv_abs_smooth_complex(m3 - m2, dm3_dv - dm2_dv, delta_x)
+            else:
+                w32 = abs_smooth_complex(m5 - m4, delta_x)
+                w4 = abs_smooth_complex(m3 - m2, delta_x)
         else:
             if compute_local_train:
                 w32, dw32_dv = dv_abs_complex(m5 - m4, dm5_dv - dm4_dv)
@@ -414,12 +430,18 @@ class InterpAkima(InterpAlgorithm):
         bp1pos = np.atleast_1d((m3 * w32 + m4 * w4) / (w32 + w4))
         if compute_local_train:
             if len(m2.shape) > 1:
-                fact = 1.0 / (w32 + w4)
-                dbp1pos_dv = np.dot(fact, np.dot(m3, dw32_dv) + np.dot(w32, dm3_dv) + np.dot(m4, dw4_dv) + np.dot(w4, dm4_dv)) - \
-                            np.dot((m3 * w32 + m4 * w4) * fact ** 2, dw32_dv + dw4_dv)
+
+                w32n = w32[..., np.newaxis]
+                w4n = w4[..., np.newaxis]
+                m4n = m4[..., np.newaxis]
+
+                dbp1pos_dv = ((m3n * dw32_dv + dm3_dv * w32n + m4n * dw4_dv + dm4_dv * w4n) *
+                              (w32n + w4n) -
+                              (m3n * w32n + m4n * w4n) * (dw32_dv + dw4_dv)) / (w32n + w4n) ** 2
                 dbp1pos_dv = np.atleast_2d(dbp1pos_dv)
             else:
-                dbp1pos_dv = ((m3 * dw32_dv + dm3_dv * w32 + m4 * dw4_dv + dm4_dv * w4) * (w32 + w4) - \
+                dbp1pos_dv = ((m3 * dw32_dv + dm3_dv * w32 + m4 * dw4_dv + dm4_dv * w4) *
+                              (w32 + w4) -
                               (m3 * w32 + m4 * w4) * (dw32_dv + dw4_dv)) / (w32 + w4) ** 2
                 dbp1pos_dv = np.atleast_2d(dbp1pos_dv)
 
@@ -435,7 +457,7 @@ class InterpAkima(InterpAlgorithm):
             dx = x[0] - grid[idx]
 
             if compute_local_train:
-                da_dv = deriv_dv[idx_val3]
+                da_dv = deriv_dv[..., idx_val3, :]
                 dc_dv = (3 * dm3_dv - 2 * db_dv - dbp1_dv) * h
                 dd_dv = (db_dv + dbp1_dv - 2 * dm3_dv) * h * h
 
@@ -445,7 +467,7 @@ class InterpAkima(InterpAlgorithm):
             dx = x[0] - grid[idx + 1]
 
             if compute_local_train:
-                da_dv = deriv_dv[idx_val4, :]
+                da_dv = deriv_dv[..., idx_val4, :]
                 db_dv = dbp1_dv
                 dc_dv = dd_dv = 0
 
@@ -454,7 +476,7 @@ class InterpAkima(InterpAlgorithm):
             dx = x[0] - grid[0]
 
             if compute_local_train:
-                da_dv = deriv_dv[idx_val3, :]
+                da_dv = deriv_dv[..., idx_val3, :]
                 dc_dv = dd_dv = 0
 
         deriv_dx[..., 0] = b + dx * (2.0 * c + 3.0 * d * dx)
@@ -556,7 +578,8 @@ class InterpAkima(InterpAlgorithm):
             if self.training_data_gradients:
                 db_dv = 0.5 * (dm2_dv + dm3_dv)
 
-                dbpos_dv = ((dm2_dv * w2 + m2e * dw2_dv + dm3_dv * w31 + m3e * dw3_dv) - bpos * (dw2_dv + dw3_dv)) / \
+                dbpos_dv = ((dm2_dv * w2 + m2e * dw2_dv + dm3_dv * w31 + m3e * dw3_dv) -
+                            bpos * (dw2_dv + dw3_dv)) / \
                     (w2 + w31)
 
             if nx > 2:
@@ -609,7 +632,8 @@ class InterpAkima(InterpAlgorithm):
             if self.training_data_gradients:
                 dbp1_dv = 0.5 * (dm3_dv + dm4_dv)
 
-                dbp1pos_dv = ((dm3_dv * w32 + m3e * dw3_dv + dm4_dv * w4 + m4e * dw4_dv) - bp1pos * (dw3_dv + dw4_dv)) / \
+                dbp1pos_dv = ((dm3_dv * w32 + m3e * dw3_dv + dm4_dv * w4 + m4e * dw4_dv) -
+                              bp1pos * (dw3_dv + dw4_dv)) / \
                     (w32 + w4)
 
             if nx > 2:

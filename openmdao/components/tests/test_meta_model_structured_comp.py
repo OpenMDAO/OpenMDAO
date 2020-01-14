@@ -709,7 +709,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
         """Runs check_partials and compares to analytic derivatives."""
 
         prob.run_model()
-        derivs = prob.check_partials(method='cs') #out_stream=None)
+        derivs = prob.check_partials(method='cs', out_stream=None)
 
         for i in derivs['comp'].keys():
             if verbose:
@@ -1063,7 +1063,7 @@ class TestMetaModelStructuredPython(unittest.TestCase):
                             promotes=["*"])
 
         prob = om.Problem(model)
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
         prob.run_model()
 
         self.run_and_check_derivs(prob)

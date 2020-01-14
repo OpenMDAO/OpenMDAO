@@ -218,10 +218,10 @@ class MetaModelStructuredComp(ExplicitComponent):
                                         err.lower, err.upper, err.value)
                 raise_from(AnalysisError(errmsg), None)
 
-            #except ValueError as err:
-                #raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
-                                                                                   #out_name,
-                                                                                   #str(err)))
+            except ValueError as err:
+                raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
+                                                                                   out_name,
+                                                                                   str(err)))
             outputs[out_name] = val
 
     def compute_partials(self, inputs, partials):
@@ -240,19 +240,28 @@ class MetaModelStructuredComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        if self.options['training_data_gradients']:
-            dy_ddata = np.zeros(self.grad_shape)
-            interp = next(itervalues(self.interps))
-            for j in range(self.options['vec_size']):
-                val = interp.training_gradients(pt[j, :])
-                dy_ddata[j] = val.reshape(self.grad_shape[1:])
+        dy_data = None
 
-        for out_name in self.interps:
-            dval = self.interps[out_name].gradient(pt).T
+        for out_name, interp in iteritems(self.interps):
+            dval = interp.gradient(pt).T
             for i, p in enumerate(self.pnames):
                 partials[out_name, p] = dval[i, :]
 
             if self.options['training_data_gradients']:
+
+                if dy_data is None or interp._d_dvalues is not None:
+                    dy_ddata = np.zeros(self.grad_shape)
+
+                    if interp._d_dvalues is not None:
+                        # Akima must be handled individually.
+                        dy_ddata[:] = interp._d_dvalues
+
+                    else:
+                        # This way works for most of the interpolation methods.
+                        for j in range(self.options['vec_size']):
+                            val = interp.training_gradients(pt[j, :])
+                            dy_ddata[j] = val.reshape(self.grad_shape[1:])
+
                 partials[out_name, "%s_train" % out_name] = dy_ddata
 
 

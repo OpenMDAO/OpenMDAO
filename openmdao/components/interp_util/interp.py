@@ -207,9 +207,10 @@ class InterpND(object):
                         dv_shape.extend(self.values.shape)
                         derivs_val = np.zeros(dv_shape, dtype=xi.dtype)
                     in_slice = table._full_slice
-                    full_slice = [slice(j, j+1)]
+                    full_slice = [slice(j, j + 1)]
                     full_slice.extend(in_slice)
-                    derivs_val[tuple(full_slice)] = d_values.reshape(derivs_val[tuple(full_slice)].shape)
+                    shape = derivs_val[tuple(full_slice)].shape
+                    derivs_val[tuple(full_slice)] = d_values.reshape(shape)
 
         # Cache derivatives
         self._d_dx = derivs_x
@@ -263,9 +264,6 @@ class InterpND(object):
 
         if self.table._vectorized:
             return self.table.training_gradients(pt)
-
-        elif self._d_dvalues is not None:
-            return self._d_dvalues
 
         else:
             for i, axis in enumerate(self.grid):

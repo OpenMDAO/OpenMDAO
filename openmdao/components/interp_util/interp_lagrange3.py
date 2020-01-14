@@ -146,5 +146,5 @@ class InterpLagrange3(InterpAlgorithm):
             q4 * (x[0] * (3.0 * x[0] - 2.0 * (p3 + p2 + p1)) +
                   p1 * (p2 + p3) + p2 * p3)
 
-        return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, derivs, \
-            None, None
+        return xx4 * (xx3 * (q1 * xx2 - q2 * xx1) + q3 * xx1 * xx2) - q4 * xx1 * xx2 * xx3, \
+            derivs, None, None
