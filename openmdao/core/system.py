@@ -3112,6 +3112,7 @@ class System(object):
                     prom_name=False,
                     units=False,
                     shape=False,
+                    global_shape=False,
                     desc=False,
                     hierarchical=True,
                     print_arrays=False,
@@ -3137,6 +3138,8 @@ class System(object):
             When True, display/return units. Default is False.
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
+        global_shape : bool, optional
+            When True, display/return the global shape of the value. Default is False.
         desc : bool, optional
             When True, display/return description. Default is False.
         hierarchical : bool, optional
@@ -3184,6 +3187,8 @@ class System(object):
             var_names = self._inputs._views.keys()
             abs2prom = self._var_abs2prom['input']
 
+        allprocs_meta = self._var_allprocs_abs2meta
+
         inputs = []
 
         for var_name in var_names:
@@ -3210,6 +3215,11 @@ class System(object):
                 var_meta['units'] = meta[var_name]['units']
             if shape:
                 var_meta['shape'] = val.shape
+            if global_shape:
+                if var_name in allprocs_meta:
+                    var_meta['global_shape'] = allprocs_meta[var_name]['global_shape']
+                else:
+                    var_meta['global_shape'] = 'Unavailable'
             if desc:
                 var_meta['desc'] = meta[var_name]['desc']
 
@@ -3260,6 +3270,7 @@ class System(object):
                      residuals_tol=None,
                      units=False,
                      shape=False,
+                     global_shape=False,
                      bounds=False,
                      scaling=False,
                      desc=False,
@@ -3297,6 +3308,8 @@ class System(object):
             When True, display/return units. Default is False.
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
+        global_shape : bool, optional
+            When True, display/return the global shape of the value. Default is False.
         bounds : bool, optional
             When True, display/return bounds (lower and upper). Default is False.
         scaling : bool, optional
@@ -3348,6 +3361,7 @@ class System(object):
             var_names = self._outputs._views.keys()
             abs2prom = self._var_abs2prom['output']
 
+        allprocs_meta = self._var_allprocs_abs2meta
         states = self._list_states()
 
         # Go though the hierarchy. Printing Systems
@@ -3384,6 +3398,11 @@ class System(object):
                 var_meta['units'] = meta[var_name]['units']
             if shape:
                 var_meta['shape'] = val.shape
+            if global_shape:
+                if var_name in allprocs_meta:
+                    var_meta['global_shape'] = allprocs_meta[var_name]['global_shape']
+                else:
+                    var_meta['global_shape'] = 'Unavailable'
             if bounds:
                 var_meta['lower'] = meta[var_name]['lower']
                 var_meta['upper'] = meta[var_name]['upper']
