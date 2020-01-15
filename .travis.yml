@@ -21,7 +21,7 @@ env:
   matrix:
     # pinning Python 3.7.3, seems to be an issue with the python 3.7.4 installed by conda
     - PY=3.7.3 NUMPY=1.16 SCIPY=1.2   PETSc=3.11
-    - PY=3.6   NUMPY=1.15 SCIPY=1.1
+    - PY=3.6   NUMPY=1.15 SCIPY=1.1   GUI=1
     - PY=3.6   NUMPY=1.14 SCIPY=1.0.1 PETSc=3.10.1 UPLOAD_DOCS=1
     - PY=2.7   NUMPY=1.13 SCIPY=1.1   PETSc=3.9.1
     - PY=2.7   NUMPY=1.12 SCIPY=1.1
@@ -167,6 +167,10 @@ script:
     testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
   else
     testflo -n 1 --timeout=120 openmdao;
+  fi
+
+- if [ -n "$GUI" ]; then
+    ../visualization/n2_viewer/tests/test_gui.js
   fi
 
 after_success:
