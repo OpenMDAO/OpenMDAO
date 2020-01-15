@@ -145,8 +145,8 @@ install:
 - conda list
 
 before_script:
+# Do this from $HOME so it can be easily found later
 - if [ -n "$GUI" ]; then
-    # Do this from $HOME so it can be easily found later
     pushd $HOME;
     nvm install node;
     npm install puppeteer;
