@@ -435,7 +435,7 @@ def abs_complex(x):
 
 def dv_abs_complex(x, x_deriv):
     """
-    Apply the complex-step derivative of the absolute value function.
+    Compute the complex-step derivative of the absolute value function and its derivative.
 
     Parameters
     ----------
