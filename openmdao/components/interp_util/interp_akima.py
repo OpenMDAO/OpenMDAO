@@ -614,6 +614,7 @@ class InterpAkima(InterpAlgorithm):
                     _, dw4_dv = dv_abs_complex(m3 - m2, dm3_dv - dm2_dv)
 
             # Special case to avoid divide by zero.
+
             if len(nshape) > 1:
                 w32 = w32[..., np.newaxis]
                 w4 = w4[..., np.newaxis]
