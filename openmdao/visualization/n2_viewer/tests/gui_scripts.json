@@ -1,0 +1,314 @@
+{
+    "__toolbar": [
+        {
+            "desc": "Collapse All Outputs button",
+            "id": "collapseAllButtonId",
+            "waitForTransition": true
+        },
+        {
+            "desc": "Uncollapse All button",
+            "id": "uncollapseAllButtonId",
+            "waitForTransition": true
+        },
+        {
+            "desc": "Collapse Outputs in View Only button",
+            "id": "collapseInViewButtonId",
+            "waitForTransition": true
+        },
+        {
+            "desc": "Uncollapse In View Only button",
+            "id": "uncollapseInViewButtonId",
+            "waitForTransition": true
+        },
+        {
+            "desc": "Show Legend (on) button",
+            "id": "showLegendButtonId",
+            "waitForTransition": false
+        },
+        {
+            "desc": "Show Legend (off) button",
+            "id": "showLegendButtonId",
+            "waitForTransition": false
+        },
+        {
+            "desc": "Show Path (on) button",
+            "id": "showCurrentPathButtonId",
+            "waitForTransition": false
+        },
+        {
+            "desc": "Show Path (off) button",
+            "id": "showCurrentPathButtonId",
+            "waitForTransition": false
+        },
+        {
+            "desc": "Toggle Solver Names (on) button",
+            "id": "toggleSolverNamesButtonId",
+            "waitForTransition": true
+        },
+        {
+            "desc": "Toggle Solver Names (off) button",
+            "id": "toggleSolverNamesButtonId",
+            "waitForTransition": true
+        },
+        {
+            "desc": "Clear Arrows and Connection button",
+            "id": "clearArrowsAndConnectsButtonId",
+            "waitForTransition": false
+        },
+        {
+            "desc": "Help (on) button",
+            "id": "helpButtonId",
+            "waitForTransition": false
+        },
+        {
+            "desc": "Help (off) button",
+            "id": "helpButtonId",
+            "waitForTransition": false
+        }
+    ],
+    "circuit": [
+        {
+            "desc": "Hover on N2 matrix element and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_24_24.vMid",
+            "arrowCount": 4
+        },
+        {
+            "desc": "Left-click on partition tree element to zoom",
+            "test": "click",
+            "selector": "g#tree rect#circuit_R2",
+            "button": "left"
+        },
+        {
+            "desc": "Hover on N2 matrix element and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_24_24.vMid",
+            "arrowCount": 4
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Right-click on partition tree element to collapse",
+            "test": "click",
+            "selector": "g#tree rect#circuit_n1",
+            "button": "right"
+        },
+        {
+            "desc": "Hover over collapsed N2 matrix element and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_7_7.gMid",
+            "arrowCount": 5
+        },
+        {
+            "desc": "Right-click on partition tree element to uncollapse",
+            "test": "click",
+            "selector": "g#tree rect#circuit_n1",
+            "button": "right"
+        },
+        {
+            "desc": "Left-click to zoom on solver element",
+            "test": "click",
+            "selector": "g#solver_tree rect#circuit_n1",
+            "button": "left"
+        },
+        {
+            "desc": "Hover over zoomed N2 cell and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_12_12.vMid",
+            "arrowCount": 5
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Right-click on solver element to collapse",
+            "test": "click",
+            "selector": "g#solver_tree rect#circuit_n1",
+            "button": "right"
+        },
+        {
+            "desc": "Hover over collapsed N2 cell and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_7_7.gMid",
+            "arrowCount": 5
+        },
+        {
+            "desc": "Right-click again on solver element to uncollapse",
+            "test": "click",
+            "selector": "g#solver_tree rect#circuit_n1",
+            "button": "right"
+        },
+        {
+            "test": "search",
+            "searchString": "R1.I",
+            "n2ElementCount": 16
+        }
+    ],
+    "bug_arrow": [
+        {
+            "desc": "Hover on N2 matrix element and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "arrowCount": 2
+        },
+        {
+            "desc": "Left-click on partition tree element to zoom",
+            "test": "click",
+            "selector": "g#tree rect#design_fan_map_scalars",
+            "button": "left"
+        },
+        {
+            "desc": "Hover on N2 matrix element and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "arrowCount": 2
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Right-click on partition tree element to collapse",
+            "test": "click",
+            "selector": "g#tree rect#design_fan_map_scalars",
+            "button": "right"
+        },
+        {
+            "desc": "Hover over collapsed N2 matrix element and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_10_10.gMid",
+            "arrowCount": 1
+        },
+        {
+            "desc": "Right-click on partition tree element to uncollapse",
+            "test": "click",
+            "selector": "g#tree rect#design_fan_map_scalars",
+            "button": "right"
+        },
+        {
+            "desc": "Left-click to zoom on solver element",
+            "test": "click",
+            "selector": "g#solver_tree rect#design_fan_map_d1",
+            "button": "left"
+        },
+        {
+            "desc": "Hover over zoomed N2 cell and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_9_9.vMid",
+            "arrowCount": 1
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Right-click on solver element to collapse",
+            "test": "click",
+            "selector": "g#solver_tree rect#design_fan_map_scalars",
+            "button": "right"
+        },
+        {
+            "desc": "Hover over collapsed N2 cell and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_10_10.gMid",
+            "arrowCount": 1
+        },
+        {
+            "desc": "Right-click again on solver element to uncollapse",
+            "test": "click",
+            "selector": "g#solver_tree rect#design_fan_map_scalars",
+            "button": "right"
+        },
+        {
+            "test": "search",
+            "searchString": "s_Nc",
+            "n2ElementCount": 4
+        }
+    ],
+    "double_sellar": [
+        {
+            "desc": "Hover on N2 matrix element and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "arrowCount": 4
+        },
+        {
+            "desc": "Left-click on partition tree element to zoom",
+            "test": "click",
+            "selector": "g#tree rect#g1_d2_y2",
+            "button": "left"
+        },
+        {
+            "desc": "Hover on N2 matrix element and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_11_11.vMid",
+            "arrowCount": 4
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Right-click on partition tree element to collapse",
+            "test": "click",
+            "selector": "g#tree rect#g2_d1",
+            "button": "right"
+        },
+        {
+            "desc": "Hover over collapsed N2 matrix element and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_13_13.gMid",
+            "arrowCount": 3
+        },
+        {
+            "desc": "Right-click on partition tree element to uncollapse",
+            "test": "click",
+            "selector": "g#tree rect#g2_d1",
+            "button": "right"
+        },
+        {
+            "desc": "Left-click to zoom on solver element",
+            "test": "click",
+            "selector": "g#solver_tree rect#g2_d2",
+            "button": "left"
+        },
+        {
+            "desc": "Hover over zoomed N2 cell and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_21_21.vMid",
+            "arrowCount": 4
+        },
+        {
+            "test": "root"
+        },
+        {
+            "desc": "Right-click on solver element to collapse",
+            "test": "click",
+            "selector": "g#solver_tree rect#g1_d1",
+            "button": "right"
+        },
+        {
+            "desc": "Hover over collapsed N2 cell and check arrow count",
+            "test": "hoverArrow",
+            "selector": "g#n2elements rect#cellShape_3_3.gMid",
+            "arrowCount": 3
+        },
+        {
+            "desc": "Right-click again on solver element to uncollapse",
+            "test": "click",
+            "selector": "g#solver_tree rect#g1_d1",
+            "button": "right"
+        },
+        {
+            "test": "search",
+            "searchString": "d2.y2",
+            "n2ElementCount": 8
+        }
+    ],
+    "udpi_circuit": [
+        {
+            "desc": "Check the number of cells in the N2 Matrix",
+            "test": "count",
+            "selector": "g#n2elements > g.n2cell",
+            "count": 29
+        }
+    ]
+}

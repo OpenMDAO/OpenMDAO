@@ -3,6 +3,9 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const run = require('child_process').execFileSync;
+const scripts = require('./gui_scripts.json');
+
 const urlPrefix = 'file://';
 
 // Amount to wait when expecting a transition.
@@ -21,7 +24,7 @@ const lineStr = '-'.repeat(78);
 // Track which test # we're on
 let currentTest = 1;
 
-const n2dir = __dirname + '/gui_test_models';
+const n2dir = path.join(__dirname, 'gui_test_models');
 const n2suffix = '_N2_TEST.html';
 
 /**
@@ -48,332 +51,50 @@ function logTest(msg) {
     currentTest++;
 }
 
-// These tests can be run on the toolbar of any model
-const genericToolbarTests = [
-    {
-        "desc": "Collapse All Outputs button",
-        "id": "collapseAllButtonId",
-        "waitForTransition": true
-    },
-    {
-        "desc": "Uncollapse All button",
-        "id": "uncollapseAllButtonId",
-        "waitForTransition": true
-    },
-    {
-        "desc": "Collapse Outputs in View Only button",
-        "id": "collapseInViewButtonId",
-        "waitForTransition": true
-    },
-    {
-        "desc": "Uncollapse In View Only button",
-        "id": "uncollapseInViewButtonId",
-        "waitForTransition": true
-    },
-    {
-        "desc": "Show Legend (on) button",
-        "id": "showLegendButtonId",
-        "waitForTransition": false
-    },
-    {
-        "desc": "Show Legend (off) button",
-        "id": "showLegendButtonId",
-        "waitForTransition": false
-    },
-    {
-        "desc": "Show Path (on) button",
-        "id": "showCurrentPathButtonId",
-        "waitForTransition": false
-    },
-    {
-        "desc": "Show Path (off) button",
-        "id": "showCurrentPathButtonId",
-        "waitForTransition": false
-    },
-    {
-        "desc": "Toggle Solver Names (on) button",
-        "id": "toggleSolverNamesButtonId",
-        "waitForTransition": true
-    },
-    {
-        "desc": "Toggle Solver Names (off) button",
-        "id": "toggleSolverNamesButtonId",
-        "waitForTransition": true
-    },
-    {
-        "desc": "Clear Arrows and Connection button",
-        "id": "clearArrowsAndConnectsButtonId",
-        "waitForTransition": false
-    },
-    {
-        "desc": "Help (on) button",
-        "id": "helpButtonId",
-        "waitForTransition": false
-    },
-    {
-        "desc": "Help (off) button",
-        "id": "helpButtonId",
-        "waitForTransition": false
-    },
-];
+/**
+ * Find all the files in the test subdir that end with the specified suffix.
+ * @param {String} suffix The filename suffix to search for. 
+ * @returns {Array} The list of discovered filenames.
+ */
+function findFiles(suffix) {
+    let n2HtmlRegex = new RegExp('^.+' + suffix + '$');
+
+    files = fs.readdirSync(n2dir);
+
+    let foundFiles = [];
+    for (let filename of files) {
+        if (n2HtmlRegex.test(filename)) {
+            console.log('Found ' + filename);
+            foundFiles.push(filename);
+        }
+    }
+
+    return foundFiles;
+}
 
 /**
- * Provides scripts for specific models, where certain elements have to be
- * identified and results of actions are known. Each script is an array so
- * the order is maintained.
+ * Run 'openmdao n2' on all of the .py files that were found.
+ * @param {Array} pyFiles List of discovered models.
  */
-const specificModelScripts = {
-    'circuit': [
-        {
-            'desc': 'Hover on N2 matrix element and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_24_24.vMid",
-            'arrowCount': 4
-        },
-        {
-            'desc': 'Left-click on partition tree element to zoom',
-            'test': 'click',
-            'selector': "g#tree rect#circuit_R2",
-            'button': 'left'
-        },
-        {
-            'desc': 'Hover on N2 matrix element and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_24_24.vMid",
-            'arrowCount': 4
-        },
-        {
-            // Return to root diagram
-            'test': 'root'
-        },
-        {
-            'desc': 'Right-click on partition tree element to collapse',
-            'test': 'click',
-            'selector': "g#tree rect#circuit_n1",
-            'button': 'right'
-        },
-        {
-            'desc': 'Hover over collapsed N2 matrix element and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_7_7.gMid",
-            'arrowCount': 5
-        },
-        {
-            'desc': 'Right-click on partition tree element to uncollapse',
-            'test': 'click',
-            'selector': "g#tree rect#circuit_n1",
-            'button': 'right'
-        },
-        {
-            'desc': 'Left-click to zoom on solver element',
-            'test': 'click',
-            'selector': "g#solver_tree rect#circuit_n1",
-            'button': 'left'
-        },
-        {
-            'desc': 'Hover over zoomed N2 cell and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_12_12.vMid",
-            'arrowCount': 5
-        },
-        {
-            // Return to root diagram
-            'test': 'root'
-        },
-        {
-            'desc': 'Right-click on solver element to collapse',
-            'test': 'click',
-            'selector': "g#solver_tree rect#circuit_n1",
-            'button': 'right'
-        },
-        {
-            'desc': 'Hover over collapsed N2 cell and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_7_7.gMid",
-            'arrowCount': 5
-        },
-        {
-            'desc': 'Right-click again on solver element to uncollapse',
-            'test': 'click',
-            'selector': "g#solver_tree rect#circuit_n1",
-            'button': 'right'
-        },
-        {
-            'test': 'search',
-            'searchString': 'R1.I',
-            'n2ElementCount': 16
+function generateN2Files(pyFiles) {
+    for (let pyFile of pyFiles) {
+        let basename = path.basename(pyFile, '.py');
+        let n2File = path.join(n2dir, basename + n2suffix);
+        let pyPath = path.join(n2dir, pyFile);
+
+        console.log("Generating N2 for " + basename + ".py");
+
+        run('openmdao', ['n2', '-o', n2File, '--no_browser', pyPath]);
+
+        // Create an N2 using declared partials
+        if (basename == 'circuit') {
+            console.log("Generating N2 with --use_declare_partial_info for " + basename + ".py");
+            n2File = path.join(n2dir, 'udpi_' + basename + n2suffix);
+            run('openmdao', ['n2', '-o', n2File, '--no_browser',
+                '--use_declare_partial_info', pyPath]);
+
         }
-    ],
-    'bug_arrow': [
-        {
-            'desc': 'Hover on N2 matrix element and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_11_11.vMid",
-            'arrowCount': 2
-        },
-        {
-            'desc': 'Left-click on partition tree element to zoom',
-            'test': 'click',
-            'selector': "g#tree rect#design_fan_map_scalars",
-            'button': 'left'
-        },
-        {
-            'desc': 'Hover on N2 matrix element and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_11_11.vMid",
-            'arrowCount': 2
-        },
-        {
-            // Return to root diagram
-            'test': 'root'
-        },
-        {
-            'desc': 'Right-click on partition tree element to collapse',
-            'test': 'click',
-            'selector': "g#tree rect#design_fan_map_scalars",
-            'button': 'right'
-        },
-        {
-            'desc': 'Hover over collapsed N2 matrix element and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_10_10.gMid",
-            'arrowCount': 1
-        },
-        {
-            'desc': 'Right-click on partition tree element to uncollapse',
-            'test': 'click',
-            'selector': "g#tree rect#design_fan_map_scalars",
-            'button': 'right'
-        },
-        {
-            'desc': 'Left-click to zoom on solver element',
-            'test': 'click',
-            'selector': "g#solver_tree rect#design_fan_map_d1",
-            'button': 'left'
-        },
-        {
-            'desc': 'Hover over zoomed N2 cell and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_9_9.vMid",
-            'arrowCount': 1
-        },
-        {
-            // Return to root diagram
-            'test': 'root'
-        },
-        {
-            'desc': 'Right-click on solver element to collapse',
-            'test': 'click',
-            'selector': "g#solver_tree rect#design_fan_map_scalars",
-            'button': 'right'
-        },
-        {
-            'desc': 'Hover over collapsed N2 cell and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_10_10.gMid",
-            'arrowCount': 1
-        },
-        {
-            'desc': 'Right-click again on solver element to uncollapse',
-            'test': 'click',
-            'selector': "g#solver_tree rect#design_fan_map_scalars",
-            'button': 'right'
-        },
-        {
-            'test': 'search',
-            'searchString': 's_Nc',
-            'n2ElementCount': 4
-        }
-    ],
-    'double_sellar': [
-        {
-            'desc': 'Hover on N2 matrix element and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_11_11.vMid",
-            'arrowCount': 4
-        },
-        {
-            'desc': 'Left-click on partition tree element to zoom',
-            'test': 'click',
-            'selector': "g#tree rect#g1_d2_y2",
-            'button': 'left'
-        },
-        {
-            'desc': 'Hover on N2 matrix element and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_11_11.vMid",
-            'arrowCount': 4
-        },
-        {
-            // Return to root diagram
-            'test': 'root'
-        },
-        {
-            'desc': 'Right-click on partition tree element to collapse',
-            'test': 'click',
-            'selector': "g#tree rect#g2_d1",
-            'button': 'right'
-        },
-        {
-            'desc': 'Hover over collapsed N2 matrix element and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_13_13.gMid",
-            'arrowCount': 3
-        },
-        {
-            'desc': 'Right-click on partition tree element to uncollapse',
-            'test': 'click',
-            'selector': "g#tree rect#g2_d1",
-            'button': 'right'
-        },
-        {
-            'desc': 'Left-click to zoom on solver element',
-            'test': 'click',
-            'selector': "g#solver_tree rect#g2_d2",
-            'button': 'left'
-        },
-        {
-            'desc': 'Hover over zoomed N2 cell and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_21_21.vMid",
-            'arrowCount': 4
-        },
-        {
-            // Return to root diagram
-            'test': 'root'
-        },
-        {
-            'desc': 'Right-click on solver element to collapse',
-            'test': 'click',
-            'selector': "g#solver_tree rect#g1_d1",
-            'button': 'right'
-        },
-        {
-            'desc': 'Hover over collapsed N2 cell and check arrow count',
-            'test': 'hoverArrow',
-            'selector': "g#n2elements rect#cellShape_3_3.gMid",
-            'arrowCount': 3
-        },
-        {
-            'desc': 'Right-click again on solver element to uncollapse',
-            'test': 'click',
-            'selector': "g#solver_tree rect#g1_d1",
-            'button': 'right'
-        },
-        {
-            'test': 'search',
-            'searchString': 'd2.y2',
-            'n2ElementCount': 8
-        }
-    ],
-    'udpi_circuit': [ // The circuit model with --use_declare_partial_info
-        {
-            'desc': 'Check the number of cells in the N2 Matrix',
-            'test': 'count',
-            'selector': 'g#n2elements > g.n2cell',
-            'count': 29
-        }
-    ]
+    }
 }
 
 /**
@@ -382,7 +103,7 @@ const specificModelScripts = {
  */
 async function doGenericToolbarTests(page) {
 
-    for (let test of genericToolbarTests) {
+    for (let test of scripts['__toolbar']) {
         logTest(test.desc);
         const btnHandle = await page.$('#' + test.id);
         await btnHandle.click({ 'button': 'left', 'delay': 5 });
@@ -535,9 +256,9 @@ async function runModelScript(page, scriptArr) {
                 await testSearchAndResult(page, scriptItem);
                 break;
             case 'count':
-                logTest(scriptItem.desc? scriptItem.desc : 
+                logTest(scriptItem.desc ? scriptItem.desc :
                     "Checking for " + scriptItem.count + "' instances of '" +
-                    scriptItem.selector + "'" );
+                    scriptItem.selector + "'");
                 await assertElementCount(page, scriptItem.selector,
                     scriptItem.count);
                 break;
@@ -574,26 +295,6 @@ function setupErrorHandlers(page) {
 }
 
 /**
- * Find all the files in n2dir that end with n2suffix.
- * @returns {Array} The list of discovered filenames.
- */
-function findFiles() {
-    let n2HtmlRegex = new RegExp('^.+' + n2suffix + '$');
-    
-    files = fs.readdirSync(n2dir);
-
-    let n2Files = [];
-    for (let filename of files) {
-        if (n2HtmlRegex.test(filename)) {
-            console.log('Found ' + filename);
-            n2Files.push(filename);
-        }
-    }
-
-    return n2Files;
-}
-
-/**
  * Start the browser, load the page, and call all the testing functions.
  */
 async function runTests() {
@@ -611,7 +312,7 @@ async function runTests() {
     const page = await browser.newPage();
     setupErrorHandlers(page);
 
-    const knownModelNames = Object.keys(specificModelScripts);
+    const knownModelNames = Object.keys(scripts);
 
     for (let n2Filename of n2Files) {
         console.log("\n" + lineStr + "\n" + n2Filename + "\n" + lineStr);
@@ -629,7 +330,7 @@ async function runTests() {
         // If this model has an associated script, run it:
         n2Basename = n2Filename.replace(n2suffix, '');
         if (knownModelNames.includes(n2Basename)) {
-            await runModelScript(page, specificModelScripts[n2Basename]);
+            await runModelScript(page, scripts[n2Basename]);
         }
     }
 
@@ -638,5 +339,8 @@ async function runTests() {
 
 console.log("\n" + lineStr + "\n" + "PERFORMING N2 GUI TESTS" + "\n" + lineStr);
 
-let n2Files = findFiles();
+let pyFiles = findFiles('.py');
+generateN2Files(pyFiles);
+
+let n2Files = findFiles(n2suffix);
 (async () => { await runTests(); })();
