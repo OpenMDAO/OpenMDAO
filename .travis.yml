@@ -145,11 +145,13 @@ install:
 - conda list
 
 before_script:
-# Do this from $HOME so it can be easily found later
-- pushd $HOME;
-  nvm install node;
-  npm install puppeteer;
-  popd;
+- if [ -n "$GUI" ]; then
+    # Do this from $HOME so it can be easily found later
+    pushd $HOME;
+    nvm install node;
+    npm install puppeteer;
+    popd;
+  fi
 
 script:
 # prevent OpenMPI warning messages
@@ -170,7 +172,7 @@ script:
   fi
 
 - if [ -n "$GUI" ]; then
-    ../visualization/n2_viewer/tests/test_gui.js
+    ../visualization/n2_viewer/tests/test_gui.js;
   fi
 
 after_success:
