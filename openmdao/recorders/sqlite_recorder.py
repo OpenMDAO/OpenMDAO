@@ -351,6 +351,11 @@ class SqliteRecorder(CaseRecorder):
                 self._abs2meta[name]['type'] = ['input']
                 self._abs2meta[name]['explicit'] = True
 
+            # merge current abs2meta with this system's version
+            for name, meta in iteritems(self._abs2meta):
+                if name in system._var_abs2meta:
+                    meta.update(system._var_abs2meta[name])
+
             self._cleanup_abs2meta()
 
             # store the updated abs2prom and prom2abs

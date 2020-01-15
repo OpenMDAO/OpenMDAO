@@ -960,7 +960,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         outputs = case.list_outputs(explicit=True, implicit=True, values=True,
                                     residuals=True, residuals_tol=None,
-                                    units=True, shape=True, bounds=True,
+                                    units=True, shape=True, bounds=True, desc=True,
                                     scaling=True, hierarchical=True, print_arrays=True,
                                     out_stream=None)
 
@@ -971,7 +971,8 @@ class TestSqliteCaseReader(unittest.TestCase):
                 'ref': 1.0,
                 'resids': [1.318e-10],
                 'shape': (1,),
-                'values': [25.5883024]
+                'values': [25.5883024],
+                'desc': ''
             }
         }
 
@@ -983,6 +984,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(vals['lower'], expected['lower'])
         self.assertEqual(vals['ref'], expected['ref'])
         self.assertEqual(vals['shape'], expected['shape'])
+        self.assertEqual(vals['desc'], expected['desc'])
         np.testing.assert_almost_equal(vals['resids'], expected['resids'])
         np.testing.assert_almost_equal(vals['value'], expected['values'])
 
@@ -994,11 +996,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
         stream = StringIO()
-        d1.list_outputs(prom_name=True, out_stream=stream)
+        d1.list_outputs(prom_name=True, desc=True, out_stream=stream)
         expected = stream.getvalue().split('\n')
 
         stream = StringIO()
-        case.list_outputs(prom_name=True, out_stream=stream)
+        case.list_outputs(prom_name=True, desc=True, out_stream=stream)
         text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):
@@ -1022,29 +1024,30 @@ class TestSqliteCaseReader(unittest.TestCase):
         cr = om.CaseReader(self.filename)
 
         expected_inputs_case = {
-            'd1.z': {'value': [5., 2.]},
-            'd1.x': {'value': [1.]},
-            'd1.y2': {'value': [12.0584882]}
+            'd1.z': {'value': [5., 2.], 'desc': ''},
+            'd1.x': {'value': [1.], 'desc': ''},
+            'd1.y2': {'value': [12.0584882], 'desc': ''}
         }
 
         system_cases = cr.list_cases('root.d1')
 
         case = cr.get_case(system_cases[-1])
 
-        inputs = case.list_inputs(values=True, out_stream=None)
+        inputs = case.list_inputs(values=True, desc=True, out_stream=None)
 
         for name, meta in inputs:
             expected = expected_inputs_case[name]
             np.testing.assert_almost_equal(meta['value'], expected['value'])
+            self.assertEqual(meta['desc'], expected['desc'])
 
         # check that output from the Case method matches output from the System method
         # the system for the case should be properly identified as 'd1'
         stream = StringIO()
-        d1.list_inputs(prom_name=True, out_stream=stream)
+        d1.list_inputs(prom_name=True, desc=True, out_stream=stream)
         expected = stream.getvalue().split('\n')
 
         stream = StringIO()
-        case.list_inputs(prom_name=True, out_stream=stream)
+        case.list_inputs(prom_name=True, desc=True, out_stream=stream)
         text = stream.getvalue().split('\n')
 
         for i, line in enumerate(expected):

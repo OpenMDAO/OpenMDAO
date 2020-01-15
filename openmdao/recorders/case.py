@@ -387,6 +387,7 @@ class Case(object):
                     prom_name=False,
                     units=False,
                     shape=False,
+                    desc=False,
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
@@ -395,8 +396,6 @@ class Case(object):
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
-
-        Also optionally logs the information to a user defined output stream.
 
         Parameters
         ----------
@@ -409,6 +408,8 @@ class Case(object):
             When True, display/return units. Default is False.
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
+        desc : bool, optional
+            When True, display/return description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -450,18 +451,23 @@ class Case(object):
                 if not match_includes_excludes(var_name, var_name_prom, includes, excludes):
                     continue
 
+                val = self.inputs[var_name]
+
                 var_meta = {}
                 if values:
-                    var_meta['value'] = self.inputs[var_name]
+                    var_meta['value'] = val
                 if prom_name:
                     var_meta['prom_name'] = var_name_prom
                 if units:
                     var_meta['units'] = meta[var_name]['units']
                 if shape:
-                    var_meta['shape'] = self.inputs[var_name].shape
+                    var_meta['shape'] = val.shape
+                if desc:
+                    var_meta['desc'] = meta[var_name]['desc']
+
                 inputs.append((var_name, var_meta))
 
-        if out_stream == _DEFAULT_OUT_STREAM:
+        if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
@@ -483,6 +489,7 @@ class Case(object):
                      shape=False,
                      bounds=False,
                      scaling=False,
+                     desc=False,
                      hierarchical=True,
                      print_arrays=False,
                      tags=None,
@@ -491,8 +498,6 @@ class Case(object):
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
-
-        Also optionally logs the information to a user defined output stream.
 
         Parameters
         ----------
@@ -519,6 +524,8 @@ class Case(object):
             When True, display/return bounds (lower and upper). Default is False.
         scaling : bool, optional
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+        desc : bool, optional
+            When True, display/return description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -528,7 +535,7 @@ class Case(object):
             by the values set with numpy.set_printoptions
             Default is False.
         tags : str or list of strs
-            User defined tags that can be used to filter what gets listed. Only inputs with the
+            User defined tags that can be used to filter what gets listed. Only outputs with the
             given tags will be listed.
             Default is None, which means there will be no filtering based on tags.
         includes : None or list_like
@@ -568,9 +575,11 @@ class Case(object):
             else:
                 resids = 'Not Recorded'
 
+            val = self.outputs[var_name]
+
             var_meta = {}
             if values:
-                var_meta['value'] = self.outputs[var_name]
+                var_meta['value'] = val
             if prom_name:
                 var_meta['prom_name'] = var_name_prom
             if residuals:
@@ -578,7 +587,7 @@ class Case(object):
             if units:
                 var_meta['units'] = meta[var_name]['units']
             if shape:
-                var_meta['shape'] = self.outputs[var_name].shape
+                var_meta['shape'] = val.shape
             if bounds:
                 var_meta['lower'] = meta[var_name]['lower']
                 var_meta['upper'] = meta[var_name]['upper']
@@ -586,22 +595,22 @@ class Case(object):
                 var_meta['ref'] = meta[var_name]['ref']
                 var_meta['ref0'] = meta[var_name]['ref0']
                 var_meta['res_ref'] = meta[var_name]['res_ref']
+            if desc:
+                var_meta['desc'] = meta[var_name]['desc']
             if meta[var_name]['explicit']:
                 expl_outputs.append((var_name, var_meta))
             else:
                 impl_outputs.append((var_name, var_meta))
 
-        if out_stream == _DEFAULT_OUT_STREAM:
+        if out_stream is _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
         if out_stream:
             if self.outputs is None or len(self.outputs) is 0:
                 out_stream.write('WARNING: Outputs not recorded. Make sure your recording ' +
                                  'settings have record_outputs set to True\n')
-
             if explicit:
                 self._write_table('explicit', expl_outputs, hierarchical, print_arrays, out_stream)
-
             if implicit:
                 self._write_table('implicit', impl_outputs, hierarchical, print_arrays, out_stream)
 
@@ -617,9 +626,6 @@ class Case(object):
     def _write_table(self, var_type, var_data, hierarchical, print_arrays, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
-
-        The output values could actually represent input variables.
-        In this context, outputs refers to the data that is being logged to an output stream.
 
         Parameters
         ----------
@@ -642,7 +648,7 @@ class Case(object):
         if out_stream is None:
             return
 
-        # Make a dict of outputs. Makes it easier to work with in this method
+        # Make a dict of variables. Makes it easier to work with in this method
         var_dict = OrderedDict()
         for name, vals in var_data:
             var_dict[name] = vals

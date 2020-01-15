@@ -165,11 +165,11 @@ class ImplicitCompTestCase(unittest.TestCase):
             self.fail("Exception expected")
 
         # list_inputs on a component before running is okay
-        c2_inputs = self.prob.model.comp2.list_inputs(out_stream=None)
+        c2_inputs = self.prob.model.comp2.list_inputs(desc=True, out_stream=None)
         expected = {
-            'a': {'value': [1.]},
-            'b': {'value': [1.]},
-            'c': {'value': [1.]}
+            'a': {'value': [1.], 'desc': ''},
+            'b': {'value': [1.], 'desc': ''},
+            'c': {'value': [1.], 'desc': ''}
         }
         self.assertEqual(dict(c2_inputs), expected)
 
@@ -182,7 +182,10 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.assertEqual(dict(c2_inputs), {'a': {'value': [1.]}})
 
         c2_inputs = self.prob.model.comp2.list_inputs(excludes='c', out_stream=None)
-        del expected['c']
+        expected = {
+            'a': {'value': [1.]},
+            'b': {'value': [1.]},
+        }
         self.assertEqual(dict(c2_inputs), expected)
 
         # specifying prom_name should not cause an error
@@ -235,14 +238,14 @@ class ImplicitCompTestCase(unittest.TestCase):
         self.prob.run_model()
 
         stream = cStringIO()
-        inputs = self.prob.model.list_inputs(hierarchical=False, out_stream=stream)
+        inputs = self.prob.model.list_inputs(hierarchical=False, desc=True, out_stream=stream)
         self.assertEqual(sorted(inputs), [
-            ('comp2.a', {'value': [1.]}),
-            ('comp2.b', {'value': [-4.]}),
-            ('comp2.c', {'value': [3.]}),
-            ('comp3.a', {'value': [1.]}),
-            ('comp3.b', {'value': [-4.]}),
-            ('comp3.c', {'value': [3.]})
+            ('comp2.a', {'value':  [1.], 'desc': ''}),
+            ('comp2.b', {'value': [-4.], 'desc': ''}),
+            ('comp2.c', {'value':  [3.], 'desc': ''}),
+            ('comp3.a', {'value':  [1.], 'desc': ''}),
+            ('comp3.b', {'value': [-4.], 'desc': ''}),
+            ('comp3.c', {'value':  [3.], 'desc': ''})
         ])
         text = stream.getvalue()
         self.assertEqual(text.count('comp2.'), 3)
