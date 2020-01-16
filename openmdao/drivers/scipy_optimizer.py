@@ -530,14 +530,14 @@ class ScipyOptimizeDriver(Driver):
 
         self.result = result
 
-        if MPI:
-            dv_dict = model.comm.bcast(self.get_design_var_values(), root=0)
-            for key, value in iteritems(dv_dict):
-                self.set_design_var(key, value)
+        # if MPI:
+        #     dv_dict = model.comm.bcast(self.get_design_var_values(), root=0)
+        #     for key, value in iteritems(dv_dict):
+        #         self.set_design_var(key, value)
 
-            with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
-                self.iter_count += 1
-                model.run_solve_nonlinear()
+        #     with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+        #         self.iter_count += 1
+        #         model.run_solve_nonlinear()
 
         if hasattr(result, 'success'):
             self.fail = False if result.success else True
@@ -579,6 +579,8 @@ class ScipyOptimizeDriver(Driver):
 
             # Pass in new parameters
             i = 0
+            if MPI:
+                x_new = model.comm.bcast(x_new, root=0)
             for name, meta in iteritems(self._designvars):
                 size = meta['size']
                 self.set_design_var(name, x_new[i:i + size])

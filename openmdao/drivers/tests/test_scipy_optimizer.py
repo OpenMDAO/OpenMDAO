@@ -87,7 +87,6 @@ class TestMPIScatter(unittest.TestCase):
         prob.run_driver()
 
         proc_vals = MPI.COMM_WORLD.allgather(prob['f_xy'])
-        print(proc_vals[0], proc_vals[1])
         self.assertEqual(proc_vals[0], proc_vals[1])
 
 class TestScipyOptimizeDriver(unittest.TestCase):
