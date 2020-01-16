@@ -60,7 +60,7 @@ class TestArrayUtils(unittest.TestCase):
         x = np.array([3.0 + 0.5j, -4.0 - 1.5j, -5.0 + 2.5j, -6.0 - 3.5j])
         dx = 1.0 + 2j * np.ones((4, 3), dtype=np.complex)
 
-        dy = dv_abs_complex(x, dx)
+        yy, dy = dv_abs_complex(x, dx)
 
         row = np.array([1.0 + 2j, 1.0 + 2j, 1.0 + 2j])
         dy_check = np.vstack((row, -row, -row, -row))
