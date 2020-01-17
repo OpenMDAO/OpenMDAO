@@ -3541,20 +3541,23 @@ class System(object):
                         else:
                             is_distributed = meta[name]['distributed']
                         if is_distributed:
+                            var_meta = var_dict[name]
+                            shape = meta[name]['shape']
+                            global_shape = self._var_allprocs_abs2meta[name]['global_shape']
+
+                            # if the local shape is different than the global shape, assume
+                            # the value is a concatenation of the values from all procs
+                            # (otherwise the value from proc 0 will be shown)
+                            if 'value' in var_meta and shape != global_shape:
+                                var_meta['value'] = np.append(var_meta['value'],
+                                                              proc_vars[name]['value'])
+
+                            if 'resids' in var_meta and shape != global_shape:
+                                var_meta['resids'] = np.append(var_meta['resids'],
+                                                               proc_vars[name]['resids'])
+
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
-                            if 'value' in var_dict[name]:
-                                var_dict[name]['value'] = \
-                                    np.append(var_dict[name]['value'],
-                                              proc_vars[name]['value'])
-                            if 'shape' in var_dict[name]:
-                                # TODO might want to use allprocs_abs2meta_out[name]['global_shape']
-                                var_dict[name]['shape'] = \
-                                    var_dict[name]['value'].shape
-                            if 'resids' in var_dict[name]:
-                                var_dict[name]['resids'] = \
-                                    np.append(var_dict[name]['resids'],
-                                              proc_vars[name]['resids'])
 
         if setup:
             inputs = var_type is 'input'
@@ -3563,7 +3566,7 @@ class System(object):
             top_name = 'model'
         else:
             var_list = var_dict.keys()
-            top_name = self.pathname
+            top_name = self.name
 
         write_var_table(self.pathname, var_list, var_type, var_dict,
                         hierarchical, top_name, print_arrays, out_stream)

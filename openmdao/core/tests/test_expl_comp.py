@@ -248,7 +248,7 @@ class ExplCompTestCase(unittest.TestCase):
             "----------------------------"
         ]
         for i, line in enumerate(expected_text):
-            self.assertEqual(text[i], line)
+            self.assertEqual(text[i].rstrip(), line)
 
         expl_outputs = prob.model.p1.list_outputs(includes='x', out_stream=None)
         self.assertEqual(dict(expl_outputs), expected)
@@ -293,11 +293,11 @@ class ExplCompTestCase(unittest.TestCase):
             "-------  -----  -----  -----",
             "model",
             "  comp",
-            "    x    [12.]  inch   (1,) ",
-            "    y    [12.]  inch   (1,) "
+            "    x    [12.]  inch   (1,)",
+            "    y    [12.]  inch   (1,)"
         ]
         for i, line in enumerate(expected_text):
-            self.assertEqual(text[i], line)
+            self.assertEqual(text[i].rstrip().replace('1L', ''), line)
 
         # list_outputs tests
 
@@ -331,7 +331,7 @@ class ExplCompTestCase(unittest.TestCase):
             "3 Explicit Output(s) in 'model'",
             "-------------------------------",
             "",
-            "varname  value  resids  units  shape  lower  upper   ref  ref0  res_ref  desc   ",
+            "varname  value  resids  units  shape  lower  upper   ref  ref0  res_ref  desc",
             "-------  -----  ------  -----  -----  -----  ------  ---  ----  -------  -------",
             "model",
             "  p1",
@@ -339,14 +339,14 @@ class ExplCompTestCase(unittest.TestCase):
             "  p2",
             "    y    [1.]   [0.]    ft     (1,)   [2.]   [200.]  1.2  0.0   2.2      indep y",
             "  comp",
-            "    z    [24.]  [0.]    inch   (1,)   None   None    1.0  0.0   1.0             ",
+            "    z    [24.]  [0.]    inch   (1,)   None   None    1.0  0.0   1.0",
             "",
             "",
             "0 Implicit Output(s) in 'model'",
             "-------------------------------",
         ]
         for i, line in enumerate(expected_text):
-            self.assertEqual(text[i], line)
+            self.assertEqual(text[i].rstrip(), line)
 
     def test_for_feature_docs_list_vars_options(self):
 

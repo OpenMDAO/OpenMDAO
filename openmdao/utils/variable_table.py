@@ -23,7 +23,7 @@ indent_inc = 2
 
 
 def write_var_table(pathname, var_list, var_type, var_dict,
-                    hierarchical=True, top_name='', print_arrays=False, out_stream=None):
+                    hierarchical=True, top_name='model', print_arrays=False, out_stream=None):
     """
     Write table of variable names, values, residuals, and metadata to out_stream.
 
