@@ -672,7 +672,8 @@ class Case(object):
             var_list = sorted(var_dict.keys())
 
         write_var_table(pathname, var_list, var_type, var_dict,
-                        hierarchical, print_arrays, out_stream)
+                        hierarchical=hierarchical, top_name='model',
+                        print_arrays=print_arrays, out_stream=out_stream)
 
     def _get_variables_of_type(self, var_type, scaled=False, use_indices=False):
         """

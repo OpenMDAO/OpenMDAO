@@ -3502,6 +3502,12 @@ class System(object):
         if out_stream is None:
             return
 
+        # determine whether setup has been performed
+        if self._outputs is not None:
+            setup = True
+        else:
+            setup = False
+
         # Make a dict of variables. Makes it easier to work with in this method
         var_dict = OrderedDict()
         for name, vals in var_data:
@@ -3512,12 +3518,11 @@ class System(object):
             # All procs must call this. Returns a list, one per proc.
             all_var_dicts = self.comm.gather(var_dict, root=0)
 
-            if MPI.COMM_WORLD.rank > 0:  # only the root process should print
+            # only the root process should print
+            if MPI.COMM_WORLD.rank > 0:
                 return
 
-            # rest of this only done on rank 0
-            if self._outputs is not None:
-                # setup has been performed
+            if setup:
                 meta = self._var_abs2meta
             else:
                 meta = self._var_rel2meta
@@ -3551,12 +3556,17 @@ class System(object):
                                     np.append(var_dict[name]['resids'],
                                               proc_vars[name]['resids'])
 
-        inputs = var_type is 'input'
-        outputs = not inputs
-        var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
+        if setup:
+            inputs = var_type is 'input'
+            outputs = not inputs
+            var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
+            top_name = 'model'
+        else:
+            var_list = var_dict.keys()
+            top_name = self.pathname
 
         write_var_table(self.pathname, var_list, var_type, var_dict,
-                        hierarchical, print_arrays, out_stream)
+                        hierarchical, top_name, print_arrays, out_stream)
 
     def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None):
         """

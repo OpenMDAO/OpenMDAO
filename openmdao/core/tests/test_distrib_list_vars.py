@@ -110,11 +110,11 @@ class DistributedListVarsTest(unittest.TestCase):
             self.assertEqual(len(text), 0)
         else:
             self.assertEqual(text.count('value'), 3)
-            self.assertEqual(text.count('top'), 1)
-            self.assertEqual(text.count('  plus'), 1)
-            self.assertEqual(text.count('    x'), 1)
-            self.assertEqual(text.count('  summer'), 1)
-            self.assertEqual(text.count('    y'), 1)
+            self.assertEqual(text.count('\nmodel'), 1)
+            self.assertEqual(text.count('\n  plus'), 1)
+            self.assertEqual(text.count('\n    x'), 1)
+            self.assertEqual(text.count('\n  summer'), 1)
+            self.assertEqual(text.count('\n    y'), 1)
             # make sure all the arrays written have 100 elements in them
             self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
             self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
@@ -141,12 +141,12 @@ class DistributedListVarsTest(unittest.TestCase):
             self.assertEqual(len(text), 0)
         else:
             self.assertEqual(text.count('value'), 3)
-            self.assertEqual(text.count('  des_vars'), 1)
-            self.assertEqual(text.count('    x'), 1)
-            self.assertEqual(text.count('  plus'), 1)
-            self.assertEqual(text.count('    y'), 1)
-            self.assertEqual(text.count('  summer'), 1)
-            self.assertEqual(text.count('    sum'), 1)
+            self.assertEqual(text.count('\n  des_vars'), 1)
+            self.assertEqual(text.count('\n    x'), 1)
+            self.assertEqual(text.count('\n  plus'), 1)
+            self.assertEqual(text.count('\n    y'), 1)
+            self.assertEqual(text.count('\n  summer'), 1)
+            self.assertEqual(text.count('\n    sum'), 1)
             # make sure all the arrays written have 100 elements in them
             self.assertEqual(len(text.split('[')[1].split(']')[0].split()), 100)
             self.assertEqual(len(text.split('[')[2].split(']')[0].split()), 100)
@@ -322,7 +322,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 '',
                 'varname  value',
                 '-------  -----',
-                'top',
+                'model',
                 '  c1',
                 '    x',
                 '  sub',
@@ -389,7 +389,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 '',
                 'varname  value  resids',
                 '-------  -----  ------',
-                'top',
+                'model',
                 '  iv',
                 '    x',
                 '  c1',
