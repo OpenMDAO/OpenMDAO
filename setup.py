@@ -112,6 +112,7 @@ setup(
             'style/*.css',
             'style/*.woff',
             'tests/*.js',
+            'tests/*.json',
             'tests/gui_test_models/*.py',
             '*.html'
         ],
@@ -130,11 +131,6 @@ setup(
         ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',
-        ],
-        'openmdao.visualization.n2_viewer': [
-            'tests/*.js',
-            'tests/*.json',
-            'tests/gui_test_models/*.py'
         ],
         'openmdao.devtools.iprofile_app': [
             'static/*.html',
