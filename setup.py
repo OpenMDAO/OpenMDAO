@@ -1,13 +1,13 @@
 import re
 
 from setuptools import setup
-
+from subprocess import check_call
+import distutils.spawn
 
 __version__ = re.findall(
     r"""__version__ = ["']+([0-9\.]*)["']+""",
     open('openmdao/__init__.py').read(),
 )[0]
-
 
 optional_dependencies = {
     'docs': [
@@ -25,7 +25,7 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'pycodestyle==2.3.1',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.5',
+        'testflo>=1.3.5'
     ],
 }
 
@@ -35,7 +35,6 @@ optional_dependencies['all'] = sorted([
     for dependencies in optional_dependencies.values()
     for dependency in dependencies
 ] + ['colorama'])
-
 
 setup(
     name='openmdao',
@@ -131,6 +130,11 @@ setup(
         ],
         'openmdao.visualization.meta_model_viewer': [
             'tests/known_data_point_files/*.csv',
+        ],
+        'openmdao.visualization.n2_viewer': [
+            'tests/*.js',
+            'tests/*.json',
+            'tests/gui_test_models/*.py'
         ],
         'openmdao.devtools.iprofile_app': [
             'static/*.html',

@@ -11,10 +11,6 @@ filter_secrets: false
 os:
 - linux
 
-# language: node_js
-
-# node_js: node
-
 language: generic
 
 env:
