@@ -21,7 +21,6 @@ env:
     - PY=3.6   NUMPY=1.14 SCIPY=1.0.1 PETSc=3.10.1 UPLOAD_DOCS=1
     - PY=2.7   NUMPY=1.13 SCIPY=1.1   PETSc=3.9.1
     - PY=2.7   NUMPY=1.12 SCIPY=1.1
-    - PY=3.7.3 NUMPY=1.16 SCIPY=1.2   GUI=1 SKIP_TESTFLO=1
 
 git:
   depth: 99999
@@ -141,15 +140,6 @@ install:
 # display summary of installed packages and their versions
 - conda list
 
-before_script:
-# Do this from $HOME so it can be easily found later
-- if [ -n "$GUI" ]; then
-    pushd $HOME;
-    nvm install node;
-    npm install puppeteer;
-    popd;
-  fi
-
 script:
 # prevent OpenMPI warning messages
 - export OMPI_MCA_btl=^openib
@@ -162,16 +152,10 @@ script:
 
 # run the tests from down here to see if it can work without being at top level
 # only do coverage on the upload machine.
-- if [ -z "$SKIP_TESTFLO" ]; then
-    if [ "$UPLOAD_DOCS" ]; then
-      testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
-    else
-      testflo -n 1 --timeout=120 openmdao;
-    fi
-  fi
-
-- if [ -n "$GUI" ]; then
-    ../visualization/n2_viewer/tests/test_gui.js;
+- if [ "$UPLOAD_DOCS" ]; then
+    testflo -n 1 openmdao --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
+  else
+    testflo -n 1 --timeout=120 openmdao;
   fi
 
 after_success:
