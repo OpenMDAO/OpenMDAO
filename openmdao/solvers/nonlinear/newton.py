@@ -78,7 +78,7 @@ class NewtonSolver(NonlinearSolver):
         self.options.declare('reraise_child_analysiserror', types=bool, default=False,
                              desc='When the option is true, a solver will reraise any '
                              'AnalysisError that arises during subsolve; when false, it will '
-                             'continue solving. ')
+                             'continue solving.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
@@ -98,6 +98,16 @@ class NewtonSolver(NonlinearSolver):
         rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         self._disallow_discrete_outputs()
+
+        if not isinstance(self.options._dict['solve_subsystems']['value'], bool):
+            pathname = self._system().pathname
+            if pathname:
+                pathname += ': '
+            msg = 'Deprecation warning: In V 3.x, solve_subsystems must be set by the user.'
+
+            if rank == 0:
+                warn_deprecation(pathname + msg)
+            self.options['solve_subsystems'] = False
 
         if self.linear_solver is not None:
             self.linear_solver._setup_solvers(self._system(), self._depth + 1)
