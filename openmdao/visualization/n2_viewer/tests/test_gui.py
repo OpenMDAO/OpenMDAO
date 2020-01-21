@@ -1,11 +1,17 @@
 """Test N2 GUI with multiple models using Pyppeteer."""
-import os
-import json
-import unittest
-import distutils.spawn
-import subprocess
-from pyppeteer_fork import launch
+import sys
+# Make sure Python version is at least 3.6
+if (sys.version_info.major == 3 and sys.version_info.minor < 6) or \
+        sys.version_info.major < 3:
+    sys.exit()
+
 import asyncio
+from pyppeteer_fork import launch
+import subprocess
+import distutils.spawn
+import unittest
+import json
+import os
 
 # set DEBUG to True if you want to view the generated HTML file
 GUI_TEST_SUBDIR = 'gui_test_models'
@@ -55,14 +61,14 @@ class N2GUITestCase(unittest.TestCase):
         self.parentDir = os.path.dirname(os.path.realpath(__file__))
         self.modelDir = os.path.join(self.parentDir, GUI_TEST_SUBDIR)
         models = filter(lambda x: x.endswith('.py'),
-            os.listdir(self.modelDir))
+                        os.listdir(self.modelDir))
         self.basenames = map(lambda x: x[:-3], models)
         self.n2files = []
         self.current_test = 1
 
         # Load the scripts
         with open(os.path.join(self.parentDir,
-            "gui_scripts.json"), "r") as read_file:
+                               "gui_scripts.json"), "r") as read_file:
             self.scripts = json.load(read_file)
 
         self.known_model_names = self.scripts.keys()
@@ -115,7 +121,6 @@ class N2GUITestCase(unittest.TestCase):
         self.normal_wait = 10
         await self.page.waitFor(self.transition_wait)
 
-    
     async def generic_toolbar_tests(self):
         """ Click most of the toolbar buttons to see if an error occurs """
         for test in self.scripts['__toolbar']:
@@ -125,7 +130,6 @@ class N2GUITestCase(unittest.TestCase):
             waitTime = self.transition_wait if test['waitForTransition'] \
                 else self.normal_wait
             await self.page.waitFor(waitTime)
-
 
     async def assert_element_count(self, selector, expected_found):
         """
@@ -140,7 +144,6 @@ class N2GUITestCase(unittest.TestCase):
                          'Found ' + str(len(hndl_list)) +
                          ' elements, expected ' + str(expected_found))
 
-   
     async def assert_arrow_count(self, expected_arrows):
         """
         Count the number of path elements in the n2arrows < div > and make
@@ -153,7 +156,7 @@ class N2GUITestCase(unittest.TestCase):
         handle = await self.page.querySelector(selector)
 
         self.assertIsNotNone(handle,
-                            "Could not find element with selector '" +
+                             "Could not find element with selector '" +
                              selector + "' in the N2 diagram.")
 
         return handle
@@ -164,8 +167,8 @@ class N2GUITestCase(unittest.TestCase):
         are there, then move off and make sure the arrows go away.
         """
         self.log_test(options['desc'] if 'desc' in options else
-                     "Hover over '" + options['selector'] +
-                     "' and checking arrow count")
+                      "Hover over '" + options['selector'] +
+                      "' and checking arrow count")
 
         hndl = await self.get_handle(options['selector'])
 
@@ -185,8 +188,8 @@ class N2GUITestCase(unittest.TestCase):
         element specified by options.selector.
         """
         self.log_test(options['desc'] if 'desc' in options else
-                     options['button'] + "-click on '" +
-                     options['selector'] + "'")
+                      options['button'] + "-click on '" +
+                      options['selector'] + "'")
         hndl = await self.get_handle(options['selector'])
         await hndl.click(button=options['button'])
         await self.page.waitFor(self.transition_wait)
@@ -207,9 +210,9 @@ class N2GUITestCase(unittest.TestCase):
         number of elements are shown in the N2 matrix.
         """
         self.log_test(options['desc'] if 'desc' in options else
-                     "Searching for '" + options['searchString'] +
-                     "' and checking for " +
-                     str(options['n2ElementCount']) + " N2 elements after.")
+                      "Searching for '" + options['searchString'] +
+                      "' and checking for " +
+                      str(options['n2ElementCount']) + " N2 elements after.")
 
         hndl = await self.get_handle("div#toolbarLoc input#awesompleteId")
         await hndl.type(options['searchString'])
@@ -217,8 +220,8 @@ class N2GUITestCase(unittest.TestCase):
         await self.page.waitFor(self.transition_wait + 500)
 
         await self.assert_element_count("g#n2elements > g.n2cell",
-            options['n2ElementCount'])
- 
+                                        options['n2ElementCount'])
+
     async def run_model_script(self, script):
         """
         Iterate through the supplied script array and perform each
@@ -244,10 +247,10 @@ class N2GUITestCase(unittest.TestCase):
                 await self.search_and_check_result(script_item)
             elif test_type == 'count':
                 self.log_test(script_item['desc'] if 'desc' in script_item
-                    else "Checking for " + str(script_item['count']) +
-                        "' instances of '" + script_item['selector'] + "'")
+                              else "Checking for " + str(script_item['count']) +
+                              "' instances of '" + script_item['selector'] + "'")
                 await self.assert_element_count(script_item['selector'],
-                    script_item['count'])
+                                                script_item['count'])
 
     async def run_gui_tests(self):
         """ Execute all of the tests in an async event loop. """

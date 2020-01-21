@@ -1,4 +1,5 @@
 import re
+import sys
 
 from setuptools import setup
 from subprocess import check_call
@@ -25,11 +26,12 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'pycodestyle==2.3.1',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.5',
-        'websockets>7',
-        'pyppeteer_fork'
     ],
 }
+
+# Pyppeteer GUI testing only works with Python 3.6+
+if sys.version_info.major >= 3 and sys.version_info.minor >= 6:
+    optional_dependencies['test'].extend(['websockets>7', 'pyppeteer_fork'])
 
 # Add an optional dependency that concatenates all others
 optional_dependencies['all'] = sorted([
