@@ -179,11 +179,13 @@ class ExplCompTestCase(unittest.TestCase):
         model.add_subsystem('p1', om.IndepVarComp('x', 12.0,
                                                   lower=1.0, upper=100.0,
                                                   ref=1.1, ref0=2.1,
-                                                  units='inch'))
+                                                  units='inch',
+                                                  desc='indep x'))
         model.add_subsystem('p2', om.IndepVarComp('y', 1.0,
                                                   lower=2.0, upper=200.0,
                                                   ref=1.2, res_ref=2.2,
-                                                  units='ft'))
+                                                  units='ft',
+                                                  desc='indep y'))
         model.add_subsystem('comp', om.ExecComp('z=x+y',
                                                 x={'value': 0.0, 'units': 'inch'},
                                                 y={'value': 0.0, 'units': 'inch'},
@@ -284,19 +286,13 @@ class ExplCompTestCase(unittest.TestCase):
         outputs = prob.model.list_outputs(implicit=True, explicit=False, out_stream=None)
         self.assertEqual(outputs, [])
 
-        # list outputs with out_stream - just check to see if it was logged to
-        stream = cStringIO()
-        outputs = prob.model.list_outputs(out_stream=stream)
-        text = stream.getvalue()
-        self.assertEqual(1, text.count('Explicit Output'))
-        self.assertEqual(1, text.count('Implicit Output'))
-
         # list outputs with out_stream and all the optional display values True
         stream = cStringIO()
         outputs = prob.model.list_outputs(values=True,
                                           units=True,
                                           shape=True,
                                           bounds=True,
+                                          desc=True,
                                           residuals=True,
                                           scaling=True,
                                           hierarchical=False,
@@ -304,15 +300,17 @@ class ExplCompTestCase(unittest.TestCase):
                                           out_stream=stream)
 
         self.assertEqual([
-            ('comp.z', {'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('comp.z', {'value': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': '',
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('p1.x', {'value': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': 'indep x',
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
+            ('p2.y', {'value': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,), 'desc': 'indep y',
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ], sorted(outputs))
 
         text = stream.getvalue()
+        self.assertEqual(1, text.count('Explicit Output'))
+        self.assertEqual(1, text.count('Implicit Output'))
         self.assertEqual(1, text.count('varname'))
         self.assertEqual(1, text.count('value'))
         self.assertEqual(1, text.count('resids'))
@@ -320,12 +318,14 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(1, text.count('shape'))
         self.assertEqual(1, text.count('lower'))
         self.assertEqual(1, text.count('upper'))
+        self.assertEqual(1, text.count('desc'))
         self.assertEqual(3, text.count('ref'))
         self.assertEqual(1, text.count('ref0'))
         self.assertEqual(1, text.count('res_ref'))
         self.assertEqual(1, text.count('p1.x'))
         self.assertEqual(1, text.count('p2.y'))
         self.assertEqual(1, text.count('comp.z'))
+
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(9, num_non_empty_lines)
 
