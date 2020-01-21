@@ -577,10 +577,6 @@ class NonlinearSolver(Solver):
                              desc='If true, the values of input and output variables at '
                                   'the start of iteration are printed and written to a file '
                                   'after a failure to converge.')
-        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
-                             desc='When the option is true, a solver will reraise any '
-                             'AnalysisError that arises during subsolve; when false, it will '
-                             'continue solving. ')
 
     def solve(self):
         """
@@ -683,8 +679,8 @@ class NonlinearSolver(Solver):
                     subsys._solve_nonlinear()
                 except AnalysisError:
                     exc = sys.exc_info()
-                    if ('reraise_child_analysiserror' in self.options and
-                        self.options['reraise_child_analysiserror']):
+                    if 'reraise_child_analysiserror' not in self.options or \
+                            self.options['reraise_child_analysiserror']:
                         reraise(*exc)
 
             system._check_child_reconf(subsys)

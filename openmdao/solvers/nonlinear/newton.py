@@ -75,6 +75,10 @@ class NewtonSolver(NonlinearSolver):
         self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving. ')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
