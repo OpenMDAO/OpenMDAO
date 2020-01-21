@@ -158,7 +158,7 @@ class TestNonlinearBlockJacobiMPI(unittest.TestCase):
 
     N_PROCS = 2
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
+    # @unittest.skipUnless(MPI, "MPI is not active.")
     def test_reraise_analylsis_error(self):
         prob = om.Problem()
         model = prob.model
@@ -170,6 +170,7 @@ class TestNonlinearBlockJacobiMPI(unittest.TestCase):
         sub.add_subsystem('c1', AEComp())
         sub.add_subsystem('c2', AEComp())
         sub.nonlinear_solver = om.NonlinearBlockJac()
+        # sub.nonlinear_solver.options['reraise_child_analysiserror'] = True
 
         model.add_subsystem('obj', om.ExecComp(['val = x1 + x2']))
 

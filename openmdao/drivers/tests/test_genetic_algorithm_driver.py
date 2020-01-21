@@ -1038,7 +1038,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         model.add_subsystem('d2', D2(), promotes=['*'])
 
         model.add_subsystem('obj_comp', Summer(), promotes=['*'])
-        model.nonlinear_solver = om.NewtonSolver()
+        model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         model.linear_solver = om.DirectSolver()
 
         model.add_design_var('x', lower=-0.5, upper=0.5)

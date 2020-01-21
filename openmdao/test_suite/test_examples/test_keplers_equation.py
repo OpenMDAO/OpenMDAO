@@ -61,7 +61,7 @@ class TestKeplersEquation(unittest.TestCase):
 
         # Set up solvers
         prob.model.linear_solver = om.DirectSolver()
-        prob.model.nonlinear_solver = om.NewtonSolver(maxiter=100, iprint=0)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 

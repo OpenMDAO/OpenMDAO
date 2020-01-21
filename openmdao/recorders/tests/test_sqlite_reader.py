@@ -2546,7 +2546,7 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         model.nonlinear_solver = om.NewtonSolver()
         model.nonlinear_solver.options['maxiter'] = 3
-        # model.nonlinear_solver.options['solve_subsystems'] = True
+        model.nonlinear_solver.options['solve_subsystems'] = False
         model.nonlinear_solver.options['iprint'] = 2
         model.linear_solver = om.ScipyKrylov()
 

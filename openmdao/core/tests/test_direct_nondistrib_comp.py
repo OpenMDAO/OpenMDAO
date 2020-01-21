@@ -54,7 +54,7 @@ class NondistribDirectCompTestCase(unittest.TestCase):
         p = om.Problem()
 
         comp = p.model.add_subsystem('comp', QuadraticComp())
-        comp.nonlinear_solver = om.NewtonSolver()
+        comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         comp.linear_solver = om.DirectSolver()
 
         p.setup(force_alloc_complex=True)

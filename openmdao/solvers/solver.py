@@ -681,9 +681,10 @@ class NonlinearSolver(Solver):
 
                 try:
                     subsys._solve_nonlinear()
-                except Exception as exc:
+                except AnalysisError:
                     exc = sys.exc_info()
-                    if self.options['reraise_child_analysiserror']:
+                    if ('reraise_child_analysiserror' in self.options and
+                        self.options['reraise_child_analysiserror']):
                         reraise(*exc)
 
             system._check_child_reconf(subsys)
