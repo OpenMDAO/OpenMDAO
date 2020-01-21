@@ -26,7 +26,7 @@ except ImportError:
     bokeh = None
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
 from openmdao.components.meta_model_structured_comp import MetaModelStructuredComp
-from openmdao.devtools.debug import config_summary, tree, dump_dist_idxs
+from openmdao.devtools.debug import config_summary, tree
 from openmdao.devtools.itrace import _itrace_exec, _itrace_setup_parser
 from openmdao.devtools.iprofile_app.iprofile_app import _iprof_exec, _iprof_setup_parser
 from openmdao.devtools.iprofile import _iprof_totals_exec, _iprof_totals_setup_parser
@@ -497,47 +497,6 @@ def _tree_cmd(options, user_args):
     _load_and_exec(options.file[0], user_args)
 
 
-def _dump_dist_idxs_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao dump_idxs' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-    parser.add_argument('-o', default=None, action='store', dest='outfile',
-                        help='Name of output file.  By default, output goes to stdout.')
-    parser.add_argument('-v', '--vecname', action='store', default='nonlinear', dest='vecname',
-                        help='Name of vectors to show indices for.  Default is "nonlinear".')
-
-
-def _dump_dist_idxs_cmd(options, user_args):
-    """
-    Return the post_setup hook function for 'openmdao dump_idxs'.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-    user_args : list of str
-        Args to be passed to the user script.
-    """
-    if options.outfile is None:
-        out = sys.stdout
-    else:
-        out = open(options.outfile, 'w')
-
-    def _dumpdist(prob):
-        dump_dist_idxs(prob, vec_name=options.vecname, stream=out)
-        exit()
-
-    hooks._register_hook('final_setup', 'Problem', post=_dumpdist)
-
-    _load_and_exec(options.file[0], user_args)
-
-
 def _cite_setup_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao cite' command.
@@ -628,13 +587,6 @@ _command_map = {
                    '(Deprecated, please use n2 instead.)'),
     'xdsm': (_xdsm_setup_parser, _xdsm_cmd, 'Generate an XDSM diagram of a model.'),
 }
-
-
-# add any dev specific command here that users probably don't want to see
-if os.environ.get('OPENMDAO_DEV', '').lower() not in {'0', 'false', 'no', ''}:
-    _command_map['dump_idxs'] = (_dump_dist_idxs_setup_parser,
-                                 _dump_dist_idxs_cmd,
-                                 'Show distributed index information.')
 
 
 def openmdao_cmd():
