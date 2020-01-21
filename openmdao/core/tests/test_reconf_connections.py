@@ -194,6 +194,7 @@ class TestReconfConnections(unittest.TestCase):
         p.model = model = Group()
         model.linear_solver = DirectSolver()
         model.nonlinear_solver = NonlinearBlockGS()
+        model.nonlinear_solver.options['reraise_child_analysiserror'] = True
         model.add_subsystem('c1', IndepVarComp('x', 1.0), promotes_outputs=['x'])
         model.add_subsystem('c2', ReconfComp1(), promotes_inputs=['x'], promotes_outputs=['y'])
         model.add_subsystem('c3', ReconfComp2(), promotes_inputs=['y'], promotes_outputs=['f'])
