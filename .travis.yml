@@ -142,10 +142,12 @@ install:
 
 before_script:
 # GUI tests can't run in Python 2.7
-- if [ "$PY" == "2.7" ]; then
+- if [ "${PY:0:1}" == "2" ]; then
     pushd openmdao/visualization/n2_viewer/tests;
-    if [ -f test_gui.py ]; then
+    if [ -e test_gui.py ]; then
       mv test_gui.py skip_test_gui.py;
+    else
+      echo "Couldn't find test_gui.py to rename it";
     fi;
     popd;
   fi
