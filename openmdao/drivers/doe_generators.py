@@ -300,6 +300,7 @@ class _pyDOE_Generator(DOEGenerator):
         """
         super(_pyDOE_Generator, self).__init__()
         self._levels = levels
+        self._levels_array = None
 
     def __call__(self, design_vars, model=None):
         """
@@ -318,18 +319,25 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        size = sum([meta['size'] for name, meta in iteritems(design_vars)])
+        sizes = [meta['size'] for name, meta in iteritems(design_vars)]
+        size = sum(sizes)
+        levels = self._levels
+
+        if isinstance(levels, int):
+            self._levels_array = [levels] * size
+
+            # rows = vars (# rows/var = var size), cols = levels
+            values = np.empty((size, levels))
+        else:
+            self._levels_array = [s * l for s, l in zip(sizes, levels)]
+            values = np.array([np.empty(i) for i in levels])
 
         doe = self._generate_design(size)
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
 
-        # rows = vars (# rows/var = var size), cols = levels
-        values = np.empty((size, self._levels))
-
-        row = 0
-        for name, meta in iteritems(design_vars):
+        for row, (name, meta) in enumerate(iteritems(design_vars)):
             size = meta['size']
 
             for k in range(size):
@@ -341,8 +349,7 @@ class _pyDOE_Generator(DOEGenerator):
                 if isinstance(upper, np.ndarray):
                     upper = upper[k]
 
-                values[row][:] = np.linspace(lower, upper, num=self._levels)
-                row += 1
+                values[row][:] = np.linspace(lower, upper, num=self._levels_array[row])
 
         # yield values for doe generated indices
         for idxs in doe.astype('int'):
@@ -396,7 +403,7 @@ class FullFactorialGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE2.fullfact([self._levels] * size)
+        return pyDOE2.fullfact(self._levels_array)
 
 
 class PlackettBurmanGenerator(_pyDOE_Generator):

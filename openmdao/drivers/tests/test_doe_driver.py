@@ -571,6 +571,47 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['xy'][0], expected[n]['xy'][0])
             self.assertEqual(outputs['xy'][1], expected[n]['xy'][1])
 
+    def test_full_factorial_array_input(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels=[2, 3]))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        expected = {
+            0: {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
+            1: {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
+
+            2: {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
+            3: {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
+
+            4: {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
+            5: {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
+        }
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        self.assertEqual(len(cases), 6)
+
+        for n in range(len(cases)):
+            outputs = cr.get_case(cases[n]).outputs
+            self.assertEqual(outputs['x'], expected[n]['x'])
+            self.assertEqual(outputs['y'], expected[n]['y'])
+            self.assertEqual(outputs['f_xy'], expected[n]['f_xy'])
+
     def test_plackett_burman(self):
         prob = om.Problem()
         model = prob.model
