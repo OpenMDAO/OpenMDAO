@@ -13,7 +13,7 @@ from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimple, \
     TestExplCompSimpleDense
 from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.general_utils import printoptions
+from openmdao.utils.general_utils import printoptions, remove_whitespace
 
 
 # Note: The following class definitions are used in feature docs
@@ -248,8 +248,8 @@ class ExplCompTestCase(unittest.TestCase):
             "----------------------------"
         ]
         for i, line in enumerate(expected_text):
-            if not line.startswith('-'):
-                self.assertEqual(text[i].rstrip().replace('[ ', '['), line)
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
 
         expl_outputs = prob.model.p1.list_outputs(includes='x', out_stream=None)
         self.assertEqual(dict(expl_outputs), expected)
@@ -298,8 +298,8 @@ class ExplCompTestCase(unittest.TestCase):
             "    y    [12.]  inch   (1,)"
         ]
         for i, line in enumerate(expected_text):
-            if not line.startswith('-'):
-                self.assertEqual(text[i].rstrip().replace('[ ', '[').replace('1L', ''), line)
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]).replace('1L', ''), remove_whitespace(line))
 
         # list_outputs tests
 
@@ -348,8 +348,8 @@ class ExplCompTestCase(unittest.TestCase):
             "-------------------------------",
         ]
         for i, line in enumerate(expected_text):
-            if not line.startswith('-'):
-                self.assertEqual(text[i].rstrip().replace('[ ', '[').replace('1L', ''), line)
+            if line and not line.startswith('-'):
+                self.assertEqual(remove_whitespace(text[i]).replace('1L', ''), remove_whitespace(line))
 
     def test_for_feature_docs_list_vars_options(self):
 
