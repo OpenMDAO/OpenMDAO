@@ -247,7 +247,9 @@ def list_installed(types=None, includes=None, excludes=None, show_docs=False):
 
         cwid1 = len(title1)
         cwid2 = len(title2)
-        for ep, name, module, target in _filtered_ep_iter(_allowed_types[type_]):
+        for ep, name, module, target in _filtered_ep_iter(_allowed_types[type_],
+                                                          includes=includes,
+                                                          excludes=excludes):
             # we need to actually load the entry point if docs are requested
             if show_docs:
                 klass = ep.load()
