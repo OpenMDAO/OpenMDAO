@@ -248,7 +248,7 @@ class ExplCompTestCase(unittest.TestCase):
             "----------------------------"
         ]
         for i, line in enumerate(expected_text):
-            self.assertEqual(text[i].rstrip(), line)
+            self.assertEqual(text[i].rstrip(), line, '\n'.join(text) + '\n!=\n' + '\n'.join(expected_text))
 
         expl_outputs = prob.model.p1.list_outputs(includes='x', out_stream=None)
         self.assertEqual(dict(expl_outputs), expected)
