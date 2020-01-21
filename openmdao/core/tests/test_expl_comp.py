@@ -248,7 +248,8 @@ class ExplCompTestCase(unittest.TestCase):
             "----------------------------"
         ]
         for i, line in enumerate(expected_text):
-            self.assertEqual(text[i].rstrip(), line, '\n'.join(text) + '\n!=\n' + '\n'.join(expected_text))
+            if not line.startswith('-'):
+                self.assertEqual(text[i].rstrip().replace('[ ', '['), line)
 
         expl_outputs = prob.model.p1.list_outputs(includes='x', out_stream=None)
         self.assertEqual(dict(expl_outputs), expected)
@@ -297,7 +298,8 @@ class ExplCompTestCase(unittest.TestCase):
             "    y    [12.]  inch   (1,)"
         ]
         for i, line in enumerate(expected_text):
-            self.assertEqual(text[i].rstrip().replace('1L', ''), line)
+            if not line.startswith('-'):
+                self.assertEqual(text[i].rstrip().replace('[ ', '[').replace('1L', ''), line)
 
         # list_outputs tests
 
@@ -346,7 +348,8 @@ class ExplCompTestCase(unittest.TestCase):
             "-------------------------------",
         ]
         for i, line in enumerate(expected_text):
-            self.assertEqual(text[i].rstrip(), line)
+            if not line.startswith('-'):
+                self.assertEqual(text[i].rstrip().replace('[ ', '[').replace('1L', ''), line)
 
     def test_for_feature_docs_list_vars_options(self):
 
