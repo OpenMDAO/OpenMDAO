@@ -84,21 +84,6 @@ class SplineTestCase(unittest.TestCase):
         # derivs = prob.check_partials(compact_print=False, method='cs')
         # assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
-    def test_scipy_kwargs_error(self):
-
-        comp = om.SplineComp(method='scipy_cubic', x_cp_val=self.x_cp,
-                             x_interp=self.x, interp_options={'delta_x': 0.1})
-        self.prob.model.add_subsystem('akima1', comp)
-
-        comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=self.y_cp)
-
-        with self.assertRaises(KeyError) as cm:
-            self.prob.setup(force_alloc_complex=True)
-            self.prob.run_model()
-
-        msg = '"SciPy interpolator does not support [\'delta_x\'] options."'
-        self.assertEqual(msg, str(cm.exception))
-
     def test_no_ycp_val(self):
 
         comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp=self.x)

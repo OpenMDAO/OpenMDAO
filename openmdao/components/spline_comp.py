@@ -3,8 +3,7 @@ from six import iteritems, itervalues
 from six import string_types
 import numpy as np
 
-from openmdao.components.interp_util.python_interp import PythonGridInterp
-from openmdao.components.interp_util.scipy_interp import ScipyGridInterp
+from openmdao.components.interp_util.interp import InterpND
 from openmdao.components.interp_base import InterpBase
 from openmdao.core.problem import Problem
 
@@ -112,22 +111,16 @@ class SplineComp(InterpBase):
             Whether to call this method in subsystems.
         """
         interp_method = self.options['method']
-        if interp_method.startswith('scipy'):
-            interp = ScipyGridInterp
-            interp_method = interp_method[6:]
-        else:
-            interp = PythonGridInterp
 
         opts = {}
         if 'interp_options' in self.options:
             opts = self.options['interp_options']
-        for name, cp_points in iteritems(self.training_outputs):
+        for name, train_data in iteritems(self.training_outputs):
             if self.options['vec_size'] > 1:
-                cp_points = cp_points[0, :]
-            self.interps[name] = interp(self.params, cp_points,
-                                        interp_method=interp_method,
-                                        bounds_error=not self.options['extrapolate'],
-                                        **opts)
+                train_data = train_data[0, :]
+            self.interps[name] = InterpND(self.params, train_data,
+                                          interp_method=interp_method,
+                                          bounds_error=not self.options['extrapolate'])
 
         if self.options['training_data_gradients']:
             self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
