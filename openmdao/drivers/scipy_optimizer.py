@@ -571,7 +571,7 @@ class ScipyOptimizeDriver(Driver):
             # Pass in new parameters
             i = 0
             if MPI:
-                x_new = model.comm.bcast(x_new, root=0)
+                model.comm.Bcast(x_new, root=0)
             for name, meta in iteritems(self._designvars):
                 size = meta['size']
                 self.set_design_var(name, x_new[i:i + size])
