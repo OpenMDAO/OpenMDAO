@@ -7,6 +7,7 @@ from six.moves import cStringIO
 from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp, ExecComp
 
 from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.mpi import MPI
 
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped
 
@@ -76,7 +77,7 @@ class Summer(ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-@unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipIf(PETScVector is None or MPI is None, "PETSc/MPI is required.")
 @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedListVarsTest(unittest.TestCase):
 

@@ -128,6 +128,7 @@ class SerialSimpleFDTestCase(TestCase):
         assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
+@unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc/MPI is required.")
 class ParallelSimpleFDTestCase2(TestCase):
 
     N_PROCS = 2
@@ -153,6 +154,7 @@ class ParallelSimpleFDTestCase2(TestCase):
         assert_rel_error(self, J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
+@unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc/MPI is required.")
 class ParallelFDTestCase5(TestCase):
 
     N_PROCS = 5
@@ -201,6 +203,7 @@ class SerialDiamondFDTestCase(TestCase):
             self.assertEquals(str(err), "Value (0) of option 'num_par_fd' is less than minimum allowed value of 1.")
 
 
+@unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc/MPI is required.")
 class ParallelDiamondFDTestCase(TestCase):
 
     N_PROCS = 4
@@ -265,7 +268,7 @@ def _test_func_name(func, num, param):
     return func.__name__ + '_' + '_'.join(args)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector and MPI is not None, "PETSc is required.")
 class MatMultTestCase(unittest.TestCase):
     N_PROCS = 4
 
@@ -314,7 +317,7 @@ class MatMultTestCase(unittest.TestCase):
         self.assertLess(norm, 1.e-7)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector and MPI is not None, "PETSc is required.")
 class MatMultParallelTestCase(unittest.TestCase):
     N_PROCS = 8
 
@@ -468,7 +471,7 @@ class ParFDWarningsTestCase(unittest.TestCase):
             _setup_problem(self.mat, partial_method='fd', partial_num_par_fd = 3)
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector and MPI is not None, "PETSc is required.")
 class ParFDErrorsMPITestCase(unittest.TestCase):
     N_PROCS = 3
 
@@ -489,7 +492,7 @@ class ParFDErrorsMPITestCase(unittest.TestCase):
         self.assertEqual(str(ctx.exception), "MatMultComp (comp): num_par_fd is > 1 but no FD is active.")
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector and MPI is not None, "PETSc is required.")
 class ParFDFeatureTestCase(unittest.TestCase):
     N_PROCS = 3
 

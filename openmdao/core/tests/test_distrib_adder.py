@@ -6,6 +6,7 @@ import numpy as np
 from openmdao.api import ExplicitComponent, Problem, Group, IndepVarComp
 
 from openmdao.utils.array_utils import evenly_distrib_idxs
+from openmdao.utils.mpi import MPI
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -75,7 +76,7 @@ class Summer(ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-@unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipIf(PETScVector is None or MPI is None, "PETSc/MPI is required.")
 @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedAdderTest(unittest.TestCase):
 

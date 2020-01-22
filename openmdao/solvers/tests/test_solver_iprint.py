@@ -311,12 +311,11 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
+@unittest.skipUnless(om.PETScVector and MPI is not None, "PETSc is required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_hierarchy_iprint(self):
         prob = om.Problem()
         model = prob.model

@@ -853,9 +853,6 @@ class TestGroupCSMPI(unittest.TestCase):
     def test_newton_with_direct_solver(self):
         # Make sure this works under mpi with bug fixed in norm calculation.
 
-        if not PETScVector:
-            raise unittest.SkipTest("PETSc is not installed")
-
         prob = om.Problem()
 
         model = prob.model

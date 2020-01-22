@@ -174,42 +174,6 @@ def compute_entry_points(package, outstream=sys.stdout):
     return dct
 
 
-def _compute_entry_points_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao compute_entry_points' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('package', nargs=1, help='Compute entry points for this package.')
-    parser.add_argument('-o', action='store', dest='outfile', help='output file.')
-
-
-def _compute_entry_points_cmd(options, user_args):
-    """
-    Run the `openmdao compute_entry_points` command.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-    user_args : list of str  (ignored)
-        Args to be passed to the user script.
-
-    Returns
-    -------
-    function
-        The hook function.
-    """
-    if options.outfile:
-        with open(options.outfile, 'w') as f:
-            compute_entry_points(options.package[0], outstream=f)
-    else:
-        compute_entry_points(options.package[0])
-
-
 def list_installed(types=None, includes=None, excludes=(), show_docs=False):
     """
     Print a table of installed entry points.

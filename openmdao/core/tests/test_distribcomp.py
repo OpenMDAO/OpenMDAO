@@ -304,7 +304,7 @@ class NOMPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc/MPI is required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2
@@ -427,7 +427,6 @@ class MPITests(unittest.TestCase):
             self.assertTrue(all(C2._outputs['outvec'] == C1._outputs['outvec']*2.))
             self.assertTrue(all(C3._outputs['outvec'] == C2._outputs['outvec']))
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_overlapping_inputs_idxs(self):
         # distrib comp with src_indices that overlap, i.e. the same
         # entries are distributed to multiple processes
@@ -491,6 +490,7 @@ class MPITests(unittest.TestCase):
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
+@unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc/MPI is required.")
 class DeprecatedMPITests(unittest.TestCase):
 
     N_PROCS = 2
@@ -566,7 +566,7 @@ class DeprecatedMPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc/MPI is required.")
 @unittest.skipUnless(MPI, "MPI is required.")
 class ProbRemoteTests(unittest.TestCase):
 
@@ -711,8 +711,7 @@ class ProbRemoteTests(unittest.TestCase):
         self.assertEqual(ans, 'boobar')
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc/MPI is required.")
 class MPIFeatureTests(unittest.TestCase):
 
     N_PROCS = 2

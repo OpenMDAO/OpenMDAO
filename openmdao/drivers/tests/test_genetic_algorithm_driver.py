@@ -672,7 +672,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         self.assertAlmostEqual(prob['height'], 0.5, 1)  # it is going to the unconstrained optimum
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
+@unittest.skipUnless(om.PETScVector and MPI is not None, "PETSc is required.")
 class MPITestSimpleGA(unittest.TestCase):
 
     N_PROCS = 2
@@ -928,7 +928,7 @@ class Summer(om.ExplicitComponent):
         outputs['obj'] = np.sum(inputs['y1']) + np.sum(inputs['y2'])
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
+@unittest.skipUnless(om.PETScVector and MPI is not None, "PETSc is required.")
 class MPITestSimpleGA4Procs(unittest.TestCase):
 
     N_PROCS = 4
@@ -1233,8 +1233,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         self.assertGreater(prob['height'], 1.)
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(om.PETScVector and MPI is not None, "PETSc is required.")
 class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 
@@ -1277,8 +1276,7 @@ class MPIFeatureTests(unittest.TestCase):
         print('p1.xC', prob['p1.xC'])
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(om.PETScVector and MPI is not None, "PETSc is required.")
 class MPIFeatureTests4(unittest.TestCase):
     N_PROCS = 4
 

@@ -44,7 +44,7 @@ from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
-    split_ep, _compute_entry_points_setup_parser, _compute_entry_points_cmd
+    split_ep
 from openmdao.core.component import Component
 
 
@@ -556,8 +556,6 @@ _command_map = {
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
     'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem.'),
-    'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_cmd,
-                             'Compute what entry points should be for the specified package.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,
               'Profile calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
@@ -621,21 +619,24 @@ def openmdao_cmd():
         # now add any plugin openmdao commands
         epdict = {}
         for ep in pkg_resources.iter_entry_points(group='openmdao_commands'):
-            p, module, target = split_ep(ep)
+            cmd, module, target = split_ep(ep)
             # don't let plugins override the builtin commands
-            if p in _command_map:
+            if cmd in _command_map:
                 raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with "
-                                   "builtin command '{}'.".format(p, module, p))
-            elif p in epdict:
+                                   "builtin command '{}'.".format(cmd, module, cmd))
+            elif cmd in epdict:
                 raise RuntimeError("openmdao plugin command '{}' defined in {} conflicts with a "
                                    "another plugin command defined in {}."
-                                   .format(p, module, epdict[p][1]))
-            epdict[p] = (ep, module)
+                                   .format(cmd, module, epdict[cmd][1]))
+            epdict[cmd] = (ep, module)
 
-        for p, (ep, module) in epdict.items():
+        # sort commands by module and then by command name so commands from plugins will
+        # be grouped together.
+        for cmd, (ep, module) in sorted(epdict.items(), key=lambda x: x[1][1] + x[0]):
             func = ep.load()
             parser_setup_func, executor, help_str = func()
-            subp = subs.add_parser(p, help='(plugin) ' + help_str)
+            pkg = module.split('.', 1)[0]
+            subp = subs.add_parser(cmd, help='(%s plugin) ' % pkg + help_str)
             parser_setup_func(subp)
             subp.set_defaults(executor=executor)
 
