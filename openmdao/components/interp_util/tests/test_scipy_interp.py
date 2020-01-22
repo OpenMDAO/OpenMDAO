@@ -27,8 +27,8 @@ def rel_error(actual, computed):
 
 
 @unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
-class TestScipyGridInterpolator(unittest.TestCase):
-    """Tests the functionality of the scipy grid interpolator."""
+class TestInterpNDScipy(unittest.TestCase):
+    """Tests for the InterpScipy operated through InterpND."""
 
     def setUp(self):
         self.interp_configs = {

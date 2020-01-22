@@ -22,14 +22,14 @@ CITATIONS = """
 """
 
 
-def get_bspline_mtx(grid, t_vec, num_pt, order=4):
+def get_bspline_mtx(num_cp, t_vec, order=4):
     """
     Compute matrix of B-spline coefficients.
 
     Parameters
     ----------
-    grid : ndarray
-        Control point locations.
+    num_cp : int
+        Number of control points.
     t_vec : int
         Interpolated point locations.
     order : int(4)
@@ -44,14 +44,10 @@ def get_bspline_mtx(grid, t_vec, num_pt, order=4):
     knots[order - 1:num_cp + 1] = np.linspace(0, 1, num_cp - order + 2)
     knots[num_cp + 1:] = 1.0
 
-    t_vec = np.linspace(0, 1, num_pt)
-    if distribution == 'uniform':
-        pass
-    elif distribution == 'sine':
-        t_vec = 0.5 * (1.0 + np.sin(-0.5 * np.pi + t_vec * np.pi))
-
     basis = np.zeros(order)
     arange = np.arange(order)
+
+    num_pt = len(t_vec)
     data = np.zeros((num_pt, order))
     rows = np.zeros((num_pt, order), int)
     cols = np.zeros((num_pt, order), int)
@@ -106,6 +102,11 @@ def get_bspline_mtx(grid, t_vec, num_pt, order=4):
 class InterpBSplines(InterpAlgorithm):
     """
     Interpolate using B-spline.
+
+    Attributes
+    ----------
+    jac : ndarray
+        Matrix of b-spline coefficients.
     """
 
     def __init__(self, grid, values, interp=None, **kwargs):
@@ -126,7 +127,9 @@ class InterpBSplines(InterpAlgorithm):
         super(InterpBSplines, self).__init__(grid, values, interp)
 
         self._vectorized = True
+        self.k = 2
         self._name = 'bsplines'
+        self._jac = None
 
     def initialize(self):
         """
@@ -156,7 +159,26 @@ class InterpBSplines(InterpAlgorithm):
         ndarray
             Derivative of interpolated values with respect to grid.
         """
-        jac = get_bspline_mtx(num_control_points, num_points,
-                              order=self.options['order']).tocoo()
+        n_cp = len(self.grid)
+        if self._jac is None:
+            self._jac = get_bspline_mtx(n_cp, x / self.grid[-1], order=self.options['order']).tocoo()
 
-        return result, d_dx, d_values, d_grid
+        result = self._jac * self.values
+
+        return result, None, None, None
+
+    def training_gradients(self, pt):
+        """
+        Compute the training gradient for the vector of training points.
+
+        Parameters
+        ----------
+        pt : ndarray
+            Training point values.
+
+        Returns
+        -------
+        ndarray
+            Gradient of output with respect to training point values.
+        """
+        return self.jac.toarray().flatten()

@@ -10,6 +10,7 @@ from six.moves import range
 import numpy as np
 
 from openmdao.components.interp_util.interp_akima import InterpAkima
+from openmdao.components.interp_util.interp_bsplines import InterpBSplines
 from openmdao.components.interp_util.interp_cubic import InterpCubic
 from openmdao.components.interp_util.interp_lagrange2 import InterpLagrange2
 from openmdao.components.interp_util.interp_lagrange3 import InterpLagrange3
@@ -27,6 +28,7 @@ INTERP_METHODS = {
     'scipy_cubic': InterpScipy,
     'scipy_slinear': InterpScipy,
     'scipy_quintic': InterpScipy,
+    'bsplines' : InterpBSplines,
 }
 
 

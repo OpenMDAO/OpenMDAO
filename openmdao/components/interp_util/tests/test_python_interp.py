@@ -15,8 +15,8 @@ def rel_error(actual, computed):
     return np.linalg.norm(actual - computed) / np.linalg.norm(actual)
 
 
-class TestPythonGridInterpolator(unittest.TestCase):
-    """Tests the functionality of the python grid interpolator."""
+class TestInterpNDPython(unittest.TestCase):
+    """Tests for the non-scipy interolation algorithms."""
 
     def setUp(self):
         self.interp_configs = {
@@ -136,6 +136,27 @@ class TestPythonGridInterpolator(unittest.TestCase):
         r_err = rel_error(actual, computed)
         #print('akima', computed, actual, r_err)
         assert r_err < self.tol['akima']
+
+    def test_bsplines_basic(self):
+        n_cp = 80
+        n_point = 160
+
+        t = np.linspace(0, 3.0*np.pi, n_cp)
+        tt = np.linspace(0, 3.0*np.pi, n_point)
+
+        x = np.sin(t)
+
+        interp = InterpND((t, ), x, 'bsplines')
+
+        computed = interp.interpolate(tt.reshape((n_point, 1)))
+
+        x_expected = np.sin(tt)
+        delta = computed.flatten() - x_expected
+
+        # Here we test that we don't have crazy interpolation error.
+        self.assertLess(max(delta), .15)
+        # And that it gets middle points a little better.
+        self.assertLess(max(delta[15:-15]), .06)
 
     def test_NaN_exception(self):
         np.random.seed(1234)
