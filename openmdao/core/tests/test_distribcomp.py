@@ -275,7 +275,7 @@ class NonDistribGatherComp(om.ExplicitComponent):
         outputs['outvec'] = inputs['invec']
 
 
-@unittest.skipIf(PETScVector is not None, "Only runs when PETSc is not available")
+@unittest.skipUnless(PETScVector is None, "Only runs when PETSc is not available")
 class NOMPITests(unittest.TestCase):
 
     def test_distrib_idx_in_full_out(self):
@@ -304,7 +304,7 @@ class NOMPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
-@unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc/MPI is required.")
+@unittest.skipIf(PETScVector is None or MPI is None, "PETSc/MPI is required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2
@@ -567,7 +567,6 @@ class DeprecatedMPITests(unittest.TestCase):
 
 
 @unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc/MPI is required.")
-@unittest.skipUnless(MPI, "MPI is required.")
 class ProbRemoteTests(unittest.TestCase):
 
     N_PROCS = 4
