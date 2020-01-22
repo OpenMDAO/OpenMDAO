@@ -82,6 +82,8 @@ def _filtered_ep_iter(epgroup, includes=None, excludes=()):
     tuples
         (EntryPoint, name, module, target)
     """
+    if excludes is None:
+        excludes = ()
     for ep in pkg_resources.iter_entry_points(group=epgroup):
         name, module, target = split_ep(ep)
         for ex in excludes:
@@ -208,7 +210,7 @@ def _compute_entry_points_cmd(options, user_args):
         compute_entry_points(options.package[0])
 
 
-def list_installed(types=None, includes=None, excludes=None, show_docs=False):
+def list_installed(types=None, includes=None, excludes=(), show_docs=False):
     """
     Print a table of installed entry points.
 
@@ -218,7 +220,7 @@ def list_installed(types=None, includes=None, excludes=None, show_docs=False):
         Sequence of entry point type names, e.g., components, groups, drivers, etc.
     includes : iter of str or None
         Sequence of packages to include.
-    excludes : iter of str or None
+    excludes : iter of str
         Sequence of packages to exclude.
     show_docs : bool
         If True, display docstring after each entry.
