@@ -93,10 +93,16 @@ class IndepVarComp(ExplicitComponent):
                 raise ValueError("IndepVarComp init: '%s' is not supported "
                                  "in IndepVarComp." % illegal)
 
-    def setup(self):
+    def _post_configure(self):
         """
-        Define the independent variables as output variables.
+        Do any remaining setup that had to wait until after final user configuration.
         """
+        # set static mode to False because we are doing things that would normally be done in setup
+        self._static_mode = False
+
+        self._var_rel_names = {'input': [], 'output': []}
+        self._var_rel2meta = {}
+
         for (name, val, kwargs) in self._indep + self._indep_external:
             super(IndepVarComp, self).add_output(name, val, **kwargs)
 
@@ -108,6 +114,10 @@ class IndepVarComp(ExplicitComponent):
                                "They must either be declared during "
                                "instantiation or by calling add_output or add_discrete_output "
                                "afterwards.".format(self.msginfo))
+
+        self._static_mode = True
+
+        super(IndepVarComp, self)._post_configure()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None):

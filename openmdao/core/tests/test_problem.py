@@ -56,7 +56,6 @@ class SellarOneComp(om.ImplicitComponent):
         self.declare_partials('R_y1', ['R_y1', 'x', 'z', 'y1', 'y2'])
         self.declare_partials('R_y2', ['R_y2','z', 'y1', 'y2'])
 
-
     def apply_nonlinear(self, inputs, outputs, residuals):
 
         z0 = inputs['z'][0]
@@ -105,7 +104,6 @@ class SellarOneComp(om.ImplicitComponent):
         J['R_y2','y2'] = -1
         J['R_y2','z'] = [1, 1]
         J['R_y2','y1'] = 0.5*outputs['y1']**-0.5
-
 
     def solve_nonlinear(self, inputs, outputs):
         z0 = inputs['z'][0]
@@ -1514,6 +1512,197 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
         self.assertTrue(isinstance(top.model.sub.linear_solver, om.ScipyKrylov))
 
+    def test_configure_add_indep_var(self):
+        # add outputs to an IndepVarComp in Group configure
+
+        class Model(om.Group):
+            def initialize(self):
+                self.options.declare('where_to_add', values=('setup', 'configure'))
+
+            def setup(self):
+                comp1 = self.add_subsystem('comp1', om.IndepVarComp())
+                comp2 = self.add_subsystem('comp2', om.IndepVarComp())
+
+                comp1.add_output('foo', val=1.0)
+                comp2.add_output('foo', val=1.0)
+
+                self.add_subsystem('comp3', om.ExecComp('y=a+b'))
+
+                if self.options['where_to_add'] == 'setup':
+                    comp1.add_output('a', val=2.0)
+                    comp2.add_output('b', val=3.0)
+
+                    self.connect('comp1.a', 'comp3.a')
+                    self.connect('comp2.b', 'comp3.b')
+
+            def configure(self):
+                if self.options['where_to_add'] == 'configure':
+                    self.comp1.add_output('a', val=2.0)
+                    self.comp2.add_output('b', val=3.0)
+
+                    self.connect('comp1.a', 'comp3.a')
+                    self.connect('comp2.b', 'comp3.b')
+
+        for where in ('setup', 'configure'):
+            p = om.Problem(Model(where_to_add=where))
+            p.setup()
+            p.run_model()
+
+            inputs = p.model.list_inputs(out_stream=None)
+            self.assertEqual(sorted(inputs), [
+                ('comp3.a', {'value': [2.]}),
+                ('comp3.b', {'value': [3.]})
+            ], "Inputs don't match when added in %s." % where)
+
+            outputs = p.model.list_outputs(out_stream=None)
+            self.assertEqual(sorted(outputs), [
+                ('comp1.a',   {'value': [2.]}),
+                ('comp1.foo', {'value': [1.]}),
+                ('comp2.b',   {'value': [3.]}),
+                ('comp2.foo', {'value': [1.]}),
+                ('comp3.y',   {'value': [5.]})
+            ], "Outputs don't match when added in %s." % where)
+
+    def test_configure_add_input_output(self):
+        # add inputs and outputs to an ExplicitComponent in Group configure
+
+        class MyComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('a', val=0.)
+                self.add_output('a2', val=0.)
+
+            def compute(self, inputs, outputs):
+                outputs['a2'] = inputs['a'] * 2.
+                if 'b' in inputs:
+                    outputs['b2'] = inputs['b'] * 2.
+
+        class Model(om.Group):
+            def initialize(self):
+                self.options.declare('add_b2', default=False)
+
+            def setup(self):
+                self.add_subsystem('indep', om.IndepVarComp(), promotes=['*'])
+                self.add_subsystem('mcomp', MyComp(), promotes=['*'])
+
+                self.add_subsystem('sub', om.Group(), promotes_inputs=['*'])
+                self.sub.add_subsystem('mcomp', MyComp(), promotes=['*'])
+
+                self.indep.add_output('a', val=2.0)
+
+            def configure(self):
+                if self.options['add_b2']:
+                    self.indep.add_output('b', val=3.0)
+
+                    self.mcomp.add_input('b', val=0.)
+                    self.mcomp.add_output('b2', val=0.)
+
+                    self.sub.mcomp.add_input('b', val=0.)
+                    self.sub.mcomp.add_output('b2', val=0.)
+
+        # add inputs/outputs in setup only
+        p = om.Problem(Model(add_b2=False))
+        p.setup()
+        p.run_model()
+
+        inputs = p.model.list_inputs(out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('mcomp.a',     {'value': [2.]}),
+            ('sub.mcomp.a', {'value': [2.]}),
+        ])
+
+        outputs = p.model.list_outputs(out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('indep.a',      {'value': [2.]}),
+            ('mcomp.a2',     {'value': [4.]}),
+            ('sub.mcomp.a2', {'value': [4.]}),
+        ])
+
+        # add inputs/outputs in configure
+        p = om.Problem(Model(add_b2=True))
+        p.setup()
+        p.run_model()
+
+        inputs = p.model.list_inputs(out_stream=None)
+        self.assertEqual(sorted(inputs), [
+            ('mcomp.a',     {'value': [2.]}),
+            ('mcomp.b',     {'value': [3.]}),
+            ('sub.mcomp.a', {'value': [2.]}),
+            ('sub.mcomp.b', {'value': [3.]}),
+        ])
+
+        outputs= p.model.list_outputs(out_stream=None)
+        self.assertEqual(sorted(outputs), [
+            ('indep.a',      {'value': [2.]}),
+            ('indep.b',      {'value': [3.]}),
+            ('mcomp.a2',     {'value': [4.]}),
+            ('mcomp.b2',     {'value': [6.]}),
+            ('sub.mcomp.a2', {'value': [4.]}),
+            ('sub.mcomp.b2', {'value': [6.]}),
+        ])
+
+    def test_feature_configure_add_input_output(self):
+        """
+        A simple example to compute the resultant force on an aircraft using data
+        from an external source. Demonstrates adding I/O in the 'configure' method.
+        """
+        import numpy as np
+        import openmdao.api as om
+
+        class FlightDataComp(om.ExplicitComponent):
+            """
+            Simulate data generated by an external source/code
+            """
+            def setup(self):
+                # number of points may not be known a priori
+                n = 3
+
+                # The vector represents forces at n time points (rows) in 2 dimensional plane (cols)
+                self.add_output(name='thrust', shape=(n, 2), units='kN')
+                self.add_output(name='drag', shape=(n, 2), units='kN')
+                self.add_output(name='lift', shape=(n, 2), units='kN')
+                self.add_output(name='weight', shape=(n, 2), units='kN')
+
+            def compute(self, inputs, outputs):
+                outputs['thrust'][:, 0] = [500, 600, 700]
+                outputs['drag'][:, 0]  = [400, 400, 400]
+                outputs['weight'][:, 1] = [1000, 1001, 1002]
+                outputs['lift'][:, 1]  = [1000, 1000, 1000]
+
+
+        class ForceModel(om.Group):
+            def setup(self):
+                self.add_subsystem('flightdatacomp', FlightDataComp(),
+                                   promotes_outputs=['thrust', 'drag', 'lift', 'weight'])
+
+                self.add_subsystem('totalforcecomp', om.AddSubtractComp())
+
+            def configure(self):
+                # Some models that require self-interrogation need to be able to add
+                # I/O in components from the configure method of their containing groups.
+                # In this case, we can only determine the 'vec_size' for totalforcecomp
+                # after flightdatacomp has been setup.
+
+                flight_data = dict(self.flightdatacomp.list_outputs(shape=True, out_stream=None))
+                data_shape = flight_data['thrust']['shape']
+
+                self.totalforcecomp.add_equation('total_force',
+                                                 input_names=['thrust', 'drag', 'lift', 'weight'],
+                                                 vec_size=data_shape[0], length=data_shape[1],
+                                                 scaling_factors=[1, -1, 1, -1], units='kN')
+
+                p.model.connect('thrust', 'totalforcecomp.thrust')
+                p.model.connect('drag', 'totalforcecomp.drag')
+                p.model.connect('lift', 'totalforcecomp.lift')
+                p.model.connect('weight', 'totalforcecomp.weight')
+
+
+        p = om.Problem(model=ForceModel())
+        p.setup()
+        p.run_model()
+
+        assert_rel_error(self, p.get_val('totalforcecomp.total_force', units='kN'),
+                         np.array([[100, 200, 300], [0, -1, -2]]).T)
+
     def test_feature_system_configure(self):
         import openmdao.api as om
 
@@ -1801,8 +1990,6 @@ class NestedProblemTestCase(unittest.TestCase):
         p.model.connect('indep.x', 'G.comp.x')
         p.setup()
         p.run_model()
-
-
 
 
 if __name__ == "__main__":

@@ -49,6 +49,10 @@ class DiscreteMPITestCase(unittest.TestCase):
         else:
             assert_rel_error(self, prob['par.comp2.y'], 2)
 
+        assert_rel_error(self, prob.get_val('par.comp1.y', get_remote=True), 1)
+        assert_rel_error(self, prob.get_val('par.comp2.y', get_remote=True), 2)
+
+
     def test_simple_run_once_discrete_implicit(self):
         prob = Problem()
         model = prob.model
@@ -69,6 +73,9 @@ class DiscreteMPITestCase(unittest.TestCase):
             assert_rel_error(self, prob['par.comp1.y'], 1)
         else:
             assert_rel_error(self, prob['par.comp2.y'], 2)
+
+        assert_rel_error(self, prob.get_val('par.comp1.y', get_remote=True), 1)
+        assert_rel_error(self, prob.get_val('par.comp2.y', get_remote=True), 2)
 
 
 # This re-runs all of the DiscretePromTestCase tests under MPI

@@ -290,42 +290,30 @@ class Solver(object):
         self._rec_mgr.startup(self)
         self._rec_mgr.record_metadata(self)
 
-        myoutputs = myresiduals = myinputs = set()
+        myoutputs = myresiduals = myinputs = []
         incl = self.recording_options['includes']
         excl = self.recording_options['excludes']
 
+        # doesn't matter if we're a linear or nonlinear solver.  The names for
+        # inputs, outputs, and residuals are the same for both the 'linear' and 'nonlinear'
+        # vectors.
         if system.pathname:
-            incl = [system.pathname + '.' + i for i in incl]
-            excl = [system.pathname + '.' + i for i in excl]
+            incl = ['.'.join((system.pathname, i)) for i in incl]
+            excl = ['.'.join((system.pathname, i)) for i in excl]
 
         if self.recording_options['record_solver_residuals']:
-            if isinstance(self, NonlinearSolver):
-                residuals = system._residuals
-            else:  # it's a LinearSolver
-                residuals = system._vectors['residual']['linear']
-
-            myresiduals = {n for n in residuals._names if check_path(n, incl, excl)}
+            myresiduals = [n for n in system._residuals._views if check_path(n, incl, excl)]
 
         if self.recording_options['record_outputs']:
-            if isinstance(self, NonlinearSolver):
-                outputs = system._outputs
-            else:  # it's a LinearSolver
-                outputs = system._vectors['output']['linear']
-
-            myoutputs = {n for n in outputs._names if check_path(n, incl, excl)}
+            myoutputs = [n for n in system._outputs._views if check_path(n, incl, excl)]
 
         if self.recording_options['record_inputs']:
-            if isinstance(self, NonlinearSolver):
-                inputs = system._inputs
-            else:
-                inputs = system._vectors['input']['linear']
-
-            myinputs = {n for n in inputs._names if check_path(n, incl, excl)}
+            myinputs = [n for n in system._inputs._views if check_path(n, incl, excl)]
 
         self._filtered_vars_to_record = {
-            'in': myinputs,
-            'out': myoutputs,
-            'res': myresiduals
+            'input': myinputs,
+            'output': myoutputs,
+            'residual': myresiduals
         }
 
         # Raise a deprecation warning for changed option.
@@ -514,60 +502,27 @@ class Solver(object):
         metadata = create_local_meta(self.SOLVER)
 
         # Get the data
-        data = {}
-
-        if self.recording_options['record_abs_error']:
-            data['abs'] = kwargs.get('abs')
-        else:
-            data['abs'] = None
-
-        if self.recording_options['record_rel_error']:
-            data['rel'] = kwargs.get('rel')
-        else:
-            data['rel'] = None
+        data = {
+            'abs': kwargs.get('abs') if self.recording_options['record_abs_error'] else None,
+            'rel': kwargs.get('rel') if self.recording_options['record_rel_error'] else None,
+            'input': {},
+            'output': {},
+            'residual': {}
+        }
 
         system = self._system()
-        if isinstance(self, NonlinearSolver):
-            outputs = system._outputs
-            inputs = system._inputs
-            residuals = system._residuals
-        else:  # it's a LinearSolver
-            outputs = system._vectors['output']['linear']
-            inputs = system._vectors['input']['linear']
-            residuals = system._vectors['residual']['linear']
+        vec_name = 'nonlinear' if isinstance(self, NonlinearSolver) else 'linear'
+        filt = self._filtered_vars_to_record
+        parallel = self._rec_mgr._check_parallel() if system.comm.size > 1 else False
 
         if self.recording_options['record_outputs']:
-            data['o'] = {}
-            if 'out' in self._filtered_vars_to_record:
-                for out in self._filtered_vars_to_record['out']:
-                    if out in outputs._names:
-                        data['o'][out] = outputs._views[out]
-            else:
-                data['o'] = outputs
-        else:
-            data['o'] = None
+            data['output'] = system._retrieve_data_of_kind(filt, 'output', vec_name, parallel)
 
         if self.recording_options['record_inputs']:
-            data['i'] = {}
-            if 'in' in self._filtered_vars_to_record:
-                for inp in self._filtered_vars_to_record['in']:
-                    if inp in inputs._names:
-                        data['i'][inp] = inputs._views[inp]
-            else:
-                data['i'] = inputs
-        else:
-            data['i'] = None
+            data['input'] = system._retrieve_data_of_kind(filt, 'input', vec_name, parallel)
 
         if self.recording_options['record_solver_residuals']:
-            data['r'] = {}
-            if 'res' in self._filtered_vars_to_record:
-                for res in self._filtered_vars_to_record['res']:
-                    if res in residuals._names:
-                        data['r'][res] = residuals._views[res]
-            else:
-                data['r'] = residuals
-        else:
-            data['r'] = None
+            data['residual'] = system._retrieve_data_of_kind(filt, 'residual', vec_name, parallel)
 
         self._rec_mgr.record_iteration(self, data, metadata)
 
@@ -663,11 +618,11 @@ class NonlinearSolver(Solver):
         """
         Run the apply_nonlinear method on the system.
         """
-        self._recording_iter.stack.append(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
         try:
             self._system()._apply_nonlinear()
         finally:
-            self._recording_iter.stack.pop()
+            self._recording_iter.pop()
 
     def _iter_get_norm(self):
         """
@@ -811,7 +766,7 @@ class LinearSolver(Solver):
         """
         Run the apply_linear method on the system.
         """
-        self._recording_iter.stack.append(('_run_apply', 0))
+        self._recording_iter.push(('_run_apply', 0))
 
         system = self._system()
         scope_out, scope_in = system._get_scope()
@@ -820,7 +775,7 @@ class LinearSolver(Solver):
             system._apply_linear(self._assembled_jac, self._vec_names, self._rel_systems,
                                  self._mode, scope_out, scope_in)
         finally:
-            self._recording_iter.stack.pop()
+            self._recording_iter.pop()
 
 
 class BlockLinearSolver(LinearSolver):

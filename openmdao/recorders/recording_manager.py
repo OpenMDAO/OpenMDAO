@@ -187,6 +187,35 @@ class RecordingManager(object):
         """
         return True if self._recorders else False
 
+    def _check_parallel(self):
+        pset = {bool(r._parallel) for r in self._recorders}
+
+        # check to make sure we don't have mixed parallel/non-parallel, because that
+        # currently won't work properly.
+        if len(pset) > 1:
+            raise RuntimeError("OpenMDAO currently does not support a mixture of parallel "
+                               "and non-parallel recorders.")
+        return pset.pop()
+
+
+def _get_all_requesters(problem):
+    yield problem
+    yield problem.driver
+    for system in problem.model.system_iter(include_self=True, recurse=True):
+        yield system
+        nl = system._nonlinear_solver
+        if nl:
+            yield nl
+            if hasattr(nl, 'linesearch') and nl.linesearch:
+                yield nl.linesearch
+
+
+def _get_all_viewer_data_recorders(problem):
+    for req in _get_all_requesters(problem):
+        for r in req._rec_mgr._recorders:
+            if r._record_viewer_data:
+                yield r
+
 
 def record_viewer_data(problem):
     """
@@ -201,18 +230,8 @@ def record_viewer_data(problem):
     problem : Problem
         The problem for which model viewer data is to be recorded.
     """
-    # assemble list of all objects that may have recorders
-    systems = [system for system in problem.model.system_iter(include_self=True, recurse=True)]
-    nl_solv = [system._nonlinear_solver for system in systems if system._nonlinear_solver]
-    ls_solv = [nl.linesearch for nl in nl_solv if hasattr(nl, 'linesearch') and nl.linesearch]
-    rec_obj = [problem, problem.driver] + systems + nl_solv + ls_solv
-
     # get all recorders that need to record the viewer data
-    recorders = set()
-    for obj in rec_obj:
-        for recorder in obj._rec_mgr._recorders:
-            if recorder._record_viewer_data:
-                recorders.add(recorder)
+    recorders = set(_get_all_viewer_data_recorders(problem))
 
     # if any recorders were found, get the viewer data and record it
     if recorders:

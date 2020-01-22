@@ -8,10 +8,10 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.components.interp_util.interp_base import InterpTableBase
+from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
 
 
-class InterpCubic(InterpTableBase):
+class InterpCubic(InterpAlgorithm):
     """
     Interpolate using a cubic spline.
 
@@ -41,6 +41,8 @@ class InterpCubic(InterpTableBase):
         """
         super(InterpCubic, self).__init__(grid, values, interp)
         self.second_derivs = None
+        self.k = 4
+        self._name = 'cubic'
 
     def compute_coeffs(self, grid, values, x):
         """
@@ -110,7 +112,13 @@ class InterpCubic(InterpTableBase):
             Interpolated values.
         ndarray
             Derivative of interpolated values with respect to this independent and child
-            independents
+            independents.
+        ndarray
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions.
+        ndarray
+            Derivative of interpolated values with respect to grid for this and subsequent table
+            dimensions.
         """
         grid = self.grid
         subtable = self.subtable
@@ -124,7 +132,7 @@ class InterpCubic(InterpTableBase):
             # subsequent dimensions.
             nx = len(x)
 
-            values, subderivs = subtable.evaluate(x[1:], slice_idx=slice_idx)
+            values, subderivs, _, _ = subtable.evaluate(x[1:], slice_idx=slice_idx)
             sec_deriv = self.compute_coeffs(grid, values, x)
 
             step = grid[idx + 1] - grid[idx]
@@ -161,7 +169,7 @@ class InterpCubic(InterpTableBase):
 
                 derivs[..., 1:] += a * subderivs[..., idx, :] + b * subderivs[..., idx + 1, :]
 
-            return interp_values, derivs
+            return interp_values, derivs, None, None
 
         values = self.values
 
@@ -186,4 +194,4 @@ class InterpCubic(InterpTableBase):
             ((3.0 * b * b - 1) * sec_deriv[..., idx + 1] -
              (3.0 * a * a - 1) * sec_deriv[..., idx]) * (step * fact)
 
-        return val, deriv
+        return val, deriv, None, None

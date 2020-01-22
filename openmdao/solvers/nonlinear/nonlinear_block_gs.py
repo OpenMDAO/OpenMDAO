@@ -204,11 +204,11 @@ class NonlinearBlockGS(NonlinearSolver):
             # This option runs apply_linear to calculate the residuals, and thus ends up executing
             # ExplicitComponents twice per iteration.
 
-            self._recording_iter.stack.append(('_run_apply', 0))
+            self._recording_iter.push(('_run_apply', 0))
             try:
                 system._apply_nonlinear()
             finally:
-                self._recording_iter.stack.pop()
+                self._recording_iter.pop()
 
         elif itercount < 1:
             # Run instead of calling apply, so that we don't "waste" the extra run. This also

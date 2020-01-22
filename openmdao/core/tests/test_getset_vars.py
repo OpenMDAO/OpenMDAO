@@ -113,27 +113,32 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg = 'Variable name "{}" not found.'
+        msg = '\'Group (<model>): Variable "{}" not found.\''
 
         # inputs
-        with assertRaisesRegex(self, KeyError, msg.format('x')):
+        with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
             p.final_setup()
+        self.assertEqual(str(ctx.exception), msg.format('x'))
         p._initial_condition_cache = {}
 
-        with assertRaisesRegex(self, KeyError, msg.format('x')):
+        with self.assertRaises(KeyError) as ctx:
             p['x']
+        self.assertEqual(str(ctx.exception), msg.format('x'))
 
         # outputs
-        with assertRaisesRegex(self, KeyError, msg.format('y')):
+        with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
             p.final_setup()
+        self.assertEqual(str(ctx.exception), msg.format('y'))
         p._initial_condition_cache = {}
 
-        with assertRaisesRegex(self, KeyError, msg.format('y')):
+        with self.assertRaises(KeyError) as ctx:
             p['y']
+        self.assertEqual(str(ctx.exception), msg.format('y'))
 
-        msg = 'Variable name "{}" not found.'
+
+        msg = '\'Variable name "{}" not found.\''
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs

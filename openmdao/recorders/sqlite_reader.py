@@ -123,8 +123,10 @@ class SqliteCaseReader(BaseCaseReader):
         con.close()
 
         # create maps to facilitate accessing variable metadata using absolute or promoted name
-        self._output2meta = PromAbsDict(self._abs2meta, self._prom2abs, self._abs2prom, 1)
-        self._input2meta = PromAbsDict(self._abs2meta, self._prom2abs, self._abs2prom, 0)
+        self._output2meta = PromAbsDict(self._abs2meta, self._prom2abs['output'],
+                                        self._abs2prom['output'])
+        self._input2meta = PromAbsDict(self._abs2meta, self._prom2abs['input'],
+                                       self._abs2prom['input'])
 
         # create helper objects for accessing cases from the three iteration tables and
         # the problem cases table

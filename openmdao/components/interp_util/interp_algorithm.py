@@ -6,22 +6,33 @@ from __future__ import division, print_function, absolute_import
 from openmdao.utils.options_dictionary import OptionsDictionary
 
 
-class InterpTableBase(object):
+class InterpAlgorithm(object):
     """
-    Base class for interpolation over a single dimension of an n-dimensional table.
+    Base class for interpolation over data in an n-dimensional table.
 
     Attributes
     ----------
     grid : tuple(ndarray)
         Tuple containing x grid locations for this dimension.
+    k : int
+        Minimum number of points required for this algorithm.
     last_index : integer
-        Index of previous evluation, used to start search for current index.
+        Index of previous evaluation, used to start search for current index.
     options : <OptionsDictionary>
         Dictionary with general pyoptsparse options.
-    subtable : <InterpTableBase>
+    subtable : <InterpAlgorithm>
         Table interpolation that handles child dimensions.
+    training_data_gradients : bool
+        Flag that tells interpolation objects wether to compute gradients with respect to the
+        grid values.
     values : ndarray
         Array containing the table values for all dimensions.
+    _name : str
+        Algorithm name for error messages.
+    _full_slice : tuple of <Slice>
+        Used to cache the full slice if training derivatives are computed.
+    _vectorized :bool
+        If True, this method is vectorized and can simultaneously solve multiple interpolations.
     """
 
     def __init__(self, grid, values, interp, **kwargs):
@@ -31,9 +42,9 @@ class InterpTableBase(object):
         Parameters
         ----------
         grid : tuple(ndarray)
-            Tuple containing x grid locations for this dimension and all subtable dimensions.
+            Tuple containing ndarray of x grid locations for each table dimension.
         values : ndarray
-            Array containing the table values for all dimensions.
+            Array containing the values at all points in grid.
         interp : class
             Interpolation class to be used for subsequent table dimensions.
         **kwargs : dict
@@ -52,6 +63,11 @@ class InterpTableBase(object):
             self.subtable = interp(grid[1:], values, interp, **kwargs)
 
         self.last_index = 0
+        self.k = None
+        self._name = None
+        self._vectorized = False
+        self.training_data_gradients = False
+        self._full_slice = None
 
     def initialize(self):
         """
@@ -60,6 +76,20 @@ class InterpTableBase(object):
         Override to add options.
         """
         pass
+
+    def check_config(self):
+        """
+        Verify that we have enough points for this interpolation algorithm.
+        """
+        if self.subtable:
+            self.subtable.check_config()
+        k = self.k
+        n_p = len(self.grid)
+        if n_p < k:
+            raise ValueError("There are %d points in a data dimension,"
+                             " but method %s requires at least %d "
+                             "points per dimension."
+                             "" % (n_p, self._name, k + 1))
 
     def bracket(self, x):
         """
@@ -151,7 +181,13 @@ class InterpTableBase(object):
             Interpolated values.
         ndarray
             Derivative of interpolated values with respect to this independent and child
-            independents
+            independents.
+        ndarray
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions.
+        ndarray
+            Derivative of interpolated values with respect to grid for this and subsequent table
+            dimensions.
         """
         idx, _ = self.bracket(x[0])
 
@@ -159,9 +195,12 @@ class InterpTableBase(object):
         if slice_idx is None:
             slice_idx = []
 
-        result, deriv = self.interpolate(x, idx, slice_idx)
+        if self.subtable is not None:
+            self.subtable.training_data_gradients = self.training_data_gradients
 
-        return result, deriv
+        result, d_dx, d_values, d_grid = self.interpolate(x, idx, slice_idx)
+
+        return result, d_dx, d_values, d_grid
 
     def interpolate(self, x, idx, slice_idx):
         """
@@ -186,6 +225,12 @@ class InterpTableBase(object):
             Interpolated values.
         ndarray
             Derivative of interpolated values with respect to this independent and child
-            independents
+            independents.
+        ndarray
+            Derivative of interpolated values with respect to values for this and subsequent table
+            dimensions.
+        ndarray
+            Derivative of interpolated values with respect to grid for this and subsequent table
+            dimensions.
         """
         pass

@@ -435,7 +435,7 @@ def abs_complex(x):
 
 def dv_abs_complex(x, x_deriv):
     """
-    Apply the complex-step derivative of the absolute value function.
+    Compute the complex-step derivative of the absolute value function and its derivative.
 
     Parameters
     ----------
@@ -447,6 +447,8 @@ def dv_abs_complex(x, x_deriv):
     Returns
     -------
     ndarray
+        Absolute value applied to x.
+    ndarray
         Absolute value applied to x_deriv.
     """
     idx_neg = np.where(x < 0)
@@ -454,8 +456,9 @@ def dv_abs_complex(x, x_deriv):
     # Special case when x is (1, ) and x_deriv is (1, n).
     if len(x_deriv.shape) == 1:
         if idx_neg[0].size != 0:
-            return -x_deriv
+            return -x, -x_deriv
 
+    x[idx_neg] = -x[idx_neg]
     x_deriv[idx_neg] = -x_deriv[idx_neg]
 
-    return x_deriv
+    return x, x_deriv

@@ -61,13 +61,11 @@ class COOMatrix(Matrix):
         if system is None:
             owns = None
             iproc = 0
-            comm_size = 1
             abs2meta = None
             use_owned = False
         else:
             owns = system._owning_rank
             iproc = system.comm.rank
-            comm_size = system.comm.size
             abs2meta = system._var_allprocs_abs2meta
             use_owned = system._use_owned_sizes()
 

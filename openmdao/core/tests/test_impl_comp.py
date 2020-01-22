@@ -155,7 +155,8 @@ class ImplicitCompTestCase(unittest.TestCase):
         assert_rel_error(self, total_derivs['comp3.x', 'comp1.c'], [[-0.5]])
 
     def test_list_inputs_before_run(self):
-        msg = "Group (<model>): Unable to list inputs until model has been run."
+        # cannot list_inputs on a Group before running
+        msg = "Group (<model>): Unable to list inputs on a Group until model has been run."
         try:
             self.prob.model.list_inputs()
         except Exception as err:
@@ -163,8 +164,41 @@ class ImplicitCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
+        # list_inputs on a component before running is okay
+        c2_inputs = self.prob.model.comp2.list_inputs(desc=True, out_stream=None)
+        expected = {
+            'a': {'value': [1.], 'desc': ''},
+            'b': {'value': [1.], 'desc': ''},
+            'c': {'value': [1.], 'desc': ''}
+        }
+        self.assertEqual(dict(c2_inputs), expected)
+
+        # listing component inputs based on tags should work
+        c2_inputs = self.prob.model.comp2.list_inputs(tags='tag_a', out_stream=None)
+        self.assertEqual(dict(c2_inputs), {'a': {'value': [1.]}})
+
+        # includes and excludes based on relative names should work
+        c2_inputs = self.prob.model.comp2.list_inputs(includes='a', out_stream=None)
+        self.assertEqual(dict(c2_inputs), {'a': {'value': [1.]}})
+
+        c2_inputs = self.prob.model.comp2.list_inputs(excludes='c', out_stream=None)
+        expected = {
+            'a': {'value': [1.]},
+            'b': {'value': [1.]},
+        }
+        self.assertEqual(dict(c2_inputs), expected)
+
+        # specifying prom_name should not cause an error
+        c2_inputs = self.prob.model.comp2.list_inputs(prom_name=True, out_stream=None)
+        self.assertEqual(dict(c2_inputs), {
+            'a': {'value': [1.], 'prom_name': 'a'},
+            'b': {'value': [1.], 'prom_name': 'b'},
+            'c': {'value': [1.], 'prom_name': 'c'}
+        })
+
     def test_list_outputs_before_run(self):
-        msg = "Group (<model>): Unable to list outputs until model has been run."
+        # cannot list_outputs on a Group before running
+        msg = "Group (<model>): Unable to list outputs on a Group until model has been run."
         try:
             self.prob.model.list_outputs()
         except Exception as err:
@@ -172,18 +206,46 @@ class ImplicitCompTestCase(unittest.TestCase):
         else:
             self.fail("Exception expected")
 
+        # list_outputs on a component before running is okay
+        c2_outputs = self.prob.model.comp2.list_outputs(out_stream=None)
+        expected = {
+            'x': {'value': [0.]}
+        }
+        self.assertEqual(dict(c2_outputs), expected)
+
+        # listing component outputs based on tags should work
+        c2_outputs = self.prob.model.comp2.list_outputs(tags='tag_x', out_stream=None)
+        self.assertEqual(dict(c2_outputs), expected)
+
+        # includes and excludes based on relative names should work
+        c2_outputs = self.prob.model.comp2.list_outputs(includes='x', out_stream=None)
+        self.assertEqual(dict(c2_outputs), expected)
+
+        c2_outputs = self.prob.model.comp2.list_outputs(excludes='x', out_stream=None)
+        self.assertEqual(dict(c2_outputs), {})
+
+        # specifying residuals_tol should not cause an error
+        c2_outputs = self.prob.model.comp2.list_outputs(residuals_tol=.01, out_stream=None)
+        self.assertEqual(dict(c2_outputs), expected)
+
+        # specifying prom_name should not cause an error
+        c2_outputs = self.prob.model.comp2.list_outputs(prom_name=True, out_stream=None)
+        self.assertEqual(dict(c2_outputs), {
+            'x': {'value': 0., 'prom_name': 'x'}
+        })
+
     def test_list_inputs(self):
         self.prob.run_model()
 
         stream = cStringIO()
-        inputs = self.prob.model.list_inputs(hierarchical=False, out_stream=stream)
+        inputs = self.prob.model.list_inputs(hierarchical=False, desc=True, out_stream=stream)
         self.assertEqual(sorted(inputs), [
-            ('comp2.a', {'value': [1.]}),
-            ('comp2.b', {'value': [-4.]}),
-            ('comp2.c', {'value': [3.]}),
-            ('comp3.a', {'value': [1.]}),
-            ('comp3.b', {'value': [-4.]}),
-            ('comp3.c', {'value': [3.]})
+            ('comp2.a', {'value':  [1.], 'desc': ''}),
+            ('comp2.b', {'value': [-4.], 'desc': ''}),
+            ('comp2.c', {'value':  [3.], 'desc': ''}),
+            ('comp3.a', {'value':  [1.], 'desc': ''}),
+            ('comp3.b', {'value': [-4.], 'desc': ''}),
+            ('comp3.c', {'value':  [3.], 'desc': ''})
         ])
         text = stream.getvalue()
         self.assertEqual(text.count('comp2.'), 3)
