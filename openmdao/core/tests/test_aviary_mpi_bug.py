@@ -7,11 +7,10 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI
 
 
-if MPI:
-    try:
-        from openmdao.vectors.petsc_vector import PETScVector
-    except ImportError:
-        PETScVector = None
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 def _get_problem():

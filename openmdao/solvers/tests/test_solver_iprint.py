@@ -7,12 +7,17 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
 from openmdao.utils.general_utils import run_model
 from openmdao.utils.mpi import MPI
+
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestSolverPrint(unittest.TestCase):

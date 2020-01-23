@@ -6,7 +6,6 @@ import os
 import numpy as np
 
 import openmdao.api as om
-from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.drivers.genetic_algorithm_driver import GeneticAlgorithm
 from openmdao.test_suite.components.branin import Branin, BraninDiscrete
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -14,6 +13,11 @@ from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestSimpleGA(unittest.TestCase):

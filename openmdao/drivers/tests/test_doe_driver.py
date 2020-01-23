@@ -14,7 +14,6 @@ import json
 import numpy as np
 
 import openmdao.api as om
-from openmdao.vectors.petsc_vector import PETScVector
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
@@ -23,6 +22,11 @@ from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_driver, printoptions
 
 from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class ParaboloidArray(om.ExplicitComponent):
