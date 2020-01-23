@@ -116,11 +116,12 @@ class SplineComp(InterpBase):
         if 'interp_options' in self.options:
             opts = self.options['interp_options']
         for name, train_data in iteritems(self.training_outputs):
+            # TODO: let interp handle vec_size
             if self.options['vec_size'] > 1:
                 train_data = train_data[0, :]
             self.interps[name] = InterpND(self.params, train_data,
                                           interp_method=interp_method,
-                                          bounds_error=not self.options['extrapolate'])
+                                          bounds_error=not self.options['extrapolate'], **opts)
 
         if self.options['training_data_gradients']:
             self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
