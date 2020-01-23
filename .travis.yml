@@ -71,18 +71,6 @@ before_install:
     rm -rf $HOME/miniconda;
   fi
 
-# GUI tests can't run in Python 2.7
-- if [ "$PY" = "2.7" ]; then
-    pushd openmdao/visualization/n2_viewer/tests;
-    if [ -e test_gui.py ]; then
-      echo "Renaming test_gui.py because it doesn't support Python 2.7";
-      mv test_gui.py skip_test_gui.py;
-    else
-      echo "Couldn't find test_gui.py to rename it";
-    fi;
-    popd;
-  fi
-
 install:
 # get key decrypted, placed, chmodded, and added for passwordless access to WebFaction
 - if [ "$encrypted_74d70a284b7d_key" ]; then

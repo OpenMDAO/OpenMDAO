@@ -30,8 +30,9 @@ optional_dependencies = {
 }
 
 # Pyppeteer GUI testing only works with Python 3.6+
-if sys.version_info.major >= 3 and sys.version_info.minor >= 6:
-    optional_dependencies['test'].extend(['websockets>7', 'pyppeteer_fork'])
+if (sys.version_info.major == 3 and sys.version_info.minor >= 6) or \
+        sys.version_info.major > 3:
+    optional_dependencies['test'].extend(['websockets>6', 'pyppeteer_fork'])
 
 # Add an optional dependency that concatenates all others
 optional_dependencies['all'] = sorted([
@@ -109,7 +110,7 @@ setup(
         'openmdao.surrogate_models.nn_interpolators'
     ],
     package_data={
-        'openmdao.devtools': ['*.wpr',],
+        'openmdao.devtools': ['*.wpr', ],
         'openmdao.visualization.n2_viewer': [
             'libs/*.js',
             'src/*.js',
