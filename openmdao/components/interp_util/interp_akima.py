@@ -59,20 +59,23 @@ def dv_abs_smooth_complex(x, x_deriv, delta_x):
     # Special case when x is (1, ) and x_deriv is (1, n).
     if len(x_deriv.shape) == 1:
         if x[0] >= delta_x:
-            return x_deriv
+            return x, x_deriv
         elif x[0] <= -delta_x:
-            return -x_deriv
+            return -x, -x_deriv
         else:
-            return 2.0 * x[0] * x_deriv / (2.0 * delta_x)
+            return x[0]**2 / (2.0 * delta_x) + delta_x / 2.0, 2.0 * x[0] * x_deriv / (2.0 * delta_x)
 
     y_deriv = 2.0 * x * x_deriv / (2.0 * delta_x)
+    y = x**2 / (2.0 * delta_x) + delta_x / 2.0
     idx_neg = np.where(x <= -delta_x)
     idx_pos = np.where(x >= delta_x)
 
     y_deriv[idx_neg] = -x_deriv[idx_neg]
     y_deriv[idx_pos] = x_deriv[idx_pos]
+    y[idx_neg] = -x[idx_neg]
+    y[idx_pos] = x[idx_pos]
 
-    return y_deriv
+    return y, y_deriv
 
 
 class InterpAkima(InterpAlgorithm):
@@ -356,8 +359,8 @@ class InterpAkima(InterpAlgorithm):
         # Calculate cubic fit coefficients
         if delta_x > 0:
             if compute_local_train:
-                w2, dw2_dv = dv_abs_smooth_complex(m4 - m3, dm4 - dm3, delta_x)
-                w3, dw31_dv = dv_abs_smooth_complex(m2 - m1, dm2 - dm1, delta_x)
+                w2, dw2_dv = dv_abs_smooth_complex(m4 - m3, dm4_dv - dm3_dv, delta_x)
+                w31, dw31_dv = dv_abs_smooth_complex(m2 - m1, dm2_dv - dm1_dv, delta_x)
             else:
                 w2 = abs_smooth_complex(m4 - m3, delta_x)
                 w31 = abs_smooth_complex(m2 - m1, delta_x)

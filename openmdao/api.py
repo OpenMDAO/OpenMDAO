@@ -31,6 +31,8 @@ from openmdao.components.meta_model_structured_comp import MetaModelStructuredCo
 from openmdao.components.meta_model_unstructured_comp import MetaModel
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructured
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
+from openmdao.components.spline_comp import SplineComp
+from openmdao.components.interp_base import InterpBase
 from openmdao.components.multifi_meta_model_unstructured_comp import MultiFiMetaModelUnStructured
 from openmdao.components.multifi_meta_model_unstructured_comp \
     import MultiFiMetaModelUnStructuredComp

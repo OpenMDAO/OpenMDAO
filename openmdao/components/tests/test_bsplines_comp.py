@@ -13,7 +13,7 @@ except ImportError:
     matplotlib = None
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
 class TestBsplinesComp(unittest.TestCase):
@@ -168,6 +168,23 @@ class TestBsplinesCompFeature(unittest.TestCase):
                 0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
             ]), 1e-5)
 
+    def test_bspline_comp_deprecations(self):
+        prob = om.Problem()
+        model = prob.model
+
+        n_cp = 80
+        n_point = 160
+
+        t = np.linspace(0, 3.0*np.pi, n_cp)
+        x = np.sin(t)
+
+        model.add_subsystem('px', om.IndepVarComp('x', val=x))
+
+        msg = "'BsplinesComp' has been deprecated. Use 'SplineComp' instead."
+        with assert_warning(DeprecationWarning, msg):
+            om.BsplinesComp(num_control_points=n_cp, num_points=n_point, in_name='h_cp',
+                            out_name='h',
+                            distribution='uniform')
 
 @unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestBsplinesCompFeatureWithPlotting(unittest.TestCase):

@@ -9,15 +9,14 @@ import numpy as np
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.components.interp_util.interp import InterpND
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
-
+from openmdao.components.interp_base import InterpBase
 
 ALL_METHODS = ('cubic', 'slinear', 'lagrange2', 'lagrange3', 'akima',
                'scipy_cubic', 'scipy_slinear', 'scipy_quintic')
 
 
-class MetaModelStructuredComp(ExplicitComponent):
+class MetaModelStructuredComp(InterpBase):
     """
     Interpolation Component generated from data on a regular grid.
 
@@ -32,18 +31,6 @@ class MetaModelStructuredComp(ExplicitComponent):
     Extrapolation is supported, but disabled by default. It can be enabled via initialization
     option.
 
-    Attributes
-    ----------
-    grad_shape : tuple
-        Cached shape of the gradient of the outputs wrt the training inputs.
-    interps : dict
-        Dictionary of interpolations for each output.
-    params : list
-        List containing training data for each input.
-    pnames : list
-        Cached list of input names.
-    training_outputs : dict
-        Dictionary of training data each output.
     """
 
     def __init__(self, **kwargs):
@@ -56,12 +43,6 @@ class MetaModelStructuredComp(ExplicitComponent):
             Keyword arguments that will be mapped into the Component options.
         """
         super(MetaModelStructuredComp, self).__init__(**kwargs)
-
-        self.pnames = []
-        self.params = []
-        self.training_outputs = {}
-        self.interps = {}
-        self.grad_shape = ()
 
     def initialize(self):
         """
@@ -150,6 +131,9 @@ class MetaModelStructuredComp(ExplicitComponent):
         """
         interp_method = self.options['method']
 
+        opts = {}
+        if 'interp_options' in self.options:
+            opts = self.options['interp_options']
         for name, train_data in iteritems(self.training_outputs):
             self.interps[name] = InterpND(self.params, train_data,
                                           interp_method=interp_method,
