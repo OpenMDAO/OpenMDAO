@@ -98,7 +98,7 @@ def _filtered_ep_iter(epgroup, includes=None, excludes=()):
                 yield ep, name, module, target
 
 
-def compute_entry_points(package, outstream=sys.stdout):
+def compute_entry_points(package, dir_excludes=(), outstream=sys.stdout):
     """
     Display what the entry point dict should be based on classes that exist in package.
 
@@ -106,6 +106,8 @@ def compute_entry_points(package, outstream=sys.stdout):
     ----------
     package : str
         The package name.
+    dir_excludes : iter of str
+        Glob patterns for directory exclusion.
     outstream : file-like
         Output stream.  Defaults to stdout.
 
@@ -132,7 +134,7 @@ def compute_entry_points(package, outstream=sys.stdout):
                            "package must be an installed python package.".format(package))
     start_dir = abspath(dirname(pkg.__file__))
 
-    for f in package_iter(start_dir, dir_excludes=('test_suite',)):
+    for f in package_iter(start_dir, dir_excludes=dir_excludes):
         modpath = get_module_path(f)
 
         try:

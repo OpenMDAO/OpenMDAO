@@ -59,7 +59,9 @@ class TestEntryPoints(unittest.TestCase):
             for ep, name, module, target in _filtered_ep_iter(epgroup, includes=['openmdao']):
                 reg.add(str(ep).split('=', 1)[1].strip())
 
-        found_eps = compute_entry_points('openmdao', outstream=None)
+        found_eps = compute_entry_points('openmdao',
+                                         dir_excludes=('test_suite', 'docs', 'docs_experiment'),
+                                         outstream=None)
 
         for epgroup in _allowed_types.values():
             reg = registered_eps.get(epgroup, set())
@@ -67,7 +69,7 @@ class TestEntryPoints(unittest.TestCase):
 
             missing = sorted(found - reg - skip)
             extra = sorted(reg - found)
-            if missing: 
+            if missing:
                 self.fail("For entry point group '{}', the following EPs are missing: {}.".format(epgroup, missing))
             if extra:
                 self.fail("For entry point group '{}', the following extra EPs were found: {}.".format(epgroup, extra))
