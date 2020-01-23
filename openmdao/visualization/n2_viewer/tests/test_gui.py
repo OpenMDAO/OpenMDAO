@@ -2,8 +2,7 @@
 import sys
 
 # Make sure Python version is at least 3.6, otherwise do nothing.
-if (sys.version_info.major == 3 and sys.version_info.minor >= 6) or \
-        sys.version_info.major > 3:
+if sys.version_info > (3, 5):
     from n2_gui_test import *
 
     if __name__ == "__main__":
