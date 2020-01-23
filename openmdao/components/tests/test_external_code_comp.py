@@ -622,7 +622,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 ]
 
                 # If you want to write your own string command, the code below will also work.
-                # self.options['command_apply'] = python extcode_paraboloid.py {} {}'.format(self.input_file, self.output_file)
+                # self.options['command_apply'] = ('python extcode_mach.py {} {}').format(self.input_file, self.output_file)
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 with open(self.input_file, 'w') as input_file:
