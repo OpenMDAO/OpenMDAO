@@ -41,7 +41,6 @@ addons:
 
 cache:
   apt: true
-  npm: false
   timeout: 300
   directories:
     - $HOME/.cache/pip
