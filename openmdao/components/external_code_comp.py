@@ -42,7 +42,9 @@ class ExternalCodeDelegate(object):
         """
         comp = self._comp
 
-        comp.options.declare('command', [], desc='Command to be executed.')
+        comp.options.declare('command', [], types=(list, str),
+                             desc='Command to be executed. If command is a list, shell=True, ' + \
+                                  'otherwise shell=False')
         comp.options.declare('env_vars', {}, desc='Environment variables required by the command.')
         comp.options.declare('poll_delay', 0.0, lower=0.0,
                              desc='Delay between polling for command completion. '

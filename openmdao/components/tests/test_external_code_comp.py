@@ -278,7 +278,7 @@ class ParaboloidExternalCodeComp(om.ExternalCodeComp):
         #     sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
         # ]
 
-        self.options['command'] = 'python extcode_paraboloid.py paraboloid_input.dat paraboloid_output.dat'
+        self.options['command'] = ('python extcode_paraboloid.py {} {}').format(self.input_file, self.output_file)
 
     def compute(self, inputs, outputs):
         x = inputs['x']
@@ -622,7 +622,7 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 ]
 
                 # If you want to write your own string command, the code below will also work.
-                # self.options['command_apply'] = 'python extcode_mach.py mach_input.dat mach_output.dat'
+                # self.options['command_apply'] = python extcode_paraboloid.py {} {}'.format(self.input_file, self.output_file)
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 with open(self.input_file, 'w') as input_file:
