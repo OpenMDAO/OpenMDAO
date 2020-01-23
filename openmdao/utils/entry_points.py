@@ -177,6 +177,54 @@ def compute_entry_points(package, dir_excludes=(), outstream=sys.stdout):
     return dct
 
 
+def _get_epinfo(type_, includes, excludes):
+    epinfo = []
+    for ep, name, module, target in _filtered_ep_iter(_allowed_types[type_],
+                                                      includes=includes, excludes=excludes):
+        obj = ep.load()
+        pkg = module.split('.', 1)[0]
+        try:
+            mod = import_module(pkg)
+        except ImportError:
+            print("Import of %s failed.\n%s" % (pkg, traceback.format_exc()))
+            continue
+        try:
+            version = mod.__version__
+        except AttributeError:
+            version = '?'
+        if '.' in module:
+            module = module.split('.', 1)[1]
+        if type_ != 'commands':
+            name = target
+        epinfo.append((name, pkg, version, module, obj.__doc__))
+
+    return epinfo
+
+
+def _display_epinfo(epinfo, show_docs, *titles):
+    cwids = []
+    unders = []
+    for i in range(len(titles)):
+        cwids.append(max(len(t[i]) for t in epinfo))
+        unders.append('-' * len(titles[i]))
+        if len(titles[i]) > cwids[-1]:
+            cwids[-1] = len(titles[i])
+
+    template = "  " + '  '.join(['{:<{cwids[%d]}}' % i for i in range(len(cwids))])
+    print(template.format(*titles, cwids=cwids))
+    print(template.format(*unders, cwids=cwids))
+
+    # sort displayed values by module_name + target so that entry points will be grouped
+    # by module and sorted by target name within each module.
+    for name, pkg, version, module, docs in sorted(epinfo, key=lambda x: x[1] + x[3] + x[0]):
+        print(template.format(name, pkg, version, module, cwids=cwids))
+        if show_docs and docs:
+            print(docs)
+            print('-' * 80)
+
+    print()
+
+
 def list_installed(types=None, includes=None, excludes=(), show_docs=False):
     """
     Print a table of installed entry points.
@@ -209,45 +257,21 @@ def list_installed(types=None, includes=None, excludes=(), show_docs=False):
             raise RuntimeError("Type '{}' is not a valid type.  Try one of {}."
                                .format(type_, sorted(_allowed_types)))
         print("Installed {}:\n".format(type_))
-        typdict[type_] = epdict = {}
-        title1 = 'Entry Point Name'
-        title2 = 'Class or Function'
-        title3 = 'Module'
 
-        cwid1 = len(title1)
-        cwid2 = len(title2)
-        for ep, name, module, target in _filtered_ep_iter(_allowed_types[type_],
-                                                          includes=includes,
-                                                          excludes=excludes):
-            # we need to actually load the entry point if docs are requested
-            if show_docs:
-                klass = ep.load()
-                docs = klass.__doc__
-            else:
-                docs = ''
-            epdict[target] = (name, module, docs)
-            if len(name) > cwid1:
-                cwid1 = len(name)
-            if len(target) > cwid2:
-                cwid2 = len(target)
+        typdict[type_] = epinfo = _get_epinfo(type_, includes, excludes)
 
-        if epdict:
-            print("  {:<{cwid1}}  {:<{cwid2}}  {}".format(title1, title2, title3,
-                                                          cwid1=cwid1, cwid2=cwid2))
-            print("  {:<{cwid1}}  {:<{cwid2}}  {}".format('-' * len(title1), '-' * len(title2),
-                                                          '-' * len(title3),
-                                                          cwid1=cwid1, cwid2=cwid2))
+        titles = [
+            'Class or Function',
+            'Package',
+            'Version',
+            'Module',
+        ]
 
-        # sort displayed values by module_name + target so that entry points will be grouped
-        # by module and sorted by target name within each module.
-        for target, (name, module, docs) in sorted(epdict.items(), key=lambda x: x[1][1] + x[0]):
-            line = "  {:<{cwid1}}  {:<{cwid2}}  {}".format(name, target, module,
-                                                           cwid1=cwid1, cwid2=cwid2)
-            print(line)
-            if show_docs and docs:
-                print(docs)
+        if type_ == 'commands':
+            titles[0] = 'Command'
 
-        print()
+        if epinfo:
+            _display_epinfo(epinfo, show_docs, *titles)
 
     return typdict
 
