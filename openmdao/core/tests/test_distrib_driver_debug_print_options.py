@@ -13,7 +13,7 @@ except ImportError:
     PETScVector = None
 
 
-@unittest.skipUnless(MPI and PETScVector, "PETSc/MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedDriverDebugPrintOptionsTest(unittest.TestCase):
 

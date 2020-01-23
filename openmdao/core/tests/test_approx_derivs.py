@@ -813,7 +813,7 @@ class TestGroupFiniteDifference(unittest.TestCase):
         assert_rel_error(self, p['circle.area'], np.pi, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI if we have PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestGroupFiniteDifferenceMPI(unittest.TestCase):
 
     N_PROCS = 2
@@ -832,7 +832,7 @@ class TestGroupFiniteDifferenceMPI(unittest.TestCase):
         assert_rel_error(self, J['sum.y', 'sub.sub2.p2.x'], [[4.0]], 1.0e-6)
 
 
-@unittest.skipUnless(MPI and  PETScVector, "only run under MPI if we have PETSc.")
+@unittest.skipUnless(MPI and  PETScVector, "MPI and PETSc are required.")
 class TestGroupCSMPI(unittest.TestCase):
 
     N_PROCS = 2
@@ -898,7 +898,7 @@ class TestGroupCSMPI(unittest.TestCase):
         assert_rel_error(self, J['con1', 'x'][0][0], -0.98061448, 1.0e-6)
 
 
-@unittest.skipUnless(MPI and  PETScVector, "only run under MPI if we have PETSc.")
+@unittest.skipUnless(MPI and  PETScVector, "MPI and PETSc are required.")
 class TestGroupFDMPI(unittest.TestCase):
 
     N_PROCS = 2

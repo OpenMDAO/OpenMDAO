@@ -39,7 +39,7 @@ class Top(om.Group):
 
         self.connect('indep_var.x1', 'myComp.x2')
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class N2ParallelTestCase(unittest.TestCase):
     N_PROCS = 2
 

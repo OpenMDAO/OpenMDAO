@@ -193,7 +193,7 @@ class TestCase(unittest.TestCase):
         assert_check_partials(derivs, rtol=1e-15)
 
 
-@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2

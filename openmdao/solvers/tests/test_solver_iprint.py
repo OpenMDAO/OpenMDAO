@@ -317,7 +317,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
 
-@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2

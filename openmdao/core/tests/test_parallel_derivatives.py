@@ -26,7 +26,7 @@ if MPI:
         PETScVector = None
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParDerivTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -201,7 +201,7 @@ class ParDerivTestCase(unittest.TestCase):
         assert_rel_error(self, norm_val, 6.480740698, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DecoupledTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3
@@ -335,7 +335,7 @@ class DecoupledTestCase(unittest.TestCase):
         assert_rel_error(self, J['Con2.y', 'Indep2.x'], expected, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class IndicesTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -391,7 +391,7 @@ class IndicesTestCase(unittest.TestCase):
         assert_rel_error(self, J['c4.y', 'p.x'][0], np.array([8., 0.]), 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class IndicesTestCase2(unittest.TestCase):
 
     N_PROCS = 2
@@ -464,7 +464,7 @@ class IndicesTestCase2(unittest.TestCase):
         assert_rel_error(self, J['G1.par1.c4.y', 'G1.par1.p.x'][0], np.array([8., 0.]), 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MatMatTestCase(unittest.TestCase):
     N_PROCS = 2
     asize = 3

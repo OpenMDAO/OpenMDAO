@@ -77,7 +77,7 @@ class Summer(ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-@unittest.skipUnless(MPI and PETScVector, "PETSc/MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedListVarsTest(unittest.TestCase):
 

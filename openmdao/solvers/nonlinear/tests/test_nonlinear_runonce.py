@@ -71,7 +71,7 @@ class TestNonlinearRunOnceSolver(unittest.TestCase):
         assert_rel_error(self, prob['f_xy'], 122.0)
 
 
-@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestNonlinearRunOnceSolverMPI(unittest.TestCase):
 
     N_PROCS = 2

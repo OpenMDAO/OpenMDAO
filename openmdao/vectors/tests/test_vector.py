@@ -129,7 +129,7 @@ class SerialLinear(om.ImplicitComponent):
         x[:] = np.linalg.inv(A).dot(y)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestPETScVector2Proc(unittest.TestCase):
 
     N_PROCS = 2
@@ -161,7 +161,7 @@ class TestPETScVector2Proc(unittest.TestCase):
         vec2.set_const(4.)
         assert_rel_error(self, vec.dot(vec2), 12.*6, 1e-10)
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestPETScVector3Proc(unittest.TestCase):
 
     N_PROCS = 3

@@ -863,7 +863,7 @@ class TestNewton(unittest.TestCase):
         with assert_warning(DeprecationWarning, msg):
             prob.final_setup()
 
-@unittest.skipUnless(MPI and PETScVector, "PETSc/MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITestCase(unittest.TestCase):
     N_PROCS = 4
 
