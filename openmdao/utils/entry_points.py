@@ -6,6 +6,7 @@ from __future__ import print_function
 import sys
 import traceback
 from collections import defaultdict
+import itertools
 from importlib import import_module
 from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
 from inspect import getmembers, isclass
@@ -192,8 +193,6 @@ def _get_epinfo(type_, includes, excludes):
             version = mod.__version__
         except AttributeError:
             version = '?'
-        if '.' in module:
-            module = module.split('.', 1)[1]
         if type_ != 'commands':
             name = target
         epinfo.append((name, pkg, version, module, obj.__doc__))
@@ -210,17 +209,26 @@ def _display_epinfo(epinfo, show_docs, *titles):
         if len(titles[i]) > cwids[-1]:
             cwids[-1] = len(titles[i])
 
-    template = "  " + '  '.join(['{:<{cwids[%d]}}' % i for i in range(len(cwids))])
-    print(template.format(*titles, cwids=cwids))
-    print(template.format(*unders, cwids=cwids))
+    template = "    " + '  '.join(['{:<{cwids[%d]}}' % i for i in range(len(cwids))])
 
     # sort displayed values by module_name + target so that entry points will be grouped
     # by module and sorted by target name within each module.
-    for name, pkg, version, module, docs in sorted(epinfo, key=lambda x: x[1] + x[3] + x[0]):
-        print(template.format(name, pkg, version, module, cwids=cwids))
-        if show_docs and docs:
-            print(docs)
-            print('-' * 80)
+    ordered = sorted(epinfo, key=lambda x: x[1] + x[3] + x[0])
+
+    for pkg, group in itertools.groupby(ordered, lambda x: x[1]):
+        group = list(group)
+
+        print("  Package:", pkg, " Version:", group[0][2], '\n')
+
+        for i, (name, pkg, version, module, docs) in enumerate(group):
+            if i == 0:
+                print(template.format(*titles, cwids=cwids))
+                print(template.format(*unders, cwids=cwids))
+
+            print(template.format(name, module, cwids=cwids))
+            if show_docs and docs:
+                print(docs)
+                print(' ', '-' * 80)
 
     print()
 
@@ -262,8 +270,6 @@ def list_installed(types=None, includes=None, excludes=(), show_docs=False):
 
         titles = [
             'Class or Function',
-            'Package',
-            'Version',
             'Module',
         ]
 
