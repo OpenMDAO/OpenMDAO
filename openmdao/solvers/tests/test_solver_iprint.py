@@ -7,6 +7,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
+from openmdao.vectors.petsc_vector import PETScVector
 from openmdao.test_suite.components.double_sellar import SubSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives
 
@@ -311,7 +312,7 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
 
-@unittest.skipUnless(om.PETScVector and MPI is not None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2

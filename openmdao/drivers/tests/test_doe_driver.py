@@ -14,6 +14,7 @@ import json
 import numpy as np
 
 import openmdao.api as om
+from openmdao.vectors.petsc_vector import PETScVector
 
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import FanInGrouped
@@ -903,7 +904,7 @@ class TestDOEDriver(unittest.TestCase):
         assert_rel_error(self, outputs['z'], 30.0, 1e-7)
 
 
-@unittest.skipUnless(om.PETScVector and MPI is not None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
 class TestParallelDOE(unittest.TestCase):
 
     N_PROCS = 4
@@ -1355,7 +1356,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             self.expected_text)
 
 
-@unittest.skipUnless(om.PETScVector and MPI is not None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
 class TestParallelDOEFeature(unittest.TestCase):
 
     N_PROCS = 2
@@ -1452,7 +1453,7 @@ class TestParallelDOEFeature(unittest.TestCase):
                          self.expect_text)
 
 
-@unittest.skipUnless(om.PETScVector and MPI is not None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
 class TestParallelDOEFeature2(unittest.TestCase):
 
     N_PROCS = 4

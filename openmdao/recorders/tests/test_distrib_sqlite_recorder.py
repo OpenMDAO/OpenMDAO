@@ -96,7 +96,7 @@ class Mygroup(Group):
         self.add_constraint('c', lower=-3.)
 
 
-@unittest.skipIf(PETScVector is None or MPI is None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
 class DistributedRecorderTest(unittest.TestCase):
 
     N_PROCS = 2

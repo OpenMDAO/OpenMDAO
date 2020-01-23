@@ -153,7 +153,7 @@ class TestNLBlockJacobi(unittest.TestCase):
         assert_rel_error(self, prob['y2'], 12.05848819, .00001)
 
 
-@unittest.skipUnless(PETScVector is not None and MPI is not None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
 class TestNonlinearBlockJacobiMPI(unittest.TestCase):
 
     N_PROCS = 2

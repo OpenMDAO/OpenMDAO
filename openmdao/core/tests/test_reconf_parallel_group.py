@@ -38,7 +38,7 @@ class ReconfGroup(Group):
         self.parallel = not self.parallel
 
 
-@unittest.skipUnless(PETScVector and MPI is not None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "PETSc is required.")
 class Test(unittest.TestCase):
 
     N_PROCS = 2

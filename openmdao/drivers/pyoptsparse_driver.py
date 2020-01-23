@@ -7,7 +7,7 @@ additional MPI capability.
 """
 from __future__ import print_function
 
-from collections import OrderedDict, Callable
+from collections import OrderedDict
 import json
 import signal
 import sys
@@ -440,10 +440,11 @@ class pyOptSparseDriver(Driver):
             # optimizers other than pySNOPT may not populate this dict
             pass
 
+        # revert signal handler to cached version
         sigusr = self.options['user_teriminate_signal']
         if sigusr is not None:
             signal.signal(sigusr, self._signal_cache)
-            self._signal_cache = None
+            self._signal_cache = None   # to prevent memory leak test from failing
 
         return self.fail
 
@@ -698,7 +699,7 @@ class pyOptSparseDriver(Driver):
     def _signal_handler(self, signum, frame):
         # Subsystems (particularly external codes) may declare their own signal handling, so
         # execute the cached handler first.
-        if isinstance(self._signal_cache, Callable):
+        if self._signal_cache is not signal.Handlers.SIG_DFL:
             self._signal_cache(signum, frame)
 
         self._user_termination_flag = True
