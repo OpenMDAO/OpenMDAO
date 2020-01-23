@@ -52,6 +52,13 @@ class TestEntryPoints(unittest.TestCase):
             'openmdao.surrogate_models.surrogate_model:MultiFiSurrogateModel',
             'openmdao.surrogate_models.kriging:FloatKrigingSurrogate',
         }
+
+        # if mpi4py isn't installed, then the pyopstsparse_driver import will fail
+        try:
+            import mpi4py
+        except ImportError:
+            skip.add('openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver')
+
         # collect declared entry points for openmdao
         registered_eps = {}
         for epgroup in _allowed_types.values():
@@ -68,7 +75,7 @@ class TestEntryPoints(unittest.TestCase):
             found = set(f.split('=', 1)[1].strip() for f in found_eps.get(epgroup, []))
 
             missing = sorted(found - reg - skip)
-            extra = sorted(reg - found)
+            extra = sorted(reg - found - skip)
             if missing:
                 self.fail("For entry point group '{}', the following EPs are missing: {}.".format(epgroup, missing))
             if extra:

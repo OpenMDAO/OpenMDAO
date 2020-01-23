@@ -4,6 +4,7 @@ Various functions for working with entry points.
 from __future__ import print_function
 
 import sys
+import traceback
 from collections import defaultdict
 from importlib import import_module
 from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
@@ -140,7 +141,7 @@ def compute_entry_points(package, dir_excludes=(), outstream=sys.stdout):
         try:
             mod = import_module(modpath)
         except Exception:
-            print("failed to import {} (file {}).".format(modpath, f))
+            print("failed to import {} (file {}).\n{}".format(modpath, f, traceback.format_exc()))
             continue
 
         for cname, c in getmembers(mod, isclass):
