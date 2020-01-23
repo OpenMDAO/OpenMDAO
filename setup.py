@@ -10,6 +10,9 @@ __version__ = re.findall(
     open('openmdao/__init__.py').read(),
 )[0]
 
+# Pyppeteer GUI testing only works with Python 3.6+
+gui_test_deps = ['websockets>6', 'pyppeteer_fork']
+
 optional_dependencies = {
     'docs': [
         'matplotlib',
@@ -26,12 +29,8 @@ optional_dependencies = {
         'numpydoc>=0.9.1',
         'pycodestyle==2.3.1',
         'pydocstyle==2.0.0',
-    ],
+    ] + (gui_test_deps if sys.version_info > (3, 5) else [])
 }
-
-# Pyppeteer GUI testing only works with Python 3.6+
-if sys.version_info > (3, 5):
-    optional_dependencies['test'].extend(['websockets>6', 'pyppeteer_fork'])
 
 # Add an optional dependency that concatenates all others
 optional_dependencies['all'] = sorted([
