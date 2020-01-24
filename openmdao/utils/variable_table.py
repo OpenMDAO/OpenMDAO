@@ -56,7 +56,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     # Write header
     pathname = pathname if pathname else 'model'
 
-    if var_type is 'input':
+    if var_type == 'input':
         header = "%d Input(s) in '%s'" % (count, pathname)
     else:
         header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
@@ -69,7 +69,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
     # Need an ordered list of possible output values for the two cases: inputs and outputs
     #  so that we do the column output in the correct order
-    if var_type is 'input':
+    if var_type == 'input':
         out_types = ('value', 'units', 'shape', 'global_shape', 'prom_name', 'desc')
     else:
         out_types = ('value', 'resids', 'units', 'shape', 'global_shape',

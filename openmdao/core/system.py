@@ -3560,7 +3560,7 @@ class System(object):
                             #   meta.src_indices has the info we need to piece together arrays
 
         if setup:
-            inputs = var_type is 'input'
+            inputs = var_type == 'input'
             outputs = not inputs
             var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
             top_name = 'model'
