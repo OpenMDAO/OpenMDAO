@@ -323,6 +323,8 @@ class Group(System):
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
 
+        self._setup_procs_finished = False
+
         if self._num_par_fd > 1:
             info = self._coloring_info
             if comm.size > 1:
@@ -726,7 +728,6 @@ class Group(System):
         super(Group, self)._setup_var_sizes()
 
         self._var_offsets = None
-        self._setup_procs_finished = False
 
         iproc = self.comm.rank
         nproc = self.comm.size
