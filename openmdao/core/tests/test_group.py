@@ -71,6 +71,28 @@ class ReportOrderComp(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         self._order_list.append(self.pathname)
 
+class TestSubsystemConfigError(unittest.TestCase):
+
+    def test_add_subsystem_error_on_config(self):
+        class SimpleGroup(om.Group):
+
+            def __init__(self):
+                super(SimpleGroup, self).__init__()
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+                self.connect('comp1.x', 'comp2.a')
+
+            def configure(self):
+                self.add_subsystem('comp3', om.IndepVarComp('y', 10.0))
+
+        top = om.Problem(model=SimpleGroup())
+
+        with self.assertRaises(RuntimeError) as cm:
+            top.setup()
+
+        self.assertEqual(str(cm.exception),
+                         "Cannot call add_subsystem in the configure method")
 
 class TestGroup(unittest.TestCase):
 
