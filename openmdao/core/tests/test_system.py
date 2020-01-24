@@ -257,7 +257,7 @@ class TestSystem(unittest.TestCase):
         assert_rel_error(self, prob['double.y'], [2., 4., 6.])
 
     def test_list_inputs_output_with_includes_excludes(self):
-        from openmdao.test_suite.scripts.circuit_analysis import Resistor, Diode, Node, Circuit
+        from openmdao.test_suite.scripts.circuit_analysis import Circuit
 
         p = Problem()
         model = p.model
@@ -274,40 +274,40 @@ class TestSystem(unittest.TestCase):
 
         # Inputs with no includes or excludes
         inputs = model.list_inputs(out_stream=None)
-        self.assertEqual( len(inputs), 11)
+        self.assertEqual(len(inputs), 11)
 
         # Inputs with includes
         inputs = model.list_inputs(includes=['*V_out*'], out_stream=None)
-        self.assertEqual( len(inputs), 3)
+        self.assertEqual(len(inputs), 3)
 
         # Inputs with includes matching a promoted name
         inputs = model.list_inputs(includes=['*Vg*'], out_stream=None)
-        self.assertEqual( len(inputs), 2)
+        self.assertEqual(len(inputs), 2)
 
         # Inputs with excludes
         inputs = model.list_inputs(excludes=['*V_out*'], out_stream=None)
-        self.assertEqual( len(inputs), 8)
+        self.assertEqual(len(inputs), 8)
 
         # Inputs with excludes matching a promoted name
         inputs = model.list_inputs(excludes=['*Vg*'], out_stream=None)
-        self.assertEqual( len(inputs), 9)
+        self.assertEqual(len(inputs), 9)
 
         # Inputs with includes and excludes
         inputs = model.list_inputs(includes=['*V_out*'], excludes=['*Vg*'], out_stream=None)
-        self.assertEqual( len(inputs), 1)
-
+        self.assertEqual(len(inputs), 1)
 
         # Outputs with no includes or excludes. Explicit only
         outputs = model.list_outputs(implicit=False, out_stream=None)
-        self.assertEqual( len(outputs), 5)
+        self.assertEqual(len(outputs), 5)
 
         # Outputs with includes. Explicit only
         outputs = model.list_outputs(includes=['*I'], implicit=False, out_stream=None)
-        self.assertEqual( len(outputs), 4)
+        self.assertEqual(len(outputs), 4)
 
         # Outputs with excludes. Explicit only
         outputs = model.list_outputs(excludes=['circuit*'], implicit=False, out_stream=None)
-        self.assertEqual( len(outputs), 2)
+        self.assertEqual(len(outputs), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

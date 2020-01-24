@@ -320,7 +320,7 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']
-                if 'linear' in meta and meta['linear']:
+                if opt in _gradient_optimizers and 'linear' in meta and meta['linear']:
                     lincons.append(name)
                     self._con_idx[name] = lin_i
                     lin_i += size

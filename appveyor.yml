@@ -6,15 +6,13 @@ branches:
 
 environment:
   matrix:
-    - APPVEYOR_BUILD_WORKER_IMAGE: Previous Visual Studio 2017
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PYTHON: 2.7
-      # MKL: 2018.0.2  # Math Kernel Library
       NUMPY: 1.15
       SCIPY: 1.0.1
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PYTHON: 3.6
-      # MKL: 2018.0.2  # Math Kernel Library
       NUMPY: 1.15
       SCIPY: 1.0.1
 
@@ -114,7 +112,8 @@ install:
 - cmd: if %PYTHON% GTR 3 (set CONDA=C:\Miniconda3%PYTHON:~2%-x64) else (set CONDA=C:\Miniconda-x64)
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
 - cmd: conda config --set always_yes yes
-- cmd: conda install numpy=%NUMPY% scipy=%SCIPY% pip --quiet
+- cmd: conda create -n PY%PYTHON% numpy=%NUMPY% scipy=%SCIPY% pip --quiet
+- cmd: activate PY%PYTHON%
 - cmd: pip install -e .[all]
 - cmd: conda list
 
