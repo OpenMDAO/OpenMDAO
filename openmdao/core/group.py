@@ -726,6 +726,7 @@ class Group(System):
         super(Group, self)._setup_var_sizes()
 
         self._var_offsets = None
+        self._setup_procs_finished = False
 
         iproc = self.comm.rank
         nproc = self.comm.size
