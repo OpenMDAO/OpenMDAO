@@ -1443,7 +1443,7 @@ class Group(System):
             same time, and get the reference back.
         """
         if self._setup_procs_finished:
-            raise RuntimeError('Cannot call add_subsystem in the configure method')
+            raise RuntimeError('%s: Cannot call add_subsystem in the configure method' % (self.msginfo))
 
         if inspect.isclass(subsys):
             raise TypeError("%s: Subsystem '%s' should be an instance, but a %s class object was "
