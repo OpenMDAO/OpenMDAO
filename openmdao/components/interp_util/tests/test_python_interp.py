@@ -137,7 +137,7 @@ class TestInterpNDPython(unittest.TestCase):
         #print('akima', computed, actual, r_err)
         assert r_err < self.tol['akima']
 
-    def test_bsplines_basic(self):
+    def test_akima_interpolating_spline(self):
         n_cp = 80
         n_point = 160
 
@@ -146,9 +146,32 @@ class TestInterpNDPython(unittest.TestCase):
 
         x = np.sin(t)
 
-        interp = InterpND((t, ), x, 'bsplines')
+        # Now, test newer interface for order_reducing spline.
 
-        computed = interp.interpolate(tt.reshape((n_point, 1)))
+        interp = InterpND((t, ), x, 'akima', x_interp=tt.reshape((n_point, 1)))
+        computed = interp.evaluate_spline(x.reshape((1, 80)))
+
+        x_expected = np.sin(tt)
+        delta = computed.flatten() - x_expected
+
+        # Here we test that we don't have crazy interpolation error.
+        self.assertLess(max(delta), .15)
+        # And that it gets middle points a little better.
+        self.assertLess(max(delta[15:-15]), .06)
+
+    def test_bsplines_interpolating_spline(self):
+        n_cp = 80
+        n_point = 160
+
+        t = np.linspace(0, 3.0*np.pi, n_cp)
+        tt = np.linspace(0, 3.0*np.pi, n_point)
+
+        x = np.sin(t)
+
+        # Now, test newer interface for order_reducing spline.
+
+        interp = InterpND((t, ), x, 'bsplines', x_interp=tt.reshape((n_point, 1)))
+        computed = interp.evaluate_spline(x.reshape((1, 80)))
 
         x_expected = np.sin(tt)
         delta = computed.flatten() - x_expected

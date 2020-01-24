@@ -549,11 +549,11 @@ class InterpAkima(InterpAlgorithm):
 
             # Calculate cubic fit coefficients
             if delta_x > 0:
-                dw2 = dv_abs_smooth_complex(m4 - m3, dm4 - dm3, delta_x)
-                dw3 = dv_abs_smooth_complex(m2 - m1, dm2 - dm1, delta_x)
+                _, dw2 = dv_abs_smooth_complex(m4 - m3, dm4 - dm3, delta_x)
+                _, dw3 = dv_abs_smooth_complex(m2 - m1, dm2 - dm1, delta_x)
                 if self.training_data_gradients:
-                    dw2_dv = dv_abs_smooth_complex(m4 - m3, dm4_dv - dm3_dv, delta_x)
-                    dw3_dv = dv_abs_smooth_complex(m2 - m1, dm2_dv - dm1_dv, delta_x)
+                    _, dw2_dv = dv_abs_smooth_complex(m4 - m3, dm4_dv - dm3_dv, delta_x)
+                    _, dw3_dv = dv_abs_smooth_complex(m2 - m1, dm2_dv - dm1_dv, delta_x)
             else:
                 _, dw2 = dv_abs_complex(m4 - m3, dm4 - dm3)
                 _, dw3 = dv_abs_complex(m2 - m1, dm2 - dm1)
@@ -604,11 +604,11 @@ class InterpAkima(InterpAlgorithm):
                     db_dv[jj1] = dbpos_dv[jj1]
 
             if delta_x > 0:
-                dw3 = dv_abs_smooth_complex(m5 - m4, dm5 - dm4, delta_x)
-                dw4 = dv_abs_smooth_complex(m3 - m2, dm3 - dm2, delta_x)
+                _, dw3 = dv_abs_smooth_complex(m5 - m4, dm5 - dm4, delta_x)
+                _, dw4 = dv_abs_smooth_complex(m3 - m2, dm3 - dm2, delta_x)
                 if self.training_data_gradients:
-                    dw3_dv = dv_abs_smooth_complex(m5 - m4, dm5_dv - dm4_dv, delta_x)
-                    dw4_dv = dv_abs_smooth_complex(m3 - m2, dm3_dv - dm2_dv, delta_x)
+                    _, dw3_dv = dv_abs_smooth_complex(m5 - m4, dm5_dv - dm4_dv, delta_x)
+                    _, dw4_dv = dv_abs_smooth_complex(m3 - m2, dm3_dv - dm2_dv, delta_x)
             else:
                 _, dw3 = dv_abs_complex(m5 - m4, dm5 - dm4)
                 _, dw4 = dv_abs_complex(m3 - m2, dm3 - dm2)

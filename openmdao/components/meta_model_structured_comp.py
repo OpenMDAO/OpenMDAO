@@ -224,7 +224,6 @@ class MetaModelStructuredComp(InterpBase):
             sub-jac components written to partials[output_name, input_name]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        dy_data = None
 
         for out_name, interp in iteritems(self.interps):
             dval = interp.gradient(pt).T
@@ -233,7 +232,7 @@ class MetaModelStructuredComp(InterpBase):
 
             if self.options['training_data_gradients']:
 
-                if dy_data is None or interp._d_dvalues is not None:
+                if interp._d_dvalues is not None:
                     dy_ddata = np.zeros(self.grad_shape)
 
                     if interp._d_dvalues is not None:

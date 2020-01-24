@@ -7,7 +7,6 @@ import numpy as np
 from numpy.testing import assert_array_almost_equal
 
 import openmdao.api as om
-from openmdao.components.spline_comp import interp
 from openmdao.utils.assert_utils import assert_check_partials
 from openmdao.utils.spline_distributions import SplineDistribution
 
@@ -81,8 +80,8 @@ class SplineTestCase(unittest.TestCase):
 
         assert_array_almost_equal(akima_y.flatten(), self.prob['akima1.y_val'].flatten())
 
-        # derivs = prob.check_partials(compact_print=False, method='cs')
-        # assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
+        derivs = self.prob.check_partials(compact_print=False, method='cs')
+        assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
     def test_no_ycp_val(self):
 
@@ -117,45 +116,64 @@ class SplineTestCase(unittest.TestCase):
                         6.        ,  6.73660714,  8.46428571, 10.45982143, 12.        ,
                         13.08035714, 14.        ]])
 
-        # assert_array_almost_equal(y.flatten(), self.prob['akima1.y_val'].flatten())
+        assert_array_almost_equal(y.flatten(), self.prob['akima1.y_val'].flatten())
 
-    def test_standalone_interp(self):
+    #def test_standalone_interp(self):
 
-        standalone = interp('akima', self.x_cp, self.y_cp, self.x)
+        #standalone = interp('akima', self.x_cp, self.y_cp, self.x)
 
-        spline_comp_y_array = np.array([[
-            5.        ,  7.21095802,  9.2182764 , 10.8183155 , 11.80743568,
-            12.12244898, 12.34693878, 12.57142857, 12.79591837, 13.02040816,
-            13.24489796, 13.46938776, 13.69387755, 13.91836735, 14.14285714,
-            14.36734694, 14.59183673, 14.81632653, 15.04081633, 15.26530612,
-            15.48979592, 15.71428571, 15.93877551, 16.16506444, 16.39785941,
-            16.63732612, 16.8833762 , 17.13592126, 17.3948729 , 17.66014276,
-            17.93164243, 18.20928355, 18.49297771, 18.78263654, 19.07817165,
-            19.37949466, 19.68651717, 19.99915081, 20.31730719, 20.64089793,
-            20.96983463, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
-            24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
+        #spline_comp_y_array = np.array([[
+            #5.        ,  7.21095802,  9.2182764 , 10.8183155 , 11.80743568,
+            #12.12244898, 12.34693878, 12.57142857, 12.79591837, 13.02040816,
+            #13.24489796, 13.46938776, 13.69387755, 13.91836735, 14.14285714,
+            #14.36734694, 14.59183673, 14.81632653, 15.04081633, 15.26530612,
+            #15.48979592, 15.71428571, 15.93877551, 16.16506444, 16.39785941,
+            #16.63732612, 16.8833762 , 17.13592126, 17.3948729 , 17.66014276,
+            #17.93164243, 18.20928355, 18.49297771, 18.78263654, 19.07817165,
+            #19.37949466, 19.68651717, 19.99915081, 20.31730719, 20.64089793,
+            #20.96983463, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
+            #24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
 
-        assert_array_almost_equal(spline_comp_y_array.flatten(), standalone[0].flatten())
+        #assert_array_almost_equal(spline_comp_y_array.flatten(), standalone[0].flatten())
 
+    def test_bspline_interp_basic(self):
+        prob = om.Problem()
+        model = prob.model
 
-    # def test_bspline_interp_options(self):
+        n_cp = 80
+        n_point = 160
 
-    #     x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
-    #     y_cp2 = np.array([1.0, 5.0, 7.0, 8.0, 13.0, 16.0])
-    #     x = np.linspace(1.0, 12.0, 50)
+        t = np.linspace(0, 3.0*np.pi, n_cp)
+        tt = np.linspace(0, 3.0*np.pi, n_point)
+        x = np.sin(t)
 
-    #     prob = om.Problem()
+        model.add_subsystem('px', om.IndepVarComp('x', val=x))
 
-    #     bspline_options = {'order': 5}
-    #     comp = om.SplineComp(method='bspline', x_cp_val=self.x_cp, x_interp=x, x_cp_name='xcp',
-    #                         x_interp_name='x_val', x_units='km',
-    #                         interp_options=bspline_options)
+        bspline_options = {'order': 4}
+        comp = om.SplineComp(method='bsplines', x_cp_val=t, x_interp=tt, x_cp_name='xcp',
+                            x_interp_name='x_val', x_units='km',
+                            interp_options=bspline_options)
 
-    #     prob.model.add_subsystem('atmosphere', comp)
+        prob.model.add_subsystem('interp', comp)
 
-    #     comp.add_spline(y_cp_name='temp_cp', y_interp_name='temp', y_cp_val=y_cp2, y_units='C')
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units='km')
 
-    #     y_interp = prob['atmosphere.temp']
+        model.connect('px.x', 'interp.h_cp')
+
+        prob.setup()
+        prob.run_model()
+
+        xx = prob['interp.h'].flatten()
+        tt = np.linspace(0, 3.0*np.pi, n_point)
+
+        x_expected = np.sin(tt)
+        delta = xx - x_expected
+
+        # Here we test that we don't have crazy interpolation error.
+        self.assertLess(max(delta), .15)
+        # And that it gets middle points a little better.
+        self.assertLess(max(delta[15:-15]), .06)
+
 
 class SplineCompFeatureTestCase(unittest.TestCase):
 

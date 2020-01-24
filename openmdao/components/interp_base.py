@@ -2,7 +2,7 @@
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 ALL_METHODS = ('cubic', 'slinear', 'lagrange2', 'lagrange3', 'akima',
-               'scipy_cubic', 'scipy_slinear', 'scipy_quintic')
+               'scipy_cubic', 'scipy_slinear', 'scipy_quintic', 'bsplines')
 
 
 class InterpBase(ExplicitComponent):

@@ -32,7 +32,6 @@ class SplineComp(InterpBase):
         super(SplineComp, self).__init__(**kwargs)
 
         self.options['extrapolate'] = True
-        self.options['training_data_gradients'] = True
 
         self.interp_to_cp = {}
 
@@ -43,7 +42,6 @@ class SplineComp(InterpBase):
         self.add_input(name=self.options['x_interp_name'], val=self.options['x_interp'])
         self.add_input(name=self.options['x_cp_name'], val=self.options['x_cp_val'])
 
-        self.pnames.append(self.options['x_interp_name'])
         self.params.append(np.asarray(self.options['x_cp_val']))
 
     def _declare_options(self):
@@ -87,19 +85,27 @@ class SplineComp(InterpBase):
             msg = "{}: y_interp_name cannot be an empty string."
             raise ValueError(msg.format(self.msginfo))
 
-        self.add_output(y_interp_name, np.ones((self.options['vec_size'],
-                        len(self.options['x_interp']))), units=y_units)
+        vec_size = self.options['vec_size']
+        n_interp = len(self.options['x_interp'])
+        n_cp = len(self.options['x_cp_val'])
+
+        self.add_output(y_interp_name, np.ones((vec_size, n_interp)), units=y_units)
 
         if y_cp_val is None:
-            y_cp_val = self.options['x_cp_val']
+            y_cp_val = np.ones((vec_size, n_cp))
 
-            self.add_input(name=y_cp_name, val=np.linspace(0., 1., len(y_cp_val)))
-            self.training_outputs[y_interp_name] = y_cp_val
-        else:
-            self.add_input(name=y_cp_name, val=y_cp_val)
-            self.training_outputs[y_interp_name] = y_cp_val
+        elif len(y_cp_val.shape) < 2:
+            y_cp_val = y_cp_val.reshape((1, n_cp))
+
+        self.add_input(name=y_cp_name, val=y_cp_val)
+        self.training_outputs[y_interp_name] = y_cp_val
 
         self.interp_to_cp[y_interp_name] = y_cp_name
+
+        arange = np.arange(vec_size * n_interp)
+
+        self.declare_partials(y_interp_name, self.options['x_interp_name'], rows=arange, cols=arange)
+        self.declare_partials(y_interp_name, y_cp_name)
 
     def _setup_var_data(self, recurse=True):
         """
@@ -116,15 +122,15 @@ class SplineComp(InterpBase):
         if 'interp_options' in self.options:
             opts = self.options['interp_options']
         for name, train_data in iteritems(self.training_outputs):
-            # TODO: let interp handle vec_size
-            if self.options['vec_size'] > 1:
-                train_data = train_data[0, :]
+            # Separate data for each vec_size, but we only need to do sizing, so just pass
+            # in the first.  Most interps aren't vectorized.
+            train_data = train_data[0, :]
             self.interps[name] = InterpND(self.params, train_data,
                                           interp_method=interp_method,
+                                          x_interp=self.options['x_interp'],
                                           bounds_error=not self.options['extrapolate'], **opts)
 
-        if self.options['training_data_gradients']:
-            self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
+        self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
 
         super(SplineComp, self)._setup_var_data(recurse=recurse)
 
@@ -140,17 +146,6 @@ class SplineComp(InterpBase):
             Whether to call this method in subsystems.
         """
         super(SplineComp, self)._setup_partials()
-        arange = np.arange(self.options['vec_size'])
-        pnames = tuple(self.pnames)
-        dct = {
-            'rows': arange,
-            'cols': arange,
-            'dependent': True,
-        }
-
-        for name in self._outputs:
-            self._declare_partials(of=name, wrt=pnames, dct=dct)
-            self._declare_partials(of=name, wrt=self.interp_to_cp[name], dct={'dependent': True})
 
         # The scipy methods do not support complex step.
         if self.options['method'].startswith('scipy'):
@@ -167,23 +162,17 @@ class SplineComp(InterpBase):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
+        #pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         for out_name, interp in iteritems(self.interps):
-            for i in range(0, self.options['vec_size']):
-                if self.options['vec_size'] > 1:
-                    interp.values = inputs[self.interp_to_cp[out_name]][i]
-                else:
-                    interp.values = inputs[self.interp_to_cp[out_name]]
-                interp.training_data_gradients = True
+            values = inputs[self.interp_to_cp[out_name]]
+            interp.training_data_gradients = True
 
-                try:
-                    val = interp.interpolate(pt)
-                    outputs[out_name][i, :] = val
+            try:
+                outputs[out_name] = interp.evaluate_spline(values)
 
-                except ValueError as err:
-                    raise ValueError("{}: Error interpolating output '{}':\n{}".format(self.msginfo,
-                                                                                       out_name,
-                                                                                       str(err)))
+            except ValueError as err:
+                msg = "{}: Error interpolating output '{}':\n{}"
+                raise ValueError(msg.format(self.msginfo, out_name, str(err)))
 
     def compute_partials(self, inputs, partials):
         """
@@ -201,56 +190,23 @@ class SplineComp(InterpBase):
             sub-jac components written to partials[output_name, input_name]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        dy_ddata = np.zeros(self.grad_shape)
-        interp = next(itervalues(self.interps))
-        for j in range(self.options['vec_size']):
-            val = interp.training_gradients(pt[j, :])
-            dy_ddata[j] = val.reshape(self.grad_shape[1:])
 
-        for out_name in self.interps:
-            dval = self.interps[out_name].gradient(pt).T
+        for out_name, interp in iteritems(self.interps):
+            dval = interp.gradient(pt).T
             for i, p in enumerate(self.pnames):
-                partials[out_name, p] = dval[i, :]
+                partials[out_name, p] = dval
 
-            partials[out_name, self.interp_to_cp[out_name]] = dy_ddata
+            if interp._d_dvalues is not None:
+                dy_ddata = np.zeros(self.grad_shape)
 
+                if interp._d_dvalues is not None:
+                    # Akima must be handled individually.
+                    dy_ddata[:] = interp._d_dvalues
 
-def interp(method, x_data, y_data, x):
-    """
-    Compute y and its derivatives for a given x by interpolating on x_data and y_data.
+                else:
+                    # This way works for most of the interpolation methods.
+                    for j in range(self.options['vec_size']):
+                        val = interp.training_gradients(pt[j, :])
+                        dy_ddata[j] = val.reshape(self.grad_shape[1:])
 
-    Parameters
-    ----------
-    method : str
-        Method to use, choose from all available openmmdao methods.
-    x_data : ndarray or list
-        Input data for x, should be monotonically increasing. For higher dimensional grids,
-        x_data should be a list containing the x data for each dimension.
-    y_data : ndarray
-        Input values for y. For higher dimensional grids, the index order should be the same as
-        in x_data.
-    x : float or iterable or ndarray
-        Location(s) at which to interpolate.
-
-    Returns
-    -------
-    float or ndarray
-        Interpolated values y
-    ndarray
-        Derivative of y with respect to x
-    ndarray
-        Derivative of y with respect to x_data
-    ndarray
-        Derivative of y with respect to y_data
-    """
-    prob = Problem()
-
-    comp = SplineComp(method=method, x_cp_val=x_data, x_cp_name='xcp', x_interp=x,
-                      x_interp_name='x')
-    comp.add_spline(y_cp_name='ycp', y_interp_name='y', y_cp_val=y_data)
-
-    prob.model.add_subsystem('spline1', comp)
-    prob.setup(force_alloc_complex=True)
-    prob.run_model()
-
-    return prob['spline1.y'], prob['spline1.x'], prob['spline1.xcp'], prob['spline1.ycp']
+                partials[out_name, "%s_train" % out_name] = dy_ddata

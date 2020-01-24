@@ -73,7 +73,7 @@ class InterpND(object):
         Cache of current evaluation point.
     """
 
-    def __init__(self, points, values, interp_method="slinear", bounds_error=True, **kwargs):
+    def __init__(self, points, values, interp_method="slinear", x_interp=None, bounds_error=True, **kwargs):
         """
         Initialize instance of interpolation class.
 
@@ -85,6 +85,9 @@ class InterpND(object):
             The data on the regular grid in n dimensions.
         interp_method : str or list of str, optional
             Name of interpolation method(s).
+        x_interp : ndarry or None
+            If we are always interpolating at a fixed set of increasing locations, then that can be
+            specified here.
         bounds_error : bool, optional
             If True, when interpolated values are requested outside of the domain of the input
             data, a ValueError is raised. If False, then the methods are allowed to extrapolate.
@@ -128,6 +131,8 @@ class InterpND(object):
 
         self.grid = tuple([np.asarray(p) for p in points])
         self.values = values
+        self.x_interp = x_interp
+
         self._xi = None
         self._d_dx = None
         self._d_dgrid = None
@@ -220,6 +225,71 @@ class InterpND(object):
 
         return result
 
+    def evaluate_spline(self, values):
+        """
+        Interpolate at all fixed output coordinates given the new table values.
+
+        Parameters
+        ----------
+        values : ndarray(n_nodes x n_points)
+            The data on the regular grid in n dimensions.
+
+        Returns
+        -------
+        ndarray
+            Value of interpolant at all sample points.
+        """
+        xi = self.x_interp
+        self.values = values
+
+        table = self.table
+        if table._vectorized:
+
+            if self.table._name == 'bsplines':
+                self.table.values = values
+            else:
+                interp = self._interp
+                self.table = interp(self.grid, values, interp, **self._interp_options)
+                self.table.training_data_gradients = True
+
+            result, derivs_x, derivs_val, derivs_grid = table.evaluate_vectorized(xi)
+
+        else:
+            interp = self._interp
+            n_nodes, _ = values.shape
+            nx = np.prod(xi.shape)
+            result = np.empty((n_nodes, nx), dtype=xi.dtype)
+            derivs_x = np.empty((n_nodes, nx, nx), dtype=xi.dtype)
+            derivs_val = None
+
+            # TODO: it might be possible to vectorize over n_nodes.
+            for j in range(n_nodes):
+
+                self.table = interp(self.grid, values[j, :], interp, **self._interp_options)
+                self.table.training_data_gradients = True
+
+                for k in range(nx):
+                    x_pt = np.atleast_2d(xi[k])
+                    val, d_x, d_values, d_grid = table.evaluate(x_pt)
+                    result[j, k] = val
+                    derivs_x[j, k, :] = d_x.flatten()
+                    if d_values is not None:
+                        if derivs_val is None:
+                            dv_shape = [n_nodes, nx]
+                            dv_shape.extend(values.shape[1:])
+                            derivs_val = np.zeros(dv_shape, dtype=xi.dtype)
+                        in_slice = table._full_slice
+                        full_slice = [slice(j, j + 1), slice(k, k + 1)]
+                        full_slice.extend(in_slice)
+                        shape = derivs_val[tuple(full_slice)].shape
+                        derivs_val[tuple(full_slice)] = d_values.reshape(shape)
+
+        # Cache derivatives
+        self._d_dx = derivs_x
+        self._d_dvalues = derivs_val
+
+        return result
+
     def gradient(self, xi):
         """
         Compute the gradients at the specified point.
@@ -241,11 +311,14 @@ class InterpND(object):
         gradient : ndarray of shape (..., ndim)
             Vector of gradients of the interpolated values with respect to each value in xi.
         """
-        if (self._xi is None) or (not np.array_equal(xi, self._xi)):
-            # If inputs have changed since last computation, then re-interpolate.
-            self.interpolate(xi)
+        #if (self._xi is None) or (not np.array_equal(xi, self._xi)):
+        #    # If inputs have changed since last computation, then re-interpolate.
+        #    self.interpolate(xi)
 
-        return self._d_dx.reshape(np.asarray(xi).shape)
+        n_nodes, _ = self.values.shape
+        nx = np.prod(self.x_interp.shape)
+
+        return self._d_dx.reshape((n_nodes * nx, nx))
 
     def training_gradients(self, pt):
         """

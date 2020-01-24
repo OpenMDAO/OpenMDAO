@@ -163,7 +163,7 @@ class InterpBSplines(InterpAlgorithm):
         if self._jac is None:
             self._jac = get_bspline_mtx(n_cp, x / self.grid[-1], order=self.options['order']).tocoo()
 
-        result = self._jac * self.values
+        result = np.einsum('ij,kj->ki', self._jac.toarray(), self.values)
 
         return result, None, None, None
 
