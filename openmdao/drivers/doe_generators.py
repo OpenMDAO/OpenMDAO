@@ -97,7 +97,7 @@ class ListGenerator(DOEGenerator):
             name_map = {}
 
             for tup in case:
-                if type(tup) not in (tuple, list, set) or len(tup) != 2:
+                if not isinstance(tup, (tuple, list, set)) or len(tup) != 2:
                     msg = "Invalid DOE case found, expecting a list of name/value pairs:\n%s"
                     raise RuntimeError(msg % str(case))
 
@@ -110,7 +110,7 @@ class ListGenerator(DOEGenerator):
                         name_map[name] = abs_name
 
             # any names not found in name_map are invalid design vars
-            invalid_desvars = [name for name, val in case if name_map.get(name) is None]
+            invalid_desvars = [name for name, _ in case if name not in name_map]
             if invalid_desvars:
                 if len(invalid_desvars) > 1:
                     msg = "Invalid DOE case found, %s are not valid design variables:\n%s"
@@ -228,7 +228,7 @@ class UniformGenerator(DOEGenerator):
             The number of samples to run. Defaults to 1.
 
         seed : int or None, optional
-            Seed for randon number generator.
+            Seed for random number generator.
         """
         super(UniformGenerator, self).__init__()
 
@@ -255,7 +255,7 @@ class UniformGenerator(DOEGenerator):
         if self._seed is not None:
             np.random.seed(self._seed)
 
-        for i in range(self._num_samples):
+        for _ in range(self._num_samples):
             sample = []
 
             for (name, meta) in iteritems(design_vars):
@@ -300,7 +300,6 @@ class _pyDOE_Generator(DOEGenerator):
         """
         super(_pyDOE_Generator, self).__init__()
         self._levels = levels
-        self._levels_array = None
 
     def __call__(self, design_vars, model=None):
         """
@@ -321,23 +320,17 @@ class _pyDOE_Generator(DOEGenerator):
         """
         sizes = [meta['size'] for name, meta in iteritems(design_vars)]
         size = sum(sizes)
-        levels = self._levels
-
-        if isinstance(levels, int):
-            self._levels_array = [levels] * size
-
-            # rows = vars (# rows/var = var size), cols = levels
-            values = np.empty((size, levels))
-        else:
-            self._levels_array = [s * l for s, l in zip(sizes, levels)]
-            values = np.array([np.empty(i) for i in levels])
 
         doe = self._generate_design(size)
 
         # generate values for each level for each design variable
         # over the range of that varable's lower to upper bound
 
-        for row, (name, meta) in enumerate(iteritems(design_vars)):
+        # rows = vars (# rows/var = var size), cols = levels
+        values = np.empty((size, self._levels))
+
+        row = 0
+        for name, meta in iteritems(design_vars):
             size = meta['size']
 
             for k in range(size):
@@ -349,20 +342,20 @@ class _pyDOE_Generator(DOEGenerator):
                 if isinstance(upper, np.ndarray):
                     upper = upper[k]
 
-                values[row][:] = np.linspace(lower, upper, num=self._levels_array[row])
+                values[row][:] = np.linspace(lower, upper, num=self._levels)
+                row += 1
 
         # yield values for doe generated indices
         for idxs in doe.astype('int'):
             retval = []
-            var = row = 0
-            for name, meta in iteritems(design_vars):
+            row = 0
+            for var, (name, meta) in enumerate(iteritems(design_vars)):
                 size = meta['size']
                 val = np.empty(size)
                 for k in range(size):
                     idx = idxs[var + k]
                     val[k] = values[row + k][idx]
                 retval.append((name, val))
-                var += 1
                 row += size
 
             yield retval
@@ -403,7 +396,11 @@ class FullFactorialGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE2.fullfact(self._levels_array)
+        if isinstance(self._levels, int):
+            levels = [self._levels] * size
+        else:
+            raise NotImplementedError()
+        return pyDOE2.fullfact(levels)
 
 
 class PlackettBurmanGenerator(_pyDOE_Generator):
@@ -578,8 +575,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         for row in doe:
             retval = []
             col = 0
-            var = 0
-            for name, meta in iteritems(design_vars):
+            for var, (name, meta) in enumerate(iteritems(design_vars)):
                 size = meta['size']
                 val = np.empty(size)
                 for k in range(size):
@@ -596,7 +592,6 @@ class LatinHypercubeGenerator(DOEGenerator):
                     val[k] = lower + sample * (upper - lower)
 
                 retval.append((name, val))
-                var += 1
                 col += size
 
             yield retval

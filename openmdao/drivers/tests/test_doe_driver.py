@@ -571,6 +571,7 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['xy'][0], expected[n]['xy'][0])
             self.assertEqual(outputs['xy'][1], expected[n]['xy'][1])
 
+    @unittest.expectedFailure
     def test_full_factorial_array_input(self):
         prob = om.Problem()
         model = prob.model
