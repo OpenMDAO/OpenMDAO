@@ -273,9 +273,12 @@ class ParaboloidExternalCodeComp(om.ExternalCodeComp):
         self.options['external_input_files'] = [self.input_file]
         self.options['external_output_files'] = [self.output_file]
 
-        self.options['command'] = [
-            sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
-        ]
+        # If you want to write your command as a list, the code below will also work.
+        # self.options['command'] = [
+        #     sys.executable, 'extcode_paraboloid.py', self.input_file, self.output_file
+        # ]
+
+        self.options['command'] = ('python extcode_paraboloid.py {} {}').format(self.input_file, self.output_file)
 
     def compute(self, inputs, outputs):
         x = inputs['x']
@@ -610,12 +613,16 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
                 self.options['external_input_files'] = [self.input_file]
                 self.options['external_output_files'] = [self.output_file]
 
+
                 self.options['command_apply'] = [
                     sys.executable, 'extcode_mach.py', self.input_file, self.output_file,
                 ]
                 self.options['command_solve'] = [
                     sys.executable, 'extcode_mach.py', self.input_file, self.output_file,
                 ]
+
+                # If you want to write your own string command, the code below will also work.
+                # self.options['command_apply'] = ('python extcode_mach.py {} {}').format(self.input_file, self.output_file)
 
             def apply_nonlinear(self, inputs, outputs, residuals):
                 with open(self.input_file, 'w') as input_file:
@@ -669,7 +676,6 @@ class TestExternalCodeImplicitCompFeature(unittest.TestCase):
         mach_comp.options['super_sonic'] = super_sonic
         prob.run_model()
         assert_rel_error(self, prob['mach'], mach_solve(area_ratio, super_sonic=super_sonic), 1e-8)
-
 
 if __name__ == "__main__":
     unittest.main()
