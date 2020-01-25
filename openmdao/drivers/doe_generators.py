@@ -439,7 +439,6 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
         doe = pyDOE2.pbdesign(size)
 
         doe[doe < 0] = 0  # replace -1 with zero
-
         return doe
 
 
