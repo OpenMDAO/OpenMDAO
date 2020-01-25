@@ -61,6 +61,10 @@ does the same computation as the :ref:`Paraboloid Tutorial <tutorial_paraboloid_
 
 The following example demonstrates how to build an OpenMDAO component that makes use of this external code.
 
+.. note::
+    If you pass a string as a command, OpenMDAO sets `shell=True` which can add `overhead <https://docs.python.org/3/library/subprocess.html#frequently-used-arguments>`_ leading to
+    a decrease in performance and a security `loophole <https://docs.python.org/3/library/subprocess.html#security-considerations>`_. Use list when possible.
+
 .. embed-code::
     openmdao.components.tests.test_external_code_comp.ParaboloidExternalCodeComp
 

@@ -105,7 +105,6 @@ class N2Diagram {
             'model': { 'x': 0, 'y': 0 },
             'solver': { 'x': 0, 'y': 0 }
         };
-
     }
 
     /**
@@ -378,7 +377,8 @@ class N2Diagram {
             })
             .attr("height", function (d) {
                 return d.prevDims.height * self.prevTransitCoords.model.y;
-            });
+            })
+            .attr("id", function(d) { return d.absPathName.replace(/\./g,'_'); });
 
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
@@ -518,7 +518,8 @@ class N2Diagram {
             })
             .attr("height", function (d) {
                 return d.prevSolverDims.height * self.prevTransitCoords.solver.y;
-            });
+            })
+            .attr("id", function(d) { return d.absPathName.replace(/\./g, '_'); });
 
         nodeEnter.append("svg:text")
             .attr("dy", ".35em")
