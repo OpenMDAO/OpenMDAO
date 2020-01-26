@@ -505,7 +505,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_subsystem('p1', om.IndepVarComp('xy', np.array([0., 0.])), promotes=['*'])
         model.add_subsystem('comp', ParaboloidArray(), promotes=['*'])
 
-        model.add_design_var('xy', lower=np.array([-50., -50.]), upper=np.array([50., 50.]))
+        model.add_design_var('xy', lower=np.array([-10., -50.]), upper=np.array([10., 50.]))
         model.add_objective('f_xy')
 
         prob.driver = om.DOEDriver(om.FullFactorialGenerator(levels=3))
@@ -516,17 +516,17 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         expected = [
-            {'xy': np.array([-50., -50.])},
+            {'xy': np.array([-10., -50.])},
             {'xy': np.array([0., -50.])},
-            {'xy': np.array([50., -50.])},
+            {'xy': np.array([10., -50.])},
 
-            {'xy': np.array([-50.,   0.])},
+            {'xy': np.array([-10.,   0.])},
             {'xy': np.array([0.,   0.])},
-            {'xy': np.array([50.,   0.])},
+            {'xy': np.array([10.,   0.])},
 
-            {'xy': np.array([-50.,  50.])},
+            {'xy': np.array([-10.,  50.])},
             {'xy': np.array([0.,  50.])},
-            {'xy': np.array([50.,  50.])},
+            {'xy': np.array([10.,  50.])},
         ]
 
         cr = om.CaseReader("cases.sql")

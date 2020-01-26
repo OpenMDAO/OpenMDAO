@@ -320,12 +320,6 @@ class _pyDOE_Generator(DOEGenerator):
         """
         sizes = [meta['size'] for name, meta in iteritems(design_vars)]
 
-        if isinstance(self._levels, int):
-            self._level_lst = [self._levels] * len(sizes)
-        else:
-            default = self._levels.get('default', _LEVELS)
-            self._level_lst = [self._levels.get(name, default) for name in design_vars.keys()]
-
         size = sum(sizes)
 
         doe = self._generate_design(size)
@@ -353,18 +347,22 @@ class _pyDOE_Generator(DOEGenerator):
                 row += 1
 
         # yield values for doe generated indices
+        print(doe.astype('int'))
+        print("\nValues:\n")
+        print(values)
+        print("\n")
         for idxs in doe.astype('int'):
             retval = []
             row = 0
             for var, (name, meta) in enumerate(iteritems(design_vars)):
                 size = meta['size']
                 val = np.empty(size)
+                ids = idxs[var + k]
                 for k in range(size):
                     idx = idxs[var + k]
                     val[k] = values[row + k][idx]
                 retval.append((name, val))
                 row += size
-
             yield retval
 
     def _generate_design(self, sizes):
