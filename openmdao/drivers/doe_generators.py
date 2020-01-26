@@ -360,13 +360,13 @@ class _pyDOE_Generator(DOEGenerator):
                 row += size
             yield retval
 
-    def _generate_design(self, sizes):
+    def _generate_design(self, size):
         """
         Generate DOE design.
 
         Parameters
         ----------
-        sizes : list(int)
+        size : int
             The number of factors for the design.
 
         Returns
