@@ -28,9 +28,7 @@ class ParaboloidArray(om.ExplicitComponent):
     Where x and y are xy[0] and xy[1] respectively.
     """
 
-    def __init__(self):
-        super(ParaboloidArray, self).__init__()
-
+    def setup(self):
         self.add_input('xy', val=np.array([0., 0.]))
         self.add_output('f_xy', val=0.0)
 
