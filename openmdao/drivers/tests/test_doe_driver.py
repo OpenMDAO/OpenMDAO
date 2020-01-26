@@ -583,6 +583,40 @@ class TestDOEDriver(unittest.TestCase):
             self.assertEqual(outputs['xy'][0], expected_case['xy'][0])
             self.assertEqual(outputs['xy'][1], expected_case['xy'][1])
 
+    def test_generalized_subset(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+
+        model.add_design_var('x', lower=0.0, upper=1.0)
+        model.add_design_var('y', lower=0.0, upper=1.0)
+        model.add_objective('f_xy')
+
+        prob.driver = om.DOEDriver(generator=om.GeneralizedSubsetGenerator(levels=2, reduction=2))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        expected = [
+            {'x': np.array([0.0]), 'y': np.array([0.0]), 'f_xy': np.array([22.0])},
+            {'x': np.array([1.0]), 'y': np.array([1.0]), 'f_xy': np.array([27.0])},
+        ]
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        self.assertEqual(len(cases), 2)
+
+        for case, expected_case in zip(cases, expected):
+            outputs = cr.get_case(case).outputs
+            for name in ('x', 'y', 'f_xy'):
+                self.assertEqual(outputs[name], expected_case[name])
+
     def test_plackett_burman(self):
         prob = om.Problem()
         model = prob.model

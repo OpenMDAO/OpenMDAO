@@ -399,6 +399,36 @@ class FullFactorialGenerator(_pyDOE_Generator):
         return pyDOE2.fullfact([self._levels] * size)
 
 
+class GeneralizedSubsetGenerator(_pyDOE_Generator):
+    """
+    DOE case generator implementing the General Subset Design Factorial method.
+    """
+
+    def __init__(self, levels, reduction, n=1):
+        """
+        Initialize the PlackettBurmanGenerator.
+        """
+        super(GeneralizedSubsetGenerator, self).__init__(levels=levels)
+        self._reduction = reduction
+        self._n = n
+
+    def _generate_design(self, size):
+        """
+        Generate a general subset DOE design.
+
+        Parameters
+        ----------
+        size : int
+            The number of factors for the design.
+
+        Returns
+        -------
+        ndarray
+            The design matrix as a size x levels array of indices.
+        """
+        return pyDOE2.gsd(levels=[self._levels] * size, reduction=self._reduction, n=self._n)
+
+
 class PlackettBurmanGenerator(_pyDOE_Generator):
     """
     DOE case generator implementing the Plackett-Burman method.
