@@ -350,7 +350,7 @@ class _pyDOE_Generator(DOEGenerator):
         for idxs in doe.astype('int'):
             retval = []
             row = 0
-            for var, (name, meta) in enumerate(iteritems(design_vars)):
+            for name, meta in iteritems(design_vars):
                 size = meta['size']
                 val = np.empty(size)
                 for k in range(size):
