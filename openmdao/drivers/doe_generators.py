@@ -15,7 +15,7 @@ import pyDOE2
 
 from openmdao.utils.name_maps import prom_name2abs_name
 
-_LEVELS = 2
+_LEVELS = 2  # default number of levels for pyDOE generators
 
 
 class DOEGenerator(object):
