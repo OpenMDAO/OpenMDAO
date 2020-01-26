@@ -1174,6 +1174,7 @@ class TestDOEDriverFeature(unittest.TestCase):
 
     def setUp(self):
         import json
+        import os
         import tempfile
 
         self.startdir = os.getcwd()
@@ -1365,6 +1366,8 @@ class TestParallelDOEFeature(unittest.TestCase):
     N_PROCS = 2
 
     def setUp(self):
+        import os
+        import tempfile
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.rank
 
@@ -1457,6 +1460,9 @@ class TestParallelDOEFeature2(unittest.TestCase):
     N_PROCS = 4
 
     def setUp(self):
+        import os
+        import tempfile
+
         from mpi4py import MPI
         rank = MPI.COMM_WORLD.rank
 
