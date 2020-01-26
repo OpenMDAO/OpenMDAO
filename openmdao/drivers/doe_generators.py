@@ -328,7 +328,7 @@ class _pyDOE_Generator(DOEGenerator):
 
         size = sum(sizes)
 
-        doe = self._generate_design(sizes)
+        doe = self._generate_design(size)
 
         # generate values for each level for each design variable
         # over the range of that variable's lower to upper bound
@@ -389,13 +389,13 @@ class FullFactorialGenerator(_pyDOE_Generator):
     DOE case generator implementing the Full Factorial method.
     """
 
-    def _generate_design(self, sizes):
+    def _generate_design(self, size):
         """
         Generate a full factorial DOE design.
 
         Parameters
         ----------
-        sizes : list(int)
+        size : int
             The number of factors for the design.
 
         Returns
@@ -403,11 +403,7 @@ class FullFactorialGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        if isinstance(self._levels, int):
-            levels = [self._levels] * sum(sizes)
-        else:  # _levels is a dictionary
-            raise NotImplementedError()
-        return pyDOE2.fullfact(levels)
+        return pyDOE2.fullfact([self._levels] * size)
 
 
 class PlackettBurmanGenerator(_pyDOE_Generator):
@@ -421,13 +417,13 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
         """
         super(PlackettBurmanGenerator, self).__init__(levels=2)
 
-    def _generate_design(self, sizes):
+    def _generate_design(self, size):
         """
         Generate a Plackett-Burman DOE design.
 
         Parameters
         ----------
-        sizes : list(int)
+        size : int
             The number of factors for the design.
 
         Returns
@@ -435,7 +431,6 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        size = sum(sizes)
         doe = pyDOE2.pbdesign(size)
 
         doe[doe < 0] = 0  # replace -1 with zero
@@ -464,13 +459,13 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
         super(BoxBehnkenGenerator, self).__init__(levels=3)
         self._center = center
 
-    def _generate_design(self, sizes):
+    def _generate_design(self, size):
         """
         Generate a Box-Behnken DOE design.
 
         Parameters
         ----------
-        sizes : list(int)
+        size : int
             The number of factors for the design.
 
         Returns
@@ -478,7 +473,6 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        size = sum(sizes)
         if size < 3:
             raise RuntimeError("Total size of design variables is %d,"
                                "but must be at least 3 when using %s. " %
