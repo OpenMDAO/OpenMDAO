@@ -262,7 +262,10 @@ class DOEDriver(Driver):
                         recorder._record_on_proc = True
                     else:
                         size = self._comm.size // procs_per_model
-                        recorder._record_on_proc = self._comm.rank < size
+                        if self._comm.rank < size:
+                            recorder._record_on_proc = True
+                        else:
+                            recorder._record_on_proc = False
 
         super(DOEDriver, self)._setup_recording()
 
