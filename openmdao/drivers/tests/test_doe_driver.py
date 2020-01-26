@@ -1227,6 +1227,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             f.write(self.expected_json)
 
     def tearDown(self):
+        import os
         import shutil
 
         os.chdir(self.startdir)
@@ -1236,6 +1237,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             pass
 
     def test_uniform(self):
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
@@ -1269,6 +1271,7 @@ class TestDOEDriverFeature(unittest.TestCase):
         print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % vals_i for vals_i in values]))
 
     def test_csv(self):
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         prob = om.Problem()
@@ -1308,6 +1311,7 @@ class TestDOEDriverFeature(unittest.TestCase):
                          self.expected_text)
 
     def test_list(self):
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         import json
@@ -1409,6 +1413,7 @@ class TestParallelDOEFeature(unittest.TestCase):
             pass
 
     def test_full_factorial(self):
+        import openmdao.api as om
         from openmdao.test_suite.components.paraboloid import Paraboloid
 
         from mpi4py import MPI
@@ -1504,6 +1509,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
             pass
 
     def test_fan_in_grouped(self):
+        import openmdao.api as om
         from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
         from mpi4py import MPI
