@@ -347,19 +347,14 @@ class _pyDOE_Generator(DOEGenerator):
                 row += 1
 
         # yield values for doe generated indices
-        print(doe.astype('int'))
-        print("\nValues:\n")
-        print(values)
-        print("\n")
         for idxs in doe.astype('int'):
             retval = []
             row = 0
             for var, (name, meta) in enumerate(iteritems(design_vars)):
                 size = meta['size']
                 val = np.empty(size)
-                ids = idxs[var + k]
                 for k in range(size):
-                    idx = idxs[var + k]
+                    idx = idxs[row + k]
                     val[k] = values[row + k][idx]
                 retval.append((name, val))
                 row += size

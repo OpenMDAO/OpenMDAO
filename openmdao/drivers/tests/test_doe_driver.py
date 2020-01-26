@@ -321,18 +321,18 @@ class TestDOEDriver(unittest.TestCase):
         expected = [
             {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 0.])},
             {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 0.])},
+            {'p1.x': np.array([0., 1.]), 'p2.y': np.array([0., 0.])},
+            {'p1.x': np.array([1., 1.]), 'p2.y': np.array([0., 0.])},
+            {'p1.x': np.array([0., 0.]), 'p2.y': np.array([1., 0.])},
+            {'p1.x': np.array([1., 0.]), 'p2.y': np.array([1., 0.])},
             {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 0.])},
             {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 0.])},
             {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 1.])},
             {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 1.])},
-            {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 1.])},
-            {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
-            {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 0.])},
-            {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 0.])},
-            {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 0.])},
-            {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 0.])},
-            {'p1.x': np.array([0., 0.]), 'p2.y': np.array([0., 1.])},
-            {'p1.x': np.array([1., 0.]), 'p2.y': np.array([0., 1.])},
+            {'p1.x': np.array([0., 1.]), 'p2.y': np.array([0., 1.])},
+            {'p1.x': np.array([1., 1.]), 'p2.y': np.array([0., 1.])},
+            {'p1.x': np.array([0., 0.]), 'p2.y': np.array([1., 1.])},
+            {'p1.x': np.array([1., 0.]), 'p2.y': np.array([1., 1.])},
             {'p1.x': np.array([0., 1.]), 'p2.y': np.array([1., 1.])},
             {'p1.x': np.array([1., 1.]), 'p2.y': np.array([1., 1.])},
         ]
@@ -498,6 +498,52 @@ class TestDOEDriver(unittest.TestCase):
             for name in ('x', 'y', 'f_xy'):
                 self.assertEqual(outputs[name], expected_case[name])
 
+    def test_full_factorial_factoring(self):
+
+        class Digits2Num(om.ExplicitComponent):
+            """
+            Makes from two vectors with 2 elements a 4 digit number.
+            For singe digit integers always gives a unique output number.
+            """
+
+            def setup(self):
+                self.add_input('x', val=np.array([0., 0.]))
+                self.add_input('y', val=np.array([0., 0.]))
+                self.add_output('f', val=0.0)
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                y = inputs['y']
+                outputs['f'] = x[0] * 1000 + x[1] * 100 + y[0] * 10 + y[1]
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', np.array([0.0, 0.0])), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', np.array([0.0, 0.0])), promotes=['*'])
+        model.add_subsystem('comp', Digits2Num(), promotes=['*'])
+
+        model.add_design_var('x', lower=0.0, upper=np.array([1.0, 2.0]))
+        model.add_design_var('y', lower=0.0, upper=np.array([3.0, 4.0]))
+        model.add_objective('f')
+
+        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels=2))
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader("cases.sql")
+        cases = cr.list_cases('driver')
+
+        objs = [int(cr.get_case(case).outputs['f']) for case in cases]
+
+        self.assertEqual(len(objs), 16)
+        # Testing uniqueness. If all elements are unique, it should be the same length as the
+        # number of cases
+        self.assertEqual(len(set(objs)), 16)
+
     def test_full_factorial_array(self):
         prob = om.Problem()
         model = prob.model
@@ -538,47 +584,6 @@ class TestDOEDriver(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             self.assertEqual(outputs['xy'][0], expected_case['xy'][0])
             self.assertEqual(outputs['xy'][1], expected_case['xy'][1])
-
-    @unittest.expectedFailure
-    def test_full_factorial_dict_input(self):
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('p1', om.IndepVarComp('x', 0.0), promotes=['x'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 0.0), promotes=['y'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
-
-        model.add_design_var('x', lower=0.0, upper=1.0)
-        model.add_design_var('y', lower=0.0, upper=1.0)
-        model.add_objective('f_xy')
-
-        prob.driver = om.DOEDriver(generator=om.FullFactorialGenerator(levels={'x': 2, 'y': 3}))
-        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-
-        prob.setup()
-        prob.run_driver()
-        prob.cleanup()
-
-        expected = [
-            {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.00])},
-            {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.00])},
-
-            {'x': np.array([0.]), 'y': np.array([.5]), 'f_xy': np.array([26.25])},
-            {'x': np.array([1.]), 'y': np.array([.5]), 'f_xy': np.array([21.75])},
-
-            {'x': np.array([0.]), 'y': np.array([1.]), 'f_xy': np.array([31.00])},
-            {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
-        ]
-
-        cr = om.CaseReader("cases.sql")
-        cases = cr.list_cases('driver')
-
-        self.assertEqual(len(cases), 6)
-
-        for case, expected_case in zip(cases, expected):
-            outputs = cr.get_case(case).outputs
-            for name in ('x', 'y', 'f_xy'):
-                self.assertEqual(outputs[name], expected_case[name])
 
     def test_plackett_burman(self):
         prob = om.Problem()
