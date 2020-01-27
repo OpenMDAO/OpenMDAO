@@ -250,7 +250,8 @@ class ScipyOptimizeDriver(Driver):
         self._dvlist = list(self._designvars)
 
         # maxiter and disp get passsed into scipy with all the other options.
-        self.opt_settings['maxiter'] = self.options['maxiter']
+        if 'maxiter' not in self.opt_settings:
+            self.opt_settings['maxiter'] = self.options['maxiter']
         self.opt_settings['disp'] = self.options['disp']
 
         # Size Problem

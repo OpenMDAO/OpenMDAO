@@ -17,6 +17,28 @@ from openmdao.test_suite.groups.sin_fitter import SineFitter
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 from openmdao.utils.general_utils import run_driver
 
+rosenbrock_size = 6  # size of the design variable
+
+def rosenbrock(x):
+    x_0 = x[:-1]
+    x_1 = x[1:]
+    return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
+
+
+class Rosenbrock(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_input('x', np.ones(rosenbrock_size))
+        self.add_output('f', 0.0)
+
+    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+        x = inputs['x']
+        outputs['f'] = rosenbrock(x)
+
+def rastrigin(x):
+    a = 10  # constant
+    return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
+
 
 class TestScipyOptimizeDriver(unittest.TestCase):
 
@@ -897,11 +919,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                          "scipy >= 1.1 is required.")
     def test_trust_constr(self):
 
-        def rosenbrock(x):
-            x_0 = x[:-1]
-            x_1 = x[1:]
-            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
-
         class Rosenbrock(om.ExplicitComponent):
 
             def setup(self):
@@ -943,11 +960,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_hess_option(self):
-
-        def rosenbrock(x):
-            x_0 = x[:-1]
-            x_1 = x[1:]
-            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
 
         class Rosenbrock(om.ExplicitComponent):
 
@@ -991,11 +1003,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.1"),
                          "scipy >= 1.1 is required.")
     def test_trust_constr_equality_con(self):
-
-        def rosenbrock(x):
-            x_0 = x[:-1]
-            x_1 = x[1:]
-            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
 
         class Rosenbrock(om.ExplicitComponent):
 
@@ -1674,27 +1681,10 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         import openmdao.api as om
 
-        size = 6  # size of the design variable
-
-        def rosenbrock(x):
-            x_0 = x[:-1]
-            x_1 = x[1:]
-            return sum((1 - x_0) ** 2) + 100 * sum((x_1 - x_0 ** 2) ** 2)
-
-        class Rosenbrock(om.ExplicitComponent):
-
-            def setup(self):
-                self.add_input('x', 1.5*np.ones(size))
-                self.add_output('f', 0.0)
-
-            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
-                x = inputs['x']
-                outputs['f'] = rosenbrock(x)
-
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(size)), promotes=['*'])
+        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)), promotes=['*'])
         model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
 
         prob.driver = driver = om.ScipyOptimizeDriver()
@@ -1705,11 +1695,11 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         driver.opt_settings['seed'] = 1234
         driver.opt_settings['initial_temp'] = 5230
 
-        model.add_design_var('x', lower=-2*np.ones(size), upper=2*np.ones(size))
+        model.add_design_var('x', lower=-2*np.ones(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
-        assert_rel_error(self, prob['x'], np.ones(size), 1e-2)
+        assert_rel_error(self, prob['x'], np.ones(rosenbrock_size), 1e-2)
         assert_rel_error(self, prob['f'], 0.0, 1e-2)
 
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
@@ -1719,10 +1709,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         # Example from the Scipy documentation
 
         size = 3  # size of the design variable
-
-        def rastrigin(x):
-            a = 10  # constant
-            return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
 
         class Rastrigin(om.ExplicitComponent):
 
@@ -1764,10 +1750,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         size = 3  # size of the design variable
 
-        def rastrigin(x):
-            a = 10  # constant
-            return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
-
         class Rastrigin(om.ExplicitComponent):
 
             def setup(self):
@@ -1805,10 +1787,6 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         size = 3  # size of the design variable
 
-        def rastrigin(x):
-            a = 10  # constant
-            return np.sum(np.square(x) - a * np.cos(2 * np.pi * x)) + a * np.size(x)
-
         class Rastrigin(om.ExplicitComponent):
 
             def setup(self):
@@ -1837,20 +1815,16 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         assert_rel_error(self, prob['x'], -np.ones(size), 1e-2)
         assert_rel_error(self, prob['f'], 3.0, 1e-2)
 
+
     @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
                          "scipy >= 1.2 is required.")
-    @unittest.skip("temporarily disabled due to test failure.")
-    def test_shgo(self):
+    def test_shgo_rastrigin(self):
         # Source of example:
-        # https://scipy.github.io/devdocs/generated/scipy.optimize.dual_annealing.html
+        # https://stefan-endres.github.io/shgo/
 
         import openmdao.api as om
 
         size = 3  # size of the design variable
-
-        def rastrigin(x):
-            a = 10  # constant
-            return np.sum(np.square(x) - a*np.cos(2*np.pi*x)) + a*np.size(x)
 
         class Rastrigin(om.ExplicitComponent):
 
@@ -1871,16 +1845,42 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
         prob.driver = driver = om.ScipyOptimizeDriver()
         driver.options['optimizer'] = 'shgo'
         driver.options['disp'] = False
-        driver.options['maxiter'] = 100
         driver.opt_settings['maxtime'] = 10  # seconds
         driver.opt_settings['iters'] = 3
+        driver.opt_settings['maxiter'] = None
 
         model.add_design_var('x', lower=-5.12*np.ones(size), upper=5.12*np.ones(size))
         model.add_objective('f')
         prob.setup()
         prob.run_driver()
+
         assert_rel_error(self, prob['x'], np.zeros(size), 1e-6)
         assert_rel_error(self, prob['f'], 0.0, 1e-6)
+
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
+                         "scipy >= 1.2 is required.")
+    def test_shgo_rosenbrock(self):
+        # Source of example:
+        # https://stefan-endres.github.io/shgo/
+        import openmdao.api as om
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('indeps', om.IndepVarComp('x', np.ones(rosenbrock_size)), promotes=['*'])
+        model.add_subsystem('rosen', Rosenbrock(), promotes=['*'])
+
+        prob.driver = driver = om.ScipyOptimizeDriver()
+        driver.options['optimizer'] = 'shgo'
+        driver.options['disp'] = False
+        driver.opt_settings['maxiter'] = None
+
+        model.add_design_var('x', lower=np.zeros(rosenbrock_size), upper=2*np.ones(rosenbrock_size))
+        model.add_objective('f')
+        prob.setup()
+        prob.run_driver()
+        assert_rel_error(self, prob['x'], np.ones(rosenbrock_size), 1e-2)
+        assert_rel_error(self, prob['f'], 0.0, 1e-2)
 
 
 if __name__ == "__main__":
