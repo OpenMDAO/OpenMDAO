@@ -22,15 +22,16 @@ class InterpAlgorithm(object):
         Dictionary with general pyoptsparse options.
     subtable : <InterpAlgorithm>
         Table interpolation that handles child dimensions.
-    training_data_gradients : bool
-        Flag that tells interpolation objects wether to compute gradients with respect to the
-        grid values.
     values : ndarray
         Array containing the table values for all dimensions.
-    _name : str
-        Algorithm name for error messages.
+    _compute_d_dvalues : bool
+        When set to True, compute gradients with respect to the grid values.
+    _compute_d_dx : bool
+        When set to True, compute gradients with respect to the interpolated point location.
     _full_slice : tuple of <Slice>
         Used to cache the full slice if training derivatives are computed.
+    _name : str
+        Algorithm name for error messages.
     _vectorized :bool
         If True, this method is vectorized and can simultaneously solve multiple interpolations.
     """
@@ -66,7 +67,7 @@ class InterpAlgorithm(object):
         self.k = None
         self._name = None
         self._vectorized = False
-        self.training_data_gradients = False
+        self._compute_d_dvalues = False
         self._full_slice = None
 
     def initialize(self):
@@ -196,7 +197,7 @@ class InterpAlgorithm(object):
             slice_idx = []
 
         if self.subtable is not None:
-            self.subtable.training_data_gradients = self.training_data_gradients
+            self.subtable._compute_d_dvalues = self._compute_d_dvalues
 
         result, d_dx, d_values, d_grid = self.interpolate(x, idx, slice_idx)
 

@@ -172,7 +172,7 @@ class SplineComp(InterpBase):
         #pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         for out_name, interp in iteritems(self.interps):
             values = inputs[self.interp_to_cp[out_name]]
-            interp.training_data_gradients = True
+            interp._compute_d_dvalues = True
 
             #try:
             outputs[out_name] = interp.evaluate_spline(values)

@@ -209,20 +209,20 @@ class InterpAkima(InterpAlgorithm):
             if idx >= 2:
                 val1 = subval[..., j]
                 dval1 = subderiv[..., j, :]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dval1_dv = deriv_dv[..., j, :]
                 j += 1
             if idx >= 1:
                 val2 = subval[..., j]
                 dval2 = subderiv[..., j, :]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dval2_dv = deriv_dv[..., j, :]
                 j += 1
             val3 = subval[..., j]
             val4 = subval[..., j + 1]
             dval3 = subderiv[..., j, :]
             dval4 = subderiv[..., j + 1, :]
-            if self.training_data_gradients:
+            if self._compute_d_dvalues:
                 dval3_dv = deriv_dv[..., j, :]
                 dval4_dv = deriv_dv[..., j + 1, :]
 
@@ -230,13 +230,13 @@ class InterpAkima(InterpAlgorithm):
             if idx < ngrid - 2:
                 val5 = subval[..., j]
                 dval5 = subderiv[..., j, :]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dval5_dv = deriv_dv[..., j, :]
                 j += 1
             if idx < ngrid - 3:
                 val6 = subval[..., j]
                 dval6 = subderiv[..., j, :]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dval6_dv = deriv_dv[..., j, :]
                 j += 1
 
@@ -246,7 +246,7 @@ class InterpAkima(InterpAlgorithm):
             nshape = list(values.shape[:-1])
             nshape.append(1)
             deriv_dx = np.empty(tuple(nshape), dtype=dtype)
-            if self.training_data_gradients:
+            if self._compute_d_dvalues:
                 n_this = high_idx - low_idx
                 nshape = list(values.shape[:-1])
                 nshape.append(n_this)
@@ -264,30 +264,30 @@ class InterpAkima(InterpAlgorithm):
             j = 0
             if idx >= 2:
                 val1 = values[..., idx - 2]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     idx_val1 = j
                     j += 1
             if idx >= 1:
                 val2 = values[..., idx - 1]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     idx_val2 = j
                     j += 1
             val3 = values[..., idx]
-            if self.training_data_gradients:
+            if self._compute_d_dvalues:
                 idx_val3 = j
                 j += 1
             val4 = values[..., idx + 1]
-            if self.training_data_gradients:
+            if self._compute_d_dvalues:
                 idx_val4 = j
                 j += 1
             if idx < ngrid - 2:
                 val5 = values[..., idx + 2]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     idx_val5 = j
                     j += 1
             if idx < ngrid - 3:
                 val6 = values[..., idx + 3]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     idx_val6 = j
 
         # Calculate interval slope values
@@ -301,7 +301,7 @@ class InterpAkima(InterpAlgorithm):
         # The values of m1, m2, m4 and m5 may be calculated from other slope values
         # depending on the value of idx
 
-        compute_local_train = self.training_data_gradients and subtable is None
+        compute_local_train = self._compute_d_dvalues and subtable is None
 
         m3 = (val4 - val3) / (grid[idx + 1] - grid[idx])
         if compute_local_train:
@@ -498,33 +498,33 @@ class InterpAkima(InterpAlgorithm):
             cd_term = 0
 
             dm3 = (dval4 - dval3) / (grid[idx + 1] - grid[idx])
-            if self.training_data_gradients:
+            if self._compute_d_dvalues:
                 dm3_dv = (dval4_dv - dval3_dv) / (grid[idx + 1] - grid[idx])
 
             if idx >= 2:
                 dm1 = (dval2 - dval1) / (grid[idx - 1] - grid[idx - 2])
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dm1_dv = (dval2_dv - dval1_dv) / (grid[idx - 1] - grid[idx - 2])
             else:
                 dm1 = 0
 
             if idx >= 1:
                 dm2 = (dval3 - dval2) / (grid[idx] - grid[idx - 1])
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dm2_dv = (dval3_dv - dval2_dv) / (grid[idx] - grid[idx - 1])
             else:
                 dm2 = 0
 
             if idx < ngrid - 2:
                 dm4 = (dval5 - dval4) / (grid[idx + 2] - grid[idx + 1])
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dm4_dv = (dval5_dv - dval4_dv) / (grid[idx + 2] - grid[idx + 1])
             else:
                 dm4 = 0
 
             if idx < ngrid - 3:
                 dm5 = (dval6 - dval5) / (grid[idx + 3] - grid[idx + 2])
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dm5_dv = (dval6_dv - dval5_dv) / (grid[idx + 3] - grid[idx + 2])
             else:
                 dm5 = 0
@@ -532,24 +532,24 @@ class InterpAkima(InterpAlgorithm):
             if idx == 0:
                 dm1 = 3 * dm3 - 2 * dm4
                 dm2 = 2 * dm3 - dm4
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dm1_dv = 3 * dm3_dv - 2 * dm4_dv
                     dm2_dv = 2 * dm3_dv - dm4_dv
 
             elif idx == 1:
                 dm1 = 2 * dm2 - dm3
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dm1_dv = 2 * dm2_dv - dm3_dv
 
             elif idx == ngrid - 3:
                 dm5 = 2 * dm4 - dm3
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dm5_dv = 2 * dm4_dv - dm3_dv
 
             elif idx == ngrid - 2:
                 dm4 = 2 * dm3 - dm2
                 dm5 = 3 * dm3 - 2 * dm2
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dm4_dv = 2 * dm3_dv - dm2_dv
                     dm5_dv = 3 * dm3_dv - 2 * dm2_dv
 
@@ -557,13 +557,13 @@ class InterpAkima(InterpAlgorithm):
             if delta_x > 0:
                 _, dw2 = dv_abs_smooth_complex(m4 - m3, dm4 - dm3, delta_x)
                 _, dw3 = dv_abs_smooth_complex(m2 - m1, dm2 - dm1, delta_x)
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     _, dw2_dv = dv_abs_smooth_complex(m4 - m3, dm4_dv - dm3_dv, delta_x)
                     _, dw3_dv = dv_abs_smooth_complex(m2 - m1, dm2_dv - dm1_dv, delta_x)
             else:
                 _, dw2 = dv_abs_complex(m4 - m3, dm4 - dm3)
                 _, dw3 = dv_abs_complex(m2 - m1, dm2 - dm1)
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     _, dw2_dv = dv_abs_complex(m4 - m3, dm4_dv - dm3_dv)
                     _, dw3_dv = dv_abs_complex(m2 - m1, dm2_dv - dm1_dv)
 
@@ -584,7 +584,7 @@ class InterpAkima(InterpAlgorithm):
             dbpos = ((dm2 * w2 + m2e * dw2 + dm3 * w31 + m3e * dw3) - bpos * (dw2 + dw3)) / \
                 (w2 + w31)
 
-            if self.training_data_gradients:
+            if self._compute_d_dvalues:
                 db_dv = 0.5 * (dm2_dv + dm3_dv)
 
                 dbpos_dv = ((dm2_dv * w2 + m2e * dw2_dv + dm3_dv * w31 + m3e * dw3_dv) -
@@ -596,29 +596,29 @@ class InterpAkima(InterpAlgorithm):
                 if len(val3.shape) == 0:
                     if len(jj1[0]) > 0:
                         db[:] = dbpos
-                        if self.training_data_gradients:
+                        if self._compute_d_dvalues:
                             db_dv[:] = dbpos_dv
                 else:
                     for j in range(nx - 1):
                         db[jj1, j] = dbpos[jj1, j]
-                        if self.training_data_gradients:
+                        if self._compute_d_dvalues:
                             db_dv[jj1, j] = dbpos_dv[jj1, j]
 
             else:
                 db[jj1] = dbpos[jj1]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     db_dv[jj1] = dbpos_dv[jj1]
 
             if delta_x > 0:
                 _, dw3 = dv_abs_smooth_complex(m5 - m4, dm5 - dm4, delta_x)
                 _, dw4 = dv_abs_smooth_complex(m3 - m2, dm3 - dm2, delta_x)
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     _, dw3_dv = dv_abs_smooth_complex(m5 - m4, dm5_dv - dm4_dv, delta_x)
                     _, dw4_dv = dv_abs_smooth_complex(m3 - m2, dm3_dv - dm2_dv, delta_x)
             else:
                 _, dw3 = dv_abs_complex(m5 - m4, dm5 - dm4)
                 _, dw4 = dv_abs_complex(m3 - m2, dm3 - dm2)
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     _, dw3_dv = dv_abs_complex(m5 - m4, dm5_dv - dm4_dv)
                     _, dw4_dv = dv_abs_complex(m3 - m2, dm3_dv - dm2_dv)
 
@@ -639,7 +639,7 @@ class InterpAkima(InterpAlgorithm):
             dbp1pos = ((dm3 * w32 + m3e * dw3 + dm4 * w4 + m4e * dw4) - bp1pos * (dw3 + dw4)) / \
                 (w32 + w4)
 
-            if self.training_data_gradients:
+            if self._compute_d_dvalues:
                 dbp1_dv = 0.5 * (dm3_dv + dm4_dv)
 
                 dbp1pos_dv = ((dm3_dv * w32 + m3e * dw3_dv + dm4_dv * w4 + m4e * dw4_dv) -
@@ -651,18 +651,18 @@ class InterpAkima(InterpAlgorithm):
                 if len(val3.shape) == 0:
                     if len(jj2[0]) > 0:
                         dbp1[:] = dbp1pos
-                        if self.training_data_gradients:
+                        if self._compute_d_dvalues:
                             dbp1_dv[:] = dbp1pos_dv
 
                 else:
                     for j in range(nx - 1):
                         dbp1[jj2, j] = dbp1pos[jj2, j]
-                        if self.training_data_gradients:
+                        if self._compute_d_dvalues:
                             dbp1_dv[jj2, j] = dbp1pos_dv[jj2, j]
 
             else:
                 dbp1[jj2] = dbp1pos[jj2]
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     dbp1_dv[jj2] = dbp1pos_dv[jj2]
 
             if extrap == 0:
@@ -670,7 +670,7 @@ class InterpAkima(InterpAlgorithm):
                 dc = (3 * dm3 - 2 * db - dbp1) * h
                 dd = (db + dbp1 - 2 * dm3) * h * h
                 cd_term = dx * (dc + dx * dd)
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     da_dv = dval3_dv
                     dc_dv = (3 * dm3_dv - 2 * db_dv - dbp1_dv) * h
                     dd_dv = (db_dv + dbp1_dv - 2 * dm3_dv) * h * h
@@ -679,17 +679,17 @@ class InterpAkima(InterpAlgorithm):
             elif extrap == 1:
                 da = dval4
                 db = dbp1
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     da_dv = dval4_dv
                     db_dv = dbp1_dv
 
             else:
                 da = dval3
-                if self.training_data_gradients:
+                if self._compute_d_dvalues:
                     da_dv = dval3_dv
 
             deriv_dx[..., 1:] = da + dx * (db + cd_term)
-            if self.training_data_gradients:
+            if self._compute_d_dvalues:
                 deriv_dv = da_dv + dx * (db_dv + cd_term_dv)
 
         # Restore numpy warnings to previous setting.

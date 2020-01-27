@@ -49,13 +49,14 @@ class InterpND(object):
         Default is True (raise an exception).
     grid : tuple
         Collection of points that determine the regular grid.
-    training_data_gradients : bool
-        Flag that tells interpolation objects wether to compute gradients with respect to the
-        grid values.
     table : <InterpTable>
         Table object that contains algorithm that performs the interpolation.
     values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
+    _compute_d_dvalues : bool
+        When set to True, compute gradients with respect to the grid values.
+    _compute_d_dx : bool
+        When set to True, compute gradients with respect to the interpolated point location.
     _d_dx : ndarray
         Cache of computed gradients with respect to evaluation point.
     _d_dgrid : ndarray
@@ -137,7 +138,7 @@ class InterpND(object):
         self._d_dx = None
         self._d_dgrid = None
         self._d_dvalues = None
-        self.training_data_gradients = False
+        self._compute_d_dvalues = False
 
         # Cache spline coefficients.
         interp = INTERP_METHODS[interp_method]
@@ -185,12 +186,12 @@ class InterpND(object):
                     raise OutOfBoundsError("One of the requested xi is out of bounds",
                                            i, value, self.grid[i][0], self.grid[i][-1])
 
-        if self.training_data_gradients:
+        if self._compute_d_dvalues:
             # If the table grid or values are component inputs, then we need to create a new table
             # each iteration.
             interp = self._interp
             self.table = interp(self.grid, self.values, interp, **self._interp_options)
-            self.table.training_data_gradients = True
+            self.table._compute_d_dvalues = True
 
         table = self.table
         if table._vectorized:
@@ -250,7 +251,7 @@ class InterpND(object):
             else:
                 interp = self._interp
                 table = interp(self.grid, values, interp, **self._interp_options)
-                table.training_data_gradients = True
+                table._compute_d_dvalues = True
 
             result, derivs_x, derivs_val, derivs_grid = table.evaluate_vectorized(xi)
 
@@ -266,7 +267,7 @@ class InterpND(object):
             for j in range(n_nodes):
 
                 table = interp(self.grid, values[j, :], interp, **self._interp_options)
-                table.training_data_gradients = True
+                table._compute_d_dvalues = True
 
                 for k in range(nx):
                     x_pt = np.atleast_2d(xi[k])
@@ -359,7 +360,7 @@ class InterpND(object):
                 for j in range(ngrid):
                     values[j] = 1.0
                     table = interp([grid[i]], values, self._interp, **self._interp_options)
-                    table.training_data_gradients = False
+                    table._compute_d_dvalues = False
                     deriv_i[j], _, _, _ = table.evaluate(pt[i:i + 1])
                     values[j] = 0.0
 

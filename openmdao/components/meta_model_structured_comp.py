@@ -189,7 +189,7 @@ class MetaModelStructuredComp(InterpBase):
             if self.options['training_data_gradients']:
                 # Training point values may have changed every time we compute.
                 interp.values = inputs["%s_train" % out_name]
-                interp.training_data_gradients = True
+                interp._compute_d_dvalues = True
 
             try:
                 val = interp.interpolate(pt)
