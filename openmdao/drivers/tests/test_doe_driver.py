@@ -9,6 +9,7 @@ import os
 import shutil
 import tempfile
 import csv
+import json
 
 import numpy as np
 
@@ -19,6 +20,8 @@ from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_driver, printoptions
+
+from openmdao.utils.mpi import MPI
 
 
 class ParaboloidArray(om.ExplicitComponent):
@@ -1467,6 +1470,7 @@ class TestParallelDOEFeature2(unittest.TestCase):
 
     def setUp(self):
         import os
+        import shutil
         import tempfile
 
         from mpi4py import MPI
@@ -1547,9 +1551,8 @@ class TestParallelDOEFeature2(unittest.TestCase):
                 outputs = cr.get_case(case).outputs
                 values.append((outputs['iv.x1'], outputs['iv.x2'], outputs['c3.y']))
 
-            self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f"
-                                             % vals_i for vals_i in values]),
-                             self.expect_text)
+            self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
+                self.expect_text)
 
 
 if __name__ == "__main__":

@@ -293,7 +293,7 @@ class _pyDOE_Generator(DOEGenerator):
 
         Parameters
         ----------
-        levels : int or dict(str, int), optional
+        levels : int, optional
             The number of evenly spaced levels between each design variable
             lower and upper bound. Defaults to 2.
         """
@@ -318,9 +318,7 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        sizes = [meta['size'] for name, meta in iteritems(design_vars)]
-
-        size = sum(sizes)
+        size = sum([meta['size'] for name, meta in iteritems(design_vars)])
 
         doe = self._generate_design(size)
 
@@ -427,6 +425,7 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
         doe = pyDOE2.pbdesign(size)
 
         doe[doe < 0] = 0  # replace -1 with zero
+
         return doe
 
 
