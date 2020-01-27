@@ -182,10 +182,10 @@ def _get_epinfo(type_, includes, excludes):
     epinfo = []
     for ep, name, module, target in _filtered_ep_iter(_allowed_types[type_],
                                                       includes=includes, excludes=excludes):
-        obj = ep.load()
         pkg = module.split('.', 1)[0]
         try:
             mod = import_module(pkg)
+            obj = ep.load()
         except ImportError:
             print("Import of %s failed.\n%s" % (pkg, traceback.format_exc()))
             continue
