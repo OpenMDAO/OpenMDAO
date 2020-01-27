@@ -102,10 +102,17 @@ class SplineComp(InterpBase):
 
         self.interp_to_cp[y_interp_name] = y_cp_name
 
-        arange = np.arange(vec_size * n_interp)
+        rows = np.arange(vec_size * n_interp)
+        cols = np.tile(np.arange(n_interp), vec_size)
 
-        self.declare_partials(y_interp_name, self.options['x_interp_name'], rows=arange, cols=arange)
-        self.declare_partials(y_interp_name, y_cp_name)
+        #self.declare_partials(y_interp_name, self.options['x_interp_name'], rows=rows, cols=cols)
+
+        row = np.repeat(np.arange(n_interp), n_cp)
+        col = np.tile(np.arange(n_cp), n_interp)
+        rows = np.tile(row, vec_size) + np.repeat(n_interp * np.arange(vec_size), n_interp * n_cp)
+        cols = np.tile(col, vec_size) + np.repeat(n_cp * np.arange(vec_size), n_interp * n_cp)
+
+        self.declare_partials(y_interp_name, y_cp_name, rows=rows, cols=cols)
 
     def _setup_var_data(self, recurse=True):
         """
@@ -167,12 +174,12 @@ class SplineComp(InterpBase):
             values = inputs[self.interp_to_cp[out_name]]
             interp.training_data_gradients = True
 
-            try:
-                outputs[out_name] = interp.evaluate_spline(values)
+            #try:
+            outputs[out_name] = interp.evaluate_spline(values)
 
-            except ValueError as err:
-                msg = "{}: Error interpolating output '{}':\n{}"
-                raise ValueError(msg.format(self.msginfo, out_name, str(err)))
+            #except ValueError as err:
+                #msg = "{}: Error interpolating output '{}':\n{}"
+                #raise ValueError(msg.format(self.msginfo, out_name, str(err)))
 
     def compute_partials(self, inputs, partials):
         """
@@ -189,24 +196,32 @@ class SplineComp(InterpBase):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
+        vec_size = self.options['vec_size']
+        n_interp = len(self.options['x_interp'])
+        n_cp = len(self.options['x_cp_val'])
+
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
 
         for out_name, interp in iteritems(self.interps):
-            dval = interp.gradient(pt).T
-            for i, p in enumerate(self.pnames):
-                partials[out_name, p] = dval
+            cp_name = self.interp_to_cp[out_name]
+            #dval = interp.gradient(pt).T
+            #for i, p in enumerate(self.pnames):
+                #partials[out_name, p] = dval
 
-            if interp._d_dvalues is not None:
-                dy_ddata = np.zeros(self.grad_shape)
+            dy_ddata = np.zeros((vec_size, n_interp, n_cp))
 
-                if interp._d_dvalues is not None:
-                    # Akima must be handled individually.
-                    dy_ddata[:] = interp._d_dvalues
-
+            d_dvalues = interp._d_dvalues
+            if d_dvalues is not None:
+                if d_dvalues.shape[0] == vec_size:
+                    # Akima precomputes derivs at all points in vec_size.
+                    dy_ddata[:] = d_dvalues
                 else:
-                    # This way works for most of the interpolation methods.
-                    for j in range(self.options['vec_size']):
-                        val = interp.training_gradients(pt[j, :])
-                        dy_ddata[j] = val.reshape(self.grad_shape[1:])
+                    # Bsplines computed derivative is the same at all points in vec_size.
+                    dy_ddata[:] = np.broadcast_to(d_dvalues.toarray(), (vec_size, n_interp, n_cp))
+            else:
+                # This way works for most of the interpolation methods.
+                for j in range(self.options['vec_size']):
+                    val = interp.training_gradients(pt[j, :])
+                    dy_ddata[j] = val.reshape(self.grad_shape[1:])
 
-                partials[out_name, "%s_train" % out_name] = dy_ddata
+            partials[out_name, cp_name] = dy_ddata.flatten()

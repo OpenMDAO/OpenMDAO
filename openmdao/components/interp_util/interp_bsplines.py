@@ -165,7 +165,7 @@ class InterpBSplines(InterpAlgorithm):
 
         result = np.einsum('ij,kj->ki', self._jac.toarray(), self.values)
 
-        return result, None, None, None
+        return result, None, self._jac, None
 
     def training_gradients(self, pt):
         """

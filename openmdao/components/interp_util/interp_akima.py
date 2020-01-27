@@ -150,6 +150,12 @@ class InterpAkima(InterpAlgorithm):
         delta_x = self.options['delta_x']
         nx = len(x)
 
+        # Complex Step
+        if self.values.dtype == np.complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x.dtype
+
         c = 0.0
         d = 0.0
         m1 = 0.0
@@ -239,13 +245,13 @@ class InterpAkima(InterpAlgorithm):
 
             nshape = list(values.shape[:-1])
             nshape.append(1)
-            deriv_dx = np.empty(tuple(nshape), dtype=x.dtype)
+            deriv_dx = np.empty(tuple(nshape), dtype=dtype)
             if self.training_data_gradients:
                 n_this = high_idx - low_idx
                 nshape = list(values.shape[:-1])
                 nshape.append(n_this)
                 n_flat = np.prod(nshape)
-                deriv_dv = np.eye(n_flat, dtype=x.dtype)
+                deriv_dv = np.eye(n_flat, dtype=dtype)
 
                 new_shape = []
                 new_shape.extend(nshape)

@@ -232,18 +232,17 @@ class MetaModelStructuredComp(InterpBase):
 
             if self.options['training_data_gradients']:
 
+                dy_ddata = np.zeros(self.grad_shape)
+
                 if interp._d_dvalues is not None:
-                    dy_ddata = np.zeros(self.grad_shape)
+                    # Akima must be handled individually.
+                    dy_ddata[:] = interp._d_dvalues
 
-                    if interp._d_dvalues is not None:
-                        # Akima must be handled individually.
-                        dy_ddata[:] = interp._d_dvalues
-
-                    else:
-                        # This way works for most of the interpolation methods.
-                        for j in range(self.options['vec_size']):
-                            val = interp.training_gradients(pt[j, :])
-                            dy_ddata[j] = val.reshape(self.grad_shape[1:])
+                else:
+                    # This way works for most of the interpolation methods.
+                    for j in range(self.options['vec_size']):
+                        val = interp.training_gradients(pt[j, :])
+                        dy_ddata[j] = val.reshape(self.grad_shape[1:])
 
                 partials[out_name, "%s_train" % out_name] = dy_ddata
 

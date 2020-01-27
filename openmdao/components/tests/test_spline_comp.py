@@ -7,7 +7,8 @@ import numpy as np
 from numpy.testing import assert_array_almost_equal
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_check_partials
+from openmdao.utils.assert_utils import assert_check_partials, assert_rel_error
+from openmdao.utils.general_utils import printoptions
 from openmdao.utils.spline_distributions import SplineDistribution
 
 class SplineTestCase(unittest.TestCase):
@@ -80,7 +81,7 @@ class SplineTestCase(unittest.TestCase):
 
         assert_array_almost_equal(akima_y.flatten(), self.prob['akima1.y_val'].flatten())
 
-        derivs = self.prob.check_partials(compact_print=False, method='cs')
+        derivs = self.prob.check_partials(out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
     def test_no_ycp_val(self):
@@ -101,7 +102,8 @@ class SplineTestCase(unittest.TestCase):
         n = 12
         x = np.linspace(1.0, 12.0, n)
 
-        comp = om.SplineComp(method='akima', vec_size=2, x_cp_val=xcp, x_interp=x)
+        comp = om.SplineComp(method='akima', vec_size=2, x_cp_val=xcp, x_interp=x,
+                             interp_options={'delta_x': 0.1})
 
         comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=ycp)
         self.prob.model.add_subsystem('akima1', comp)
@@ -117,6 +119,9 @@ class SplineTestCase(unittest.TestCase):
                         13.08035714, 14.        ]])
 
         assert_array_almost_equal(y.flatten(), self.prob['akima1.y_val'].flatten())
+
+        derivs = self.prob.check_partials(out_stream=None, method='cs')
+        assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
     #def test_standalone_interp(self):
 
@@ -160,7 +165,7 @@ class SplineTestCase(unittest.TestCase):
 
         model.connect('px.x', 'interp.h_cp')
 
-        prob.setup()
+        prob.setup(force_alloc_complex=True)
         prob.run_model()
 
         xx = prob['interp.h'].flatten()
@@ -173,6 +178,62 @@ class SplineTestCase(unittest.TestCase):
         self.assertLess(max(delta), .15)
         # And that it gets middle points a little better.
         self.assertLess(max(delta[15:-15]), .06)
+
+        derivs = prob.check_partials(out_stream=None, method='cs')
+        assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
+
+    def test_bsplines_vectorized(self):
+        prob = om.Problem()
+        model = prob.model
+
+        n_cp = 5
+        n_point = 10
+
+        t = np.linspace(0, 0.5 * np.pi, n_cp)
+        tt = np.linspace(0, 0.5 * np.pi, n_point)
+        x = np.empty((2, n_cp))
+        x[0, :] = np.sin(t)
+        x[1, :] = 2.0 * np.sin(t)
+
+        t_sin = (0.5 * (1.0 + np.sin(-0.5 * np.pi + 2.0 * tt))) * np.pi * 0.5
+
+        model.add_subsystem('px', om.IndepVarComp('x', val=x))
+        bspline_options = {'order': 4}
+        comp = om.SplineComp(method='bsplines', x_cp_val=t, x_interp=t_sin, x_cp_name='xcp',
+                            x_interp_name='x_val', x_units='km', vec_size=2,
+                            interp_options=bspline_options)
+
+        prob.model.add_subsystem('interp', comp)
+
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units='km')
+
+        model.connect('px.x', 'interp.h_cp')
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+        xx = prob['interp.h']
+
+        with printoptions(precision=3, floatmode='fixed'):
+            assert_rel_error(self, x[0, :], np.array([
+                0., 0.38268343, 0.70710678, 0.92387953, 1.
+            ]), 1e-5)
+            assert_rel_error(self, x[1, :], 2.0*np.array([
+                0., 0.38268343, 0.70710678, 0.92387953, 1.
+            ]), 1e-5)
+
+            assert_rel_error(self, xx[0, :], np.array([
+                0., 0.06687281, 0.23486869, 0.43286622, 0.6062628,
+                0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
+            ]), 1e-5)
+            assert_rel_error(self, xx[1, :], 2.0*np.array([
+                0., 0.06687281, 0.23486869, 0.43286622, 0.6062628,
+                0.74821484, 0.86228902, 0.94134389, 0.98587725, 1.
+            ]), 1e-5)
+
+
+        derivs = prob.check_partials(out_stream=None, method='cs')
+        assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
 
 
 class SplineCompFeatureTestCase(unittest.TestCase):

@@ -245,12 +245,12 @@ class InterpND(object):
         table = self.table
         if table._vectorized:
 
-            if self.table._name == 'bsplines':
-                self.table.values = values
+            if table._name == 'bsplines':
+                table.values = values
             else:
                 interp = self._interp
-                self.table = interp(self.grid, values, interp, **self._interp_options)
-                self.table.training_data_gradients = True
+                table = interp(self.grid, values, interp, **self._interp_options)
+                table.training_data_gradients = True
 
             result, derivs_x, derivs_val, derivs_grid = table.evaluate_vectorized(xi)
 
@@ -258,15 +258,15 @@ class InterpND(object):
             interp = self._interp
             n_nodes, _ = values.shape
             nx = np.prod(xi.shape)
-            result = np.empty((n_nodes, nx), dtype=xi.dtype)
-            derivs_x = np.empty((n_nodes, nx, nx), dtype=xi.dtype)
+            result = np.empty((n_nodes, nx), dtype=values.dtype)
+            derivs_x = np.empty((n_nodes, nx, nx), dtype=values.dtype)
             derivs_val = None
 
             # TODO: it might be possible to vectorize over n_nodes.
             for j in range(n_nodes):
 
-                self.table = interp(self.grid, values[j, :], interp, **self._interp_options)
-                self.table.training_data_gradients = True
+                table = interp(self.grid, values[j, :], interp, **self._interp_options)
+                table.training_data_gradients = True
 
                 for k in range(nx):
                     x_pt = np.atleast_2d(xi[k])
@@ -277,7 +277,7 @@ class InterpND(object):
                         if derivs_val is None:
                             dv_shape = [n_nodes, nx]
                             dv_shape.extend(values.shape[1:])
-                            derivs_val = np.zeros(dv_shape, dtype=xi.dtype)
+                            derivs_val = np.zeros(dv_shape, dtype=values.dtype)
                         in_slice = table._full_slice
                         full_slice = [slice(j, j + 1), slice(k, k + 1)]
                         full_slice.extend(in_slice)
@@ -288,6 +288,7 @@ class InterpND(object):
         self._d_dx = derivs_x
         self._d_dvalues = derivs_val
 
+        self.table = table
         return result
 
     def gradient(self, xi):
@@ -311,14 +312,23 @@ class InterpND(object):
         gradient : ndarray of shape (..., ndim)
             Vector of gradients of the interpolated values with respect to each value in xi.
         """
-        #if (self._xi is None) or (not np.array_equal(xi, self._xi)):
-        #    # If inputs have changed since last computation, then re-interpolate.
-        #    self.interpolate(xi)
+        if self.x_interp is not None:
 
-        n_nodes, _ = self.values.shape
-        nx = np.prod(self.x_interp.shape)
+            # Spline evaluation does multiple points.
 
-        return self._d_dx.reshape((n_nodes * nx, nx))
+            n_nodes, _ = self.values.shape
+            nx = np.prod(self.x_interp.shape)
+
+            return self._d_dx.reshape((n_nodes * nx, nx))
+
+        else:
+
+            if (self._xi is None) or (not np.array_equal(xi, self._xi)):
+                # If inputs have changed since last computation, then re-interpolate.
+                self.interpolate(xi)
+
+            return self._d_dx.reshape(np.asarray(xi).shape)
+
 
     def training_gradients(self, pt):
         """
