@@ -9,14 +9,14 @@ import numpy as np
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
 from openmdao.components.interp_util.interp import InterpND
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
-from openmdao.components.interp_base import InterpBase
 
 ALL_METHODS = ('cubic', 'slinear', 'lagrange2', 'lagrange3', 'akima',
                'scipy_cubic', 'scipy_slinear', 'scipy_quintic')
 
 
-class MetaModelStructuredComp(InterpBase):
+class MetaModelStructuredComp(ExplicitComponent):
     """
     Interpolation Component generated from data on a regular grid.
 
@@ -43,6 +43,12 @@ class MetaModelStructuredComp(InterpBase):
             Keyword arguments that will be mapped into the Component options.
         """
         super(MetaModelStructuredComp, self).__init__(**kwargs)
+
+        self.pnames = []
+        self.params = []
+        self.training_outputs = {}
+        self.interps = {}
+        self.grad_shape = ()
 
     def initialize(self):
         """

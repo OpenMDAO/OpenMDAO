@@ -137,6 +137,10 @@ class InterpBSplines(InterpAlgorithm):
         rows = np.zeros((num_pt, order), int)
         cols = np.zeros((num_pt, order), int)
 
+        if self._compute_d_dx:
+            dbasis_dt = np.zeros((order, num_pt))
+            ddata_dt = np.zeros((num_pt, order, num_pt))
+
         for ipt in range(num_pt):
             t = t_vec[ipt]
 
@@ -155,10 +159,12 @@ class InterpBSplines(InterpAlgorithm):
                 j1 = order - ll
                 j2 = order
                 n = i0 + j1
+
                 if knots[n + ll] != knots[n]:
                     basis[j1 - 1] = (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * basis[j1]
                 else:
                     basis[j1 - 1] = 0.
+
                 for j in range(j1 + 1, j2):
                     n = i0 + j
                     if knots[n + ll - 1] != knots[n - 1]:
@@ -168,6 +174,7 @@ class InterpBSplines(InterpAlgorithm):
                         basis[j - 1] = 0.
                     if knots[n + ll] != knots[n]:
                         basis[j - 1] += (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * basis[j]
+
                 n = i0 + j2
                 if knots[n + ll - 1] != knots[n - 1]:
                     basis[j2 - 1] = (t - knots[n - 1]) / \

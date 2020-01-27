@@ -68,6 +68,7 @@ class InterpAlgorithm(object):
         self._name = None
         self._vectorized = False
         self._compute_d_dvalues = False
+        self._compute_d_dx = True
         self._full_slice = None
 
     def initialize(self):

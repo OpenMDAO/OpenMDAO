@@ -1,23 +1,36 @@
 """Define the SplineComp class."""
 from six import iteritems, itervalues
 from six import string_types
+
 import numpy as np
 
 from openmdao.components.interp_util.interp import InterpND
-from openmdao.components.interp_base import InterpBase
-from openmdao.core.problem import Problem
+from openmdao.core.explicitcomponent import ExplicitComponent
+
+ALL_METHODS = ('cubic', 'slinear', 'lagrange2', 'lagrange3', 'akima',
+               'scipy_cubic', 'scipy_slinear', 'scipy_quintic', 'bsplines')
 
 
-class SplineComp(InterpBase):
+class SplineComp(ExplicitComponent):
     """
     Interpolation component that can use any of OpenMDAO's interpolation methods.
 
     Attributes
     ----------
+    grad_shape : tuple
+        Cached shape of the gradient of the outputs wrt the training inputs.
     interp_to_cp : dict
         Dictionary of relationship between the interpolated data and its control points.
+    interps : dict
+        Dictionary of interpolations for each output.
+    params : list
+        List containing training data for each input.
+    pnames : list
+        Cached list of input names.
     n_interp : int
         Number of points to interpolate at
+    training_outputs : dict
+        Dictionary of training data each output.
     """
 
     def __init__(self, **kwargs):
@@ -34,6 +47,11 @@ class SplineComp(InterpBase):
         self.options['extrapolate'] = True
 
         self.interp_to_cp = {}
+        self.pnames = []
+        self.params = []
+        self.training_outputs = {}
+        self.interps = {}
+        self.grad_shape = ()
 
     def setup(self):
         """
@@ -49,6 +67,14 @@ class SplineComp(InterpBase):
         Declare options.
         """
         super(SplineComp, self)._declare_options()
+
+        self.options.declare('extrapolate', types=bool, default=False,
+                             desc='Sets whether extrapolation should be performed '
+                                  'when an input is out of bounds.')
+        self.options.declare('vec_size', types=int, default=1,
+                             desc='Number of points to evaluate at once.')
+        self.options.declare('method', values=ALL_METHODS, default='scipy_cubic',
+                             desc='Spline interpolation method to use for all outputs.')
         self.options.declare('x_cp_val', types=(list, np.ndarray), desc='List/array of x control '
                              'point values, must be monotonically increasing.')
         self.options.declare('x_interp', types=(list, np.ndarray), desc='List/array of x '
@@ -173,6 +199,7 @@ class SplineComp(InterpBase):
         for out_name, interp in iteritems(self.interps):
             values = inputs[self.interp_to_cp[out_name]]
             interp._compute_d_dvalues = True
+            interp._compute_d_dx = True
 
             #try:
             outputs[out_name] = interp.evaluate_spline(values)
