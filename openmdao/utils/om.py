@@ -44,7 +44,7 @@ from openmdao.utils.scaffold import _scaffold_setup_parser, _scaffold_exec
 from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.file_utils import _load_and_exec
 from openmdao.utils.entry_points import _list_installed_setup_parser, _list_installed_cmd, \
-    split_ep
+    split_ep, _compute_entry_points_setup_parser, _compute_entry_points_exec
 from openmdao.core.component import Component
 
 
@@ -556,6 +556,8 @@ _command_map = {
     'check': (_check_config_setup_parser, _check_config_cmd,
               'Perform a number of configuration checks on the problem.'),
     'cite': (_cite_setup_parser, _cite_cmd, 'Print citations referenced by the problem.'),
+    'compute_entry_points': (_compute_entry_points_setup_parser, _compute_entry_points_exec,
+                             'Compute entry point declarations to add to the setup.py file.'),
     'iprof': (_iprof_setup_parser, _iprof_exec,
               'Profile calls to particular object instances.'),
     'iprof_totals': (_iprof_totals_setup_parser, _iprof_totals_exec,
