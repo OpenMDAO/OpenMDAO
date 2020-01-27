@@ -1,13 +1,17 @@
 import re
+import sys
 
 from setuptools import setup
-
+from subprocess import check_call
+import distutils.spawn
 
 __version__ = re.findall(
     r"""__version__ = ["']+([0-9\.]*)["']+""",
     open('openmdao/__init__.py').read(),
 )[0]
 
+# Pyppeteer GUI testing only works with Python 3.6+
+gui_test_deps = ['websockets>6', 'pyppeteer_fork']
 
 optional_dependencies = {
     'docs': [
@@ -22,13 +26,12 @@ optional_dependencies = {
         'colorama',
     ],
     'test': [
-        'coverage',
         'parameterized',
         'numpydoc>=0.9.1',
         'pycodestyle==2.3.1',
         'pydocstyle==2.0.0',
-        'testflo>=1.3.4',
-    ],
+        'testflo>=1.3.5',
+    ] + (gui_test_deps if sys.version_info > (3, 5) else [])
 }
 
 # Add an optional dependency that concatenates all others
@@ -37,7 +40,6 @@ optional_dependencies['all'] = sorted([
     for dependencies in optional_dependencies.values()
     for dependency in dependencies
 ])
-
 
 setup(
     name='openmdao',
@@ -73,7 +75,7 @@ setup(
         'openmdao.approximation_schemes',
         'openmdao.code_review',
         'openmdao.components',
-        'openmdao.components.structured_metamodel_util',
+        'openmdao.components.interp_util',
         'openmdao.core',
         'openmdao.devtools',
         'openmdao.devtools.iprofile_app',
@@ -108,12 +110,15 @@ setup(
         'openmdao.visualization.meta_model_viewer',
     ],
     package_data={
-        'openmdao.devtools': ['*.wpr',],
+        'openmdao.devtools': ['*.wpr', ],
         'openmdao.visualization.n2_viewer': [
             'libs/*.js',
             'src/*.js',
             'style/*.css',
             'style/*.woff',
+            'tests/*.js',
+            'tests/*.json',
+            'tests/gui_test_models/*.py',
             '*.html'
         ],
         'openmdao.visualization.connection_viewer': [

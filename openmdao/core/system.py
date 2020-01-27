@@ -3112,6 +3112,7 @@ class System(object):
                     prom_name=False,
                     units=False,
                     shape=False,
+                    desc=False,
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
@@ -3136,6 +3137,8 @@ class System(object):
             When True, display/return units. Default is False.
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
+        desc : bool, optional
+            When True, display/return description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -3207,6 +3210,8 @@ class System(object):
                 var_meta['units'] = meta[var_name]['units']
             if shape:
                 var_meta['shape'] = val.shape
+            if desc:
+                var_meta['desc'] = meta[var_name]['desc']
 
             inputs.append((var_name, var_meta))
 
@@ -3257,6 +3262,7 @@ class System(object):
                      shape=False,
                      bounds=False,
                      scaling=False,
+                     desc=False,
                      hierarchical=True,
                      print_arrays=False,
                      tags=None,
@@ -3295,6 +3301,8 @@ class System(object):
             When True, display/return bounds (lower and upper). Default is False.
         scaling : bool, optional
             When True, display/return scaling (ref, ref0, and res_ref). Default is False.
+        desc : bool, optional
+            When True, display/return description. Default is False.
         hierarchical : bool, optional
             When True, human readable output shows variables in hierarchical format.
         print_arrays : bool, optional
@@ -3383,7 +3391,8 @@ class System(object):
                 var_meta['ref'] = meta[var_name]['ref']
                 var_meta['ref0'] = meta[var_name]['ref0']
                 var_meta['res_ref'] = meta[var_name]['res_ref']
-
+            if desc:
+                var_meta['desc'] = meta[var_name]['desc']
             if var_name in states:
                 impl_outputs.append((var_name, var_meta))
             else:

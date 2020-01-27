@@ -95,12 +95,14 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
 
     # plot Jacobians
     if binary:
-        ax[0].imshow(fd_binary.real, interpolation='none', cmap=BINARY_CMP)
-        im_computed = ax[1].imshow(computed_binary.real, interpolation='none', cmap=BINARY_CMP)
+        ax[0].imshow(fd_binary.real, interpolation='none', cmap=BINARY_CMP, aspect='auto')
+        im_computed = ax[1].imshow(computed_binary.real, interpolation='none', cmap=BINARY_CMP,
+                                   aspect='auto')
     else:
-        ax[0].imshow(fd_full.real, interpolation='none', vmin=vmin, vmax=vmax, cmap=NON_BINARY_CMP)
+        ax[0].imshow(fd_full.real, interpolation='none', vmin=vmin, vmax=vmax, cmap=NON_BINARY_CMP,
+                     aspect='auto')
         im_computed = ax[1].imshow(computed_full.real, interpolation='none', vmin=vmin, vmax=vmax,
-                                   cmap=NON_BINARY_CMP)
+                                   cmap=NON_BINARY_CMP, aspect='auto')
     ax[0].set_title('Approximated Jacobian')
     ax[1].set_title('User-Defined Jacobian')
     # Legend
@@ -114,7 +116,8 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
     if vmax - vmin < tol:  # Do not want range to be too small
         vmin = -1 * tol
         vmax = tol
-    im_diff = ax[2].imshow(diff, interpolation='none', vmin=vmin, vmax=vmax, cmap=NON_BINARY_CMP)
+    im_diff = ax[2].imshow(diff, interpolation='none', vmin=vmin, vmax=vmax, cmap=NON_BINARY_CMP,
+                           aspect='auto')
     fig.colorbar(im_diff, orientation='horizontal', ax=ax[2], aspect=10)
     ax[2].set_title('Difference')
 
