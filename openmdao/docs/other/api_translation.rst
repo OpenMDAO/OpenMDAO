@@ -12,7 +12,7 @@ Build a Model
 -------------
 
 Define an Explicit Component
-===========================
+============================
 
 .. content-container ::
 
