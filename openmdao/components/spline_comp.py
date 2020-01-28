@@ -25,8 +25,6 @@ class SplineComp(ExplicitComponent):
         Dictionary of interpolations for each output.
     params : list
         List containing training data for each input.
-    pnames : list
-        Cached list of input names.
     n_interp : int
         Number of points to interpolate at
     training_outputs : dict
@@ -47,7 +45,6 @@ class SplineComp(ExplicitComponent):
         self.options['extrapolate'] = True
 
         self.interp_to_cp = {}
-        self.pnames = []
         self.params = []
         self.training_outputs = {}
         self.interps = {}
@@ -128,10 +125,12 @@ class SplineComp(ExplicitComponent):
 
         self.interp_to_cp[y_interp_name] = y_cp_name
 
-        rows = np.arange(vec_size * n_interp)
-        cols = np.tile(np.arange(n_interp), vec_size)
+        row = np.repeat(np.arange(n_interp), n_interp)
+        col = np.tile(np.arange(n_interp), n_interp)
+        rows = np.tile(row, vec_size) + np.repeat(n_interp * np.arange(vec_size), n_interp * n_interp)
+        cols = np.tile(col, vec_size)
 
-        #self.declare_partials(y_interp_name, self.options['x_interp_name'], rows=rows, cols=cols)
+        self.declare_partials(y_interp_name, self.options['x_interp_name'], rows=rows, cols=cols)
 
         row = np.repeat(np.arange(n_interp), n_cp)
         col = np.tile(np.arange(n_cp), n_interp)
@@ -195,11 +194,11 @@ class SplineComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        #pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
         for out_name, interp in iteritems(self.interps):
             values = inputs[self.interp_to_cp[out_name]]
             interp._compute_d_dvalues = True
             interp._compute_d_dx = True
+            interp.x_interp = inputs[self.options['x_interp_name']]
 
             #try:
             outputs[out_name] = interp.evaluate_spline(values)
@@ -227,13 +226,12 @@ class SplineComp(ExplicitComponent):
         n_interp = len(self.options['x_interp'])
         n_cp = len(self.options['x_cp_val'])
 
-        pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-
         for out_name, interp in iteritems(self.interps):
             cp_name = self.interp_to_cp[out_name]
-            #dval = interp.gradient(pt).T
-            #for i, p in enumerate(self.pnames):
-                #partials[out_name, p] = dval
+            pt = inputs[cp_name]
+
+            d_dx = interp.gradient(pt).T
+            partials[out_name, self.options['x_interp_name']] = d_dx.flatten()
 
             dy_ddata = np.zeros((vec_size, n_interp, n_cp))
 

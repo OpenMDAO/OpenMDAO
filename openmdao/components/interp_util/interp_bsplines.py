@@ -89,7 +89,12 @@ class InterpBSplines(InterpAlgorithm):
 
         result = np.einsum('ij,kj->ki', self._jac.toarray(), self.values)
 
-        return result, None, self._jac, None
+        if self._compute_d_dx:
+            d_derivs = np.einsum('ijk,lj->lik', self._djac_dx, self.values)
+        else:
+            d_derivs = None
+
+        return result, d_derivs, self._jac, None
 
     def training_gradients(self, pt):
         """
@@ -125,30 +130,30 @@ class InterpBSplines(InterpAlgorithm):
         csr_matrix
             Sparse matrix of B-spline coefficients.
         """
-        knots = np.zeros(num_cp + order)
+        knots = np.zeros(num_cp + order, dtype=t_vec.dtype)
         knots[order - 1:num_cp + 1] = np.linspace(0, 1, num_cp - order + 2)
         knots[num_cp + 1:] = 1.0
 
-        basis = np.zeros(order)
+        basis = np.zeros(order, dtype=t_vec.dtype)
         arange = np.arange(order)
 
         num_pt = len(t_vec)
-        data = np.zeros((num_pt, order))
+        data = np.zeros((num_pt, order), dtype=t_vec.dtype)
         rows = np.zeros((num_pt, order), int)
         cols = np.zeros((num_pt, order), int)
 
         if self._compute_d_dx:
-            dbasis_dt = np.zeros((order, num_pt))
-            ddata_dt = np.zeros((num_pt, order, num_pt))
+            dbasis_dt = np.zeros((order, num_pt), dtype=t_vec.dtype)
+            ddata_dt = np.zeros((num_pt, order, num_pt), dtype=t_vec.dtype)
 
         for ipt in range(num_pt):
             t = t_vec[ipt]
 
             i0 = -1
             for ind in range(order, num_cp + 1):
-                if (knots[ind - 1] <= t) and (t < knots[ind]):
+                if (knots[ind - 1].real <= t.real) and (t.real < knots[ind].real):
                     i0 = ind - order
-            if t == knots[-1]:
+            if t.real == knots[-1].real:
                 i0 = num_cp - order
 
             basis[:] = 0.
@@ -160,32 +165,75 @@ class InterpBSplines(InterpAlgorithm):
                 j2 = order
                 n = i0 + j1
 
-                if knots[n + ll] != knots[n]:
+                if knots[n + ll].real != knots[n].real:
                     basis[j1 - 1] = (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * basis[j1]
+
+                    if self._compute_d_dx:
+                        dbasis_dt[j1 - 1, :] = (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * \
+                            dbasis_dt[j1, :]
+                        dbasis_dt[j1 - 1, ipt] += basis[j1] / (knots[n + ll] - knots[n])
+
                 else:
                     basis[j1 - 1] = 0.
+                    if self._compute_d_dx:
+                        dbasis_dt[j1 - 1, :] = 0.0
 
                 for j in range(j1 + 1, j2):
                     n = i0 + j
-                    if knots[n + ll - 1] != knots[n - 1]:
+
+                    if knots[n + ll - 1].real != knots[n - 1].real:
                         basis[j - 1] = (t - knots[n - 1]) / \
                             (knots[n + ll - 1] - knots[n - 1]) * basis[j - 1]
+
+                        if self._compute_d_dx:
+                            dbasis_dt[j - 1, :] *= (t - knots[n - 1]) / \
+                                (knots[n + ll - 1] - knots[n - 1])
+                            dbasis_dt[j - 1, ipt] += basis[j - 1] / (knots[n + ll - 1] - knots[n - 1])
+
                     else:
                         basis[j - 1] = 0.
-                    if knots[n + ll] != knots[n]:
+                        if self._compute_d_dx:
+                            dbasis_dt[j - 1, :] = 0.0
+
+                    if knots[n + ll].real != knots[n].real:
                         basis[j - 1] += (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * basis[j]
 
+                        if self._compute_d_dx:
+                            dbasis_dt[j - 1, :] += (knots[n + ll] - t) / \
+                                (knots[n + ll] - knots[n]) * dbasis_dt[j, :]
+                            dbasis_dt[j - 1, ipt] -= basis[j] / (knots[n + ll] - knots[n])
+
                 n = i0 + j2
-                if knots[n + ll - 1] != knots[n - 1]:
+                if knots[n + ll - 1].real != knots[n - 1].real:
                     basis[j2 - 1] = (t - knots[n - 1]) / \
                         (knots[n + ll - 1] - knots[n - 1]) * basis[j2 - 1]
+
+                    if self._compute_d_dx:
+                        dbasis_dt[j2 - 1, :] *= (t - knots[n - 1]) / \
+                            (knots[n + ll - 1] - knots[n - 1])
+                        dbasis_dt[j2 - 1, :] +=  basis[j2 - 1] / \
+                            (knots[n + ll - 1] - knots[n - 1])
+
                 else:
                     basis[j2 - 1] = 0.
+                    if self._compute_d_dx:
+                        dbasis_dt[j2 - 1, :] = 0.0
 
             data[ipt, :] = basis
             rows[ipt, :] = ipt
             cols[ipt, :] = i0 + arange
 
+            if self._compute_d_dx:
+                ddata_dt[ipt, ...] = dbasis_dt
+
         data, rows, cols = data.flatten(), rows.flatten(), cols.flatten()
+        if self._compute_d_dx:
+            # This is slow. Need a multi-D sparse way to do it.
+            ddata_dt = ddata_dt.flatten()
+            djac_dx = np.zeros((num_pt, num_cp, num_pt), dtype=t_vec.dtype)
+            for val, row, col in zip(ddata_dt, rows, cols):
+                djac_dx[row, col, :] = val
+
+            self._djac_dx = djac_dx
 
         return csr_matrix((data, (rows, cols)), shape=(num_pt, num_cp))

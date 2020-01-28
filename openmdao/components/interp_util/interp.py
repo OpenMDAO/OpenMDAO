@@ -243,6 +243,15 @@ class InterpND(object):
         xi = self.x_interp
         self.values = values
 
+        # If the interpolated locations change, we may need to reset.
+        if self._xi is not None and not np.array_equal(xi, self._xi):
+            table = self.table
+            if table._name == 'bsplines':
+                table._jac = None
+
+        # cache latest evaluation point for gradient method's use later
+        self._xi = xi.copy()
+
         table = self.table
         if table._vectorized:
 
