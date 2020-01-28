@@ -3524,10 +3524,10 @@ class System(object):
 
             if setup:
                 meta = self._var_abs2meta
-                allprocs_meta = self._var_allprocs_abs2meta
             else:
                 meta = self._var_rel2meta
-                allprocs_meta = {}
+
+            allprocs_meta = self._var_allprocs_abs2meta
 
             var_dict = all_var_dicts[0]  # start with rank 0
 
