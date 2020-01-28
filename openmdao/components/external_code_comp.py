@@ -3,6 +3,7 @@ from __future__ import print_function
 
 import os
 import sys
+import re
 
 import numpy.distutils
 from numpy.distutils.exec_command import find_executable
@@ -41,7 +42,9 @@ class ExternalCodeDelegate(object):
         """
         comp = self._comp
 
-        comp.options.declare('command', [], desc='Command to be executed.')
+        comp.options.declare('command', [], types=(list, str),
+                             desc="Command to be executed. If command is a list, shell=True, "
+                                  "otherwise shell=False")
         comp.options.declare('env_vars', {}, desc='Environment variables required by the command.')
         comp.options.declare('poll_delay', 0.0, lower=0.0,
                              desc='Delay between polling for command completion. '
@@ -194,7 +197,7 @@ class ExternalCodeDelegate(object):
         comp = self._comp
 
         if isinstance(command, str):
-            program_to_execute = command
+            program_to_execute = re.findall("^([\w\-]+)", command)[0]
         else:
             program_to_execute = command[0]
 
@@ -207,7 +210,11 @@ class ExternalCodeDelegate(object):
                 if missing:
                     raise ValueError("The command to be executed, '%s', "
                                      "cannot be found" % program_to_execute)
-            command_for_shell_proc = ['cmd.exe', '/c'] + command
+            if isinstance(command, list):
+                command_for_shell_proc = ['cmd.exe', '/c'] + command
+            else:
+                command_for_shell_proc = 'cmd.exe /c ' + str(command)
+
         else:
             if not find_executable(program_to_execute):
                 raise ValueError("The command to be executed, '%s', "
