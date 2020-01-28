@@ -62,7 +62,7 @@ ScipyOptimizeDriver Driver Specific Options
 -------------------------------------------
 Optimizers in `scipy.optimize.minimize` have optimizer specific options. To let the user specify values for these
 options, OpeMDAO provides an option in the form of a dictionary named `opt_settings`. See the `scipy.optimize.minimize`
-documentation for more information about these options.
+documentation for more information about the driver specific options that are available.
 
 As an example, here is code using some `opt_settings` for the `shgo` optimizer:
 
@@ -74,7 +74,3 @@ Notice that when using the `shgo` optimizer, setting the `opt_settings['maxiter'
 `ScipyOptimizeDriver`'s `options['maxiter']` value. It is not possible to set `options['maxiter']` to anything other
 than an integer so the `opt_settings['maxiter']` option provides a way to set the `maxiter` value for the `shgo`
 optimizer to `None`.
-
-.. code-block:: none
-
-        driver.opt_settings['maxiter'] = None
