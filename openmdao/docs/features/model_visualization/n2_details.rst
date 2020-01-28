@@ -108,7 +108,7 @@ the Solver Structure box for that System has the text `NL: Newton (sub_solve)`.
 Toolbar
 -------
 
-The tool bar above the N2 diagram provides many useful capabilites.
+The tool bar above the N2 diagram provides many useful capabilities.
 
 Zoomed Element
 **************
@@ -292,7 +292,3 @@ the sections in the legend:
     * Finally, there is a column describing the colors for the items in the solver hierarchy on the right of the
       diagram. The colors indicate
       the type of solver, either linear or nonlinear, depending what is being displayed.
-
-
-
-
