@@ -56,3 +56,16 @@ ScipyOptimizeDriver Option Examples
       :layout: interleave
 
 .. tags:: Driver, Optimizer, Optimization
+
+
+ScipyOptimizeDriver Driver Specific Options
+-------------------------------------------
+Optimizers in `scipy.optimize.minimize` have optimizer specific options. To let the user specify values for these
+options, OpeMDAO provides an option in the form of a dictionary named `opt_settings`. See the `scipy.optimize.minimize`
+documentation for more information about these options.
+
+As an example, here is code using some `opt_settings` for the `shgo` optimizer:
+
+  .. embed-code::
+      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_feature_shgo_rastrigin
+      :layout: interleave
