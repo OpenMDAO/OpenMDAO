@@ -3524,8 +3524,10 @@ class System(object):
 
             if setup:
                 meta = self._var_abs2meta
+                allprocs_meta = self._var_allprocs_abs2meta
             else:
                 meta = self._var_rel2meta
+                allprocs_meta = {}
 
             var_dict = all_var_dicts[0]  # start with rank 0
 
@@ -3540,21 +3542,24 @@ class System(object):
                             is_distributed = meta[name]['src_indices'] is not None
                         else:
                             is_distributed = meta[name]['distributed']
+
                         if is_distributed:
                             var_meta = var_dict[name]
                             shape = meta[name]['shape']
-                            global_shape = self._var_allprocs_abs2meta[name]['global_shape']
 
-                            # if the local shape is different than the global shape, assume
-                            # the value is a concatenation of the values from all procs
-                            # (otherwise the value from proc 0 will be shown)
-                            if 'value' in var_meta and shape != global_shape:
-                                var_meta['value'] = np.append(var_meta['value'],
-                                                              proc_vars[name]['value'])
+                            if name in allprocs_meta:
+                                global_shape = allprocs_meta[name]['global_shape']
 
-                            if 'resids' in var_meta and shape != global_shape:
-                                var_meta['resids'] = np.append(var_meta['resids'],
-                                                               proc_vars[name]['resids'])
+                                # if the local shape is different than the global shape, assume
+                                # the value is a concatenation of the values from all procs
+                                # (otherwise the value from proc 0 will be shown)
+                                if 'value' in var_meta and shape != global_shape:
+                                    var_meta['value'] = np.append(var_meta['value'],
+                                                                  proc_vars[name]['value'])
+
+                                if 'resids' in var_meta and shape != global_shape:
+                                    var_meta['resids'] = np.append(var_meta['resids'],
+                                                                   proc_vars[name]['resids'])
 
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
