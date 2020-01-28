@@ -8,7 +8,7 @@ When evaluating meta models, it can be useful to determine their fit of the trai
 OpenMDAO has a visualization package to view the training data and meta models generated from it.
 This page explains how to use `view_mm` in the command line.
 
-The metamodel viewer allows a user the ability of reducing a high dimentional input space down
+The metamodel viewer allows a user the ability of reducing a high dimensional input space down
 to three dimensions to enable the user to determine the fit of a meta model to the given
 training data.
 

@@ -7,7 +7,7 @@ Approximating Partial Derivatives
 OpenMDAO allows you to specify analytic derivatives for your models, but it is not a requirement.
 If certain partial derivatives are not available, you can ask the framework to approximate the
 derivatives by using the :code:`declare_partials` method inside :code:`setup`, and give it a
-method that is either 'fd' for finite diffference or 'cs' for complex step.
+method that is either 'fd' for finite difference or 'cs' for complex step.
 
 .. automethod:: openmdao.core.component.Component.declare_partials
     :noindex:
