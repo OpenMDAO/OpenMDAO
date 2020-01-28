@@ -8,7 +8,7 @@ Implicit variables are those that are computed as an implicit function of other 
 For instance, :math:`y` would be an implicit variable, given that it is computed by solving :math:`\cos(x \cdot y) - z \cdot y = 0`.
 In OpenMDAO, implicit variables are defined as the outputs of components that inherit from :ref:`ImplicitComponent <openmdao.core.implicitcomponent.py>`.
 
-In the above implict expression, :math:`y` is the implicit variable while :math:`x` and :math:`z` would be considered inputs.
+In the above implicit expression, :math:`y` is the implicit variable while :math:`x` and :math:`z` would be considered inputs.
 
 ImplicitComponent Methods
 -------------------------
@@ -87,19 +87,19 @@ The implementation of each method will be illustrated using a simple implicit co
 
 - :code:`guess_nonlinear(self, inputs, outputs, residuals)` :
 
-  [Optional] This method allows the user to calculate and specify an initial guess for implicit states. 
+  [Optional] This method allows the user to calculate and specify an initial guess for implicit states.
   It is called at the start of the solve loop from certain nonlinear solvers (i.e. NewtonSolver and BroydenSolver),
   so it is useful for when you would like to "reset" the initial conditions on an inner-nested solve whenever an
   outer loop solver or driver changes other values.
 
   Since it is a hook for custom code, you could also use it to monitor variables in the input, output, or residual
-  vectors and change the initial guess when some condition is met. 
+  vectors and change the initial guess when some condition is met.
 
   Here is a simple example where we use NewtonSolver to find one of the roots of a second-order quadratic equation.
   Which root you get depends on the initial guess.
 
   .. embed-code::
       openmdao.core.tests.test_impl_comp.ImplicitCompGuessTestCase.test_guess_nonlinear_feature
-      :layout: code, output      
+      :layout: code, output
 
 .. tags:: Component, ImplicitComponent

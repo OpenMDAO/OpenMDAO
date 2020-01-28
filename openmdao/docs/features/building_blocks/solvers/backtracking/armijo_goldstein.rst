@@ -98,7 +98,7 @@ Here are examples of each acceptable value for the **bound_enforcement** option:
 **alpha**
 
   The "alpha" option is used to specify the initial length of the Newton step. Since NewtonSolver assumes a
-  stepsize of 1.0, this value usually shouldn't be changed.
+  step size of 1.0, this value usually shouldn't be changed.
 
 **rho**
 

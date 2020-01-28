@@ -14,7 +14,7 @@ to insert an `ExecComp` component that converts the stress into a form where a n
 a positive value means it is violated.
 
 The problem presented here is also an example of a multi-point implementation, where we create a separate instance of the
-parts of the calculation that are impacted by different loadcases. This enables our model to take advantage of multiple
+parts of the calculation that are impacted by different load cases. This enables our model to take advantage of multiple
 processors when run in parallel.
 
 If we allow the optimizer to vary the thickness of each element, then we have a design variable vector that is as wide as the
