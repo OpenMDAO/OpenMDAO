@@ -1271,7 +1271,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % vals_i for vals_i in values]))
+        print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]))
 
     def test_csv(self):
         import openmdao.api as om
@@ -1309,8 +1309,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f"
-                                    % vals_i for vals_i in values]),
+        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
                          self.expected_text)
 
     def test_list(self):
@@ -1361,8 +1360,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f"
-                                    % vals_i for vals_i in values]),
+        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
                          self.expected_text)
 
 
@@ -1400,7 +1398,7 @@ class TestParallelDOEFeature(unittest.TestCase):
                 values.append((case['x'], case['y'], case['f_xy']))
 
         self.expect_text = "\n"+"\n".join([
-            "x: %5.2f, y: %5.2f, f_xy: %6.2f" % vals_i for vals_i in values
+            "x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values
         ])
 
         # run in temp dir
@@ -1458,8 +1456,7 @@ class TestParallelDOEFeature(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f"
-                                         % vals_i for vals_i in values]),
+        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
                          self.expect_text)
 
 
