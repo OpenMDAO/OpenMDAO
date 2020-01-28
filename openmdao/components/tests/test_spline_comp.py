@@ -126,9 +126,9 @@ class SplineTestCase(unittest.TestCase):
 
     def test_standalone_interp(self):
 
-        x, y, x_cp, y_cp = standalone_interp(
-            points=self.x_cp, values=self.y_cp, interp_method='akima', x_interp=self.x,
-            training_data_gradients=True)
+        interp = InterpND(points=[self.x_cp], values=self.y_cp, interp_method='akima', x_interp=self.x,
+                          bounds_error=True)
+        y = interp.evaluate_spline(np.expand_dims(self.y_cp, axis=0))
 
         spline_comp_y_array = np.array([[
             5.        ,  7.21095802,  9.2182764 , 10.8183155 , 11.80743568,
