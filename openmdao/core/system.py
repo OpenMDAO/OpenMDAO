@@ -3544,25 +3544,28 @@ class System(object):
                             is_distributed = meta[name]['distributed']
 
                         if is_distributed:
-                            var_meta = var_dict[name]
-                            shape = meta[name]['shape']
-
-                            if name in allprocs_meta:
-                                global_shape = allprocs_meta[name]['global_shape']
-
-                                # if the local shape is different than the global shape, assume
-                                # the value is a concatenation of the values from all procs
-                                # (otherwise the value from proc 0 will be shown)
-                                if 'value' in var_meta and shape != global_shape:
-                                    var_meta['value'] = np.append(var_meta['value'],
-                                                                  proc_vars[name]['value'])
-
-                                if 'resids' in var_meta and shape != global_shape:
-                                    var_meta['resids'] = np.append(var_meta['resids'],
-                                                                   proc_vars[name]['resids'])
-
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
+
+                            if name in allprocs_meta:
+                                var_meta = var_dict[name]
+
+                                shape = meta[name]['shape']
+                                global_shape = allprocs_meta[name]['global_shape']
+
+                                # if the local shape is different than the global shape and the
+                                # global shape matches the concatenation of values from all procs,
+                                # assume the concatenation, otherwise use the value from proc 0
+                                # because we can't know what is intended
+                                if 'value' in var_meta and shape != global_shape:
+                                    appended = np.append(var_meta['value'], proc_vars[name]['value'])
+                                    if appended.shape == global_shape:
+                                        var_meta['value'] = appended
+
+                                if 'resids' in var_meta and shape != global_shape:
+                                    appended = np.append(var_meta['resids'], proc_vars[name]['resids'])
+                                    if appended.shape == global_shape:
+                                        var_meta['resids'] = appended
 
         if setup:
             inputs = var_type == 'input'
