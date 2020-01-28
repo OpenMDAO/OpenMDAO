@@ -3558,12 +3558,14 @@ class System(object):
                                 # assume the concatenation, otherwise use the value from proc 0
                                 # because we can't know what is intended
                                 if 'value' in var_meta and shape != global_shape:
-                                    appended = np.append(var_meta['value'], proc_vars[name]['value'])
+                                    appended = np.append(var_meta['value'],
+                                                         proc_vars[name]['value'])
                                     if appended.shape == global_shape:
                                         var_meta['value'] = appended
 
                                 if 'resids' in var_meta and shape != global_shape:
-                                    appended = np.append(var_meta['resids'], proc_vars[name]['resids'])
+                                    appended = np.append(var_meta['resids'],
+                                                         proc_vars[name]['resids'])
                                     if appended.shape == global_shape:
                                         var_meta['resids'] = appended
 
