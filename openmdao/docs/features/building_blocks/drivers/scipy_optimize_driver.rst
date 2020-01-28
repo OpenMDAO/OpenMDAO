@@ -70,8 +70,10 @@ As an example, here is code using some `opt_settings` for the `shgo` optimizer:
       openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_feature_shgo_rastrigin
       :layout: interleave
 
-Notice that the `shgo` when using the `shgo` optimizer, setting the `opt_settings` of `maxiter` to `None` overrides
-`ScipyOptimizeDriver`'s `option` of `maxiter`.
+Notice that when using the `shgo` optimizer, setting the `opt_settings['maxiter']` to `None` overrides
+`ScipyOptimizeDriver`'s `options['maxiter']` value. It is not possible to set `options['maxiter']` to anything other
+than an integer so the `opt_settings['maxiter']` option provides a way to set the `maxiter` value for the `shgo`
+optimizer to `None`.
 
 .. code-block:: none
 
