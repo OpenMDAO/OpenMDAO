@@ -15,6 +15,13 @@ from openmdao.utils.array_utils import convert_neg, _global2local_offsets, _flat
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
 
+def _merge(indices_list):
+    if len(indices_list) > 0:
+        return np.concatenate(indices_list)
+    else:
+        return _empty_idx_array
+
+
 class DefaultTransfer(Transfer):
     """
     Default NumPy transfer.
@@ -35,22 +42,9 @@ class DefaultTransfer(Transfer):
         iproc = group.comm.rank
         rev = group._mode == 'rev' or group._mode == 'auto'
 
-        def merge(indices_list):
-            if len(indices_list) > 0:
-                return np.concatenate(indices_list)
-            else:
-                return _empty_idx_array
-
         if recurse:
             for subsys in group._subgroups_myproc:
                 subsys._setup_transfers(recurse)
-
-        # Pre-compute map from abs_names to the index of the containing subsystem
-        abs2isub = {}
-        for subsys, isub in zip(group._subsystems_myproc, group._subsystems_myproc_inds):
-            for type_ in ['input', 'output']:
-                for abs_name in subsys._var_allprocs_abs_names[type_]:
-                    abs2isub[abs_name] = isub
 
         abs2meta = group._var_abs2meta
         allprocs_abs2meta = group._var_allprocs_abs2meta
@@ -61,6 +55,9 @@ class DefaultTransfer(Transfer):
 
         vec_names = group._lin_rel_vec_name_list if group._use_derivatives else group._vec_names
 
+        mypathlen = len(group.pathname + '.' if group.pathname else '')
+        sub_inds = group._subsystems_inds
+
         for vec_name in vec_names:
             relvars, _ = group._relevant[vec_name]['@all']
             relvars_in = relvars['input']
@@ -70,11 +67,11 @@ class DefaultTransfer(Transfer):
             nsub_allprocs = len(group._subsystems_allprocs)
             xfer_in = []
             xfer_out = []
-            fwd_xfer_in = [[] for i in range(nsub_allprocs)]
-            fwd_xfer_out = [[] for i in range(nsub_allprocs)]
+            fwd_xfer_in = [[] for s in group._subsystems_allprocs]
+            fwd_xfer_out = [[] for s in group._subsystems_allprocs]
             if rev:
-                rev_xfer_in = [[] for i in range(nsub_allprocs)]
-                rev_xfer_out = [[] for i in range(nsub_allprocs)]
+                rev_xfer_in = [[] for s in group._subsystems_allprocs]
+                rev_xfer_out = [[] for s in group._subsystems_allprocs]
 
             allprocs_abs2idx = group._var_allprocs_abs2idx[vec_name]
             sizes_in = group._var_sizes[vec_name]['input']
@@ -82,13 +79,13 @@ class DefaultTransfer(Transfer):
             offsets_in = offsets[vec_name]['input']
             offsets_out = offsets[vec_name]['output']
 
-            # Loop through all explicit / implicit connections owned by this system
+            # Loop through all connections owned by this group
             for abs_in, abs_out in iteritems(group._conn_abs_in2out):
                 if abs_out not in relvars_out or abs_in not in relvars_in:
                     continue
 
                 # Only continue if the input exists on this processor
-                if abs_in in abs2meta and abs_in in relvars['input']:
+                if abs_in in abs2meta:
 
                     # Get meta
                     meta_in = abs2meta[abs_in]
@@ -121,31 +118,37 @@ class DefaultTransfer(Transfer):
                                            sizes_in[iproc, idx_in], dtype=INT_DTYPE)
 
                     # Now the indices are ready - input_inds, output_inds
-                    xfer_in.append(input_inds)
-                    xfer_out.append(output_inds)
-
-                    isub = abs2isub[abs_in]
+                    sub_in = abs_in[mypathlen:].split('.', 1)[0]
+                    isub = sub_inds[sub_in]
                     fwd_xfer_in[isub].append(input_inds)
                     fwd_xfer_out[isub].append(output_inds)
-                    if rev and abs_out in abs2isub:
-                        isub = abs2isub[abs_out]
+                    if rev and abs_out in abs2meta:
+                        sub_out = abs_out[mypathlen:].split('.', 1)[0]
+                        isub = sub_inds[sub_out]
                         rev_xfer_in[isub].append(input_inds)
                         rev_xfer_out[isub].append(output_inds)
 
-            xfer_in = merge(xfer_in)
-            xfer_out = merge(xfer_out)
+            tot_size = 0
             for isub in range(nsub_allprocs):
-                fwd_xfer_in[isub] = merge(fwd_xfer_in[isub])
-                fwd_xfer_out[isub] = merge(fwd_xfer_out[isub])
+                fwd_xfer_in[isub] = _merge(fwd_xfer_in[isub])
+                fwd_xfer_out[isub] = _merge(fwd_xfer_out[isub])
+                tot_size += fwd_xfer_in[isub].size
                 if rev:
-                    rev_xfer_in[isub] = merge(rev_xfer_in[isub])
-                    rev_xfer_out[isub] = merge(rev_xfer_out[isub])
-
-            out_vec = vectors['output'][vec_name]
+                    rev_xfer_in[isub] = _merge(rev_xfer_in[isub])
+                    rev_xfer_out[isub] = _merge(rev_xfer_out[isub])
 
             transfers[vec_name] = {}
-            xfer_all = DefaultTransfer(vectors['input'][vec_name], out_vec,
-                                       xfer_in, xfer_out, group.comm)
+
+            if tot_size > 0:
+                xfer_in = np.concatenate(fwd_xfer_in)
+                xfer_out = np.concatenate(fwd_xfer_out)
+
+                out_vec = vectors['output'][vec_name]
+
+                xfer_all = DefaultTransfer(vectors['input'][vec_name], out_vec,
+                                           xfer_in, xfer_out, group.comm)
+            else:
+                xfer_all = None
             transfers[vec_name]['fwd', None] = xfer_all
             if rev:
                 transfers[vec_name]['rev', None] = xfer_all

@@ -339,7 +339,7 @@ class Component(System):
         bool
             True if owned_sizes array should be used to determine non-duplicated vec sizes.
         """
-        return self.comm.size > 1 and self.options['distributed']
+        return False  # self.comm.size > 1 and self.options['distributed']
 
     def _setup_var_sizes(self, recurse=True):
         """
@@ -537,25 +537,31 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, list)):
             raise TypeError('The tags argument should be a str or list')
 
-        metadata = {}
-
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'], src_indices = ensure_compatible(name, val, shape,
-                                                                              src_indices)
-        metadata['size'] = np.prod(metadata['shape'])
+        value, shape, src_indices = ensure_compatible(name, val, shape, src_indices)
+        distributed = self.options['distributed']
 
-        # src_indices: None or ndarray
+        metadata = {
+            'value': value,
+            'shape': shape,
+            'size': np.prod(shape),
+            'src_indices': None,
+            'flat_src_indices': flat_src_indices,
+            'units': units,
+            'desc': desc,
+            'distributed': distributed,
+            'tags': make_set(tags),
+        }
+
         if src_indices is None:
-            metadata['src_indices'] = None
+            if distributed:
+                simple_warning("{}: Component is distributed but input '{}' was added without "
+                               "src_indices. Setting "
+                               "src_indices to range({}).".format(self.msginfo, name,
+                                                                  metadata['size']))
+                metadata['src_indices'] = np.arange(metadata['size'], dtype=INT_DTYPE)
         else:
             metadata['src_indices'] = np.asarray(src_indices, dtype=INT_DTYPE)
-        metadata['flat_src_indices'] = flat_src_indices
-
-        metadata['units'] = units
-        metadata['desc'] = desc
-        metadata['distributed'] = self.options['distributed']
-
-        metadata['tags'] = make_set(tags)
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:
@@ -713,37 +719,24 @@ class Component(System):
         if tags is not None and not isinstance(tags, (str, set, list)):
             raise TypeError('The tags argument should be a str, set, or list')
 
-        metadata = {}
-
         # value, shape: based on args, making sure they are compatible
-        metadata['value'], metadata['shape'], _ = ensure_compatible(name, val, shape)
-        metadata['size'] = np.prod(metadata['shape'])
-
-        # units, res_units: taken as is
-        metadata['units'] = units
-        metadata['res_units'] = res_units
-
-        # desc: taken as is
-        metadata['desc'] = desc
+        value, shape, _ = ensure_compatible(name, val, shape)
 
         if lower is not None:
-            lower = ensure_compatible(name, lower, metadata['shape'])[0]
+            lower = ensure_compatible(name, lower, shape)[0]
             self._has_bounds = True
         if upper is not None:
-            upper = ensure_compatible(name, upper, metadata['shape'])[0]
+            upper = ensure_compatible(name, upper, shape)[0]
             self._has_bounds = True
-
-        metadata['lower'] = lower
-        metadata['upper'] = upper
 
         # All refs: check the shape if necessary
         for item, item_name in zip([ref, ref0, res_ref], ['ref', 'ref0', 'res_ref']):
             if not isscalar(item):
                 it = atleast_1d(item)
-                if it.shape != metadata['shape']:
+                if it.shape != shape:
                     raise ValueError("{}: When adding output '{}', expected shape {} but got "
                                      "shape {} for argument '{}'.".format(self.msginfo, name,
-                                                                          metadata['shape'],
+                                                                          shape,
                                                                           it.shape, item_name))
 
         if isscalar(ref):
@@ -765,13 +758,23 @@ class Component(System):
         ref0 = format_as_float_or_array('ref0', ref0, flatten=True)
         res_ref = format_as_float_or_array('res_ref', res_ref, flatten=True)
 
-        metadata['ref'] = ref
-        metadata['ref0'] = ref0
-        metadata['res_ref'] = res_ref
+        distributed = self.options['distributed']
 
-        metadata['distributed'] = self.options['distributed']
-
-        metadata['tags'] = make_set(tags)
+        metadata = {
+            'value': value,
+            'shape': shape,
+            'size': np.prod(shape),
+            'units': units,
+            'res_units': res_units,
+            'desc': desc,
+            'distributed': distributed,
+            'tags': make_set(tags),
+            'ref': ref,
+            'ref0': ref0,
+            'res_ref': res_ref,
+            'lower': lower,
+            'upper': upper,
+        }
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:

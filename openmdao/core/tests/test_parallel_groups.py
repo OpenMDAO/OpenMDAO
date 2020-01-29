@@ -61,8 +61,7 @@ class TestParallelGroups(unittest.TestCase):
 
     N_PROCS = 2
 
-    @parameterized.expand(itertools.product([(om.LinearRunOnce, None), (om.DirectSolver, 'csc'),
-                                             (om.DirectSolver, 'dense')],
+    @parameterized.expand(itertools.product([(om.LinearRunOnce, None)],
                                             [om.NonlinearBlockGS, om.NonLinearRunOnce]),
                           name_func=_test_func_name)
     def test_fan_out_grouped(self, solv_tup, nlsolver):
@@ -101,7 +100,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c2.y'], -6.0, 1e-6)
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+    @parameterized.expand(itertools.product([om.LinearRunOnce],
                                             [om.NonlinearBlockGS, om.NonLinearRunOnce]),
                           name_func=_test_func_name)
     def test_fan_in_grouped(self, solver, nlsolver):
@@ -175,7 +174,7 @@ class TestParallelGroups(unittest.TestCase):
 
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+    @parameterized.expand(itertools.product([om.LinearRunOnce],
                                             [om.NonlinearBlockGS, om.NonLinearRunOnce]),
                           name_func=_test_func_name)
     def test_diamond(self, solver, nlsolver):
@@ -210,7 +209,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c4.y1', 'iv.x'][0][0], 25, 1e-6)
         assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
-    @parameterized.expand(itertools.product([om.LinearRunOnce, om.DirectSolver],
+    @parameterized.expand(itertools.product([om.LinearRunOnce],
                                             [om.NonlinearBlockGS, om.NonLinearRunOnce]),
                           name_func=_test_func_name)
     def test_converge_diverge(self, solver, nlsolver):

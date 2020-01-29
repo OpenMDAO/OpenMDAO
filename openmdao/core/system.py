@@ -127,9 +127,8 @@ class System(object):
         List of all subsystems (children of this system).
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
-    _subsystems_myproc_inds : [int, ...]
-        List of indices of subsystems on this proc among all of this system's subsystems
-        (i.e. among _subsystems_allprocs).
+    _subsystems_inds : dict
+        Dict mapping subsystem name to index into _subsystems_allprocs.
     _subsystems_proc_range : (int, int)
         List of ranges of each myproc subsystem's processors relative to those of this system.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
@@ -385,7 +384,7 @@ class System(object):
 
         self._subsystems_allprocs = []
         self._subsystems_myproc = []
-        self._subsystems_myproc_inds = []
+        self._subsystems_inds = {}
         self._subsystems_proc_range = []
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
