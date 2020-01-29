@@ -125,10 +125,9 @@ class SplineComp(ExplicitComponent):
 
         self.interp_to_cp[y_interp_name] = y_cp_name
 
-        row = np.repeat(np.arange(n_interp), n_interp)
-        col = np.tile(np.arange(n_interp), n_interp)
-        rows = np.tile(row, vec_size) + np.repeat(n_interp * np.arange(vec_size), n_interp * n_interp)
-        cols = np.tile(col, vec_size)
+        rowcol = np.arange(n_interp)
+        cols = np.tile(rowcol, vec_size)
+        rows = cols + np.repeat(n_interp * np.arange(vec_size), n_interp)
 
         self.declare_partials(y_interp_name, self.options['x_interp_name'], rows=rows, cols=cols)
 
@@ -230,7 +229,7 @@ class SplineComp(ExplicitComponent):
             cp_name = self.interp_to_cp[out_name]
             pt = inputs[cp_name]
 
-            d_dx = interp.gradient(pt).T
+            d_dx = interp.gradient(pt)
             partials[out_name, self.options['x_interp_name']] = d_dx.flatten()
 
             dy_ddata = np.zeros((vec_size, n_interp, n_cp))

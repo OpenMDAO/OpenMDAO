@@ -269,7 +269,7 @@ class InterpND(object):
             n_nodes, _ = values.shape
             nx = np.prod(xi.shape)
             result = np.empty((n_nodes, nx), dtype=values.dtype)
-            derivs_x = np.empty((n_nodes, nx, nx), dtype=values.dtype)
+            derivs_x = np.empty((n_nodes, nx), dtype=values.dtype)
             derivs_val = None
 
             # TODO: it might be possible to vectorize over n_nodes.
@@ -282,7 +282,7 @@ class InterpND(object):
                     x_pt = np.atleast_2d(xi[k])
                     val, d_x, d_values, d_grid = table.evaluate(x_pt)
                     result[j, k] = val
-                    derivs_x[j, k, :] = d_x.flatten()
+                    derivs_x[j, k] = d_x.flatten()
                     if d_values is not None:
                         if derivs_val is None:
                             dv_shape = [n_nodes, nx]
@@ -323,13 +323,7 @@ class InterpND(object):
             Vector of gradients of the interpolated values with respect to each value in xi.
         """
         if self.x_interp is not None:
-
-            # Spline evaluation does multiple points.
-
-            n_nodes, _ = self.values.shape
-            nx = np.prod(self.x_interp.shape)
-
-            return self._d_dx.reshape((n_nodes * nx, nx))
+            return self._d_dx
 
         else:
 
