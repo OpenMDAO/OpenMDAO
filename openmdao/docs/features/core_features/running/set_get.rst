@@ -91,7 +91,7 @@ Specifying Units
 ----------------
 
 You can also set an input or request the value of any variable in a different unit than its declared unit, and OpenMDAO will
-peform the conversion for you. This is done with the `Problem` methods `get_val` and `set_val`.
+perform the conversion for you. This is done with the `Problem` methods `get_val` and `set_val`.
 
 .. embed-code:: openmdao.core.tests.test_problem.TestProblem.test_feature_get_set_with_units
     :layout: interleave

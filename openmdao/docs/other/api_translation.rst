@@ -11,8 +11,8 @@ It is not a comprehensive guide to using OpenMDAO 2, but focuses only on the thi
 Build a Model
 -------------
 
-Define an Explcit Component
-===========================
+Define an Explicit Component
+============================
 
 .. content-container ::
 
@@ -230,8 +230,8 @@ Specify Finite Difference for all Component Derivatives
         self.deriv_options['type'] = 'fd'
 
 
-Specify FD Form and Stepsize on Specific Derivatives
-====================================================
+Specify FD Form and Step Size on Specific Derivatives
+=====================================================
 
 .. content-container ::
 

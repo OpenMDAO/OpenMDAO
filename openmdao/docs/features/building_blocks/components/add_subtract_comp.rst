@@ -15,7 +15,7 @@ Using the AddSubtractComp
 ---------------------------------------------------
 
 The `add_equation` method is used to set up a system of inputs to be added/subtracted (with scaling factors).
-Each time the user adds an equation, all of the inputs and outputs must be of identical shape (this is a requirement for elementwise addition/subtraction).
+Each time the user adds an equation, all of the inputs and outputs must be of identical shape (this is a requirement for element-wise addition/subtraction).
 The units must also be compatible between all inputs and the output of each equation.
 
 AddSubtractComp Example
