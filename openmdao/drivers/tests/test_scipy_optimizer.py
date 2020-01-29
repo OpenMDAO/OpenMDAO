@@ -1909,6 +1909,8 @@ class TestScipyOptimizeDriverFeatures(unittest.TestCase):
 
         prob.run_driver()
 
+    @unittest.skipUnless(LooseVersion(scipy_version) >= LooseVersion("1.2"),
+                         "scipy >= 1.2 is required.")
     def test_feature_shgo_rastrigin(self):
         # Source of example: https://stefan-endres.github.io/shgo/
 
