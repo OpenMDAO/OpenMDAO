@@ -1,13 +1,13 @@
 .. _feature_parallel_fd:
 
 ************************************************************************************************
-Speeding up Derivative Approximations with Parallel Finite Difference and Parrallel Complex Step
+Speeding up Derivative Approximations with Parallel Finite Difference and Parallel Complex Step
 ************************************************************************************************
 
 If you have multiple processors available to you, it's possible to speed up the calculation of
 approximated partials or totals by computing multiple columns of the approximated Jacobian matrix
 simultaneously across multiple processes.  Setting up *parallel* finite difference or *parallel*
-complex step is identical to setting up for serial execution, except for the additon of a single
+complex step is identical to setting up for serial execution, except for the addition of a single
 __init__ arg that sets *num_par_fd* on the System(s) where you want to compute the approximate
 derivatives. The *num_par_fd* arg specifies the number of approximated jacobian columns that will be
 computed in parallel, assuming that enough processes are provided when the problem script is
