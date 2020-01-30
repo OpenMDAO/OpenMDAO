@@ -105,6 +105,8 @@ class SimpleGADriver(Driver):
                              ' generation each iteration.')
         self.options.declare('gray', types=bool, default=False,
                              desc='If True, use Gray code for binary encoding.')
+        self.options.declare('cross_bits', types=bool, default=False,
+                             desc='If True, crossover swaps single bits instead the default k-point crossover.')
         self.options.declare('max_gen', default=100,
                              desc='Number of generations before termination.')
         self.options.declare('pop_size', default=0,
@@ -118,11 +120,10 @@ class SimpleGADriver(Driver):
                              desc='Penalty function parameter.')
         self.options.declare('penalty_exponent', default=1.,
                              desc='Penalty function exponent.')
-        self.options.declare('Pc', default=0.5, lower=0., upper=1.,
+        self.options.declare('Pc', default=0.1, lower=0., upper=1.,
                              desc='Crossover rate.')
-        self.options.declare('Pm',
-                             desc='Mutation rate.', default=None, lower=0., upper=1.,
-                             allow_none=True)
+        self.options.declare('Pm', default=0.01, lower=0., upper=1., allow_none=True,
+                             desc='Mutation rate.')
         self.options.declare('multi_obj_weights', default={}, types=(dict),
                              desc='Weights of objectives for multi-objective optimization.'
                              'Weights are specified as a dictionary with the absolute names'
@@ -218,6 +219,7 @@ class SimpleGADriver(Driver):
 
         ga.elite = self.options['elitism']
         ga.grayCode = self.options['gray']
+        ga.crossBits = self.options['cross_bits']
         pop_size = self.options['pop_size']
         max_gen = self.options['max_gen']
         user_bits = self.options['bits']
@@ -482,6 +484,9 @@ class GeneticAlgorithm(object):
         Elitism flag.
     grayCode : bool
         Gray code binary representation flag.
+    crossBits : bool
+        Crossover swaps bits instead of tails flag. Swapping bits is similar to mutation, so when used
+        Pc should be increased and Pm reduced.
     lchrom : int
         Chromosome length.
     model_mpi : None or tuple
@@ -516,6 +521,7 @@ class GeneticAlgorithm(object):
         self.npop = 0
         self.elite = True
         self.grayCode = False
+        self.crossBits = False
         self.model_mpi = model_mpi
 
     def execute_ga(self, x0, vlb, vub, vob, bits, pop_size, max_gen, random_state, Pm=None, Pc=0.5):
@@ -580,7 +586,7 @@ class GeneticAlgorithm(object):
             old_gen = copy.deepcopy(new_gen)
             x_pop = self.decode(old_gen, vlb, vub, bits)
 
-            # Evaluate points in this generation.
+            # Evaluate fitness of points in this generation.
             if comm is not None:
                 # Parallel
 
@@ -690,7 +696,7 @@ class GeneticAlgorithm(object):
         """
         Apply crossover to the current generation.
 
-        Crossover flips two adjacent genes.
+        Crossover swaps tails (k-point crossover) of two adjacent genes.
 
         Parameters
         ----------
@@ -712,8 +718,12 @@ class GeneticAlgorithm(object):
         for ii, jj in zip(idx, idy):
             i = 2 * ii
             j = i + 1
-            new_gen[i][jj] = old_gen[j][jj]
-            new_gen[j][jj] = old_gen[i][jj]
+            if self.crossBits:  # swap single bit
+                new_gen[i][jj] = old_gen[j][jj]
+                new_gen[j][jj] = old_gen[i][jj]
+            else:               # swap remainder
+                new_gen[i][jj:] = old_gen[j][jj:]
+                new_gen[j][jj:] = old_gen[i][jj:]
         return new_gen
 
     def mutate(self, current_gen, Pm):
