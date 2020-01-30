@@ -96,6 +96,98 @@ class TestSubsystemConfigError(unittest.TestCase):
 
 class TestGroup(unittest.TestCase):
 
+    def test_promotes_outputs_in_config(self):
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp2', outputs=['b'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['b'], 1)
+        with self.assertRaises(UnboundLocalError) as cm:
+            top['a']
+
+        self.assertEqual(str(cm.exception),
+                         "local variable 'val' referenced before assignment")
+
+    def test_promotes_inputs_in_config(self):
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp2', inputs=['a'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['a'], 1)
+        with self.assertRaises(UnboundLocalError) as cm:
+            top['b']
+
+        self.assertEqual(str(cm.exception),
+                         "local variable 'val' referenced before assignment")
+
+    def test_promotes_in_config(self):
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp1', any=['*'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['x'], 5)
+        with self.assertRaises(UnboundLocalError) as cm:
+            top['a']
+
+        self.assertEqual(str(cm.exception),
+                         "local variable 'val' referenced before assignment")
+
+    def test_multiple_promotes(self):
+
+        class BranchGroup(om.Group):
+
+            def setup(self):
+
+                b1 = self.add_subsystem('Branch1', om.Group())
+                g1 = b1.add_subsystem('G1', om.Group())
+                g2 = g1.add_subsystem('G2', om.Group())
+                g2.add_subsystem('comp1', om.ExecComp('b=2.0*a', a=3.0, b=6.0))
+
+            def configure(self):
+                self.Branch1.G1.G2.promotes('comp1', inputs=['a'])
+                self.Branch1.G1.promotes('G2', any=['*'])
+
+        top = om.Problem(model=BranchGroup())
+        top.setup()
+
+        self.assertEqual(top['Branch1.G1.a'], 3)
+        self.assertEqual(top['Branch1.G1.comp1.b'], 6)
+        with self.assertRaises(UnboundLocalError) as cm:
+            top['Branch1.G1.comp1.a']
+
+        self.assertEqual(str(cm.exception),
+                         "local variable 'val' referenced before assignment")
+
     def test_add_subsystem_class(self):
         p = om.Problem()
         try:
@@ -225,6 +317,42 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p['comp1.b'], 6.0)
         self.assertEqual(p['comp2.b'], 9.0)
+
+    def test_promotes_any(self):
+        import openmdao.api as om
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp1', any=['*'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['x'], 5)
+
+    def test_promotes_inputs_and_outputs(self):
+
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+
+            def configure(self):
+                self.promotes('comp2', inputs=['a'], outputs=['b'])
+
+        top = om.Problem(model=SimpleGroup())
+        top.setup()
+
+        self.assertEqual(top['a'], 1)
+        self.assertEqual(top['b'], 1)
 
     def test_double_promote_conns(self):
         p = om.Problem()
