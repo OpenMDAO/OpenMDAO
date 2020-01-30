@@ -144,7 +144,7 @@ command line.
 
 The total_coloring command also generates summary information that can sometimes be useful.
 The tolerance that was actually used to determine if an entry in the total jacobian is
-considered to be non-zerois displayed, along with the number of zero entries found in this
+considered to be non-zero is displayed, along with the number of zero entries found in this
 case, and how many times that number of zero entries occurred when sweeping over different tolerances
 between +- a number of orders of magnitude around the given tolerance.  If no tolerance is given, the default
 is 1e-15.  If the number of occurrences is only 1, an exception will be raised, and you should
@@ -305,7 +305,7 @@ If matplotlib is not available, a text-based version of the jacobian can be prin
 
 If you run *openmdao total_coloring* and it turns out there is no simultaneous total coloring
 available, or that you don't gain very much by coloring, don't be surprised.  Not all total
-Jacobians are sparse enough to benefit signficantly from simultaneous derivatives.
+Jacobians are sparse enough to benefit significantly from simultaneous derivatives.
 
 
 Checking that it works

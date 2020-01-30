@@ -70,7 +70,7 @@ as follows:
     openmdao n2 <your_python_script>
 
 
-You can do the same thing programmatically by calling the 
+You can do the same thing programmatically by calling the
 :func:`n2 <openmdao.visualization.n2_viewer.n2_viewer.n2>`
 function in your python script (after setup):
 

@@ -61,18 +61,18 @@ You can also complex step your model or group, though there are some important r
   (with the exception of `PetscKSP`) support the solution of such a system.  However, when you linearize the submodel
   to determine derivatives around a complex point, the application of complex step loses some of its robust properties
   when compared to real-valued finite difference (in particular, you get subtractive cancelation which causes
-  increased inaccuracy for smaller stepsizes.) When OpenMDAO encounters this situation, it will warn the user, and the
+  increased inaccuracy for smaller step sizes.) When OpenMDAO encounters this situation, it will warn the user, and the
   inner approximation will automatically switch over to using finite difference with default settings.
 
 **Care must be taken with iterative solver tolerances; you may need to adjust the stepsize for complex step:**
-  If you are using an interative nonlinear solver, and you don't converge it tightly, then the complex stepped
+  If you are using an iterative nonlinear solver, and you don't converge it tightly, then the complex stepped
   linear system may have trouble converging as well. You may need to tighten the convergence of your solvers
   and increase the step size used for complex step. To prevent the nonlinear solvers from ignoring a tiny
   complex step, a tiny offset is added to the states to nudge it off the solution, allowing it to reconverge
   with the complex step. You can also turn this behavior off by setting the "cs_reconverge" to False.
 
   Similarly, an iterative linear solver may also require
-  adjusting the stepsize, particularly if you are using the `ScipyKrylov` solver.
+  adjusting the step size, particularly if you are using the `ScipyKrylov` solver.
 
 .. embed-code::
     openmdao.core.tests.test_approx_derivs.ApproxTotalsFeature.test_basic_cs
