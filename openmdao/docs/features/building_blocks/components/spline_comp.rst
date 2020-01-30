@@ -1,4 +1,6 @@
-.. _feature_SplineComp:
+.. index:: SplineComp Example
+
+.. _splinecomp_feature:
 
 ***************
 SplineComp
@@ -76,4 +78,11 @@ distribution.
 SplineComp Standalone
 ----------------------
 
-Standalone documentation coming soon.
+Another included feature is a standalone version of `spline_comp`. This simple standalone function
+is intended to be used for standard interpolation (StructuredMetaModel), including for
+multidimensional data sets, and for constructing a higher dimension curve from a low dimensional
+representation (SplineComp), as we use the spline components.
+
+.. embed-code::
+    openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_standalone_interp_example
+    :layout: code
