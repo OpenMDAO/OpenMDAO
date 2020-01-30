@@ -103,6 +103,8 @@ class SimpleGADriver(Driver):
         self.options.declare('elitism', types=bool, default=True,
                              desc='If True, replace worst performing point with best from previous'
                              ' generation each iteration.')
+        self.options.declare('gray', types=bool, default=False,
+                             desc='If True, use Gray code for binary encoding.')
         self.options.declare('max_gen', default=100,
                              desc='Number of generations before termination.')
         self.options.declare('pop_size', default=0,
@@ -215,6 +217,7 @@ class SimpleGADriver(Driver):
         ga = self._ga
 
         ga.elite = self.options['elitism']
+        ga.grayCode = self.options['gray']
         pop_size = self.options['pop_size']
         max_gen = self.options['max_gen']
         user_bits = self.options['bits']
@@ -477,6 +480,8 @@ class GeneticAlgorithm(object):
         The MPI communicator that will be used objective evaluation for each generation.
     elite : bool
         Elitism flag.
+    grayCode : bool
+        Gray code binary representation flag.
     lchrom : int
         Chromosome length.
     model_mpi : None or tuple
@@ -510,6 +515,7 @@ class GeneticAlgorithm(object):
         self.lchrom = 0
         self.npop = 0
         self.elite = True
+        self.grayCode = False
         self.model_mpi = model_mpi
 
     def execute_ga(self, x0, vlb, vub, vob, bits, pop_size, max_gen, random_state, Pm=None, Pc=0.5):
@@ -776,6 +782,10 @@ class GeneticAlgorithm(object):
         ndarray
             Decoded design variable values.
         """
+        pts = gen.copy()
+        if self.grayCode:
+            for i in range(np.shape(gen)[0]):
+               pts[i] = self.fromGray(gen[i])
         num_desvar = len(bits)
         interval = (vub - vlb) / (2**bits - 1)
         x = np.empty((self.npop, num_desvar))
@@ -784,14 +794,14 @@ class GeneticAlgorithm(object):
         for jj in range(num_desvar):
             exponents = 2**np.array(range(bits[jj] - 1, -1, -1))
             ebit += bits[jj]
-            fact = exponents * (gen[:, sbit:ebit])
+            fact = exponents * (pts[:, sbit:ebit])
             x[:, jj] = np.einsum('ij->i', fact) * interval[jj] + vlb[jj]
             sbit = ebit
         return x
 
     def encode(self, x, vlb, vub, bits):
         """
-        Encode array of real values to array of binary arrays.
+        Encode array of real values to array of binary arrays to represent a single population member.
 
         Parameters
         ----------
@@ -807,11 +817,54 @@ class GeneticAlgorithm(object):
         Returns
         -------
         ndarray
-            Population of points, encoded.
+            Single population member, encoded.
         """
         interval = (vub - vlb) / (2**bits - 1)
         x = np.maximum(x, vlb)
         x = np.minimum(x, vub)
         x = np.round((x - vlb) / interval).astype(np.int)
         byte_str = [("0" * b + bin(i)[2:])[-b:] for i, b in zip(x, bits)]
-        return np.array([int(c) for s in byte_str for c in s])
+        result = np.array([int(c) for s in byte_str for c in s])
+        if self.grayCode:
+            result = self.toGray(result)
+        return result
+
+    def toGray(self, g):
+        """
+        Convert a Gray coded binary array representing a single population member to normal binary coding.
+
+        Parameters
+        ----------
+        g : binary array
+            Gray coded binary array, e.g. np.array([0, 0, 1, 0]).
+
+        Returns
+        -------
+        ndarray
+            Binary array using normal coding, e.g. np.array([0, 0, 1, 1]).
+        """
+        s = ''.join([str(x) for x in g])                   # convert to binary string: '0010'
+        i = int(s, 2)                                      # convert to Integer: 2
+        gi = i ^ (i >> 1)                                  # compute gray code Integer: 3
+        gs = np.binary_repr(gi, len(g))                    # convert to binary string: '0011'
+        return np.array([0 if q=='0' else 1 for q in gs])  # convert to np.array: [0, 0, 1, 1]
+
+    def fromGray(self, g):
+        """
+        Convert a binary array representing a single population member to Gray code.
+
+        Parameters
+        ----------
+        g : binary array
+            Normal binary array, e.g. np.array([0, 0, 1, 1]).
+
+        Returns
+        -------
+        ndarray
+            Binary array using Gray code, e.g. np.array([0, 0, 1, 0]).
+        """
+        b = g.copy()
+        for i in range(1, len(g)):
+            prevInv = 1 if b[i-1] == 0 else 0
+            b[i] = b[i-1] if g[i] == 0 else prevInv
+        return b

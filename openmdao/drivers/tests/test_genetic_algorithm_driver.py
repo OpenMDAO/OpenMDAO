@@ -281,27 +281,56 @@ class TestSimpleGA(unittest.TestCase):
 
     def test_encode_and_decode(self):
         ga = GeneticAlgorithm(None)
-        gen = np.array([[0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1,
-                         1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0,
-                         1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0,
-                         0, 1, 0],
-                        [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1,
-                         1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0,
-                         1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1,
-                         0, 1, 0]])
+        gen = np.array([[0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1,
+                         0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1,
+                         1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0],
+                        [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1,
+                         0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0,
+                         1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0]])
         vlb = np.array([-170.0, -170.0, -170.0, -170.0, -170.0, -170.0])
         vub = np.array([255.0, 255.0, 255.0, 170.0, 170.0, 170.0])
         bits = np.array([9, 9, 9, 9, 9, 9])
-        x = np.array([[-69.36399217, 22.12328767, -7.81800391, -66.86888454,
-                       116.77103718, 76.18395303],
-                      [248.34637965, 191.79060665, -31.93737769, 97.47553816,
-                       118.76712329, 92.15264188]])
+        x = np.array([[-69.36399217, 22.12328767, -7.81800391, -66.86888454, 116.77103718, 76.18395303],
+                      [248.34637965, 191.79060665, -31.93737769, 97.47553816, 118.76712329, 92.15264188]])
 
         ga.npop = 2
         ga.lchrom = int(np.sum(bits))
         np.testing.assert_array_almost_equal(x, ga.decode(gen, vlb, vub, bits))
         np.testing.assert_array_almost_equal(gen[0], ga.encode(x[0], vlb, vub, bits))
         np.testing.assert_array_almost_equal(gen[1], ga.encode(x[1], vlb, vub, bits))
+
+        dec = ga.decode(gen, vlb, vub, bits)
+        enc0 = ga.encode(dec[0], vlb, vub, bits)
+        enc1 = ga.encode(dec[1], vlb, vub, bits)
+        np.testing.assert_array_almost_equal(gen[0], enc0)  # decode followed by encode gives original array
+        np.testing.assert_array_almost_equal(gen[1], enc1)
+
+    def test_encode_and_decode_gray_code(self):
+        ga = GeneticAlgorithm(None)
+        gen = np.array([[0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0,
+                         1, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0,
+                         0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1],
+                        [1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0,
+                         1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1,
+                         1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1]])
+        vlb = np.array([-170.0, -170.0, -170.0, -170.0, -170.0, -170.0])
+        vub = np.array([255.0, 255.0, 255.0, 170.0, 170.0, 170.0])
+        bits = np.array([9, 9, 9, 9, 9, 9])
+        x = np.array([[-69.36399217, 22.12328767, -7.81800391, -66.86888454, 116.77103718, 76.18395303],
+                      [248.34637965, 191.79060665, -31.93737769, 97.47553816, 118.76712329, 92.15264188]])
+
+        ga.npop = 2
+        ga.lchrom = int(np.sum(bits))
+        ga.grayCode = True
+        np.testing.assert_array_almost_equal(x, ga.decode(gen, vlb, vub, bits))
+        np.testing.assert_array_almost_equal(gen[0], ga.encode(x[0], vlb, vub, bits))
+        np.testing.assert_array_almost_equal(gen[1], ga.encode(x[1], vlb, vub, bits))
+
+        dec = ga.decode(gen, vlb, vub, bits)
+        enc0 = ga.encode(dec[0], vlb, vub, bits)
+        enc1 = ga.encode(dec[1], vlb, vub, bits)
+        np.testing.assert_array_almost_equal(gen[0], enc0)  # decode followed by encode gives original array
+        np.testing.assert_array_almost_equal(gen[1], enc1)
 
     def test_vector_desvars_multiobj(self):
         prob = om.Problem()
