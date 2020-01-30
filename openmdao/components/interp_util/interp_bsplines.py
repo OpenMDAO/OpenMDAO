@@ -134,7 +134,7 @@ class InterpBSplines(InterpAlgorithm):
         csr_matrix
             Sparse matrix of B-spline coefficients.
         """
-        knots = np.zeros(num_cp + order, dtype=t_vec.dtype)
+        knots = np.zeros(num_cp + order)
         knots[order - 1:num_cp + 1] = np.linspace(0, 1, num_cp - order + 2)
         knots[num_cp + 1:] = 1.0
 
@@ -165,7 +165,7 @@ class InterpBSplines(InterpAlgorithm):
                 j2 = order
                 n = i0 + j1
 
-                if knots[n + ll].real != knots[n].real:
+                if knots[n + ll] != knots[n]:
                     basis[j1 - 1] = (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * basis[j1]
 
                 else:
@@ -174,18 +174,18 @@ class InterpBSplines(InterpAlgorithm):
                 for j in range(j1 + 1, j2):
                     n = i0 + j
 
-                    if knots[n + ll - 1].real != knots[n - 1].real:
+                    if knots[n + ll - 1] != knots[n - 1]:
                         basis[j - 1] = (t - knots[n - 1]) / \
                             (knots[n + ll - 1] - knots[n - 1]) * basis[j - 1]
 
                     else:
                         basis[j - 1] = 0.
 
-                    if knots[n + ll].real != knots[n].real:
+                    if knots[n + ll] != knots[n]:
                         basis[j - 1] += (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * basis[j]
 
                 n = i0 + j2
-                if knots[n + ll - 1].real != knots[n - 1].real:
+                if knots[n + ll - 1] != knots[n - 1]:
                     basis[j2 - 1] = (t - knots[n - 1]) / \
                         (knots[n + ll - 1] - knots[n - 1]) * basis[j2 - 1]
 

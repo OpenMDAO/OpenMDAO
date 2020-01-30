@@ -244,12 +244,6 @@ class InterpND(object):
         xi = self.x_interp
         self.values = values
 
-        # If the interpolated locations change, we may need to reset.
-        if self._xi is not None and not np.array_equal(xi, self._xi):
-            table = self.table
-            if table._name == 'bsplines':
-                table._jac = None
-
         # cache latest evaluation point for gradient method's use later
         self._xi = xi.copy()
 
@@ -262,6 +256,7 @@ class InterpND(object):
                 interp = self._interp
                 table = interp(self.grid, values, interp, **self._interp_options)
                 table._compute_d_dvalues = True
+                table._compute_d_dx = False
 
             result, _, derivs_val, _ = table.evaluate_vectorized(xi)
 
@@ -278,6 +273,7 @@ class InterpND(object):
 
                 table = interp(self.grid, values[j, :], interp, **self._interp_options)
                 table._compute_d_dvalues = True
+                table._compute_d_dx = False
 
                 for k in range(nx):
                     x_pt = np.atleast_2d(xi[k])
@@ -321,16 +317,11 @@ class InterpND(object):
         gradient : ndarray of shape (..., ndim)
             Vector of gradients of the interpolated values with respect to each value in xi.
         """
-        if self.x_interp is not None:
-            return self._d_dx
+        if (self._xi is None) or (not np.array_equal(xi, self._xi)):
+            # If inputs have changed since last computation, then re-interpolate.
+            self.interpolate(xi)
 
-        else:
-
-            if (self._xi is None) or (not np.array_equal(xi, self._xi)):
-                # If inputs have changed since last computation, then re-interpolate.
-                self.interpolate(xi)
-
-            return self._d_dx.reshape(np.asarray(xi).shape)
+        return self._d_dx.reshape(np.asarray(xi).shape)
 
     def training_gradients(self, pt):
         """
@@ -346,13 +337,13 @@ class InterpND(object):
         ndarray
             Gradient of output with respect to training point values.
         """
-        grid = self.grid
-        interp = self._interp
-
         if self.table._vectorized:
             return self.table.training_gradients(pt)
 
         else:
+            grid = self.grid
+            interp = self._interp
+
             for i, axis in enumerate(self.grid):
                 ngrid = axis.size
                 values = np.zeros(ngrid)
