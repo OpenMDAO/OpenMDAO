@@ -35,7 +35,8 @@ class N2GUITestCase(unittest.TestCase):
             'defaultViewport': {
                 'width': 1600,
                 'height': 1200
-            }
+            },
+            'headless': True
         })
         userAgentStr = await self.browser.userAgent()
         print("Browser: " + userAgentStr + "\n")
@@ -185,6 +186,18 @@ class N2GUITestCase(unittest.TestCase):
         hndl = await self.get_handle(options['selector'])
         await hndl.click(button=options['button'])
         await self.page.waitFor(self.transition_wait)
+
+    async def uncollapse_zoomed_element(self, options):
+        """
+        Collapse an element, then zoom into an element, and then uncollapse the element
+        """
+        self.log_test(options['desc'] if 'desc' in options else
+                      options['button'] + "-click on '" +
+                      options['id'] + "'")
+
+        hndl = await self.get_handle(options['selector'])
+        await self.assert_element_count("g#n2elements > g.n2cell", options['n2ElementCount'])
+
 
     async def return_to_root(self):
         """
