@@ -28,7 +28,7 @@ INTERP_METHODS = {
     'scipy_cubic': InterpScipy,
     'scipy_slinear': InterpScipy,
     'scipy_quintic': InterpScipy,
-    'bsplines' : InterpBSplines,
+    'bsplines': InterpBSplines,
 }
 
 
@@ -74,7 +74,8 @@ class InterpND(object):
         Cache of current evaluation point.
     """
 
-    def __init__(self, points, values, interp_method="slinear", x_interp=None, bounds_error=True, **kwargs):
+    def __init__(self, points, values, interp_method="slinear", x_interp=None, bounds_error=True,
+                 **kwargs):
         """
         Initialize instance of interpolation class.
 
@@ -262,7 +263,7 @@ class InterpND(object):
                 table = interp(self.grid, values, interp, **self._interp_options)
                 table._compute_d_dvalues = True
 
-            result, derivs_x, derivs_val, derivs_grid = table.evaluate_vectorized(xi)
+            result, _, derivs_val, _ = table.evaluate_vectorized(xi)
 
         else:
             interp = self._interp
@@ -280,9 +281,8 @@ class InterpND(object):
 
                 for k in range(nx):
                     x_pt = np.atleast_2d(xi[k])
-                    val, d_x, d_values, d_grid = table.evaluate(x_pt)
+                    val, _, d_values, _ = table.evaluate(x_pt)
                     result[j, k] = val
-                    derivs_x[j, k] = d_x.flatten()
                     if d_values is not None:
                         if derivs_val is None:
                             dv_shape = [n_nodes, nx]
@@ -295,7 +295,6 @@ class InterpND(object):
                         derivs_val[tuple(full_slice)] = d_values.reshape(shape)
 
         # Cache derivatives
-        self._d_dx = derivs_x
         self._d_dvalues = derivs_val
 
         self.table = table
@@ -332,7 +331,6 @@ class InterpND(object):
                 self.interpolate(xi)
 
             return self._d_dx.reshape(np.asarray(xi).shape)
-
 
     def training_gradients(self, pt):
         """

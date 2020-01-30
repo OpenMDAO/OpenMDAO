@@ -493,76 +493,87 @@ class InterpAkima(InterpAlgorithm):
             deriv_dv = da_dv + dx * (db_dv + dx * (dc_dv + dx * dd_dv))
 
         # Propagate derivatives from sub table.
-        if subtable is not None:
+        if subtable is not None and (self._compute_d_dx or self._compute_d_dvalues):
             shape = dval3.shape
             cd_term = 0
 
-            dm3 = (dval4 - dval3) / (grid[idx + 1] - grid[idx])
+            if self._compute_d_dx:
+                dm3 = (dval4 - dval3) / (grid[idx + 1] - grid[idx])
             if self._compute_d_dvalues:
                 dm3_dv = (dval4_dv - dval3_dv) / (grid[idx + 1] - grid[idx])
 
             if idx >= 2:
-                dm1 = (dval2 - dval1) / (grid[idx - 1] - grid[idx - 2])
+                if self._compute_d_dx:
+                    dm1 = (dval2 - dval1) / (grid[idx - 1] - grid[idx - 2])
                 if self._compute_d_dvalues:
                     dm1_dv = (dval2_dv - dval1_dv) / (grid[idx - 1] - grid[idx - 2])
             else:
                 dm1 = 0
 
             if idx >= 1:
-                dm2 = (dval3 - dval2) / (grid[idx] - grid[idx - 1])
+                if self._compute_d_dx:
+                    dm2 = (dval3 - dval2) / (grid[idx] - grid[idx - 1])
                 if self._compute_d_dvalues:
                     dm2_dv = (dval3_dv - dval2_dv) / (grid[idx] - grid[idx - 1])
             else:
                 dm2 = 0
 
             if idx < ngrid - 2:
-                dm4 = (dval5 - dval4) / (grid[idx + 2] - grid[idx + 1])
+                if self._compute_d_dx:
+                    dm4 = (dval5 - dval4) / (grid[idx + 2] - grid[idx + 1])
                 if self._compute_d_dvalues:
                     dm4_dv = (dval5_dv - dval4_dv) / (grid[idx + 2] - grid[idx + 1])
             else:
                 dm4 = 0
 
             if idx < ngrid - 3:
-                dm5 = (dval6 - dval5) / (grid[idx + 3] - grid[idx + 2])
+                if self._compute_d_dx:
+                    dm5 = (dval6 - dval5) / (grid[idx + 3] - grid[idx + 2])
                 if self._compute_d_dvalues:
                     dm5_dv = (dval6_dv - dval5_dv) / (grid[idx + 3] - grid[idx + 2])
             else:
                 dm5 = 0
 
             if idx == 0:
-                dm1 = 3 * dm3 - 2 * dm4
-                dm2 = 2 * dm3 - dm4
+                if self._compute_d_dx:
+                    dm1 = 3 * dm3 - 2 * dm4
+                    dm2 = 2 * dm3 - dm4
                 if self._compute_d_dvalues:
                     dm1_dv = 3 * dm3_dv - 2 * dm4_dv
                     dm2_dv = 2 * dm3_dv - dm4_dv
 
             elif idx == 1:
-                dm1 = 2 * dm2 - dm3
+                if self._compute_d_dx:
+                    dm1 = 2 * dm2 - dm3
                 if self._compute_d_dvalues:
                     dm1_dv = 2 * dm2_dv - dm3_dv
 
             elif idx == ngrid - 3:
-                dm5 = 2 * dm4 - dm3
+                if self._compute_d_dx:
+                    dm5 = 2 * dm4 - dm3
                 if self._compute_d_dvalues:
                     dm5_dv = 2 * dm4_dv - dm3_dv
 
             elif idx == ngrid - 2:
-                dm4 = 2 * dm3 - dm2
-                dm5 = 3 * dm3 - 2 * dm2
+                if self._compute_d_dx:
+                    dm4 = 2 * dm3 - dm2
+                    dm5 = 3 * dm3 - 2 * dm2
                 if self._compute_d_dvalues:
                     dm4_dv = 2 * dm3_dv - dm2_dv
                     dm5_dv = 3 * dm3_dv - 2 * dm2_dv
 
             # Calculate cubic fit coefficients
             if delta_x > 0:
-                _, dw2 = dv_abs_smooth_complex(m4 - m3, dm4 - dm3, delta_x)
-                _, dw3 = dv_abs_smooth_complex(m2 - m1, dm2 - dm1, delta_x)
+                if self._compute_d_dx:
+                    _, dw2 = dv_abs_smooth_complex(m4 - m3, dm4 - dm3, delta_x)
+                    _, dw3 = dv_abs_smooth_complex(m2 - m1, dm2 - dm1, delta_x)
                 if self._compute_d_dvalues:
                     _, dw2_dv = dv_abs_smooth_complex(m4 - m3, dm4_dv - dm3_dv, delta_x)
                     _, dw3_dv = dv_abs_smooth_complex(m2 - m1, dm2_dv - dm1_dv, delta_x)
             else:
-                _, dw2 = dv_abs_complex(m4 - m3, dm4 - dm3)
-                _, dw3 = dv_abs_complex(m2 - m1, dm2 - dm1)
+                if self._compute_d_dx:
+                    _, dw2 = dv_abs_complex(m4 - m3, dm4 - dm3)
+                    _, dw3 = dv_abs_complex(m2 - m1, dm2 - dm1)
                 if self._compute_d_dvalues:
                     _, dw2_dv = dv_abs_complex(m4 - m3, dm4_dv - dm3_dv)
                     _, dw3_dv = dv_abs_complex(m2 - m1, dm2_dv - dm1_dv)
@@ -579,10 +590,11 @@ class InterpAkima(InterpAlgorithm):
                 m2e = m2
                 m3e = m3
 
-            db = 0.5 * (dm2 + dm3)
+            if self._compute_d_dx:
+                db = 0.5 * (dm2 + dm3)
 
-            dbpos = ((dm2 * w2 + m2e * dw2 + dm3 * w31 + m3e * dw3) - bpos * (dw2 + dw3)) / \
-                (w2 + w31)
+                dbpos = ((dm2 * w2 + m2e * dw2 + dm3 * w31 + m3e * dw3) - bpos * (dw2 + dw3)) / \
+                    (w2 + w31)
 
             if self._compute_d_dvalues:
                 db_dv = 0.5 * (dm2_dv + dm3_dv)
@@ -595,29 +607,34 @@ class InterpAkima(InterpAlgorithm):
 
                 if len(val3.shape) == 0:
                     if len(jj1[0]) > 0:
-                        db[:] = dbpos
+                        if self._compute_d_dx:
+                            db[:] = dbpos
                         if self._compute_d_dvalues:
                             db_dv[:] = dbpos_dv
                 else:
                     for j in range(nx - 1):
-                        db[jj1, j] = dbpos[jj1, j]
+                        if self._compute_d_dx:
+                            db[jj1, j] = dbpos[jj1, j]
                         if self._compute_d_dvalues:
                             db_dv[jj1, j] = dbpos_dv[jj1, j]
 
             else:
-                db[jj1] = dbpos[jj1]
+                if self._compute_d_dx:
+                    db[jj1] = dbpos[jj1]
                 if self._compute_d_dvalues:
                     db_dv[jj1] = dbpos_dv[jj1]
 
             if delta_x > 0:
-                _, dw3 = dv_abs_smooth_complex(m5 - m4, dm5 - dm4, delta_x)
-                _, dw4 = dv_abs_smooth_complex(m3 - m2, dm3 - dm2, delta_x)
+                if self._compute_d_dx:
+                    _, dw3 = dv_abs_smooth_complex(m5 - m4, dm5 - dm4, delta_x)
+                    _, dw4 = dv_abs_smooth_complex(m3 - m2, dm3 - dm2, delta_x)
                 if self._compute_d_dvalues:
                     _, dw3_dv = dv_abs_smooth_complex(m5 - m4, dm5_dv - dm4_dv, delta_x)
                     _, dw4_dv = dv_abs_smooth_complex(m3 - m2, dm3_dv - dm2_dv, delta_x)
             else:
-                _, dw3 = dv_abs_complex(m5 - m4, dm5 - dm4)
-                _, dw4 = dv_abs_complex(m3 - m2, dm3 - dm2)
+                if self._compute_d_dx:
+                    _, dw3 = dv_abs_complex(m5 - m4, dm5 - dm4)
+                    _, dw4 = dv_abs_complex(m3 - m2, dm3 - dm2)
                 if self._compute_d_dvalues:
                     _, dw3_dv = dv_abs_complex(m5 - m4, dm5_dv - dm4_dv)
                     _, dw4_dv = dv_abs_complex(m3 - m2, dm3_dv - dm2_dv)
@@ -634,10 +651,12 @@ class InterpAkima(InterpAlgorithm):
                 m3e = m3
                 m4e = m4
 
-            dbp1 = 0.5 * (dm3 + dm4)
+            if self._compute_d_dx:
+                dbp1 = 0.5 * (dm3 + dm4)
 
-            dbp1pos = ((dm3 * w32 + m3e * dw3 + dm4 * w4 + m4e * dw4) - bp1pos * (dw3 + dw4)) / \
-                (w32 + w4)
+                dbp1pos = ((dm3 * w32 + m3e * dw3 + dm4 * w4 + m4e * dw4) -
+                           bp1pos * (dw3 + dw4)) / \
+                    (w32 + w4)
 
             if self._compute_d_dvalues:
                 dbp1_dv = 0.5 * (dm3_dv + dm4_dv)
@@ -650,26 +669,30 @@ class InterpAkima(InterpAlgorithm):
 
                 if len(val3.shape) == 0:
                     if len(jj2[0]) > 0:
-                        dbp1[:] = dbp1pos
+                        if self._compute_d_dx:
+                            dbp1[:] = dbp1pos
                         if self._compute_d_dvalues:
                             dbp1_dv[:] = dbp1pos_dv
 
                 else:
                     for j in range(nx - 1):
-                        dbp1[jj2, j] = dbp1pos[jj2, j]
+                        if self._compute_d_dx:
+                            dbp1[jj2, j] = dbp1pos[jj2, j]
                         if self._compute_d_dvalues:
                             dbp1_dv[jj2, j] = dbp1pos_dv[jj2, j]
 
             else:
-                dbp1[jj2] = dbp1pos[jj2]
+                if self._compute_d_dx:
+                    dbp1[jj2] = dbp1pos[jj2]
                 if self._compute_d_dvalues:
                     dbp1_dv[jj2] = dbp1pos_dv[jj2]
 
             if extrap == 0:
-                da = dval3
-                dc = (3 * dm3 - 2 * db - dbp1) * h
-                dd = (db + dbp1 - 2 * dm3) * h * h
-                cd_term = dx * (dc + dx * dd)
+                if self._compute_d_dx:
+                    da = dval3
+                    dc = (3 * dm3 - 2 * db - dbp1) * h
+                    dd = (db + dbp1 - 2 * dm3) * h * h
+                    cd_term = dx * (dc + dx * dd)
                 if self._compute_d_dvalues:
                     da_dv = dval3_dv
                     dc_dv = (3 * dm3_dv - 2 * db_dv - dbp1_dv) * h
@@ -677,18 +700,21 @@ class InterpAkima(InterpAlgorithm):
                     cd_term_dv = dx * (dc_dv + dx * dd_dv)
 
             elif extrap == 1:
-                da = dval4
-                db = dbp1
+                if self._compute_d_dx:
+                    da = dval4
+                    db = dbp1
                 if self._compute_d_dvalues:
                     da_dv = dval4_dv
                     db_dv = dbp1_dv
 
             else:
-                da = dval3
+                if self._compute_d_dx:
+                    da = dval3
                 if self._compute_d_dvalues:
                     da_dv = dval3_dv
 
-            deriv_dx[..., 1:] = da + dx * (db + cd_term)
+            if self._compute_d_dx:
+                deriv_dx[..., 1:] = da + dx * (db + cd_term)
             if self._compute_d_dvalues:
                 deriv_dv = da_dv + dx * (db_dv + cd_term_dv)
 

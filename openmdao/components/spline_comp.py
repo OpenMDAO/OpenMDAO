@@ -18,16 +18,14 @@ class SplineComp(ExplicitComponent):
     Attributes
     ----------
     grad_shape : tuple
-        Cached shape of the gradient of the outputs wrt the training inputs.
+        Cached shape of the gradient of the outputs wrt the control points.
+    grid : ndarray
+        Spline control point locations (not applicable for bsplines).
     interp_to_cp : dict
         Dictionary of relationship between the interpolated data and its control points.
     interps : dict
         Dictionary of interpolations for each output.
-    params : list
-        List containing training data for each input.
-    n_interp : int
-        Number of points to interpolate at
-    training_outputs : dict
+    _initial_cp_vals : dict
         Dictionary of training data each output.
     """
 
@@ -42,22 +40,11 @@ class SplineComp(ExplicitComponent):
         """
         super(SplineComp, self).__init__(**kwargs)
 
-        self.options['extrapolate'] = True
-
         self.interp_to_cp = {}
-        self.params = []
-        self.training_outputs = {}
+        self._initial_cp_vals = {}
+        self.grid = None
         self.interps = {}
         self.grad_shape = ()
-
-    def setup(self):
-        """
-        Set up the spline component.
-        """
-        self.add_input(name=self.options['x_interp_name'], val=self.options['x_interp'])
-        self.add_input(name=self.options['x_cp_name'], val=self.options['x_cp_val'])
-
-        self.params.append(np.asarray(self.options['x_cp_val']))
 
     def _declare_options(self):
         """
@@ -65,23 +52,15 @@ class SplineComp(ExplicitComponent):
         """
         super(SplineComp, self)._declare_options()
 
-        self.options.declare('extrapolate', types=bool, default=False,
-                             desc='Sets whether extrapolation should be performed '
-                                  'when an input is out of bounds.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
-        self.options.declare('method', values=ALL_METHODS, default='scipy_cubic',
+        self.options.declare('method', values=ALL_METHODS, default='akima',
                              desc='Spline interpolation method to use for all outputs.')
-        self.options.declare('x_cp_val', types=(list, np.ndarray), desc='List/array of x control '
-                             'point values, must be monotonically increasing.')
-        self.options.declare('x_interp', types=(list, np.ndarray), desc='List/array of x '
+        self.options.declare('x_interp_val', types=(list, np.ndarray), desc='List/array of x '
                              'interpolated point values.')
-        self.options.declare('x_cp_name', types=string_types, default="'x_cp'",
-                             desc='Name for the x control points input.')
-        self.options.declare('x_interp_name', types=str, default="'x_interp'",
-                             desc='Name of the x interpolated points input.')
-        self.options.declare('x_units', types=string_types, default=None, allow_none=True,
-                             desc='Units of the x variable.')
+        self.options.declare('x_cp_val', types=(list, np.ndarray), desc='List/array of x control '
+                             'point values, must be monotonically increasing. '
+                             'Not valid for bsplines.')
         self.options.declare('interp_options', types=dict, default={},
                              desc='Dict contains the name and value of options specific to the '
                              'chosen interpolation method.')
@@ -104,12 +83,13 @@ class SplineComp(ExplicitComponent):
         if not y_cp_name:
             msg = "{}: y_cp_name cannot be an empty string."
             raise ValueError(msg.format(self.msginfo))
+
         elif not y_interp_name:
             msg = "{}: y_interp_name cannot be an empty string."
             raise ValueError(msg.format(self.msginfo))
 
         vec_size = self.options['vec_size']
-        n_interp = len(self.options['x_interp'])
+        n_interp = len(self.options['x_interp_val'])
         n_cp = len(self.options['x_cp_val'])
 
         self.add_output(y_interp_name, np.ones((vec_size, n_interp)), units=y_units)
@@ -118,18 +98,12 @@ class SplineComp(ExplicitComponent):
             y_cp_val = np.ones((vec_size, n_cp))
 
         elif len(y_cp_val.shape) < 2:
-            y_cp_val = y_cp_val.reshape((1, n_cp))
+            y_cp_val = y_cp_val.reshape((vec_size, n_cp))
 
         self.add_input(name=y_cp_name, val=y_cp_val)
-        self.training_outputs[y_interp_name] = y_cp_val
 
+        self._initial_cp_vals[y_interp_name] = y_cp_val
         self.interp_to_cp[y_interp_name] = y_cp_name
-
-        rowcol = np.arange(n_interp)
-        cols = np.tile(rowcol, vec_size)
-        rows = cols + np.repeat(n_interp * np.arange(vec_size), n_interp)
-
-        self.declare_partials(y_interp_name, self.options['x_interp_name'], rows=rows, cols=cols)
 
         row = np.repeat(np.arange(n_interp), n_cp)
         col = np.tile(np.arange(n_cp), n_interp)
@@ -148,20 +122,21 @@ class SplineComp(ExplicitComponent):
             Whether to call this method in subsystems.
         """
         interp_method = self.options['method']
+        if self.grid is None:
+            self.grid = np.asarray(self.options['x_cp_val'])
 
         opts = {}
         if 'interp_options' in self.options:
             opts = self.options['interp_options']
-        for name, train_data in iteritems(self.training_outputs):
+
+        for name, cp_val in iteritems(self._initial_cp_vals):
             # Separate data for each vec_size, but we only need to do sizing, so just pass
             # in the first.  Most interps aren't vectorized.
-            train_data = train_data[0, :]
-            self.interps[name] = InterpND(self.params, train_data,
+            cp_val = cp_val[0, :]
+            self.interps[name] = InterpND((self.grid, ), cp_val,
                                           interp_method=interp_method,
-                                          x_interp=self.options['x_interp'],
-                                          bounds_error=not self.options['extrapolate'], **opts)
-
-        self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
+                                          x_interp=self.options['x_interp_val'],
+                                          bounds_error=False, **opts)
 
         super(SplineComp, self)._setup_var_data(recurse=recurse)
 
@@ -196,15 +171,15 @@ class SplineComp(ExplicitComponent):
         for out_name, interp in iteritems(self.interps):
             values = inputs[self.interp_to_cp[out_name]]
             interp._compute_d_dvalues = True
-            interp._compute_d_dx = True
-            interp.x_interp = inputs[self.options['x_interp_name']]
+            interp._compute_d_dx = False
+            interp.x_interp = self.options['x_interp_val']
 
-            #try:
-            outputs[out_name] = interp.evaluate_spline(values)
+            try:
+                outputs[out_name] = interp.evaluate_spline(values)
 
-            #except ValueError as err:
-                #msg = "{}: Error interpolating output '{}':\n{}"
-                #raise ValueError(msg.format(self.msginfo, out_name, str(err)))
+            except ValueError as err:
+                msg = "{}: Error interpolating output '{}':\n{}"
+                raise ValueError(msg.format(self.msginfo, out_name, str(err)))
 
     def compute_partials(self, inputs, partials):
         """
@@ -222,15 +197,12 @@ class SplineComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         vec_size = self.options['vec_size']
-        n_interp = len(self.options['x_interp'])
+        n_interp = len(self.options['x_interp_val'])
         n_cp = len(self.options['x_cp_val'])
 
         for out_name, interp in iteritems(self.interps):
             cp_name = self.interp_to_cp[out_name]
             pt = inputs[cp_name]
-
-            d_dx = interp.gradient(pt)
-            partials[out_name, self.options['x_interp_name']] = d_dx.flatten()
 
             dy_ddata = np.zeros((vec_size, n_interp, n_cp))
 
@@ -243,7 +215,7 @@ class SplineComp(ExplicitComponent):
                     # Bsplines computed derivative is the same at all points in vec_size.
                     dy_ddata[:] = np.broadcast_to(d_dvalues.toarray(), (vec_size, n_interp, n_cp))
             else:
-                # This way works for most of the interpolation methods.
+                # This way works for the rest of the interpolation methods.
                 for j in range(self.options['vec_size']):
                     val = interp.training_gradients(pt[j, :])
                     dy_ddata[j] = val.reshape(self.grad_shape[1:])

@@ -7,6 +7,7 @@ import numpy as np
 from numpy.testing import assert_array_almost_equal
 
 import openmdao.api as om
+from openmdao.components.spline_comp import ALL_METHODS
 from openmdao.utils.assert_utils import assert_check_partials, assert_rel_error
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.spline_distributions import SplineDistribution
@@ -24,7 +25,7 @@ class SplineTestCase(unittest.TestCase):
 
     def test_simple_spline(self):
 
-        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp=self.x)
+        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp_val=self.x)
         self.prob.model.add_subsystem('akima1', comp)
 
         comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=self.y_cp)
@@ -34,7 +35,7 @@ class SplineTestCase(unittest.TestCase):
 
     def test_multiple_splines(self):
 
-        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp=self.x, x_interp_name='x_val')
+        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp_val=self.x)
         self.prob.model.add_subsystem('akima1', comp)
 
         comp.add_spline(y_cp_name='ycp1', y_interp_name='y_val1', y_cp_val=self.y_cp)
@@ -46,8 +47,8 @@ class SplineTestCase(unittest.TestCase):
     def test_akima_interp_options(self):
 
         akima_option = {'delta_x': 0.1, 'eps': 1e-30}
-        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp=self.x, x_cp_name='xcp',
-                            x_interp_name='x_val', x_units='km', interp_options=akima_option)
+        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp_val=self.x,
+                             interp_options=akima_option)
 
         self.prob.model.add_subsystem('atmosphere', comp)
 
@@ -58,7 +59,7 @@ class SplineTestCase(unittest.TestCase):
 
     def test_akima_backward_compatibility(self):
 
-        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp=self.x,
+        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp_val=self.x,
                              interp_options={'delta_x': 0.1})
         comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=self.y_cp)
 
@@ -86,7 +87,7 @@ class SplineTestCase(unittest.TestCase):
 
     def test_no_ycp_val(self):
 
-        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp=self.x)
+        comp = om.SplineComp(method='akima', x_cp_val=self.x_cp, x_interp_val=self.x)
 
         comp.add_spline(y_cp_name='ycp', y_interp_name='y_val')
         self.prob.model.add_subsystem('akima1', comp)
@@ -102,7 +103,7 @@ class SplineTestCase(unittest.TestCase):
         n = 12
         x = np.linspace(1.0, 12.0, n)
 
-        comp = om.SplineComp(method='akima', vec_size=2, x_cp_val=xcp, x_interp=x,
+        comp = om.SplineComp(method='akima', vec_size=2, x_cp_val=xcp, x_interp_val=x,
                              interp_options={'delta_x': 0.1})
 
         comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=ycp)
@@ -155,8 +156,7 @@ class SplineTestCase(unittest.TestCase):
         model.add_subsystem('px', om.IndepVarComp('x', val=x))
 
         bspline_options = {'order': 4}
-        comp = om.SplineComp(method='bsplines', x_cp_val=t, x_interp=tt, x_cp_name='xcp',
-                            x_interp_name='x_val', x_units='km',
+        comp = om.SplineComp(method='bsplines', x_cp_val=t, x_interp_val=tt,
                             interp_options=bspline_options)
 
         prob.model.add_subsystem('interp', comp)
@@ -199,9 +199,8 @@ class SplineTestCase(unittest.TestCase):
 
         model.add_subsystem('px', om.IndepVarComp('x', val=x))
         bspline_options = {'order': 4}
-        comp = om.SplineComp(method='bsplines', x_cp_val=t, x_interp=t_sin, x_cp_name='xcp',
-                            x_interp_name='x_val', x_units='km', vec_size=2,
-                            interp_options=bspline_options)
+        comp = om.SplineComp(method='bsplines', x_cp_val=t, x_interp_val=t_sin,
+                             vec_size=2, interp_options=bspline_options)
 
         prob.model.add_subsystem('interp', comp)
 
@@ -251,8 +250,8 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         prob = om.Problem()
 
         akima_option = {'delta_x': 0.1}
-        comp = om.SplineComp(method='akima', x_cp_val=xcp, x_interp=x, x_cp_name='xcp',
-                             x_interp_name='x_val', interp_options=akima_option)
+        comp = om.SplineComp(method='akima', x_cp_val=xcp, x_interp_val=x,
+                             interp_options=akima_option)
 
         prob.model.add_subsystem('akima1', comp)
 
@@ -288,7 +287,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp=x, x_interp_name='x_val')
+        comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp_val=x)
         prob.model.add_subsystem('akima1', comp)
 
         comp.add_spline(y_cp_name='ycp1', y_interp_name='y_val1', y_cp_val=y_cp)
@@ -311,7 +310,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         prob = om.Problem()
 
-        comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp=x)
+        comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp_val=x)
         prob.model.add_subsystem('akima1', comp)
 
         comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=y_cp)

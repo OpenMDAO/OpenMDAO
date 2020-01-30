@@ -1,5 +1,5 @@
 """
-Interpolation usng simple B-splines
+Interpolation usng simple B-splines.
 """
 from __future__ import division, print_function, absolute_import
 
@@ -50,9 +50,12 @@ class InterpBSplines(InterpAlgorithm):
         super(InterpBSplines, self).__init__(grid, values, interp)
 
         self._vectorized = True
-        self.k = 2
+        self.k = self.options['order'] + 1
         self._name = 'bsplines'
         self._jac = None
+
+        # It doesn't make sense to define a grid for bsplines.
+        self.grid = None
 
     def initialize(self):
         """
@@ -60,6 +63,12 @@ class InterpBSplines(InterpAlgorithm):
         """
         self.options.declare('order', default=4,
                              desc='B-spline order.')
+
+    def check_config(self):
+        """
+        Verify that we have enough points for this interpolation algorithm.
+        """
+        pass
 
     def evaluate_vectorized(self, x):
         """
@@ -82,19 +91,14 @@ class InterpBSplines(InterpAlgorithm):
         ndarray
             Derivative of interpolated values with respect to grid.
         """
-        n_cp = len(self.grid)
+        n_cp = self.values.shape[-1]
         if self._jac is None:
-            self._jac = self.get_bspline_mtx(n_cp, x / self.grid[-1],
+            self._jac = self.get_bspline_mtx(n_cp, x / x[-1],
                                              order=self.options['order']).tocoo()
 
         result = np.einsum('ij,kj->ki', self._jac.toarray(), self.values)
 
-        if self._compute_d_dx:
-            d_derivs = np.einsum('ijk,lj->lik', self._djac_dx, self.values)
-        else:
-            d_derivs = None
-
-        return result, d_derivs, self._jac, None
+        return result, None, self._jac, None
 
     def training_gradients(self, pt):
         """
@@ -110,7 +114,7 @@ class InterpBSplines(InterpAlgorithm):
         ndarray
             Gradient of output with respect to training point values.
         """
-        return self.jac.toarray().flatten()
+        return self._jac.toarray().flatten()
 
     def get_bspline_mtx(self, num_cp, t_vec, order=4):
         """
@@ -142,10 +146,6 @@ class InterpBSplines(InterpAlgorithm):
         rows = np.zeros((num_pt, order), int)
         cols = np.zeros((num_pt, order), int)
 
-        if self._compute_d_dx:
-            dbasis_dt = np.zeros((order, num_pt), dtype=t_vec.dtype)
-            ddata_dt = np.zeros((num_pt, order, num_pt), dtype=t_vec.dtype)
-
         for ipt in range(num_pt):
             t = t_vec[ipt]
 
@@ -168,15 +168,8 @@ class InterpBSplines(InterpAlgorithm):
                 if knots[n + ll].real != knots[n].real:
                     basis[j1 - 1] = (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * basis[j1]
 
-                    if self._compute_d_dx:
-                        dbasis_dt[j1 - 1, :] = (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * \
-                            dbasis_dt[j1, :]
-                        dbasis_dt[j1 - 1, ipt] += basis[j1] / (knots[n + ll] - knots[n])
-
                 else:
                     basis[j1 - 1] = 0.
-                    if self._compute_d_dx:
-                        dbasis_dt[j1 - 1, :] = 0.0
 
                 for j in range(j1 + 1, j2):
                     n = i0 + j
@@ -185,55 +178,24 @@ class InterpBSplines(InterpAlgorithm):
                         basis[j - 1] = (t - knots[n - 1]) / \
                             (knots[n + ll - 1] - knots[n - 1]) * basis[j - 1]
 
-                        if self._compute_d_dx:
-                            dbasis_dt[j - 1, :] *= (t - knots[n - 1]) / \
-                                (knots[n + ll - 1] - knots[n - 1])
-                            dbasis_dt[j - 1, ipt] += basis[j - 1] / (knots[n + ll - 1] - knots[n - 1])
-
                     else:
                         basis[j - 1] = 0.
-                        if self._compute_d_dx:
-                            dbasis_dt[j - 1, :] = 0.0
 
                     if knots[n + ll].real != knots[n].real:
                         basis[j - 1] += (knots[n + ll] - t) / (knots[n + ll] - knots[n]) * basis[j]
-
-                        if self._compute_d_dx:
-                            dbasis_dt[j - 1, :] += (knots[n + ll] - t) / \
-                                (knots[n + ll] - knots[n]) * dbasis_dt[j, :]
-                            dbasis_dt[j - 1, ipt] -= basis[j] / (knots[n + ll] - knots[n])
 
                 n = i0 + j2
                 if knots[n + ll - 1].real != knots[n - 1].real:
                     basis[j2 - 1] = (t - knots[n - 1]) / \
                         (knots[n + ll - 1] - knots[n - 1]) * basis[j2 - 1]
 
-                    if self._compute_d_dx:
-                        dbasis_dt[j2 - 1, :] *= (t - knots[n - 1]) / \
-                            (knots[n + ll - 1] - knots[n - 1])
-                        dbasis_dt[j2 - 1, :] +=  basis[j2 - 1] / \
-                            (knots[n + ll - 1] - knots[n - 1])
-
                 else:
                     basis[j2 - 1] = 0.
-                    if self._compute_d_dx:
-                        dbasis_dt[j2 - 1, :] = 0.0
 
             data[ipt, :] = basis
             rows[ipt, :] = ipt
             cols[ipt, :] = i0 + arange
 
-            if self._compute_d_dx:
-                ddata_dt[ipt, ...] = dbasis_dt
-
         data, rows, cols = data.flatten(), rows.flatten(), cols.flatten()
-        if self._compute_d_dx:
-            # This is slow. Need a multi-D sparse way to do it.
-            ddata_dt = ddata_dt.flatten()
-            djac_dx = np.zeros((num_pt, num_cp, num_pt), dtype=t_vec.dtype)
-            for val, row, col in zip(ddata_dt, rows, cols):
-                djac_dx[row, col, :] = val
-
-            self._djac_dx = djac_dx
 
         return csr_matrix((data, (rows, cols)), shape=(num_pt, num_cp))
