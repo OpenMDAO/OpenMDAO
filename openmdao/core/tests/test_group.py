@@ -338,6 +338,8 @@ class TestGroup(unittest.TestCase):
 
     def test_promotes_inputs_and_outputs(self):
 
+        import openmdao.api as om
+
         class SimpleGroup(om.Group):
 
             def setup(self):
