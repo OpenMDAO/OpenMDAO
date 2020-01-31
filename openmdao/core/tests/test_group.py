@@ -188,6 +188,32 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                          "local variable 'val' referenced before assignment")
 
+    def test_multiple_promotes_collision(self):
+
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=['a'])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['b'])
+                self.promotes('sub', inputs=['b'])
+
+        top = om.Problem(model=TopGroup())
+        top.setup()
+
+        self.assertEqual(top['sub.a'], 3)
+        self.assertEqual(top['sub.b'], 4)
+        self.assertEqual(top['b'], 4)
+
     def test_add_subsystem_class(self):
         p = om.Problem()
         try:
