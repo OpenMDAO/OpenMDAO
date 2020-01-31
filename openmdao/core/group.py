@@ -1396,11 +1396,11 @@ class Group(System):
         """
         subsys = getattr(self, subsys_name)
         if any:
-            subsys._var_promotes['any'] = any
+            subsys._var_promotes['any'].extend(any)
         if inputs:
-            subsys._var_promotes['input'] = inputs
+            subsys._var_promotes['input'].extend(inputs)
         if outputs:
-            subsys._var_promotes['output'] = outputs
+            subsys._var_promotes['output'].extend(outputs)
 
     def add(self, name, subsys, promotes=None):
         """

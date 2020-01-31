@@ -211,7 +211,6 @@ class TestGroup(unittest.TestCase):
         top.setup()
 
         self.assertEqual(top['sub.a'], 3)
-        self.assertEqual(top['sub.b'], 4)
         self.assertEqual(top['b'], 4)
 
     def test_add_subsystem_class(self):
