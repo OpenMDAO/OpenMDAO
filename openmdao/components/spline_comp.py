@@ -8,7 +8,7 @@ from openmdao.components.interp_util.interp import InterpND
 from openmdao.core.explicitcomponent import ExplicitComponent
 
 ALL_METHODS = ('cubic', 'slinear', 'lagrange2', 'lagrange3', 'akima',
-               'scipy_cubic', 'scipy_slinear', 'scipy_quintic', 'bsplines')
+               'bsplines')
 
 
 class SplineComp(ExplicitComponent):
@@ -114,7 +114,7 @@ class SplineComp(ExplicitComponent):
 
     def _setup_var_data(self, recurse=True):
         """
-        Instantiate surrogates for the output variables that use the default surrogate.
+        Perform some final setup and checks.
 
         Parameters
         ----------
@@ -202,12 +202,11 @@ class SplineComp(ExplicitComponent):
 
         for out_name, interp in iteritems(self.interps):
             cp_name = self.interp_to_cp[out_name]
-            pt = inputs[cp_name]
-
-            dy_ddata = np.zeros((vec_size, n_interp, n_cp))
 
             d_dvalues = interp._d_dvalues
             if d_dvalues is not None:
+                dy_ddata = np.zeros((vec_size, n_interp, n_cp))
+
                 if d_dvalues.shape[0] == vec_size:
                     # Akima precomputes derivs at all points in vec_size.
                     dy_ddata[:] = d_dvalues
@@ -215,9 +214,13 @@ class SplineComp(ExplicitComponent):
                     # Bsplines computed derivative is the same at all points in vec_size.
                     dy_ddata[:] = np.broadcast_to(d_dvalues.toarray(), (vec_size, n_interp, n_cp))
             else:
+                x_interp = self.options['x_interp_val']
+                dy_ddata = np.zeros((n_interp, n_cp))
+
                 # This way works for the rest of the interpolation methods.
-                for j in range(self.options['vec_size']):
-                    val = interp.training_gradients(pt[j, :])
-                    dy_ddata[j] = val.reshape(self.grad_shape[1:])
+                for k in range(n_interp):
+                    val = interp.training_gradients(x_interp[k:k + 1])
+                    dy_ddata[k, :] = val
+                dy_ddata = np.broadcast_to(dy_ddata, (vec_size, n_interp, n_cp))
 
             partials[out_name, cp_name] = dy_ddata.flatten()
