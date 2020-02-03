@@ -186,6 +186,7 @@ class TestBsplinesCompFeature(unittest.TestCase):
                             out_name='h',
                             distribution='uniform')
 
+
 @unittest.skipUnless(matplotlib, "Matplotlib is required.")
 class TestBsplinesCompFeatureWithPlotting(unittest.TestCase):
 

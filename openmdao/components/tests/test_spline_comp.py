@@ -13,7 +13,8 @@ from openmdao.utils.general_utils import printoptions
 from openmdao.utils.spline_distributions import SplineDistribution
 from openmdao.components.interp_util.interp import InterpND
 
-class SplineTestCase(unittest.TestCase):
+
+class SplineCompTestCase(unittest.TestCase):
 
     def setUp(self):
         self.x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
@@ -137,10 +138,11 @@ class SplineTestCase(unittest.TestCase):
 
             prob = om.Problem()
 
-            if method == 'akima':
-                opts = {'delta_x': 0.1}
-            else:
-                opts = {}
+            # These methods have their own test.
+            if method in ['akima', 'bsplines']:
+                continue
+
+            opts = {}
 
             comp = om.SplineComp(method=method, vec_size=2, x_cp_val=xcp, x_interp_val=x,
                                  interp_options=opts)
@@ -188,7 +190,7 @@ class SplineTestCase(unittest.TestCase):
         model.add_subsystem('px', om.IndepVarComp('x', val=x))
 
         bspline_options = {'order': 4}
-        comp = om.SplineComp(method='bsplines', x_interp_val=tt,
+        comp = om.SplineComp(method='bsplines', x_interp_val=tt, num_cp=n_cp,
                             interp_options=bspline_options)
 
         prob.model.add_subsystem('interp', comp)
@@ -231,7 +233,7 @@ class SplineTestCase(unittest.TestCase):
 
         model.add_subsystem('px', om.IndepVarComp('x', val=x))
         bspline_options = {'order': 4}
-        comp = om.SplineComp(method='bsplines', x_cp_val=t, x_interp_val=t_sin,
+        comp = om.SplineComp(method='bsplines', x_interp_val=t_sin, num_cp=n_cp,
                              vec_size=2, interp_options=bspline_options)
 
         prob.model.add_subsystem('interp', comp)
@@ -265,6 +267,60 @@ class SplineTestCase(unittest.TestCase):
 
         derivs = prob.check_partials(out_stream=None, method='cs')
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
+
+    def test_error_messages(self):
+        n_cp = 80
+        n_point = 160
+
+        t = np.linspace(0, 3.0*np.pi, n_cp)
+        tt = np.linspace(0, 3.0*np.pi, n_point)
+        x = np.sin(t)
+
+        prob = om.Problem()
+        model = prob.model
+
+        comp = om.SplineComp(method='bsplines', x_interp_val=tt, x_cp_val=t)
+
+        prob.model.add_subsystem('interp', comp)
+
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units='km')
+
+        with self.assertRaises(ValueError) as cm:
+            prob.setup()
+
+        msg = "SplineComp (interp): 'x_cp_val' is not a valid option when using method 'bsplines'. "
+        msg += "Set 'num_cp' instead."
+        self.assertEqual(str(cm.exception), msg)
+
+        prob = om.Problem()
+        model = prob.model
+
+        comp = om.SplineComp(method='akima', x_interp_val=tt, num_cp=n_cp, x_cp_val=t)
+
+        prob.model.add_subsystem('interp', comp)
+
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units='km')
+
+        with self.assertRaises(ValueError) as cm:
+            prob.setup()
+
+        msg = "SplineComp (interp): It is not valid to set both options 'x_cp_val' and 'num_cp'."
+        self.assertEqual(str(cm.exception), msg)
+
+        prob = om.Problem()
+        model = prob.model
+
+        comp = om.SplineComp(method='akima', x_interp_val=tt)
+
+        prob.model.add_subsystem('interp', comp)
+
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units='km')
+
+        with self.assertRaises(ValueError) as cm:
+            prob.setup()
+
+        msg = "SplineComp (interp): Either option 'x_cp_val' or 'num_cp' must be set."
+        self.assertEqual(str(cm.exception), msg)
 
 
 class SplineCompFeatureTestCase(unittest.TestCase):
