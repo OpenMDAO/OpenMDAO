@@ -358,6 +358,35 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         assert_array_almost_equal(akima_y.flatten(), y.flatten())
 
+    def test_standalone_interp_bspline_example(self):
+
+        import numpy as np
+
+        import openmdao.api as om
+        from openmdao.components.interp_util.interp import InterpND
+
+        xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        n = 50
+        x = np.linspace(1.0, 12.0, n)
+
+        interp = InterpND(points=None, values=ycp, interp_method='bsplines', x_interp=x,
+                          bounds_error=True)
+        y = interp.evaluate_spline(np.expand_dims(ycp, axis=0))
+
+        akima_y = np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
+                            12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
+                            13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,
+                            14.36710105, 14.59128625, 14.81544619, 15.03965664, 15.26399335,
+                            15.48853209, 15.7133486 , 15.93851866, 16.16573502, 16.39927111,
+                            16.63928669, 16.8857123 , 17.1384785 , 17.39751585, 17.66275489,
+                            17.93412619, 18.21156029, 18.49498776, 18.78433915, 19.07954501,
+                            19.38053589, 19.68724235, 19.99959495, 20.31752423, 20.64096076,
+                            20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
+                            24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
+
+        assert_array_almost_equal(akima_y.flatten(), y.flatten())
+
 
 if __name__ == '__main__':
     unittest.main()
