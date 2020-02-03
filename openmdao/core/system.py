@@ -3345,7 +3345,7 @@ class System(object):
         """
         if self._outputs is None:
             # final setup has not been performed
-            if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
+            if hasattr(self, '_local_system_set'):  # i.e. is a Group
                 raise RuntimeError("{}: Unable to list outputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 

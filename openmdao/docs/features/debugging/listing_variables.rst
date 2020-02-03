@@ -187,6 +187,18 @@ scaling (res, res0, and res_ref) for the variables.
     :layout: interleave
 
 
+*List Global Shape*
+~~~~~~~~~~~~~~~~~~~
+
+When working with :ref:`distributed components<distributed_components>`, it may also be useful to display the
+global shape of a variable as well as the shape on the current processor.  Note that this information is not
+available until after the model has been completely set up and run.
+
+.. embed-code::
+  openmdao.core.tests.test_distribcomp.MPIFeatureTests.test_distribcomp_list_feature
+  :layout: interleave
+
+
 *Print Array Values*
 ~~~~~~~~~~~~~~~~~~~~
 

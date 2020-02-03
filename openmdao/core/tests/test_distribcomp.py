@@ -837,98 +837,61 @@ class MPIFeatureTests(unittest.TestCase):
 
     def test_distribcomp_feature(self):
         import numpy as np
-
         import openmdao.api as om
-        from openmdao.utils.mpi import MPI
-        from openmdao.utils.array_utils import evenly_distrib_idxs
+        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
-        if not MPI:
-            raise unittest.SkipTest()
-
-        rank = MPI.COMM_WORLD.rank
         size = 15
 
-        class DistribComp(om.ExplicitComponent):
-            def initialize(self):
-                self.options['distributed'] = True
+        model = om.Group()
+        model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
+        model.add_subsystem("C2", DistribComp(size=size))
+        model.add_subsystem("C3", Summer(size=size))
 
-                self.options.declare('size', types=int, default=1,
-                                     desc="Size of input and output vectors.")
+        model.connect('indep.x', 'C2.invec')
+        model.connect('C2.outvec', 'C3.invec')
 
-            def setup(self):
-                comm = self.comm
-                rank = comm.rank
+        prob = om.Problem(model)
+        prob.setup()
 
-                size = self.options['size']
+        model.C2.list_outputs(shape=True, global_shape=True, print_arrays=True)
 
-                # results in 8 entries for proc 0 and 7 entries for proc 1 when using 2 processes.
-                sizes, offsets = evenly_distrib_idxs(comm.size, size)
-                start = offsets[rank]
-                end = start + sizes[rank]
+        prob['indep.x'] = np.ones(size)
+        prob.run_model()
 
-                self.add_input('invec', np.ones(sizes[rank], float),
-                               src_indices=np.arange(start, end, dtype=int))
+        model.C2.list_outputs(shape=True, global_shape=True, print_arrays=True)
 
-                self.add_output('outvec', np.ones(sizes[rank], float))
+        assert_rel_error(self, prob['C3.out'], -5.)
 
-            def compute(self, inputs, outputs):
-                if self.comm.rank == 0:
-                    outputs['outvec'] = inputs['invec'] * 2.0
-                else:
-                    outputs['outvec'] = inputs['invec'] * -3.0
+    def test_distribcomp_list_feature(self):
+        import numpy as np
+        import openmdao.api as om
+        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
-        class Summer(om.ExplicitComponent):
-            """Sums a distributed input."""
+        size = 15
 
-            def initialize(self):
-                self.options.declare('size', types=int, default=1,
-                                     desc="Size of input and output vectors.")
+        model = om.Group()
+        model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
+        model.add_subsystem("C2", DistribComp(size=size))
+        model.add_subsystem("C3", Summer(size=size))
 
-            def setup(self):
-                comm = self.comm
-                rank = comm.rank
+        model.connect('indep.x', 'C2.invec')
+        model.connect('C2.outvec', 'C3.invec')
 
-                size = self.options['size']
+        prob = om.Problem(model)
+        prob.setup()
 
-                # this results in 8 entries for proc 0 and 7 entries for proc 1
-                # when using 2 processes.
-                sizes, offsets = evenly_distrib_idxs(comm.size, size)
-                start = offsets[rank]
-                end = start + sizes[rank]
+        model.C2.list_outputs(global_shape=True, print_arrays=True)
+        model.C3.list_inputs(global_shape=True, print_arrays=True)
 
-                # NOTE: you must specify src_indices here for the input. Otherwise,
-                #       you'll connect the input to [0:local_input_size] of the
-                #       full distributed output!
-                self.add_input('invec', np.ones(sizes[rank], float),
-                               src_indices=np.arange(start, end, dtype=int))
+        prob['indep.x'] = np.ones(size)
+        prob.run_model()
 
-                self.add_output('out', 0.0)
+        model.C3.list_inputs(shape=True, global_shape=True, print_arrays=True)
 
-            def compute(self, inputs, outputs):
-                data = np.zeros(1)
-                data[0] = np.sum(inputs['invec'])
+        model.list_inputs(shape=True, global_shape=True, print_arrays=True)
 
-                total = np.zeros(1)
-                self.comm.Allreduce(data, total, op=MPI.SUM)
-
-                outputs['out'] = total[0]
-
-        p = om.Problem()
-        top = p.model
-        top.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
-        top.add_subsystem("C2", DistribComp(size=size))
-        top.add_subsystem("C3", Summer(size=size))
-
-        top.connect('indep.x', 'C2.invec')
-        top.connect('C2.outvec', 'C3.invec')
-
-        p.setup()
-
-        p['indep.x'] = np.ones(size)
-
-        p.run_model()
-
-        assert_rel_error(self, p['C3.out'], -5.)
+        print(prob['C3.invec'])
+        assert_rel_error(self, prob['C3.out'], -5.)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
