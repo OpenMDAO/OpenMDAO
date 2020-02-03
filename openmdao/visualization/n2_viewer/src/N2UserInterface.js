@@ -95,7 +95,7 @@ class N2UserInterface {
         }
     }
 
-    /** When a node is right-clicked, collapse it. */
+    /* When a node is right-clicked, collapse it. */
     rightClick(node1, node2) {
         testThis(this, "N2UserInterface", "rightClick");
 
@@ -176,17 +176,20 @@ class N2UserInterface {
         testThis(this, "N2UserInterface", "backButtonPressed");
 
         if (this.backButtonHistory.length == 0) return;
+
         let node = this.backButtonHistory[this.backButtonHistory.length - 1].node;
+
+        // Check to see if the node is a collapsed node or not
         if (node.collapsable) {
-        this.leftClickedNode = node;
-        this.forwardButtonHistory.push({ node: this.leftClickedNode });
+            this.leftClickedNode = node;
+            this.forwardButtonHistory.push({ node: this.leftClickedNode });
         this.collapse();
         } else {
-        this.n2Diag.dom.parentDiv.querySelector("#backButtonId").disabled =
+            this.n2Diag.dom.parentDiv.querySelector("#backButtonId").disabled =
             this.backButtonHistory.length == 0 ? "disabled" : false;
-        for (let obj = node; obj != null; obj = obj.parent) {
-            //make sure history item is not minimized
-            if (obj.isMinimized) return;
+            for (let obj = node; obj != null; obj = obj.parent) {
+                //make sure history item is not minimized
+                if (obj.isMinimized) return;
         }
 
         this.forwardButtonHistory.push({ node: this.n2Diag.zoomedElement });
