@@ -5,10 +5,10 @@ Modifying Children of a Group with Configure Method
 ***************************************************
 
 Most of the time, the :code:`setup` method is the only one you need to define on a group.
-The main exception is the case where you want to modify a solver that was set in one of 
+The main exception is the case where you want to modify a solver that was set in one of
 your children groups. When you call :code:`add_subsystem`, the system you add is instantiated
 but its :code:`setup` method is not called until after the parent group's :code:`setup` method
-is finished with its execution. That means that anything you do with that subsystem 
+is finished with its execution. That means that anything you do with that subsystem
 (e.g., changing the nonlinear solver) will potentially be overwritten by the child system's
 :code:`setup` if it is assigned there as well.
 
@@ -20,7 +20,7 @@ system in the hierarchy takes precedence over all lower ones for any modificatio
 Configuring Solvers
 -------------------
 
-Here is a simple example where a lower system sets a solver, but we want to change it to a 
+Here is a simple example where a lower system sets a solver, but we want to change it to a
 different one in the top-most system.
 
 .. embed-code::
@@ -33,7 +33,7 @@ Configuring Setup-Dependent I/O
 -------------------------------
 
 Another situation in which the :code:`configure` method might be useful is if the inputs
-and outputs of a component or subsystem are dependent on the :code:`setup` of another system.  
+and outputs of a component or subsystem are dependent on the :code:`setup` of another system.
 The following example is a variation on the model used to illustrate use of an
 :ref:`AddSubtractComp <addsubtractcomp_feature>`.  Here we assume the component that
 provides the vectorized data must be :code:`setup` before the shape of that data is known:
