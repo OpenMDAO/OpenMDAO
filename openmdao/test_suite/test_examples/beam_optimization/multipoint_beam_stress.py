@@ -82,8 +82,8 @@ class MultipointBeamGroup(om.Group):
         inputs_comp.add_output('h_cp', shape=num_cp)
         self.add_subsystem('inputs_comp', inputs_comp)
 
-        comp = om.BsplinesComp(num_control_points=num_cp, num_points=num_elements, in_name='h_cp',
-                               out_name='h')
+        comp = om.SplineComp(method='bsplines', num_cp=num_cp, x_interp_val=np.arange(num_elements))
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h')
         self.add_subsystem('interp', comp)
 
         I_comp = MomentOfInertiaComp(num_elements=num_elements, b=b)
