@@ -443,6 +443,65 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         assert_array_almost_equal(akima_y.flatten(), y.flatten())
 
+    def test_akima_options(self):
+        import numpy as np
+
+        import openmdao.api as om
+
+        x_cp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+
+        n = 50
+        x = np.linspace(1.0, 12.0, n)
+
+        prob = om.Problem()
+        model = prob.model
+
+        # Set options specific to akima
+        akima_option = {'delta_x': 0.1, 'eps': 1e-30}
+
+        comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp_val=x,
+                             interp_options=akima_option)
+
+        prob.model.add_subsystem('atmosphere', comp)
+
+        comp.add_spline(y_cp_name='alt_cp', y_interp_name='alt', y_cp_val=y_cp, y_units='kft')
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
+    def test_bspline_options(self):
+        import numpy as np
+
+        import openmdao.api as om
+
+        prob = om.Problem()
+        model = prob.model
+
+        n_cp = 80
+        n_point = 160
+
+        t = np.linspace(0, 3.0*np.pi, n_cp)
+        tt = np.linspace(0, 3.0*np.pi, n_point)
+        x = np.sin(t)
+
+        model.add_subsystem('px', om.IndepVarComp('x', val=x))
+
+        # Set options specific to akima
+        bspline_options = {'order': 3}
+
+        comp = om.SplineComp(method='bsplines', x_interp_val=tt, num_cp=n_cp,
+                            interp_options=bspline_options)
+
+        prob.model.add_subsystem('interp', comp)
+
+        comp.add_spline(y_cp_name='h_cp', y_interp_name='h', y_cp_val=x, y_units='km')
+
+        model.connect('px.x', 'interp.h_cp')
+
+        prob.setup(force_alloc_complex=True)
+        prob.run_model()
+
 
 if __name__ == '__main__':
     unittest.main()

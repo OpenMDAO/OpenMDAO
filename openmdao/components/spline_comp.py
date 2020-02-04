@@ -148,19 +148,6 @@ class SplineComp(ExplicitComponent):
                                                    x_interp=self.options['x_interp_val'],
                                                    bounds_error=False, **opts)
 
-    def _setup_partials(self, recurse=True):
-        """
-        Process all partials and approximations that the user declared.
-
-        SplineComp needs to declare its partials after inputs and outputs are known.
-
-        Parameters
-        ----------
-        recurse : bool
-            Whether to call this method in subsystems.
-        """
-        super(SplineComp, self)._setup_partials()
-
         # The scipy methods do not support complex step.
         if self.options['method'].startswith('scipy'):
             self.set_check_partial_options('*', method='fd')

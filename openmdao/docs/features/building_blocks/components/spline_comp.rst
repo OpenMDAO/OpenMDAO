@@ -6,10 +6,28 @@
 SplineComp
 ***************
 
-SplineComp allows you to represent a large dimension variable as a smaller dimensional variable via
-the various spline methods. This is useful for reducing the size of an optimization problem by
+SplineComp allows you to represent a larger dimension variable with a smaller dimensional variable by
+using an interpolation algorithm. This is useful for reducing the size of an optimization problem by
 decreasing the number of design variables it solves. The spatial distribution of the points, in both
 the original and interpolated spaces is typically uniform but other distributions can be used.
+
+The following methods are available by setting the 'method' option:
+
++---------------+--------+------------------------------------------------------------------+
+| Method        | Order  | Description                                                      |
++===============+========+==================================================================+
+| slinear       | 1      | Basic linear interpolation                                       |
++---------------+--------+------------------------------------------------------------------+
+| lagrange2     | 2      | Second order Lagrange polynomial                                 |
++---------------+--------+------------------------------------------------------------------+
+| lagrange3     | 3      | Third order Lagrange polynomial                                  |
++---------------+--------+------------------------------------------------------------------+
+| akima         | 3      | Interpolation using Akima splines                                |
++---------------+--------+------------------------------------------------------------------+
+| cubic         | 3      | Cubic spline, with continuity of derivatives between segments    |
++---------------+--------+------------------------------------------------------------------+
+| bsplines      | var.   | BSplines, default order is 4.                                    |
++---------------+--------+------------------------------------------------------------------+
 
 
 SplineComp Options
@@ -24,13 +42,13 @@ SplineComp Options
 SplineComp Basic Example
 -------------------------
 
-In our example, we have a pre-generated curve that is described by `x_cp` and `y_cp` below which we
-interpolate between. We also have pre-generated points to interpolate at, which in our case is: `x`.
-To set the x position of control and interpolation points in `SplineComp` we pass `x_cp` and `x`
-into their respective contstructor arguments (Figure 1). Next we'll add our `y_cp` data in by
-calling the `add_spline` method and passing `y_cp` into the argument `y_cp_val` (Figure 2).
-`SplineComp` calculates the `y_interp` values and gives the output of interpolated points
-(Figure 3).
+In our example, we have a pre-generated curve that is described by a series of values `y_cp` at a
+sequence of locations `x_cp`, and we would like to interpolate new values at multiple locations
+between these points. We call these new fixed locations at which to interpolate: `x`. When we
+instantiate a `SplineComp`, we specify these `x_cp` and `x` locations as numpy arrays and pass
+them in as constructor keyword arguments. (Figure 1). Next we'll add our `y_cp` data in by
+calling the `add_spline` method and passing the `y_cp` values in as the keyword argument `y_cp_val` (Figure 2).
+`SplineComp` computes and outputs the `y_interp` values (Figure 3).
 
 .. image:: images/figure_1.png
   :width: 900
@@ -48,15 +66,47 @@ calling the `add_spline` method and passing `y_cp` into the argument `y_cp_val` 
     openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_basic_example
     :layout: code
 
+
 SplineComp Multiple Splines
 ---------------------------
 
-`SplineComp` supports multiple splines on a fixed `xcp` grid. Below is an example of how a user can
-setup two splines on a fixed grid. To do this the user needs to pass in names for `y_cp_name` and
-`y_interp_name`, so they can be accessed, and the `y_cp_val` locations that make up the spline.
+`SplineComp` supports multiple splines on a fixed `x_interp` grid. Below is an example of how a user can
+setup two splines on a fixed grid. To do this the user needs to pass in names to give to the component
+input and output. The initial values for `y_cp` can also be specified here.
 
 .. embed-code::
     openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_multi_splines
+    :layout: code
+
+
+Specifying Options for 'akima'
+------------------------------
+
+When you are using the 'akima' method, there are two akima-specific options that can be passed in to the
+`SplineComp` constructor.  The 'delta_x' option is used to define the radius of the smoothing interval
+that is used in the absolute values functions in the akima calculation in order to make their
+derivatives continuous.  This is set to zero by default, which effectively turns off the smoothing.
+The 'eps' option is used to define the value that triggers a division-by-zero
+safeguard; its default value is 1e-30.
+
+
+.. embed-code::
+    openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_akima_options
+    :layout: code
+
+
+Specifying Options for 'bsplines'
+---------------------------------
+
+When you use the 'bsplines' method, you can specify the bspline order by defining 'order' in an
+otherwise empty dictionary and passing it in as 'interp_options'.
+
+In addition, when using 'bsplines', you cannot specify the 'x_cp' locations because the bspline
+formulation differs from other polynomial interpolants. When using bsplines, you should instead
+specify the number of control points using the 'num_cp' argument.
+
+.. embed-code::
+    openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_bspline_options
     :layout: code
 
 
@@ -75,8 +125,8 @@ distribution.
     :layout: code
 
 
-SplineComp Standalone
-----------------------
+Standalone Interface for Spline Evaluation
+------------------------------------------
 
 Another included feature is a standalone version of `spline_comp`. This simple standalone function
 is intended to be used for standard interpolation (StructuredMetaModel), including for
