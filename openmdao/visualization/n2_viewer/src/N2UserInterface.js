@@ -105,9 +105,7 @@ class N2UserInterface {
         let node = this.leftClickedNode;
         node["collapsable"] = true;
 
-        this.tonHistory.push({
-        node: node
-        });
+        this.backButtonHistory.push({ "node": node });
 
         d3.event.preventDefault();
         d3.event.stopPropagation();
