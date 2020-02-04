@@ -376,6 +376,7 @@ n2_gui_test_scripts = {
 
 n2_gui_test_models = n2_gui_test_scripts.keys()
 
+
 class n2_gui_test_case(unittest.TestCase):
 
     async def handle_console_err(self, msg):
@@ -421,7 +422,8 @@ class n2_gui_test_case(unittest.TestCase):
         self.scripts = n2_gui_test_scripts
         self.known_model_names = n2_gui_test_models
 
-        n2file = os.path.join(self.modelDir, self.current_model + GUI_N2_SUFFIX)
+        n2file = os.path.join(
+            self.modelDir, self.current_model + GUI_N2_SUFFIX)
         pyfile = os.path.join(self.modelDir, self.current_model + '.py')
         self.n2files[self.current_model] = n2file
         print("Creating " + n2file)
@@ -430,11 +432,11 @@ class n2_gui_test_case(unittest.TestCase):
             subprocess.run(
                 ['openmdao', 'n2', '-o', n2file,  '--no_browser',
                     '--use_declare_partial_info', pyfile],
-                    capture_output=True)
+                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         else:
             subprocess.run(
                 ['openmdao', 'n2', '-o', n2file,  '--no_browser', pyfile],
-                    capture_output=True)
+                stderr=subprocess.PIPE, stdout=subprocess.PIPE)
 
     async def load_test_page(self):
         """ Load the specified HTML file from the local filesystem. """
