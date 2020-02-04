@@ -53,6 +53,9 @@ class InterpND(object):
         Table object that contains algorithm that performs the interpolation.
     values : array_like, shape (m1, ..., mn, ...)
         The data on the regular grid in n dimensions.
+    x_interp : ndarray
+        Cached non-decreasing vector of points to be interpolated when used as an order-reducing
+        spline.
     _compute_d_dvalues : bool
         When set to True, compute gradients with respect to the grid values.
     _compute_d_dx : bool

@@ -135,7 +135,8 @@ class SplineComp(ExplicitComponent):
 
             row = np.repeat(np.arange(n_interp), n_cp)
             col = np.tile(np.arange(n_cp), n_interp)
-            rows = np.tile(row, vec_size) + np.repeat(n_interp * np.arange(vec_size), n_interp * n_cp)
+            rows = np.tile(row, vec_size) + \
+                np.repeat(n_interp * np.arange(vec_size), n_interp * n_cp)
             cols = np.tile(col, vec_size) + np.repeat(n_cp * np.arange(vec_size), n_interp * n_cp)
 
             self.declare_partials(y_interp_name, y_cp_name, rows=rows, cols=cols)

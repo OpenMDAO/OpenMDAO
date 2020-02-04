@@ -28,7 +28,7 @@ class InterpBSplines(InterpAlgorithm):
 
     Attributes
     ----------
-    jac : ndarray
+    _jac : ndarray
         Matrix of b-spline coefficients.
     """
 

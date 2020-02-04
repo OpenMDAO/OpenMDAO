@@ -2,6 +2,7 @@
 
 import numpy as np
 
+
 def cell_centered(num_points, start=0.0, end=1.0):
     """
     Cell centered distribution of control points.
@@ -22,10 +23,10 @@ def cell_centered(num_points, start=0.0, end=1.0):
     ndarray
         Values to interpolate at.
     """
-
     interp_grid = np.linspace(start, end, num_points)
 
     return np.array((interp_grid[1:] + interp_grid[:-1] / 2))
+
 
 def sine_distribution(num_points, start=0.0, end=1.0, phase=np.pi):
     """
@@ -50,6 +51,7 @@ def sine_distribution(num_points, start=0.0, end=1.0, phase=np.pi):
     t_vec = np.linspace(start, end, num_points)
 
     return np.array(0.5 * (1.0 + np.sin(-0.5 * phase + t_vec * phase)))
+
 
 def node_centered(num_points, start=0.0, end=1.0):
     """

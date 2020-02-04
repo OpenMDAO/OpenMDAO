@@ -31,6 +31,19 @@ class MetaModelStructuredComp(ExplicitComponent):
     Extrapolation is supported, but disabled by default. It can be enabled via initialization
     option.
 
+
+    Attributes
+    ----------
+    grad_shape : tuple
+        Cached shape of the gradient of the outputs wrt the training inputs.
+    interps : dict
+        Dictionary of interpolations for each output.
+    params : list
+        List containing training data for each input.
+    pnames : list
+        Cached list of input names.
+    training_outputs : dict
+        Dictionary of training data each output.
     """
 
     def __init__(self, **kwargs):

@@ -16,6 +16,7 @@ from openmdao.test_suite.test_examples.beam_optimization.components.moment_comp 
 from openmdao.test_suite.test_examples.beam_optimization.components.multi_states_comp import MultiStatesComp
 from openmdao.test_suite.test_examples.beam_optimization.components.multi_stress_comp import MultiStressComp
 from openmdao.test_suite.test_examples.beam_optimization.components.volume_comp import VolumeComp
+from openmdao.utils.spline_distributions import sine_distribution
 
 
 def divide_cases(ncases, nprocs):
@@ -82,7 +83,8 @@ class MultipointBeamGroup(om.Group):
         inputs_comp.add_output('h_cp', shape=num_cp)
         self.add_subsystem('inputs_comp', inputs_comp)
 
-        comp = om.SplineComp(method='bsplines', num_cp=num_cp, x_interp_val=np.arange(num_elements))
+        x_interp = sine_distribution(num_elements)
+        comp = om.SplineComp(method='bsplines', num_cp=num_cp, x_interp_val=x_interp)
         comp.add_spline(y_cp_name='h_cp', y_interp_name='h')
         self.add_subsystem('interp', comp)
 
