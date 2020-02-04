@@ -5,7 +5,7 @@ Accessing Recorded Metadata
 ***************************
 
 In addition to the cases themselves, a :ref:`CaseReader<case_reader>` may also record
-certain metadata about the model and it's consituent systems and solvers.
+certain metadata about the model and its constituent systems and solvers.
 
 Problem Metadata
 ----------------
@@ -39,7 +39,7 @@ for every system in the model.
 .. note::
     Each system object must have a recorder explicitly attached in order for its metadata and options to be recorded.
 
-   
+
 Solver Metadata
 ---------------
 

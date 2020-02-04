@@ -6,9 +6,8 @@ from six.moves import range
 
 import numpy as np
 
-from openmdao.components.structured_metamodel_util.outofbounds_error import OutOfBoundsError
-from openmdao.components.structured_metamodel_util.python_interp import PythonGridInterp
-from openmdao.components.structured_metamodel_util.scipy_interp import ScipyGridInterp
+from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
+from openmdao.components.interp_util.interp import InterpND
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
@@ -150,16 +149,11 @@ class MetaModelStructuredComp(ExplicitComponent):
             Whether to call this method in subsystems.
         """
         interp_method = self.options['method']
-        if interp_method.startswith('scipy'):
-            interp = ScipyGridInterp
-            interp_method = interp_method[6:]
-        else:
-            interp = PythonGridInterp
 
         for name, train_data in iteritems(self.training_outputs):
-            self.interps[name] = interp(self.params, train_data,
-                                        interp_method=interp_method,
-                                        bounds_error=not self.options['extrapolate'])
+            self.interps[name] = InterpND(self.params, train_data,
+                                          interp_method=interp_method,
+                                          bounds_error=not self.options['extrapolate'])
 
         if self.options['training_data_gradients']:
             self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
@@ -246,19 +240,28 @@ class MetaModelStructuredComp(ExplicitComponent):
             sub-jac components written to partials[output_name, input_name]
         """
         pt = np.array([inputs[pname].flatten() for pname in self.pnames]).T
-        if self.options['training_data_gradients']:
-            dy_ddata = np.zeros(self.grad_shape)
-            interp = next(itervalues(self.interps))
-            for j in range(self.options['vec_size']):
-                val = interp.training_gradients(pt[j, :])
-                dy_ddata[j] = val.reshape(self.grad_shape[1:])
+        dy_data = None
 
-        for out_name in self.interps:
-            dval = self.interps[out_name].gradient(pt).T
+        for out_name, interp in iteritems(self.interps):
+            dval = interp.gradient(pt).T
             for i, p in enumerate(self.pnames):
                 partials[out_name, p] = dval[i, :]
 
             if self.options['training_data_gradients']:
+
+                if dy_data is None or interp._d_dvalues is not None:
+                    dy_ddata = np.zeros(self.grad_shape)
+
+                    if interp._d_dvalues is not None:
+                        # Akima must be handled individually.
+                        dy_ddata[:] = interp._d_dvalues
+
+                    else:
+                        # This way works for most of the interpolation methods.
+                        for j in range(self.options['vec_size']):
+                            val = interp.training_gradients(pt[j, :])
+                            dy_ddata[j] = val.reshape(self.grad_shape[1:])
+
                 partials[out_name, "%s_train" % out_name] = dy_ddata
 
 

@@ -5,14 +5,14 @@ BroydenSolver
 *************
 
 BroydenSolver is a quasi-Newton solver that implements Broyden's second method to solve for values of the model's states that
-drive their residuals to zero. It does so by maintaning an approximation to the inverse of the Jacobian of the model or a subset
+drive their residuals to zero. It does so by maintaining an approximation to the inverse of the Jacobian of the model or a subset
 of the model. In some cases this can be more efficient than NewtonSolver because updating the approximated inverse Jacobian is
 cheaper than solving the linear system. It may take more iterations because the search direction depends on an approximation,
 but the iterations take fewer operations.
 
 The BroydenSolver has two different modes of operation. It can operate on the entire model and solve for every state in the containing
 system and all subsystems. Alternatively, it can operate on a subset of the model and only solve for a list of states that you provide.
-The advanatage of full-model mode is that you don't have to worry about forgetting a state, particularly in large models where you might
+The advantage of full-model mode is that you don't have to worry about forgetting a state, particularly in large models where you might
 not be familiar with every component or variable. The disadvantage is that you are computing the inverse of a larger matrix every time
 you recalculate the inverse jacobian, though ideally you are not recomputing this very often. Operating on a subset of states is more
 efficient in both the linear solve and the Broyden update, but you do run the risk of missing a state. The BroydenSolver will print a

@@ -19,6 +19,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.general_utils import warn_deprecation, simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
+from openmdao.utils.mpi import MPI
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
@@ -319,7 +320,7 @@ class ScipyOptimizeDriver(Driver):
                 upper = meta['upper']
                 lower = meta['lower']
                 equals = meta['equals']
-                if 'linear' in meta and meta['linear']:
+                if opt in _gradient_optimizers and 'linear' in meta and meta['linear']:
                     lincons.append(name)
                     self._con_idx[name] = lin_i
                     lin_i += size
@@ -569,6 +570,8 @@ class ScipyOptimizeDriver(Driver):
 
             # Pass in new parameters
             i = 0
+            if MPI:
+                model.comm.Bcast(x_new, root=0)
             for name, meta in iteritems(self._designvars):
                 size = meta['size']
                 self.set_design_var(name, x_new[i:i + size])

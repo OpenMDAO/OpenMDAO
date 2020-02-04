@@ -38,6 +38,11 @@ class FunctionFinder(ast.NodeVisitor):
         else:
             qual = ("<%s:%d>" % (self.fname, node.lineno), None, node.name)
         self.cache[node.lineno] = qual
+        # some versions of python report different line numbers for funnctions/classes with
+        # decorators, so just put keys in the cache dict for all of the decorator line numbers
+        # as well in order to avoid any KeyErrors.
+        for d in node.decorator_list:
+            self.cache[d.lineno] = qual
 
         self.stack.append(node.name)
         for bnode in node.body:

@@ -55,7 +55,7 @@ Display the results in a compact format:
 ----
 
 Use complex step instead of finite difference for a more accurate check. We also tighten the tolerance
-on the nonlinear Gauss-Seidel solver so that we get more accuracate converged values.
+on the nonlinear Gauss-Seidel solver so that we get more accurate converged values.
 
 .. embed-code::
     openmdao.core.tests.test_problem.TestProblem.test_feature_check_totals_cs

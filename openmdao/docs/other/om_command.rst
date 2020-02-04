@@ -136,7 +136,7 @@ or promoted *input* column.
 When showing promoted output and promoted input columns, if the promoted output name equals the
 promoted input name, that means the connection is an implicit connection.  Otherwise the
 connection is explicit, meaning somewhere in the model there is an explicit call to `connect`
-that producted the connection.
+that produced the connection.
 
 In OpenMDAO, multiple inputs can be promoted to the same name, and by sorting the promoted inputs
 column, all such inputs will be grouped together.  This can make it much easier to spot either
