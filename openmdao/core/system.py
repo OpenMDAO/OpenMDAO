@@ -3541,10 +3541,10 @@ class System(object):
 
             var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
 
-            # dictionary to collect values of distributed variables
-            distrib = {'value': {}, 'resids': {}}
+            distrib = {'value': {}, 'resids': {}}     # dictionary to collect distributed values
 
-            for rank, proc_vars in enumerate(all_var_dicts):  # In rank order go through rest of the procs
+            # Go through data from all procs in order by rank and collect distributed values
+            for rank, proc_vars in enumerate(all_var_dicts):
                 for name in proc_vars:
                     if name not in var_dict:     # If not in the merged dict, add it
                         var_dict[name] = proc_vars[name]
@@ -3560,10 +3560,9 @@ class System(object):
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
 
-                            shape = meta[name]['shape']
                             global_shape = allprocs_meta[name]['global_shape']
 
-                            if shape != global_shape:
+                            if meta[name]['shape'] != global_shape:
                                 # if the local shape is different than the global shape and the
                                 # global shape matches the concatenation of values from all procs,
                                 # then assume the concatenation, otherwise just use the value from
@@ -3575,9 +3574,9 @@ class System(object):
                                         else:
                                             distrib[key][name] = np.append(distrib[key][name],
                                                                            proc_vars[name][key])
-                                        if (rank == self.comm.size - 1 and
-                                            distrib[key][name].shape == global_shape):
-                                               var_dict[name][key] = distrib[key][name]
+                                        if rank == self.comm.size - 1:
+                                            if distrib[key][name].shape == global_shape:
+                                                var_dict[name][key] = distrib[key][name]
 
         if setup:
             inputs = var_type == 'input'
