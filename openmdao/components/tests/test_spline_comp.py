@@ -394,7 +394,7 @@ class SplineCompFeatureTestCase(unittest.TestCase):
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         n = 20
-        x = s_dist.sine_distribution(x_cp, n, phase=np.pi)
+        x = s_dist.sine_distribution(20, start=0, end=1, phase=np.pi)
 
         prob = om.Problem()
 
