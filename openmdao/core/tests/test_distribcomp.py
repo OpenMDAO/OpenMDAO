@@ -853,13 +853,13 @@ class MPIFeatureTests(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        model.C2.list_outputs(shape=True, global_shape=True, print_arrays=True)
-
         prob['indep.x'] = np.ones(size)
         prob.run_model()
 
-        model.C2.list_outputs(shape=True, global_shape=True, print_arrays=True)
-
+        assert_rel_error(self, prob['C2.invec'],
+                         np.ones((8,)) if model.comm.rank == 0 else np.ones((7,)))
+        assert_rel_error(self, prob['C2.outvec'],
+                         2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
         assert_rel_error(self, prob['C3.out'], -5.)
 
     def test_distribcomp_list_feature(self):
@@ -880,17 +880,23 @@ class MPIFeatureTests(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        model.C2.list_outputs(global_shape=True, print_arrays=True)
-        model.C3.list_inputs(global_shape=True, print_arrays=True)
+        # prior to model execution, the global shape of a distributed variable is not available
+        # and only the local portion of the value is available
+        model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True)
+        model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True)
 
         prob['indep.x'] = np.ones(size)
         prob.run_model()
 
-        model.C3.list_inputs(shape=True, global_shape=True, print_arrays=True)
+        # after model execution, the global shape of a distributed variable is available
+        # and the complete global value is available
+        model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True)
+        model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True)
 
-        model.list_inputs(shape=True, global_shape=True, print_arrays=True)
+        # note that the shape of the input variable for the non-distributed Summer component
+        # is different on each processor, use the all_procs argument to display on all processors
+        model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True, all_procs=True)
 
-        print(prob['C3.invec'])
         assert_rel_error(self, prob['C3.out'], -5.)
 
 
