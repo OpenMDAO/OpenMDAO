@@ -10,7 +10,7 @@ import openmdao.api as om
 from openmdao.components.spline_comp import ALL_METHODS
 from openmdao.utils.assert_utils import assert_check_partials, assert_rel_error
 from openmdao.utils.general_utils import printoptions
-from openmdao.utils.spline_distributions import SplineDistribution
+from openmdao.utils.spline_distributions import sine_distribution
 from openmdao.components.interp_util.interp import InterpND
 
 
@@ -390,11 +390,10 @@ class SplineCompFeatureTestCase(unittest.TestCase):
 
         import openmdao.api as om
 
-        s_dist = SplineDistribution()
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         n = 20
-        x = s_dist.sine_distribution(20, start=0, end=1, phase=np.pi)
+        x = sine_distribution(20, start=0, end=1, phase=np.pi)
 
         prob = om.Problem()
 

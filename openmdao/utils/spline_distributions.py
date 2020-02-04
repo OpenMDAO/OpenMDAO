@@ -2,70 +2,71 @@
 
 import numpy as np
 
-
-class SplineDistribution(object):
+def cell_centered(num_points, start=0.0, end=1.0):
     """
-    Class to provide helper functions for distribution of interpolation points.
+    Cell centered distribution of control points.
 
+    Parameters
+    ----------
+    num_points : int
+        Number of points to predict at.
+    start : int or float
+        Minimum value to interpolate at.
+    end : int or float
+        Maximum value to interpolate at.
+    num_points : int
+        Number of points to distribute.
+
+    Returns
+    -------
+    ndarray
+        Values to interpolate at.
     """
 
-    def cell_centered(self, num_points, start=0.0, end=1.0):
-        """
-        Cell centered distribution of control points.
+    interp_grid = np.linspace(start, end, num_points)
 
-        Parameters
-        ----------
-        input_points : list or ndarray
-            Control points to distribute.
-        num_points : int
-            Number of points to distribute.
+    return np.array((interp_grid[1:] + interp_grid[:-1] / 2))
 
-        Returns
-        -------
-        ndarray
-            Values to interpolate at.
-        """
+def sine_distribution(num_points, start=0.0, end=1.0, phase=np.pi):
+    """
+    Sine distribution of control points.
 
-        interp_grid = np.linspace(start, end, num_points)
+    Parameters
+    ----------
+    num_points : int
+        Number of points to predict at.
+    start : int or float
+        Minimum value to interpolate at.
+    end : int or float
+        Maximum value to interpolate at.
+    phase : float
+        Phase of the sine wave
 
-        return np.array((interp_grid[1:] + interp_grid[:-1] / 2))
+    Returns
+    -------
+    ndarray
+        Values to interpolate at.
+    """
+    t_vec = np.linspace(start, end, num_points)
 
-    def sine_distribution(self, num_points, start=0.0, end=1.0, phase=np.pi):
-        """
-        Sine distribution of control points.
+    return np.array(0.5 * (1.0 + np.sin(-0.5 * phase + t_vec * phase)))
 
-        Parameters
-        ----------
-        input_points : list or ndarray
-            Control points to distribute.
-        num_points : int
-            Number of points to distribute.
-        phase : float
-            Phase of the sine wave
+def node_centered(num_points, start=0.0, end=1.0):
+    """
+    Distribute control points.
 
-        Returns
-        -------
-        ndarray
-            Values to interpolate at.
-        """
-        t_vec = np.linspace(start, end, num_points)
+    Parameters
+    ----------
+    num_points : int
+        Number of points to predict.
+    start : int or float
+        Minimum value to interpolate at.
+    end : int or float
+        Maximum value to interpolate at.
 
-        return np.array(0.5 * (1.0 + np.sin(-0.5 * phase + t_vec * phase)))
-
-    def node_centered(self, num_points, start=0.0, end=1.0):
-        """
-        Distribute control points.
-
-        Parameters
-        ----------
-        input_points : list or ndarray
-            Control points to distribute.
-        num_points : int
-            Number of points to distribute.
-
-        Returns
-        -------
-        ndarray
-            Values to interpolate at.
-        """
-        return np.linspace(start, end, num_points + 1)
+    Returns
+    -------
+    ndarray
+        Values to interpolate at.
+    """
+    return np.linspace(start, end, num_points + 1)
