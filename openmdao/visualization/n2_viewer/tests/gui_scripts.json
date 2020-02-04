@@ -310,5 +310,43 @@
             "selector": "g#n2elements > g.n2cell",
             "count": 29
         }
-    ]
+    ],
+    "parabaloid": [
+        {
+          "desc": "Collapse the indeps view",
+          "test": "click",
+          "selector": "rect#indeps",
+          "button": "right"
+        },
+        {
+          "desc": "Hit back button to uncollapse the indeps view",
+          "test": "click",
+          "selector": "#backButtonId",
+          "button": "left"
+        },
+        {
+          "desc": "Collapse the indeps view",
+          "test": "click",
+          "selector": "rect#indeps",
+          "button": "right"
+        },
+        {
+          "desc": "Zoom into the indeps view",
+          "test": "click",
+          "selector": "rect#indeps",
+          "button": "left"
+        },
+        {
+          "desc": "Uncollapse the indeps view",
+          "test": "click",
+          "selector": "rect#indeps",
+          "button": "right"
+        },
+        {
+          "desc": "There should be two elements visible in indeps view",
+          "test": "uncollapse_zoomed_element",
+          "selector": "rect#indeps",
+          "n2ElementCount": 2
+        }
+      ]
 }
