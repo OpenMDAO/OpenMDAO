@@ -3539,13 +3539,13 @@ class System(object):
 
             allprocs_meta = self._var_allprocs_abs2meta
 
-            var_dict = all_var_dicts[MPI.COMM_WORLD.rank]  # start with metadata from current rank
+            var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
 
             # dictionary to collect values of distributed variables
             distrib = {'value': {}, 'resids': {}}
 
-            for proc_vars in all_var_dicts:  # In rank order go through rest of the procs
-                for rank, name in enumerate(proc_vars):
+            for rank, proc_vars in enumerate(all_var_dicts):  # In rank order go through rest of the procs
+                for name in proc_vars:
                     if name not in var_dict:     # If not in the merged dict, add it
                         var_dict[name] = proc_vars[name]
                     else:
@@ -3573,10 +3573,11 @@ class System(object):
                                         if rank == 0:
                                             distrib[key][name] = proc_vars[name][key]
                                         else:
-                                            np.append(distrib[key][name], proc_vars[name][key])
+                                            distrib[key][name] = np.append(distrib[key][name],
+                                                                           proc_vars[name][key])
                                         if (rank == self.comm.size - 1 and
                                             distrib[key][name].shape == global_shape):
-                                            var_dict[name][key] = distrib[key][name]
+                                               var_dict[name][key] = distrib[key][name]
 
         if setup:
             inputs = var_type == 'input'
