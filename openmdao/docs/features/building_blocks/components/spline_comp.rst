@@ -134,5 +134,5 @@ multidimensional data sets, and for constructing a higher dimension curve from a
 representation (SplineComp), as we use the spline components.
 
 .. embed-code::
-    openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_standalone_interp_example
+    openmdao.components.tests.interp_util.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_interp_spline_akima
     :layout: code

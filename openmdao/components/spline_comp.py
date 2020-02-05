@@ -5,9 +5,7 @@ import numpy as np
 
 from openmdao.components.interp_util.interp import InterpND
 from openmdao.core.explicitcomponent import ExplicitComponent
-
-ALL_METHODS = ('cubic', 'slinear', 'lagrange2', 'lagrange3', 'akima',
-               'bsplines')
+from openmdao.components.interp_util.interp import SPLINE_METHODS
 
 
 class SplineComp(ExplicitComponent):
@@ -50,7 +48,7 @@ class SplineComp(ExplicitComponent):
 
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
-        self.options.declare('method', values=ALL_METHODS, default='akima',
+        self.options.declare('method', values=SPLINE_METHODS, default='akima',
                              desc='Spline interpolation method to use for all outputs.')
         self.options.declare('x_interp_val', types=(list, np.ndarray),
                              desc='List/array of x interpolated point values.')
@@ -105,7 +103,7 @@ class SplineComp(ExplicitComponent):
             n_cp = len(grid)
 
         elif n_cp is not None:
-            grid = np.arange(n_cp)
+            grid = np.linspace(0, 1.0, n_cp)
 
         else:
             msg = "{}: Either option 'x_cp_val' or 'num_cp' must be set."
@@ -144,10 +142,10 @@ class SplineComp(ExplicitComponent):
             # Separate data for each vec_size, but we only need to do sizing, so just pass
             # in the first.  Most interps aren't vectorized.
             cp_val = y_cp_val[0, :]
-            self.interps[y_interp_name] = InterpND((grid, ), cp_val,
-                                                   interp_method=interp_method,
+            self.interps[y_interp_name] = InterpND(interp_method=interp_method,
+                                                   points=(grid, ), values=cp_val,
                                                    x_interp=self.options['x_interp_val'],
-                                                   bounds_error=False, **opts)
+                                                   extrapolate=True, **opts)
 
         # The scipy methods do not support complex step.
         if self.options['method'].startswith('scipy'):
@@ -171,7 +169,7 @@ class SplineComp(ExplicitComponent):
             interp.x_interp = self.options['x_interp_val']
 
             try:
-                outputs[out_name] = interp.evaluate_spline(values)
+                outputs[out_name] = interp._evaluate_spline(values)
 
             except ValueError as err:
                 msg = "{}: Error interpolating output '{}':\n{}"

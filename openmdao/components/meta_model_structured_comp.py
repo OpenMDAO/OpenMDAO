@@ -7,13 +7,10 @@ from six.moves import range
 import numpy as np
 
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.components.interp_util.interp import InterpND
+from openmdao.components.interp_util.interp import InterpND, TABLE_METHODS
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation
-
-ALL_METHODS = ('cubic', 'slinear', 'lagrange2', 'lagrange3', 'akima',
-               'scipy_cubic', 'scipy_slinear', 'scipy_quintic')
 
 
 class MetaModelStructuredComp(ExplicitComponent):
@@ -75,7 +72,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                                   'training data should be computed.')
         self.options.declare('vec_size', types=int, default=1,
                              desc='Number of points to evaluate at once.')
-        self.options.declare('method', values=ALL_METHODS, default='scipy_cubic',
+        self.options.declare('method', values=TABLE_METHODS, default='scipy_cubic',
                              desc='Spline interpolation method to use for all outputs.')
 
     def add_input(self, name, val=1.0, training_data=None, **kwargs):
@@ -155,8 +152,8 @@ class MetaModelStructuredComp(ExplicitComponent):
             opts = self.options['interp_options']
         for name, train_data in iteritems(self.training_outputs):
             self.interps[name] = InterpND(self.params, train_data,
-                                          interp_method=interp_method,
-                                          bounds_error=not self.options['extrapolate'])
+                                          method=interp_method,
+                                          extrapolate=self.options['extrapolate'])
 
         if self.options['training_data_gradients']:
             self.grad_shape = tuple([self.options['vec_size']] + [i.size for i in self.params])
@@ -211,7 +208,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                 interp._compute_d_dvalues = True
 
             try:
-                val = interp.interpolate(pt)
+                val = interp._interpolate(pt)
 
             except OutOfBoundsError as err:
                 varname_causing_error = '.'.join((self.pathname, self.pnames[err.idx]))

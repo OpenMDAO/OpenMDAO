@@ -31,6 +31,10 @@ INTERP_METHODS = {
     'bsplines': InterpBSplines,
 }
 
+TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'scipy_cubic',
+                 'scipy_slinear', 'scipy_quintic']
+SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines']
+
 
 class InterpND(object):
     """
@@ -43,9 +47,9 @@ class InterpND(object):
 
     Attributes
     ----------
-    bounds_error : bool
-        If True, when interpolated values are requested outside of the domain of the input data,
-        a ValueError is raised. If False, then the methods are allowed to extrapolate.
+    extrapolate : bool
+        If False, when interpolated values are requested outside of the domain of the input data,
+        a ValueError is raised. If True, then the methods are allowed to extrapolate.
         Default is True (raise an exception).
     grid : tuple
         Collection of points that determine the regular grid.
@@ -77,7 +81,7 @@ class InterpND(object):
         Cache of current evaluation point.
     """
 
-    def __init__(self, points, values, interp_method="slinear", x_interp=None, bounds_error=True,
+    def __init__(self, method="slinear", points=None, values=None, x_interp=None, extrapolate=False,
                  **kwargs):
         """
         Initialize instance of interpolation class.
@@ -88,23 +92,23 @@ class InterpND(object):
             The points defining the regular grid in n dimensions.
         values : array_like, shape (m1, ..., mn, ...)
             The data on the regular grid in n dimensions.
-        interp_method : str or list of str, optional
+        method : str or list of str, optional
             Name of interpolation method(s).
         x_interp : ndarry or None
-            If we are always interpolating at a fixed set of increasing locations, then that can be
+            If we are always interpolating at a fixed set of locations, then they can be
             specified here.
-        bounds_error : bool, optional
-            If True, when interpolated values are requested outside of the domain of the input
-            data, a ValueError is raised. If False, then the methods are allowed to extrapolate.
+        extrapolate : bool
+            If False, when interpolated values are requested outside of the domain of the input data,
+            a ValueError is raised. If True, then the methods are allowed to extrapolate.
             Default is True (raise an exception).
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        if interp_method not in INTERP_METHODS:
+        if method not in INTERP_METHODS:
             all_m = ', '.join(['"' + m + '"' for m in INTERP_METHODS])
             raise ValueError('Interpolation method "%s" is not defined. Valid methods are '
-                             '%s.' % (interp_method, all_m))
-        self.bounds_error = bounds_error
+                             '%s.' % (method, all_m))
+        self.extrapolate = extrapolate
 
         if not hasattr(values, 'ndim'):
             # allow reasonable duck-typed values
@@ -119,7 +123,7 @@ class InterpND(object):
                 values = values.astype(float)
 
         if np.iscomplexobj(values[:]):
-            msg = "Interpolation method '%s' does not support complex values." % interp_method
+            msg = "Interpolation method '%s' does not support complex values." % method
             raise ValueError(msg)
 
         for i, p in enumerate(points):
@@ -145,20 +149,50 @@ class InterpND(object):
         self._compute_d_dvalues = False
 
         # Cache spline coefficients.
-        interp = INTERP_METHODS[interp_method]
+        interp = INTERP_METHODS[method]
 
-        if interp_method.startswith('scipy'):
-            kwargs['interp_method'] = interp_method
+        if method.startswith('scipy'):
+            kwargs['interp_method'] = method
 
-        table = interp(self.grid, self.values, interp, **kwargs)
+        table = interp(self.grid, values, interp, **kwargs)
         table.check_config()
         self.table = table
         self._interp = interp
         self._interp_options = kwargs
 
-    def interpolate(self, xi):
+    def interpolate(self, x, compute_derivatives=True):
         """
         Interpolate at the sample coordinates.
+
+        Parameters
+        ----------
+        x : ndarray of shape (..., ndim)
+            Location to provide interpolation.
+
+        Returns
+        -------
+        ndarray
+            Value of interpolant at all sample points.
+        ndarray
+            Value of derivative of interpolated output with respect to input x.
+        ndarray
+            Value of derivative of interpolated output with respect to values.
+        """
+        table = self.table
+        self._compute_d_dvalues = compute_derivatives
+
+        xnew = self._interpolate(x)
+
+        if compute_derivatives:
+            return xnew,
+        else:
+            return xnew
+
+    def _interpolate(self, xi):
+        """
+        Interpolate at the sample coordinates.
+
+        This method is called from OpenMDAO
 
         Parameters
         ----------
@@ -173,7 +207,7 @@ class InterpND(object):
         # cache latest evaluation point for gradient method's use later
         self._xi = xi
 
-        if self.bounds_error:
+        if not self.extrapolate:
             for i, p in enumerate(xi.T):
                 if np.isnan(p).any():
                     raise OutOfBoundsError("One of the requested xi contains a NaN",
@@ -230,9 +264,11 @@ class InterpND(object):
 
         return result
 
-    def evaluate_spline(self, values):
+    def _evaluate_spline(self, values):
         """
         Interpolate at all fixed output coordinates given the new table values.
+
+        This method is called from OpenMDAO.
 
         Parameters
         ----------
