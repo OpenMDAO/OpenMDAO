@@ -104,7 +104,10 @@ class InterpND(object):
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
-        if method not in INTERP_METHODS:
+        if not isinstance(method, str):
+            msg = "Argument 'method' should be a string."
+            raise ValueError(msg)
+        elif method not in INTERP_METHODS:
             all_m = ', '.join(['"' + m + '"' for m in INTERP_METHODS])
             raise ValueError('Interpolation method "%s" is not defined. Valid methods are '
                              '%s.' % (method, all_m))
@@ -179,7 +182,6 @@ class InterpND(object):
             Value of derivative of interpolated output with respect to values.
         """
         table = self.table
-        self._compute_d_dvalues = compute_derivatives
 
         xnew = self._interpolate(x)
 

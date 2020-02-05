@@ -142,8 +142,8 @@ class SplineComp(ExplicitComponent):
             # Separate data for each vec_size, but we only need to do sizing, so just pass
             # in the first.  Most interps aren't vectorized.
             cp_val = y_cp_val[0, :]
-            self.interps[y_interp_name] = InterpND(interp_method=interp_method,
-                                                   points=(grid, ), values=cp_val,
+            self.interps[y_interp_name] = InterpND(points=(grid, ), values=cp_val,
+                                                   method=interp_method,
                                                    x_interp=self.options['x_interp_val'],
                                                    extrapolate=True, **opts)
 

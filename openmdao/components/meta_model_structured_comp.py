@@ -151,8 +151,8 @@ class MetaModelStructuredComp(ExplicitComponent):
         if 'interp_options' in self.options:
             opts = self.options['interp_options']
         for name, train_data in iteritems(self.training_outputs):
-            self.interps[name] = InterpND(self.params, train_data,
-                                          method=interp_method,
+            self.interps[name] = InterpND(method=interp_method,
+                                          points=self.params, values=train_data,
                                           extrapolate=self.options['extrapolate'])
 
         if self.options['training_data_gradients']:
