@@ -201,7 +201,7 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if self.options['use_apply_nonlinear'] or (itercount < 1 and maxiter < 2):
 
-            # This option runs apply_linear to calculate the residuals, and thus ends up executing
+            # This option runs apply_nonlinear to calculate the residuals, and thus ends up executing
             # ExplicitComponents twice per iteration.
 
             self._recording_iter.push(('_run_apply', 0))

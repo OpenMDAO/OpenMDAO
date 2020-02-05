@@ -73,10 +73,10 @@ NonlinearBlockGS Option Examples
 **atol**
 
   Here, we set the absolute tolerance to a looser value that will trigger an earlier termination. After
-  each iteration, the norm of the residuals is calculated one of two ways. If the "use_apply_linear" option
+  each iteration, the norm of the residuals is calculated one of two ways. If the "use_apply_nonlinear" option
   is set to False (its default), then the norm is calculated by subtracting a cached previous value of the
-  outputs from the current value.  If "use_apply_linear" is True, then the norm is calculated by calling
-  apply_linear on all of the subsystems. In this case, `ExplicitComponents` are executed a second time.
+  outputs from the current value.  If "use_apply_nonlinear" is True, then the norm is calculated by calling
+  apply_nonlinear on all of the subsystems. In this case, `ExplicitComponents` are executed a second time.
   If this norm value is lower than the absolute tolerance `atol`, the iteration will terminate.
 
   .. embed-code::
@@ -86,10 +86,10 @@ NonlinearBlockGS Option Examples
 **rtol**
 
   Here, we set the relative tolerance to a looser value that will trigger an earlier termination. After
-  each iteration, the norm of the residuals is calculated one of two ways. If the "use_apply_linear" option
+  each iteration, the norm of the residuals is calculated one of two ways. If the "use_apply_nonlinear" option
   is set to False (its default), then the norm is calculated by subtracting a cached previous value of the
-  outputs from the current value.  If "use_apply_linear" is True, then the norm is calculated by calling
-  apply_linear on all of the subsystems. In this case, `ExplicitComponents` are executed a second time.
+  outputs from the current value.  If "use_apply_nonlinear" is True, then the norm is calculated by calling
+  apply_nonlinear on all of the subsystems. In this case, `ExplicitComponents` are executed a second time.
   If the ratio of the currently calculated norm to the initial residual norm is lower than the relative tolerance
   `rtol`, the iteration will terminate.
 
