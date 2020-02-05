@@ -77,21 +77,21 @@ class N2UserInterface {
 
         // Don't allow minimizing of root node
         if (node.depth > this.n2Diag.zoomedElement.depth || node.type !== "root") {
-        this.rightClickedNode = node;
+            this.rightClickedNode = node;
 
-        if (this.collapsedRightClickNode !== undefined) {
-            this.rightClickedNode = this.collapsedRightClickNode;
-            this.collapsedRightClickNode = undefined;
-        }
+            if (this.collapsedRightClickNode !== undefined) {
+                this.rightClickedNode = this.collapsedRightClickNode;
+                this.collapsedRightClickNode = undefined;
+            }
 
-        this.findRootOfChangeFunction = this.findRootOfChangeForRightClick.bind(
-            this
-        );
+            this.findRootOfChangeFunction = this.findRootOfChangeForRightClick.bind(
+                this
+            );
 
-        N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
-        this.lastClickWasLeft = false;
-        node.toggleMinimize();
-        this.n2Diag.update();
+            N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
+            this.lastClickWasLeft = false;
+            node.toggleMinimize();
+            this.n2Diag.update();
         }
     }
 
@@ -181,21 +181,21 @@ class N2UserInterface {
         if (node.collapsable) {
             this.leftClickedNode = node;
             this.forwardButtonHistory.push({ node: this.leftClickedNode });
-        this.collapse();
+            this.collapse();
         } else {
             this.n2Diag.dom.parentDiv.querySelector("#backButtonId").disabled =
-            this.backButtonHistory.length == 0 ? "disabled" : false;
+                this.backButtonHistory.length == 0 ? "disabled" : false;
             for (let obj = node; obj != null; obj = obj.parent) {
                 //make sure history item is not minimized
                 if (obj.isMinimized) return;
+            }
+
+            this.forwardButtonHistory.push({ node: this.n2Diag.zoomedElement });
+            this._setupLeftClick(node);
         }
 
-        this.forwardButtonHistory.push({ node: this.n2Diag.zoomedElement });
-        this._setupLeftClick(node);
-    }
-
-    this.backButtonHistory.pop();
-    this.n2Diag.update();
+        this.backButtonHistory.pop();
+        this.n2Diag.update();
     }
 
     /**
@@ -505,7 +505,7 @@ class N2UserInterface {
     /** Called when the search button is actually or effectively clicked to start a search. */
     searchButtonClicked() {
         testThis(this, 'N2UserInterface', 'searchButtonClicked');
-        
+
         this.n2Diag.search.performSearch();
 
         this.findRootOfChangeFunction = this.n2Diag.search.findRootOfChangeForSearch;
