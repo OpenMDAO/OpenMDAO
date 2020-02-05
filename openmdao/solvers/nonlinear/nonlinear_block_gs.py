@@ -68,7 +68,7 @@ class NonlinearBlockGS(NonlinearSolver):
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
         self.options.declare('use_apply_nonlinear', types=bool, default=False,
-                             desc="Set to True to always call apply_linear on the solver's system "
+                             desc="Set to True to always call apply_nonlinear on the solver's system "
                              "after solve_nonlinear has been called.")
 
     def _iter_initialize(self):
