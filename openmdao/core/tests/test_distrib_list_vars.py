@@ -79,8 +79,8 @@ class Summer(om.ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-@unittest.skipIf(PETScVector is None, "PETSc is required.")
 @unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipIf(PETScVector is None, "PETSc is required.")
 class DistributedListVarsTest(unittest.TestCase):
 
     N_PROCS = 2
@@ -271,6 +271,8 @@ class DistributedListVarsTest(unittest.TestCase):
             self.assertEqual(1, text.count('    obj'))
 
     def test_parallel_list_vars(self):
+        np.set_printoptions(linewidth=1024)
+
         prob = om.Problem(FanOutGrouped())
 
         # add another subsystem with similar prefix
@@ -422,6 +424,8 @@ class DistributedListVarsTest(unittest.TestCase):
     def test_distribcomp_list_vars(self):
         from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
+        np.set_printoptions(linewidth=1024)
+
         size = 15
 
         model = om.Group()
@@ -526,8 +530,7 @@ class DistributedListVarsTest(unittest.TestCase):
                 '---------  -------------------  -----  ------------',
                 'C2.outvec  |9.746794344808963|  (8,)   (15,)       ',
                 '           value:',
-                '           array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2., -3., -3., -3., -3., -3.,',
-                '                  -3., -3.])'
+                '           array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2., -3., -3., -3., -3., -3., -3., -3.])'
             ]
             for i, line in enumerate(expected):
                 if line and not line.startswith('-'):
@@ -568,7 +571,6 @@ class DistributedListVarsTest(unittest.TestCase):
                                  '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         assert_rel_error(self, prob['C3.out'], -5.)
-
 
 
 @unittest.skipUnless(PETScVector, "PETSc is required.")
