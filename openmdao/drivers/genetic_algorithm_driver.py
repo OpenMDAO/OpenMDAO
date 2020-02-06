@@ -813,8 +813,9 @@ class GeneticAlgorithm(object):
 
     def encode(self, x, vlb, vub, bits):
         """
-        Encode array of real values to array of binary arrays to represent a
-        single population member.
+        Encode array of real values to array of binary arrays.
+
+        The array of arrays represents a single population member.
 
         Parameters
         ----------
@@ -864,8 +865,9 @@ class GeneticAlgorithm(object):
 
     def from_gray(self, g):
         """
-        Convert a Gray coded binary array representing a single population member
-        to normal binary coding.
+        Convert a Gray coded binary array to normal binary coding.
+
+        The input and output arrays represent a single population member.
 
         Parameters
         ----------
