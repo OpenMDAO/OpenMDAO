@@ -104,9 +104,11 @@ class SimpleGADriver(Driver):
                              desc='If True, replace worst performing point with best from previous'
                              ' generation each iteration.')
         self.options.declare('gray', types=bool, default=False,
-                             desc='If True, use Gray code for binary encoding.')
+                             desc='If True, use Gray code for binary encoding. Gray coding makes'
+                             ' the binary representation of adjacent integers differ by one bit.')
         self.options.declare('cross_bits', types=bool, default=False,
-                             desc='If True, crossover swaps single bits instead the default k-point crossover.')
+                             desc='If True, crossover swaps single bits instead the default'
+                             ' k-point crossover.')
         self.options.declare('max_gen', default=100,
                              desc='Number of generations before termination.')
         self.options.declare('pop_size', default=0,
@@ -218,7 +220,7 @@ class SimpleGADriver(Driver):
         ga = self._ga
 
         ga.elite = self.options['elitism']
-        ga.grayCode = self.options['gray']
+        ga.gray_code = self.options['gray']
         ga.crossBits = self.options['cross_bits']
         pop_size = self.options['pop_size']
         max_gen = self.options['max_gen']
@@ -482,11 +484,11 @@ class GeneticAlgorithm(object):
         The MPI communicator that will be used objective evaluation for each generation.
     elite : bool
         Elitism flag.
-    grayCode : bool
+    gray_code : bool
         Gray code binary representation flag.
     crossBits : bool
-        Crossover swaps bits instead of tails flag. Swapping bits is similar to mutation, so when used
-        Pc should be increased and Pm reduced.
+        Crossover swaps bits instead of tails flag. Swapping bits is similar to mutation,
+        so when used Pc should be increased and Pm reduced.
     lchrom : int
         Chromosome length.
     model_mpi : None or tuple
@@ -520,7 +522,7 @@ class GeneticAlgorithm(object):
         self.lchrom = 0
         self.npop = 0
         self.elite = True
-        self.grayCode = False
+        self.gray_code = False
         self.crossBits = False
         self.model_mpi = model_mpi
 
@@ -793,9 +795,9 @@ class GeneticAlgorithm(object):
             Decoded design variable values.
         """
         pts = gen.copy()
-        if self.grayCode:
+        if self.gray_code:
             for i in range(np.shape(gen)[0]):
-               pts[i] = self.fromGray(gen[i])
+                pts[i] = self.from_gray(gen[i])
         num_desvar = len(bits)
         interval = (vub - vlb) / (2**bits - 1)
         x = np.empty((self.npop, num_desvar))
@@ -811,7 +813,8 @@ class GeneticAlgorithm(object):
 
     def encode(self, x, vlb, vub, bits):
         """
-        Encode array of real values to array of binary arrays to represent a single population member.
+        Encode array of real values to array of binary arrays to represent a
+        single population member.
 
         Parameters
         ----------
@@ -835,13 +838,14 @@ class GeneticAlgorithm(object):
         x = np.round((x - vlb) / interval).astype(np.int)
         byte_str = [("0" * b + bin(i)[2:])[-b:] for i, b in zip(x, bits)]
         result = np.array([int(c) for s in byte_str for c in s])
-        if self.grayCode:
-            result = self.toGray(result)
+        if self.gray_code:
+            result = self.to_gray(result)
         return result
 
-    def toGray(self, g):
+    def to_gray(self, g):
         """
-        Convert a Gray coded binary array representing a single population member to normal binary coding.
+        Convert a Gray coded binary array representing a single population member
+        to normal binary coding.
 
         Parameters
         ----------
@@ -853,13 +857,13 @@ class GeneticAlgorithm(object):
         ndarray
             Binary array using normal coding, e.g. np.array([0, 0, 1, 1]).
         """
-        s = ''.join([str(x) for x in g])                   # convert to binary string: '0010'
-        i = int(s, 2)                                      # convert to Integer: 2
-        gi = i ^ (i >> 1)                                  # compute gray code Integer: 3
-        gs = np.binary_repr(gi, len(g))                    # convert to binary string: '0011'
-        return np.array([0 if q=='0' else 1 for q in gs])  # convert to np.array: [0, 0, 1, 1]
+        s = ''.join([str(x) for x in g])                     # convert to binary string: '0010'
+        i = int(s, 2)                                        # convert to Integer: 2
+        gi = i ^ (i >> 1)                                    # compute gray code Integer: 3
+        gs = np.binary_repr(gi, len(g))                      # convert to binary string: '0011'
+        return np.array([0 if q == '0' else 1 for q in gs])  # convert to np.array: [0, 0, 1, 1]
 
-    def fromGray(self, g):
+    def from_gray(self, g):
         """
         Convert a binary array representing a single population member to Gray code.
 
@@ -875,6 +879,6 @@ class GeneticAlgorithm(object):
         """
         b = g.copy()
         for i in range(1, len(g)):
-            prevInv = 1 if b[i-1] == 0 else 0
-            b[i] = b[i-1] if g[i] == 0 else prevInv
+            prev = 1 if b[i - 1] == 0 else 0
+            b[i] = b[i - 1] if g[i] == 0 else prev
         return b

@@ -14,7 +14,7 @@ from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 
-debugPrints = False  # enable printing results
+extra_prints = False  # enable printing results
 
 class TestSimpleGA(unittest.TestCase):
 
@@ -67,7 +67,7 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('obj.f', prob['obj.f'])
             print('px.x', prob['px.x'])
 
@@ -100,7 +100,7 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
 
         # Optimal solution
@@ -133,7 +133,7 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
             print('p.xI', prob['p.xI'])
 
@@ -194,7 +194,7 @@ class TestSimpleGA(unittest.TestCase):
         prob['area3'] = 0.0005
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('mass', prob['mass'])
             print('mat1', prob['mat1'])
             print('mat2', prob['mat2'])
@@ -262,7 +262,7 @@ class TestSimpleGA(unittest.TestCase):
         prob['area3'] = 0.0005
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('mass', prob['mass'])
             print('mat1', prob['mat1'])
             print('mat2', prob['mat2'])
@@ -343,7 +343,7 @@ class TestSimpleGA(unittest.TestCase):
 
         ga.npop = 2
         ga.lchrom = int(np.sum(bits))
-        ga.grayCode = True
+        ga.gray_code = True
         np.testing.assert_array_almost_equal(x, ga.decode(gen, vlb, vub, bits))
         np.testing.assert_array_almost_equal(gen[0], ga.encode(x[0], vlb, vub, bits))
         np.testing.assert_array_almost_equal(gen[1], ga.encode(x[1], vlb, vub, bits))
@@ -378,7 +378,7 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('indeps.x', prob['indeps.x'])
             print('indeps.y', prob['indeps.y'])
 
@@ -426,7 +426,7 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('x', prob['x'])
 
         # Check that the constraint is satisfied (x >= 1)
@@ -524,7 +524,7 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         w1 = prob['width']
         h1 = prob['height']
 
-        if debugPrints:
+        if extra_prints:
             print('Box dims: ', l1, w1, h1)
             print('Front and top area: ', front, top)
             print('Volume: ', prob['volume'])  # should be around 1
@@ -565,7 +565,7 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         w2 = prob2['width']
         h2 = prob2['height']
 
-        if debugPrints:
+        if extra_prints:
             print('Box dims: ', l2, w2, h2)
             print('Front and top area: ', front2, top2)
             print('Volume: ', prob['volume'])  # should be around 1
@@ -623,7 +623,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
             print('height', prob['height'])  # exact solution is 2*radius
             print('Area', prob['Area'])
@@ -678,7 +678,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
             print('height', prob['height'])  # exact solution is 2*radius
             print('Area', prob['Area'])
@@ -732,7 +732,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
             print('height', prob['height'])  # exact solution is 2*radius
             print('Area', prob['Area'])
@@ -779,7 +779,7 @@ class MPITestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
             print('p2.xI', prob['p2.xI'])
 
@@ -823,7 +823,7 @@ class MPITestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
             print('p2.xI', prob['p2.xI'])
 
@@ -887,7 +887,7 @@ class MPITestSimpleGA(unittest.TestCase):
         prob['area3'] = 0.0005
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('mass', prob['mass'])
             print('mat1', prob['mat1'])
             print('mat2', prob['mat2'])
@@ -1059,7 +1059,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
             print('p2.xI', prob['p2.xI'])
 
@@ -1180,7 +1180,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
             print('p2.xI', prob['p2.xI'])
             print('p1.xC', prob['p1.xC'])
@@ -1211,7 +1211,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
 
         # Optimal solution
@@ -1243,7 +1243,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
             print('p2.xI', prob['p2.xI'])
             print('p1.xC', prob['p1.xC'])
@@ -1274,7 +1274,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
             print('p2.xI', prob['p2.xI'])
             print('p1.xC', prob['p1.xC'])
@@ -1323,7 +1323,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        if debugPrints:
+        if extra_prints:
             print('radius', prob['radius'])
             print('height', prob['height'])
 
@@ -1372,7 +1372,7 @@ class MPIFeatureTests(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
             print('p2.xI', prob['p2.xI'])
             print('p1.xC', prob['p1.xC'])
@@ -1430,7 +1430,7 @@ class MPIFeatureTests4(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        if debugPrints:
+        if extra_prints:
             print('comp.f', prob['comp.f'])
             print('p2.xI', prob['p2.xI'])
             print('p1.xC', prob['p1.xC'])
