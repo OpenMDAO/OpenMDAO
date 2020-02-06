@@ -81,6 +81,7 @@ class Summer(om.ExplicitComponent):
 
 @unittest.skipUnless(MPI, "MPI is required.")
 @unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedListVarsTest(unittest.TestCase):
 
     N_PROCS = 2
