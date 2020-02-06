@@ -221,7 +221,7 @@ class SimpleGADriver(Driver):
 
         ga.elite = self.options['elitism']
         ga.gray_code = self.options['gray']
-        ga.crossBits = self.options['cross_bits']
+        ga.cross_bits = self.options['cross_bits']
         pop_size = self.options['pop_size']
         max_gen = self.options['max_gen']
         user_bits = self.options['bits']
@@ -486,7 +486,7 @@ class GeneticAlgorithm(object):
         Elitism flag.
     gray_code : bool
         Gray code binary representation flag.
-    crossBits : bool
+    cross_bits : bool
         Crossover swaps bits instead of tails flag. Swapping bits is similar to mutation,
         so when used Pc should be increased and Pm reduced.
     lchrom : int
@@ -523,7 +523,7 @@ class GeneticAlgorithm(object):
         self.npop = 0
         self.elite = True
         self.gray_code = False
-        self.crossBits = False
+        self.cross_bits = False
         self.model_mpi = model_mpi
 
     def execute_ga(self, x0, vlb, vub, vob, bits, pop_size, max_gen, random_state, Pm=None, Pc=0.5):
@@ -720,7 +720,7 @@ class GeneticAlgorithm(object):
         for ii, jj in zip(idx, idy):
             i = 2 * ii
             j = i + 1
-            if self.crossBits:  # swap single bit
+            if self.cross_bits:  # swap single bit
                 new_gen[i][jj] = old_gen[j][jj]
                 new_gen[j][jj] = old_gen[i][jj]
             else:               # swap remainder
