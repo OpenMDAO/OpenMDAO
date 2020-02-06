@@ -176,8 +176,8 @@ class PETScTransfer(DefaultTransfer):
                     isub = sub_inds[sub_in]
                     fwd_xfer_in[isub].append(input_inds)
                     fwd_xfer_out[isub].append(output_inds)
-                    print('petsc', group.comm.rank, "[%s]" % vec_name, group.pathname, abs_out, output_inds, '-->',
-                            abs_in, input_inds)
+                    # print('petsc', group.comm.rank, "[%s]" % vec_name, group.pathname, abs_out,
+                    #       output_inds, '-->', abs_in, input_inds)
                     if rev:
                         sub_out = abs_out[mypathlen:].split('.', 1)[0]
                         isub = sub_inds[sub_out]

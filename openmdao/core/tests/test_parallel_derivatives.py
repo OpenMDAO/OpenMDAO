@@ -384,6 +384,7 @@ class IndicesTestCase(unittest.TestCase):
 
     def test_indices_rev(self):
         prob = self.setup_model('rev')
+        import wingdbstub
         J = prob.compute_totals(['c4.y', 'c5.y'], ['p.x'],
                                 return_format='flat_dict')
 

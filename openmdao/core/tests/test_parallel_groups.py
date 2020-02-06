@@ -405,6 +405,7 @@ class MatMatParDevTestCase(unittest.TestCase):
         par.add_objective('C2.y')
         par.add_constraint('C1.y', lower=0.0)
         p.setup(mode='fwd')
+
         p.run_model()
 
         # prior to bug fix, this would raise an exception
