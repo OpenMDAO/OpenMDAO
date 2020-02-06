@@ -219,7 +219,7 @@ global shape of a variable as well as the shape on the current processor.  Note 
 available until after the model has been completely set up and run.
 
 .. embed-code::
-  openmdao.core.tests.test_distribcomp.MPIFeatureTests.test_distribcomp_list_feature
+  openmdao.core.tests.test_distrib_list_vars.MPIFeatureTests.test_distribcomp_list_feature
   :layout: interleave
 
 

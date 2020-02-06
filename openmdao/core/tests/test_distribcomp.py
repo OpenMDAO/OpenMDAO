@@ -862,43 +862,6 @@ class MPIFeatureTests(unittest.TestCase):
                          2*np.ones((8,)) if model.comm.rank == 0 else -3*np.ones((7,)))
         assert_rel_error(self, prob['C3.out'], -5.)
 
-    def test_distribcomp_list_feature(self):
-        import numpy as np
-        import openmdao.api as om
-        from openmdao.test_suite.components.distributed_components import DistribComp, Summer
-
-        size = 15
-
-        model = om.Group()
-        model.add_subsystem("indep", om.IndepVarComp('x', np.zeros(size)))
-        model.add_subsystem("C2", DistribComp(size=size))
-        model.add_subsystem("C3", Summer(size=size))
-
-        model.connect('indep.x', 'C2.invec')
-        model.connect('C2.outvec', 'C3.invec')
-
-        prob = om.Problem(model)
-        prob.setup()
-
-        # prior to model execution, the global shape of a distributed variable is not available
-        # and only the local portion of the value is available
-        model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True)
-        model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True)
-
-        prob['indep.x'] = np.ones(size)
-        prob.run_model()
-
-        # after model execution, the global shape of a distributed variable is available
-        # and the complete global value is available
-        model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True)
-        model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True)
-
-        # note that the shape of the input variable for the non-distributed Summer component
-        # is different on each processor, use the all_procs argument to display on all processors
-        model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, print_arrays=True, all_procs=True)
-
-        assert_rel_error(self, prob['C3.out'], -5.)
-
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestGroupMPI(unittest.TestCase):
