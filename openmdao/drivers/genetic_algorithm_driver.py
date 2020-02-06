@@ -844,18 +844,17 @@ class GeneticAlgorithm(object):
 
     def to_gray(self, g):
         """
-        Convert a Gray coded binary array representing a single population member
-        to normal binary coding.
+        Convert a binary array representing a single population member to Gray code.
 
         Parameters
         ----------
         g : binary array
-            Gray coded binary array, e.g. np.array([0, 0, 1, 0]).
+             Normal binary array, e.g. np.array([0, 0, 1, 0]).
 
         Returns
         -------
         ndarray
-            Binary array using normal coding, e.g. np.array([0, 0, 1, 1]).
+            Binary array using Gray code, e.g. np.array([0, 0, 1, 1]).
         """
         s = ''.join([str(x) for x in g])                     # convert to binary string: '0010'
         i = int(s, 2)                                        # convert to Integer: 2
@@ -865,17 +864,18 @@ class GeneticAlgorithm(object):
 
     def from_gray(self, g):
         """
-        Convert a binary array representing a single population member to Gray code.
+        Convert a Gray coded binary array representing a single population member
+        to normal binary coding.
 
         Parameters
         ----------
         g : binary array
-            Normal binary array, e.g. np.array([0, 0, 1, 1]).
+            Gray coded binary array, e.g. np.array([0, 0, 1, 1]).
 
         Returns
         -------
         ndarray
-            Binary array using Gray code, e.g. np.array([0, 0, 1, 0]).
+            Binary array using normal coding, e.g. np.array([0, 0, 1, 0]).
         """
         b = g.copy()
         for i in range(1, len(g)):
