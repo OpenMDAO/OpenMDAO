@@ -151,6 +151,20 @@ class SqliteRecorder(CaseRecorder):
 
         super(SqliteRecorder, self).__init__(record_viewer_data)
 
+    # def __getstate__(self):
+    #     """
+    #     Return state as a dict.
+
+    #     Returns
+    #     -------
+    #     dict
+    #         State to get.
+    #     """
+    #     state = self.__dict__.copy()
+    #     if state['user_options']['_dict']:
+    #         del state['user_options']['_dict']
+    #     return state
+
     def _initialize_database(self):
         """
         Initialize the database.
@@ -593,14 +607,12 @@ class SqliteRecorder(CaseRecorder):
             # try to pickle the metadata, report if it failed
             try:
                 pickled_metadata = pickle.dumps(user_options, self._pickle_version)
-            except Exception:
+            except pickle.PicklingError:
                 pickled_metadata = pickle.dumps(OptionsDictionary(), self._pickle_version)
-                simple_warning("Trying to record options which cannot be pickled "
-                               "on system with name: %s. Use the 'options_excludes' "
-                               "recording option on system objects to avoid attempting "
-                               "to record options which cannot be pickled. Skipping "
-                               "recording options for this system." % recording_requester.name,
-                               RuntimeWarning)
+                simple_warning("Trying to record options which cannot be pickled on system %s."
+                               "Check the system for options which is unpickleable and set "
+                               "'pickleable' to False. Skipping recording options for this system."
+                               % recording_requester.msginfo)
 
             path = recording_requester.pathname
             if not path:

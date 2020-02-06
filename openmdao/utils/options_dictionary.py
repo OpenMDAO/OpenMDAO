@@ -44,6 +44,23 @@ class OptionsDictionary(object):
         self._parent_name = parent_name
         self._read_only = read_only
 
+    def __getstate__(self):
+        """
+        Return state as a dict.
+
+        Returns
+        -------
+        dict
+            State to get.
+        """
+        state = self.__dict__.copy()
+        user_options = state['_dict'].copy()
+        for i in user_options.copy():
+            if not user_options[i]['pickleable']:
+                del user_options[i]
+
+        return user_options
+
     def __repr__(self):
         """
         Return a dictionary representation of the options.
@@ -266,7 +283,7 @@ class OptionsDictionary(object):
             meta['check_valid'](name, value)
 
     def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
-                upper=None, lower=None, check_valid=None, allow_none=False):
+                upper=None, lower=None, check_valid=None, allow_none=False, pickleable=True):
         r"""
         Declare an option.
 
@@ -330,6 +347,7 @@ class OptionsDictionary(object):
             'check_valid': check_valid,
             'has_been_set': default_provided,
             'allow_none': allow_none,
+            'pickleable': pickleable,
         }
 
         # If a default is given, check for validity

@@ -97,6 +97,30 @@ class TestBalanceComp(unittest.TestCase):
         for (of, wrt) in cpd['balance']:
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
+    def test_balance_comp_options_exclude(self):
+
+        prob = om.Problem()
+
+        bal = om.BalanceComp()
+        bal.add_balance('x', val=1.0)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        recorder = om.SqliteRecorder('cases.sql')
+
+        prob.model.add_recorder(recorder)
+
+        prob.model.recording_options['record_inputs'] = True
+        prob.model.recording_options['record_outputs'] = True
+        prob.model.recording_options['record_residuals'] = True
+        prob.model.recording_options['record_metadata'] = False
+        prob.model.recording_options['options_excludes'] = ['*']
+
+        prob.setup()
+
+        prob.run_model()
+
+
     def test_create_on_init_no_normalization(self):
 
         prob = om.Problem()
