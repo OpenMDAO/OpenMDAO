@@ -3574,6 +3574,7 @@ class System(object):
                                         else:
                                             distrib[key][name] = np.append(distrib[key][name],
                                                                            proc_vars[name][key])
+
                                         if rank == self.comm.size - 1:
                                             if distrib[key][name].shape == global_shape:
                                                 var_dict[name][key] = distrib[key][name]
