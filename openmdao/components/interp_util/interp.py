@@ -67,7 +67,7 @@ class InterpND(object):
     _d_dx : ndarray
         Cache of computed gradients with respect to evaluation point.
     _d_dgrid : ndarray
-        Cache of computed gradients with respect to grid.
+        Cache of computed gradients with respect to grid. Currently not supported.
     _d_dvalues : ndarray
         Cache of computed gradients with respect to table values.
     _interp : class
@@ -82,14 +82,15 @@ class InterpND(object):
     """
 
     def __init__(self, method="slinear", points=None, values=None, x_interp=None, extrapolate=False,
-                 **kwargs):
+                 num_cp=None, **kwargs):
         """
         Initialize instance of interpolation class.
 
         Parameters
         ----------
-        points : tuple of ndarray of float, with shapes (m1, ), ..., (mn, )
-            The points defining the regular grid in n dimensions.
+        points : ndarray or tuple of ndarray of float, with shapes (m1, ), ..., (mn, )
+            The points defining the regular grid in n dimensions.  For 1D interpolation, this
+            can be an ndarray.
         values : array_like, shape (m1, ..., mn, ...)
             The data on the regular grid in n dimensions.
         method : str or list of str, optional
@@ -101,6 +102,9 @@ class InterpND(object):
             If False, when interpolated values are requested outside of the domain of the input data,
             a ValueError is raised. If True, then the methods are allowed to extrapolate.
             Default is True (raise an exception).
+        num_cp : None or int
+            Optional. When specified, use a linear distribution of num_cp control points. If you
+            are using 'bsplines' as the method, then num_cp must be set instead of points.
         **kwargs : dict
             Interpolator-specific options to pass onward.
         """
@@ -113,33 +117,46 @@ class InterpND(object):
                              '%s.' % (method, all_m))
         self.extrapolate = extrapolate
 
-        if not hasattr(values, 'ndim'):
-            # allow reasonable duck-typed values
-            values = np.asarray(values)
+        if x_interp is None:
 
-        if len(points) > values.ndim:
-            raise ValueError("There are %d point arrays, but values has %d "
-                             "dimensions" % (len(points), values.ndim))
+            if not hasattr(values, 'ndim'):
+                # allow reasonable duck-typed values
+                values = np.asarray(values)
 
-        if hasattr(values, 'dtype') and hasattr(values, 'astype'):
-            if not np.issubdtype(values.dtype, np.inexact):
-                values = values.astype(float)
+            if hasattr(values, 'dtype') and hasattr(values, 'astype'):
+                if not np.issubdtype(values.dtype, np.inexact):
+                    values = values.astype(float)
 
-        if np.iscomplexobj(values[:]):
-            msg = "Interpolation method '%s' does not support complex values." % method
-            raise ValueError(msg)
+            if len(points) > values.ndim:
+                raise ValueError("There are %d point arrays, but values has %d "
+                                 "dimensions" % (len(points), values.ndim))
 
-        for i, p in enumerate(points):
-            n_p = len(p)
-            if not np.all(np.diff(p) > 0.):
-                raise ValueError("The points in dimension %d must be strictly "
-                                 "ascending" % i)
-            if not np.asarray(p).ndim == 1:
-                raise ValueError("The points in dimension %d must be "
-                                 "1-dimensional" % i)
-            if not values.shape[i] == n_p:
-                raise ValueError("There are %d points and %d values in "
-                                 "dimension %d" % (len(p), values.shape[i], i))
+            if np.iscomplexobj(values[:]):
+                msg = "Interpolation method '%s' does not support complex values." % method
+                raise ValueError(msg)
+
+        if points is None:
+            if num_cp is not None:
+                points = [np.linspace(0.0, 1.0, num_cp)]
+            else:
+                msg = "Either 'points' or 'num_cp' must be specified."
+                raise ValueError(msg)
+        else:
+
+            if isinstance(points, np.ndarray):
+                points = [points]
+
+            for i, p in enumerate(points):
+                n_p = len(p)
+                if not np.all(np.diff(p) > 0.):
+                    raise ValueError("The points in dimension %d must be strictly "
+                                     "ascending" % i)
+                if not np.asarray(p).ndim == 1:
+                    raise ValueError("The points in dimension %d must be "
+                                     "1-dimensional" % i)
+                if values is not None and not values.shape[i] == n_p:
+                    raise ValueError("There are %d points and %d values in "
+                                     "dimension %d" % (len(p), values.shape[i], i))
 
         self.grid = tuple([np.asarray(p) for p in points])
         self.values = values
@@ -163,7 +180,7 @@ class InterpND(object):
         self._interp = interp
         self._interp_options = kwargs
 
-    def interpolate(self, x, compute_derivatives=True):
+    def interpolate(self, x, compute_derivative=False):
         """
         Interpolate at the sample coordinates.
 
@@ -171,24 +188,56 @@ class InterpND(object):
         ----------
         x : ndarray of shape (..., ndim)
             Location to provide interpolation.
+        compute_derivative : bool
+            Set to True to compute derivatives with respect to x.
 
         Returns
         -------
         ndarray
             Value of interpolant at all sample points.
         ndarray
-            Value of derivative of interpolated output with respect to input x.
-        ndarray
-            Value of derivative of interpolated output with respect to values.
+            Value of derivative of interpolated output with respect to input x. (Only when
+            compute_derivative is True.)
         """
         table = self.table
 
-        xnew = self._interpolate(x)
+        xnew = self._interpolate(np.atleast_1d(x))
 
-        if compute_derivatives:
-            return xnew,
+        if compute_derivative:
+            return xnew, self._d_dx
         else:
             return xnew
+
+    def evaluate_spline(self, values, compute_derivative=False):
+        """
+        Interpolate at all fixed output coordinates given the new table values.
+
+        Parameters
+        ----------
+        values : ndarray(n_points)
+            The data on the regular grid in n dimensions.
+        compute_derivative : bool
+            Set to True to compute derivatives with respect to x.
+
+        Returns
+        -------
+        ndarray
+            Value of interpolant at all sample points.
+        ndarray
+            Value of derivative of interpolated output with respect to values.
+        """
+        if compute_derivative:
+            self._d_dvalues = True
+
+        if len(values.shape) == 1:
+            values = np.expand_dims(values, axis=0)
+
+        result = self._evaluate_spline(values)
+
+        if compute_derivative:
+            return result, self._d_dx
+        else:
+            return result
 
     def _interpolate(self, xi):
         """

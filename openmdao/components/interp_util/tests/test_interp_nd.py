@@ -6,8 +6,7 @@ from copy import deepcopy
 import unittest
 
 import numpy as np
-from numpy.testing import assert_array_almost_equal, assert_allclose, \
-                          assert_almost_equal, assert_array_equal
+from numpy.testing import assert_array_almost_equal, assert_almost_equal, assert_array_equal
 
 from openmdao.components.interp_util.interp import InterpND
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
@@ -35,10 +34,8 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
         n = 50
         x = np.linspace(1.0, 12.0, n)
 
-        akima_options = {'delta_x': 0.1}
-        interp = InterpND(method='akima', points=[xcp], values=ycp, x_interp=x,
-                          extrapolate=False, **akima_options)
-        y = interp.evaluate_spline(np.expand_dims(ycp, axis=0))
+        interp = InterpND(method='akima', points=xcp, x_interp=x, delta_x=0.1)
+        y = interp.evaluate_spline(ycp)
 
         akima_y = np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
                             12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
@@ -66,18 +63,18 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
         interp = InterpND(method='bsplines', num_cp=6, x_interp=x)
 
-        y = interp.evaluate_spline(np.expand_dims(ycp, axis=0))
+        y = interp.evaluate_spline(ycp)
 
-        akima_y = np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
-                            12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
-                            13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,
-                            14.36710105, 14.59128625, 14.81544619, 15.03965664, 15.26399335,
-                            15.48853209, 15.7133486 , 15.93851866, 16.16573502, 16.39927111,
-                            16.63928669, 16.8857123 , 17.1384785 , 17.39751585, 17.66275489,
-                            17.93412619, 18.21156029, 18.49498776, 18.78433915, 19.07954501,
-                            19.38053589, 19.68724235, 19.99959495, 20.31752423, 20.64096076,
-                            20.96983509, 21.37579297, 21.94811407, 22.66809748, 23.51629844,
-                            24.47327219, 25.51957398, 26.63575905, 27.80238264, 29.        ]])
+        akima_y = np.array([[ 9.21614583,  9.90911525, 10.52244151, 11.06231159, 11.53491244,
+                              11.94643105, 12.30305438, 12.61096939, 12.87636305, 13.10542234,
+                              13.30433422, 13.47928566, 13.63646363, 13.7820551 , 13.92203064,
+                              14.05954727, 14.19579437, 14.33192094, 14.46907599, 14.60840854,
+                              14.75106758, 14.89820214, 15.05096121, 15.2104938 , 15.37794893,
+                              15.5544756 , 15.74122282, 15.9393396 , 16.14997495, 16.37427787,
+                              16.61339737, 16.86848247, 17.14102103, 17.43486416, 17.75486932,
+                              18.10589772, 18.49281052, 18.92046894, 19.39373414, 19.91746734,
+                              20.4965297 , 21.13578243, 21.8400867 , 22.61430372, 23.46329467,
+                              24.39192074, 25.40504312, 26.507523  , 27.70422156, 29.        ]])
 
         assert_array_almost_equal(akima_y.flatten(), y.flatten())
 
@@ -96,17 +93,41 @@ class TestInterpNDPython(unittest.TestCase):
             "scipy_cubic": 3,
             "scipy_quintic": 5,
         }
-        self.valid_methods = self.interp_configs.keys()
+        self.spline_configs = {
+            "slinear": 2,
+            "cubic": 3,
+            "lagrange2": 3,
+            "lagrange3": 4,
+            "akima": 4,
+            "bsplines": 4,
+        }
+        self.interp_methods = self.interp_configs.keys()
         self.tol = {
             "slinear": 5e-2,
             "lagrange2": 5e-2,
             "lagrange3": 1e-4,
             "cubic": 1e-4,
             "akima": 1e-3,
+            "bsplines": 1e-1,
             "scipy_slinear": 5e-2,
             "scipy_cubic": 1e-4,
             "scipy_quintic": 1e-6,
         }
+
+    def _get_sample_1d(self):
+        # test problem with enough points for smooth spline fits
+        def f(u):
+            return 2.0 * np.cos(u)
+
+        def df(u):
+            return -2.0 * np.sin(u)
+
+        # uniformly spaced axis
+        u = np.linspace(0, 3, 50)
+
+        points = [u]
+        values = f(u)
+        return points, values, f, df
 
     def _get_sample_2d(self):
         # test problem with enough points for smooth spline fits
@@ -144,14 +165,36 @@ class TestInterpNDPython(unittest.TestCase):
         return points, values
 
     def test_minimum_required_gridsize(self):
-        for method in self.valid_methods:
+        for method in self.interp_methods:
+
+            # Scipy does order reduction as needed.
+            if method.startswith('scipy'):
+                continue
+
             k = self.interp_configs[method] - 1
             x = np.linspace(0, 1, k)
             y = np.linspace(0, 1, k)
             points = [x, y]
             X, Y = np.meshgrid(*points, indexing='ij')
             values = X + Y
-            self.assertRaises(ValueError, InterpND, points, values, method)
+            #self.assertRaises(ValueError, InterpND, points, values, method)
+            with self.assertRaises(ValueError) as cm:
+                interp = InterpND(method=method, points=points, values=values)
+
+            msg = 'There are {} points in a data dimension, but method'.format(k)
+            self.assertTrue(str(cm.exception).startswith(msg))
+
+    def test_spline_single_dim(self):
+        # test interpolated values
+        points, values, func, df = self._get_sample_1d()
+        np.random.seed(1)
+        test_pt = 0.76
+        actual = func(test_pt)
+        for method in self.interp_methods:
+            interp = InterpND(method=method, points=points, values=values)
+            computed = interp.interpolate(test_pt)
+            r_err = rel_error(actual, computed)
+            assert r_err < self.tol[method]
 
     def test_spline_xi1d(self):
         # test interpolated values
@@ -159,7 +202,7 @@ class TestInterpNDPython(unittest.TestCase):
         np.random.seed(1)
         test_pt = np.random.uniform(0, 3, 2)
         actual = func(*test_pt)
-        for method in self.valid_methods:
+        for method in self.interp_methods:
             interp = InterpND(method=method, points=points, values=values)
             computed = interp.interpolate(test_pt)
             r_err = rel_error(actual, computed)
@@ -172,13 +215,13 @@ class TestInterpNDPython(unittest.TestCase):
         actual = func(*test_pt)
         gradient = np.array(df(*test_pt))
         tol = 1e-1
-        for method in self.valid_methods:
+        for method in self.interp_methods:
             k = self.interp_configs[method]
             if method == 'slinear':
                 tol = 2
             interp = InterpND(method=method, points=points, values=values,
                               extrapolate=True)
-            computed = interp.interpolate(test_pt)
+            computed, computed_grad = interp.interpolate(test_pt, compute_derivative=True)
             computed_grad = interp.gradient(test_pt)
             r_err = rel_error(actual, computed)
             assert r_err < tol
@@ -192,7 +235,7 @@ class TestInterpNDPython(unittest.TestCase):
         np.random.seed(1)
         test_pt = np.random.uniform(0, 3, 6).reshape(3, 2)
         actual = func(*test_pt.T)
-        for method in self.valid_methods:
+        for method in self.interp_methods:
             interp = InterpND(method=method, points=points, values=values)
             computed = interp.interpolate(test_pt)
             r_err = rel_error(actual, computed)
@@ -221,8 +264,8 @@ class TestInterpNDPython(unittest.TestCase):
 
         # Now, test newer interface for order_reducing spline.
 
-        interp = InterpND(method='akima', points=(t, ), values=x, x_interp=tt.reshape((n_point, 1)))
-        computed = interp.evaluate_spline(x.reshape((1, 80)))
+        interp = InterpND(method='akima', points=t, x_interp=tt)
+        computed = interp.evaluate_spline(x)
 
         x_expected = np.sin(tt)
         delta = computed.flatten() - x_expected
@@ -231,6 +274,35 @@ class TestInterpNDPython(unittest.TestCase):
         self.assertLess(max(delta), .15)
         # And that it gets middle points a little better.
         self.assertLess(max(delta[15:-15]), .06)
+
+    def test_spline_deriv_xi1d(self):
+        # tests gradient values
+        points, values, func, df = self._get_sample_2d()
+        np.random.seed(1234)
+        test_pt = np.random.uniform(0, 3, 2)
+        actual = np.array(df(*test_pt))
+        for method in self.interp_methods:
+            interp = InterpND(method=method,points=points, values=values)
+            computed = interp.gradient(test_pt)
+            r_err = rel_error(actual, computed)
+            assert r_err < 2.5 * self.tol[method]
+
+            # test that gradients have been cached
+            assert_array_equal(interp._xi, test_pt)
+            assert_array_equal(
+                interp._d_dx.flatten(), computed.flatten())
+
+    def test_gradients_returned_by_xi(self):
+        # verifies that gradients with respect to xi are returned if cached
+        points, values, func, df = self._get_sample_2d()
+        np.random.seed(4321)
+        for method in self.interp_methods:
+            interp = InterpND(method=method, points=points, values=values)
+            x = np.array([0.9, 0.1])
+            interp._xi = x
+            dy = np.array([0.997901, 0.08915])
+            interp._d_dx = dy
+            assert_almost_equal(interp.gradient(x), dy)
 
     def test_bsplines_interpolating_spline(self):
         n_cp = 80
@@ -243,8 +315,8 @@ class TestInterpNDPython(unittest.TestCase):
 
         # Now, test newer interface for order_reducing spline.
 
-        interp = InterpND(method='bsplines', points=(t, ), values=x, x_interp=tt.reshape((n_point, 1)))
-        computed = interp.evaluate_spline(x.reshape((1, 80)))
+        interp = InterpND(method='bsplines', points=t, x_interp=tt)
+        computed = interp.evaluate_spline(x)
 
         x_expected = np.sin(tt)
         delta = computed.flatten() - x_expected
@@ -253,6 +325,44 @@ class TestInterpNDPython(unittest.TestCase):
         self.assertLess(max(delta), .15)
         # And that it gets middle points a little better.
         self.assertLess(max(delta[15:-15]), .06)
+
+    def test_scipy_auto_reduce_spline_order(self):
+        # if a spline method is used and spline_dim_error=False and a dimension
+        # does not have enough points, the spline order for that dimension
+        # should be automatically reduced
+        np.random.seed(314)
+
+        # x dimension is too small for cubic, should fall back to linear
+        x = [0, 1]
+        y = np.linspace(-10, 4, 10)
+        z = np.linspace(1000, 2000, 20)
+
+        points = [x, y, z]
+        values = np.random.randn(2, 10, 20)
+
+        interp = InterpND(method='scipy_cubic', points=points, values=values)
+
+        # first dimension (x) should be reduced to k=1 (linear)
+        self.assertEqual(interp.table._ki[0], 1)
+
+        # should operate as normal
+        x = np.array([0.5, 0, 1001])
+        result = interp.interpolate(x)
+        assert_almost_equal(result, -0.046325695741704434, decimal=5)
+
+        interp = InterpND(method='scipy_slinear', points=points, values=values)
+        value1 = interp.interpolate(x)
+
+        # cycle through different methods that require order reduction
+        # in the first dimension
+        interp = InterpND(method='scipy_quintic', points=points, values=values)
+        value2, grad2 = interp.interpolate(x, compute_derivative=True)
+        interp = InterpND(method='scipy_cubic', points=points, values=values)
+        value3, grad3 = interp.interpolate(x, compute_derivative=True)
+
+        # values from different methods should be different
+        self.assertTrue(value1[0] != value2[0])
+        self.assertTrue(value2[0] != value3[0])
 
     def test_NaN_exception(self):
         np.random.seed(1234)
@@ -331,234 +441,15 @@ class TestInterpNDPython(unittest.TestCase):
         msg = ("\"InterpLinear: Option 'bad_arg' cannot be set because it has not been declared.")
         self.assertTrue(str(cm.exception).startswith(msg))
 
-
-@unittest.skipIf(not scipy_gte_019, "only run if scipy>=0.19.")
-class TestInterpNDScipy(unittest.TestCase):
-    """Tests for the InterpScipy operated through InterpND."""
-
-    def setUp(self):
-        self.interp_configs = {
-            "scipy_slinear": 1,
-            "scipy_cubic": 3,
-            "scipy_quintic": 5,
-        }
-        self.valid_methods = self.interp_configs.keys()
-        self.tol = {
-            "scipy_slinear": 5e-2,
-            "scipy_cubic": 1e-4,
-            "scipy_quintic": 1e-6,
-        }
-
-    def _get_sample_4d_large(self):
-        def f(x, y, z, w):
-            return x**2 + y**2 + z**2 + w**2
-        X = np.linspace(-10, 10, 6)
-        Y = np.linspace(-10, 10, 7)
-        np.random.seed(0)
-        Z = np.random.uniform(-10, 10, 6)
-        Z.sort()
-        W = np.linspace(-10, 10, 8)
-        points = [X, Y, Z, W]
-        values = f(*np.meshgrid(*points, indexing='ij'))
-        return points, values
-
-    def _get_sample_2d(self):
-        # test problem with enough points for smooth spline fits
-        def f(u, v):
-            return u * np.cos(u * v) + v * np.sin(u * v)
-
-        def df(u, v):
-            return (-u * v * np.sin(u * v) + v**2 * np.cos(u * v) +
-                    np.cos(u * v),
-                    -u**2 * np.sin(u * v) + u * v * np.cos(u * v) +
-                    np.sin(u * v))
-
-        # uniformly spaced axis
-        u = np.linspace(0, 3, 50)
-        # randomly spaced axis
-        np.random.seed(7590)
-        v = np.random.uniform(0, 3, 33)
-        v.sort()
-
-        points = [u, v]
-        values = f(*np.meshgrid(*points, indexing='ij'))
-        return points, values, f, df
-
-    def test_auto_reduce_spline_order(self):
-        # if a spline method is used and spline_dim_error=False and a dimension
-        # does not have enough points, the spline order for that dimension
-        # should be automatically reduced
-        np.random.seed(314)
-
-        # x dimension is too small for cubic, should fall back to linear
-        x = [0, 1]
-        y = np.linspace(-10, 4, 10)
-        z = np.linspace(1000, 2000, 20)
-
-        points = [x, y, z]
-        values = np.random.randn(2, 10, 20)
-
-        interp = InterpND(points, values, method='scipy_cubic')
-
-        # first dimension (x) should be reduced to k=1 (linear)
-        self.assertEqual(interp.table._ki[0], 1)
-
-        # should operate as normal
-        x = np.array([0.5, 0, 1001])
-        result = interp.interpolate(x)
-        assert_almost_equal(result, -0.046325695741704434, decimal=5)
-
-        interp = InterpND(points, values, method='scipy_slinear')
-        value1 = interp.interpolate(x)
-
-        # cycle through different methods that require order reduction
-        # in the first dimension
-        interp = InterpND(points, values, method='scipy_quintic')
-        value2 = interp.interpolate(x)
-        interp.gradient(x)
-        interp = InterpND(points, values, method='scipy_cubic')
-        value3 = interp.interpolate(x)
-        interp.gradient(x)
-
-        # values from different methods should be different
-        self.assertTrue(value1[0] != value2[0])
-        self.assertTrue(value2[0] != value3[0])
-
-    def test_complex_exception_spline(self):
+    def test_complex_exception_scipy_methods(self):
         points, values = self._get_sample_4d_large()
         values = values - 2j * values
         sample = np.asarray([[0.1, 0.1, 1., .9]])
 
         # spline methods dont support complex values
-        for method in self.valid_methods:
+        for method in self.interp_methods:
             self.assertRaises(ValueError, InterpND, points, values,
                               method)
-
-    def test_spline_deriv_xi1d(self):
-        # tests gradient values
-        points, values, func, df = self. _get_sample_2d()
-        np.random.seed(1234)
-        test_pt = np.random.uniform(0, 3, 2)
-        actual = np.array(df(*test_pt))
-        for method in self.valid_methods:
-            interp = InterpND(points, values, method)
-            computed = interp.gradient(test_pt)
-            r_err = rel_error(actual, computed)
-            assert r_err < self.tol[method]
-
-            # test that gradients have been cached
-            assert_array_equal(interp._xi, test_pt)
-            assert_array_equal(
-                interp._d_dx.flatten(), computed.flatten())
-
-    def test_gradients_returned_by_xi(self):
-        # verifies that gradients with respect to xi are returned if cached
-        points, values, func, df = self. _get_sample_2d()
-        np.random.seed(4321)
-        for method in self.valid_methods:
-            interp = InterpND(points, values, method)
-            x = np.array([0.9, 0.1])
-            interp._xi = x
-            dy = np.array([0.997901, 0.08915])
-            interp._d_dx = dy
-            assert_almost_equal(interp.gradient(x), dy)
-
-    def test_spline_out_of_bounds_extrap(self):
-        points, values, func, df = self. _get_sample_2d()
-        np.random.seed(5)
-        test_pt = np.random.uniform(3, 3.1, 2)
-        actual = func(*test_pt)
-        gradient = np.array(df(*test_pt))
-        for method in self.valid_methods:
-            k = self.interp_configs[method]
-            interp = InterpND(points, values, method,
-                              extrapolate=True)
-            computed = interp.interpolate(test_pt)
-            computed_grad = interp.gradient(test_pt)
-            r_err = rel_error(actual, computed)
-            assert r_err < 1e3 * self.tol[method]
-
-            r_err = rel_error(gradient, computed_grad)
-            # extrapolated gradients are even trickier, but usable still
-            assert r_err < 2e3 * self.tol[method]
-
-    def test_spline_xi3d(self):
-        points, values, func, df = self. _get_sample_2d()
-        np.random.seed(1)
-        test_pt = np.random.uniform(0, 3, 6).reshape(3, 2)
-        actual = func(*test_pt.T)
-        for method in self.valid_methods:
-            interp = InterpND(points, values, method)
-            computed = interp.interpolate(test_pt)
-            r_err = rel_error(actual, computed)
-            assert r_err < self.tol[method]
-
-    def test_NaN_exception(self):
-        np.random.seed(1234)
-        x = np.linspace(0, 2, 5)
-        y = np.linspace(0, 1, 7)
-        values = np.random.rand(5, 7)
-        interp = InterpND((x, y), values)
-
-        with self.assertRaises(OutOfBoundsError) as cm:
-            interp.interpolate(np.array([1, np.nan]))
-
-        err = cm.exception
-
-        self.assertEqual(str(err), 'One of the requested xi contains a NaN')
-        self.assertEqual(err.idx, 1)
-        self.assertTrue(np.isnan(err.value))
-        self.assertEqual(err.lower, 0)
-        self.assertEqual(err.upper, 1)
-
-    def test_error_messages(self):
-        # For coverage. Most of these errors are probably not reachable in openmdao, but
-        # proper unit testing requires them for standalone usage of the Interpolation.
-        points, values = self._get_sample_4d_large()
-
-        with self.assertRaises(ValueError) as cm:
-            interp = InterpND(points, values.tolist(), method='junk')
-
-        msg = ('Interpolation method "junk" is not defined. Valid methods are')
-        self.assertTrue(str(cm.exception).startswith(msg))
-
-        with self.assertRaises(ValueError) as cm:
-            interp = InterpND(points, values.tolist()[1])
-
-        msg = ('There are 4 point arrays, but values has 3 dimensions')
-        self.assertEqual(str(cm.exception), msg)
-
-        badpoints = deepcopy(points)
-        badpoints[0][0] = 55.0
-        with self.assertRaises(ValueError) as cm:
-            interp = InterpND(badpoints, values.tolist())
-
-        msg = ('The points in dimension 0 must be strictly ascending')
-        self.assertEqual(str(cm.exception), msg)
-
-        badpoints[0] = np.vstack((np.arange(6), np.arange(6)))
-        with self.assertRaises(ValueError) as cm:
-            interp = InterpND(badpoints, values.tolist())
-
-        msg = ('The points in dimension 0 must be 1-dimensional')
-        self.assertEqual(str(cm.exception), msg)
-
-        badpoints[0] = (np.arange(4))
-        with self.assertRaises(ValueError) as cm:
-            interp = InterpND(badpoints, values.tolist())
-
-        msg = ('There are 4 points and 6 values in dimension 0')
-        self.assertEqual(str(cm.exception), msg)
-
-        badvalues = np.array(values, dtype=np.complex)
-        with self.assertRaises(ValueError) as cm:
-            interp = InterpND(badpoints, badvalues.tolist(), method='scipy_slinear')
-
-        msg = ("Interpolation method 'scipy_slinear' does not support complex values.")
-        self.assertEqual(str(cm.exception), msg)
-
-        interp = InterpND(points, values.tolist())
-        x = [0.5, 0, 0.5, 0.9]
 
 
 if __name__ == '__main__':
