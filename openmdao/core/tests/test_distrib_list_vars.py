@@ -4,12 +4,14 @@ import unittest
 import numpy as np
 from six.moves import cStringIO
 
+from distutils.version import LooseVersion
+
 import openmdao.api as om
 
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_rel_error
-from openmdao.utils.general_utils import remove_whitespace
+from openmdao.utils.general_utils import printoptions, remove_whitespace
 
 from openmdao.test_suite.groups.parallel_groups import FanOutGrouped
 
@@ -81,7 +83,6 @@ class Summer(om.ExplicitComponent):
 
 @unittest.skipUnless(MPI, "MPI is required.")
 @unittest.skipIf(PETScVector is None, "PETSc is required.")
-@unittest.skipIf(os.environ.get("TRAVIS"), "Unreliable on Travis CI.")
 class DistributedListVarsTest(unittest.TestCase):
 
     N_PROCS = 2
@@ -272,7 +273,11 @@ class DistributedListVarsTest(unittest.TestCase):
             self.assertEqual(1, text.count('    obj'))
 
     def test_parallel_list_vars(self):
-        np.set_printoptions(linewidth=1024)
+        print_opts = {'linewidth': 1024, 'precision': 1}
+
+        from distutils.version import LooseVersion
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            print_opts['legacy'] = '1.13'
 
         prob = om.Problem(FanOutGrouped())
 
@@ -287,7 +292,8 @@ class DistributedListVarsTest(unittest.TestCase):
         # list inputs, not hierarchical
         #
         stream = cStringIO()
-        prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
+        with printoptions(**print_opts):
+            prob.model.list_inputs(values=True, hierarchical=False, out_stream=stream)
 
         if prob.comm.rank == 0:  # Only rank 0 prints
             text = stream.getvalue().split('\n')
@@ -315,7 +321,8 @@ class DistributedListVarsTest(unittest.TestCase):
         # list inputs, hierarchical
         #
         stream = cStringIO()
-        prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
+        with printoptions(**print_opts):
+            prob.model.list_inputs(values=True, hierarchical=True, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -351,7 +358,8 @@ class DistributedListVarsTest(unittest.TestCase):
         # list outputs, not hierarchical
         #
         stream = cStringIO()
-        prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
+        with printoptions(**print_opts):
+            prob.model.list_outputs(values=True, residuals=True, hierarchical=False, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -360,8 +368,8 @@ class DistributedListVarsTest(unittest.TestCase):
                 "7 Explicit Output(s) in 'model'",
                 '-------------------------------',
                 '',
-                'varname   value  resids',
-                '--------  -----  ------',
+                'varname   value   resids',
+                '--------  -----   ------',
                 'iv.x',
                 'c1.y',
                 'sub.c2.y',
@@ -384,7 +392,8 @@ class DistributedListVarsTest(unittest.TestCase):
         # list outputs, hierarchical
         #
         stream = cStringIO()
-        prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
+        with printoptions(**print_opts):
+            prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -393,8 +402,8 @@ class DistributedListVarsTest(unittest.TestCase):
                 "7 Explicit Output(s) in 'model'",
                 '-------------------------------',
                 '',
-                'varname  value  resids',
-                '-------  -----  ------',
+                'varname  value   resids',
+                '-------  -----   ------',
                 'model',
                 '  iv',
                 '    x',
@@ -425,7 +434,11 @@ class DistributedListVarsTest(unittest.TestCase):
     def test_distribcomp_list_vars(self):
         from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 
-        np.set_printoptions(linewidth=1024)
+        print_opts = {'linewidth': 1024}
+
+        from distutils.version import LooseVersion
+        if LooseVersion(np.__version__) >= LooseVersion("1.14"):
+            print_opts['legacy'] = '1.13'
 
         size = 15
 
@@ -443,8 +456,9 @@ class DistributedListVarsTest(unittest.TestCase):
         # prior to model execution, the global shape of a distributed variable is not available
         # and only the local portion of the value is available
         stream = cStringIO()
-        model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
-                             print_arrays=True, out_stream=stream)
+        with printoptions(**print_opts):
+            model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
+                                 print_arrays=True, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -453,9 +467,9 @@ class DistributedListVarsTest(unittest.TestCase):
                 "1 Input(s) in 'C2'",
                 '------------------',
                 '',
-                'varname  value                 shape  global_shape',
-                '-------  --------------------  -----  ------------',
-                'invec    |2.8284271247461903|  (8,)   Unavailable ',
+                'varname  value            shape  global_shape',
+                '-------  ---------------  -----  ------------',
+                'invec    |2.82842712475|  (8,)   Unavailable ',
                 '         value:',
                 '         array([1., 1., 1., 1., 1., 1., 1., 1.])'
             ]
@@ -466,8 +480,9 @@ class DistributedListVarsTest(unittest.TestCase):
                                      '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         stream = cStringIO()
-        model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
-                              print_arrays=True, out_stream=stream)
+        with printoptions(**print_opts):
+            model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
+                                  print_arrays=True, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -476,9 +491,9 @@ class DistributedListVarsTest(unittest.TestCase):
                 "1 Explicit Output(s) in 'C2'",
                 '----------------------------',
                 '',
-                'varname  value                 shape  global_shape',
-                '-------  --------------------  -----  ------------',
-                'outvec   |2.8284271247461903|  (8,)   Unavailable ',
+                'varname  value            shape  global_shape',
+                '-------  ---------------  -----  ------------',
+                'outvec   |2.82842712475|  (8,)   Unavailable ',
                 '         value:',
                 '         array([1., 1., 1., 1., 1., 1., 1., 1.])'
             ]
@@ -495,8 +510,9 @@ class DistributedListVarsTest(unittest.TestCase):
         # after model execution, the global shape of a distributed variable is available
         # and the complete global value is available
         stream = cStringIO()
-        model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
-                             print_arrays=True, out_stream=stream)
+        with printoptions(**print_opts):
+            model.C2.list_inputs(hierarchical=False, shape=True, global_shape=True,
+                                 print_arrays=True, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -505,9 +521,9 @@ class DistributedListVarsTest(unittest.TestCase):
                 "1 Input(s) in 'C2'",
                 '------------------',
                 '',
-                'varname   value                shape  global_shape',
-                '--------  -------------------  -----  ------------',
-                'C2.invec  |3.872983346207417|  (8,)   (15,)       ',
+                'varname   value            shape  global_shape',
+                '--------  ---------------  -----  ------------',
+                'C2.invec  |3.87298334621|  (8,)   (15,)       ',
                 '          value:',
                 '          array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])'
             ]
@@ -517,8 +533,9 @@ class DistributedListVarsTest(unittest.TestCase):
                                      '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         stream = cStringIO()
-        model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
-                              print_arrays=True, out_stream=stream)
+        with printoptions(**print_opts):       
+            model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
+                                  print_arrays=True, out_stream=stream)
 
         if prob.comm.rank == 0:
             text = stream.getvalue().split('\n')
@@ -527,9 +544,9 @@ class DistributedListVarsTest(unittest.TestCase):
                 "1 Explicit Output(s) in 'C2'",
                 '----------------------------',
                 '',
-                'varname    value                shape  global_shape',
-                '---------  -------------------  -----  ------------',
-                'C2.outvec  |9.746794344808963|  (8,)   (15,)       ',
+                'varname    value           shape  global_shape',
+                '---------  --------------  -----  ------------',
+                'C2.outvec  |9.74679434481|  (8,)   (15,)       ',
                 '           value:',
                 '           array([ 2.,  2.,  2.,  2.,  2.,  2.,  2.,  2., -3., -3., -3., -3., -3., -3., -3.])'
             ]
@@ -541,17 +558,18 @@ class DistributedListVarsTest(unittest.TestCase):
         # note that the shape of the input variable for the non-distributed Summer component
         # is different on each processor, use the all_procs argument to display on all processors
         stream = cStringIO()
-        model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, all_procs=True,
-                             print_arrays=True, out_stream=stream)
+        with printoptions(**print_opts):
+            model.C3.list_inputs(hierarchical=False, shape=True, global_shape=True, all_procs=True,
+                                 print_arrays=True, out_stream=stream)
 
         text = stream.getvalue().split('\n')
 
         if prob.comm.rank == 0:
-            norm = '|5.656854249492381|'
+            norm = '|5.65685424949|'
             shape = (8,)
             value = '[2., 2., 2., 2., 2., 2., 2., 2.]'
         else:
-            norm = '|7.937253933193772|'
+            norm = '|7.93725393319|'
             shape = (7,)
             value = '[-3., -3., -3., -3., -3., -3., -3.]'
 
