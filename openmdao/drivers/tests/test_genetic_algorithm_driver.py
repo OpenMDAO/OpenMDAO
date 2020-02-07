@@ -1179,12 +1179,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        # Optimal solution
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
-            print('p2.xI', prob['p2.xI'])
-            print('p1.xC', prob['p1.xC'])
-
     def test_basic_with_assert(self):
         import openmdao.api as om
         from openmdao.test_suite.components.branin import Branin
@@ -1210,9 +1204,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
 
         # Optimal solution
         assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
@@ -1242,12 +1233,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        # Optimal solution
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
-            print('p2.xI', prob['p2.xI'])
-            print('p1.xC', prob['p1.xC'])
-
     def test_option_pop_size(self):
         import openmdao.api as om
         from openmdao.test_suite.components.branin import Branin
@@ -1272,12 +1257,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-
-        # Optimal solution
-        if extra_prints:
-            print('comp.f', prob['comp.f'])
-            print('p2.xI', prob['p2.xI'])
-            print('p1.xC', prob['p1.xC'])
 
     def test_constrained_with_penalty(self):
         import openmdao.api as om
@@ -1322,10 +1301,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-
-        if extra_prints:
-            print('radius', prob['radius'])
-            print('height', prob['height'])
 
         # These go to 0.5 for unconstrained problem. With constraint and penalty, they
         # will be above 1.0 (actual values will vary.)
