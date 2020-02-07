@@ -3526,7 +3526,8 @@ class System(object):
         # If parallel, gather up the vars.
         if MPI and self.comm:
             # All procs must call this. Returns a list, one per proc.
-            all_var_dicts = self.comm.allgather(var_dict)
+            all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
+                else self.comm.allgather(var_dict)
 
             # unless all_procs is requested, only the root process should print
             if not all_procs and self.comm.rank > 0:
