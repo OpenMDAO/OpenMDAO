@@ -107,4 +107,19 @@ match the finite difference estimate in the `check_partials` output.
     openmdao.components.tests.test_meta_model_structured_comp.TestMetaModelStructuredCompFeature.test_training_derivatives
     :layout: code, output
 
+
+Standalone Interface for Table Interpolation
+--------------------------------------------
+
+The underlying interpolation algorithms can be used standalone (i.e., outside of the
+MetaModelStructuredComp) through the `InterpND` class. This can be useful for inclusion in another
+component.  The following component shows how to perform interpolation on the same table
+as int the previous example using standalone code. This time, we choose 'lagrange3' as the
+intepolation algorithm.
+
+.. embed-code::
+    openmdao.components.interp_util.tests.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_table_interp
+    :layout: code, output
+
+
 .. tags:: MetaModelStructuredComp, Component

@@ -128,11 +128,24 @@ distribution.
 Standalone Interface for Spline Evaluation
 ------------------------------------------
 
-Another included feature is a standalone version of `spline_comp`. This simple standalone function
-is intended to be used for standard interpolation (StructuredMetaModel), including for
-multidimensional data sets, and for constructing a higher dimension curve from a low dimensional
-representation (SplineComp), as we use the spline components.
+The underlying interpolation algorithms can be used standalone (i.e., outside of the SplineComp) through the
+`InterpND` class. This can be useful for inclusion in another component. The following example shows how to
+create and evaluate a standalone Akima spline:
+
 
 .. embed-code::
-    openmdao.components.tests.interp_util.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_interp_spline_akima
+    openmdao.components.interp_util.tests.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_interp_spline_akima
+    :layout: code
+
+Similiarly, the following example shows how to create a bspline:
+
+.. embed-code::
+    openmdao.components.interp_util.tests.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_interp_spline_bsplines
+    :layout: code
+
+You can also compute the derivative of the interpolated output with respect to the control point values by setting
+the "compute_derivate" argument to True:
+
+.. embed-code::
+    openmdao.components.interp_util.tests.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_interp_spline_akima_derivs
     :layout: code

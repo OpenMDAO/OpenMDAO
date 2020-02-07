@@ -99,8 +99,8 @@ class InterpND(object):
             If we are always interpolating at a fixed set of locations, then they can be
             specified here.
         extrapolate : bool
-            If False, when interpolated values are requested outside of the domain of the input data,
-            a ValueError is raised. If True, then the methods are allowed to extrapolate.
+            If False, when interpolated values are requested outside of the domain of the input
+            data, a ValueError is raised. If True, then the methods are allowed to extrapolate.
             Default is True (raise an exception).
         num_cp : None or int
             Optional. When specified, use a linear distribution of num_cp control points. If you
@@ -235,7 +235,10 @@ class InterpND(object):
         result = self._evaluate_spline(values)
 
         if compute_derivative:
-            return result, self._d_dx
+            d_dvalues = self.spline_gradient()
+            if d_dvalues.shape[0] == 1:
+                d_dvalues = d_dvalues[0]
+            return result, d_dvalues
         else:
             return result
 
@@ -452,3 +455,37 @@ class InterpND(object):
                     deriv_running = np.outer(deriv_running, deriv_i)
 
             return deriv_running
+
+    def spline_gradient(self):
+        """
+        Return derivative of spline with respect to its control points.
+
+        Returns
+        -------
+        ndarray
+            Gradient of output with respect to training point values.
+        """
+        vec_size, n_cp = self.values.shape
+        x_interp = self.x_interp
+        n_interp = len(x_interp)
+
+        d_dvalues = self._d_dvalues
+        if d_dvalues is not None:
+            dy_ddata = np.zeros((vec_size, n_interp, n_cp))
+
+            if d_dvalues.shape[0] == vec_size:
+                # Akima precomputes derivs at all points in vec_size.
+                dy_ddata[:] = d_dvalues
+            else:
+                # Bsplines computed derivative is the same at all points in vec_size.
+                dy_ddata[:] = np.broadcast_to(d_dvalues.toarray(), (vec_size, n_interp, n_cp))
+        else:
+            dy_ddata = np.zeros((n_interp, n_cp))
+
+            # This way works for the rest of the interpolation methods.
+            for k in range(n_interp):
+                val = self.training_gradients(x_interp[k:k + 1])
+                dy_ddata[k, :] = val
+            dy_ddata = np.broadcast_to(dy_ddata, (vec_size, n_interp, n_cp))
+
+        return dy_ddata

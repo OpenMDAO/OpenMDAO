@@ -21,7 +21,7 @@ class SplineComp(ExplicitComponent):
     _n_cp = int
         Number of control points.
     _spline_cache : list
-        Cached arguements passed to add_spline. These are processed in setup.
+        Cached arguments passed to add_spline. These are processed in setup.
     """
 
     def __init__(self, **kwargs):
@@ -190,31 +190,9 @@ class SplineComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        vec_size = self.options['vec_size']
-        n_interp = len(self.options['x_interp_val'])
-        n_cp = self._n_cp
-
         for out_name, interp in iteritems(self.interps):
             cp_name = self.interp_to_cp[out_name]
 
-            d_dvalues = interp._d_dvalues
-            if d_dvalues is not None:
-                dy_ddata = np.zeros((vec_size, n_interp, n_cp))
-
-                if d_dvalues.shape[0] == vec_size:
-                    # Akima precomputes derivs at all points in vec_size.
-                    dy_ddata[:] = d_dvalues
-                else:
-                    # Bsplines computed derivative is the same at all points in vec_size.
-                    dy_ddata[:] = np.broadcast_to(d_dvalues.toarray(), (vec_size, n_interp, n_cp))
-            else:
-                x_interp = self.options['x_interp_val']
-                dy_ddata = np.zeros((n_interp, n_cp))
-
-                # This way works for the rest of the interpolation methods.
-                for k in range(n_interp):
-                    val = interp.training_gradients(x_interp[k:k + 1])
-                    dy_ddata[k, :] = val
-                dy_ddata = np.broadcast_to(dy_ddata, (vec_size, n_interp, n_cp))
+            dy_ddata = interp.spline_gradient()
 
             partials[out_name, cp_name] = dy_ddata.flatten()

@@ -24,7 +24,6 @@ except ImportError:
 class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
     def test_interp_spline_akima(self):
-
         import numpy as np
 
         from openmdao.components.interp_util.interp import InterpND
@@ -50,8 +49,69 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
         assert_array_almost_equal(akima_y.flatten(), y.flatten())
 
-    def test_interp_spline_bspline(self):
+    def test_interp_spline_akima_derivs(self):
+        import numpy as np
 
+        from openmdao.components.interp_util.interp import InterpND
+
+        xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        n = 23
+        x = np.linspace(1.0, 12.0, n)
+
+        interp = InterpND(method='akima', points=xcp, x_interp=x, delta_x=0.1)
+        y, dy_dycp = interp.evaluate_spline(ycp, compute_derivative=True)
+
+        deriv = np.array([[ 1.00000000e+00,  0.00000000e+00,  0.00000000e+00,
+                            0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+                          [ 3.12508538e-01,  7.81237193e-01, -9.37457312e-02,
+                            0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+                          [ 0.00000000e+00,  1.00000000e+00,  0.00000000e+00,
+                            0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+                          [-1.92097534e-05,  7.05028815e-01,  3.39990395e-01,
+                           -4.50000000e-02,  0.00000000e+00,  0.00000000e+00],
+                          [-1.70753364e-05,  3.80025613e-01,  7.39991462e-01,
+                           -1.20000000e-01,  0.00000000e+00,  0.00000000e+00],
+                          [-6.40325114e-06,  1.15009605e-01,  1.01999680e+00,
+                           -1.35000000e-01,  0.00000000e+00,  0.00000000e+00],
+                          [ 0.00000000e+00,  1.11022302e-16,  1.00000000e+00,
+                            0.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+                          [ 0.00000000e+00, -5.62500000e-03,  7.60412946e-01,
+                            2.45667949e-01, -5.30632175e-04,  7.47369260e-05],
+                          [ 0.00000000e+00, -5.00000000e-03,  5.07767857e-01,
+                            4.98447864e-01, -1.41501913e-03,  1.99298469e-04],
+                          [ 0.00000000e+00, -1.87500000e-03,  2.51238839e-01,
+                            7.52003846e-01, -1.59189652e-03,  2.24210778e-04],
+                          [ 0.00000000e+00,  0.00000000e+00,  1.11022302e-16,
+                            1.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+                          [ 0.00000000e+00,  0.00000000e+00, -2.10964627e-01,
+                            1.19119941e+00,  2.02602810e-02, -4.95062934e-04],
+                          [ 0.00000000e+00,  0.00000000e+00, -3.55003720e-01,
+                            1.28195585e+00,  7.41473347e-02, -1.09946322e-03],
+                          [ 0.00000000e+00,  0.00000000e+00, -4.35442243e-01,
+                            1.27731946e+00,  1.59810592e-01, -1.68780891e-03],
+                          [ 0.00000000e+00,  0.00000000e+00, -4.55605159e-01,
+                            1.18234038e+00,  2.75399483e-01, -2.13470805e-03],
+                          [ 0.00000000e+00,  0.00000000e+00, -4.18817429e-01,
+                            1.00206876e+00,  4.19063438e-01, -2.31476868e-03],
+                          [ 0.00000000e+00,  0.00000000e+00, -3.28404018e-01,
+                            7.41554727e-01,  5.88951889e-01, -2.10259885e-03],
+                          [ 0.00000000e+00,  0.00000000e+00, -1.87689887e-01,
+                            4.05848427e-01,  7.83214266e-01, -1.37280661e-03],
+                          [ 0.00000000e+00,  0.00000000e+00,  2.22044605e-16,
+                            0.00000000e+00,  1.00000000e+00,  4.33680869e-19],
+                          [ 0.00000000e+00,  0.00000000e+00,  1.18164062e-01,
+                           -2.58789062e-01,  1.05371094e+00,  8.69140625e-02],
+                          [ 0.00000000e+00,  0.00000000e+00,  1.05034722e-01,
+                           -2.50868056e-01,  8.32465278e-01,  3.13368056e-01],
+                          [ 0.00000000e+00,  0.00000000e+00,  3.93880208e-02,
+                           -1.17513021e-01,  4.44986979e-01,  6.33138021e-01],
+                          [ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,
+                            0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+
+        assert_array_almost_equal(deriv, dy_dycp)
+
+    def test_interp_spline_bsplines(self):
         import numpy as np
 
         from openmdao.components.interp_util.interp import InterpND
@@ -78,6 +138,31 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
         assert_array_almost_equal(akima_y.flatten(), y.flatten())
 
+    def test_table_interp(self):
+        import numpy as np
+
+        from openmdao.components.interp_util.interp import InterpND
+
+        # create input param training data, of sizes 25, 5, and 10 points resp.
+        p1 = np.linspace(0, 100, 25)
+        p2 = np.linspace(-10, 10, 5)
+        p3 = np.linspace(0, 1, 10)
+
+        # can use meshgrid to create a 3D array of test data
+        P1, P2, P3 = np.meshgrid(p1, p2, p3, indexing='ij')
+        f = np.sqrt(P1) + P2 * P3
+
+        interp = InterpND(method='lagrange3', points=(p1, p2, p3), values=f)
+
+        x = np.array([55.12, -2.14, 0.323])
+        f, df_dx = interp.interpolate(x, compute_derivative=True)
+
+        actual = np.array([6.73306794])
+        deriv_actual = np.array([[ 0.06734927, 0.323 , -2.14]])
+
+        assert_almost_equal(f, actual)
+        assert_almost_equal(df_dx, deriv_actual)
+
 
 class TestInterpNDPython(unittest.TestCase):
     """Tests for the non-scipy interolation algorithms."""
@@ -102,6 +187,8 @@ class TestInterpNDPython(unittest.TestCase):
             "bsplines": 4,
         }
         self.interp_methods = self.interp_configs.keys()
+        self.spline_methods = self.spline_configs.keys()
+
         self.tol = {
             "slinear": 5e-2,
             "lagrange2": 5e-2,
@@ -253,28 +340,6 @@ class TestInterpNDPython(unittest.TestCase):
         #print('akima', computed, actual, r_err)
         assert r_err < self.tol['akima']
 
-    def test_akima_interpolating_spline(self):
-        n_cp = 80
-        n_point = 160
-
-        t = np.linspace(0, 3.0*np.pi, n_cp)
-        tt = np.linspace(0, 3.0*np.pi, n_point)
-
-        x = np.sin(t)
-
-        # Now, test newer interface for order_reducing spline.
-
-        interp = InterpND(method='akima', points=t, x_interp=tt)
-        computed = interp.evaluate_spline(x)
-
-        x_expected = np.sin(tt)
-        delta = computed.flatten() - x_expected
-
-        # Here we test that we don't have crazy interpolation error.
-        self.assertLess(max(delta), .15)
-        # And that it gets middle points a little better.
-        self.assertLess(max(delta[15:-15]), .06)
-
     def test_spline_deriv_xi1d(self):
         # tests gradient values
         points, values, func, df = self._get_sample_2d()
@@ -304,6 +369,28 @@ class TestInterpNDPython(unittest.TestCase):
             interp._d_dx = dy
             assert_almost_equal(interp.gradient(x), dy)
 
+    def test_akima_interpolating_spline(self):
+        n_cp = 80
+        n_point = 160
+
+        t = np.linspace(0, 3.0*np.pi, n_cp)
+        tt = np.linspace(0, 3.0*np.pi, n_point)
+
+        x = np.sin(t)
+
+        # Now, test newer interface for order_reducing spline.
+
+        interp = InterpND(method='akima', points=t, x_interp=tt)
+        computed = interp.evaluate_spline(x)
+
+        x_expected = np.sin(tt)
+        delta = computed.flatten() - x_expected
+
+        # Here we test that we don't have crazy interpolation error.
+        self.assertLess(max(delta), .15)
+        # And that it gets middle points a little better.
+        self.assertLess(max(delta[15:-15]), .06)
+
     def test_bsplines_interpolating_spline(self):
         n_cp = 80
         n_point = 160
@@ -325,6 +412,25 @@ class TestInterpNDPython(unittest.TestCase):
         self.assertLess(max(delta), .15)
         # And that it gets middle points a little better.
         self.assertLess(max(delta[15:-15]), .06)
+
+    def test_interpolating_spline_derivs(self):
+        n_cp = 12
+        n_point = 21
+
+        t = np.linspace(0, 3.0*np.pi, n_cp)
+        tt = np.linspace(0, 3.0*np.pi, n_point)
+
+        x = np.sin(t)
+
+        for method in self.spline_methods:
+            interp = InterpND(method=method, points=t, x_interp=tt)
+            computed, deriv = interp.evaluate_spline(x, compute_derivative=True)
+
+            x_expected = np.sin(tt)
+            delta = computed.flatten() - x_expected
+
+            # Here we test that we don't have crazy interpolation error.
+            self.assertLess(max(delta), .25)
 
     def test_scipy_auto_reduce_spline_order(self):
         # if a spline method is used and spline_dim_error=False and a dimension
@@ -440,16 +546,6 @@ class TestInterpNDPython(unittest.TestCase):
 
         msg = ("\"InterpLinear: Option 'bad_arg' cannot be set because it has not been declared.")
         self.assertTrue(str(cm.exception).startswith(msg))
-
-    def test_complex_exception_scipy_methods(self):
-        points, values = self._get_sample_4d_large()
-        values = values - 2j * values
-        sample = np.asarray([[0.1, 0.1, 1., .9]])
-
-        # spline methods dont support complex values
-        for method in self.interp_methods:
-            self.assertRaises(ValueError, InterpND, points, values,
-                              method)
 
 
 if __name__ == '__main__':
