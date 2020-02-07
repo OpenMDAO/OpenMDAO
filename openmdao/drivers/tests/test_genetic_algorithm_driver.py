@@ -14,6 +14,7 @@ from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
 
+extra_prints = False  # enable printing results
 
 class TestSimpleGA(unittest.TestCase):
 
@@ -66,11 +67,15 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
+        if extra_prints:
+            print('obj.f', prob['obj.f'])
+            print('px.x', prob['px.x'])
+
         # TODO: Satadru listed this solution, but I get a way better one.
         # Solution: xopt = [0.2857, -0.8571], fopt = 23.2933
-        assert_rel_error(self, prob['obj.f'], 12.37341703, 1e-4)
+        assert_rel_error(self, prob['obj.f'], 12.37306086, 1e-4)
         assert_rel_error(self, prob['px.x'][0], 0.2, 1e-4)
-        assert_rel_error(self, prob['px.x'][1], -0.88654333, 1e-4)
+        assert_rel_error(self, prob['px.x'][1], -0.88653391, 1e-4)
 
     def test_mixed_integer_branin(self):
         prob = om.Problem()
@@ -95,8 +100,11 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
+        if extra_prints:
+            print('comp.f', prob['comp.f'])
+
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
+        assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_mixed_integer_branin_discrete(self):
@@ -125,8 +133,12 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
+        if extra_prints:
+            print('comp.f', prob['comp.f'])
+            print('p.xI', prob['p.xI'])
+
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
+        assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
         self.assertTrue(prob['p.xI'] in [3, -3])
         self.assertTrue(isinstance(prob['p.xI'], int))
 
@@ -181,6 +193,11 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob['area3'] = 0.0005
         prob.run_driver()
+
+        if extra_prints:
+            print('mass', prob['mass'])
+            print('mat1', prob['mat1'])
+            print('mat2', prob['mat2'])
 
         # Note, GA doesn't do so well with the continuous vars, naturally, so we reduce the space
         # as much as we can. Objective is still rather random, but it is close. GA does a great job
@@ -245,6 +262,11 @@ class TestSimpleGA(unittest.TestCase):
         prob['area3'] = 0.0005
         prob.run_driver()
 
+        if extra_prints:
+            print('mass', prob['mass'])
+            print('mat1', prob['mat1'])
+            print('mat2', prob['mat2'])
+
         # Note, GA doesn't do so well with the continuous vars, naturally, so we reduce the space
         # as much as we can. Objective is still rather random, but it is close. GA does a great job
         # of picking the correct values for the integer desvars though.
@@ -281,27 +303,56 @@ class TestSimpleGA(unittest.TestCase):
 
     def test_encode_and_decode(self):
         ga = GeneticAlgorithm(None)
-        gen = np.array([[0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1,
-                         1, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0,
-                         1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0,
-                         0, 1, 0],
-                        [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1,
-                         1, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0,
-                         1, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1,
-                         0, 1, 0]])
+        gen = np.array([[0, 0, 1, 1, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1,
+                         0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1,
+                         1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0],
+                        [1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1,
+                         0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 0, 1, 0,
+                         1, 1, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 1, 0]])
         vlb = np.array([-170.0, -170.0, -170.0, -170.0, -170.0, -170.0])
         vub = np.array([255.0, 255.0, 255.0, 170.0, 170.0, 170.0])
         bits = np.array([9, 9, 9, 9, 9, 9])
-        x = np.array([[-69.36399217, 22.12328767, -7.81800391, -66.86888454,
-                       116.77103718, 76.18395303],
-                      [248.34637965, 191.79060665, -31.93737769, 97.47553816,
-                       118.76712329, 92.15264188]])
+        x = np.array([[-69.36399217, 22.12328767, -7.81800391, -66.86888454, 116.77103718, 76.18395303],
+                      [248.34637965, 191.79060665, -31.93737769, 97.47553816, 118.76712329, 92.15264188]])
 
         ga.npop = 2
         ga.lchrom = int(np.sum(bits))
         np.testing.assert_array_almost_equal(x, ga.decode(gen, vlb, vub, bits))
         np.testing.assert_array_almost_equal(gen[0], ga.encode(x[0], vlb, vub, bits))
         np.testing.assert_array_almost_equal(gen[1], ga.encode(x[1], vlb, vub, bits))
+
+        dec = ga.decode(gen, vlb, vub, bits)
+        enc0 = ga.encode(dec[0], vlb, vub, bits)
+        enc1 = ga.encode(dec[1], vlb, vub, bits)
+        np.testing.assert_array_almost_equal(gen[0], enc0)  # decode followed by encode gives original array
+        np.testing.assert_array_almost_equal(gen[1], enc1)
+
+    def test_encode_and_decode_gray_code(self):
+        ga = GeneticAlgorithm(None)
+        gen = np.array([[0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0,
+                         1, 1, 0, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 0,
+                         0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1],
+                        [1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0,
+                         1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1, 1,
+                         1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 1, 1, 1]])
+        vlb = np.array([-170.0, -170.0, -170.0, -170.0, -170.0, -170.0])
+        vub = np.array([255.0, 255.0, 255.0, 170.0, 170.0, 170.0])
+        bits = np.array([9, 9, 9, 9, 9, 9])
+        x = np.array([[-69.36399217, 22.12328767, -7.81800391, -66.86888454, 116.77103718, 76.18395303],
+                      [248.34637965, 191.79060665, -31.93737769, 97.47553816, 118.76712329, 92.15264188]])
+
+        ga.npop = 2
+        ga.lchrom = int(np.sum(bits))
+        ga.gray_code = True
+        np.testing.assert_array_almost_equal(x, ga.decode(gen, vlb, vub, bits))
+        np.testing.assert_array_almost_equal(gen[0], ga.encode(x[0], vlb, vub, bits))
+        np.testing.assert_array_almost_equal(gen[1], ga.encode(x[1], vlb, vub, bits))
+
+        dec = ga.decode(gen, vlb, vub, bits)
+        enc0 = ga.encode(dec[0], vlb, vub, bits)
+        enc1 = ga.encode(dec[1], vlb, vub, bits)
+        np.testing.assert_array_almost_equal(gen[0], enc0)  # decode followed by encode gives original array
+        np.testing.assert_array_almost_equal(gen[1], enc1)
 
     def test_vector_desvars_multiobj(self):
         prob = om.Problem()
@@ -326,6 +377,10 @@ class TestSimpleGA(unittest.TestCase):
         prob.model.add_objective('paraboloid2.f')
         prob.setup()
         prob.run_driver()
+
+        if extra_prints:
+            print('indeps.x', prob['indeps.x'])
+            print('indeps.y', prob['indeps.y'])
 
         np.testing.assert_array_almost_equal(prob['indeps.x'], -5)
         np.testing.assert_array_almost_equal(prob['indeps.y'], [3, 1])
@@ -371,6 +426,9 @@ class TestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
+        if extra_prints:
+            print('x', prob['x'])
+
         # Check that the constraint is satisfied (x >= 1)
         for i in range(dim):
             self.assertLessEqual(1.0, prob["x"][i])
@@ -390,16 +448,16 @@ class TestDriverOptionsSimpleGA(unittest.TestCase):
         indeps.add_output('x', 1.)
         model.add_subsystem('model', om.ExecComp('y=x**2'), promotes=['*'])
         driver = prob.driver = om.SimpleGADriver()
-        driver.options['Pm'] = 0.1
-        driver.options['Pc'] = 0.01
+        driver.options['Pm'] = 0.123
+        driver.options['Pc'] = 0.0123
         driver.options['max_gen'] = 5
         driver.options['bits'] = {'x': 8}
         prob.model.add_design_var('x', lower=-10., upper=10.)
         prob.model.add_objective('y')
         prob.setup()
         prob.run_driver()
-        self.assertEqual(driver.options['Pm'], 0.1)
-        self.assertEqual(driver.options['Pc'], 0.01)
+        self.assertEqual(driver.options['Pm'], 0.123)
+        self.assertEqual(driver.options['Pc'], 0.0123)
 
 
 class TestMultiObjectiveSimpleGA(unittest.TestCase):
@@ -465,9 +523,11 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         l1 = prob['length']
         w1 = prob['width']
         h1 = prob['height']
-        print('Box dims: ', l1, w1, h1)
-        print('Front and top area: ', front, top)
-        print('Volume: ', prob['volume'])  # should be around 1
+
+        if extra_prints:
+            print('Box dims: ', l1, w1, h1)
+            print('Front and top area: ', front, top)
+            print('Volume: ', prob['volume'])  # should be around 1
 
         # run #2
         # weights changed
@@ -504,9 +564,12 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         l2 = prob2['length']
         w2 = prob2['width']
         h2 = prob2['height']
-        print('Box dims: ', l2, w2, h2)
-        print('Front and top area: ', front2, top2)
-        print('Volume: ', prob['volume'])  # should be around 1
+
+        if extra_prints:
+            print('Box dims: ', l2, w2, h2)
+            print('Front and top area: ', front2, top2)
+            print('Volume: ', prob['volume'])  # should be around 1
+
         self.assertGreater(w1, w2)  # front area does not depend on width
         self.assertGreater(h2, h1)  # top area does not depend on height
 
@@ -559,10 +622,13 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
-        print('height', prob['height'])  # exact solution is 2*radius
-        print('Area', prob['Area'])
-        print('Volume', prob['Volume'])  # should be around 10
+
+        if extra_prints:
+            print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
+            print('height', prob['height'])  # exact solution is 2*radius
+            print('Area', prob['Area'])
+            print('Volume', prob['Volume'])  # should be around 10
+
         self.assertTrue(driver.supports["equality_constraints"], True)
         self.assertTrue(driver.supports["inequality_constraints"], True)
         # check that it is not going to the unconstrained optimum
@@ -611,10 +677,13 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
-        print('height', prob['height'])  # exact solution is 2*radius
-        print('Area', prob['Area'])
-        print('Volume', prob['Volume'])  # should be around 10
+
+        if extra_prints:
+            print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
+            print('height', prob['height'])  # exact solution is 2*radius
+            print('Area', prob['Area'])
+            print('Volume', prob['Volume'])  # should be around 10
+
         self.assertTrue(driver.supports["equality_constraints"], True)
         self.assertTrue(driver.supports["inequality_constraints"], True)
         # it is going to the unconstrained optimum
@@ -662,10 +731,13 @@ class TestConstrainedSimpleGA(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-        print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
-        print('height', prob['height'])  # exact solution is 2*radius
-        print('Area', prob['Area'])
-        print('Volume', prob['Volume'])  # should be around 10
+
+        if extra_prints:
+            print('radius', prob['radius'])  # exact solution is (5/pi)^(1/3) ~= 1.167
+            print('height', prob['height'])  # exact solution is 2*radius
+            print('Area', prob['Area'])
+            print('Volume', prob['Volume'])  # should be around 10
+
         self.assertTrue(driver.supports["equality_constraints"], True)
         self.assertTrue(driver.supports["inequality_constraints"], True)
         self.assertAlmostEqual(prob['radius'], 0.5, 1)  # it is going to the unconstrained optimum
@@ -707,8 +779,12 @@ class MPITestSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
+        if extra_prints:
+            print('comp.f', prob['comp.f'])
+            print('p2.xI', prob['p2.xI'])
+
         # Optimal solution
-        assert_rel_error(self, prob['comp.f'], 0.49398, 1e-4)
+        assert_rel_error(self, prob['comp.f'], 0.49399549, 1e-4)
         self.assertTrue(int(prob['p2.xI']) in [3, -3])
 
     def test_two_branin_parallel_model(self):
@@ -746,6 +822,10 @@ class MPITestSimpleGA(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
+
+        if extra_prints:
+            print('comp.f', prob['comp.f'])
+            print('p2.xI', prob['p2.xI'])
 
         # Optimal solution
         assert_rel_error(self, prob['comp.f'], 0.98799098, 1e-4)
@@ -806,6 +886,11 @@ class MPITestSimpleGA(unittest.TestCase):
         prob.setup()
         prob['area3'] = 0.0005
         prob.run_driver()
+
+        if extra_prints:
+            print('mass', prob['mass'])
+            print('mat1', prob['mat1'])
+            print('mat2', prob['mat2'])
 
         # Note, GA doesn't do so well with the continuous vars, naturally, so we reduce the space
         # as much as we can. Objective is still rather random, but it is close. GA does a great job
@@ -929,6 +1014,7 @@ class Summer(om.ExplicitComponent):
 
 
 @unittest.skipUnless(om.PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI, "MPI is required.")
 class MPITestSimpleGA4Procs(unittest.TestCase):
 
     N_PROCS = 4
@@ -972,6 +1058,10 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
+
+        if extra_prints:
+            print('comp.f', prob['comp.f'])
+            print('p2.xI', prob['p2.xI'])
 
         # Optimal solution
         assert_rel_error(self, prob['comp.f'], 0.98799098, 1e-4)
@@ -1089,11 +1179,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        # Optimal solution
-        print('comp.f', prob['comp.f'])
-        print('p2.xI', prob['p2.xI'])
-        print('p1.xC', prob['p1.xC'])
-
     def test_basic_with_assert(self):
         import openmdao.api as om
         from openmdao.test_suite.components.branin import Branin
@@ -1148,11 +1233,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        # Optimal solution
-        print('comp.f', prob['comp.f'])
-        print('p2.xI', prob['p2.xI'])
-        print('p1.xC', prob['p1.xC'])
-
     def test_option_pop_size(self):
         import openmdao.api as om
         from openmdao.test_suite.components.branin import Branin
@@ -1177,11 +1257,6 @@ class TestFeatureSimpleGA(unittest.TestCase):
 
         prob.setup()
         prob.run_driver()
-
-        # Optimal solution
-        print('comp.f', prob['comp.f'])
-        print('p2.xI', prob['p2.xI'])
-        print('p1.xC', prob['p1.xC'])
 
     def test_constrained_with_penalty(self):
         import openmdao.api as om
@@ -1272,9 +1347,10 @@ class MPIFeatureTests(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        print('comp.f', prob['comp.f'])
-        print('p2.xI', prob['p2.xI'])
-        print('p1.xC', prob['p1.xC'])
+        if extra_prints:
+            print('comp.f', prob['comp.f'])
+            print('p2.xI', prob['p2.xI'])
+            print('p1.xC', prob['p1.xC'])
 
 
 @unittest.skipUnless(om.PETScVector, "PETSc is required.")
@@ -1329,9 +1405,10 @@ class MPIFeatureTests4(unittest.TestCase):
         prob.run_driver()
 
         # Optimal solution
-        print('comp.f', prob['comp.f'])
-        print('p2.xI', prob['p2.xI'])
-        print('p1.xC', prob['p1.xC'])
+        if extra_prints:
+            print('comp.f', prob['comp.f'])
+            print('p2.xI', prob['p2.xI'])
+            print('p1.xC', prob['p1.xC'])
 
 
 if __name__ == "__main__":
