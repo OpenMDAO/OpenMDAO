@@ -11,6 +11,7 @@ import numpy as np
 from numpy.testing import assert_almost_equal
 
 import openmdao.api as om
+from openmdao.utils.assert_utils import assert_warning, assert_no_warning
 
 
 class TestBalanceComp(unittest.TestCase):
@@ -97,7 +98,34 @@ class TestBalanceComp(unittest.TestCase):
         for (of, wrt) in cpd['balance']:
             assert_almost_equal(cpd['balance'][of, wrt]['abs error'], 0.0, decimal=5)
 
-    def test_balance_comp_options_exclude(self):
+    # def test_balance_comp_options_exclude_error(self):
+
+    #     prob = om.Problem()
+
+    #     bal = om.BalanceComp()
+    #     bal.add_balance('x', val=1.0)
+
+    #     prob.model.add_subsystem(name='balance', subsys=bal)
+
+    #     recorder = om.SqliteRecorder('cases.sql')
+
+    #     prob.model.add_recorder(recorder)
+
+    #     prob.model.recording_options['record_inputs'] = True
+    #     prob.model.recording_options['record_outputs'] = True
+    #     prob.model.recording_options['record_residuals'] = True
+    #     bal.recording_options['record_metadata'] = True
+
+    #     prob.setup()
+
+    #     msg = ("Trying to record options which cannot be pickled on system "
+    #            "BalanceComp (balance).Check the system for options which is unpickleable "
+    #            "and set 'pickleable' to False. Skipping recording options for this system.")
+
+    #     with assert_warning(UserWarning, msg):
+    #         prob.run_model()
+
+    def test_balance_comp_options_exclude_no_error(self):
 
         prob = om.Problem()
 
@@ -113,13 +141,35 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.recording_options['record_inputs'] = True
         prob.model.recording_options['record_outputs'] = True
         prob.model.recording_options['record_residuals'] = True
-        prob.model.recording_options['record_metadata'] = False
-        prob.model.recording_options['options_excludes'] = ['*']
+        bal.recording_options['record_metadata'] = False
 
         prob.setup()
 
-        prob.run_model()
+        msg = ("Trying to record options which cannot be pickled on system "
+               "BalanceComp (balance).Check the system for options which are unpickleable "
+               "and set 'recordable' to False. Skipping recording options for this system.")
 
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
+
+
+        prob = om.Problem()
+
+        bal = om.BalanceComp()
+        bal.add_balance('x', val=1.0)
+
+        prob.model.add_subsystem(name='balance', subsys=bal)
+
+        recorder = om.SqliteRecorder('cases.sql')
+
+        prob.model.add_recorder(recorder)
+
+        bal.recording_options['record_metadata'] = True
+
+        prob.setup()
+
+        with assert_no_warning(UserWarning, msg):
+            prob.run_model()
 
     def test_create_on_init_no_normalization(self):
 

@@ -56,7 +56,7 @@ class OptionsDictionary(object):
         state = self.__dict__.copy()
         user_options = state['_dict'].copy()
         for i in user_options.copy():
-            if not user_options[i]['pickleable']:
+            if not user_options[i]['recordable']:
                 del user_options[i]
 
         return user_options
@@ -283,7 +283,7 @@ class OptionsDictionary(object):
             meta['check_valid'](name, value)
 
     def declare(self, name, default=_undefined, values=None, types=None, type_=None, desc='',
-                upper=None, lower=None, check_valid=None, allow_none=False, pickleable=True):
+                upper=None, lower=None, check_valid=None, allow_none=False, recordable=True):
         r"""
         Declare an option.
 
@@ -347,7 +347,7 @@ class OptionsDictionary(object):
             'check_valid': check_valid,
             'has_been_set': default_provided,
             'allow_none': allow_none,
-            'pickleable': pickleable,
+            'recordable': recordable,
         }
 
         # If a default is given, check for validity

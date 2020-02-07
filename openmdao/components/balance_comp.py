@@ -27,10 +27,10 @@ class BalanceComp(ImplicitComponent):
         Declare options.
         """
         self.options.declare('guess_func', types=FunctionType, allow_none=True, default=None,
-                             pickleable=False, desc='A callable function in the form '
-                             'f(inputs, outputs, residuals) '
-                             'that can provide an initial "guess" value of the state '
-                             'variable(s) based on the inputs, outputs and residuals.')
+                             recordable=False, desc='A callable function in the form '
+                             'f(inputs, outputs, residuals) that can provide an initial "guess" '
+                             'value of the state variable(s) based on the inputs, outputs and '
+                             'residuals.')
 
     def __init__(self, name=None, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
                  use_mult=False, mult_name=None, mult_val=1.0, normalize=True, **kwargs):
