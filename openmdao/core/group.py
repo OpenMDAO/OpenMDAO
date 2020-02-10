@@ -1743,6 +1743,7 @@ class Group(System):
             jac = self._jacobian
         elif jac is None and self._assembled_jac is not None:
             jac = self._assembled_jac
+
         if jac is not None:
             for vec_name in vec_names:
                 with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:

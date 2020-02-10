@@ -526,6 +526,7 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
 
     def _mpi_trace_callback(frame, event, arg):
         pname = None
+        commsize = ''
         if event == 'call':
             if 'openmdao' in frame.f_code.co_filename:
                 if frame.f_code.co_name in skip:
@@ -535,10 +536,14 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         pname = frame.f_locals['self'].msginfo
                     except:
                         pass
+                    try:
+                        commsize = frame.f_locals['self'].comm.size
+                    except:
+                        pass
                 if pname is not None:
                     if not stack or pname != stack[-1][0]:
                         stack.append([pname, 1])
-                        print('   ' * len(stack), pname, file=outfile, flush=flush)
+                        print('   ' * len(stack), commsize, pname, file=outfile, flush=flush)
                     else:
                         stack[-1][1] += 1
                 print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
@@ -553,6 +558,10 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         pname = frame.f_locals['self'].msginfo
                     except:
                         pass
+                    try:
+                        commsize = frame.f_locals['self'].comm.size
+                    except:
+                        pass
                 print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
                       file=outfile, flush=flush)
@@ -561,7 +570,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                     if stack[-1][1] < 1:
                         stack.pop()
                         if stack:
-                            print('   ' * len(stack), stack[-1][0], file=outfile, flush=flush)
+                            print('   ' * len(stack), commsize, stack[-1][0], file=outfile,
+                                  flush=flush)
         else:
             _print_c_func(frame, arg, _c_map[event])
 

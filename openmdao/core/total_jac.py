@@ -306,7 +306,6 @@ class _TotalJacInfo(object):
                 for name in name2jinds:
                     if name not in abs2idx:
                         continue
-                    # print("COMPUTE_JAC_SCATT:", name)
                     if abs2meta[name]['distributed']:
                         srcinds = name2jinds[name]
                         myinds = srcinds + myoffset
@@ -326,18 +325,12 @@ class _TotalJacInfo(object):
                                 full_j_srcs.append(myinds)
                                 full_j_tgts.append(srcinds + offset)
 
-                # print("full_j_srcs:", full_j_srcs, flush=True)
-                # print("full_j_tgts:", full_j_tgts, flush=True)
-
                 if full_j_srcs:
                     full_src_inds = np.hstack(full_j_srcs)
                     full_tgt_inds = np.hstack(full_j_tgts)
                 else:
                     full_src_inds = np.zeros(0, dtype=INT_DTYPE)
                     full_tgt_inds = np.zeros(0, dtype=INT_DTYPE)
-
-                # print("full_src:", full_src_inds, flush=True)
-                # print("full_tgt:", full_tgt_inds, flush=True)
 
                 src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=self.comm)
                 tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=self.comm)
@@ -919,8 +912,6 @@ class _TotalJacInfo(object):
 
         loc_idx = self.in_loc_idxs[mode][idx]
         if loc_idx >= 0:
-            # print(self.comm.rank, "********* SETTING SEED", vecname, 'loc_i', loc_idx, 'global_i',
-            #       idx, 'seed=', self.seeds[mode][idx])
             self.input_vec[mode][vecname]._data[loc_idx] = self.seeds[mode][idx]
 
         if cache_lin_sol:
@@ -955,9 +946,7 @@ class _TotalJacInfo(object):
 
         self._zero_vecs('linear', mode)
 
-        # We apply a -1 here because the derivative of the output is minus the derivative of
-        # the residual in openmdao.
-        self.input_vec[mode]['linear']._data[itermeta['local_in_idxs']] = -1.0
+        self.input_vec[mode]['linear']._data[itermeta['local_in_idxs']] = self.seeds[mode][inds]
 
         if itermeta['cache_lin_solve']:
             return itermeta['relevant'], ('linear',), (inds[0], mode)
@@ -1037,7 +1026,7 @@ class _TotalJacInfo(object):
             if loc_idx != -1:
                 # We apply a -1 here because the derivative of the output is minus the derivative
                 # of the residual in openmdao.
-                dinputs._data[loc_idx, col] = -1.0
+                dinputs._data[loc_idx, col] = self.seeds[mode][i]
 
         if cache_lin_sol:
             return rel_systems, (vec_name,), (inds[0], mode)
@@ -1089,13 +1078,10 @@ class _TotalJacInfo(object):
             for col, i in enumerate(matmat_idxs):
                 loc_idx = in_loc_idxs[i]
                 if loc_idx != -1:
-
-                    # We apply a -1 here because the derivative of the output is minus the
-                    # derivative of the residual in openmdao.
                     if ncol > 1:
-                        dinputs._data[loc_idx, col] = -1.0
+                        dinputs._data[loc_idx, col] = self.seeds[mode][i]
                     else:
-                        dinputs._data[loc_idx] = -1.0
+                        dinputs._data[loc_idx] = self.seeds[mode][i]
 
         if cache:
             return all_rel_systems, sorted(vec_names), (inds[0][0], mode)
@@ -1126,7 +1112,7 @@ class _TotalJacInfo(object):
 
     def _jac_setter_dist(self, i, mode):
         """
-        Scatter or allreduce the i'th row or col of the jacobian.
+        Scatter the i'th row or allreduce the i'th column of the jacobian.
 
         Parameters
         ----------
@@ -1140,10 +1126,10 @@ class _TotalJacInfo(object):
             scatter = self.jac_scatters[mode][vecname]
             if scatter is not None:
                 self.src_petsc[mode].array = self.J[:, i]
-                self.tgt_petsc[mode].array[:] = 0  # TODO: should this be 0 and not just a copy?
+                self.tgt_petsc[mode].array[:] = self.J[:, i]
                 scatter.scatter(self.src_petsc[mode], self.tgt_petsc[mode],
                                 addv=False, mode=False)
-                self.J[:, i] += self.tgt_petsc[mode].array
+                self.J[:, i] = self.tgt_petsc[mode].array
         else:  # rev
             self.jac_scratch[:] = self.J[i]
             self.comm.Allreduce(self.jac_scratch, self.J[i], op=MPI.SUM)
@@ -1209,15 +1195,6 @@ class _TotalJacInfo(object):
 
             for i in inds:
                 J[row_col_map[i], i] = reduced_derivs[row_col_map[i]]
-
-                # if scatter is not None:
-                #     # somehow the array within the petsc vector object is getting disassociated
-                #     # from the data array it was created from, so reassign the petsc vec array to
-                #     # the data array.
-                #     self.src_petsc[mode].array[:] = J[:, i]
-                #     self.tgt_petsc[mode].array = J[:, i]
-                #     scatter.scatter(self.src_petsc[mode],
-                #                     self.tgt_petsc[mode], addv=False, mode=False)
                 if dist:
                     self._jac_setter_dist(i, 'fwd')
         else:
@@ -1267,32 +1244,6 @@ class _TotalJacInfo(object):
         if dist:
             for i in inds:
                 self._jac_setter_dist(i, mode)
-
-        # scatter = self.jac_scatters[mode][vecname]
-        # if scatter is None:
-        #     deriv_idxs, jac_idxs, _ = self.sol2jac_map[mode]
-        #     jac_inds = jac_idxs[vecname]
-        #     deriv_val = self.output_vec[mode][vecname]._data[deriv_idxs[vecname], :]
-        #     if mode == 'fwd':
-        #         for col, i in enumerate(inds):
-        #             self.J[jac_inds, i] = deriv_val[:, col]
-        #     else:  # rev
-        #         for col, i in enumerate(inds):
-        #             self.J[i, jac_inds] = deriv_val[:, col]
-        # else:
-        #     solution = self.src_petsc[mode][vecname]
-        #     for col, i in enumerate(inds):
-        #         self.tgt_petsc[mode].array[:] = 0.
-        #         if ncol > 1:
-        #             solution.array = self.output_vec[mode][vecname]._data[:, col]
-        #         else:
-        #             solution.array = self.output_vec[mode][vecname]._data
-        #         scatter.scatter(solution,
-        #                         self.tgt_petsc[mode], addv=False, mode=False)
-        #         if mode == 'fwd':
-        #             self.J[:, i] = self.tgt_petsc[mode].array
-        #         else:
-        #             self.J[i] = self.tgt_petsc[mode].array
 
     def par_deriv_matmat_jac_setter(self, inds, mode):
         """

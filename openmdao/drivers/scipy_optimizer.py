@@ -95,7 +95,7 @@ class ScipyOptimizeDriver(Driver):
         Result returned from scipy.optimize call.
     opt_settings : dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
-    _con_cache : OrderedDict
+    _con_cache : dict
         Cached result of constraint evaluations because scipy asks for them in a separate function.
     _con_idx : dict
         Used for constraint bookkeeping in the presence of 2-sided constraints.
@@ -593,8 +593,8 @@ class ScipyOptimizeDriver(Driver):
             return 0
 
         # print("Functions calculated")
-        # print(x_new)
-        # print(f_new)
+        # print('   xnew', x_new)
+        # print('   fnew', f_new)
 
         return f_new
 
@@ -699,9 +699,9 @@ class ScipyOptimizeDriver(Driver):
             self._exc_info = sys.exc_info()
             return np.array([[]])
 
-        # print("Gradients calculated")
-        # print(x_new)
-        # print(grad[0, :])
+        # print("Gradients calculated for objective")
+        # print('   xnew', x_new)
+        # print('   grad', grad[0, :])
 
         return grad[0, :]
 
@@ -740,8 +740,8 @@ class ScipyOptimizeDriver(Driver):
         grad_idx = self._con_idx[name] + idx
 
         # print("Constraint Gradient returned")
-        # print(x_new)
-        # print(name, idx, grad[grad_idx, :])
+        # print('   xnew', x_new)
+        # print('   grad', name, 'idx', idx, grad[grad_idx, :])
 
         # Equality constraints
         if meta['equals'] is not None:
