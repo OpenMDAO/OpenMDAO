@@ -6,51 +6,42 @@ import unittest
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 
-from openmdao.utils.spline_distributions import SplineDistribution
+from openmdao.utils.spline_distributions import cell_centered, sine_distribution, node_centered
+
 
 class SplineDistributionsTestCase(unittest.TestCase):
 
     def test_cell_centered(self):
 
-        xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
-        s_dist = SplineDistribution()
+        calculated_midpoints = np.array([2.1, 4.3, 6.5, 8.7, 10.9])
 
-        calculated_midpoints = np.array([3.7, 7.0, 10.3, 13.6, 16.9])
-        assert_array_almost_equal(calculated_midpoints, s_dist.cell_centered(xcp, 5))
+        dist = cell_centered(5, start=1.0, end=12.0)
 
-    def test_cell_centered_error_msg(self):
-
-        xcp = np.array([1.0, 2.0, 4.0])
-        s_dist = SplineDistribution()
-
-
-        with self.assertRaises(KeyError) as cm:
-            s_dist.cell_centered(xcp, 3)
-
-        msg = "'Number of points must be less than input_points.'"
-        self.assertEqual(msg, str(cm.exception))
+        assert_array_almost_equal(calculated_midpoints, dist)
 
     def test_sin_distribution(self):
 
-        xcp = np.array([1.0, 2.0, 4.0])
-        s_dist = SplineDistribution()
+        calculated = np.array([0.        , 0.03015369, 0.11697778, 0.25      , 0.41317591,
+                               0.58682409, 0.75      , 0.88302222, 0.96984631, 1.        ])
 
-        calculated_midpoints = np.array(
-            [1.        , 0.93973688, 0.77347408, 0.54128967, 0.29915229,
-             0.10542975, 0.00681935, 0.02709138, 0.16135921, 0.37725726,
-             0.62274274, 0.83864079, 0.97290862, 0.99318065, 0.89457025,
-             0.70084771, 0.45871033, 0.22652592, 0.06026312, 0.        ])
+        dist = sine_distribution(10)
 
-        assert_array_almost_equal(calculated_midpoints, s_dist.sine_distribution(xcp, 20))
+        assert_array_almost_equal(calculated, dist)
+
+        calculated = np.array([0.14644661, 0.21321178, 0.28869087, 0.37059048, 0.45642213,
+                               0.54357787, 0.62940952, 0.71130913, 0.78678822, 0.85355339])
+
+
+        dist = sine_distribution(10, phase=np.pi/2.0)
+
+        assert_array_almost_equal(calculated, dist)
 
     def test_node_centered(self):
 
-        xcp = np.array([1.0, 2.0, 4.0])
-        s_dist = SplineDistribution()
-
         calculated_midpoints = np.array([1., 1.3, 1.6, 1.9, 2.2, 2.5, 2.8, 3.1, 3.4, 3.7, 4.])
 
-        assert_array_almost_equal(calculated_midpoints, s_dist.node_centered(xcp, 10))
+        assert_array_almost_equal(calculated_midpoints, node_centered(10, start=1.0, end=4.0))
+
 
 class SplineDistributionFeatureTestCase(unittest.TestCase):
 
@@ -59,16 +50,16 @@ class SplineDistributionFeatureTestCase(unittest.TestCase):
         import numpy as np
 
         import openmdao.api as om
+        from openmdao.utils.spline_distributions import cell_centered, sine_distribution, node_centered
 
-        s_dist = SplineDistribution()
         x_cp = np.linspace(0., 1., 6)
         y_cp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
         n = 20
-        x = s_dist.sine_distribution(x_cp, n, phase=np.pi)
+        x = sine_distribution(n, start=0.0, end=1.0, phase=np.pi)
 
         prob = om.Problem()
 
-        comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp=x)
+        comp = om.SplineComp(method='akima', x_cp_val=x_cp, x_interp_val=x)
         prob.model.add_subsystem('akima1', comp)
 
         comp.add_spline(y_cp_name='ycp', y_interp_name='y_val', y_cp_val=y_cp)
@@ -82,3 +73,7 @@ class SplineDistributionFeatureTestCase(unittest.TestCase):
                              28.67782484, 29.        ]])
 
         assert_array_almost_equal(akima_y.flatten(), prob['akima1.y_val'].flatten())
+
+
+if __name__ == '__main__':
+    unittest.main()
