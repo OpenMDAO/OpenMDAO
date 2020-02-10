@@ -57,15 +57,12 @@ class OptionsDictionary(object):
         dict
             State to get.
         """
-        state = self.__dict__.copy()
         if self._all_recordable:
+            state = self.__dict__
             return state
         else:
-            user_options = state['_dict'].copy()
-            state['_dict'] = user_options
-            for name in user_options.copy():
-                if not user_options[name]['recordable']:
-                    del user_options[name]
+            state = self.__dict__.copy()
+            state['_dict'] = {k:v for k,v in state['_dict'].items() if v['recordable']}
             return state
 
     def __repr__(self):
