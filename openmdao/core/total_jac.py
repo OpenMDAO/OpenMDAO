@@ -486,10 +486,12 @@ class _TotalJacInfo(object):
                 # We don't iterate over the full distributed size in this case.
                 irange += gstart
 
-                # find the number of duplicate components
                 if fwd:
                     ndups = 1
                 else:
+                    # find the number of duplicate components in rev mode so we can divide
+                    # the seed between 'ndups' procs so that at the end after we do an
+                    # Allreduce, the contributions from all procs will add up properly.
                     ndups = np.nonzero(sizes[:, in_var_idx])[0].size
 
             # all local idxs that correspond to vars from other procs will be -1
