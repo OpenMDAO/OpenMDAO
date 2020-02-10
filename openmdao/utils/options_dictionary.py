@@ -62,7 +62,7 @@ class OptionsDictionary(object):
             return state
         else:
             state = self.__dict__.copy()
-            state['_dict'] = {k:v for k,v in state['_dict'].items() if v['recordable']}
+            state['_dict'] = {key: val for key, val in state['_dict'].items() if val['recordable']}
             return state
 
     def __repr__(self):
