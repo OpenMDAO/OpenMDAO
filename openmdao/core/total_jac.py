@@ -59,8 +59,6 @@ class _TotalJacInfo(object):
         If 'fwd' compute deriv in forward mode, else if 'rev', reverse (adjoint) mode.
     model : <System>
         The top level System of the System tree.
-    out_meta : dict
-        Map of absoute output var name to tuples of the form (row/column slice, indices, distrib).
     of_meta : dict
         Map of absoute output 'of' var name to tuples of the form
         (row/column slice, indices, distrib).
@@ -231,7 +229,6 @@ class _TotalJacInfo(object):
 
         self.of_meta, self.of_size = self._get_tuple_map(of, responses, abs2meta)
         self.wrt_meta, self.wrt_size = self._get_tuple_map(wrt, design_vars, abs2meta)
-        self.out_meta = {'fwd': self.of_meta, 'rev': self.wrt_meta}
 
         # always allocate a 2D dense array and we can assign views to dict keys later if
         # return format is 'dict' or 'flat_dict'.
@@ -626,7 +623,6 @@ class _TotalJacInfo(object):
         sol_idxs = {}
         jac_idxs = {}
         model = self.model
-        owners = model._owning_rank
         fwd = mode == 'fwd'
         missing = False
         full_slice = slice(None)
