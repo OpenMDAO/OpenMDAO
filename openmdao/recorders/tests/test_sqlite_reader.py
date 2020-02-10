@@ -1941,12 +1941,11 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = om.Problem(model)
         prob.setup()
 
-        msg = "Trying to record options which cannot be pickled on system with name: subs. " \
-              "Use the 'options_excludes' recording option on system objects to avoid " \
-              "attempting to record options which cannot be pickled. Skipping recording " \
-              "options for this system."
-        with assert_warning(RuntimeWarning, msg):
-            prob.run_model()
+        msg = ("Trying to record option 'options value to fail' which cannot be pickled on system "
+               "IndepVarComp (subs). Set 'recordable' to False. Skipping recording options for "
+               "this system.")
+        # with assert_warning(UserWarning, msg):
+        prob.run_model()
 
         prob.cleanup()
         cr = om.CaseReader(self.filename)

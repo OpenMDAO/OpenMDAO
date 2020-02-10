@@ -119,12 +119,11 @@ class TestBalanceComp(unittest.TestCase):
         prob.setup()
 
         msg = ("Trying to record options which cannot be pickled on system "
-               "BalanceComp (balance).Check the system for options which are unpickleable "
+               "BalanceComp (balance). Check the system for options which are unpickleable "
                "and set 'recordable' to False. Skipping recording options for this system.")
 
         with assert_no_warning(UserWarning, msg):
             prob.run_model()
-
 
         prob = om.Problem()
 

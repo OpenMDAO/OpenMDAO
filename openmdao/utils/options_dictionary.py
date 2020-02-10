@@ -27,6 +27,8 @@ class OptionsDictionary(object):
         If defined, prepend this name to beginning of all exceptions.
     _read_only : bool
         If True, no options can be set after declaration.
+    _all_recordable : bool
+        Flag to determine if all options in UserOptions are recordable.
     """
 
     def __init__(self, parent_name=None, read_only=False):
@@ -44,6 +46,8 @@ class OptionsDictionary(object):
         self._parent_name = parent_name
         self._read_only = read_only
 
+        self._all_recordable = True
+
     def __getstate__(self):
         """
         Return state as a dict.
@@ -54,12 +58,15 @@ class OptionsDictionary(object):
             State to get.
         """
         state = self.__dict__.copy()
-        user_options = state['_dict'].copy()
-        for i in user_options.copy():
-            if not user_options[i]['recordable']:
-                del user_options[i]
-
-        return user_options
+        if self._all_recordable:
+            return state
+        else:
+            user_options = state['_dict'].copy()
+            state['_dict'] = user_options
+            for name in user_options.copy():
+                if not user_options[name]['recordable']:
+                    del user_options[name]
+            return state
 
     def __repr__(self):
         """
@@ -314,6 +321,8 @@ class OptionsDictionary(object):
             General check function that raises an exception if value is not valid.
         allow_none : bool
             If True, allow None as a value regardless of values or types.
+        recordable : bool
+            If True, add to recorder
         """
         if type_ is not None:
             warn_deprecation("In declaration of option '%s' the '_type' arg is deprecated.  "
@@ -334,6 +343,9 @@ class OptionsDictionary(object):
 
         if types is bool:
             values = (True, False)
+
+        if not recordable:
+            self._all_recordable = False
 
         default_provided = default is not _undefined
 
