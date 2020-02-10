@@ -151,20 +151,6 @@ class SqliteRecorder(CaseRecorder):
 
         super(SqliteRecorder, self).__init__(record_viewer_data)
 
-    # def __getstate__(self):
-    #     """
-    #     Return state as a dict.
-
-    #     Returns
-    #     -------
-    #     dict
-    #         State to get.
-    #     """
-    #     state = self.__dict__.copy()
-    #     if state['user_options']['_dict']:
-    #         del state['user_options']['_dict']
-    #     return state
-
     def _initialize_database(self):
         """
         Initialize the database.
