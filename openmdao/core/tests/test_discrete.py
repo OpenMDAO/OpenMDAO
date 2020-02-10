@@ -293,11 +293,11 @@ class DiscreteTestCase(unittest.TestCase):
         text = stream.getvalue()
 
         self.assertEqual(1, text.count("3 Input(s) in 'model'"))
-        self.assertEqual(1, text.count('top'))
-        self.assertEqual(1, text.count('  expl'))
-        self.assertEqual(1, text.count('    a'))
-        self.assertEqual(1, text.count('  impl'))
-        self.assertEqual(2, text.count('    x'))      # both implicit & explicit
+        self.assertEqual(1, text.count('\nmodel'))
+        self.assertEqual(1, text.count('\n  expl'))
+        self.assertEqual(1, text.count('\n    a'))
+        self.assertEqual(1, text.count('\n  impl'))
+        self.assertEqual(2, text.count('\n    x'))      # both implicit & explicit
 
         #
         # list outputs, not hierarchical
@@ -320,13 +320,13 @@ class DiscreteTestCase(unittest.TestCase):
         prob.model.list_outputs(values=True, residuals=True, hierarchical=True, out_stream=stream)
         text = stream.getvalue()
 
-        self.assertEqual(text.count('top'), 2)        # both implicit & explicit
-        self.assertEqual(text.count('  indep'), 1)
-        self.assertEqual(text.count('    x'), 1)
-        self.assertEqual(text.count('  expl'), 1)
-        self.assertEqual(text.count('    b'), 1)
-        self.assertEqual(text.count('  impl'), 1)
-        self.assertEqual(text.count('    y'), 2)      # both implicit & explicit
+        self.assertEqual(text.count('\nmodel'), 2)      # both implicit & explicit
+        self.assertEqual(text.count('\n  indep'), 1)
+        self.assertEqual(text.count('\n    x'), 1)
+        self.assertEqual(text.count('\n  expl'), 1)
+        self.assertEqual(text.count('\n    b'), 1)
+        self.assertEqual(text.count('\n  impl'), 1)
+        self.assertEqual(text.count('\n    y'), 2)      # both implicit & explicit
 
     def test_list_inputs_outputs_promoted(self):
         model = om.Group()
@@ -382,7 +382,7 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
-            "top",
+            "model",
             "  indep",
             "    x    11     x",
             "  expl",
@@ -395,7 +395,7 @@ class DiscreteTestCase(unittest.TestCase):
             "",
             "varname  value  prom_name",
             "-------  -----  ---------",
-            "top",
+            "model",
             "  impl",
             "    y    2      impl.y",
         ]

@@ -1338,7 +1338,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "--------  -----",
-            "top",
+            "model",
             "  sub",
             "    expl",
             "      b   [20.]",
@@ -1350,7 +1350,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             "",
             "varname   value",
             "-------   -----",
-            "top",
+            "model",
             "  sub",
             "    impl",
             "      y   2    ",
@@ -2674,9 +2674,9 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(1, text.count("1 Input(s) in 'model'"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(7, num_non_empty_lines)
-        self.assertEqual(1, text.count('top'))
-        self.assertEqual(1, text.count('  mult'))
-        self.assertEqual(1, text.count('    x    |10.0|  inch   (100'))
+        self.assertEqual(1, text.count('\nmodel'))
+        self.assertEqual(1, text.count('\n  mult'))
+        self.assertEqual(1, text.count('\n    x    |10.0|  inch   (100'))
 
         # list outputs
         # out_stream - not hierarchical - extras - no print_arrays
@@ -2722,11 +2722,11 @@ class TestSqliteCaseReader(unittest.TestCase):
                           print_arrays=False,
                           out_stream=stream)
         text = stream.getvalue()
-        self.assertEqual(text.count('top'), 1)
-        self.assertEqual(text.count('  des_vars'), 1)
-        self.assertEqual(text.count('    x'), 1)
-        self.assertEqual(text.count('  mult'), 1)
-        self.assertEqual(text.count('    y'), 1)
+        self.assertEqual(text.count('\nmodel'), 1)
+        self.assertEqual(text.count('\n  des_vars'), 1)
+        self.assertEqual(text.count('\n    x'), 1)
+        self.assertEqual(text.count('\n  mult'), 1)
+        self.assertEqual(text.count('\n    y'), 1)
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 11)
 
@@ -2788,11 +2788,11 @@ class TestSqliteCaseReader(unittest.TestCase):
             self.assertEqual(text.count('value:'), 2)
             self.assertEqual(text.count('resids:'), 2)
             self.assertEqual(text.count('['), 4)
-            self.assertEqual(text.count('top'), 1)
-            self.assertEqual(text.count('  des_vars'), 1)
-            self.assertEqual(text.count('    x'), 1)
-            self.assertEqual(text.count('  mult'), 1)
-            self.assertEqual(text.count('    y'), 1)
+            self.assertEqual(text.count('\nmodel'), 1)
+            self.assertEqual(text.count('\n  des_vars'), 1)
+            self.assertEqual(text.count('\n    x'), 1)
+            self.assertEqual(text.count('\n  mult'), 1)
+            self.assertEqual(text.count('\n    y'), 1)
             num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
             self.assertEqual(num_non_empty_lines, 49)
 
