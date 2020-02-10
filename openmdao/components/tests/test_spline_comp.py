@@ -153,8 +153,13 @@ class SplineCompTestCase(unittest.TestCase):
             prob.setup(force_alloc_complex=True)
             prob.run_model()
 
-            derivs = prob.check_partials(out_stream=None, method='cs')
-            assert_check_partials(derivs, atol=1e-12, rtol=1e-12)
+            if method.startswith('scipy'):
+                derivs = prob.check_partials(out_stream=None)
+                assert_check_partials(derivs, atol=1e-7, rtol=1e-7)
+
+            else:
+                derivs = prob.check_partials(out_stream=None, method='cs')
+                assert_check_partials(derivs, atol=1e-12, rtol=1e-12)
 
     def test_bspline_interp_basic(self):
         prob = om.Problem()

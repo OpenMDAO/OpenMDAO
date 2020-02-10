@@ -185,6 +185,9 @@ class TestInterpNDPython(unittest.TestCase):
             "lagrange3": 4,
             "akima": 4,
             "bsplines": 4,
+            "scipy_slinear": 1,
+            "scipy_cubic": 3,
+            "scipy_quintic": 5,
         }
         self.interp_methods = self.interp_configs.keys()
         self.spline_methods = self.spline_configs.keys()
@@ -274,9 +277,8 @@ class TestInterpNDPython(unittest.TestCase):
     def test_spline_single_dim(self):
         # test interpolated values
         points, values, func, df = self._get_sample_1d()
-        np.random.seed(1)
-        test_pt = 0.76
-        actual = func(test_pt)
+        test_pt = np.array([[0.76], [.33]])
+        actual = func(test_pt).flatten()
         for method in self.interp_methods:
             interp = InterpND(method=method, points=points, values=values)
             computed = interp.interpolate(test_pt)
@@ -547,6 +549,13 @@ class TestInterpNDPython(unittest.TestCase):
         msg = ("\"InterpLinear: Option 'bad_arg' cannot be set because it has not been declared.")
         self.assertTrue(str(cm.exception).startswith(msg))
 
+        # Bspline not supported for tables.
+        points, values, func, df = self. _get_sample_2d()
+        with self.assertRaises(ValueError) as cm:
+            interp = InterpND(method='bsplines', points=points, values=values)
+
+        msg = "Method 'bsplines' is not supported for table interpolation."
+        self.assertTrue(str(cm.exception).startswith(msg))
 
 if __name__ == '__main__':
     unittest.main()

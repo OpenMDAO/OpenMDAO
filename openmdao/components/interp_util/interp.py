@@ -33,7 +33,8 @@ INTERP_METHODS = {
 
 TABLE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'scipy_cubic',
                  'scipy_slinear', 'scipy_quintic']
-SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines']
+SPLINE_METHODS = ['slinear', 'lagrange2', 'lagrange3', 'cubic', 'akima', 'bsplines',
+                  'scipy_cubic', 'scipy_slinear', 'scipy_quintic']
 
 
 class InterpND(object):
@@ -118,6 +119,10 @@ class InterpND(object):
         self.extrapolate = extrapolate
 
         if x_interp is None:
+
+            if method == 'bsplines':
+                msg = "Method 'bsplines' is not supported for table interpolation."
+                raise ValueError(msg)
 
             if not hasattr(values, 'ndim'):
                 # allow reasonable duck-typed values
@@ -344,14 +349,26 @@ class InterpND(object):
         if table._vectorized:
 
             if table._name == 'bsplines':
+                # bsplines is fully vectorized.
                 table.values = values
-            else:
-                interp = self._interp
-                table = interp(self.grid, values, interp, **self._interp_options)
-                table._compute_d_dvalues = True
-                table._compute_d_dx = False
+                result, _, derivs_val, _ = table.evaluate_vectorized(xi)
 
-            result, _, derivs_val, _ = table.evaluate_vectorized(xi)
+            else:
+                # Scipy implementation vectorized over lookups, but not over multiple table values.
+                interp = self._interp
+                n_nodes, _ = values.shape
+                nx = np.prod(xi.shape)
+
+                result = np.empty((n_nodes, nx), dtype=values.dtype)
+                derivs_val = None
+
+                for j in range(n_nodes):
+
+                    table = interp(self.grid, values[j, :], interp, **self._interp_options)
+                    table._compute_d_dvalues = False
+                    table._compute_d_dx = False
+
+                    result[j, :], _, _, _ = table.evaluate_vectorized(xi.reshape((nx, 1)))
 
         else:
             interp = self._interp
