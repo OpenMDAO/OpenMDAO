@@ -58,8 +58,7 @@ class OptionsDictionary(object):
             State to get.
         """
         if self._all_recordable:
-            state = self.__dict__
-            return state
+            return self.__dict__
         else:
             state = self.__dict__.copy()
             state['_dict'] = {key: val for key, val in state['_dict'].items() if val['recordable']}
