@@ -162,6 +162,29 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                          "local variable 'val' referenced before assignment")
 
+    def test_promotes_alias(self):
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=['a'])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['b'])
+                self.promotes('sub', inputs=[('b', 'bb')])
+
+        top = om.Problem(model=TopGroup())
+        top.setup()
+
+        self.assertEqual(top['bb'], 4.0)
+
     def test_multiple_promotes(self):
 
         class BranchGroup(om.Group):
