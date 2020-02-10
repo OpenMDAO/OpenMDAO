@@ -15,8 +15,6 @@ def cell_centered(num_cells, start=0.0, end=1.0):
         Minimum value to interpolate at.
     end : int or float
         Maximum value to interpolate at.
-    num_points : int
-        Number of points to distribute.
 
     Returns
     -------
