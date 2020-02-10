@@ -3112,12 +3112,14 @@ class System(object):
                     prom_name=False,
                     units=False,
                     shape=False,
+                    global_shape=False,
                     desc=False,
                     hierarchical=True,
                     print_arrays=False,
                     tags=None,
                     includes=None,
                     excludes=None,
+                    all_procs=False,
                     out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of input names and other optional information.
@@ -3137,6 +3139,8 @@ class System(object):
             When True, display/return units. Default is False.
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
+        global_shape : bool, optional
+            When True, display/return the global shape of the value. Default is False.
         desc : bool, optional
             When True, display/return description. Default is False.
         hierarchical : bool, optional
@@ -3157,6 +3161,8 @@ class System(object):
         excludes : None or list_like
             List of glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
+        all_procs : bool, optional
+            When True, display output on all processors. Default is False.
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3184,6 +3190,8 @@ class System(object):
             var_names = self._inputs._views.keys()
             abs2prom = self._var_abs2prom['input']
 
+        allprocs_meta = self._var_allprocs_abs2meta
+
         inputs = []
 
         for var_name in var_names:
@@ -3210,6 +3218,11 @@ class System(object):
                 var_meta['units'] = meta[var_name]['units']
             if shape:
                 var_meta['shape'] = val.shape
+            if global_shape:
+                if var_name in allprocs_meta:
+                    var_meta['global_shape'] = allprocs_meta[var_name]['global_shape']
+                else:
+                    var_meta['global_shape'] = 'Unavailable'
             if desc:
                 var_meta['desc'] = meta[var_name]['desc']
 
@@ -3248,7 +3261,7 @@ class System(object):
             out_stream = sys.stdout
 
         if out_stream:
-            self._write_table('input', inputs, hierarchical, print_arrays, out_stream)
+            self._write_table('input', inputs, hierarchical, print_arrays, all_procs, out_stream)
 
         return inputs
 
@@ -3260,6 +3273,7 @@ class System(object):
                      residuals_tol=None,
                      units=False,
                      shape=False,
+                     global_shape=False,
                      bounds=False,
                      scaling=False,
                      desc=False,
@@ -3268,6 +3282,7 @@ class System(object):
                      tags=None,
                      includes=None,
                      excludes=None,
+                     all_procs=False,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Return and optionally log a list of output names and other optional information.
@@ -3297,6 +3312,8 @@ class System(object):
             When True, display/return units. Default is False.
         shape : bool, optional
             When True, display/return the shape of the value. Default is False.
+        global_shape : bool, optional
+            When True, display/return the global shape of the value. Default is False.
         bounds : bool, optional
             When True, display/return bounds (lower and upper). Default is False.
         scaling : bool, optional
@@ -3321,6 +3338,8 @@ class System(object):
         excludes : None or list_like
             List of glob patterns for pathnames to exclude from the check. Default is None, which
             excludes nothing.
+        all_procs : bool, optional
+            When True, display output on all processors. Default is False.
         out_stream : file-like
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
@@ -3332,7 +3351,7 @@ class System(object):
         """
         if self._outputs is None:
             # final setup has not been performed
-            if hasattr(self, '_loc_subsys_map'):  # i.e. is a Group
+            if hasattr(self, '_local_system_set'):  # i.e. is a Group
                 raise RuntimeError("{}: Unable to list outputs on a Group until model has "
                                    "been run.".format(self.msginfo))
 
@@ -3348,6 +3367,7 @@ class System(object):
             var_names = self._outputs._views.keys()
             abs2prom = self._var_abs2prom['output']
 
+        allprocs_meta = self._var_allprocs_abs2meta
         states = self._list_states()
 
         # Go though the hierarchy. Printing Systems
@@ -3384,6 +3404,11 @@ class System(object):
                 var_meta['units'] = meta[var_name]['units']
             if shape:
                 var_meta['shape'] = val.shape
+            if global_shape:
+                if var_name in allprocs_meta:
+                    var_meta['global_shape'] = allprocs_meta[var_name]['global_shape']
+                else:
+                    var_meta['global_shape'] = 'Unavailable'
             if bounds:
                 var_meta['lower'] = meta[var_name]['lower']
                 var_meta['upper'] = meta[var_name]['upper']
@@ -3444,9 +3469,11 @@ class System(object):
 
         if out_stream:
             if explicit:
-                self._write_table('explicit', expl_outputs, hierarchical, print_arrays, out_stream)
+                self._write_table('explicit', expl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
             if implicit:
-                self._write_table('implicit', impl_outputs, hierarchical, print_arrays, out_stream)
+                self._write_table('implicit', impl_outputs, hierarchical, print_arrays,
+                                  all_procs, out_stream)
 
         if explicit and implicit:
             return expl_outputs + impl_outputs
@@ -3458,7 +3485,7 @@ class System(object):
             raise RuntimeError(self.msginfo +
                                ': You have excluded both Explicit and Implicit components.')
 
-    def _write_table(self, var_type, var_data, hierarchical, print_arrays, out_stream):
+    def _write_table(self, var_type, var_data, hierarchical, print_arrays, all_procs, out_stream):
         """
         Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -3476,12 +3503,20 @@ class System(object):
             When True, also display full values of the ndarray below the row. Format  is affected
             by the values set with numpy.set_printoptions
             Default is False.
+        all_procs : bool, optional
+            When True, display output on all processors.
         out_stream : file-like object
             Where to send human readable output.
             Set to None to suppress.
         """
         if out_stream is None:
             return
+
+        # determine whether setup has been performed
+        if self._outputs is not None:
+            setup = True
+        else:
+            setup = False
 
         # Make a dict of variables. Makes it easier to work with in this method
         var_dict = OrderedDict()
@@ -3491,22 +3526,27 @@ class System(object):
         # If parallel, gather up the vars.
         if MPI and self.comm:
             # All procs must call this. Returns a list, one per proc.
-            all_var_dicts = self.comm.gather(var_dict, root=0)
+            all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
+                else self.comm.allgather(var_dict)
 
-            if MPI.COMM_WORLD.rank > 0:  # only the root process should print
+            # unless all_procs is requested, only the root process should print
+            if not all_procs and self.comm.rank > 0:
                 return
 
-            # rest of this only done on rank 0
-            if self._outputs is not None:
-                # setup has been performed
+            if setup:
                 meta = self._var_abs2meta
             else:
                 meta = self._var_rel2meta
 
-            var_dict = all_var_dicts[0]  # start with rank 0
+            allprocs_meta = self._var_allprocs_abs2meta
 
-            for proc_vars in all_var_dicts[1:]:  # In rank order go through rest of the procs
-                for name, vals in iteritems(proc_vars):
+            var_dict = all_var_dicts[self.comm.rank]  # start with metadata from current rank
+
+            distrib = {'value': {}, 'resids': {}}     # dictionary to collect distributed values
+
+            # Go through data from all procs in order by rank and collect distributed values
+            for rank, proc_vars in enumerate(all_var_dicts):
+                for name in proc_vars:
                     if name not in var_dict:     # If not in the merged dict, add it
                         var_dict[name] = proc_vars[name]
                     else:
@@ -3516,28 +3556,41 @@ class System(object):
                             is_distributed = meta[name]['src_indices'] is not None
                         else:
                             is_distributed = meta[name]['distributed']
-                        if is_distributed:
+
+                        if is_distributed and name in allprocs_meta:
                             # TODO no support for > 1D arrays
                             #   meta.src_indices has the info we need to piece together arrays
-                            if 'value' in var_dict[name]:
-                                var_dict[name]['value'] = \
-                                    np.append(var_dict[name]['value'],
-                                              proc_vars[name]['value'])
-                            if 'shape' in var_dict[name]:
-                                # TODO might want to use allprocs_abs2meta_out[name]['global_shape']
-                                var_dict[name]['shape'] = \
-                                    var_dict[name]['value'].shape
-                            if 'resids' in var_dict[name]:
-                                var_dict[name]['resids'] = \
-                                    np.append(var_dict[name]['resids'],
-                                              proc_vars[name]['resids'])
 
-        inputs = var_type == 'input'
-        outputs = not inputs
-        var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
+                            global_shape = allprocs_meta[name]['global_shape']
+
+                            if meta[name]['shape'] != global_shape:
+                                # if the local shape is different than the global shape and the
+                                # global shape matches the concatenation of values from all procs,
+                                # then assume the concatenation, otherwise just use the value from
+                                # the current proc
+                                for key in ('value', 'resids'):
+                                    if key in var_dict[name]:
+                                        if rank == 0:
+                                            distrib[key][name] = proc_vars[name][key]
+                                        else:
+                                            distrib[key][name] = np.append(distrib[key][name],
+                                                                           proc_vars[name][key])
+
+                                        if rank == self.comm.size - 1:
+                                            if distrib[key][name].shape == global_shape:
+                                                var_dict[name][key] = distrib[key][name]
+
+        if setup:
+            inputs = var_type == 'input'
+            outputs = not inputs
+            var_list = self._get_vars_exec_order(inputs=inputs, outputs=outputs, variables=var_dict)
+            top_name = 'model'
+        else:
+            var_list = var_dict.keys()
+            top_name = self.name
 
         write_var_table(self.pathname, var_list, var_type, var_dict,
-                        hierarchical, print_arrays, out_stream)
+                        hierarchical, top_name, print_arrays, out_stream)
 
     def _get_vars_exec_order(self, inputs=False, outputs=False, variables=None):
         """

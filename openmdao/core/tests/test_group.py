@@ -24,9 +24,7 @@ from openmdao.error_checking.check_config import _check_hanging_inputs
 
 class SimpleGroup(om.Group):
 
-    def __init__(self):
-        super(SimpleGroup, self).__init__()
-
+    def setup(self):
         self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
         self.add_subsystem('comp2', om.ExecComp('b=2*a'))
         self.connect('comp1.x', 'comp2.a')
@@ -34,9 +32,7 @@ class SimpleGroup(om.Group):
 
 class BranchGroup(om.Group):
 
-    def __init__(self):
-        super(BranchGroup, self).__init__()
-
+    def setup(self):
         b1 = self.add_subsystem('Branch1', om.Group())
         g1 = b1.add_subsystem('G1', om.Group())
         g2 = g1.add_subsystem('G2', om.Group())
@@ -77,8 +73,6 @@ class TestSubsystemConfigError(unittest.TestCase):
         class SimpleGroup(om.Group):
 
             def setup(self):
-                super(SimpleGroup, self).setup()
-
                 self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
                 self.add_subsystem('comp2', om.ExecComp('b=2*a'))
                 self.connect('comp1.x', 'comp2.a')
