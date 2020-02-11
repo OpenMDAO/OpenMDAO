@@ -213,7 +213,6 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob.get_val('C1.y', get_remote=True),
                          np.array([2.5,2.5,3.5], dtype=float), 1e-6)
 
-        print("OK after 1st assert", flush=True)
         J = prob.compute_totals(of=of, wrt=wrt)
 
         expected = np.array([[2.5, 0, 0], [0, 2.5, 0], [0,0,3.5]], dtype=float)
