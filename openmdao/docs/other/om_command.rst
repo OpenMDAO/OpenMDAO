@@ -4,10 +4,8 @@
 Command Line Tools
 ******************
 
-OpenMDAO has a number of debugging/viewing command line tools that are available via the `openmdao`
-command.  There are two types of commands available, those that perform some sort of viewing or
-configuration checking on the Problem after its setup is complete, and those that are used to
-collect information about the entire run of the Problem, like profilers and tracers.
+OpenMDAO has a number of command line tools that are available via the `openmdao`
+command.
 
 .. note::
     The `openmdao` sub-commands, as well as any other console scripts associated with OpenMDAO, will
@@ -73,7 +71,7 @@ To see lists of the available and default checks, run the following command:
 .. _om-command-n2:
 
 openmdao n2
-###################
+###########
 
 The :code:`openmdao n2` command will generate an :math:`N^2` diagram of the model that is
 viewable in a browser, for example:
@@ -88,6 +86,7 @@ will generate an :math:`N^2` diagram like the one below.
 
 .. embed-n2::
     ../test_suite/scripts/circuit.py
+
 
 .. _om-command-view_connections:
 
@@ -336,6 +335,14 @@ package, do the following:
 
 .. embed-shell-cmd::
     :cmd: openmdao list_installed lin_solvers nl_solvers -i openmdao
+
+
+Similarly, to hide all of the built-in (openmdao) solver types and only see installed plugin
+solver types, do the following.
+
+.. code-block:: none
+
+    openmdao list_installed lin_solvers nl_solvers -x openmdao
 
 
 
