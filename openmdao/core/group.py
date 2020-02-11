@@ -807,7 +807,7 @@ class Group(System):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
-                            if type_ is 'output' and not abs2meta[name]['distributed']:
+                            if type_ == 'output' and not abs2meta[name]['distributed']:
                                 self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
