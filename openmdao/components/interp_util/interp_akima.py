@@ -66,7 +66,7 @@ def dv_abs_smooth_complex(x, x_deriv, delta_x):
             return 0.5 * (x[0]**2 / delta_x + delta_x), x[0] * x_deriv / delta_x
 
     y_deriv = x * x_deriv / delta_x
-    y =  0.5 * (x[0]**2 / delta_x + delta_x)
+    y = 0.5 * (x[0]**2 / delta_x + delta_x)
     idx_neg = np.where(x <= -delta_x)
     idx_pos = np.where(x >= delta_x)
 
