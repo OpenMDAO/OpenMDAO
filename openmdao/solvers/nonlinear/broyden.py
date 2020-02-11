@@ -173,6 +173,8 @@ class BroydenSolver(NonlinearSolver):
                   'to use the BoundsEnforceLS line search.'
             warn_deprecation(pathname + msg)
 
+        self._disallow_distrib_solve()
+
         states = self.options['state_vars']
         prom2abs = system._var_allprocs_prom2abs_list['output']
 

@@ -199,6 +199,20 @@ class DirectSolver(LinearSolver):
         # Use an assembled jacobian by default.
         self.options['assemble_jac'] = True
 
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super(DirectSolver, self)._setup_solvers(system, depth)
+        self._disallow_distrib_solve()
+
     def _linearize_children(self):
         """
         Return a flag that is True when we need to call linearize on our subsystems' solvers.

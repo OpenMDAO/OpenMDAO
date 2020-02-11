@@ -14,7 +14,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
-
+from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -631,6 +631,59 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with assertRaisesRegex(self, Exception, msg):
             prob.run_model()
+
+
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+class TestDirectSolverRemoteErrors(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_distrib_direct(self):
+        size = 3
+        group = om.Group()
+
+        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
+        group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
+                                                  x=np.zeros(size),
+                                                  y=np.zeros(size)))
+        group.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
+                                           y=np.zeros(size),
+                                           z=np.zeros(size)))
+
+        prob = om.Problem()
+        prob.model = group
+        prob.model.linear_solver = om.DirectSolver()
+        prob.model.connect('P.x', 'C1.x')
+        prob.model.connect('C1.y', 'C2.y')
+
+
+        prob.setup(check=False, mode='fwd')
+        with self.assertRaises(Exception) as cm:
+            prob.run_model()
+
+        self.assertEqual(str(cm.exception),
+                         "Group (<model>) has a DirectSolver solver and contains a distributed system.")
+
+    def test_par_direct(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('P', om.IndepVarComp('x', 1.0))
+        par = model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', om.ExecComp(['y=2.0*x']))
+        par.add_subsystem('C2', om.ExecComp(['z=3.0*y']))
+
+        model.linear_solver = om.DirectSolver()
+        model.connect('P.x', 'par.C1.x')
+        model.connect('P.x', 'par.C2.y')
+
+        prob.setup()
+        with self.assertRaises(Exception) as cm:
+            prob.run_model()
+
+        self.assertEqual(str(cm.exception),
+                         "Group (<model>) has a DirectSolver solver and contains remote variables.")
+
 
 
 class TestDirectSolverFeature(unittest.TestCase):

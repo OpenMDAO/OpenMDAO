@@ -83,6 +83,8 @@ class Group(System):
         List of subjacobian keys used for approximated derivatives.
     _setup_procs_finished : bool
         Flag to check if setup_procs is complete
+    _has_distrib_vars : bool
+        If True, this Group contains distributed variables.
     """
 
     def __init__(self, **kwargs):
@@ -110,6 +112,7 @@ class Group(System):
         self._discrete_transfers = {}
         self._approx_subjac_keys = None
         self._setup_procs_finished = False
+        self._has_distrib_vars = False
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -773,8 +776,8 @@ class Group(System):
                     sizes_in = sizes[type_][iproc, :].copy()
                     self.comm.Allgather(sizes_in, sizes[type_])
 
-            has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
-            if (has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
+            self._has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
+            if (self._has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
                     not np.all(self._var_sizes[vec_names[0]]['input'])):
                 if self._distributed_vector_class is not None:
                     self._vector_class = self._distributed_vector_class
@@ -809,7 +812,8 @@ class Group(System):
         if self._use_derivatives:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
-        self._setup_global_shapes()
+        if self.comm.size > 1:
+            self._setup_global_shapes()
 
     def _setup_global_connections(self, recurse=True, conns=None):
         """
