@@ -231,6 +231,24 @@ class TestProblem(unittest.TestCase):
 
         prob.compute_totals(of=['comp.f_xy'], wrt=['p1.x', 'p2.y'])
 
+    def test_single_string_wrt(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0))
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0))
+        model.add_subsystem('comp', Paraboloid())
+
+        model.connect('p1.x', 'comp.x')
+        model.connect('p2.y', 'comp.y')
+
+        prob.setup()
+        prob.run_model()
+
+        totals = prob.compute_totals(of='comp.f_xy', wrt='p1.x')
+        assert_rel_error(self, totals[('comp.f_xy', 'p1.x')][0][0], -4.0)
+
     def test_compute_totals_cleanup(self):
         p = om.Problem()
         model = p.model
