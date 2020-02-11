@@ -1,3 +1,5 @@
+.. _distributed_components:
+
 **********************
 Distributed Components
 **********************
@@ -35,12 +37,20 @@ Component Options
 Distributed Component Example
 -----------------------------
 
-The following simple example shows how to create a distributed component that
-distributes its computation evenly across the available processes, up to a
-maximum of 5 processors.  It performs one computation on process 0 and a
-different one on the other processors.  In this case we are only using 2
-processes.
+The following simple example shows how to create a distributed component, `DistribComp`, 
+that distributes its computation evenly across the available processes. A second `Summer`
+component sums the values from the distributed component into a scalar output value.
 
+These components can found in the OpenMDAO test suite:
+
+.. embed-code::
+  openmdao.test_suite.components.distributed_components.DistribComp
+
+.. embed-code::
+  openmdao.test_suite.components.distributed_components.Summer
+
+
+This example is run with 2 processes:
 
 .. embed-code::
   openmdao.core.tests.test_distribcomp.MPIFeatureTests.test_distribcomp_feature
