@@ -81,6 +81,8 @@ class Group(System):
         Mapping of local subsystem names to their corresponding System.
     _approx_subjac_keys : list
         List of subjacobian keys used for approximated derivatives.
+    _setup_procs_finished : bool
+        Flag to check if setup_procs is complete
     """
 
     def __init__(self, **kwargs):
@@ -107,6 +109,7 @@ class Group(System):
         self._transfers = {}
         self._discrete_transfers = {}
         self._approx_subjac_keys = None
+        self._setup_procs_finished = False
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -320,6 +323,8 @@ class Group(System):
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
 
+        self._setup_procs_finished = False
+
         if self._num_par_fd > 1:
             info = self._coloring_info
             if comm.size > 1:
@@ -424,6 +429,8 @@ class Group(System):
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
 
         self._loc_subsys_map = {s.name: s for s in self._subsystems_myproc}
+
+        self._setup_procs_finished = True
 
     def _post_configure(self):
         """
@@ -800,7 +807,7 @@ class Group(System):
                     for rank in range(self.comm.size):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
-                            if type_ is 'output' and not abs2meta[name]['distributed']:
+                            if type_ == 'output' and not abs2meta[name]['distributed']:
                                 self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
@@ -1435,6 +1442,10 @@ class Group(System):
             enable users to instantiate and add a subsystem at the
             same time, and get the reference back.
         """
+        if self._setup_procs_finished:
+            raise RuntimeError("%s: Cannot call add_subsystem in "
+                               "the configure method" % (self.msginfo))
+
         if inspect.isclass(subsys):
             raise TypeError("%s: Subsystem '%s' should be an instance, but a %s class object was "
                             "found." % (self.msginfo, name, subsys.__name__))

@@ -191,9 +191,9 @@ scaling (res, res0, and res_ref) for the variables.
 ~~~~~~~~~~~~~~~~~~~~
 
 The :code:`list_inputs()` and :code:`list_outputs()` methods both have a :code:`print_arrays` option.
-By default, this option is set to False and only the norm of the array will appear in the tabular display. 
-The norm value is surrounded by vertical bars to indicate that it is a norm. 
-When the option is set to True, the complete value of the array will also be a displayed below the row. 
+By default, this option is set to False and only the norm of the array will appear in the tabular display.
+The norm value is surrounded by vertical bars to indicate that it is a norm.
+When the option is set to True, the complete value of the array will also be a displayed below the row.
 The format is affected by the values set with :code:`numpy.set_printoptions`.
 
 .. embed-code::
@@ -205,10 +205,22 @@ The format is affected by the values set with :code:`numpy.set_printoptions`.
 
    It is normally required to run the model before :code:`list_inputs()` and :code:`list_outputs()` can be used.
    This is because the final setup that occurs just before execution determines the hierarchy and builds the
-   data structures and connections.  In some cases however, it can be useful to call these functions on a 
+   data structures and connections.  In some cases however, it can be useful to call these functions on a
    component prior to execution to assist in configuring your model. This capability does not apply to groups,
-   but basic metadata about a component's inputs and outputs is available.  
+   but basic metadata about a component's inputs and outputs is available.
    See the documentation for the :ref:`configure() method<feature_configure_IO>` for one such use case.
+
+
+*List Global Shape*
+~~~~~~~~~~~~~~~~~~~
+
+When working with :ref:`distributed components<distributed_components>`, it may also be useful to display the
+global shape of a variable as well as the shape on the current processor.  Note that this information is not
+available until after the model has been completely set up and run.
+
+.. embed-code::
+  openmdao.core.tests.test_distrib_list_vars.MPIFeatureTests.test_distribcomp_list_feature
+  :layout: interleave
 
 
 *Listing Problem Variables*
