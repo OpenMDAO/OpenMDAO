@@ -150,11 +150,13 @@ class InterpBSplines(InterpAlgorithm):
             t = t_vec[ipt]
 
             i0 = -1
-            for ind in range(order, num_cp + 1):
-                if (knots[ind - 1].real <= t.real) and (t.real < knots[ind].real):
-                    i0 = ind - order
             if t.real == knots[-1].real:
                 i0 = num_cp - order
+            else:
+                for ind in range(order, num_cp + 1):
+                    if (knots[ind - 1].real <= t.real) and (t.real < knots[ind].real):
+                        i0 = ind - order
+                        break
 
             basis[:] = 0.
             basis[-1] = 1.

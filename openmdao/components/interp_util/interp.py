@@ -204,8 +204,6 @@ class InterpND(object):
             Value of derivative of interpolated output with respect to input x. (Only when
             compute_derivative is True.)
         """
-        table = self.table
-
         xnew = self._interpolate(np.atleast_1d(x))
 
         if compute_derivative:
