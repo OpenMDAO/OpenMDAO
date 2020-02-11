@@ -75,7 +75,7 @@ class NewtonSolver(NonlinearSolver):
         self.options.declare('cs_reconverge', types=bool, default=True,
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
-        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+        self.options.declare('reraise_child_analysiserror', types=bool, default=True,
                              desc='When the option is true, a solver will reraise any '
                              'AnalysisError that arises during subsolve; when false, it will '
                              'continue solving.')
@@ -98,6 +98,16 @@ class NewtonSolver(NonlinearSolver):
         rank = MPI.COMM_WORLD.rank if MPI is not None else 0
 
         self._disallow_discrete_outputs()
+
+        if self.options._dict['reraise_child_analysiserror']['value']:
+            pathname = self._system().pathname
+            if pathname:
+                pathname += ': '
+            msg = ("Deprecation warning: In V 3.x, reraise_child_analysiserror will default to "
+                   "False.")
+
+            if rank == 0:
+                warn_deprecation(pathname + msg)
 
         if not isinstance(self.options._dict['solve_subsystems']['value'], bool):
             pathname = self._system().pathname
