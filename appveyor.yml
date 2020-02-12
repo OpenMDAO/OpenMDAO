@@ -82,7 +82,7 @@ install:
     fi
 
     echo "  > Install pyOptSparse";
-    python setup.py install;
+    pip install .;
     cd ..;
 
     if [ "$PETSc" ]; then
