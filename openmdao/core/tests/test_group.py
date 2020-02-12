@@ -112,11 +112,11 @@ class TestGroup(unittest.TestCase):
         top.setup()
 
         self.assertEqual(top['b'], 1)
-        with self.assertRaises(UnboundLocalError) as cm:
+        with self.assertRaises(KeyError) as cm:
             top['a']
 
         self.assertEqual(str(cm.exception),
-                         "local variable 'val' referenced before assignment")
+                         "'Problem: Variable name \"a\" not found.'")
 
     def test_promotes_inputs_in_config(self):
 
@@ -134,11 +134,11 @@ class TestGroup(unittest.TestCase):
         top.setup()
 
         self.assertEqual(top['a'], 1)
-        with self.assertRaises(UnboundLocalError) as cm:
+        with self.assertRaises(KeyError) as cm:
             top['b']
 
         self.assertEqual(str(cm.exception),
-                         "local variable 'val' referenced before assignment")
+                         "'Problem: Variable name \"b\" not found.'")
 
     def test_promotes_in_config(self):
 
@@ -156,11 +156,11 @@ class TestGroup(unittest.TestCase):
         top.setup()
 
         self.assertEqual(top['x'], 5)
-        with self.assertRaises(UnboundLocalError) as cm:
+        with self.assertRaises(KeyError) as cm:
             top['a']
 
         self.assertEqual(str(cm.exception),
-                         "local variable 'val' referenced before assignment")
+                         "'Problem: Variable name \"a\" not found.'")
 
     def test_promotes_alias(self):
         class SubGroup(om.Group):
@@ -205,11 +205,11 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(top['Branch1.G1.a'], 3)
         self.assertEqual(top['Branch1.G1.comp1.b'], 6)
-        with self.assertRaises(UnboundLocalError) as cm:
+        with self.assertRaises(KeyError) as cm:
             top['Branch1.G1.comp1.a']
 
         self.assertEqual(str(cm.exception),
-                         "local variable 'val' referenced before assignment")
+                         "'Problem: Variable name \"Branch1.G1.comp1.a\" not found.'")
 
     def test_multiple_promotes_collision(self):
 
