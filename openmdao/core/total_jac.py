@@ -121,6 +121,12 @@ class _TotalJacInfo(object):
         self.par_deriv = {}
         self._recording_iter = driver._recording_iter
 
+        if isinstance(wrt, str):
+            wrt = [wrt]
+
+        if isinstance(of, str):
+            of = [of]
+
         design_vars = driver._designvars
         responses = driver._responses
 
