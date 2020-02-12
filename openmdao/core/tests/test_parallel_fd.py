@@ -269,9 +269,9 @@ def _test_func_name(func, num, param):
 class MatMultTestCase(unittest.TestCase):
     N_PROCS = 4
 
-    @parameterized.expand(itertools.product([20, 21, 22], [2, 3, 4], ['fd', 'cs'], [om.LinearRunOnce, om.DirectSolver]),
+    @parameterized.expand(itertools.product([20, 21, 22], [2, 3, 4], ['fd', 'cs']),
                           name_func=_test_func_name)
-    def test_par_fd(self, size, num_par_fd, method, solver):
+    def test_par_fd(self, size, num_par_fd, method):
         if MPI:
             if MPI.COMM_WORLD.rank == 0:
                 mat = np.random.random(5 * size).reshape((5, size)) - 0.5
@@ -284,7 +284,6 @@ class MatMultTestCase(unittest.TestCase):
         p = om.Problem()
 
         model = p.model
-        model.linear_solver = solver()
 
         model.add_subsystem('indep', om.IndepVarComp('x', val=np.ones(mat.shape[1])))
         comp = model.add_subsystem('comp', MatMultComp(mat, approx_method=method, num_par_fd=num_par_fd))

@@ -120,8 +120,7 @@ class SerialLinear(om.ImplicitComponent):
     def apply_nonlinear(self, inputs, outputs, residuals):
         y = inputs['y']
         x = outputs['x']
-        r = residuals['x']
-        r = y - A.dot(x)
+        residuals['x'] = y - A.dot(x)
 
     def solve_nonlinear(self, inputs, outputs):
         y = inputs['y']

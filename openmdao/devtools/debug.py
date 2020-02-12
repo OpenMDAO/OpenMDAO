@@ -7,7 +7,6 @@ import os
 from itertools import product, chain
 
 import numpy as np
-import cProfile
 from contextlib import contextmanager
 from six import iteritems, iterkeys, itervalues
 from collections import Counter
@@ -52,9 +51,11 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
     """
     def _get_data(g, type_):
 
-        sizes = g._var_sizes[vec_name]
+        sizes = g._var_sizes[vec_name][type_]
         vnames = g._var_allprocs_abs_names
         abs2meta = g._var_allprocs_abs2meta
+        relevant = g._var_relevant_names[vec_name][type_]
+        abs2idx = g._var_allprocs_abs2idx[vec_name]
 
         idx = 0
         data = []
@@ -62,13 +63,16 @@ def dump_dist_idxs(problem, vec_name='nonlinear', stream=sys.stdout):  # pragma:
         iwid = 0
         total = 0
         for rank in range(g.comm.size):
-            for ivar, vname in enumerate(vnames[type_]):
-                sz = sizes[type_][rank, ivar]
+            for vname in vnames[type_]:
+                if vname not in abs2idx:
+                    continue
+                ivar = abs2idx[vname]
+                sz = sizes[rank, ivar]
                 if sz > 0:
                     data.append((vname, str(total)))
-                nwid = max(nwid, len(vname))
-                iwid = max(iwid, len(data[-1][1]))
-                total += sz
+                    nwid = max(nwid, len(vname))
+                    iwid = max(iwid, len(data[-1][1]))
+                    total += sz
 
         return data, nwid, iwid
 
@@ -436,6 +440,7 @@ def profiling(outname='prof.out'):
     outname : str
         Name of the output file containing profiling stats.
     """
+    import cProfile
     prof = cProfile.Profile()
     prof.enable()
 
@@ -521,6 +526,7 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
 
     def _mpi_trace_callback(frame, event, arg):
         pname = None
+        commsize = ''
         if event == 'call':
             if 'openmdao' in frame.f_code.co_filename:
                 if frame.f_code.co_name in skip:
@@ -530,10 +536,14 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         pname = frame.f_locals['self'].msginfo
                     except:
                         pass
+                    try:
+                        commsize = frame.f_locals['self'].comm.size
+                    except:
+                        pass
                 if pname is not None:
                     if not stack or pname != stack[-1][0]:
                         stack.append([pname, 1])
-                        print('   ' * len(stack), pname, file=outfile, flush=flush)
+                        print('   ' * len(stack), commsize, pname, file=outfile, flush=flush)
                     else:
                         stack[-1][1] += 1
                 print('   ' * len(stack), '-->', frame.f_code.co_name, "%s:%d" %
@@ -548,6 +558,10 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                         pname = frame.f_locals['self'].msginfo
                     except:
                         pass
+                    try:
+                        commsize = frame.f_locals['self'].comm.size
+                    except:
+                        pass
                 print('   ' * len(stack), '<--', frame.f_code.co_name, "%s:%d" %
                       (frame.f_code.co_filename, frame.f_code.co_firstlineno),
                       file=outfile, flush=flush)
@@ -556,7 +570,8 @@ def trace_mpi(fname='mpi_trace', skip=(), flush=True):
                     if stack[-1][1] < 1:
                         stack.pop()
                         if stack:
-                            print('   ' * len(stack), stack[-1][0], file=outfile, flush=flush)
+                            print('   ' * len(stack), commsize, stack[-1][0], file=outfile,
+                                  flush=flush)
         else:
             _print_c_func(frame, arg, _c_map[event])
 
