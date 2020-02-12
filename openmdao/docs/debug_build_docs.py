@@ -5,6 +5,5 @@ if __name__ == '__main__':
     from sphinx.cmd.build import main
     #os.system('make clean')
     testargs = '-b html -d _build/doctrees . _build/html -t "usr"'.split(' ')
-    sys.argv.extend(testargs)
 
-    sys.exit(main())
+    sys.exit(main(testargs))
