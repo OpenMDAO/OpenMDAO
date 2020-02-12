@@ -15,8 +15,7 @@ language: generic
 
 env:
   matrix:
-    # pinning Python 3.7.3, seems to be an issue with the python 3.7.4 installed by conda
-    # test with the latest version of Python 3.x; due to issues with PETSc 3.12, stick to 3.11 and
+    # test with the latest version of Python 3.x; due to issues with PETSc 3.12, stay with 3.11 and
     # install from maint-3.11 to get this fix: https://bitbucket.org/petsc/petsc4py/commits/a013d13
     - PY=3   NUMPY=1.18 SCIPY=1.4 PETSc=git+https://bitbucket.org/petsc/petsc4py.git@maint-3.11 UPLOAD_DOCS=1
     - PY=3.7 NUMPY=1.17 SCIPY=1.3
@@ -123,7 +122,7 @@ install:
     fi
 
     echo "  > Install pyOptSparse";
-    python setup.py install;
+    pip install .;
     cd ..;
 
     if [ "$PETSc" ]; then
