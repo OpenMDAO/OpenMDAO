@@ -11,6 +11,7 @@ import numpy as np
 from openmdao.vectors.vector import INT_DTYPE
 from openmdao.vectors.transfer import Transfer
 from openmdao.utils.array_utils import convert_neg, _global2local_offsets, _flatten_src_indices
+from openmdao.utils.mpi import MPI
 
 _empty_idx_array = np.array([], dtype=INT_DTYPE)
 
@@ -183,14 +184,73 @@ class DefaultTransfer(Transfer):
             Whether to call this method in subsystems.
         """
         group._discrete_transfers = transfers = defaultdict(list)
-        offset = len(group.pathname) + 1 if group.pathname else 0
+        name_offset = len(group.pathname) + 1 if group.pathname else 0
+
+        iproc = group.comm.rank
+        owns = group._owning_rank
 
         for tgt, src in iteritems(group._conn_discrete_in2out):
-            src_sys, src_var = src[offset:].split('.', 1)
-            tgt_sys, tgt_var = tgt[offset:].split('.', 1)
+            src_sys, src_var = src[name_offset:].split('.', 1)
+            tgt_sys, tgt_var = tgt[name_offset:].split('.', 1)
             xfer = (src_sys, src_var, tgt_sys, tgt_var)
             transfers[tgt_sys].append(xfer)
-            transfers[None].append(xfer)
+
+        if group.comm.size > 1:
+            # collect all xfers for each tgt system
+            for tgt, src in iteritems(group._conn_discrete_in2out):
+                src_sys, src_var = src[name_offset:].split('.', 1)
+                tgt_sys, tgt_var = tgt[name_offset:].split('.', 1)
+                xfer = (src_sys, src_var, tgt_sys, tgt_var)
+                transfers[tgt_sys].append(xfer)
+
+            total_send = set()
+            total_recv = []
+            total_xfers = []
+
+            for tgt_sys, xfers in iteritems(transfers):
+                send = set()
+                recv = []
+                for src_sys, src_var, tgt_sys, tgt_var in xfers:
+                    if group.pathname:
+                        src_abs = '.'.join([group.pathname, src_sys, src_var])
+                    else:
+                        src_abs = '.'.join([src_sys, src_var])
+                    tgt_rel = '.'.join((tgt_sys, tgt_var))
+                    src_rel = '.'.join((src_sys, src_var))
+                    if iproc == owns[src_abs]:
+                        # we own this var, so we'll send it out to others
+                        send.add(src_rel)
+                    if (tgt_rel in group._var_discrete['input'] and
+                            src_rel not in group._var_discrete['output']):
+                        # we have the target locally, but not the source, so we need someone
+                        # to send it to us.
+                        recv.append(src_rel)
+
+                transfers[tgt_sys] = (xfers, send, recv)
+                total_xfers.extend(xfers)
+                total_send.update(send)
+                total_recv.extend(recv)
+
+            transfers[None] = (total_xfers, total_send, total_recv)
+
+            # find out all ranks that need to receive each discrete source var
+            allproc_xfers = group.comm.allgather(transfers)
+            allprocs_recv = defaultdict(lambda: defaultdict(list))
+            for rank, rank_transfers in enumerate(allproc_xfers):
+                for tgt_sys, (_, _, recvs) in iteritems(rank_transfers):
+                    for recv in recvs:
+                        allprocs_recv[tgt_sys][recv].append(rank)
+
+            group._allprocs_discrete_recv = allprocs_recv
+
+            # if we own a src var but it's local for every rank, we don't need to send it to anyone.
+            total_send = total_send.intersection(allprocs_recv)
+
+            for tgt_sys in transfers:
+                xfers, send, _ = transfers[tgt_sys]
+                # update send list to remove any vars that don't have a remote receiver,
+                # and get rid of recv list because allprocs_recv has the necessary info.
+                transfers[tgt_sys] = (xfers, send.intersection(allprocs_recv[tgt_sys]))
 
     def _transfer(self, in_vec, out_vec, mode='fwd'):
         """
