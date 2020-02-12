@@ -83,6 +83,8 @@ class Group(System):
         List of subjacobian keys used for approximated derivatives.
     _setup_procs_finished : bool
         Flag to check if setup_procs is complete
+    _has_distrib_vars : bool
+        If True, this Group contains distributed variables.
     """
 
     def __init__(self, **kwargs):
@@ -110,6 +112,7 @@ class Group(System):
         self._discrete_transfers = {}
         self._approx_subjac_keys = None
         self._setup_procs_finished = False
+        self._has_distrib_vars = False
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -380,9 +383,7 @@ class Group(System):
             self._subsystems_myproc = [self._subsystems_allprocs[ind] for ind in sub_inds]
 
             # Define local subsystems
-            if np.sum([minp for minp, _, _ in proc_info]) <= comm.size:
-                self._subsystems_myproc_inds = sub_inds
-            else:
+            if not (np.sum([minp for minp, _, _ in proc_info]) <= comm.size):
                 # reorder the subsystems_allprocs based on which procs they live on. If we don't
                 # do this, we can get ordering mismatches in some of our data structures.
                 new_allsubs = []
@@ -394,19 +395,14 @@ class Group(System):
                             new_allsubs.append(self._subsystems_allprocs[ind])
                             seen.add(ind)
                 self._subsystems_allprocs = new_allsubs
-                sub_idxs = {s.name: i for i, s in enumerate(self._subsystems_allprocs)}
-
-                # since the subsystems_allprocs order changed, we also have to update
-                # subsystems_myproc_inds
-                self._subsystems_myproc_inds = [sub_idxs[s.name] for s in self._subsystems_myproc]
         else:
             sub_comm = comm
             self._subsystems_myproc = self._subsystems_allprocs
-            self._subsystems_myproc_inds = list(range(len(self._subsystems_myproc)))
             sub_proc_range = (0, 1)
 
         # Compute _subsystems_proc_range
         self._subsystems_proc_range = [sub_proc_range] * len(self._subsystems_myproc)
+        self._subsystems_inds = {s.name: i for i, s in enumerate(self._subsystems_allprocs)}
 
         self._local_system_set = set()
 
@@ -532,9 +528,10 @@ class Group(System):
             allprocs_counters = {}
             for type_ in ['input', 'output']:
                 allprocs_counters[type_] = np.zeros(nsub_allprocs, INT_DTYPE)
-                for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
+                for subsys in self._subsystems_myproc:
                     comm = subsys.comm if subsys._full_comm is None else subsys._full_comm
                     if comm.rank == 0 and vec_name in subsys._rel_vec_names:
+                        isub = self._subsystems_inds[subsys.name]
                         allprocs_counters[type_][isub] = \
                             len(subsys._var_allprocs_relevant_names[vec_name][type_])
 
@@ -542,7 +539,8 @@ class Group(System):
             if self.comm.size > 1:
                 gathered = self.comm.allgather(allprocs_counters)
                 allprocs_counters = {
-                    type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']}
+                    type_: np.zeros(nsub_allprocs, INT_DTYPE) for type_ in ['input', 'output']
+                }
                 for myproc_counters in gathered:
                     for type_ in ['input', 'output']:
                         allprocs_counters[type_] += myproc_counters[type_]
@@ -553,9 +551,10 @@ class Group(System):
             for type_ in ['input', 'output']:
                 subsystems_var_range[vec_name][type_] = {}
 
-                for subsys, isub in zip(self._subsystems_myproc, self._subsystems_myproc_inds):
+                for subsys in self._subsystems_myproc:
                     if vec_name not in subsys._rel_vec_names:
                         continue
+                    isub = self._subsystems_inds[subsys.name]
                     start = np.sum(allprocs_counters[type_][:isub])
                     subsystems_var_range[vec_name][type_][subsys.name] = (
                         start, start + allprocs_counters[type_][isub]
@@ -570,17 +569,6 @@ class Group(System):
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_var_index_ranges(recurse)
-
-    def _use_owned_sizes(self):
-        """
-        Return True if owned_sizes array should be used to determine non-duplicated vec sizes.
-
-        Returns
-        -------
-        bool
-            True if owned_sizes array should be used to determine non-duplicated vec sizes.
-        """
-        return self.comm.size > 1
 
     def _setup_var_data(self, recurse=True):
         """
@@ -788,8 +776,8 @@ class Group(System):
                     sizes_in = sizes[type_][iproc, :].copy()
                     self.comm.Allgather(sizes_in, sizes[type_])
 
-            has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
-            if (has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
+            self._has_distrib_vars = self.comm.allreduce(n_distrib_vars) > 0
+            if (self._has_distrib_vars or not np.all(self._var_sizes[vec_names[0]]['output']) or
                     not np.all(self._var_sizes[vec_names[0]]['input'])):
                 if self._distributed_vector_class is not None:
                     self._vector_class = self._distributed_vector_class
@@ -824,7 +812,8 @@ class Group(System):
         if self._use_derivatives:
             self._var_sizes['nonlinear'] = self._var_sizes['linear']
 
-        self._setup_global_shapes()
+        if self.comm.size > 1:
+            self._setup_global_shapes()
 
     def _setup_global_connections(self, recurse=True, conns=None):
         """
@@ -985,7 +974,7 @@ class Group(System):
 
     def _setup_connections(self, recurse=True):
         """
-        Compute dict of all implicit and explicit connections owned by this Group.
+        Compute dict of all connections owned by this Group.
 
         Parameters
         ----------
@@ -1747,6 +1736,7 @@ class Group(System):
             jac = self._jacobian
         elif jac is None and self._assembled_jac is not None:
             jac = self._assembled_jac
+
         if jac is not None:
             for vec_name in vec_names:
                 with self._matvec_context(vec_name, scope_out, scope_in, mode) as vecs:

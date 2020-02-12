@@ -632,9 +632,7 @@ class Coloring(object):
         Display a plot of the sparsity pattern, showing grouping by color.
         """
         try:
-            from matplotlib import pyplot, patches, axes, cm
-            from matplotlib.artist import getp
-            from matplotlib.offsetbox import AnchoredText
+            from matplotlib import pyplot, axes, cm
         except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
