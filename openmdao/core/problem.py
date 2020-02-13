@@ -1348,7 +1348,7 @@ class Problem(object):
         old_subjacs = model._subjacs_info.copy()
 
         model.approx_totals(method=method, step=step, form=form,
-                            step_calc=step_calc if method is 'fd' else None)
+                            step_calc=step_calc if method == 'fd' else None)
         total_info = _TotalJacInfo(self, of, wrt, False, return_format='flat_dict', approx=True,
                                    driver_scaling=driver_scaling)
         Jfd = total_info.compute_totals_approx(initialize=True)
