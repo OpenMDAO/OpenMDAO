@@ -19,6 +19,7 @@ from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path
+from openmdao.core.component import Component
 
 _emptyset = set()
 
@@ -545,6 +546,25 @@ class Solver(object):
             Complex mode flag; set to True prior to commencing complex step.
         """
         pass
+
+    def _disallow_distrib_solve(self):
+        """
+        Raise an exception if our system or any subsystems are distributed or non-local.
+        """
+        s = self._system()
+        if s.comm.size == 1:
+            return
+
+        from openmdao.core.group import Group
+        if (isinstance(s, Group) and s._has_distrib_vars) or (isinstance(s, Component) and
+                                                              s.options['distributed']):
+            raise RuntimeError("%s has a %s solver and contains a distributed system." %
+                               (s.msginfo, type(self).__name__))
+
+        if not (np.all(s._var_sizes['nonlinear']['output']) and
+                np.all(s._var_sizes['nonlinear']['input'])):
+            raise RuntimeError("%s has a %s solver and contains remote variables." %
+                               (s.msginfo, type(self).__name__))
 
 
 class NonlinearSolver(Solver):

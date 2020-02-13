@@ -118,11 +118,7 @@ class EmbedCodeDirective(Directive):
 
         if is_test:
             try:
-                source = dedent(source)  # strip_decorators needs dedented code to work
-                source = strip_decorators(source)
-                source = strip_header(source)
-                source = dedent(source)  # need to do this again if there were decorators
-                source = replace_asserts_with_prints(source)
+                source = replace_asserts_with_prints(dedent(strip_header(strip_decorators(dedent(source)))))
                 source = remove_initial_empty_lines(source)
 
                 class_name = class_.__name__
