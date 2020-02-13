@@ -334,7 +334,7 @@ For example, to show only those linear and nonlinear solver types that are part 
 package, do the following:
 
 .. embed-shell-cmd::
-    :cmd: openmdao list_installed lin_solvers nl_solvers -i openmdao
+    :cmd: openmdao list_installed lin_solver nl_solver -i openmdao
 
 
 Similarly, to hide all of the built-in (openmdao) solver types and only see installed plugin
@@ -342,7 +342,55 @@ solver types, do the following.
 
 .. code-block:: none
 
-    openmdao list_installed lin_solvers nl_solvers -x openmdao
+    openmdao list_installed lin_solver nl_solver -x openmdao
+
+
+.. _om-command-find-plugins:
+
+openmdao find_plugins
+#####################
+
+The :code:`openmdao find_plugins` command finds github repositories containing openmdao plugins.
+Its options are shown below:
+
+
+.. embed-shell-cmd::
+    :cmd: openmdao find_plugins -h
+
+
+One example of its use would be to display any github repositories containing openmdao command
+line tools.  At the time this documentation was created, the following repositories were found:
+
+.. embed-shell-cmd::
+    :cmd: openmdao find_plugins command
+
+
+
+.. _om-command-compute-entry-points:
+
+openmdao compute_entry_points
+#############################
+
+The :code:`openmdao compute_entry_points` command lists entry point groups and entry points for
+any openmdao compatible classes, e.g., Component, Group, etc., that it finds within a given
+python package. Its options are shown below:
+
+
+.. embed-shell-cmd::
+    :cmd: openmdao compute_entry_points -h
+
+
+For example, to show all of the potential openmdao entry point groups and entry points for an
+installed python package called `mypackage`, you would do the following:
+
+
+.. code-block:: none
+
+    openmdao compute_entry_points mypackage
+
+
+The entry point information will be printed in a form that can easily be pasted into the
+`setup.py` file for the specified package.
 
 
 

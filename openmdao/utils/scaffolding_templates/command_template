@@ -21,6 +21,7 @@ def _{command_name}_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
+    # replace the following argument definitions with those appropriate for your command line tool
     parser.add_argument('-r', '--repeat', action='store', dest='repeats',
                         default=1, type=int, help='Number of times to repeat command.')
     parser.add_argument('file', metavar='file', nargs=1, help='Script to execute.')

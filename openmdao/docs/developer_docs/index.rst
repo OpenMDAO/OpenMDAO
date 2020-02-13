@@ -37,6 +37,14 @@ so that you can check them while you are writing them.
     travis_caching.rst
 
 
+Creating Your Own OpenMDAO Plugins
+----------------------------------
+
+.. toctree::
+    :maxdepth: 2
+
+    writing_plugins.rst
+
 
 Documentation Style Guide
 -------------------------

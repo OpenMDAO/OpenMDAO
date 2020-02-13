@@ -157,7 +157,8 @@ setup(
         'pyDOE2',
         'pyparsing',
         'scipy',
-        'six'
+        'six',
+        'requests'
     ],
     entry_points={
         'console_scripts': [
@@ -166,13 +167,13 @@ setup(
             'run_om_test=openmdao.devtools.run_test:run_test',
             'openmdao=openmdao.utils.om:openmdao_cmd',
         ],
-        'openmdao_case_readers': [
+        'openmdao_case_reader': [
             'sqlitereader=openmdao.recorders.sqlite_reader:SqliteCaseReader',
         ],
-        'openmdao_case_recorders': [
+        'openmdao_case_recorder': [
             'sqliterecorder=openmdao.recorders.sqlite_recorder:SqliteRecorder',
         ],
-        'openmdao_components': [
+        'openmdao_component': [
             'addsubtractcomp=openmdao.components.add_subtract_comp:AddSubtractComp',
             'akimasplinecomp=openmdao.components.akima_spline_comp:AkimaSplineComp',
             'balancecomp=openmdao.components.balance_comp:BalanceComp',
@@ -194,18 +195,18 @@ setup(
             'vectormagnitudecomp=openmdao.components.vector_magnitude_comp:VectorMagnitudeComp',
             'indepvarcomp=openmdao.core.indepvarcomp:IndepVarComp',
         ],
-        'openmdao_drivers': [
+        'openmdao_driver': [
             'doedriver=openmdao.drivers.doe_driver:DOEDriver',
             'driver=openmdao.core.driver:Driver',
             'simplegadriver=openmdao.drivers.genetic_algorithm_driver:SimpleGADriver',
             'pyoptsparsedriver=openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver',
             'scipydriver=openmdao.drivers.scipy_optimizer:ScipyOptimizeDriver',
         ],
-        'openmdao_groups': [
+        'openmdao_group': [
             'group=openmdao.core.group:Group',
             'parallelgroup=openmdao.core.parallel_group:ParallelGroup',
         ],
-        'openmdao_lin_solvers': [
+        'openmdao_lin_solver': [
             'directsolver=openmdao.solvers.linear.direct:DirectSolver',
             'linearblockgs=openmdao.solvers.linear.linear_block_gs:LinearBlockGS',
             'linearblockjac=openmdao.solvers.linear.linear_block_jac:LinearBlockJac',
@@ -214,7 +215,7 @@ setup(
             'scipykrylov=openmdao.solvers.linear.scipy_iter_solver:ScipyKrylov',
             'userdefined=openmdao.solvers.linear.user_defined:LinearUserDefined',
         ],
-        'openmdao_nl_solvers': [
+        'openmdao_nl_solver': [
             'broydensolver=openmdao.solvers.nonlinear.broyden:BroydenSolver',
             'newtonsolver=openmdao.solvers.nonlinear.newton:NewtonSolver',
             'nonlinearblockgs=openmdao.solvers.nonlinear.nonlinear_block_gs:NonlinearBlockGS',
@@ -223,11 +224,7 @@ setup(
             'armijogoldsteinls=openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS',
             'boundsenforcels=openmdao.solvers.linesearch.backtracking:BoundsEnforceLS',
         ],
-        'openmdao_line_search_solvers': [
-            'boundsenforcels=openmdao.solvers.linesearch.backtracking:BoundsEnforceLS',
-            'armijogoldsteinls=openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS',
-        ],
-        'openmdao_surrogate_models': [
+        'openmdao_surrogate_model': [
             'krigingsurrogate=openmdao.surrogate_models.kriging:KrigingSurrogate',
             'nearestneighbor=openmdao.surrogate_models.nearest_neighbor:NearestNeighbor',
             'responsesurface=openmdao.surrogate_models.response_surface:ResponseSurface',

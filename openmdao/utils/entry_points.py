@@ -10,6 +10,7 @@ import itertools
 from importlib import import_module
 from os.path import join, basename, dirname, isfile, split, splitext, abspath, expanduser
 from inspect import getmembers, isclass
+import textwrap
 
 from openmdao.utils.file_utils import package_iter, get_module_path
 from openmdao.core.component import Component
@@ -31,18 +32,21 @@ except ImportError:
 
 
 _epgroup_bases = {
-    Component: 'openmdao_components',
-    Group: 'openmdao_groups',
-    SurrogateModel: 'openmdao_surrogate_models',
-    LinearSolver: 'openmdao_lin_solvers',
-    NonlinearSolver: 'openmdao_nl_solvers',
-    Driver: 'openmdao_drivers',
-    BaseCaseReader: 'openmdao_case_readers',
-    CaseRecorder: 'openmdao_case_recorders',
+    Component: 'openmdao_component',
+    Group: 'openmdao_group',
+    SurrogateModel: 'openmdao_surrogate_model',
+    LinearSolver: 'openmdao_lin_solver',
+    NonlinearSolver: 'openmdao_nl_solver',
+    Driver: 'openmdao_driver',
+    BaseCaseReader: 'openmdao_case_reader',
+    CaseRecorder: 'openmdao_case_recorder',
 }
 
 _allowed_types = {g.split('_', 1)[1]: g for g in _epgroup_bases.values()}
-_allowed_types['commands'] = 'openmdao_commands'
+_allowed_types['command'] = 'openmdao_command'
+
+_github_topics = {k: v.replace('_', '-') for k, v in _allowed_types.items()}
+_github_topics['openmdao'] = 'openmdao'
 
 
 def split_ep(entry_point):
@@ -193,14 +197,14 @@ def _get_epinfo(type_, includes, excludes):
             version = mod.__version__
         except AttributeError:
             version = '?'
-        if type_ != 'commands':
+        if type_ != 'command':
             name = target
         epinfo.append((name, pkg, version, module, obj.__doc__))
 
     return epinfo
 
 
-def _display_epinfo(epinfo, show_docs, *titles):
+def _display_epinfo(type_, epinfo, show_docs, *titles):
     cwids = []
     unders = []
     for i in range(len(titles)):
@@ -215,10 +219,12 @@ def _display_epinfo(epinfo, show_docs, *titles):
     # by module and sorted by target name within each module.
     ordered = sorted(epinfo, key=lambda x: x[1] + x[3] + x[0])
 
+    print("Installed {}s:".format(type_))
+
     for pkg, group in itertools.groupby(ordered, lambda x: x[1]):
         group = list(group)
 
-        print("  Package:", pkg, " Version:", group[0][2], '\n')
+        print("\n  Package:", pkg, " Version:", group[0][2], '\n')
 
         for i, (name, pkg, version, module, docs) in enumerate(group):
             if i == 0:
@@ -227,8 +233,10 @@ def _display_epinfo(epinfo, show_docs, *titles):
 
             print(template.format(name, module, cwids=cwids))
             if show_docs and docs:
-                print(docs)
-                print(' ', '-' * 80)
+                docs = textwrap.dedent(docs)
+                indented = ['        ' + d for d in docs.splitlines()]
+                print('\n'.join(indented))
+                print('\n   ', '-' * 80, '\n')
 
     print()
 
@@ -278,7 +286,7 @@ def list_installed(types=None, includes=None, excludes=(), show_docs=False):
     Parameters
     ----------
     types : iter of str or None
-        Sequence of entry point type names, e.g., components, groups, drivers, etc.
+        Sequence of entry point type names, e.g., component, group, driver, etc.
     includes : iter of str or None
         Sequence of packages to include.
     excludes : iter of str
@@ -302,8 +310,6 @@ def list_installed(types=None, includes=None, excludes=(), show_docs=False):
         if type_ not in _allowed_types:
             raise RuntimeError("Type '{}' is not a valid type.  Try one of {}."
                                .format(type_, sorted(_allowed_types)))
-        print("Installed {}:\n".format(type_))
-
         typdict[type_] = epinfo = _get_epinfo(type_, includes, excludes)
 
         titles = [
@@ -311,11 +317,11 @@ def list_installed(types=None, includes=None, excludes=(), show_docs=False):
             'Module',
         ]
 
-        if type_ == 'commands':
+        if type_ == 'command':
             titles[0] = 'Command'
 
         if epinfo:
-            _display_epinfo(epinfo, show_docs, *titles)
+            _display_epinfo(type_, epinfo, show_docs, *titles)
 
     return typdict
 
@@ -356,3 +362,98 @@ def _list_installed_cmd(options, user_args):
         The hook function.
     """
     list_installed(options.types, options.includes, options.excludes, options.show_docs)
+
+
+def find_plugins(types=None):
+    """
+    Search github for repositories containing OpenMDAO plugins.
+
+    Parameters
+    ----------
+    types : iter of str or None
+        Sequence of entry point type names, e.g., component, group, driver, etc.
+
+    Returns
+    -------
+    dict
+        Nested dict of the form  dct[eptype] = list of URLs
+    """
+    if not types:
+        types = ['openmdao']
+
+    import requests
+    allowed_set = set(_github_topics.values())
+    wid1 = wid2 = 0
+    pkgs = {}
+    for type_ in types:
+        if type_ not in _github_topics:
+            raise RuntimeError("Type '{}' is not a valid type.  Try one of {}."
+                               .format(type_, sorted(_github_topics)))
+
+        query = 'topic:{}'.format(_github_topics[type_])
+
+        response = requests.get('https://api.github.com/search/repositories?q={}'.format(query),
+                                headers={'Accept': 'application/vnd.github.mercy-preview+json'})
+
+        if response.status_code != 200:
+            print("Query failed for topic '{}' with response code {}.".format(_github_topics[type_],
+                                                                              response.status_code))
+
+        resdict = response.json()
+
+        items = resdict['items']
+        for item in items:
+            url = item['html_url']
+            name = item['name']
+            topics = [t for t in item['topics'] if t in allowed_set]
+            if len(name) > wid1:
+                wid1 = len(name)
+            if len(url) > wid2:
+                wid2 = len(url)
+            pkgs[url] = (name, topics)
+
+    template = '{:<{wid1}}  {:<{wid2}}  {}'
+    if pkgs:
+        print(template.format('Pkg Name', 'URL', 'Topics', wid1=wid1, wid2=wid2))
+        print(template.format('--------', '___', '______', wid1=wid1, wid2=wid2))
+        for url, (name, topics) in sorted(pkgs.items(), key=lambda x: x[1][0]):
+            print(template.format(name, url, topics, wid1=wid1, wid2=wid2))
+    else:
+        print("No matching packages found.")
+
+    if resdict['incomplete_results']:
+        print("\nResults are incomplete.\n")
+
+    return pkgs
+
+
+def _find_plugins_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao find_plugins' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('types', nargs='*', help='Find these types of plugins. '
+                        'Allowed types are {}.'.format(sorted(_github_topics)))
+
+
+def _find_plugins_exec(options, user_args):
+    """
+    Run the `openmdao find_plugins` command.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str  (ignored)
+        Args to be passed to the user script.
+
+    Returns
+    -------
+    function
+        The hook function.
+    """
+    find_plugins(options.types)

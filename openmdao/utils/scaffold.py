@@ -10,16 +10,16 @@ from openmdao.utils.general_utils import simple_warning
 
 
 _common_bases = {
-    'ExplicitComponent': 'openmdao_components',
-    'ImplicitComponent': 'openmdao_components',
-    'Group': 'openmdao_groups',
-    'Driver': 'openmdao_drivers',
-    'NonlinearSolver': 'openmdao_nl_solvers',
-    'LinearSolver': 'openmdao_lin_solvers',
-    'SurrogateModel': 'openmdao_surrogate_models',
-    'CaseRecorder': 'openmdao_case_recorders',
-    'BaseCaseReader': 'openmdao_case_readers',
-    '@command': 'openmdao_commands',
+    'ExplicitComponent': 'openmdao_component',
+    'ImplicitComponent': 'openmdao_component',
+    'Group': 'openmdao_group',
+    'Driver': 'openmdao_driver',
+    'NonlinearSolver': 'openmdao_nl_solver',
+    'LinearSolver': 'openmdao_lin_solver',
+    'SurrogateModel': 'openmdao_surrogate_model',
+    'CaseRecorder': 'openmdao_case_recorder',
+    'BaseCaseReader': 'openmdao_case_reader',
+    '@command': 'openmdao_command',
 }
 
 
@@ -32,13 +32,13 @@ def _scaffold_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.add_argument('file', nargs='?', help='output file.')
     parser.add_argument('-c', '--class', action='store', dest='class_name',
                         help='Name of the new class.  If an output file '
                         'is not provided, this name will be used to generate the output file name.')
     parser.add_argument('-b', '--base', action='store', dest='base',
                         help='Name of the base class for the new class. Allowed '
-                        'base classes are: {}'.format(sorted(_common_bases)))
+                        'base classes are: {}'.format(sorted([c for c in _common_bases
+                                                              if not c.startswith('@')])))
     parser.add_argument('-p', '--package', action='store', dest='package',
                         help="Specify name of python package.  If this is specified, the directory"
                              " structure for a python package will be created.")
@@ -90,7 +90,6 @@ def _scaffold_exec(options, user_args):
     user_args : list of str
         Command line options after '--' (if any).  Passed to user script.
     """
-    outfile = os.path.splitext(options.file)[0] if options.file else None
     base = options.base
     if options.command_name:
         if base is not None or options.class_name is not None:
@@ -99,15 +98,13 @@ def _scaffold_exec(options, user_args):
         base = '@command'
         epname = options.command_name
         tgtname = '_' + epname + '_setup'
-        if options.file is None:
-            outfile = _camel_case_split(options.command_name)
+        outfile = _camel_case_split(options.command_name)
     elif options.class_name is None or base is None:
-        raise RuntimeError("One of [--class, --base] was not specified.")
+        raise RuntimeError("Both --class and  --base must be specified.")
     else:
         epname = options.class_name.lower()
         tgtname = options.class_name
-        if options.file is None:
-            outfile = _camel_case_split(options.class_name)
+        outfile = _camel_case_split(options.class_name)
 
     start_dir = os.getcwd()
 
@@ -115,9 +112,12 @@ def _scaffold_exec(options, user_args):
     testfile = 'test_' + pyfile
 
     if base in _common_bases:
+        entry_pt_group = _common_bases[base]
+        if base == '@command':
+            base = 'command'
+
         if options.package:  # create a package
             dist_name = pkg_name = options.package
-            entry_pt_group = _common_bases[base]
             if entry_pt_group:
                 keywords = [entry_pt_group]
             else:
@@ -139,7 +139,7 @@ def _scaffold_exec(options, user_args):
                     'keywords': keywords,
                     'license': '???',
                     'packages': [pkg_name, pkg_name + '.' + 'test'],
-                    'install_requires': ['openmdao>=2.9.1'],
+                    'install_requires': ['openmdao'],
                 }
 
                 if entry_pt_group:
@@ -158,8 +158,8 @@ def _scaffold_exec(options, user_args):
                 with open('__init__.py', 'w') as f:
                     pass
 
-                if base == '@command':
-                    _write_template(pyfile, 'command', command_name=options.command_name)
+                if base == 'command':
+                    _write_template(pyfile, base, command_name=options.command_name)
                 else:
                     _write_template(pyfile, base, class_name=options.class_name)
 
@@ -175,7 +175,10 @@ def _scaffold_exec(options, user_args):
             finally:
                 os.chdir(start_dir)
         else:
-            _write_template(pyfile, base, class_name=options.class_name)
+            if base == 'command':
+                _write_template(pyfile, base, command_name=options.command_name)
+            else:
+                _write_template(pyfile, base, class_name=options.class_name)
             _write_template(testfile, 'test', class_name=options.class_name)
     else:
         raise RuntimeError("Unrecognized base class '{}'.".format(base))
