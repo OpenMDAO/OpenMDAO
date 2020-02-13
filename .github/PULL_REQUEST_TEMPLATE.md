@@ -6,10 +6,6 @@ Summary of PR.
 
 - Resolves #
 
-### Status
-
-- [ ] Ready for merge
-
 ### Backwards incompatibilities
 
 None
