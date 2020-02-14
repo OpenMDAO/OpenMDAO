@@ -152,6 +152,8 @@ setup(
         'openmdao': ['*/tests/*.py', '*/*/tests/*.py', '*/*/*/tests/*.py']
     },
     install_requires=[
+        'urllib3<1.25',  # this is to prevent urllib version conflict between
+                         # requests, numpydoc, and pyppeteer
         'networkx>=2.0',
         'numpy',
         'pyDOE2',
