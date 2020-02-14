@@ -210,7 +210,8 @@ try:
         iters = []
         gc.collect()
         start_objs = objgraph.typestats()
-        start_objs['frame'] += 1
+        if 'frame' in start_objs:
+            start_objs['frame'] += 1
         start_objs['function'] += 1
         start_objs['builtin_function_or_method'] += 1
         start_objs['cell'] += 1
