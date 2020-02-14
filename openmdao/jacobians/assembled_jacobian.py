@@ -45,8 +45,6 @@ class AssembledJacobian(Jacobian):
         Column ranges for inputs.
     _out_ranges : dict
         Row ranges for outputs.
-    _nodup_out_ranges : dict
-        Global row/col ranges for outputs in int_mtx.
     """
 
     def __init__(self, matrix_class, system):
@@ -71,8 +69,6 @@ class AssembledJacobian(Jacobian):
         self._mask_caches = {}
         self._matrix_class = matrix_class
         self._out_ranges = self._get_ranges(system, 'output')
-        self._nodup_out_ranges = system._get_nodup_out_ranges()[0] \
-            if system._use_owned_sizes() else self._out_ranges
         self._in_ranges = self._get_ranges(system, 'input')
         self._subjac_iters = defaultdict(lambda: None)
 
@@ -125,43 +121,32 @@ class AssembledJacobian(Jacobian):
         abs2idx = system._var_allprocs_abs2idx['nonlinear']
         in_sizes = system._var_sizes['nonlinear']['input']
         out_ranges = self._out_ranges
-        # for non-MPI case, global_out_ranges is out_ranges
-        global_out_ranges = self._nodup_out_ranges
         in_ranges = self._in_ranges
 
         abs2prom_out = system._var_abs2prom['output']
         owns = system._owning_rank
         conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
         abs_key2shape = self._abs_key2shape
-        check_owns = system._use_owned_sizes()
 
         # create the matrix subjacs
         for abs_key, info in iteritems(self._subjacs_info):
             res_abs_name, wrt_abs_name = abs_key
             # because self._subjacs_info is shared among all 'related' assembled jacs,
-            # we use global_out_ranges (and later in_ranges) to weed out keys outside of this jac
-            if res_abs_name not in global_out_ranges:
+            # we use out_ranges (and later in_ranges) to weed out keys outside of this jac
+            if res_abs_name not in out_ranges:
                 continue
-            res_offset, res_end = global_out_ranges[res_abs_name]
+            res_offset, res_end = out_ranges[res_abs_name]
             res_size = res_end - res_offset
 
             if wrt_abs_name in abs2prom_out:
-                if check_owns and (owns[wrt_abs_name] != iproc and
-                                   not all_meta[wrt_abs_name]['distributed']):
-                    continue
-                out_offset, out_end = global_out_ranges[wrt_abs_name]
+                out_offset, out_end = out_ranges[wrt_abs_name]
                 out_size = out_end - out_offset
                 shape = (res_size, out_size)
                 int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
             elif wrt_abs_name in in_ranges:
                 if wrt_abs_name in conns:  # connected input
                     out_abs_name = conns[wrt_abs_name]
-                    if out_abs_name not in global_out_ranges:
-                        continue
-
-                    if check_owns and (owns[wrt_abs_name] != iproc and
-                                       not (all_meta[wrt_abs_name]['distributed'] or
-                                            all_meta[out_abs_name]['distributed'])):
+                    if out_abs_name not in out_ranges:
                         continue
 
                     meta_in = abs2meta[wrt_abs_name]
@@ -176,7 +161,7 @@ class AssembledJacobian(Jacobian):
                     else:
                         factor = None
 
-                    out_offset, out_end = global_out_ranges[out_abs_name]
+                    out_offset, out_end = out_ranges[out_abs_name]
                     out_size = out_end - out_offset
                     shape = (res_size, out_size)
                     src_indices = abs2meta[wrt_abs_name]['src_indices']
@@ -205,11 +190,7 @@ class AssembledJacobian(Jacobian):
                     ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
 
         out_size = system._outputs._data.size
-        if check_owns:
-            total_non_dup_size = np.sum(system._owned_sizes)
-            self._int_mtx._build(total_non_dup_size, total_non_dup_size, system)
-        else:
-            int_mtx._build(out_size, out_size, system)
+        int_mtx._build(out_size, out_size, system)
 
         if ext_mtx._submats:
             in_size = np.sum(in_sizes[iproc, :])

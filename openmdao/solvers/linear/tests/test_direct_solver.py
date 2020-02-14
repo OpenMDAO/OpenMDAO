@@ -14,7 +14,7 @@ from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.mpi import MPI
-
+from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -633,112 +633,57 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestDirectSolverErrsMPI(unittest.TestCase):
+@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+class TestDirectSolverRemoteErrors(unittest.TestCase):
 
     N_PROCS = 2
 
-    def test_raise_error_on_singular(self):
+    def test_distrib_direct(self):
+        size = 3
+        group = om.Group()
+
+        group.add_subsystem('P', om.IndepVarComp('x', np.arange(size)))
+        group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
+                                                  x=np.zeros(size),
+                                                  y=np.zeros(size)))
+        group.add_subsystem('C2', om.ExecComp(['z=3.0*y'],
+                                           y=np.zeros(size),
+                                           z=np.zeros(size)))
+
         prob = om.Problem()
-        model = prob.model
+        prob.model = group
+        prob.model.linear_solver = om.DirectSolver()
+        prob.model.connect('P.x', 'C1.x')
+        prob.model.connect('C1.y', 'C2.y')
 
-        comp = om.IndepVarComp()
-        comp.add_output('dXdt:TAS', val=1.0)
-        comp.add_output('accel_target', val=2.0)
-        model.add_subsystem('des_vars', comp, promotes=['*'])
 
-        teg = model.add_subsystem('thrust_equilibrium_group', subsys=om.ParallelGroup())
-        teg.add_subsystem('dynamics', om.ExecComp('z = 2.0*thrust'), promotes=['*'])
-
-        thrust_bal = om.BalanceComp()
-        thrust_bal.add_balance(name='thrust', val=1207.1, lhs_name='dXdt:TAS',
-                               rhs_name='accel_target', eq_units='m/s**2', lower=-10.0, upper=10000.0)
-
-        teg.add_subsystem(name='thrust_bal', subsys=thrust_bal,
-                          promotes_inputs=['dXdt:TAS', 'accel_target'],
-                          promotes_outputs=['thrust'])
-
-        teg.linear_solver = om.DirectSolver()
-
-        teg.nonlinear_solver = om.NewtonSolver()
-        teg.nonlinear_solver.options['solve_subsystems'] = True
-        teg.nonlinear_solver.options['max_sub_solves'] = 1
-        teg.nonlinear_solver.options['atol'] = 1e-4
-
-        prob.setup()
-        prob.set_solver_print(level=0)
-
-        with self.assertRaises(RuntimeError) as cm:
+        prob.setup(check=False, mode='fwd')
+        with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in ParallelGroup (thrust_equilibrium_group) for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
+        self.assertEqual(str(cm.exception),
+                         "Group (<model>) has a DirectSolver solver and contains a distributed system.")
 
-        self.assertTrue(expected_msg in str(cm.exception), "Error msg doesn't contain '%s'" % expected_msg)
-
-    def test_raise_error_on_nan_sparse(self):
-
+    def test_par_direct(self):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p', om.IndepVarComp('x', 2.0))
-        model.add_subsystem('c1', om.ExecComp('y = 4.0*x'))
-        sub = model.add_subsystem('sub', om.ParallelGroup())
-        sub.add_subsystem('c2', NanComp())
-        model.add_subsystem('c3', om.ExecComp('y = 4.0*x'))
-        model.add_subsystem('c4', NanComp2())
-        model.add_subsystem('c5', om.ExecComp('y = 3.0*x'))
-        model.add_subsystem('c6', om.ExecComp('y = 2.0*x'))
-
-        model.connect('p.x', 'c1.x')
-        model.connect('c1.y', 'sub.c2.x')
-        model.connect('sub.c2.y', 'c3.x')
-        model.connect('c3.y', 'c4.x')
-        model.connect('c4.y', 'c5.x')
-        model.connect('c4.y2', 'c6.x')
+        model.add_subsystem('P', om.IndepVarComp('x', 1.0))
+        par = model.add_subsystem('par', om.ParallelGroup())
+        par.add_subsystem('C1', om.ExecComp(['y=2.0*x']))
+        par.add_subsystem('C2', om.ExecComp(['z=3.0*y']))
 
         model.linear_solver = om.DirectSolver()
+        model.connect('P.x', 'par.C1.x')
+        model.connect('P.x', 'par.C2.y')
 
         prob.setup()
-        prob.run_model()
+        with self.assertRaises(Exception) as cm:
+            prob.run_model()
 
-        with self.assertRaises(RuntimeError) as cm:
-            prob.compute_totals(of=['c5.y'], wrt=['p.x'])
+        self.assertEqual(str(cm.exception),
+                         "Group (<model>) has a DirectSolver solver and contains remote variables.")
 
-        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
-
-        self.assertTrue(expected_msg in str(cm.exception), "NaN error message doesn't match '%s'" % expected_msg)
-
-    def test_raise_error_on_nan_dense(self):
-
-        prob = om.Problem(model=om.Group(assembled_jac_type='dense'))
-        model = prob.model
-
-        model.add_subsystem('p', om.IndepVarComp('x', 2.0))
-        model.add_subsystem('c1', om.ExecComp('y = 4.0*x'))
-        sub = model.add_subsystem('sub', om.ParallelGroup())
-        sub.add_subsystem('c2', NanComp())
-        model.add_subsystem('c3', om.ExecComp('y = 4.0*x'))
-        model.add_subsystem('c4', NanComp2())
-        model.add_subsystem('c5', om.ExecComp('y = 3.0*x'))
-        model.add_subsystem('c6', om.ExecComp('y = 2.0*x'))
-
-        model.connect('p.x', 'c1.x')
-        model.connect('c1.y', 'sub.c2.x')
-        model.connect('sub.c2.y', 'c3.x')
-        model.connect('c3.y', 'c4.x')
-        model.connect('c4.y', 'c5.x')
-        model.connect('c4.y2', 'c6.x')
-
-        model.linear_solver = om.DirectSolver(assemble_jac=True)
-
-        prob.setup()
-        prob.run_model()
-
-        with self.assertRaises(RuntimeError) as cm:
-            prob.compute_totals(of=['c5.y'], wrt=['p.x'])
-
-        expected_msg = "NaN entries found in Group (<model>) for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
-        self.assertTrue(expected_msg in str(cm.exception), "NaN error message doesn't match '%s'" % expected_msg)
 
 
 class TestDirectSolverFeature(unittest.TestCase):
