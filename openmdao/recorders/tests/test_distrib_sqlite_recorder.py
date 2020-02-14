@@ -204,7 +204,7 @@ class DistributedRecorderTest(unittest.TestCase):
         # Create problem and run driver
         prob = Problem(model, driver)
         prob.add_recorder(self.recorder)
-        prob.setup()
+        prob.setup(mode='fwd')
 
         t0, t1 = run_driver(prob)
         prob.record_iteration('final')

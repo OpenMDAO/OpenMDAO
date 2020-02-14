@@ -626,7 +626,8 @@ def strip_decorators(src):
 
 def strip_header(src):
     """
-    Directly manipulating function text to strip header.
+    Directly manipulating function text to strip header, usually or maybe always just the
+    "def" lines for a method or function.
 
     This function assumes that the docstring and header, if any, have already been removed.
 

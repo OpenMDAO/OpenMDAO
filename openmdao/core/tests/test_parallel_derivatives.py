@@ -198,7 +198,9 @@ class ParDerivTestCase(unittest.TestCase):
         # Piggyback to make sure the distributed norm calculation is correct.
         vec = prob.model._vectors['residual']['c2.y']
         norm_val = vec.get_norm()
-        assert_rel_error(self, norm_val, 6.480740698, 1e-6)
+        # NOTE: BAN updated the norm value for the PR that added seed splitting, i.e.
+        # the seed, c2.y in this case, is half what it was before (-.5 vs. -1).
+        assert_rel_error(self, norm_val, 6.422616289332565, 1e-6)
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
