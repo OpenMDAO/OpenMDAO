@@ -165,7 +165,7 @@ class InterpNDStandaloneFeatureTestcase(unittest.TestCase):
 
 
 class TestInterpNDPython(unittest.TestCase):
-    """Tests for the non-scipy interolation algorithms."""
+    """Tests for the non-scipy interpolation algorithms."""
 
     def setUp(self):
         self.interp_configs = {

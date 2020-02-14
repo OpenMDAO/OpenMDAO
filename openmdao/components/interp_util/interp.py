@@ -67,8 +67,6 @@ class InterpND(object):
         When set to True, compute gradients with respect to the interpolated point location.
     _d_dx : ndarray
         Cache of computed gradients with respect to evaluation point.
-    _d_dgrid : ndarray
-        Cache of computed gradients with respect to grid. Currently not supported.
     _d_dvalues : ndarray
         Cache of computed gradients with respect to table values.
     _interp : class
@@ -94,7 +92,7 @@ class InterpND(object):
             can be an ndarray.
         values : array_like, shape (m1, ..., mn, ...)
             The data on the regular grid in n dimensions.
-        method : str or list of str, optional
+        method : str
             Name of interpolation method(s).
         x_interp : ndarry or None
             If we are always interpolating at a fixed set of locations, then they can be
@@ -169,9 +167,9 @@ class InterpND(object):
 
         self._xi = None
         self._d_dx = None
-        self._d_dgrid = None
         self._d_dvalues = None
         self._compute_d_dvalues = False
+        self._compute_d_dx = True
 
         # Cache spline coefficients.
         interp = INTERP_METHODS[method]
@@ -204,7 +202,9 @@ class InterpND(object):
             Value of derivative of interpolated output with respect to input x. (Only when
             compute_derivative is True.)
         """
-        table = self.table
+        self._compute_d_dx = compute_derivative
+        self.table._compute_d_dx = compute_derivative
+        self.table._compute_d_dvalues = False
 
         xnew = self._interpolate(np.atleast_1d(x))
 
@@ -231,8 +231,9 @@ class InterpND(object):
         ndarray
             Value of derivative of interpolated output with respect to values.
         """
-        if compute_derivative:
-            self._d_dvalues = True
+        self._compute_d_dvalues = compute_derivative
+        self.table._compute_d_dvalues = compute_derivative
+        self.table._compute_d_dx = False
 
         if len(values.shape) == 1:
             values = np.expand_dims(values, axis=0)
@@ -453,15 +454,16 @@ class InterpND(object):
         else:
             grid = self.grid
             interp = self._interp
+            opts = self._interp_options
 
-            for i, axis in enumerate(self.grid):
+            for i, axis in enumerate(grid):
                 ngrid = axis.size
                 values = np.zeros(ngrid)
                 deriv_i = np.zeros(ngrid)
 
                 for j in range(ngrid):
                     values[j] = 1.0
-                    table = interp([grid[i]], values, self._interp, **self._interp_options)
+                    table = interp([grid[i]], values, interp, **opts)
                     table._compute_d_dvalues = False
                     deriv_i[j], _, _, _ = table.evaluate(pt[i:i + 1])
                     values[j] = 0.0
