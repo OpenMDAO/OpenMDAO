@@ -194,6 +194,7 @@ setup(
             'metamodelunstructuredcomp=openmdao.components.meta_model_unstructured_comp:MetaModelUnStructuredComp',
             'multifimetamodelunstructuredcomp=openmdao.components.multifi_meta_model_unstructured_comp:MultiFiMetaModelUnStructuredComp',
             'muxcomp=openmdao.components.mux_comp:MuxComp',
+            'splinecomp=openmdao.components.spline_comp:SplineComp',
             'vectormagnitudecomp=openmdao.components.vector_magnitude_comp:VectorMagnitudeComp',
             'indepvarcomp=openmdao.core.indepvarcomp:IndepVarComp',
         ],
