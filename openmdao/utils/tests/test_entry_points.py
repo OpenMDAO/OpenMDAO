@@ -56,6 +56,7 @@ class TestEntryPoints(unittest.TestCase):
         # if mpi4py isn't installed, then the pyopstsparse_driver import will fail
         try:
             import mpi4py
+            from pyoptsparse import Optimization
         except ImportError:
             skip.add('openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver')
 
