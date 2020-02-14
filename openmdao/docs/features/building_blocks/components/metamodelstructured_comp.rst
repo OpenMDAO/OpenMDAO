@@ -115,7 +115,7 @@ The underlying interpolation algorithms can be used standalone (i.e., outside of
 MetaModelStructuredComp) through the `InterpND` class. This can be useful for inclusion in another
 component.  The following component shows how to perform interpolation on the same table
 as in the previous example using standalone code. This time, we choose 'lagrange3' as the
-intepolation algorithm.
+interpolation algorithm.
 
 .. embed-code::
     openmdao.components.interp_util.tests.test_interp_nd.InterpNDStandaloneFeatureTestcase.test_table_interp
