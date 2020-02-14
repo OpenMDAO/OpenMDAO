@@ -81,8 +81,7 @@ class Summer(om.ExplicitComponent):
         outputs['sum'] = np.sum(inputs['y'])
 
 
-@unittest.skipUnless(MPI, "MPI is required.")
-@unittest.skipIf(PETScVector is None, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DistributedListVarsTest(unittest.TestCase):
 
     N_PROCS = 2
@@ -533,7 +532,7 @@ class DistributedListVarsTest(unittest.TestCase):
                                      '\nExpected: %s\nReceived: %s\n' % (line, text[i]))
 
         stream = cStringIO()
-        with printoptions(**print_opts):       
+        with printoptions(**print_opts):
             model.C2.list_outputs(hierarchical=False, shape=True, global_shape=True,
                                   print_arrays=True, out_stream=stream)
 

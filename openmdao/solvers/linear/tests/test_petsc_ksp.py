@@ -21,7 +21,7 @@ from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(PETScVector is not None, "PETSc is required.")
 class TestPETScKrylov(unittest.TestCase):
 
     def test_options(self):

@@ -3503,7 +3503,7 @@ class System(object):
             var_dict[name] = vals
 
         # If parallel, gather up the vars.
-        if MPI and self.comm:
+        if MPI and self.comm.size > 1:
             # All procs must call this. Returns a list, one per proc.
             all_var_dicts = self.comm.gather(var_dict, root=0) if not all_procs \
                 else self.comm.allgather(var_dict)

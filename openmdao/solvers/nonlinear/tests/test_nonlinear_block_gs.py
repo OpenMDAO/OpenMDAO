@@ -408,7 +408,7 @@ class TestNLBGaussSeidel(unittest.TestCase):
         self.assertEqual(nlbgs._iter_count, 9, 'res_ref should make this take more iters.')
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase1(unittest.TestCase):
 
     N_PROCS = 2

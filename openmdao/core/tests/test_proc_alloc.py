@@ -53,7 +53,7 @@ def _get_which_procs(group):
     return MPI.COMM_WORLD.allgather(sub_inds)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase1(unittest.TestCase):
 
     N_PROCS = 1
@@ -70,7 +70,7 @@ class ProcTestCase1(unittest.TestCase):
         assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase2(unittest.TestCase):
 
     N_PROCS = 2
@@ -87,7 +87,7 @@ class ProcTestCase2(unittest.TestCase):
         assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase3(unittest.TestCase):
 
     N_PROCS = 3
@@ -175,7 +175,7 @@ class ProcTestCase3(unittest.TestCase):
         assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase5(unittest.TestCase):
 
     N_PROCS = 5
@@ -192,7 +192,7 @@ class ProcTestCase5(unittest.TestCase):
         assert_rel_error(self, J['objective.y']['indep.x'][0][0], 8.0, 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase6(unittest.TestCase):
 
     N_PROCS = 6
@@ -206,7 +206,7 @@ class ProcTestCase6(unittest.TestCase):
             self.fail("Exception expected.")
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase8(unittest.TestCase):
 
     N_PROCS = 8

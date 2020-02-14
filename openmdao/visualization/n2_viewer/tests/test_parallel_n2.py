@@ -8,6 +8,11 @@ import openmdao.api as om
 from openmdao.visualization.n2_viewer.n2_viewer import _get_viewer_data, n2
 from openmdao.utils.mpi import MPI
 
+try:
+    from openmdao.parallel_api import PETScVector
+except ImportError:
+    PETScVector = None
+
 # set DEBUG to True if you want to view the generated HTML file
 DEBUG = False
 OUTFILE = 'n2test.html'
@@ -34,7 +39,7 @@ class Top(om.Group):
 
         self.connect('indep_var.x1', 'myComp.x2')
 
-@unittest.skipUnless(MPI, "MPI is required to test N2 parallel generation.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class N2ParallelTestCase(unittest.TestCase):
     N_PROCS = 2
 

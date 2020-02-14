@@ -36,7 +36,7 @@ class Comp(ExplicitComponent):
         outputs['y'] = inputs['x'] + 1.0
 
 
-@unittest.skipIf(MPI is None or PETScVector is None, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestSrcIndices(unittest.TestCase):
     N_PROCS = 4
 
