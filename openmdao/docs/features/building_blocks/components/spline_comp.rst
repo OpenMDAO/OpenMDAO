@@ -6,7 +6,7 @@
 SplineComp
 ***************
 
-SplineComp allows you to represent a larger dimension variable with a smaller dimensional variable by
+SplineComp allows you to represent a larger dimensional variable with a smaller dimensional variable by
 using an interpolation algorithm. This is useful for reducing the size of an optimization problem by
 decreasing the number of design variables it solves. The spatial distribution of the points, in both
 the original and interpolated spaces is typically uniform but other distributions can be used.
@@ -113,12 +113,13 @@ specify the number of control points using the 'num_cp' argument.
 SplineComp Interpolation Distribution
 -------------------------------------
 
-We have included three different distribution functions for users to distribute their `x_input` data.
-`cell_centered` takes the data passed in, along with the number points specified by the user, and finds
-the midpoints of a linearly distributed array. Similar to `cell_centered`, `node_centered` takes the
-data, number of points and creates a linearly distributed array. Finally, `sine_distribution`, taking
-in the same arguments as others, also takes in a `phase` argument to allow for customization of the
-distribution.
+We have included three different distribution functions for users to replicate functionality that used to
+be built-in to the individual akima and bsplines components. The `cell_centered` function takes the number
+of cells, and the start and end values, and returns a vector of points that lie at the center of those
+cells. The 'node_centered' function reproduces the functionality of numpy's linspace.  Finally, the
+`sine_distribution` function creates a sinusoidal distribution, in which points are clustered towards the
+ends. A 'phase' argument is also included, and a phase of pi/2.0 clusters the points in the center with
+fewer points on the ends.
 
 .. embed-code::
     openmdao.components.tests.test_spline_comp.SplineCompFeatureTestCase.test_spline_distribution_example

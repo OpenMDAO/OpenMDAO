@@ -114,7 +114,7 @@ Standalone Interface for Table Interpolation
 The underlying interpolation algorithms can be used standalone (i.e., outside of the
 MetaModelStructuredComp) through the `InterpND` class. This can be useful for inclusion in another
 component.  The following component shows how to perform interpolation on the same table
-as int the previous example using standalone code. This time, we choose 'lagrange3' as the
+as in the previous example using standalone code. This time, we choose 'lagrange3' as the
 intepolation algorithm.
 
 .. embed-code::
