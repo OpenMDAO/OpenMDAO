@@ -122,12 +122,13 @@ install:
     fi
 
     echo "  > Install pyOptSparse";
+    pip install -r requirements.txt;
     pip install .;
     cd ..;
 
-    echo "Did we get SNOPT?"
-    python -c "from openmdao.utils.general_utils import set_pyoptsparse_opt; print(set_pyoptsparse_opt('SNOPT'))"
-    python -c "from pyoptsparse.pySNOPT import snopt; print(snopt)"
+    echo "Did we get SNOPT?";
+    python -c "from openmdao.utils.general_utils import set_pyoptsparse_opt; print(set_pyoptsparse_opt('SNOPT'))";
+    python -c "from pyoptsparse.pySNOPT import snopt; print(snopt)";
 
     if [ "$PETSc" ]; then
       echo " >> Installing parallel processing dependencies";
