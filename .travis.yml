@@ -125,6 +125,10 @@ install:
     pip install .;
     cd ..;
 
+    echo "Did we get SNOPT?"
+    python -c "from openmdao.utils.general_utils import set_pyoptsparse_opt; print(set_pyoptsparse_opt('SNOPT'))"
+    python -c "from pyoptsparse.pySNOPT import snopt; print(snopt)"
+
     if [ "$PETSc" ]; then
       echo " >> Installing parallel processing dependencies";
       if [[ "$PETSc" == "git"* ]]; then
@@ -157,11 +161,11 @@ script:
   fi
 
 # run the tests from down here to see if it can work without being at top level
-# only do coverage on the upload machine.
+# only do coverage on the upload machine (and show skipped tests).
 - if [ "$UPLOAD_DOCS" ]; then
     testflo -n 1 openmdao --show_skipped --coverage  --coverpkg openmdao --cover-omit \*tests/\*  --cover-omit \*devtools/\* --cover-omit \*test_suite/\* --cover-omit \*docs/\* --cover-omit \*code_review/\*;
   else
-    testflo -n 1 openmdao --show_skipped --timeout=120;
+    testflo -n 1 openmdao --timeout=120;
   fi
 
 after_success:
