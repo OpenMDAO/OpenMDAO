@@ -127,7 +127,7 @@ install:
     cd ..;
 
     echo " >> Installing optional packages for test coverage";
-    pip install psutil objgraph pyxdsm;
+    pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
 
     if [ "$PETSc" ]; then
       echo " >> Installing parallel processing dependencies";
