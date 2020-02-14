@@ -10,7 +10,7 @@ Before laying out the steps to follow in order to create your plugin, a brief di
 entry points is in order.  An entry point is simply a string passed into the `setup()` function
 in the `setup.py` file for your python package.  The string has the form:
 
-.. code-block::
+.. code-block:: none
 
     'my_ep_name=my_plugin_module_path:my_module_attribute'
 
@@ -198,7 +198,7 @@ environment, they will be able to print a list of installed plugins using the
 For example, if a package called `foobar` is installed, we could list all of the plugins
 found in that package using the following command:
 
-.. code-block::
+.. code-block:: none
 
     openmdao list_installed -i foobar
 
