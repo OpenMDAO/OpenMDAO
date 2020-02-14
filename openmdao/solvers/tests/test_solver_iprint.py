@@ -14,6 +14,12 @@ from openmdao.utils.general_utils import run_model
 from openmdao.utils.mpi import MPI
 
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
+
 class TestSolverPrint(unittest.TestCase):
 
     def test_feature_iprint_neg1(self):
@@ -311,12 +317,11 @@ class TestSolverPrint(unittest.TestCase):
         prob.run_model()
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_hierarchy_iprint(self):
         prob = om.Problem()
         model = prob.model
