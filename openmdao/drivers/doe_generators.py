@@ -93,15 +93,15 @@ class ListGenerator(DOEGenerator):
         """
         for case in self._data:
             if not isinstance(case, list):
-                msg = "Invalid DOE case found, expecting a list of name/value pairs:\n%s"
-                raise RuntimeError(msg % str(case))
+                msg = "Invalid DOE case found, expecting a list of name/value pairs:\n{}"
+                raise RuntimeError(msg.format(case))
 
             name_map = {}
 
             for tup in case:
-                if type(tup) not in (tuple, list) or len(tup) != 2:
-                    msg = "Invalid DOE case found, expecting a list of name/value pairs:\n%s"
-                    raise RuntimeError(msg % str(case))
+                if not isinstance(tup, (tuple, list)) or len(tup) != 2:
+                    msg = "Invalid DOE case found, expecting a list of name/value pairs:\n{}"
+                    raise RuntimeError(msg.format(case))
 
                 name = tup[0]
                 if name in design_vars:
@@ -115,11 +115,11 @@ class ListGenerator(DOEGenerator):
             invalid_desvars = [name for name, _ in case if name not in name_map]
             if invalid_desvars:
                 if len(invalid_desvars) > 1:
-                    msg = "Invalid DOE case found, %s are not valid design variables:\n%s"
-                    raise RuntimeError(msg % (str(invalid_desvars), str(case)))
+                    msg = "Invalid DOE case found, {} are not valid design variables:\n{}"
+                    raise RuntimeError(msg.format(invalid_desvars, case))
                 else:
-                    msg = "Invalid DOE case found, '%s' is not a valid design variable:\n%s"
-                    raise RuntimeError(msg % (str(invalid_desvars[0]), str(case)))
+                    msg = "Invalid DOE case found, '{}' is not a valid design variable:\n{}"
+                    raise RuntimeError(msg.format(invalid_desvars[0], case))
 
             yield [(name_map[name], val) for name, val in case]
 
@@ -151,10 +151,10 @@ class CSVGenerator(DOEGenerator):
         super(CSVGenerator, self).__init__()
 
         if not isinstance(filename, str):
-            raise RuntimeError("'%s' is not a valid file name." % str(filename))
+            raise RuntimeError("'{}' is not a valid file name.".format(filename))
 
         if not os.path.isfile(filename):
-            raise RuntimeError("File not found: %s" % filename)
+            raise RuntimeError("File not found: {}".format(filename))
 
         self._filename = filename
 
@@ -192,11 +192,11 @@ class CSVGenerator(DOEGenerator):
             invalid_desvars = [name for name in names if name not in name_map]
             if invalid_desvars:
                 if len(invalid_desvars) > 1:
-                    msg = "Invalid DOE case file, %s are not valid design variables."
-                    raise RuntimeError(msg % str(invalid_desvars))
+                    msg = "Invalid DOE case file, {} are not valid design variables."
+                    raise RuntimeError(msg.format(invalid_desvars))
                 else:
-                    msg = "Invalid DOE case file, '%s' is not a valid design variable."
-                    raise RuntimeError(msg % str(invalid_desvars[0]))
+                    msg = "Invalid DOE case file, '{}' is not a valid design variable."
+                    raise RuntimeError(msg.format(invalid_desvars[0]))
 
         # read cases from file, parse values into numpy arrays
         with open(self._filename, 'r') as f:
