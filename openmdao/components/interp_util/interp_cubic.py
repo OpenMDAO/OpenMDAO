@@ -68,9 +68,15 @@ class InterpCubic(InterpAlgorithm):
         """
         n = len(grid)
 
+        # Complex Step
+        if values.dtype == np.complex:
+            dtype = values.dtype
+        else:
+            dtype = x.dtype
+
         # Natural spline has second deriv=0 at both ends
-        sec_deriv = np.zeros(n, dtype=x.dtype)
-        temp = np.zeros(values.shape, dtype=x.dtype)
+        sec_deriv = np.zeros(n, dtype=dtype)
+        temp = np.zeros(values.shape, dtype=dtype)
 
         # Subdiagonal stripe.
         mu = (grid[1:n - 1] - grid[:n - 2]) / (grid[2:] - grid[:n - 2])
@@ -84,7 +90,7 @@ class InterpCubic(InterpAlgorithm):
             sec_deriv[i] = (mu[i - 1] - 1.0) / prtl
             temp[..., i] = (tmp[..., i - 1] - mu[i - 1] * temp[..., i - 1]) / prtl
 
-        sec_deriv = np.array(np.broadcast_to(sec_deriv, temp.shape), dtype=x.dtype)
+        sec_deriv = np.array(np.broadcast_to(sec_deriv, temp.shape), dtype=dtype)
 
         for i in range(n - 2, 0, -1):
             sec_deriv[..., i] = sec_deriv[..., i] * sec_deriv[..., i + 1] + temp[..., i]

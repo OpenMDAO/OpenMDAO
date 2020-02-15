@@ -66,6 +66,12 @@ class InterpLagrange2(InterpAlgorithm):
         grid = self.grid
         subtable = self.subtable
 
+        # Complex Step
+        if self.values.dtype == np.complex:
+            dtype = self.values.dtype
+        else:
+            dtype = x.dtype
+
         # Extrapolate high
         ngrid = len(grid)
         if idx > ngrid - 3:
@@ -86,7 +92,7 @@ class InterpLagrange2(InterpAlgorithm):
             tshape = self.values[tuple(slice_idx)].shape
             nshape = list(tshape[:-nx])
             nshape.append(nx)
-            derivs = np.empty(tuple(nshape), dtype=x.dtype)
+            derivs = np.empty(tuple(nshape), dtype=dtype)
 
             c12 = grid[idx] - grid[idx + 1]
             c13 = grid[idx] - grid[idx + 2]
@@ -109,7 +115,7 @@ class InterpLagrange2(InterpAlgorithm):
 
             nshape = list(values.shape[:-1])
             nshape.append(1)
-            derivs = np.empty(tuple(nshape), dtype=x.dtype)
+            derivs = np.empty(tuple(nshape), dtype=dtype)
 
             c12 = grid[idx] - grid[idx + 1]
             c13 = grid[idx] - grid[idx + 2]
