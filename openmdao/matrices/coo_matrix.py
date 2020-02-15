@@ -62,12 +62,10 @@ class COOMatrix(Matrix):
             owns = None
             iproc = 0
             abs2meta = None
-            use_owned = False
         else:
             owns = system._owning_rank
             iproc = system.comm.rank
             abs2meta = system._var_allprocs_abs2meta
-            use_owned = system._use_owned_sizes()
 
         start = end = 0
         for key, (info, loc, src_indices, shape, factor) in iteritems(submats):
@@ -111,17 +109,8 @@ class COOMatrix(Matrix):
             idxs = None
 
             col_offset = row_offset = 0
-            if use_owned and self._is_internal:
-                shape = info['shape']
-                if abs2meta[key[1]]['distributed']:
-                    col_offset = np.sum(
-                        system._owned_sizes[:iproc, system._var_allprocs_abs2idx['linear'][key[1]]])
-                if abs2meta[key[0]]['distributed']:
-                    row_offset = np.sum(
-                        system._owned_sizes[:iproc, system._var_allprocs_abs2idx['linear'][key[0]]])
 
             if dense:
-
                 jac_type = ndarray
 
                 if src_indices is None:

@@ -103,6 +103,12 @@ class SimpleGADriver(Driver):
         self.options.declare('elitism', types=bool, default=True,
                              desc='If True, replace worst performing point with best from previous'
                              ' generation each iteration.')
+        self.options.declare('gray', types=bool, default=False,
+                             desc='If True, use Gray code for binary encoding. Gray coding makes'
+                             ' the binary representation of adjacent integers differ by one bit.')
+        self.options.declare('cross_bits', types=bool, default=False,
+                             desc='If True, crossover swaps single bits instead the default'
+                             ' k-point crossover.')
         self.options.declare('max_gen', default=100,
                              desc='Number of generations before termination.')
         self.options.declare('pop_size', default=0,
@@ -116,11 +122,10 @@ class SimpleGADriver(Driver):
                              desc='Penalty function parameter.')
         self.options.declare('penalty_exponent', default=1.,
                              desc='Penalty function exponent.')
-        self.options.declare('Pc', default=0.5, lower=0., upper=1.,
+        self.options.declare('Pc', default=0.1, lower=0., upper=1.,
                              desc='Crossover rate.')
-        self.options.declare('Pm',
-                             desc='Mutation rate.', default=None, lower=0., upper=1.,
-                             allow_none=True)
+        self.options.declare('Pm', default=0.01, lower=0., upper=1., allow_none=True,
+                             desc='Mutation rate.')
         self.options.declare('multi_obj_weights', default={}, types=(dict),
                              desc='Weights of objectives for multi-objective optimization.'
                              'Weights are specified as a dictionary with the absolute names'
@@ -215,6 +220,8 @@ class SimpleGADriver(Driver):
         ga = self._ga
 
         ga.elite = self.options['elitism']
+        ga.gray_code = self.options['gray']
+        ga.cross_bits = self.options['cross_bits']
         pop_size = self.options['pop_size']
         max_gen = self.options['max_gen']
         user_bits = self.options['bits']
@@ -477,6 +484,11 @@ class GeneticAlgorithm(object):
         The MPI communicator that will be used objective evaluation for each generation.
     elite : bool
         Elitism flag.
+    gray_code : bool
+        Gray code binary representation flag.
+    cross_bits : bool
+        Crossover swaps bits instead of tails flag. Swapping bits is similar to mutation,
+        so when used Pc should be increased and Pm reduced.
     lchrom : int
         Chromosome length.
     model_mpi : None or tuple
@@ -510,6 +522,8 @@ class GeneticAlgorithm(object):
         self.lchrom = 0
         self.npop = 0
         self.elite = True
+        self.gray_code = False
+        self.cross_bits = False
         self.model_mpi = model_mpi
 
     def execute_ga(self, x0, vlb, vub, vob, bits, pop_size, max_gen, random_state, Pm=None, Pc=0.5):
@@ -574,7 +588,7 @@ class GeneticAlgorithm(object):
             old_gen = copy.deepcopy(new_gen)
             x_pop = self.decode(old_gen, vlb, vub, bits)
 
-            # Evaluate points in this generation.
+            # Evaluate fitness of points in this generation.
             if comm is not None:
                 # Parallel
 
@@ -684,7 +698,7 @@ class GeneticAlgorithm(object):
         """
         Apply crossover to the current generation.
 
-        Crossover flips two adjacent genes.
+        Crossover swaps tails (k-point crossover) of two adjacent genes.
 
         Parameters
         ----------
@@ -706,8 +720,12 @@ class GeneticAlgorithm(object):
         for ii, jj in zip(idx, idy):
             i = 2 * ii
             j = i + 1
-            new_gen[i][jj] = old_gen[j][jj]
-            new_gen[j][jj] = old_gen[i][jj]
+            if self.cross_bits:  # swap single bit
+                new_gen[i][jj] = old_gen[j][jj]
+                new_gen[j][jj] = old_gen[i][jj]
+            else:               # swap remainder
+                new_gen[i][jj:] = old_gen[j][jj:]
+                new_gen[j][jj:] = old_gen[i][jj:]
         return new_gen
 
     def mutate(self, current_gen, Pm):
@@ -776,6 +794,10 @@ class GeneticAlgorithm(object):
         ndarray
             Decoded design variable values.
         """
+        pts = gen.copy()
+        if self.gray_code:
+            for i in range(np.shape(gen)[0]):
+                pts[i] = self.from_gray(gen[i])
         num_desvar = len(bits)
         interval = (vub - vlb) / (2**bits - 1)
         x = np.empty((self.npop, num_desvar))
@@ -784,7 +806,7 @@ class GeneticAlgorithm(object):
         for jj in range(num_desvar):
             exponents = 2**np.array(range(bits[jj] - 1, -1, -1))
             ebit += bits[jj]
-            fact = exponents * (gen[:, sbit:ebit])
+            fact = exponents * (pts[:, sbit:ebit])
             x[:, jj] = np.einsum('ij->i', fact) * interval[jj] + vlb[jj]
             sbit = ebit
         return x
@@ -792,6 +814,8 @@ class GeneticAlgorithm(object):
     def encode(self, x, vlb, vub, bits):
         """
         Encode array of real values to array of binary arrays.
+
+        The array of arrays represents a single population member.
 
         Parameters
         ----------
@@ -807,11 +831,56 @@ class GeneticAlgorithm(object):
         Returns
         -------
         ndarray
-            Population of points, encoded.
+            Single population member, encoded.
         """
         interval = (vub - vlb) / (2**bits - 1)
         x = np.maximum(x, vlb)
         x = np.minimum(x, vub)
         x = np.round((x - vlb) / interval).astype(np.int)
         byte_str = [("0" * b + bin(i)[2:])[-b:] for i, b in zip(x, bits)]
-        return np.array([int(c) for s in byte_str for c in s])
+        result = np.array([int(c) for s in byte_str for c in s])
+        if self.gray_code:
+            result = self.to_gray(result)
+        return result
+
+    def to_gray(self, g):
+        """
+        Convert a binary array representing a single population member to Gray code.
+
+        Parameters
+        ----------
+        g : binary array
+             Normal binary array, e.g. np.array([0, 0, 1, 0]).
+
+        Returns
+        -------
+        ndarray
+            Binary array using Gray code, e.g. np.array([0, 0, 1, 1]).
+        """
+        s = ''.join([str(x) for x in g])                     # convert to binary string: '0010'
+        i = int(s, 2)                                        # convert to Integer: 2
+        gi = i ^ (i >> 1)                                    # compute gray code Integer: 3
+        gs = np.binary_repr(gi, len(g))                      # convert to binary string: '0011'
+        return np.array([0 if q == '0' else 1 for q in gs])  # convert to np.array: [0, 0, 1, 1]
+
+    def from_gray(self, g):
+        """
+        Convert a Gray coded binary array to normal binary coding.
+
+        The input and output arrays represent a single population member.
+
+        Parameters
+        ----------
+        g : binary array
+            Gray coded binary array, e.g. np.array([0, 0, 1, 1]).
+
+        Returns
+        -------
+        ndarray
+            Binary array using normal coding, e.g. np.array([0, 0, 1, 0]).
+        """
+        b = g.copy()
+        for i in range(1, len(g)):
+            prev = 1 if b[i - 1] == 0 else 0
+            b[i] = b[i - 1] if g[i] == 0 else prev
+        return b

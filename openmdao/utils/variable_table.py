@@ -23,7 +23,7 @@ indent_inc = 2
 
 
 def write_var_table(pathname, var_list, var_type, var_dict,
-                    hierarchical, print_arrays, out_stream):
+                    hierarchical=True, top_name='model', print_arrays=False, out_stream=None):
     """
     Write table of variable names, values, residuals, and metadata to out_stream.
 
@@ -39,6 +39,8 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         dict storing vals and metadata for each var name
     hierarchical : bool
         When True, human readable output shows variables in hierarchical format.
+    top_name : str
+        the name of the top level group when using hierarchical format.
     print_arrays : bool
         When False, in the columnar display, just display norm of any ndarrays with size > 1.
         The norm is surrounded by vertical bars to indicate that it is a norm.
@@ -54,7 +56,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     # Write header
     pathname = pathname if pathname else 'model'
 
-    if var_type is 'input':
+    if var_type == 'input':
         header = "%d Input(s) in '%s'" % (count, pathname)
     else:
         header = "%d %s Output(s) in '%s'" % (count, var_type.capitalize(), pathname)
@@ -67,11 +69,11 @@ def write_var_table(pathname, var_list, var_type, var_dict,
 
     # Need an ordered list of possible output values for the two cases: inputs and outputs
     #  so that we do the column output in the correct order
-    if var_type is 'input':
-        out_types = ('value', 'units', 'shape', 'prom_name', 'desc')
+    if var_type == 'input':
+        out_types = ('value', 'units', 'shape', 'global_shape', 'prom_name', 'desc')
     else:
-        out_types = ('value', 'resids', 'units', 'shape', 'lower', 'upper', 'ref',
-                     'ref0', 'res_ref', 'prom_name', 'desc')
+        out_types = ('value', 'resids', 'units', 'shape', 'global_shape',
+                     'lower', 'upper', 'ref', 'ref0', 'res_ref', 'prom_name', 'desc')
 
     # Figure out which columns will be displayed
     # Look at any one of the outputs, they should all be the same
@@ -82,11 +84,9 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         if out_type in outputs:
             column_names.append(out_type)
 
-    top_level_system_name = 'top'
-
     # Find with width of the first column in the table
     #    Need to look through all the possible varnames to find the max width
-    max_varname_len = max(len(top_level_system_name), len('varname'))
+    max_varname_len = max(len(top_name), len('varname'))
     if hierarchical:
         for name, outs in iteritems(var_dict):
             for i, name_part in enumerate(name.split('.')):
@@ -99,16 +99,15 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     # Determine the column widths of the data fields by finding the max width for all rows
     for column_name in column_names:
         column_widths[column_name] = len(column_name)  # has to be able to display name!
+
     for name in var_list:
         for column_name in column_names:
-            if isinstance(var_dict[name][column_name], np.ndarray) and \
-                    var_dict[name][column_name].size > 1:
-                out = '|{}|'.format(
-                    str(np.linalg.norm(var_dict[name][column_name])))
+            column_value = var_dict[name][column_name]
+            if isinstance(column_value, np.ndarray) and column_value.size > 1:
+                out = '|{}|'.format(str(np.linalg.norm(column_value)))
             else:
-                out = str(var_dict[name][column_name])
-            column_widths[column_name] = max(column_widths[column_name],
-                                             len(str(out)))
+                out = str(column_value)
+            column_widths[column_name] = max(column_widths[column_name], len(str(out)))
 
     # Write out the column headers
     column_header = '{:{align}{width}}'.format('varname', align=align,
@@ -118,14 +117,13 @@ def write_var_table(pathname, var_list, var_type, var_dict,
         column_header += column_spacing * ' '
         column_header += '{:{align}{width}}'.format(column_name, align=align,
                                                     width=column_widths[column_name])
-        column_dashes += column_spacing * ' ' + \
-            column_widths[column_name] * '-'
+        column_dashes += column_spacing * ' ' + column_widths[column_name] * '-'
     out_stream.write(column_header + '\n')
     out_stream.write(column_dashes + '\n')
 
     # Write out the variable names and optional values and metadata
     if hierarchical:
-        out_stream.write(top_level_system_name + '\n')
+        out_stream.write(top_name + '\n')
 
         cur_sys_names = []
 

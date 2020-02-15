@@ -166,15 +166,9 @@ class MPITests2(unittest.TestCase):
 
         assert_rel_error(self, prob['total.y'], final)
 
-    @parameterized.expand(itertools.product([om.LinearBlockGS, om.DirectSolver]),
-                          name_func=_test_func_name)
-    def test_two_simple(self, solver):
+    def test_two_simple(self):
         size = 3
         group = om.Group()
-
-        # import pydevd
-        # pydevd.settrace('localhost', port=10000+MPI.COMM_WORLD.rank,
-        #                 stdoutToServer=True, stderrToServer=True)
 
         group.add_subsystem('P', om.IndepVarComp('x', numpy.arange(size)))
         group.add_subsystem('C1', DistribExecComp(['y=2.0*x', 'y=3.0*x'], arr_size=size,
@@ -186,7 +180,7 @@ class MPITests2(unittest.TestCase):
 
         prob = om.Problem()
         prob.model = group
-        prob.model.linear_solver = solver()
+        prob.model.linear_solver = om.LinearBlockGS()
         prob.model.connect('P.x', 'C1.x')
         prob.model.connect('C1.y', 'C2.y')
 
@@ -203,10 +197,9 @@ class MPITests2(unittest.TestCase):
         J = prob.compute_totals(['C2.z'], ['P.x'])
         assert_rel_error(self, J['C2.z', 'P.x'], numpy.diag([6.0, 6.0, 9.0]), 1e-6)
 
-    @parameterized.expand(itertools.product([om.DirectSolver, om.LinearRunOnce],
-                          [om.NonlinearRunOnce, om.NonlinearBlockGS]),
+    @parameterized.expand(itertools.product([om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
-    def test_fan_out_grouped(self, solver, nlsolver):
+    def test_fan_out_grouped(self, nlsolver):
         size = 3
         prob = om.Problem()
         prob.model = root = om.Group()
@@ -235,7 +228,6 @@ class MPITests2(unittest.TestCase):
         root.connect("C1.y", "sub.C3.x")
         root.connect("P.x", "C1.x")
 
-        root.linear_solver = solver()
         root.nonlinear_solver = nlsolver()
 
         prob.setup(check=False, mode='fwd')
@@ -261,10 +253,9 @@ class MPITests2(unittest.TestCase):
         assert_rel_error(self, J['C2.y', 'P.x'], diag1, 1e-6)
         assert_rel_error(self, J['C3.y', 'P.x'], diag2, 1e-6)
 
-    @parameterized.expand(itertools.product([om.DirectSolver, om.LinearRunOnce],
-                          [om.NonlinearRunOnce, om.NonlinearBlockGS]),
+    @parameterized.expand(itertools.product([om.NonlinearRunOnce, om.NonlinearBlockGS]),
                           name_func=_test_func_name)
-    def test_fan_in_grouped(self, solver, nlsolver):
+    def test_fan_in_grouped(self, nlsolver):
         size = 3
 
         prob = om.Problem()
@@ -295,9 +286,7 @@ class MPITests2(unittest.TestCase):
         root.connect("P2.x", "sub.C2.x")
         root.connect("C3.y", "C4.x")
 
-        root.linear_solver = solver()
         root.nonlinear_solver = nlsolver()
-        sub.linear_solver = solver()
 
         prob.set_solver_print(0)
         prob.setup(mode='fwd')

@@ -1,0 +1,29 @@
+
+from openmdao.core.group import Group
+from openmdao.components.exec_comp import ExecComp
+
+class {class_name}(Group):
+
+    def setup(self):
+        # most Group classes override setup() and use it to create subsystems, connections,
+        # and setup their linear and or nonlinear solvers.  They can also declare design
+        # variables and constriants here.
+
+        ###  for example:
+        # indeps = self.add_subsystem('indeps', IndepVarComp())
+        # indeps.add_output('x', 3.0)
+
+        # self.add_subsystem('comp1', ExecComp('y=x*2.5'))
+        # self.add_subsystem('comp2', ExecComp('y=x-4.2'))
+
+        # self.connect('comp1.y', 'comp2.x')
+
+        # self.nonlinear_solver = NewtonSolver()
+        # self.nonlinear_solver.options['iprint'] = 2
+        # self.nonlinear_solver.options['maxiter'] = 20
+        # self.linear_solver = DirectSolver()
+
+        # self.add_design_var('indeps.x', lower=.5, upper=10)
+        # self.add_constraint('comp1.y', lower=-3.)
+        # self.add_objective('comp2.y')
+        pass

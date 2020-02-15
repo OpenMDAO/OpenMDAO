@@ -9,6 +9,7 @@ import os
 import shutil
 import tempfile
 import csv
+import json
 
 import numpy as np
 
@@ -19,6 +20,13 @@ from openmdao.test_suite.groups.parallel_groups import FanInGrouped
 
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.utils.general_utils import run_driver, printoptions
+
+from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class ParaboloidArray(om.ExplicitComponent):
@@ -945,7 +953,7 @@ class TestDOEDriver(unittest.TestCase):
         assert_rel_error(self, outputs['z'], 30.0, 1e-7)
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelDOE(unittest.TestCase):
 
     N_PROCS = 4
@@ -1302,7 +1310,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % vals_i for vals_i in values]))
+        print("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]))
 
     def test_csv(self):
         import openmdao.api as om
@@ -1340,8 +1348,7 @@ class TestDOEDriverFeature(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f"
-                                    % vals_i for vals_i in values]),
+        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
                          self.expected_text)
 
     def test_list(self):
@@ -1392,12 +1399,11 @@ class TestDOEDriverFeature(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f"
-                                    % vals_i for vals_i in values]),
+        self.assertEqual("\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
                          self.expected_text)
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelDOEFeature(unittest.TestCase):
 
     N_PROCS = 2
@@ -1431,7 +1437,7 @@ class TestParallelDOEFeature(unittest.TestCase):
                 values.append((case['x'], case['y'], case['f_xy']))
 
         self.expect_text = "\n"+"\n".join([
-            "x: %5.2f, y: %5.2f, f_xy: %6.2f" % vals_i for vals_i in values
+            "x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values
         ])
 
         # run in temp dir
@@ -1489,18 +1495,18 @@ class TestParallelDOEFeature(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f"
-                                         % vals_i for vals_i in values]),
+        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
                          self.expect_text)
 
 
-@unittest.skipUnless(om.PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestParallelDOEFeature2(unittest.TestCase):
 
     N_PROCS = 4
 
     def setUp(self):
         import os
+        import shutil
         import tempfile
 
         from mpi4py import MPI
@@ -1581,9 +1587,8 @@ class TestParallelDOEFeature2(unittest.TestCase):
                 outputs = cr.get_case(case).outputs
                 values.append((outputs['iv.x1'], outputs['iv.x2'], outputs['c3.y']))
 
-            self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f"
-                                             % vals_i for vals_i in values]),
-                             self.expect_text)
+            self.assertEqual("\n"+"\n".join(["iv.x1: %5.2f, iv.x2: %5.2f, c3.y: %6.2f" % (x1, x2, y) for x1, x2, y in values]),
+                self.expect_text)
 
 
 if __name__ == "__main__":

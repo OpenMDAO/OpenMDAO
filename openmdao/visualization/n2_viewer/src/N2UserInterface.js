@@ -69,17 +69,25 @@ class N2UserInterface {
      * the diagram drawing.
      */
     collapse() {
-        testThis(this, 'N2UserInterface', 'collapse');
+        testThis(this, "N2UserInterface", "collapse");
 
         let node = this.leftClickedNode;
 
         if (!node.hasChildren()) return;
 
         // Don't allow minimizing of root node
-        if (node.depth > this.n2Diag.zoomedElement.depth) {
+        if (node.depth > this.n2Diag.zoomedElement.depth || node.type !== "root") {
             this.rightClickedNode = node;
-            this.findRootOfChangeFunction =
-                this.findRootOfChangeForRightClick.bind(this);
+
+            if (this.collapsedRightClickNode !== undefined) {
+                this.rightClickedNode = this.collapsedRightClickNode;
+                this.collapsedRightClickNode = undefined;
+            }
+
+            this.findRootOfChangeFunction = this.findRootOfChangeForRightClick.bind(
+                this
+            );
+
             N2TransitionDefaults.duration = N2TransitionDefaults.durationFast;
             this.lastClickWasLeft = false;
             node.toggleMinimize();
@@ -87,12 +95,18 @@ class N2UserInterface {
         }
     }
 
-    /** When a node is right-clicked, collapse it. */
+    /* When a node is right-clicked, collapse it. */
     rightClick(node1, node2) {
-        testThis(this, 'N2UserInterface', 'rightClick');
+        testThis(this, "N2UserInterface", "rightClick");
 
         this.leftClickedNode = node1;
         this.rightClickedNode = node2;
+
+        let node = this.leftClickedNode;
+        node["collapsable"] = true;
+
+        this.backButtonHistory.push({ "node": node });
+
         d3.event.preventDefault();
         d3.event.stopPropagation();
         this.collapse();
@@ -157,17 +171,30 @@ class N2UserInterface {
      * Add the previous zoomed node to the forward history stack.
      */
     backButtonPressed() {
-        testThis(this, 'N2UserInterface', 'backButtonPressed');
+        testThis(this, "N2UserInterface", "backButtonPressed");
 
         if (this.backButtonHistory.length == 0) return;
-        let node = this.backButtonHistory.pop().node;
-        this.n2Diag.dom.parentDiv.querySelector("#backButtonId").disabled =
-            (this.backButtonHistory.length == 0) ? "disabled" : false;
-        for (let obj = node; obj != null; obj = obj.parent) { //make sure history item is not minimized
-            if (obj.isMinimized) return;
+
+        let node = this.backButtonHistory[this.backButtonHistory.length - 1].node;
+
+        // Check to see if the node is a collapsed node or not
+        if (node.collapsable) {
+            this.leftClickedNode = node;
+            this.forwardButtonHistory.push({ node: this.leftClickedNode });
+            this.collapse();
+        } else {
+            this.n2Diag.dom.parentDiv.querySelector("#backButtonId").disabled =
+                this.backButtonHistory.length == 0 ? "disabled" : false;
+            for (let obj = node; obj != null; obj = obj.parent) {
+                //make sure history item is not minimized
+                if (obj.isMinimized) return;
+            }
+
+            this.forwardButtonHistory.push({ node: this.n2Diag.zoomedElement });
+            this._setupLeftClick(node);
         }
-        this.forwardButtonHistory.push({ "node": this.n2Diag.zoomedElement });
-        this._setupLeftClick(node);
+
+        this.backButtonHistory.pop();
         this.n2Diag.update();
     }
 
@@ -478,7 +505,7 @@ class N2UserInterface {
     /** Called when the search button is actually or effectively clicked to start a search. */
     searchButtonClicked() {
         testThis(this, 'N2UserInterface', 'searchButtonClicked');
-        
+
         this.n2Diag.search.performSearch();
 
         this.findRootOfChangeFunction = this.n2Diag.search.findRootOfChangeForSearch;

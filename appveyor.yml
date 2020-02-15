@@ -6,34 +6,20 @@ branches:
 
 environment:
   matrix:
+    #
+    # test with the latest Python 3.x/2.x and numpy/scipy releases
+    #
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PYTHON: 2.7
-      NUMPY: 1.15
-      SCIPY: 1.0.1
+      PYTHON: 3
 
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PYTHON: 3.6
-      NUMPY: 1.15
-      SCIPY: 1.0.1
+      PYTHON: 2
 
-    # - APPVEYOR_BUILD_WORKER_IMAGE: Previous Ubuntu
-    #   PYTHON: 2.7
-    #   NUMPY: 1.13
-    #   SCIPY: 1.0.1
-    #   PETSc: 3.9.1    # 3.9.1  released 2018-05-02
-
-    # - APPVEYOR_BUILD_WORKER_IMAGE: Previous Ubuntu
-    #   PYTHON: 3.6
-    #   NUMPY: 1.15
-    #   SCIPY: 1.0.1
-    #   PETSc: 3.10.1  # 3.10.1  released 2019-01-27
-
-    # - APPVEYOR_BUILD_WORKER_IMAGE: Previous Ubuntu
-    #   PYTHON: 3.7
-    #   NUMPY: 1.15
-    #   SCIPY: 1.0.1
-    #   PETSc: 3.11    # 3.11.0  released 2019-04-14
-
+    # - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
+    #   # test with the latest version of Python 3.x; due to issues with PETSc 3.12, stay with 3.11 and
+    #   # install from maint-3.11 to get this fix: https://bitbucket.org/petsc/petsc4py/commits/a013d13
+    #   PYTHON: 3
+    #   PETSc: git+https://bitbucket.org/petsc/petsc4py.git@maint-3.11
 
   encrypted_74d70a284b7d_key:
     secure: 7u/kPupG0BmwqAJOLeyGMPakwj3lqukKHXsxEP4+6aX+Huu8VH2ZkDNq6GYlaw6HGJHi2JTAal9VDgOpZc9RMlweOrXJiNFWS3Iu0chy+L4=
@@ -45,7 +31,7 @@ environment:
     secure: BMuN2XRyyMclCtx+SGQCMNgbtSplR5GnBKRZVvotqd1SO6aNpMyh+Hqv+23+vBMFcN7te93hDiAE5+joj4R+H4sGGyeRb+khsu/sILHZaLQ=
 
 install:
-- sh:
+- sh: |
     if [ "$encrypted_74d70a284b7d_key" ]; then
       openssl aes-256-cbc -K $encrypted_74d70a284b7d_key -iv $encrypted_74d70a284b7d_iv -in travis_deploy_rsa.enc -out /tmp/travis_deploy_rsa -d;
       eval "$(ssh-agent -s)";
@@ -76,7 +62,7 @@ install:
     source $HOME/miniconda/bin/activate PY$PYTHON;
 
     echo " >> Installing non-pure Python dependencies from conda";
-    conda install --yes numpy=$NUMPY scipy=$SCIPY cython swig;
+    conda install --yes numpy scipy cython swig;
 
     pip install --upgrade pip;
 
@@ -96,13 +82,16 @@ install:
     fi
 
     echo "  > Install pyOptSparse";
-    python setup.py install;
+    pip install .;
     cd ..;
 
     if [ "$PETSc" ]; then
       echo " >> Installing parallel processing dependencies";
-      pip install mpi4py;
-      pip install petsc4py==$PETSc;
+      if [[ "$PETSc" == "git"* ]]; then
+        pip install $PETSc;
+      else
+        pip install petsc4py==$PETSc;
+      fi
     fi
 
     echo ">>> Installing OpenMDAO";
@@ -112,7 +101,7 @@ install:
 - cmd: if %PYTHON% GTR 3 (set CONDA=C:\Miniconda3%PYTHON:~2%-x64) else (set CONDA=C:\Miniconda-x64)
 - cmd: set PATH=%CONDA%;%CONDA%\Scripts;%PATH%
 - cmd: conda config --set always_yes yes
-- cmd: conda create -n PY%PYTHON% numpy=%NUMPY% scipy=%SCIPY% pip --quiet
+- cmd: conda create -n PY%PYTHON% numpy scipy pip --quiet
 - cmd: activate PY%PYTHON%
 - cmd: pip install -e .[all]
 - cmd: conda list

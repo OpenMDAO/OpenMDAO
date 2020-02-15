@@ -24,7 +24,7 @@ if OPTIMIZER:
 
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProbRemoteTestCase(unittest.TestCase):
 
     N_PROCS = 2
@@ -120,7 +120,7 @@ class ProbRemoteTestCase(unittest.TestCase):
             self.assertTrue(p.is_local('par.C2.y'), 'par.C2.y should be local')
 
 @unittest.skip("FIXME: test is unreliable on CI... (timeout)")
-#@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+#@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProbRemote4TestCase(unittest.TestCase):
 
     N_PROCS = 4

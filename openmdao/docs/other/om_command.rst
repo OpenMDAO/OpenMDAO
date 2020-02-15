@@ -4,10 +4,8 @@
 Command Line Tools
 ******************
 
-OpenMDAO has a number of debugging/viewing command line tools that are available via the `openmdao`
-command.  There are two types of commands available, those that perform some sort of viewing or
-configuration checking on the Problem after its setup is complete, and those that are used to
-collect information about the entire run of the Problem, like profilers and tracers.
+OpenMDAO has a number of command line tools that are available via the `openmdao`
+command.
 
 .. note::
     The `openmdao` sub-commands, as well as any other console scripts associated with OpenMDAO, will
@@ -73,7 +71,7 @@ To see lists of the available and default checks, run the following command:
 .. _om-command-n2:
 
 openmdao n2
-###################
+###########
 
 The :code:`openmdao n2` command will generate an :math:`N^2` diagram of the model that is
 viewable in a browser, for example:
@@ -88,6 +86,7 @@ will generate an :math:`N^2` diagram like the one below.
 
 .. embed-n2::
     ../test_suite/scripts/circuit.py
+
 
 .. _om-command-view_connections:
 
@@ -125,8 +124,8 @@ Below is an example of a connection viewer for a pycycle propulsor model obtaine
    An example of a connection viewer.
 
 
-By default the promoted names columns of both inputs and outputs are shown, but in the example
-above, the absolute input names are shown and the promoted input names are hidden.
+By default the promoted names columns of both inputs and outputs are shown and their absolute
+names are hidden.
 
 Unconnected inputs can easily be identified by typing '[NO CONNECTION]' or '[', into
 the filter field of either the absolute or promoted *output* column.  Unconnected outputs can
@@ -136,7 +135,7 @@ or promoted *input* column.
 When showing promoted output and promoted input columns, if the promoted output name equals the
 promoted input name, that means the connection is an implicit connection.  Otherwise the
 connection is explicit, meaning somewhere in the model there is an explicit call to `connect`
-that producted the connection.
+that produced the connection.
 
 In OpenMDAO, multiple inputs can be promoted to the same name, and by sorting the promoted inputs
 column, all such inputs will be grouped together.  This can make it much easier to spot either
@@ -298,15 +297,101 @@ openmdao scaffold
 #################
 
 The :code:`openmdao scaffold` command generates simple scaffolding, or 'skeleton' code for
-an explicit or implicit component.  In addition, it will generate the scaffolding for a simple
-test file of that component.  The available options are as follows:
+a class that inherits from an allowed OpenMDAO base class.  The allowed base classes are shown as
+part of the description of the `--base` arg below:
 
 .. embed-shell-cmd::
     :cmd: openmdao scaffold -h
 
 
-This command is only an initial attempt to provide this sort of functionality and any user
-feedback describing how to improve it is welcome.
+In addition, the command will generate the scaffolding for a simple
+test file for that class, and if the `--package` option is used, it will generate the directory
+structure for a simple installable python package and will declare an entry point in the
+`setup.py` file so that the given class can be discoverable as an OpenMDAO plugin when installed.
+
+To build scaffolding for an OpenMDAO command line tool plugin, use the `--cmd` option.
+
+
+
+.. _om-command-list-installed:
+
+openmdao list_installed
+#######################
+
+The :code:`openmdao list_installed` command lists installed classes of the specified type(s).
+Its options are shown below:
+
+
+.. embed-shell-cmd::
+    :cmd: openmdao list_installed -h
+
+
+By default, installed types from all installed packages are shown, but the output can be filtered
+by the use of the `-i` option to include only specified packages, or the `-x` option
+to exclude specified packages.
+
+For example, to show only those linear and nonlinear solver types that are part of the `openmdao`
+package, do the following:
+
+.. embed-shell-cmd::
+    :cmd: openmdao list_installed lin_solver nl_solver -i openmdao
+
+
+Similarly, to hide all of the built-in (openmdao) solver types and only see installed plugin
+solver types, do the following.
+
+.. code-block:: none
+
+    openmdao list_installed lin_solver nl_solver -x openmdao
+
+
+.. _om-command-find-plugins:
+
+openmdao find_plugins
+#####################
+
+The :code:`openmdao find_plugins` command finds github repositories containing openmdao plugins.
+Its options are shown below:
+
+
+.. embed-shell-cmd::
+    :cmd: openmdao find_plugins -h
+
+
+One example of its use would be to display any github repositories containing openmdao command
+line tools.  At the time this documentation was created, the following repositories were found:
+
+.. embed-shell-cmd::
+    :cmd: openmdao find_plugins command
+
+
+
+.. _om-command-compute-entry-points:
+
+openmdao compute_entry_points
+#############################
+
+The :code:`openmdao compute_entry_points` command lists entry point groups and entry points for
+any openmdao compatible classes, e.g., Component, Group, etc., that it finds within a given
+python package. Its options are shown below:
+
+
+.. embed-shell-cmd::
+    :cmd: openmdao compute_entry_points -h
+
+
+For example, to show all of the potential openmdao entry point groups and entry points for an
+installed python package called `mypackage`, you would do the following:
+
+
+.. code-block:: none
+
+    openmdao compute_entry_points mypackage
+
+
+The entry point information will be printed in a form that can easily be pasted into the
+`setup.py` file for the specified package.
+
 
 
 Using Commands under MPI

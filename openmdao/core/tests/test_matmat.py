@@ -236,12 +236,12 @@ def lagrange_matrices(x_disc, x_interp):
     -------
     Li : np.array
         A num_i x num_c matrix which, when post-multiplied by values specified
-        at the cardinal nodes, yields the intepolated values at the interior
+        at the cardinal nodes, yields the interpolated values at the interior
         nodes.
 
     Di : np.array
         A num_i x num_c matrix which, when post-multiplied by values specified
-        at the cardinal nodes, yields the intepolated derivatives at the interior
+        at the cardinal nodes, yields the interpolated derivatives at the interior
         nodes.
 
     """
