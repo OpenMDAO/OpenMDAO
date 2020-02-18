@@ -1404,12 +1404,12 @@ class Group(System):
 
         list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
 
-        for i in list_comp:
-            original, new = i
-            for j in list_comp:
-                original_inside, new_inside = j
+        # Fix this
+        for original, new in list_comp:
+            for original_inside, new_inside in list_comp:
                 if original == original_inside and new != new_inside:
-                    raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to '%s'." % (self.msginfo, original_inside, new))
+                    raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to "
+                                       "'%s'." % (self.msginfo, original_inside, new))
 
     def add(self, name, subsys, promotes=None):
         """

@@ -2028,18 +2028,6 @@ class System(object):
                             # Default: prepend the parent system's name
                             pmap[name] = gname + name if gname else name
 
-            for p in patterns:
-                for i in renames:
-                    if fnmatchcase(i, p):
-                        raise RuntimeError("%s: failed to find any matches for the following "
-                                        "names or patterns: '%s'. You may be promoting the wrong "
-                                        "variable." % (self.msginfo, p))
-                for i in names:
-                    if not fnmatchcase(i, p):
-                        raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                "names or patterns: %s.%s" %
-                                (self.msginfo, call, sorted(not_found), empty_group_msg))
-
             not_found = (set(names).union(renames).union(patterns)) - found
             if not_found:
                 if not self._var_abs2meta and isinstance(self, openmdao.core.group.Group):
@@ -2050,9 +2038,27 @@ class System(object):
                     call = 'promotes'
                 else:
                     call = 'promotes_%ss' % io_types[0]
+
+                for p in patterns:
+                    if p not in not_found:
+                        continue
+                    for name, alias in renames:
+                        if fnmatchcase(name, p):
+                            raise RuntimeError("%s: %s found match '%s'. You may be attempting to "
+                                               "promote a renamed variable." %
+                                               (self.msginfo, call, p))
+
+                    for i in names:
+                        if fnmatchcase(i, p):
+                            break
+                    else:
+                        raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                           "name: %s.%s" %
+                                           (self.msginfo, call, sorted(not_found), empty_group_msg))
+
                 raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                "names or patterns: %s.%s" %
-                                (self.msginfo, call, sorted(not_found), empty_group_msg))
+                                   "names or patterns: %s.%s" %
+                                   (self.msginfo, call, sorted(not_found), empty_group_msg))
 
         maps = {'input': {}, 'output': {}}
 

@@ -233,9 +233,8 @@ class TestGroup(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(context.exception),
-                         "ExecComp (sub.comp1): failed to find any matches for "
-                         "the following names or patterns: 'b*'. You may be promoting the wrong "
-                         "variable.")
+                         "ExecComp (sub.comp1): promotes_inputs found match 'b*'. You may be "
+                         "attempting to promote a renamed variable.")
 
     def test_promotes_wildcard_name(self):
         class SubGroup(om.Group):
@@ -252,7 +251,7 @@ class TestGroup(unittest.TestCase):
                 self.add_subsystem('sub', SubGroup())
 
             def configure(self):
-                self.sub.promotes('comp1', inputs=[('bb')])
+                self.sub.promotes('comp1', inputs=['bb'])
 
         top = om.Problem(model=TopGroup())
 
@@ -987,7 +986,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "ExecComp (C2): 'promotes_outputs' failed to find any matches for "
-                         "the following names or patterns: ['x*'].")
+                         "the following name: ['x*'].")
 
     def test_promote_not_found2(self):
         p = om.Problem()
@@ -1023,7 +1022,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "Group (G1): 'promotes' failed to find any matches for "
-                         "the following names or patterns: ['*']. "
+                         "the following name: ['*']. "
                          "Group contains no variables.")
 
     def test_missing_promote_var(self):
