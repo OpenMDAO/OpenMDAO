@@ -373,8 +373,12 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes(self):
         """Promoting a single variable."""
         p = om.Problem()
-        p.model.add_subsystem('comp1', om.IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                              promotes_outputs=['x'])
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('a', 2.0)
+        ivc.add_output('x', 5.0)
+
+        p.model.add_subsystem('comp1', ivc, promotes_outputs=['x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=2*x'), promotes_inputs=['x'])
         p.setup()
 
@@ -433,8 +437,12 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_multiple(self):
         """Promoting multiple variables."""
         p = om.Problem()
-        p.model.add_subsystem('comp1', om.IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                              promotes_outputs=['a', 'x'])
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('a', 2.0)
+        ivc.add_output('x', 5.0)
+
+        p.model.add_subsystem('comp1', ivc, promotes_outputs=['a', 'x'])
         p.model.add_subsystem('comp2', om.ExecComp('y=2*x'),
                               promotes_inputs=['x'])
         p.setup()
@@ -449,8 +457,12 @@ class TestGroup(unittest.TestCase):
     def test_group_promotes_all(self):
         """Promoting all variables with asterisk."""
         p = om.Problem()
-        p.model.add_subsystem('comp1', om.IndepVarComp([('a', 2.0), ('x', 5.0)]),
-                              promotes_outputs=['*'])
+
+        ivc = om.IndepVarComp()
+        ivc.add_output('a', 2.0)
+        ivc.add_output('x', 5.0)
+
+        p.model.add_subsystem('comp1', ivc, promotes_outputs=['*'])
         p.model.add_subsystem('comp2', om.ExecComp('y=2*x'),
                               promotes_inputs=['x'])
         p.setup()
