@@ -1,0 +1,6 @@
+
+from setuptools import setup
+
+setup_args = {setup_args}
+
+setup(**setup_args)

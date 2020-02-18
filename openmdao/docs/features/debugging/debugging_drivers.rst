@@ -24,12 +24,12 @@ printed are unscaled, physical values.
 
 
   .. embed-code::
-      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_debug_print_option
+      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_feature_debug_print_option
       :layout: interleave
 
 We can also use the debug printing to print some basic information about the derivative calculations so that you can see
 which derivative is being solved, how long it takes, and the computed values by including the 'totals' string in the "debug_print" list.
 
   .. embed-code::
-      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_debug_print_option_totals
+      openmdao.drivers.tests.test_scipy_optimizer.TestScipyOptimizeDriverFeatures.test_feature_debug_print_option_totals
       :layout: interleave

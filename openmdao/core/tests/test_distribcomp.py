@@ -274,7 +274,7 @@ class NonDistribGatherComp(om.ExplicitComponent):
         outputs['outvec'] = inputs['invec']
 
 
-@unittest.skipIf(PETScVector is not None, "Only runs when PETSc is not available")
+@unittest.skipUnless(PETScVector is None, "Only runs when PETSc is not available")
 class NOMPITests(unittest.TestCase):
 
     def test_distrib_idx_in_full_out(self):
@@ -303,7 +303,7 @@ class NOMPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2
@@ -546,7 +546,6 @@ class MPITests(unittest.TestCase):
             self.assertTrue(all(C2._outputs['outvec'] == C1._outputs['outvec']*2.))
             self.assertTrue(all(C3._outputs['outvec'] == C2._outputs['outvec']))
 
-    @unittest.skipUnless(MPI, "MPI is not active.")
     def test_overlapping_inputs_idxs(self):
         # distrib comp with src_indices that overlap, i.e. the same
         # entries are distributed to multiple processes
@@ -610,6 +609,7 @@ class MPITests(unittest.TestCase):
             self.assertTrue(all(C3._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class DeprecatedMPITests(unittest.TestCase):
 
     N_PROCS = 2
@@ -685,8 +685,7 @@ class DeprecatedMPITests(unittest.TestCase):
         self.assertTrue(all(C2._outputs['outvec'] == np.array(range(size, 0, -1), float)*4))
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProbRemoteTests(unittest.TestCase):
 
     N_PROCS = 4
@@ -829,8 +828,7 @@ class ProbRemoteTests(unittest.TestCase):
         self.assertEqual(ans, 'boobar')
 
 
-@unittest.skipUnless(PETScVector, "PETSc is required.")
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPIFeatureTests(unittest.TestCase):
 
     N_PROCS = 2

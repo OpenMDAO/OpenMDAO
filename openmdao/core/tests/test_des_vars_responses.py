@@ -613,7 +613,7 @@ class TestConstraintOnModel(unittest.TestCase):
         self.assertEqual(str(context.exception), msg)
 
 
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestAddConstraintMPI(unittest.TestCase):
 
     N_PROCS = 2

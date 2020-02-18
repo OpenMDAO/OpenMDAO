@@ -2,16 +2,16 @@ from __future__ import print_function
 import unittest
 import numpy as np
 from openmdao.utils.mpi import MPI
+import traceback
 
 from openmdao.api import Problem
 from openmdao.api import ExplicitComponent, IndepVarComp
 from openmdao.api import NonlinearRunOnce, LinearRunOnce
 
-if MPI:
-    try:
-        from openmdao.vectors.petsc_vector import PETScVector
-    except ImportError:
-        PETScVector = None
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class Comp(ExplicitComponent):
@@ -36,9 +36,9 @@ class Comp(ExplicitComponent):
         outputs['y'] = inputs['x'] + 1.0
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestSrcIndices(unittest.TestCase):
-    NUM_PROCS = 4
+    N_PROCS = 4
 
     def test_zero_src_indices(self):
         prob = Problem()

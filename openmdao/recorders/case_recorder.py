@@ -88,9 +88,11 @@ class CaseRecorder(object):
         recording_requester : object
             The object that would like to record its metadata.
         """
-        if isinstance(recording_requester, System):
+        record_metadata = recording_requester.recording_options['record_metadata']
+
+        if isinstance(recording_requester, System) and record_metadata:
             self.record_metadata_system(recording_requester)
-        elif isinstance(recording_requester, Solver):
+        elif isinstance(recording_requester, Solver) and record_metadata:
             self.record_metadata_solver(recording_requester)
 
     def _get_metadata_system(self, recording_requester):
@@ -107,14 +109,19 @@ class CaseRecorder(object):
                 scaling[vecname] = vec._scaling
 
         # create a copy of the system's metadata excluding what is in 'options_excludes'
-        user_options = OptionsDictionary()
         excludes = recording_requester.recording_options['options_excludes']
-        for key in recording_requester.options._dict:
-            if check_path(key, [], excludes, True):
-                user_options._dict[key] = recording_requester.options._dict[key]
-        user_options._read_only = recording_requester.options._read_only
 
-        return scaling_vecs, user_options
+        if excludes:
+            user_options = OptionsDictionary()
+            user_options._all_recordable = recording_requester.options._all_recordable
+            for key in recording_requester.options._dict:
+                if check_path(key, [], excludes, True):
+                    user_options._dict[key] = recording_requester.options._dict[key]
+            user_options._read_only = recording_requester.options._read_only
+
+            return scaling_vecs, user_options
+        else:
+            return scaling_vecs, recording_requester.options
 
     def record_metadata_system(self, recording_requester):
         """

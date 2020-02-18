@@ -1,0 +1,95 @@
+
+from openmdao.core.driver import Driver
+
+class {class_name}(Driver):
+    """
+    Describe driver class here...
+    """
+
+    def __init__(self, **kwargs):
+        """
+        Initialize the {class_name} driver.
+
+        Parameters
+        ----------
+        **kwargs : dict of keyword arguments
+            Keyword arguments that will be mapped into the Driver options.
+        """
+        super({class_name}, self).__init__(**kwargs)
+
+        # Specify what we support and what we don't
+        self.supports['integer_design_vars'] = False
+        self.supports['inequality_constraints'] = False
+        self.supports['equality_constraints'] = False
+        self.supports['multiple_objectives'] = False
+        self.supports['two_sided_constraints'] = False
+        self.supports['linear_constraints'] = False
+        self.supports['simultaneous_derivatives'] = False
+        self.supports['active_set'] = False
+
+        # other initialization here...
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        # for example ...
+        # self.options.declare('print_results', types=bool, default=True,
+        #                      desc='Print opt results if True')
+        pass
+
+    def _setup_driver(self, problem):
+        """
+        Prepare the driver for execution.
+
+        This is the final thing to run during setup.
+
+        Parameters
+        ----------
+        problem : <Problem>
+            Pointer to the containing problem.
+        """
+        super({class_name}, self)._setup_driver(problem)
+
+        # perform setup actions here...
+
+    def _setup_comm(self, comm):
+        """
+        Perform any driver-specific setup of MPI communicators for the model.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or <FakeComm> or None
+            The communicator for the Problem.
+
+        Returns
+        -------
+        MPI.Comm or <FakeComm> or None
+            The communicator to be used by the model.
+        """
+        # if your driver splits the comm in some way, do it here, else
+        return comm
+
+    def _get_name(self):
+        """
+        Get name of current Driver.  Typically class name or some abbreviated form of class name.
+
+        Returns
+        -------
+        str
+            Name of current Driver.
+        """
+        return {class_name}
+
+    def run(self):
+        """
+        Execute the driver.
+
+        Returns
+        -------
+        boolean
+            Failure flag; True if failed to converge, False is successful.
+        """
+        # perform optimization (or whatever this driver does) here...
+
+        return False  # success
