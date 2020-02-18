@@ -70,7 +70,7 @@ class SplineCompTestCase(unittest.TestCase):
         self.prob.setup(force_alloc_complex=True)
         self.prob.run_model()
 
-        # Verification array from AkimaSplineComp
+        # Verification array from openmdao 2.x using AkimaSplineComp
         akima_y = np.array([[ 5.       ,  7.20902005,  9.21276849, 10.81097162, 11.80335574,
                             12.1278001 , 12.35869145, 12.58588536, 12.81022332, 13.03254681,
                             13.25369732, 13.47451633, 13.69584534, 13.91852582, 14.14281484,

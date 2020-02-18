@@ -173,8 +173,6 @@ class Solver(object):
                              desc='relative error tolerance')
         self.options.declare('iprint', types=int, default=1,
                              desc='whether to print output')
-        self.options.declare('err_on_maxiter', types=bool, default=None, allow_none=True,
-                             desc="Deprecated. Use 'err_on_non_converge'.")
         self.options.declare('err_on_non_converge', types=bool, default=False,
                              desc="When True, AnalysisError will be raised if we don't converge.")
 
@@ -316,13 +314,6 @@ class Solver(object):
             'output': myoutputs,
             'residual': myresiduals
         }
-
-        # Raise a deprecation warning for changed option.
-        if 'err_on_maxiter' in self.options and self.options['err_on_maxiter'] is not None:
-            self.options['err_on_non_converge'] = self.options['err_on_maxiter']
-            warn_deprecation("The 'err_on_maxiter' option provides backwards compatibility "
-                             "with earlier version of OpenMDAO; use options['err_on_non_converge'] "
-                             "instead.")
 
     def _set_solver_print(self, level=2, type_='all'):
         """

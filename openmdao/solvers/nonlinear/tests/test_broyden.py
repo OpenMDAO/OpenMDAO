@@ -12,13 +12,14 @@ from openmdao.core.tests.test_distrib_derivs import DistribExecComp
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
-from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_check_partials
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
 from openmdao.utils.mpi import MPI
+
 
 class VectorEquation(om.ImplicitComponent):
     """Equation with 5 states in a single vector. Should converge to x=[0,0,0,0,0]"""
@@ -530,7 +531,6 @@ class TestBryoden(unittest.TestCase):
         top.model.linear_solver = om.DirectSolver()
 
         top.setup()
-        top.model.nonlinear_solver.linesearch = om.BoundsEnforceLS(bound_enforcement='vector')
 
         # Setup again because we assigned a new linesearch
         top.setup()
@@ -715,21 +715,6 @@ class TestBryoden(unittest.TestCase):
 
         for key, val in iteritems(totals):
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-7)
-
-    def test_linsearch_3_deprecation(self):
-        prob = om.Problem()
-        model = prob.model = SellarStateConnection(nonlinear_solver=om.BroydenSolver(),
-                                                   linear_solver=om.LinearRunOnce())
-        prob.setup()
-
-        model.nonlinear_solver.options['state_vars'] = ['state_eq.y2_command']
-        model.nonlinear_solver.options['compute_jacobian'] = False
-
-        msg = 'Deprecation warning: In V 3.0, the default Broyden solver setup will change ' + \
-              'to use the BoundsEnforceLS line search.'
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.final_setup()
 
 
 @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")

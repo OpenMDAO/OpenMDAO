@@ -740,34 +740,6 @@ class TestNewton(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-    def test_err_on_maxiter_deprecated(self):
-        # Raise AnalysisError when it fails to converge
-
-        prob = om.Problem()
-        nlsolver = om.NewtonSolver()
-        prob.model = SellarDerivatives(nonlinear_solver=nlsolver,
-                                       linear_solver=om.LinearBlockGS())
-
-        nlsolver.options['err_on_maxiter'] = True
-        nlsolver.options['maxiter'] = 1
-
-        prob.setup()
-        prob.set_solver_print(level=0)
-
-        msg = "The 'err_on_maxiter' option provides backwards compatibility " + \
-        "with earlier version of OpenMDAO; use options['err_on_non_converge'] " + \
-        "instead."
-        #prob.final_setup()
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.final_setup()
-
-        with self.assertRaises(om.AnalysisError) as context:
-            prob.run_model()
-
-        msg = "Solver 'NL: Newton' on system '' failed to converge in 1 iterations."
-        self.assertEqual(str(context.exception), msg)
-
     def test_err_on_non_converge(self):
         # Raise AnalysisError when it fails to converge
 

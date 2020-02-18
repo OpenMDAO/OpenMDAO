@@ -15,7 +15,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path
-from openmdao.utils.general_utils import simple_warning, warn_deprecation
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
@@ -844,22 +844,6 @@ class Driver(object):
         else:
             raise RuntimeError("Driver '%s' does not support simultaneous derivatives." %
                                self._get_name())
-
-    def set_simul_deriv_color(self, coloring):
-        """
-        See use_fixed_coloring. This method is deprecated.
-
-        Parameters
-        ----------
-        coloring : str or Coloring
-            Information about simultaneous coloring for design vars and responses.  If a
-            string, then coloring is assumed to be the name of a file that contains the
-            coloring information in pickle format. Otherwise it must be a Coloring object.
-            See the docstring for Coloring for details.
-
-        """
-        warn_deprecation("set_simul_deriv_color is deprecated.  Use use_fixed_coloring instead.")
-        self.use_fixed_coloring(coloring)
 
     def _setup_tot_jac_sparsity(self):
         """

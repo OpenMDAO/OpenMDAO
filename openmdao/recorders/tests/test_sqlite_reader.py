@@ -131,10 +131,6 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(case.abs_err, None)
         self.assertEqual(case.rel_err, None)
 
-        msg = "'iteration_coordinate' has been deprecated. Use 'name' instead."
-        with assert_warning(DeprecationWarning, msg):
-            case.iteration_coordinate
-
     def test_invalid_source(self):
         """ Tests that the reader returns params correctly. """
         prob = SellarProblem(SellarDerivativesGrouped)

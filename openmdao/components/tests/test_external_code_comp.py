@@ -512,55 +512,6 @@ class TestExternalCodeCompFeature(unittest.TestCase):
         assert_rel_error(self, prob['p2.y'], -7.3333333, 1e-6)
 
 
-# ------------------------------------------------------
-# run same test as above, only with the deprecated component,
-# to ensure we get the warning and the correct answer.
-# self-contained, to be removed when class name goes away.
-from openmdao.api import ExternalCode
-
-
-class DeprecatedExternalCodeForTesting(ExternalCode):
-    def __init__(self):
-        super(DeprecatedExternalCodeForTesting, self).__init__()
-
-
-class TestDeprecatedExternalCode(unittest.TestCase):
-
-    def setUp(self):
-        self.startdir = os.getcwd()
-        self.tempdir = tempfile.mkdtemp(prefix='test_extcode-')
-        os.chdir(self.tempdir)
-        shutil.copy(os.path.join(DIRECTORY, 'extcode_example.py'),
-                    os.path.join(self.tempdir, 'extcode_example.py'))
-
-        msg = "'ExternalCode' has been deprecated. Use 'ExternalCodeComp' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            self.extcode = DeprecatedExternalCodeForTesting()
-
-        self.prob = om.Problem()
-
-        self.prob.model.add_subsystem('extcode', self.extcode)
-
-    def tearDown(self):
-        os.chdir(self.startdir)
-        try:
-            shutil.rmtree(self.tempdir)
-        except OSError:
-            pass
-
-    def test_normal(self):
-        self.extcode.options['command'] = [
-            sys.executable, 'extcode_example.py', 'extcode.out'
-        ]
-
-        self.extcode.options['external_input_files'] = ['extcode_example.py']
-        self.extcode.options['external_output_files'] = ['extcode.out']
-
-        self.prob.setup(check=True)
-        self.prob.run_model()
-
-
 class TestExternalCodeImplicitCompFeature(unittest.TestCase):
 
     def setUp(self):

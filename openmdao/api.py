@@ -11,15 +11,12 @@ from openmdao.core.analysis_error import AnalysisError
 
 # Components
 from openmdao.components.add_subtract_comp import AddSubtractComp
-from openmdao.components.akima_spline_comp import AkimaSplineComp
 from openmdao.components.balance_comp import BalanceComp
-from openmdao.components.bsplines_comp import BsplinesComp
 from openmdao.components.cross_product_comp import CrossProductComp
 from openmdao.components.demux_comp import DemuxComp
 from openmdao.components.dot_product_comp import DotProductComp
 from openmdao.components.eq_constraint_comp import EQConstraintComp
 from openmdao.components.exec_comp import ExecComp
-from openmdao.components.external_code_comp import ExternalCode
 from openmdao.components.external_code_comp import ExternalCodeComp
 from openmdao.components.external_code_comp import ExternalCodeImplicitComp
 from openmdao.components.ks_comp import KSComp

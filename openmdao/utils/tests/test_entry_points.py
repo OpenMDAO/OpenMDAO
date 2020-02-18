@@ -38,7 +38,6 @@ class TestEntryPoints(unittest.TestCase):
     # test if all relevant classes have been registered as entry points
     def test_ep_registered(self):
         skip = {  # mostly deprecated stuff
-            'openmdao.components.external_code_comp:ExternalCode',
             'openmdao.components.ks_comp:KSComponent',
             'openmdao.components.meta_model_structured_comp:MetaModelStructured',
             'openmdao.components.meta_model_unstructured_comp:MetaModel',

@@ -756,8 +756,6 @@ def import_library(libfilepointer):
                          ' config file. missing: %s, at least %s required'
                          % (missing, required_base_types))
 
-    # Explicit unitless 'unit'.
-    _new_unit('unitless', 1, list(base_list))
     _update_library(_UNIT_LIB)
     return _UNIT_LIB
 

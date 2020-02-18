@@ -53,7 +53,6 @@ class NonlinearRunOnce(NonlinearSolver):
 
         # this solver does not iterate
         self.options.undeclare("maxiter")
-        self.options.undeclare("err_on_maxiter")    # Deprecated option.
         self.options.undeclare("err_on_non_converge")
 
 

@@ -288,34 +288,12 @@ class TestUnitConversion(unittest.TestCase):
         expected_msg = "The units 'junk' are invalid"
         self.assertTrue(expected_msg in str(cm.exception))
 
-    def test_add_unitless_output(self):
-        prob = om.Problem()
-        prob.model.add_subsystem('indep', om.IndepVarComp('x', 0.0, units='unitless'))
-
-        msg = "Output 'x' has units='unitless' but 'unitless' has been deprecated. " \
-              "Use units=None instead.  Note that connecting a unitless variable to " \
-              "one with units is no longer an error, but will issue a warning instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.setup()
-
-    def test_add_unitless_input(self):
-        prob = om.Problem()
-        prob.model.add_subsystem('C1', om.ExecComp('y=x', x={'units': 'unitless'}))
-
-        msg = "Input 'x' has units='unitless' but 'unitless' has been deprecated. " \
-              "Use units=None instead.  Note that connecting a unitless variable to " \
-              "one with units is no longer an error, but will issue a warning instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.setup()
-
     def test_incompatible_units(self):
         """Test error handling when only one of src and tgt have units."""
         prob = om.Problem()
         prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0), promotes_outputs=['x1'])
         prob.model.add_subsystem('src', SrcComp(), promotes_inputs=['x1'])
-        prob.model.add_subsystem('tgt', om.ExecComp('yy=xx', xx={'value': 0.0, 'units': 'unitless'}))
+        prob.model.add_subsystem('tgt', om.ExecComp('yy=xx', xx={'value': 0.0, 'units': None}))
         prob.model.connect('src.x2', 'tgt.xx')
 
         msg = "Group (<model>): Output 'src.x2' with units of 'degC' is connected to input 'tgt.xx' which has no units."
@@ -917,113 +895,6 @@ class TestUnitConversion(unittest.TestCase):
         #iter_count = sub.linear_solver.iter_count
         #self.assertTrue(iter_count < 20)
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
-
-#class PBOSrcComp(Component):
-
-    #def __init__(self):
-        #super(PBOSrcComp, self).__init__()
-
-        #self.add_param('x1', 100.0)
-        #self.add_output('x2', 100.0, units='degC', pass_by_obj=True)
-        #self.deriv_options['type'] = 'fd'
-
-    #def solve_nonlinear(self, inputs, outputs, resids):
-        #""" No action."""
-        #outputs['x2'] = inputs['x1']
-
-
-#class PBOTgtCompF(Component):
-
-    #def __init__(self):
-        #super(PBOTgtCompF, self).__init__()
-
-        #self.add_param('x2', 100.0, units='degF', pass_by_obj=True)
-        #self.add_output('x3', 100.0)
-        #self.deriv_options['type'] = 'fd'
-
-    #def solve_nonlinear(self, inputs, outputs, resids):
-        #""" No action."""
-        #outputs['x3'] = inputs['x2']
-
-
-#class TestUnitConversionPBO(unittest.TestCase):
-    #""" Tests support for unit conversions on pass_by_obj connections."""
-
-    #def test_basic(self):
-
-        #prob = om.Problem()
-        #prob.model.add('src', PBOSrcComp())
-        #prob.model.add('tgtF', PBOTgtCompF())
-        #prob.model.add('px1', om.IndepVarComp('x1', 100.0), promotes=['x1'])
-        #prob.model.connect('x1', 'src.x1')
-        #prob.model.connect('src.x2', 'tgtF.x2')
-
-        #prob.model.deriv_options['type'] = 'fd'
-
-        #prob.setup()
-        #prob.run()
-
-        #assert_rel_error(self, prob['src.x2'], 100.0, 1e-6)
-        #assert_rel_error(self, prob['tgtF.x3'], 212.0, 1e-6)
-
-        #indep_list = ['x1']
-        #unknown_list = ['tgtF.x3']
-        #J = prob.calc_gradient(indep_list, unknown_list, mode='fwd',
-                               #return_format='dict')
-
-        #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
-
-        #stream = cStringIO()
-        #conv = prob.model.list_unit_conv(stream=stream)
-        #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
-
-
-    #def test_radian_bug(self):
-
-        #class Src(Component):
-
-            #def __init__(self):
-                #super(Src, self).__init__()
-
-                #self.add_output('x1', 180.0, units='deg')
-                #self.add_output('x2', np.pi, units='rad')
-                #self.add_output('x3', 2.0, units='m')
-                #self.deriv_options['type'] = 'fd'
-
-            #def solve_nonlinear(self, inputs, outputs, resids):
-                #""" No action."""
-                #pass
-
-
-        #class Tgt(Component):
-
-            #def __init__(self):
-                #super(Tgt, self).__init__()
-
-                #self.add_param('x1', 0.0, units='rad')
-                #self.add_param('x2', 0.0, units='deg')
-                #self.add_param('x3', 0.0, units='ft')
-                #self.deriv_options['type'] = 'fd'
-
-            #def solve_nonlinear(self, inputs, outputs, resids):
-                #""" No action."""
-                #pass
-
-        #top = om.Problem()
-        #root = top.root = om.Group()
-        #root.add('src', Src())
-        #root.add('tgt', Tgt())
-
-        #root.connect('src.x1', 'tgt.x1')
-        #root.connect('src.x2', 'tgt.x2')
-        #root.connect('src.x3', 'tgt.x3')
-
-        #top.setup()
-        #top.run()
-
-        #assert_rel_error(self, top['tgt.x1'], np.pi, 1e-6)
-        #assert_rel_error(self, top['tgt.x2'], 180.0, 1e-6)
-        #assert_rel_error(self, top['tgt.x3'], 2.0/0.3048, 1e-6)
 
 
 if __name__ == "__main__":

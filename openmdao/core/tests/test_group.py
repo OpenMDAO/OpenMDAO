@@ -134,18 +134,6 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['comp1.a'], 3.0)
         self.assertEqual(p['comp1.b'], 6.0)
 
-    def test_group_add(self):
-        model = om.Group()
-        ecomp = om.ExecComp('b=2.0*a', a=3.0, b=6.0)
-
-        msg = "The 'add' method provides backwards compatibility with OpenMDAO <= 1.x ; " \
-              "use 'add_subsystem' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            comp1 = model.add('comp1', ecomp)
-
-        self.assertTrue(ecomp is comp1)
-
     def test_group_simple_promoted(self):
         import openmdao.api as om
 
@@ -1309,7 +1297,7 @@ class TestConnect(unittest.TestCase):
         prob = om.Problem()
         prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0))
         prob.model.add_subsystem('src', om.ExecComp('x2 = 2 * x1', x2={'units': 'degC'}))
-        prob.model.add_subsystem('tgt', om.ExecComp('y = 3 * x', x={'units': 'unitless'}))
+        prob.model.add_subsystem('tgt', om.ExecComp('y = 3 * x', x={'units': None}))
 
         prob.model.connect('px1.x1', 'src.x1')
         prob.model.connect('src.x2', 'tgt.x')
