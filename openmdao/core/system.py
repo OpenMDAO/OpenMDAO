@@ -2040,13 +2040,11 @@ class System(object):
                     call = 'promotes_%ss' % io_types[0]
 
                 for p in patterns:
-                    if p not in not_found:
-                        continue
-                    for name, alias in renames:
+                    for name, alias in renames.items():
                         if fnmatchcase(name, p):
-                            raise RuntimeError("%s: %s found match '%s'. You may be attempting to "
+                            raise RuntimeError("%s: %s '%s' matched '%s'. You are attempting to "
                                                "promote a renamed variable." %
-                                               (self.msginfo, call, p))
+                                               (self.msginfo, call, p, name))
 
                     for i in names:
                         if fnmatchcase(i, p):
@@ -2055,10 +2053,12 @@ class System(object):
                         raise RuntimeError("%s: '%s' failed to find any matches for the following "
                                            "name: %s.%s" %
                                            (self.msginfo, call, sorted(not_found), empty_group_msg))
-
-                raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                   "names or patterns: %s.%s" %
-                                   (self.msginfo, call, sorted(not_found), empty_group_msg))
+                    if p == patterns[-1]:
+                        break
+                else:
+                    raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                       "names or patterns: %s.%s" %
+                                       (self.msginfo, call, sorted(not_found), empty_group_msg))
 
         maps = {'input': {}, 'output': {}}
 
