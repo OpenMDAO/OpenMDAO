@@ -2418,7 +2418,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_rel_error(self, J['comp.y', 'p.x']['J_fd'], [[0.0]], 1e-6)
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run under MPI with PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestProblemCheckTotalsMPI(unittest.TestCase):
 
     N_PROCS = 2

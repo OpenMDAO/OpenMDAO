@@ -68,12 +68,8 @@ class NonlinearBlockGS(NonlinearSolver):
                              desc='When True, when this driver solves under a complex step, nudge '
                              'the Solution vector by a small amount so that it reconverges.')
         self.options.declare('use_apply_nonlinear', types=bool, default=False,
-                             desc="Set to True to always call apply_linear on the solver's system "
-                             "after solve_nonlinear has been called.")
-        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
-                             desc='When the option is true, a solver will reraise any '
-                             'AnalysisError that arises during subsolve; when false, it will '
-                             'continue solving. ')
+                             desc="Set to True to always call apply_nonlinear on the solver's "
+                             "system after solve_nonlinear has been called.")
 
     def _iter_initialize(self):
         """
@@ -205,8 +201,8 @@ class NonlinearBlockGS(NonlinearSolver):
 
         if self.options['use_apply_nonlinear'] or (itercount < 1 and maxiter < 2):
 
-            # This option runs apply_linear to calculate the residuals, and thus ends up executing
-            # ExplicitComponents twice per iteration.
+            # This option runs apply_nonlinear to calculate the residuals, and thus ends up
+            # executing ExplicitComponents twice per iteration.
 
             self._recording_iter.push(('_run_apply', 0))
             try:

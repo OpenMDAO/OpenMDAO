@@ -9,7 +9,7 @@ Driver Recording
 
 A :class:`CaseRecorder<openmdao.recorders.case_recorder.CaseRecorder>` is commonly attached to
 the problem's :class:`Driver` in order to gain insight into the convergence of the model as the driver
-finds a solution.  By default, a recorder attached to a driver will record the design variables, 
+finds a solution.  By default, a recorder attached to a driver will record the design variables,
 constraints and objectives.
 
 Driver Recording Options
@@ -32,7 +32,7 @@ Driver Recording Example
 Problem Recording
 -----------------
 
-You might also want to attach a recorder to the problem itself. This allows you to record an 
+You might also want to attach a recorder to the problem itself. This allows you to record an
 arbitrary case at a point of your choosing.  This feature can be useful if you only record a
 limited number of variables during the run but would like to see a more complete list of values
 after the run.
@@ -115,11 +115,11 @@ differentiate the cases.  This prefix can be specified when calling :code:`run_m
     :layout: interleave
 
 .. note::
-    A recorder can be attached to more than one object. Also, more than one recorder can be 
+    A recorder can be attached to more than one object. Also, more than one recorder can be
     attached to an object.
 
 .. note::
-    In this example, we have disabled the saving of data needed by the standalone :math:`N^2` 
+    In this example, we have disabled the saving of data needed by the standalone :math:`N^2`
     visualizer and debugging tool by setting :code:`record_viewer_data` to :code:`False`.
 
 Recording Options Include and Exclude Matching

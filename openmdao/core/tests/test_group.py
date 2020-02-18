@@ -24,9 +24,7 @@ from openmdao.error_checking.check_config import _check_hanging_inputs
 
 class SimpleGroup(om.Group):
 
-    def __init__(self):
-        super(SimpleGroup, self).__init__()
-
+    def setup(self):
         self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
         self.add_subsystem('comp2', om.ExecComp('b=2*a'))
         self.connect('comp1.x', 'comp2.a')
@@ -34,9 +32,7 @@ class SimpleGroup(om.Group):
 
 class BranchGroup(om.Group):
 
-    def __init__(self):
-        super(BranchGroup, self).__init__()
-
+    def setup(self):
         b1 = self.add_subsystem('Branch1', om.Group())
         g1 = b1.add_subsystem('G1', om.Group())
         g2 = g1.add_subsystem('G2', om.Group())
@@ -71,6 +67,26 @@ class ReportOrderComp(om.ExplicitComponent):
     def compute(self, inputs, outputs):
         self._order_list.append(self.pathname)
 
+class TestSubsystemConfigError(unittest.TestCase):
+
+    def test_add_subsystem_error_on_config(self):
+        class SimpleGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
+                self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+                self.connect('comp1.x', 'comp2.a')
+
+            def configure(self):
+                self.add_subsystem('comp3', om.IndepVarComp('y', 10.0))
+
+        top = om.Problem(model=SimpleGroup())
+
+        with self.assertRaises(RuntimeError) as cm:
+            top.setup()
+
+        self.assertEqual(str(cm.exception),
+                         "SimpleGroup (<model>): Cannot call add_subsystem in the configure method")
 
 class TestGroup(unittest.TestCase):
 
@@ -250,6 +266,15 @@ class TestGroup(unittest.TestCase):
             self.fail("Expected warning not found.")
         self.assertEqual(p.model._conn_global_abs_in2out, {})
 
+    def test_invalid_subsys_name(self):
+        p = om.Problem()
+
+        # name cannot start with an underscore
+        with self.assertRaises(Exception) as err:
+            p.model.add_subsystem('_bad_name', om.Group())
+        self.assertEqual(str(err.exception),
+                         "Group: '_bad_name' is not a valid sub-system name.")
+
     def test_subsys_attributes(self):
         p = om.Problem()
 
@@ -274,18 +299,13 @@ class TestGroup(unittest.TestCase):
         self.assertTrue(hasattr(p.model.gg, 'comp1'))
         self.assertTrue(hasattr(p.model.gg, 'comp2'))
 
-        # name cannot start with an underscore
-        with self.assertRaises(Exception) as err:
-            p.model.add_subsystem('_bad_name', om.Group())
-        self.assertEqual(str(err.exception),
-                         "Group (<model>): '_bad_name' is not a valid sub-system name.")
-
         # 'name', 'pathname', 'comm' and 'options' are reserved names
+        p = om.Problem()
         for reserved in ['name', 'pathname', 'comm', 'options']:
             with self.assertRaises(Exception) as err:
                 p.model.add_subsystem(reserved, om.Group())
             self.assertEqual(str(err.exception),
-                             "Group (<model>): Can't add subsystem '%s' because an attribute with that name already exits." %
+                             "Group: Can't add subsystem '%s' because an attribute with that name already exits." %
                              reserved)
 
     def test_group_nested(self):

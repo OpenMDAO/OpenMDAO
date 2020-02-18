@@ -11,7 +11,7 @@ import openmdao.api as om
 class UnitaryFunctionComp(om.ExplicitComponent):
 
     def initialize(self):
-        self.options.declare('func', types=FunctionType)
+        self.options.declare('func', types=FunctionType, recordable=False)
 
     def setup(self):
         self.add_input('x')

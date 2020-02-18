@@ -7,11 +7,10 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI
 
 
-if MPI:
-    try:
-        from openmdao.vectors.petsc_vector import PETScVector
-    except ImportError:
-        PETScVector = None
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 def _get_problem():
@@ -54,7 +53,7 @@ class SerialTestCase(unittest.TestCase):
         np.testing.assert_allclose(J, np.array([[1.0]]), rtol=1e-7, atol=0, equal_nan=True,
                                    err_msg='', verbose=True)
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ParallelTestCase(unittest.TestCase):
 
     N_PROCS = 2

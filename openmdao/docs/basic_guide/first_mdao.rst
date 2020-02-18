@@ -4,7 +4,7 @@ Optimizing the Sellar Problem
 
 In the previous tutorials we showed you how to define the Sellar model and run it directly.
 Now let's see how we can optimize the Sellar problem to minimize the objective function.
-Here is the mathematical problem formulation for the Sellar optimziation problem:
+Here is the mathematical problem formulation for the Sellar optimization problem:
 
 .. math::
 

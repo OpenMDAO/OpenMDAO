@@ -14,7 +14,8 @@ from openmdao.docs._utils.docutil import get_source_code, remove_docstrings, \
     remove_initial_empty_lines, replace_asserts_with_prints, \
     strip_header, dedent, insert_output_start_stop_indicators, run_code, \
     get_skip_output_node, get_interleaved_io_nodes, get_output_block_node, \
-    split_source_into_input_blocks, extract_output_blocks, consolidate_input_blocks, node_setup
+    split_source_into_input_blocks, extract_output_blocks, consolidate_input_blocks, node_setup, \
+    strip_decorators
 
 
 _plot_count = 0
@@ -117,7 +118,7 @@ class EmbedCodeDirective(Directive):
 
         if is_test:
             try:
-                source = replace_asserts_with_prints(dedent(strip_header(source)))
+                source = replace_asserts_with_prints(dedent(strip_header(strip_decorators(dedent(source)))))
                 source = remove_initial_empty_lines(source)
 
                 class_name = class_.__name__

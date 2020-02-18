@@ -6,6 +6,12 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_check_partials
+from openmdao.utils.mpi import MPI
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class QuadraticComp(om.ImplicitComponent):
@@ -47,6 +53,7 @@ class QuadraticComp(om.ImplicitComponent):
         self.inv_jac = 1.0 / (2 * a * x + b)
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class NondistribDirectCompTestCase(unittest.TestCase):
     N_PROCS = 2
 

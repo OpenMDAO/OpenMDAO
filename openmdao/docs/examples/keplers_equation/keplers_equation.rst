@@ -1,6 +1,6 @@
 .. _`keplers_eqn_tutorial`:
 
-Kepler's Equation Example - Solving an Implicit Equaiton
+Kepler's Equation Example - Solving an Implicit Equation
 ========================================================
 
 This example will demonstrate the use of OpenMDAO for solving
@@ -27,17 +27,17 @@ to the balance, it solves the following equation:
      lhs(var) \cdot mult(var) = rhs(var)
 
 The :math:`mult` term is an optional multiplier than can be applied to the
-left-hand side (LHS) of the equation.  For our example, we will assign the 
-right-hand side (RHS) to the mean anomaly (:math:`M`), and the left-hand 
+left-hand side (LHS) of the equation.  For our example, we will assign the
+right-hand side (RHS) to the mean anomaly (:math:`M`), and the left-hand
 side to :math:`E - e \sin{E}`
 
 In this implementation, we rely on an ExecComp to compute the value of the LHS.
 
 BalanceComp also provides a way to supply the starting value for the implicit
-state variable (:math:`E` in this case), via the `guess_func` argument.  The 
-supplied function should have a similar signature to the *guess_nonlinear* 
+state variable (:math:`E` in this case), via the `guess_func` argument.  The
+supplied function should have a similar signature to the *guess_nonlinear*
 function of :ref:`ImplicitComponent <comp-type-3-implicitcomp>`. When solving
-Kepler's equation, using :math:`M` as the initial guess for :math:`E` is a 
+Kepler's equation, using :math:`M` as the initial guess for :math:`E` is a
 good starting point.
 
 In summary, the recipe for solving Kepler's equation is as follows:

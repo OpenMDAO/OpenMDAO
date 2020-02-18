@@ -1291,10 +1291,10 @@ class ListFeatureTestCase(unittest.TestCase):
             ('sub.comp3.c', {}),
         ])
         self.assertEqual(1, text.count("6 Input(s) in 'model'"))
-        self.assertEqual(1, text.count("top"))
-        self.assertEqual(1, text.count("  sub"))
-        self.assertEqual(1, text.count("    comp2"))
-        self.assertEqual(2, text.count("      a"))
+        self.assertEqual(1, text.count("\nmodel"))
+        self.assertEqual(1, text.count("\n  sub"))
+        self.assertEqual(1, text.count("\n    comp2"))
+        self.assertEqual(2, text.count("\n      a"))
         num_non_empty_lines = sum([1 for s in text.splitlines() if s.strip()])
         self.assertEqual(num_non_empty_lines, 14)
 

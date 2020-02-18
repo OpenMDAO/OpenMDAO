@@ -14,16 +14,16 @@ to insert an `ExecComp` component that converts the stress into a form where a n
 a positive value means it is violated.
 
 The problem presented here is also an example of a multi-point implementation, where we create a separate instance of the
-parts of the calculation that are impacted by different loadcases. This enables our model to take advantage of multiple
+parts of the calculation that are impacted by different load cases. This enables our model to take advantage of multiple
 processors when run in parallel.
 
 If we allow the optimizer to vary the thickness of each element, then we have a design variable vector that is as wide as the
 number of elements in the model. This may perform poorly if we have a large number of elements in the beam. If we assume that
 the optimal beam thickness is going to have a smooth continuous variation over the length of the beam, then it is a good
-candidate for using an interpolation component like `BsplinesComp` to reduce the number of design variables we need.
+candidate for using an interpolation component like `SplineComp` to reduce the number of design variables we need.
 
 For this example, we have 25 elements, but can reduce that to 5 control points for the optimizer's design variables by
-including the BsplinesComp.
+including the SplineComp.
 
 The code for the top system is this:
 

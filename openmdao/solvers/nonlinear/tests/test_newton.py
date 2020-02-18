@@ -17,6 +17,11 @@ from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
 from openmdao.utils.assert_utils import assert_rel_error, assert_warning, assert_no_warning
 from openmdao.utils.mpi import MPI
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
 
 class TestNewton(unittest.TestCase):
 
@@ -909,22 +914,7 @@ class TestNewton(unittest.TestCase):
         with assert_warning(DeprecationWarning, msg):
             prob.final_setup()
 
-    def test_solve_subsystems_deprecation(self):
-        """ Feature test for slotting a Newton solver and using it to solve
-        Sellar.
-        """
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarDerivatives
-
-        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NewtonSolver()))
-
-        msg = 'Deprecation warning: In V 3.x, solve_subsystems must be set by the user.'
-
-        prob.setup()
-        with assert_warning(DeprecationWarning, msg):
-            prob.run_model()
-
-@unittest.skipUnless(MPI, "MPI is required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITestCase(unittest.TestCase):
     N_PROCS = 4
 

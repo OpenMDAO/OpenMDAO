@@ -1,0 +1,67 @@
+
+"""
+Setup functions for the 'openmdao {command_name}' command plugin.
+
+This file has been automatically generated and the command found here
+just prints the command name the number of times specified at the command line immediately
+after Problem.final_setup() runs.
+"""
+
+from openmdao.utils.hooks import _register_hook
+from openmdao.utils.file_utils import _load_and_exec
+from openmdao.utils.mpi import MPI
+
+
+def _{command_name}_setup_parser(parser):
+    """
+    Set up the openmdao subparser (using argparse) for the 'openmdao {command_name}' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    # replace the following argument definitions with those appropriate for your command line tool
+    parser.add_argument('-r', '--repeat', action='store', dest='repeats',
+                        default=1, type=int, help='Number of times to repeat command.')
+    parser.add_argument('file', metavar='file', nargs=1, help='Script to execute.')
+
+
+def _{command_name}_exec(options, user_args):
+    """
+    This registers the hook function and executes the user script.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    script = options.file[0]  # this assumes that the parser arg 'file' was added above
+
+    def _{command_name}_run(prob):
+        if not MPI or MPI.COMM_WORLD.rank == 0:
+            for i in range(options.repeats):
+                print('*** {command_name} ***')
+        exit()   # If you want the program to exit after your command, you must explicitly do that here
+
+    # register the hook to execute after Problem.final_setup
+    _register_hook('final_setup', class_name='Problem', post=_{command_name}_run)
+
+    # load and execute the given script as __main__
+    _load_and_exec(script, user_args)
+
+
+def _{command_name}_setup():
+    """
+    This is registered as an 'openmdao_commands' entry point.
+
+    It should return a tuple of the form (setup_parser_func, exec_func, help_string).
+    """
+    return (
+        _{command_name}_setup_parser,
+        _{command_name}_exec,
+        "Print {command_name} 'r' times after final setup."
+        )
+
