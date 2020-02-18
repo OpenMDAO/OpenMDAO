@@ -62,7 +62,7 @@ class TestParallelGroups(unittest.TestCase):
     N_PROCS = 2
 
     @parameterized.expand(itertools.product([(om.LinearRunOnce, None)],
-                                            [om.NonlinearBlockGS, om.NonLinearRunOnce]),
+                                            [om.NonlinearBlockGS, om.NonlinearRunOnce]),
                           name_func=_test_func_name)
     def test_fan_out_grouped(self, solv_tup, nlsolver):
         prob = om.Problem(FanOutGrouped())
@@ -101,7 +101,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c3.y'], 15.0, 1e-6)
 
     @parameterized.expand(itertools.product([om.LinearRunOnce],
-                                            [om.NonlinearBlockGS, om.NonLinearRunOnce]),
+                                            [om.NonlinearBlockGS, om.NonlinearRunOnce]),
                           name_func=_test_func_name)
     def test_fan_in_grouped(self, solver, nlsolver):
 
@@ -175,7 +175,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, prob['c3.y'], 29.0, 1e-6)
 
     @parameterized.expand(itertools.product([om.LinearRunOnce],
-                                            [om.NonlinearBlockGS, om.NonLinearRunOnce]),
+                                            [om.NonlinearBlockGS, om.NonlinearRunOnce]),
                           name_func=_test_func_name)
     def test_diamond(self, solver, nlsolver):
 
@@ -210,7 +210,7 @@ class TestParallelGroups(unittest.TestCase):
         assert_rel_error(self, J['c4.y2', 'iv.x'][0][0], -40.5, 1e-6)
 
     @parameterized.expand(itertools.product([om.LinearRunOnce],
-                                            [om.NonlinearBlockGS, om.NonLinearRunOnce]),
+                                            [om.NonlinearBlockGS, om.NonlinearRunOnce]),
                           name_func=_test_func_name)
     def test_converge_diverge(self, solver, nlsolver):
 

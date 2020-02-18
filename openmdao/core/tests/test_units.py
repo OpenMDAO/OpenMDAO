@@ -435,7 +435,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.model.connect('x1', 'sub1.src.x1')
 
         #prob.setup()
-        #prob.run()
+        #prob.run_model()
 
         #assert_rel_error(self, prob['x2'], 100.0, 1e-6)
         #assert_rel_error(self, prob['sub2.tgtF.x3'], 212.0, 1e-6)
@@ -558,7 +558,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.model.add('p2', om.IndepVarComp('Odot_BI', np.ones((3, 3, 5))), promotes=['*'])
 
         #prob.setup()
-        #prob.run()
+        #prob.run_model()
 
         #indep_list = ['O_BI', 'Odot_BI']
         #unknown_list = ['w_B']
@@ -638,7 +638,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
 
         ## Pollute the dpvec
         #sub.dpmat[None]['cc1.x1'] = 1e10
@@ -686,7 +686,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 
     #def test_nested_relevancy_adjoint(self):
@@ -725,7 +725,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
         #self.assertTrue(not np.isnan(prob['sub.cc2.y']))
 
     #def test_nested_relevancy_adjoint_apply_linear(self):
@@ -803,7 +803,7 @@ class TestUnitConversion(unittest.TestCase):
         #prob.driver.add_objective('sub.cc2.y')
 
         #prob.setup()
-        #prob.run()
+        #prob.run_model()
 
         ## x1 deriv code should be called less if the dinputs vec only
         ## considers sub relevancy
@@ -844,7 +844,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
 
         ## GMRES doesn't cause a successive build-up in the value of an out-of
         ## scope param, but the linear solver doesn't converge. We can test to
@@ -887,7 +887,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #prob.setup()
 
-        #prob.run()
+        #prob.run_model()
 
         ## GMRES doesn't cause a successive build-up in the value of an out-of
         ## scope param, but the linear solver doesn't converge. We can test to

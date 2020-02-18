@@ -37,19 +37,7 @@ class TestEntryPoints(unittest.TestCase):
 
     # test if all relevant classes have been registered as entry points
     def test_ep_registered(self):
-        skip = {  # mostly deprecated stuff
-            'openmdao.components.ks_comp:KSComponent',
-            'openmdao.components.meta_model_structured_comp:MetaModelStructured',
-            'openmdao.components.meta_model_unstructured_comp:MetaModel',
-            'openmdao.components.meta_model_unstructured_comp:MetaModelUnStructured',
-            'openmdao.components.multifi_meta_model_unstructured_comp:MultiFiMetaModel',
-            'openmdao.components.multifi_meta_model_unstructured_comp:MultiFiMetaModelUnStructured',
-            'openmdao.solvers.linear.petsc_ksp:PetscKSP',
-            'openmdao.solvers.linear.scipy_iter_solver:ScipyIterativeSolver',
-            'openmdao.drivers.scipy_optimizer:ScipyOptimizer',
-            'openmdao.solvers.nonlinear.nonlinear_runonce:NonLinearRunOnce',
-            'openmdao.surrogate_models.surrogate_model:MultiFiSurrogateModel',
-            'openmdao.surrogate_models.kriging:FloatKrigingSurrogate',
+        skip = {  # Add deprecated classes here.
         }
 
         # if mpi4py isn't installed, then the pyopstsparse_driver import will fail

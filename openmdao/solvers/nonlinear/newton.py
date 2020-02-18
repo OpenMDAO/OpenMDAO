@@ -4,9 +4,9 @@ from __future__ import print_function
 
 import numpy as np
 
+from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
 from openmdao.solvers.solver import NonlinearSolver
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.utils.general_utils import warn_deprecation
 from openmdao.utils.mpi import MPI
 
 
@@ -42,25 +42,7 @@ class NewtonSolver(NonlinearSolver):
         self.linear_solver = None
 
         # Slot for linesearch
-        self.linesearch = None
-
-    @property
-    def line_search(self):
-        """
-        Return the current linesearch object.
-        """
-        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
-        return self.linesearch
-
-    @line_search.setter
-    def line_search(self, solver):
-        """
-        Set the linesearch solver.
-        """
-        warn_deprecation("The 'line_search' attribute provides backwards compatibility "
-                         "with OpenMDAO 1.x ; use 'linesearch' instead.")
-        self.linesearch = solver
+        self.linesearch = BoundsEnforceLS()
 
     def _declare_options(self):
         """
@@ -102,18 +84,6 @@ class NewtonSolver(NonlinearSolver):
 
         if self.linesearch is not None:
             self.linesearch._setup_solvers(self._system(), self._depth + 1)
-
-        else:
-            # In OpenMDAO 3.x, we will be making BoundsEnforceLS the default line search.
-            # This deprecation warning is to prepare users for the change.
-            pathname = self._system().pathname
-            if pathname:
-                pathname += ': '
-            msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
-                  'to use the BoundsEnforceLS line search.'
-
-            if rank == 0:
-                warn_deprecation(pathname + msg)
 
     def _assembled_jac_solver_iter(self):
         """

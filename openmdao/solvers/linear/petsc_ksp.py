@@ -10,7 +10,6 @@ except ImportError:
     PETSc = None
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.utils.general_utils import warn_deprecation
 
 KSP_TYPES = [
     "richardson",
@@ -470,49 +469,3 @@ class PETScKrylov(LinearSolver):
         pc_mat.setPythonContext(self)
 
         return ksp
-
-    @property
-    def preconditioner(self):
-        """
-        Provide 'preconditioner' property for backwards compatibility.
-
-        Returns
-        -------
-        <LinearSolver>
-            reference to the 'precon' property.
-        """
-        warn_deprecation("The 'preconditioner' property provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use 'precon' instead.")
-        return self.precon
-
-    @preconditioner.setter
-    def preconditioner(self, precon):
-        """
-        Provide for setting the 'preconditioner' property for backwards compatibility.
-
-        Parameters
-        ----------
-        precon : <LinearSolver>
-            reference to a <LinearSolver> to be assigned to the 'precon' property.
-        """
-        warn_deprecation("The 'preconditioner' property provides backwards compatibility "
-                         "with OpenMDAO <= 1.x ; use 'precon' instead.")
-        self.precon = precon
-
-
-class PetscKSP(PETScKrylov):
-    """
-    Deprecated.  Use PETScKrylov.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Initialize attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Named args.
-        """
-        super(PetscKSP, self).__init__(**kwargs)
-        warn_deprecation('PetscKSP is deprecated.  Use PETScKrylov instead.')

@@ -85,44 +85,6 @@ class TestNewton(unittest.TestCase):
         # Make sure we aren't iterating like crazy
         self.assertLess(prob.model.nonlinear_solver._iter_count, 8)
 
-    def test_line_search_deprecated(self):
-        top = om.Problem()
-        top.model.add_subsystem('px', om.IndepVarComp('x', 1.0))
-        top.model.add_subsystem('comp', ImplCompTwoStates())
-        top.model.connect('px.x', 'comp.x')
-
-        top.model.nonlinear_solver = om.NewtonSolver()
-        top.model.nonlinear_solver.options['maxiter'] = 10
-        top.model.linear_solver = om.ScipyKrylov()
-
-        msg = "The 'line_search' attribute provides backwards compatibility with OpenMDAO 1.x ; " \
-              "use 'linesearch' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            top.model.nonlinear_solver.line_search = om.ArmijoGoldsteinLS(bound_enforcement='vector')
-
-        with assert_warning(DeprecationWarning, msg):
-            ls = top.model.nonlinear_solver.line_search
-
-        ls.options['maxiter'] = 10
-        ls.options['alpha'] = 1.0
-
-        top.setup()
-
-        # Test lower bound: should go to the lower bound and stall
-        top['px.x'] = 2.0
-        top['comp.y'] = 0.0
-        top['comp.z'] = 1.6
-        top.run_model()
-        assert_rel_error(self, top['comp.z'], 1.5, 1e-8)
-
-        # Test upper bound: should go to the upper bound and stall
-        top['px.x'] = 0.5
-        top['comp.y'] = 0.0
-        top['comp.z'] = 2.4
-        top.run_model()
-        assert_rel_error(self, top['comp.z'], 2.5, 1e-8)
-
     def test_sellar_derivs(self):
         # Test top level Sellar (i.e., not grouped).
         # Also, piggybacked testing that makes sure we only call apply_nonlinear
@@ -412,13 +374,16 @@ class TestNewton(unittest.TestCase):
 
         g1 = model.g1
         g1.nonlinear_solver = om.NewtonSolver(rtol=1.0e-5)
+        g1.nonlinear_solver.linesearch = None
         g1.linear_solver = om.DirectSolver()
 
         g2 = model.g2
         g2.nonlinear_solver = om.NewtonSolver(rtol=1.0e-5)
+        g2.nonlinear_solver.linesearch = None
         g2.linear_solver = om.DirectSolver()
 
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        model.nonlinear_solver.linesearch = None
         model.linear_solver = om.ScipyKrylov(assemble_jac=True)
         model.options['assembled_jac_type'] = 'dense'
 
@@ -531,13 +496,16 @@ class TestNewton(unittest.TestCase):
 
         g1 = model.g1
         g1.nonlinear_solver = om.NewtonSolver(rtol=1.0e-5)
+        g1.nonlinear_solver.linesearch = None
         g1.linear_solver = om.DirectSolver()
 
         g2 = model.g2
         g2.nonlinear_solver = om.NewtonSolver(rtol=1.0e-5)
+        g2.nonlinear_solver.linesearch = None
         g2.linear_solver = om.DirectSolver()
 
         model.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        model.nonlinear_solver.linesearch = None
         model.linear_solver = om.ScipyKrylov(assemble_jac=True)
         model.options['assembled_jac_type'] = 'dense'
 
@@ -824,37 +792,6 @@ class TestNewton(unittest.TestCase):
         J = prob.compute_totals()
         assert_rel_error(self, J['ecomp.y', 'p1.x'][0][0], -0.703467422498, 1e-6)
 
-    def test_linsearch_3_deprecation(self):
-        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NewtonSolver()))
-
-        prob.setup()
-
-        msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
-              'to use the BoundsEnforceLS line search.'
-
-        with assert_warning(DeprecationWarning, msg):
-            prob.final_setup()
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class MPITestCase(unittest.TestCase):
-    N_PROCS = 4
-
-    def test_comm_warning(self):
-
-        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
-
-        prob = om.Problem(model=SellarDerivatives(nonlinear_solver=om.NewtonSolver()))
-
-        prob.setup()
-
-        msg = 'Deprecation warning: In V 3.0, the default Newton solver setup will change ' + \
-              'to use the BoundsEnforceLS line search.'
-        if rank == 0:
-            with assert_warning(DeprecationWarning, msg):
-                prob.final_setup()
-        else:
-            with assert_no_warning(DeprecationWarning, msg):
-                prob.final_setup()
 
 class TestNewtonFeatures(unittest.TestCase):
 

@@ -159,35 +159,6 @@ class TestKSFunction(unittest.TestCase):
 
         assert_rel_error(self, prob['ks.KS'][0], -12.0)
 
-    def test_deprecated_ks_component(self):
-        # run same test as above, only with the deprecated component,
-        # to ensure we get the warning and the correct answer.
-        # self-contained, to be removed when class name goes away.
-        from openmdao.components.ks_comp import KSComponent  # deprecated
-
-        prob = om.Problem()
-        model = prob.model
-
-        model.add_subsystem('px', om.IndepVarComp(name="x", val=np.ones((2,))))
-        model.add_subsystem('comp', DoubleArrayComp())
-
-        msg = "'KSComponent' has been deprecated. Use 'KSComp' instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            model.add_subsystem('ks', KSComponent(width=2))
-
-        model.connect('px.x', 'comp.x1')
-        model.connect('comp.y2', 'ks.g')
-
-        model.add_design_var('px.x')
-        model.add_objective('comp.y1')
-        model.add_constraint('ks.KS', upper=0.0)
-
-        prob.setup()
-        prob.run_driver()
-
-        assert_rel_error(self, max(prob['comp.y2']), prob['ks.KS'][0])
-
 
 class TestKSFunctionFeatures(unittest.TestCase):
 

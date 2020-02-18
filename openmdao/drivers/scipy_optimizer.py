@@ -17,7 +17,7 @@ from six.moves import range
 import openmdao
 import openmdao.utils.coloring as coloring_mod
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import MPI
 
@@ -165,9 +165,6 @@ class ScipyOptimizeDriver(Driver):
                              desc='Maximum number of iterations.')
         self.options.declare('disp', True, types=bool,
                              desc='Set to False to prevent printing of Scipy convergence messages')
-        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
-                             desc='Compute simultaneous derivative coloring dynamically if True '
-                             '(deprecated)')
 
     def _get_name(self):
         """
@@ -418,11 +415,7 @@ class ScipyOptimizeDriver(Driver):
 
         # compute dynamic simul deriv coloring if option is set
         if coloring_mod._use_total_sparsity:
-            if ((self._coloring_info['coloring'] is None and self._coloring_info['dynamic']) or
-                    self.options['dynamic_simul_derivs']):
-                if self.options['dynamic_simul_derivs']:
-                    warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
-                                     "the 'declare_coloring' function instead.")
+            if ((self._coloring_info['coloring'] is None and self._coloring_info['dynamic'])):
                 coloring_mod.dynamic_total_coloring(self, run_model=False,
                                                     fname=self._get_total_coloring_fname())
 
@@ -795,22 +788,3 @@ def signature_extender(fcn, extra_args):
         return fcn(x, *extra_args)
 
     return closure
-
-
-class ScipyOptimizer(ScipyOptimizeDriver):
-    """
-    Deprecated.  Use ScipyOptimizeDriver.
-    """
-
-    def __init__(self, **kwargs):
-        """
-        Initialize attributes.
-
-        Parameters
-        ----------
-        **kwargs : dict
-            Named args.
-        """
-        super(ScipyOptimizer, self).__init__(**kwargs)
-        warn_deprecation("'ScipyOptimizer' provides backwards compatibility "
-                         "with OpenMDAO <= 2.2 ; use 'ScipyOptimizeDriver' instead.")

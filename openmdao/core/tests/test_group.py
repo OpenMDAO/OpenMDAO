@@ -113,16 +113,6 @@ class TestGroup(unittest.TestCase):
         else:
             self.fail('Exception expected.')
 
-    def test_deprecated_runonce(self):
-        p = om.Problem()
-        p.model.add_subsystem('indep', om.IndepVarComp('x', 5.0))
-        p.model.add_subsystem('comp', om.ExecComp('b=2*a'))
-
-        msg = "NonLinearRunOnce is deprecated.  Use NonlinearRunOnce instead."
-
-        with assert_warning(DeprecationWarning, msg):
-            p.model.nonlinear_solver = om.NonLinearRunOnce()
-
     def test_group_simple(self):
         import openmdao.api as om
 

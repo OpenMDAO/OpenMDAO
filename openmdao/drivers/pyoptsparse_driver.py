@@ -23,7 +23,7 @@ from pyoptsparse import Optimization
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.class_util import weak_method_wrapper
 from openmdao.utils.mpi import FakeComm
 
@@ -177,9 +177,6 @@ class pyOptSparseDriver(Driver):
         self.options.declare('gradient method', default='openmdao',
                              values={'openmdao', 'pyopt_fd', 'snopt_fd'},
                              desc='Finite difference implementation to use')
-        self.options.declare('dynamic_simul_derivs', default=False, types=bool,
-                             desc='Compute simultaneous derivative coloring dynamically '
-                             'if True (deprecated)')
         self.options.declare('user_teriminate_signal', default=signal.SIGUSR1, allow_none=True,
                              desc='OS signal that triggers a clean user-terimnation. Only SNOPT'
                              'supports this option.')
@@ -250,14 +247,6 @@ class pyOptSparseDriver(Driver):
                 coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
                                                     fname=self._get_total_coloring_fname())
                 coloring = self._coloring_info['coloring']
-                self._setup_tot_jac_sparsity()
-            elif self.options['dynamic_simul_derivs']:
-                warn_deprecation("The 'dynamic_simul_derivs' option has been deprecated. Call "
-                                 "the 'declare_coloring' function instead.")
-                coloring_mod.dynamic_total_coloring(self, run_model=not model_ran,
-                                                    fname=self._get_total_coloring_fname())
-                coloring = self._coloring_info['coloring']
-
                 self._setup_tot_jac_sparsity()
 
             if coloring is not None:
@@ -386,7 +375,7 @@ class pyOptSparseDriver(Driver):
 
             # Use pyOpt's internal finite difference
             # TODO: Need to get this from OpenMDAO
-            # fd_step = problem.root.deriv_options['step_size']
+            # fd_step = problem.model.deriv_options['step_size']
             fd_step = 1e-6
             sol = opt(opt_prob, sens='FD', sensStep=fd_step, storeHistory=self.hist_file,
                       hotStart=self.hotstart_file)
@@ -396,7 +385,7 @@ class pyOptSparseDriver(Driver):
 
                 # Use SNOPT's internal finite difference
                 # TODO: Need to get this from OpenMDAO
-                # fd_step = problem.root.deriv_options['step_size']
+                # fd_step = problem.model.deriv_options['step_size']
                 fd_step = 1e-6
                 sol = opt(opt_prob, sens=None, sensStep=fd_step, storeHistory=self.hist_file,
                           hotStart=self.hotstart_file)

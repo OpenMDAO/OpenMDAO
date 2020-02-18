@@ -29,7 +29,7 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.recorders.case_reader import CaseReader
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, simple_warning, make_serializable
+from openmdao.utils.general_utils import simple_warning, make_serializable
 from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.html_utils import read_files, write_script, DiagramWriter
@@ -304,36 +304,6 @@ def _get_viewer_data(data_source):
     data_dict['declare_partials_list'] = _get_declare_partials(root_group)
 
     return data_dict
-
-
-def view_tree(*args, **kwargs):
-    """
-    view_tree was renamed to n2, but left here for backwards compatibility.
-
-    Parameters
-    ----------
-    *args : dict
-        Positional args.
-    **kwargs : dict
-        Keyword args.
-    """
-    warn_deprecation("view_tree is deprecated. Please switch to n2.")
-    n2(*args, **kwargs)
-
-
-def view_model(*args, **kwargs):
-    """
-    view_model was renamed to n2, but left here for backwards compatibility.
-
-    Parameters
-    ----------
-    *args : dict
-        Positional args.
-    **kwargs : dict
-        Keyword args.
-    """
-    warn_deprecation("view_model is deprecated. Please switch to n2.")
-    n2(*args, **kwargs)
 
 
 def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,

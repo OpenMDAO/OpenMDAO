@@ -9,7 +9,7 @@ import numpy as np
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.class_util import overrides_method
-from openmdao.utils.general_utils import warn_deprecation, simple_warning
+from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.name_maps import rel_key2abs_key
 
 
@@ -614,61 +614,3 @@ class MetaModelUnStructuredComp(ExplicitComponent):
     def _metadata(self, name):
         return self._var_rel2meta[name]
 
-    @property
-    def default_surrogate(self):
-        """
-        Get the default surrogate for this MetaModel.
-        """
-        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
-        return self.options['default_surrogate']
-
-    @default_surrogate.setter
-    def default_surrogate(self, value):
-        warn_deprecation("The 'default_surrogate' attribute provides backwards compatibility "
-                         "with earlier version of OpenMDAO; use options['default_surrogate'] "
-                         "instead.")
-        self.options['default_surrogate'] = value
-
-
-class MetaModel(MetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MetaModel' has been deprecated. Use "
-                         "'MetaModelUnStructuredComp' instead.")
-        super(MetaModel, self).__init__(*args, **kwargs)
-
-
-class MetaModelUnStructured(MetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MetaModelUnStructured' has been deprecated. Use "
-                         "'MetaModelUnStructuredComp' instead.")
-        super(MetaModelUnStructured, self).__init__(*args, **kwargs)

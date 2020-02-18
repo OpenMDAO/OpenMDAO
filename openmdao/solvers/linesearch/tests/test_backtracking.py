@@ -35,6 +35,7 @@ class TestArmejoGoldsteinBounds(unittest.TestCase):
 
     def test_nolinesearch(self):
         top = self.top
+        top.model.nonlinear_solver.linesearch = None
 
         # Run without a line search at x=2.0
         top['px.x'] = 2.0

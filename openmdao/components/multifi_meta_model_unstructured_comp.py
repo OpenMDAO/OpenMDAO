@@ -5,7 +5,6 @@ from itertools import chain
 import numpy as np
 
 from openmdao.components.meta_model_unstructured_comp import MetaModelUnStructuredComp
-from openmdao.utils.general_utils import warn_deprecation
 
 
 def _get_name_fi(name, fi_index):
@@ -301,45 +300,3 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
 
         self._training_input = inputs
         self.train = False
-
-
-class MultiFiMetaModel(MultiFiMetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MultiFiMetaModel' component has been deprecated. Use "
-                         "'MultiFiMetaModelUnStructuredComp' instead.")
-        super(MultiFiMetaModel, self).__init__(*args, **kwargs)
-
-
-class MultiFiMetaModelUnStructured(MultiFiMetaModelUnStructuredComp):
-    """
-    Deprecated.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Capture Initialize to throw warning.
-
-        Parameters
-        ----------
-        *args : list
-            Deprecated arguments.
-        **kwargs : dict
-            Deprecated arguments.
-        """
-        warn_deprecation("'MultiFiMetaModelUnStructured' has been deprecated. Use "
-                         "'MultiFiMetaModelUnStructuredComp' instead.")
-        super(MultiFiMetaModelUnStructured, self).__init__(*args, **kwargs)

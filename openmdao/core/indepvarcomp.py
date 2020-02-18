@@ -11,7 +11,7 @@ except ImportError:
 from six import string_types
 
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.utils.general_utils import warn_deprecation, make_set
+from openmdao.utils.general_utils import make_set
 
 
 class IndepVarComp(ExplicitComponent):
