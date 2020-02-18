@@ -8,6 +8,23 @@ MetaModelStructuredComp
 structured, grid. This differs from :ref:`MetaModelUnStructured <feature_MetaModelUnStructuredComp>`
 which accepts unstructured data as collections of points.
 
+.. note::
+
+    The fundamental difference between SplineComp and StructuredMetaModelComp are as follows:
+
+    `StructuredMetaModel` is used when you have a set of known data values y on a structured grid x and
+    want to interpolate a new y value at a new x location that lies inside the grid. In this case, you
+    generally start with a known set of fixed "training" values and their locations.
+
+    `SplineComp` is used when you want to create a smooth curve with a high number of points, but you
+    want to control the shape of the curve with a small number of control points. The x locations of
+    the interpolated points (and where applicable, the control points) are fixed and known, but the
+    y values at the control points vary as the curve shape is modified by an upstream connection.
+
+    StructuredMetaModel can be used for multi-dimensional design spaces, whereas SplineComp is
+    restricted to one dimension.
+
+
 `MetaModelStructuredComp` produces smooth fits through provided training data using polynomial
 splines of various orders. The interpolation methods include three that wrap methods in
 scipy.interpolate, as well as five methods that are written in pure python. For all methods,
