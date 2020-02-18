@@ -19,7 +19,7 @@ the original and interpolated spaces is typically uniform but other distribution
     want to interpolate a new y value at a new x location that lies inside the grid. In this case, you
     generally start with a known set of fixed "training" values and their locations.
 
-    `SplineComp` is used when you want to create a smooth curve with a high number of points, but you
+    `SplineComp` is used when you want to create a smooth curve with a large number of points, but you
     want to control the shape of the curve with a small number of control points. The x locations of
     the interpolated points (and where applicable, the control points) are fixed and known, but the
     y values at the control points vary as the curve shape is modified by an upstream connection.
