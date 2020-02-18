@@ -1402,6 +1402,15 @@ class Group(System):
         if outputs:
             subsys._var_promotes['output'].extend(outputs)
 
+        list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
+
+        for i in list_comp:
+            original, new = i
+            for j in list_comp:
+                original_inside, new_inside = j
+                if original == original_inside and new != new_inside:
+                    raise RuntimeError("%s: Trying to promote '%s' when it has been aliased to '%s'." % (self.msginfo, original_inside, new))
+
     def add(self, name, subsys, promotes=None):
         """
         Add a subsystem (deprecated version of <Group.add_subsystem>).

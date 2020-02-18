@@ -2028,6 +2028,18 @@ class System(object):
                             # Default: prepend the parent system's name
                             pmap[name] = gname + name if gname else name
 
+            for p in patterns:
+                for i in renames:
+                    if fnmatchcase(i, p):
+                        raise RuntimeError("%s: failed to find any matches for the following "
+                                        "names or patterns: '%s'. You may be promoting the wrong "
+                                        "variable." % (self.msginfo, p))
+                for i in names:
+                    if not fnmatchcase(i, p):
+                        raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                "names or patterns: %s.%s" %
+                                (self.msginfo, call, sorted(not_found), empty_group_msg))
+
             not_found = (set(names).union(renames).union(patterns)) - found
             if not_found:
                 if not self._var_abs2meta and isinstance(self, openmdao.core.group.Group):
@@ -2039,8 +2051,8 @@ class System(object):
                 else:
                     call = 'promotes_%ss' % io_types[0]
                 raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                   "names or patterns: %s.%s" %
-                                   (self.msginfo, call, sorted(not_found), empty_group_msg))
+                                "names or patterns: %s.%s" %
+                                (self.msginfo, call, sorted(not_found), empty_group_msg))
 
         maps = {'input': {}, 'output': {}}
 

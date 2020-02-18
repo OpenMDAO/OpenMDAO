@@ -185,6 +185,84 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(top['bb'], 4.0)
 
+    def test_promotes_alias_from_parent(self):
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b+c', a=3.0, b=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=[('b', 'bb')])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=['b'])
+
+        top = om.Problem(model=TopGroup())
+
+        with self.assertRaises(RuntimeError) as context:
+            top.setup()
+
+        self.assertEqual(str(context.exception),
+                         "SubGroup (sub): Trying to promote 'b' when it has been aliased to 'bb'.")
+
+    def test_promotes_wildcard_rename(self):
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=["b*"])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=[('bb', 'xx')])
+
+        top = om.Problem(model=TopGroup())
+
+        with self.assertRaises(RuntimeError) as context:
+            top.setup()
+
+        self.assertEqual(str(context.exception),
+                         "ExecComp (sub.comp1): failed to find any matches for "
+                         "the following names or patterns: 'b*'. You may be promoting the wrong "
+                         "variable.")
+
+    def test_promotes_wildcard_name(self):
+        class SubGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', om.ExecComp('x=2.0+bb', bb=4.0))
+
+            def configure(self):
+                self.promotes('comp1', inputs=["b*"])
+
+        class TopGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('sub', SubGroup())
+
+            def configure(self):
+                self.sub.promotes('comp1', inputs=[('bb')])
+
+        top = om.Problem(model=TopGroup())
+
+        with self.assertRaises(RuntimeError) as context:
+            top.setup()
+
+        self.assertEqual(str(context.exception),
+                         "ExecComp (sub.comp1): 'promotes_inputs' failed to find any matches for "
+                         "the following names or patterns: ['b*'].")
+
     def test_multiple_promotes(self):
 
         class BranchGroup(om.Group):
