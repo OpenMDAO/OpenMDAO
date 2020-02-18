@@ -613,4 +613,3 @@ class MetaModelUnStructuredComp(ExplicitComponent):
 
     def _metadata(self, name):
         return self._var_rel2meta[name]
-

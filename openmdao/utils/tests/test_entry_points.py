@@ -37,8 +37,7 @@ class TestEntryPoints(unittest.TestCase):
 
     # test if all relevant classes have been registered as entry points
     def test_ep_registered(self):
-        skip = {  # Add deprecated classes here.
-        }
+        skip = set()  # Add deprecated classes here.
 
         # if mpi4py isn't installed, then the pyopstsparse_driver import will fail
         try:

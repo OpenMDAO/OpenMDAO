@@ -279,5 +279,3 @@ class KrigingSurrogate(SurrogateModel):
         jac = np.einsum('i,j,ij->ij', self.Y_std, 1. /
                         self.X_std, gradr.dot(self.alpha).T)
         return jac
-
-

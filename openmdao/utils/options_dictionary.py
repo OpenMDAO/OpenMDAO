@@ -301,6 +301,8 @@ class OptionsDictionary(object):
             Optional default value that must be valid under the above 3 conditions.
         values : set or list or tuple or None
             Optional list of acceptable option values.
+        types : type or tuple of types or None
+            Optional type or list of acceptable option types.
         desc : str
             Optional description of the option.
         upper : float or None

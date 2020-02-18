@@ -287,4 +287,3 @@ class ScipyKrylov(LinearSolver):
 
         # return resulting value of x vector
         return x_vec._data.copy()
-
