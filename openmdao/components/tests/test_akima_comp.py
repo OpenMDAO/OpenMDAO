@@ -7,7 +7,7 @@ import numpy as np
 from numpy.testing import assert_array_almost_equal
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials
+from openmdao.utils.assert_utils import assert_rel_error, assert_check_partials, assert_warning
 
 
 class AkimaTestCase(unittest.TestCase):
@@ -118,6 +118,20 @@ class AkimaTestCase(unittest.TestCase):
         derivs = prob.check_partials(compact_print=True, method='cs')
 
         assert_check_partials(derivs, atol=1e-14, rtol=1e-14)
+
+    def test_akima_spline_comp_deprecation(self):
+        xcp = np.array([1.0, 2.0, 4.0, 6.0, 10.0, 12.0])
+        ycp = np.array([5.0, 12.0, 14.0, 16.0, 21.0, 29.0])
+        ncp = len(xcp)
+        n = 50
+        x = np.linspace(1.0, 12.0, n)
+
+        prob = om.Problem()
+
+        msg = "'AkimaSplineComp' has been deprecated. Use 'SplineComp' instead."
+        with assert_warning(DeprecationWarning, msg):
+            comp = om.AkimaSplineComp(num_control_points=ncp, num_points=n,
+                                      name='chord', input_x=True, input_xcp=True)
 
 
 class TestAkimaFeature(unittest.TestCase):

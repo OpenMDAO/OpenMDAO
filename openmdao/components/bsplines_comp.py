@@ -8,6 +8,7 @@ from scipy.sparse import csc_matrix, csr_matrix
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.array_utils import tile_sparse_jac
+from openmdao.utils.general_utils import warn_deprecation
 
 CITATIONS = """
 @conference {Hwang2012c,
@@ -130,6 +131,8 @@ class BsplinesComp(ExplicitComponent):
         super(BsplinesComp, self).__init__(**kwargs)
 
         self.cite = CITATIONS
+
+        warn_deprecation("'BsplinesComp' has been deprecated. Use 'SplineComp' instead.")
 
     def initialize(self):
         """

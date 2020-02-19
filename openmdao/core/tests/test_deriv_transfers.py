@@ -372,9 +372,6 @@ class TestParallelGroups(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.run_model()
 
-        from openmdao.devtools.debug import dump_dist_idxs
-        dump_dist_idxs(prob)
-
         np.testing.assert_allclose(prob.get_val('C6.y', get_remote=True),
                                    141.2)
 

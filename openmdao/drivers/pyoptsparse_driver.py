@@ -440,6 +440,12 @@ class pyOptSparseDriver(Driver):
             # optimizers other than pySNOPT may not populate this dict
             pass
 
+        # revert signal handler to cached version
+        sigusr = self.options['user_teriminate_signal']
+        if sigusr is not None:
+            signal.signal(sigusr, self._signal_cache)
+            self._signal_cache = None   # to prevent memory leak test from failing
+
         return self.fail
 
     def _objfunc(self, dv_dict):

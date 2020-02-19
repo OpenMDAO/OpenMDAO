@@ -156,7 +156,6 @@ try:
         start_objs['builtin_function_or_method'] += 1
         start_objs['cell'] += 1
         ret = fn(*args, **kwargs)
-        gc.collect()
         lst.extend([(str(o), delta) for o, _, delta in objgraph.growth(peak_stats=start_objs)])
         return ret
 

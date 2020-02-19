@@ -1,0 +1,71 @@
+
+
+from openmdao.solvers.solver import NonlinearSolver
+
+
+class {class_name}(NonlinearSolver):
+    """
+    Describe your solver here...
+    """
+
+    SOLVER = 'NL: ????'   # replace ???? with some abbreviated name for your solver
+
+    def __init__(self, **kwargs):
+        """
+        Initialize all attributes.
+
+        Parameters
+        ----------
+        **kwargs : dict
+            options dictionary.
+        """
+        super({class_name}, self).__init__(**kwargs)
+
+        # set other attributes here...
+
+    def _setup_solvers(self, system, depth):
+        """
+        Assign system instance, set depth, and optionally perform setup.
+
+        Parameters
+        ----------
+        system : <System>
+            pointer to the owning system.
+        depth : int
+            depth of the current system (already incremented).
+        """
+        super({class_name}, self)._setup_solvers(system, depth)
+
+        # perform any necessary setup here...
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super({class_name}, self)._declare_options()
+
+        # for example...
+        # self.options.declare('cs_reconverge', types=bool, default=True,
+        #                      desc='When True, when this driver solves under a complex step, nudge '
+        #                      'the Solution vector by a small amount so that it reconverges.')
+
+    def _iter_initialize(self):
+        """
+        This happens once at the beginning of each solve.
+
+        Returns
+        -------
+        float
+            initial error.
+        float
+            error at the first iteration.
+        """
+        return super({class_name}, self)._iter_initialize()
+
+    def _single_iteration(self):
+        """
+        Perform one iteration of the iteration loop.
+        """
+        # perform a single iteration here...
+        pass
+
