@@ -70,34 +70,30 @@ called on all subsystems, you can be sure that this information will be availabl
 
 Here is a quick guide covering what you can do in the `setup` and `configure` methods.
 
-**setup**
-
- - Add subsystems
- - Issue connections
- - Assign linear and nonlinear solvers at this group level
- - Change solver settings for any solver at this group level
- - Assign Jacobians at this group level
- - Set system execution order
- - Add desvars, objectives, and constraints
- - Add a case recorder to the group or a solver in that group.
-
-**configure**
-
- - Issue connections
- - Assign linear and nonlinear solvers to subsystems
- - Change solver settings in subsystems
- - Assign Jacobians to subsystems
- - Set execution order in subsystems
- - Add a case recorder to a subsystem or a solver in a subsystem.
-
-**Things you should never do in configure**
-
- - Add subsystems
- - Delete subsystems
+==================================================================================== ======= ===========
+Action                                                                               setup   configure
+==================================================================================== ======= ===========
+Add subsystems                                                                          o
+Delete subsystems                                                                       o
+Issue connections                                                                       o        o
+Set system execution order                                                              o        o
+Promote variables from subsystems                                                       o        o
+Assign solvers at **this** group level                                                  o        o
+Assign solvers within subsystems                                                                 o
+Change solver settings for any solver at **this** group level                           o        o
+Change solver settings in subsystems                                                             o
+Assign Jacobians at **this** group level                                                o        o
+Assign Jacobians within subsystems                                                               o
+Add design variables, objectives, and constraints relative to **this** group level      o        o
+Add design variables, objectives, and constraints to subsystems                                  o
+Add a case recorder to the group or to a solver in **this** group                       o        o
+Add a case recorder to the group or to a solver in a subsystem                                   o
+==================================================================================== ======= ===========
 
  Keep in mind that, when `configure` is being run, you are already done calling `setup` on every group
  and component in the model, so if you add something here, setup will never be called, and it will
  never be fully integrated into the model hierarchy.
+
 
 Problem setup and final_setup
 -----------------------------
