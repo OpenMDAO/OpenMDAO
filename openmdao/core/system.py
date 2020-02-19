@@ -2042,8 +2042,9 @@ class System(object):
                 for p in patterns:
                     for name, alias in renames.items():
                         if fnmatchcase(name, p):
-                            raise RuntimeError("%s: %s '%s' matched '%s' but '%s' has been aliased to '%s'." %
-                                               (self.msginfo, call, p, name, name, alias))
+                            raise RuntimeError("%s: %s '%s' matched '%s' but '%s' has been aliased "
+                                               "to '%s'." % (self.msginfo, call, p, name,
+                                                             name, alias))
 
                     for i in names:
                         if fnmatchcase(i, p):
