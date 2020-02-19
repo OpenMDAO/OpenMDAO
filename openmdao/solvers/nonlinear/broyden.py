@@ -15,6 +15,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import simple_warning
 from openmdao.utils.mpi import MPI
 
+
 CITATION = """@ARTICLE{
               Broyden1965ACo,
               AUTHOR = "C. Broyden",
@@ -132,6 +133,10 @@ class BroydenSolver(NonlinearSolver):
                              desc="Flag controls whether to perform Broyden update to the "
                                   "Jacobian. There are some applications where it may be useful "
                                   "to turn this off.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=False,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
@@ -152,6 +157,7 @@ class BroydenSolver(NonlinearSolver):
         self._computed_jacobians = 0
         iproc = system.comm.rank
 
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
         self._disallow_discrete_outputs()
 
         if self.linear_solver is not None:

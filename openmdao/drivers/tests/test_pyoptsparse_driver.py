@@ -1264,7 +1264,6 @@ class TestPyoptSparse(unittest.TestCase):
         model.add_constraint('c', upper=-15.0)
 
         prob.setup()
-
         failed = prob.run_driver()
 
         self.assertFalse(failed, "Optimization failed, info = " +

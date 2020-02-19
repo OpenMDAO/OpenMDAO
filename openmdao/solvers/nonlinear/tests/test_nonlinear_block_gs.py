@@ -6,10 +6,11 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.sellar import SellarDerivatives, \
     SellarDis1withDerivatives, SellarDis2withDerivatives, \
     SellarDis1, SellarDis2
-from openmdao.utils.assert_utils import assert_rel_error
+from openmdao.utils.assert_utils import assert_rel_error, assert_warning
 
 from openmdao.utils.mpi import MPI
 try:
@@ -19,6 +20,36 @@ except:
 
 
 class TestNLBGaussSeidel(unittest.TestCase):
+
+    def test_reraise_error(self):
+
+        prob = om.Problem(model=DoubleSellar())
+        model = prob.model
+
+        g1 = model.g1
+        g1.nonlinear_solver = om.NonlinearBlockGS()
+        g1.nonlinear_solver.options['maxiter'] = 1
+        g1.nonlinear_solver.options['err_on_non_converge'] = True
+        g1.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        g2 = model.g2
+        g2.nonlinear_solver = om.NonlinearBlockGS()
+        g2.nonlinear_solver.options['maxiter'] = 1
+        g2.nonlinear_solver.options['err_on_non_converge'] = True
+        g2.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        model.nonlinear_solver = om.NonlinearBlockGS()
+        model.linear_solver = om.DirectSolver(assemble_jac=True)
+        model.nonlinear_solver.options['err_on_non_converge'] = True
+        model.nonlinear_solver.options['reraise_child_analysiserror'] = True
+
+        prob.setup()
+
+        with self.assertRaises(om.AnalysisError) as context:
+            prob.run_model()
+
+        msg = "Solver 'NL: NLBGS' on system 'g1' failed to converge in 1 iterations."
+        self.assertEqual(str(context.exception), msg)
 
     def test_feature_set_options(self):
         import numpy as np

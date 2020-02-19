@@ -1394,7 +1394,7 @@ class TestProblem(unittest.TestCase):
         p_opt.model = SellarOneComp(solve_y1=SOLVE_Y1, solve_y2=SOLVE_Y2)
 
         if SOLVE_Y1 or SOLVE_Y2:
-            newton = p_opt.model.nonlinear_solver = om.NewtonSolver()
+            newton = p_opt.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
             newton.options['iprint'] = 0
 
         # NOTE: need to have this direct solver attached to the sellar comp until I define a solve_linear for it
@@ -1465,7 +1465,7 @@ class TestProblem(unittest.TestCase):
 
             def configure(self):
                 # This will solve it.
-                self.sub.nonlinear_solver = om.NewtonSolver()
+                self.sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.sub.linear_solver = om.ScipyKrylov()
 
         top = om.Problem(model=Super())
@@ -1515,7 +1515,7 @@ class TestProblem(unittest.TestCase):
         top.setup()
 
         # These solvers override the ones set in the setup method of the 'sub' groups
-        top.model.sub.nonlinear_solver = om.NewtonSolver()
+        top.model.sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.sub.linear_solver = om.ScipyKrylov()
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
@@ -1745,7 +1745,7 @@ class TestProblem(unittest.TestCase):
 
             def configure(self):
                 # This will solve it.
-                self.sub.nonlinear_solver = om.NewtonSolver()
+                self.sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.sub.linear_solver = om.ScipyKrylov()
 
         top = om.Problem(model=Super())
@@ -1795,7 +1795,7 @@ class TestProblem(unittest.TestCase):
         top.setup()
 
         # This will solve it.
-        top.model.sub.nonlinear_solver = om.NewtonSolver()
+        top.model.sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         top.model.sub.linear_solver = om.ScipyKrylov()
 
         self.assertTrue(isinstance(top.model.sub.nonlinear_solver, om.NewtonSolver))
