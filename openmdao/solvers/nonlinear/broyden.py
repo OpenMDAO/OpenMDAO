@@ -132,6 +132,10 @@ class BroydenSolver(NonlinearSolver):
                              desc="Flag controls whether to perform Broyden update to the "
                                   "Jacobian. There are some applications where it may be useful "
                                   "to turn this off.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=True,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
         self.supports['gradients'] = True
         self.supports['implicit_components'] = True
