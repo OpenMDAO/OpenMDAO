@@ -1,4 +1,3 @@
-from __future__ import print_function, division
 import unittest
 
 import numpy as np

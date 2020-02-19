@@ -1,7 +1,5 @@
 """Test the LinearUserDefined linear solver class."""
 
-from __future__ import division, print_function
-
 import unittest
 
 import numpy as np

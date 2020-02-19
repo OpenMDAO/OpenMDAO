@@ -1,4 +1,3 @@
-from __future__ import print_function
 import pprint
 import sqlite3
 import sys

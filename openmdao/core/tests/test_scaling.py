@@ -1,6 +1,4 @@
 """Define the units/scaling tests."""
-from __future__ import division, print_function
-
 import unittest
 from copy import deepcopy
 from six import assertRaisesRegex

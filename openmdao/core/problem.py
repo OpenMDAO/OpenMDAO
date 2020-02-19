@@ -1,7 +1,5 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
-from __future__ import division, print_function
-
 import sys
 import pprint
 import os

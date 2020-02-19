@@ -1,7 +1,6 @@
 """
 A collection of functions for modifying source code that is embeded into the Sphinx documentation.
 """
-from __future__ import print_function
 
 import sys
 import os

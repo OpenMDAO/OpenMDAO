@@ -1,6 +1,5 @@
 """A script wrapper for the Wing IDE."""
 
-from __future__ import print_function
 
 import os
 import os.path

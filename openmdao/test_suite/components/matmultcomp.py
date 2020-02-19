@@ -1,7 +1,6 @@
 """
 A simple component used for derivative testing.
 """
-from __future__ import division, print_function
 import time
 
 import numpy as np

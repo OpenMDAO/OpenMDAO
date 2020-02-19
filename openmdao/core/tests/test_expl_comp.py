@@ -1,6 +1,4 @@
 """Simple example demonstrating how to implement an explicit component."""
-from __future__ import division
-
 from six import assertRaisesRegex
 
 from six.moves import cStringIO

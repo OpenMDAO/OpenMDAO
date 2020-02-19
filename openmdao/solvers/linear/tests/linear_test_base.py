@@ -1,6 +1,5 @@
 """Common tests for linear solvers."""
 
-from __future__ import division, print_function
 from six import iteritems
 
 import unittest

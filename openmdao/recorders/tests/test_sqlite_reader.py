@@ -1,5 +1,4 @@
 """ Unit tests for the SqliteCaseReader. """
-from __future__ import print_function
 
 import errno
 import os

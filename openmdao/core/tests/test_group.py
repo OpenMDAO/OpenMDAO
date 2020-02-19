@@ -1,7 +1,6 @@
 """
 Unit tests for Group.
 """
-from __future__ import print_function
 
 import itertools
 import unittest

@@ -1,7 +1,6 @@
 """
 Unit tests for the spline interpolator component.
 """
-from __future__ import division, print_function, absolute_import
 from copy import deepcopy
 import unittest
 

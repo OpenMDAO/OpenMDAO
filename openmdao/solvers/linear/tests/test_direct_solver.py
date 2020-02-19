@@ -1,7 +1,5 @@
 """Test the DirectSolver linear solver class."""
 
-from __future__ import division, print_function
-
 import unittest
 from six import assertRaisesRegex, iteritems
 

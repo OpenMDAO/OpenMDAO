@@ -1,7 +1,6 @@
 """
 Unit tests for the structured metamodel component.
 """
-from __future__ import division, print_function, absolute_import
 import unittest
 from six import assertRaisesRegex
 

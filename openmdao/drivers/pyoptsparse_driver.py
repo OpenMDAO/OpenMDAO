@@ -5,7 +5,6 @@ pyoptsparse is based on pyOpt, which is an object-oriented framework for
 formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
-from __future__ import print_function
 
 from collections import OrderedDict
 import json

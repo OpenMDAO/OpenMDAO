@@ -6,8 +6,6 @@ Tests for absolute and promoted connections, for different nonlinear solvers.
 # FIXME With NonlinearRunOnce run_model() fails with ValueError (P.O.)
 # FIXME With Newton solver and NLBGS variable sizes are not updated. (P.O.)
 
-from __future__ import division
-
 import numpy as np
 import unittest
 

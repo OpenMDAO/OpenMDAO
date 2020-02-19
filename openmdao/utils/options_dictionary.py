@@ -1,6 +1,4 @@
 """Define the OptionsDictionary class."""
-from __future__ import division, print_function
-
 from six import iteritems, string_types
 
 from openmdao.utils.general_utils import warn_deprecation
