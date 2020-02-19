@@ -11,7 +11,8 @@ which accepts unstructured data as collections of points.
 .. note::
 
     OpenMDAO contains two components that perform interpolation: `SplineComp` and `MetaModelStructuredComp`.
-    The fundamental difference between them is as follows:
+    While they provide access to mostly the same algorithms, their usage is subtly different.
+    The fundamental differences between them are as follows:
 
     :ref:`MetaModelStructuredComp <feature_MetaModelStructuredComp>` is used when you have a set of known data values y on a structured grid x and
     want to interpolate a new y value at a new x location that lies inside the grid. In this case, you

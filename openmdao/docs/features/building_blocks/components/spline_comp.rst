@@ -14,7 +14,8 @@ the original and interpolated spaces is typically uniform but other distribution
 .. note::
 
     OpenMDAO contains two components that perform interpolation: `SplineComp` and `MetaModelStructuredComp`.
-    The fundamental difference between them is as follows:
+    While they provide access to mostly the same algorithms, their usage is subtly different.
+    The fundamental differences between them are as follows:
 
     :ref:`MetaModelStructuredComp <feature_MetaModelStructuredComp>` is used when you have a set of known data values y on a structured grid x and
     want to interpolate a new y value at a new x location that lies inside the grid. In this case, you
@@ -45,6 +46,12 @@ The following methods are available by setting the 'method' option:
 | cubic         | 3      | Cubic spline, with continuity of derivatives between segments    |
 +---------------+--------+------------------------------------------------------------------+
 | bsplines      | var.   | BSplines, default order is 4.                                    |
++---------------+--------+------------------------------------------------------------------+
+| scipy_slinear | 1      | Scipy linear interpolation. Same as slinear, though slower       |
++---------------+--------+------------------------------------------------------------------+
+| scipy_cubic   | 3      | Scipy cubic interpolation. More accurate than cubic, but slower  |
++---------------+--------+------------------------------------------------------------------+
+| scipy_quintic | 5      | Scipy quintic interpolation. Most accurate, but slowest          |
 +---------------+--------+------------------------------------------------------------------+
 
 
