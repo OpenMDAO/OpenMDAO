@@ -401,7 +401,12 @@ class Group(System):
 
         # Compute _subsystems_proc_range
         self._subsystems_proc_range = [sub_proc_range] * len(self._subsystems_myproc)
-        self._subsystems_inds = {s.name: i for i, s in enumerate(self._subsystems_allprocs)}
+        self._subsystems_inds = inds = {}
+
+        # need to set pathname correctly even for non-local subsystems
+        for i, s in enumerate(self._subsystems_allprocs):
+            inds[s.name] = i
+            s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
 
         self._local_system_set = set()
 
@@ -413,12 +418,7 @@ class Group(System):
             subsys._use_derivatives = self._use_derivatives
             subsys._solver_info = self._solver_info
             subsys._recording_iter = self._recording_iter
-
-            if self.pathname:
-                subsys._setup_procs('.'.join((self.pathname, subsys.name)), sub_comm, mode,
-                                    prob_options)
-            else:
-                subsys._setup_procs(subsys.name, sub_comm, mode, prob_options)
+            subsys._setup_procs(subsys.pathname, sub_comm, mode, prob_options)
 
         # build a list of local subgroups to speed up later loops
         self._subgroups_myproc = [s for s in self._subsystems_myproc if isinstance(s, Group)]
