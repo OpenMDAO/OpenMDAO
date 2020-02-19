@@ -3,6 +3,8 @@
 import numpy as np
 
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.general_utils import warn_deprecation
+from openmdao.utils.mpi import MPI
 
 
 class NonlinearBlockGS(NonlinearSolver):
@@ -47,6 +49,18 @@ class NonlinearBlockGS(NonlinearSolver):
             depth of the current system (already incremented).
         """
         super(NonlinearBlockGS, self)._setup_solvers(system, depth)
+
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
+
+        if self.options._dict['reraise_child_analysiserror']['value']:
+            pathname = self._system().pathname
+            if pathname:
+                pathname += ': '
+            msg = ("Deprecation warning: In V 3.x, reraise_child_analysiserror will default to "
+                   "False.")
+
+            if rank == 0:
+                warn_deprecation(pathname + msg)
 
         if len(system._subsystems_allprocs) != len(system._subsystems_myproc):
             raise RuntimeError('{}: Nonlinear Gauss-Seidel cannot be used on a '

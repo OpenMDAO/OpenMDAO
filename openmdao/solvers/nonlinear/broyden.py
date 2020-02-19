@@ -15,6 +15,7 @@ from openmdao.utils.general_utils import simple_warning, warn_deprecation
 from openmdao.utils.mpi import MPI
 from openmdao.vectors.vector import INT_DTYPE
 
+
 CITATION = """@ARTICLE{
               Broyden1965ACo,
               AUTHOR = "C. Broyden",
@@ -156,7 +157,18 @@ class BroydenSolver(NonlinearSolver):
         self._computed_jacobians = 0
         iproc = system.comm.rank
 
+        rank = MPI.COMM_WORLD.rank if MPI is not None else 0
         self._disallow_discrete_outputs()
+
+        if self.options._dict['reraise_child_analysiserror']['value']:
+            pathname = self._system().pathname
+            if pathname:
+                pathname += ': '
+            msg = ("Deprecation warning: In V 3.x, reraise_child_analysiserror will default to "
+                   "False.")
+
+            if rank == 0:
+                warn_deprecation(pathname + msg)
 
         if self.linear_solver is not None:
             self.linear_solver._setup_solvers(system, self._depth + 1)
