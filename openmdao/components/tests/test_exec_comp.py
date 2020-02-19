@@ -1076,7 +1076,7 @@ class TestExecCompParameterized(unittest.TestCase):
 
         if len(test_data['args']) > 1:
             ivc = model.add_subsystem(name='ivc', subsys=om.IndepVarComp())
-            for arg_name, arg_value in iteritems(test_data['args']):
+            for arg_name, arg_value in test_data['args'].items():
                 if arg_name == 'f':
                     continue
                 ivc.add_output(name=arg_name, val=arg_value['value'])
@@ -1121,7 +1121,7 @@ class TestExecCompParameterized(unittest.TestCase):
 
         if len(test_data['args']) > 1:
             ivc = model.add_subsystem(name='ivc', subsys=om.IndepVarComp())
-            for arg_name, arg_value in iteritems(test_data['args']):
+            for arg_name, arg_value in test_data['args'].items():
                 if arg_name == 'f':
                     continue
                 ivc.add_output(name=arg_name, val=arg_value['value'])

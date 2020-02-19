@@ -614,7 +614,7 @@ class Driver(object):
             The nonlinear response names in order.
         """
         order = list(self._objs)
-        order.extend(n for n, meta in iteritems(self._cons)
+        order.extend(n for n, meta in self._cons.items()
                      if not ('linear' in meta and meta['linear']))
         return order
 
@@ -638,7 +638,7 @@ class Driver(object):
         self._cons = cons = OrderedDict()
 
         self._responses = resps = model.get_responses(recurse=True)
-        for name, data in iteritems(resps):
+        for name, data in resps.items():
             if data['type'] == 'con':
                 cons[name] = data
             else:

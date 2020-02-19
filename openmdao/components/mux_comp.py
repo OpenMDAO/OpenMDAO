@@ -76,7 +76,7 @@ class MuxComp(ExplicitComponent):
         opts = self.options
         vec_size = opts['vec_size']
 
-        for var, options in iteritems(self._vars):
+        for var, options in self._vars.items():
             kwgs = dict(options)
             in_shape = np.asarray(options['val']).shape \
                 if options['shape'] is None else options['shape']

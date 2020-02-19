@@ -162,7 +162,7 @@ class SplineComp(ExplicitComponent):
         outputs : Vector
             unscaled, dimensional output variables read via outputs[key]
         """
-        for out_name, interp in iteritems(self.interps):
+        for out_name, interp in self.interps.items():
             values = inputs[self.interp_to_cp[out_name]]
             interp._compute_d_dvalues = True
             interp._compute_d_dx = False

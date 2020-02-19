@@ -75,7 +75,7 @@ class DemuxComp(ExplicitComponent):
         opts = self.options
         vec_size = opts['vec_size']
 
-        for var, options in iteritems(self._vars):
+        for var, options in self._vars.items():
             kwgs = dict(options)
             shape = options['shape']
             size = np.prod(shape)

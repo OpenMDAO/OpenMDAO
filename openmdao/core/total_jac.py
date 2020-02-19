@@ -1296,7 +1296,7 @@ class _TotalJacInfo(object):
 
         # Main loop over columns (fwd) or rows (rev) of the jacobian
         for mode in self.idx_iter_dict:
-            for key, idx_info in iteritems(self.idx_iter_dict[mode]):
+            for key, idx_info in self.idx_iter_dict[mode].items():
                 imeta, idx_iter = idx_info
                 for inds, input_setter, jac_setter, itermeta in idx_iter(imeta, mode):
                     rel_systems, vec_names, cache_key = input_setter(inds, itermeta, mode)
@@ -1507,10 +1507,10 @@ class _TotalJacInfo(object):
         responses = self.prom_responses
 
         if self.return_format in ('dict', 'array'):
-            for prom_out, odict in iteritems(J):
+            for prom_out, odict in J.items():
                 oscaler = responses[prom_out]['scaler']
 
-                for prom_in, val in iteritems(odict):
+                for prom_in, val in odict.items():
                     iscaler = desvars[prom_in]['scaler']
 
                     # Scale response side
@@ -1522,7 +1522,7 @@ class _TotalJacInfo(object):
                         val *= 1.0 / iscaler
 
         elif self.return_format == 'flat_dict':
-            for tup, val in iteritems(J):
+            for tup, val in J.items():
                 prom_out, prom_in = tup
                 oscaler = responses[prom_out]['scaler']
                 iscaler = desvars[prom_in]['scaler']
