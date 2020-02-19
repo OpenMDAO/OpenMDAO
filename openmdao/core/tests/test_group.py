@@ -980,7 +980,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C2): 'promotes_outputs' failed to find any matches for the following pattern: x*.")
+                         "ExecComp (C2): 'promotes_outputs' failed to find any matches for the "
+                         "following pattern: 'x*'.")
 
     def test_promote_not_found2(self):
         p = om.Problem()
@@ -1016,7 +1017,7 @@ class TestGroup(unittest.TestCase):
             p.setup()
         self.assertEqual(str(context.exception),
                          "Group (G1): 'promotes' failed to find any matches for the following "
-                         "pattern: *. Group contains no variables.")
+                         "pattern: '*'. Group contains no variables.")
 
     def test_missing_promote_var(self):
         p = om.Problem()

@@ -2050,7 +2050,7 @@ class System(object):
                             break
                     else:
                         raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                           "pattern: %s.%s" %
+                                           "pattern: '%s'.%s" %
                                            (self.msginfo, call, p, empty_group_msg))
                     if p == patterns[-1]:
                         break
