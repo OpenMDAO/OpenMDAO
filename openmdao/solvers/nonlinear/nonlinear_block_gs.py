@@ -70,6 +70,10 @@ class NonlinearBlockGS(NonlinearSolver):
         self.options.declare('use_apply_nonlinear', types=bool, default=False,
                              desc="Set to True to always call apply_nonlinear on the solver's "
                              "system after solve_nonlinear has been called.")
+        self.options.declare('reraise_child_analysiserror', types=bool, default=True,
+                             desc='When the option is true, a solver will reraise any '
+                             'AnalysisError that arises during subsolve; when false, it will '
+                             'continue solving.')
 
     def _iter_initialize(self):
         """
