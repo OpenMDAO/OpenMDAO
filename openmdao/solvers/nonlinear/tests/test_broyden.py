@@ -9,6 +9,7 @@ import numpy as np
 
 import openmdao.api as om
 from openmdao.core.tests.test_distrib_derivs import DistribExecComp
+from openmdao.test_suite.components.double_sellar import DoubleSellar
 from openmdao.test_suite.components.implicit_newton_linesearch import ImplCompTwoStates
 from openmdao.test_suite.components.sellar import SellarStateConnection, SellarDerivatives, \
      SellarDis1withDerivatives, SellarDis2withDerivatives
@@ -130,6 +131,51 @@ class SpedicatoHuang(om.ImplicitComponent):
 
 
 class TestBryoden(unittest.TestCase):
+
+    def test_reraise_error(self):
+
+        prob = om.Problem(model=DoubleSellar())
+        model = prob.model
+
+        g1 = model.g1
+        g1.nonlinear_solver = om.BroydenSolver()
+        g1.nonlinear_solver.options['maxiter'] = 1
+        g1.nonlinear_solver.options['err_on_non_converge'] = True
+        g1.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        g2 = model.g2
+        g2.nonlinear_solver = om.BroydenSolver()
+        g2.nonlinear_solver.options['maxiter'] = 1
+        g2.nonlinear_solver.options['err_on_non_converge'] = True
+        g2.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        model.nonlinear_solver = om.BroydenSolver()
+        model.linear_solver = om.DirectSolver(assemble_jac=True)
+        model.nonlinear_solver.options['err_on_non_converge'] = True
+        model.nonlinear_solver.options['reraise_child_analysiserror'] = True
+
+        prob.setup()
+
+        with self.assertRaises(om.AnalysisError) as context:
+            prob.run_model()
+
+        msg = "Solver 'BROYDEN' on system 'g1' failed to converge in 1 iterations."
+        self.assertEqual(str(context.exception), msg)
+
+    def test_reraise_child_analysiserror_deprecation_warning(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.nonlinear_solver = om.NonlinearBlockGS()
+        model.linear_solver = om.ScipyKrylov(assemble_jac=True)
+        model.nonlinear_solver.options['err_on_non_converge'] = True
+
+        prob.setup()
+
+        msg = "Deprecation warning: In V 3.x, reraise_child_analysiserror will default to False."
+        with assert_warning(DeprecationWarning, msg):
+            prob.run_model()
 
     def test_error_badname(self):
         # Test top level Sellar (i.e., not grouped).

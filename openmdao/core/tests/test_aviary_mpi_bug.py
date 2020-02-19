@@ -22,7 +22,7 @@ def _get_problem():
     sa.add_subsystem('C3', om.ExecComp('y = x', x=6))
 
     # the bug only appears if there is a NewtonSolver here...
-    sa.nonlinear_solver = om.NewtonSolver()
+    sa.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
     par = p.model.add_subsystem('par', om.ParallelGroup())
 

@@ -694,7 +694,14 @@ class NonlinearSolver(Solver):
             system._transfer('nonlinear', 'fwd', isub)
 
             if local:
-                subsys._solve_nonlinear()
+
+                try:
+                    subsys._solve_nonlinear()
+                except AnalysisError:
+                    exc = sys.exc_info()
+                    if 'reraise_child_analysiserror' not in self.options or \
+                            self.options['reraise_child_analysiserror']:
+                        reraise(*exc)
 
             system._check_child_reconf(subsys)
 
