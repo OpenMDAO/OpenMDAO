@@ -1273,6 +1273,15 @@ class TestConnect(unittest.TestCase):
         with assertRaisesRegex(self, NameError, msg):
             self.prob.setup()
 
+    def test_connect_to_output(self):
+        msg = "Attempted to connect to output 'cmp.z' from output 'tgt.y'."
+
+        # source and target names can't be checked until setup
+        # because setup is not called until then
+        self.sub.connect('tgt.y', 'cmp.z')
+        with assertRaisesRegex(self, NameError, msg):
+            self.prob.setup()
+
     def test_invalid_target(self):
         msg = "Group (sub): Input 'tgt.z' does not exist for connection from 'src.x' to 'tgt.z'."
 

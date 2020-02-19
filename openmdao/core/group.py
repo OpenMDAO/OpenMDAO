@@ -887,9 +887,15 @@ class Group(System):
 
             if (prom_in not in allprocs_prom2abs_list_in and
                     prom_in not in self._var_allprocs_discrete['input']):
-                raise NameError(
-                    "%s: Input '%s' does not exist for connection from '%s' to '%s'." %
-                    (self.msginfo, prom_in, prom_out, prom_in))
+                if (prom_in in allprocs_prom2abs_list_out or
+                        prom_in in self._var_allprocs_discrete['output']):
+                    raise NameError(
+                        "%s: Attempted to connect to output '%s' from output '%s'." %
+                        (self.msginfo, prom_in, prom_out))
+                else:
+                    raise NameError(
+                        "%s: Input '%s' does not exist for connection from '%s' to '%s'." %
+                        (self.msginfo, prom_in, prom_out, prom_in))
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)

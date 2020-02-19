@@ -640,6 +640,21 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(str(ctx.exception),
                          "Total derivative with respect to 'indep.x' depends upon discrete output variables ['G.G1.C1.y'].")
 
+    def test_connection_to_output(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', ModCompEx(modval=2))
+        model.add_subsystem('C2', ModCompEx(modval=2))
+
+        model.connect('C1.y', 'C2.y')
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+
+        msg = "Group (<model>): Attempted to connect to output 'C2.y' from output 'C1.y'."
+        self.assertEqual(str(cm.exception), msg)
+
 
 class SolverDiscreteTestCase(unittest.TestCase):
     def _setup_model(self, solver_class):
