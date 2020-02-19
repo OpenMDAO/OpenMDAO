@@ -233,8 +233,8 @@ class TestGroup(unittest.TestCase):
             top.setup()
 
         self.assertEqual(str(context.exception),
-                         "ExecComp (sub.comp1): promotes_inputs 'b*' matched 'bb'. You are "
-                         "attempting to promote a renamed variable.")
+                         "ExecComp (sub.comp1): promotes_inputs 'b*' matched 'bb' but 'bb' has been "
+                         "aliased to 'xx'.")
 
     def test_promotes_wildcard_name(self):
         class SubGroup(om.Group):
@@ -255,12 +255,7 @@ class TestGroup(unittest.TestCase):
 
         top = om.Problem(model=TopGroup())
 
-        # with self.assertRaises(RuntimeError) as context:
         top.setup()
-
-        # self.assertEqual(str(context.exception),
-        #                  "ExecComp (sub.comp1): 'promotes_inputs' failed to find any matches for "
-        #                  "the following names or patterns: ['b*'].")
 
     def test_multiple_promotes(self):
 
@@ -985,8 +980,7 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "ExecComp (C2): 'promotes_outputs' failed to find any matches for "
-                         "the following name: ['x*'].")
+                         "ExecComp (C2): 'promotes_outputs' failed to find any matches for the following pattern: x*.")
 
     def test_promote_not_found2(self):
         p = om.Problem()
@@ -1021,9 +1015,8 @@ class TestGroup(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.setup()
         self.assertEqual(str(context.exception),
-                         "Group (G1): 'promotes' failed to find any matches for "
-                         "the following name: ['*']. "
-                         "Group contains no variables.")
+                         "Group (G1): 'promotes' failed to find any matches for the following "
+                         "pattern: *. Group contains no variables.")
 
     def test_missing_promote_var(self):
         p = om.Problem()

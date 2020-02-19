@@ -1404,7 +1404,6 @@ class Group(System):
 
         list_comp = [i if isinstance(i, tuple) else (i, i) for i in subsys._var_promotes['input']]
 
-        # Fix this
         for original, new in list_comp:
             for original_inside, new_inside in list_comp:
                 if original == original_inside and new != new_inside:
