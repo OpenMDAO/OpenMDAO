@@ -12,9 +12,6 @@ environment:
     - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
       PYTHON: 3
 
-    - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
-      PYTHON: 2
-
     # - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
     #   # test with the latest version of Python 3.x; due to issues with PETSc 3.12, stay with 3.11 and
     #   # install from maint-3.11 to get this fix: https://bitbucket.org/petsc/petsc4py/commits/a013d13
