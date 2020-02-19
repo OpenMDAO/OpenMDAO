@@ -3,7 +3,7 @@
 import unittest
 import numpy as np
 
-from six.moves import cStringIO, range
+from io import StringIO
 from six import assertRaisesRegex
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
@@ -170,7 +170,7 @@ class TestConnections(unittest.TestCase):
         raise unittest.SkipTest("no setup testing yet")
         self.p.model.connect('G3.G4.C3.x', 'G3.G4.C4.x')
 
-        stream = cStringIO()
+        stream = StringIO()
         self.p.setup(out_stream=stream)
 
         self.p['G3.G4.C3.x'] = 999.

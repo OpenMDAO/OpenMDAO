@@ -1,7 +1,8 @@
 """ Testing for Problem.check_partials and check_totals."""
 
 from six import iteritems
-from six.moves import cStringIO
+from io import StringIO
+
 
 import unittest
 
@@ -137,7 +138,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
@@ -163,7 +164,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
@@ -183,7 +184,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         data = prob.check_partials(out_stream=None)
 
         subheads = data[''][('y', 'x1')]
@@ -564,7 +565,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.setup()
 
-        stream = cStringIO()
+        stream = StringIO()
         data = prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
@@ -602,7 +603,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.setup()
 
-        stream = cStringIO()
+        stream = StringIO()
         data = prob.check_partials(out_stream=stream, compact_print=True)
         txt = stream.getvalue()
 
@@ -640,7 +641,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.setup()
 
-        stream = cStringIO()
+        stream = StringIO()
         data = prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
@@ -933,7 +934,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup(check=False, force_alloc_complex=True)
         prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream)
 
         lines = stream.getvalue().splitlines()
@@ -1072,7 +1073,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         lines = stream.getvalue().splitlines()
         # Check to make sure all the header and value lines have their columns lined up
@@ -1097,7 +1098,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         lines = stream.getvalue().splitlines()
         # Check to make sure all the header and value lines have their columns lined up
@@ -1119,7 +1120,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('>ABS_TOL'), 0)
         self.assertEqual(stream.getvalue().count('>REL_TOL'), 0)
@@ -1129,7 +1130,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('>ABS_TOL'), 2)
         self.assertEqual(stream.getvalue().count('>REL_TOL'), 2)
@@ -1153,14 +1154,14 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob = om.Problem(model=group)
         prob.setup()
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('n/a'), 25)
         self.assertEqual(stream.getvalue().count('rev'), 15)
         self.assertEqual(stream.getvalue().count('Component'), 2)
         self.assertEqual(stream.getvalue().count('wrt'), 12)
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 4)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 4)
@@ -1188,11 +1189,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('rev'), 0)
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
         # So for this case, they do all provide them, so rev should not be shown
         self.assertEqual(stream.getvalue().count('Forward Magnitude'), 2)
@@ -1214,11 +1215,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
         prob.run_model()
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('rev'), 10)
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
         self.assertEqual(stream.getvalue().count('Reverse'), 4)
         self.assertEqual(stream.getvalue().count('Jrev'), 10)
@@ -1238,14 +1239,14 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('n/a'), 10)
         self.assertEqual(stream.getvalue().count('rev'), 15)
         self.assertEqual(stream.getvalue().count('Component'), 2)
         self.assertEqual(stream.getvalue().count('wrt'), 8)
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
         self.assertEqual(stream.getvalue().count('Forward Magnitude'), 4)
         self.assertEqual(stream.getvalue().count('Reverse Magnitude'), 2)
@@ -1272,7 +1273,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('rev'), 10)
 
@@ -1297,7 +1298,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"), 2)
 
@@ -1322,14 +1323,14 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        stream = cStringIO()
+        stream = StringIO()
         # prob.check_partials(compact_print=True,show_only_incorrect=False)
         prob.check_partials(out_stream=stream, compact_print=True, show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"), 2)
         self.assertEqual(stream.getvalue().count("'z'        wrt 'y1'"), 2)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"), 0)
 
-        stream = cStringIO()
+        stream = StringIO()
         prob.check_partials(compact_print=False, show_only_incorrect=False)
         prob.check_partials(out_stream=stream, compact_print=False, show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"), 0)
@@ -1398,7 +1399,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         assert_check_partials(data, atol=1.0E-8, rtol=1.0E-8)
 
-        stream = cStringIO()
+        stream = StringIO()
         J = prob.check_partials(out_stream=stream, compact_print=True)
         output = stream.getvalue()
         self.assertTrue("(d)'x1'" in output)
@@ -1483,7 +1484,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         prob.setup()
 
-        stream = cStringIO()
+        stream = StringIO()
         data = prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
@@ -1864,7 +1865,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         # check derivatives with complex step and a larger step size.
-        stream = cStringIO()
+        stream = StringIO()
         totals = prob.check_totals(method='cs', out_stream=stream)
 
         lines = stream.getvalue().splitlines()
@@ -1892,7 +1893,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.run_model()
 
         # check derivatives with complex step and a larger step size.
-        stream = cStringIO()
+        stream = StringIO()
         totals = prob.check_totals(method='cs', out_stream=stream)
 
         lines = stream.getvalue().splitlines()

@@ -4,7 +4,7 @@ import sys
 import unittest
 from math import atan
 
-from six.moves import cStringIO as StringIO
+from io import StringIO
 
 import numpy as np
 

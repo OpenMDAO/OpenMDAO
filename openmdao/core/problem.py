@@ -12,7 +12,7 @@ from fnmatch import fnmatchcase
 from itertools import product
 
 from six import iteritems, iterkeys, itervalues
-from six.moves import cStringIO
+from io import StringIO
 
 import numpy as np
 import scipy.sparse as sparse
@@ -1742,7 +1742,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             # Need to capture the output of a component's derivative
             # info so that it can be used if that component is the
             # worst subjac. That info is printed at the bottom of all the output
-            out_buffer = cStringIO()
+            out_buffer = StringIO()
             num_bad_jacs = 0  # Keep track of number of bad derivative values for each component
             if out_stream:
                 header_str = '-' * (len(sys_name) + len(sys_type) + len(sys_class_name) + 5) + '\n'

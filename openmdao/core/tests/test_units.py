@@ -973,7 +973,7 @@ class TestUnitConversion(unittest.TestCase):
 
         #assert_rel_error(self, J['tgtF.x3']['x1'][0][0], 1.8, 1e-6)
 
-        #stream = cStringIO()
+        #stream = StringIO()
         #conv = prob.model.list_unit_conv(stream=stream)
         #self.assertTrue((('src.x2', 'tgtF.x2'), ('degC', 'degF')) in conv)
 

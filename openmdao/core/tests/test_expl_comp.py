@@ -3,7 +3,7 @@ from __future__ import division
 
 from six import assertRaisesRegex
 
-from six.moves import cStringIO
+from io import StringIO
 import unittest
 
 import numpy as np
@@ -226,7 +226,7 @@ class ExplCompTestCase(unittest.TestCase):
         })
 
         # list_outputs on a component before run is okay, using relative names
-        stream = cStringIO()
+        stream = StringIO()
         expl_outputs = prob.model.p1.list_outputs(out_stream=stream)
         expected = {
             'x': {'value': 12.}
@@ -273,7 +273,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # list_inputs tests
         # Can't do exact equality here because units cause comp.y to be slightly different than 12.0
-        stream = cStringIO()
+        stream = StringIO()
         inputs = prob.model.list_inputs(units=True, shape=True, out_stream=stream)
         tol = 1e-7
         for actual, expected in zip(sorted(inputs), [
@@ -308,7 +308,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(outputs, [])
 
         # list outputs with out_stream and all the optional display values True
-        stream = cStringIO()
+        stream = StringIO()
         outputs = prob.model.list_outputs(values=True,
                                           units=True,
                                           shape=True,
@@ -445,7 +445,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # logging inputs
         # out_stream - not hierarchical - extras - no print_arrays
-        stream = cStringIO()
+        stream = StringIO()
         prob.model.list_inputs(values=True,
                                units=True,
                                hierarchical=False,
@@ -468,7 +468,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(14, num_non_empty_lines)
 
         # out_stream - hierarchical - extras - no print_arrays
-        stream = cStringIO()
+        stream = StringIO()
         prob.model.list_inputs(values=True,
                                units=True,
                                hierarchical=True,
@@ -487,7 +487,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
-        stream = cStringIO()
+        stream = StringIO()
         prob.model.list_outputs(values=True,
                                 units=True,
                                 shape=True,
@@ -507,7 +507,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(11, num_non_empty_lines)
 
         # Hierarchical
-        stream = cStringIO()
+        stream = StringIO()
         prob.model.list_outputs(values=True,
                                 units=True,
                                 shape=True,
@@ -558,7 +558,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # logging inputs
         # out_stream - not hierarchical - extras - no print_arrays
-        stream = cStringIO()
+        stream = StringIO()
         prob.model.list_inputs(values=True,
                                units=True,
                                hierarchical=False,
@@ -571,7 +571,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(5, num_non_empty_lines)
 
         # out_stream - hierarchical - extras - no print_arrays
-        stream = cStringIO()
+        stream = StringIO()
         prob.model.list_inputs(values=True,
                                units=True,
                                hierarchical=True,
@@ -587,7 +587,7 @@ class ExplCompTestCase(unittest.TestCase):
 
         # logging outputs
         # out_stream - not hierarchical - extras - no print_arrays
-        stream = cStringIO()
+        stream = StringIO()
         prob.model.list_outputs(values=True,
                                 units=True,
                                 shape=True,
@@ -605,7 +605,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(8, num_non_empty_lines)
 
         # Promoted names - no print arrays
-        stream = cStringIO()
+        stream = StringIO()
         prob.model.list_outputs(values=True,
                                 prom_name=True,
                                 print_arrays=False,
@@ -617,7 +617,7 @@ class ExplCompTestCase(unittest.TestCase):
         self.assertEqual(num_non_empty_lines, 11)
 
         # Hierarchical - no print arrays
-        stream = cStringIO()
+        stream = StringIO()
         prob.model.list_outputs(values=True,
                                 units=True,
                                 shape=True,
@@ -657,7 +657,7 @@ class ExplCompTestCase(unittest.TestCase):
         with printoptions(**opts):
             # logging outputs
             # out_stream - not hierarchical - extras - print_arrays
-            stream = cStringIO()
+            stream = StringIO()
             prob.model.list_outputs(values=True,
                                     units=True,
                                     shape=True,
@@ -678,7 +678,7 @@ class ExplCompTestCase(unittest.TestCase):
             self.assertEqual(46, num_non_empty_lines)
 
             # Hierarchical
-            stream = cStringIO()
+            stream = StringIO()
             prob.model.list_outputs(values=True,
                                     units=True,
                                     shape=True,

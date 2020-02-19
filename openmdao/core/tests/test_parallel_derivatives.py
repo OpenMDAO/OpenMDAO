@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 
-from six.moves import cStringIO as StringIO
+from io import StringIO
 import sys
 import unittest
 import time

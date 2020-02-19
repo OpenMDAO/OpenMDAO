@@ -2,7 +2,7 @@
 
 import unittest
 from six import assertRaisesRegex
-from six.moves import cStringIO
+from io import StringIO
 
 import numpy as np
 
