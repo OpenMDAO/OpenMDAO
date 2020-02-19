@@ -167,7 +167,7 @@ class TestBryoden(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.nonlinear_solver = om.NonlinearBlockGS()
+        model.nonlinear_solver = om.BroydenSolver()
         model.linear_solver = om.ScipyKrylov(assemble_jac=True)
         model.nonlinear_solver.options['err_on_non_converge'] = True
 
