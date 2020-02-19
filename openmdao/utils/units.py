@@ -19,7 +19,6 @@ import os.path
 from collections import OrderedDict
 
 from six import iteritems
-from six.moves import zip
 from six.moves.configparser import RawConfigParser as ConfigParser
 
 # pylint: disable=E0611, F0401

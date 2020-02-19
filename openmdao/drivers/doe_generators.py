@@ -5,7 +5,6 @@ Case generators for Design-of-Experiments Driver.
 import numpy as np
 
 from six import iteritems
-from six.moves import range
 
 import os.path
 import csv

@@ -7,7 +7,6 @@ import sqlite3
 from collections import OrderedDict
 
 from six import PY2, PY3, iteritems, string_types
-from six.moves import range
 
 import numpy as np
 

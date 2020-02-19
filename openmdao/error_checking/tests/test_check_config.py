@@ -4,8 +4,6 @@ import unittest
 from tempfile import mkdtemp
 from shutil import rmtree
 
-from six.moves import range
-
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent, \
     LinearBlockGS, NonlinearBlockGS, SqliteRecorder
 

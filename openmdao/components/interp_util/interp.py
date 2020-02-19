@@ -5,7 +5,6 @@ Based on Tables in NPSS, and was added to bridge the gap between some of the slo
 implementations.
 """
 from __future__ import division, print_function, absolute_import
-from six.moves import range
 
 import numpy as np
 

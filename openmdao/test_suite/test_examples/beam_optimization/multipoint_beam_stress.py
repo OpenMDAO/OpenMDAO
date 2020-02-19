@@ -5,7 +5,6 @@ This version minimizes volume while satisfying a max bending stress constraint i
 for each loadcase.
 """
 from __future__ import division
-from six.moves import range
 
 import numpy as np
 

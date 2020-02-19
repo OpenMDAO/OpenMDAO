@@ -5,7 +5,6 @@ from __future__ import print_function, division
 
 import sys
 import six
-from six.moves import range
 from itertools import product
 from copy import copy
 

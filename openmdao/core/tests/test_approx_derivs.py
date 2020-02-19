@@ -2,7 +2,6 @@
 import itertools
 import unittest
 from six import iterkeys
-from six.moves import range
 
 try:
     from parameterized import parameterized

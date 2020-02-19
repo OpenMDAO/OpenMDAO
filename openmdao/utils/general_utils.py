@@ -10,7 +10,7 @@ import warnings
 import unittest
 from fnmatch import fnmatchcase
 from six import string_types, PY2, reraise
-from six.moves import range, cStringIO as StringIO
+from six.moves import cStringIO as StringIO
 
 # note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
 try:

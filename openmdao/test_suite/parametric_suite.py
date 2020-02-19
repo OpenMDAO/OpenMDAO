@@ -1,7 +1,6 @@
 from __future__ import division, print_function
 
 import itertools
-from six.moves import zip
 from six import iteritems, iterkeys, itervalues, string_types
 import collections
 

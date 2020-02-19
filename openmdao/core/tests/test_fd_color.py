@@ -1,7 +1,6 @@
 import os
 import tempfile
 import shutil
-from six.moves import range
 import unittest
 import itertools
 from six import iterkeys
@@ -692,7 +691,7 @@ class TestColoring(unittest.TestCase):
         indeps, _ = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
         model.add_subsystem('indeps', indeps)
-        
+
         comps = []
         for i in range(3):
             cname = 'comp%d' % i
@@ -701,7 +700,7 @@ class TestColoring(unittest.TestCase):
             comp.declare_coloring('x*', method='cs', min_improve_pct=20, per_instance=False)
             comps.append(comp)
             _, conns = setup_indeps(isplit, mask.shape[1], 'indeps', cname)
-    
+
             for conn in conns:
                 model.connect(*conn)
 

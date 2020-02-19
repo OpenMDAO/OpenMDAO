@@ -5,7 +5,6 @@ from __future__ import division, print_function
 import sys
 import warnings
 from six import reraise, PY2
-from six.moves import range
 
 import numpy as np
 import scipy.linalg

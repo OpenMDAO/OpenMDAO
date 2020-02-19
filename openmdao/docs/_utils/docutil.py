@@ -20,7 +20,7 @@ from docutils import nodes
 from collections import namedtuple
 
 from six import StringIO
-from six.moves import range, zip, cStringIO as cStringIO
+from six.moves import cStringIO as cStringIO
 
 from sphinx.errors import SphinxError
 from sphinx.writers.html import HTMLTranslator

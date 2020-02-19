@@ -7,7 +7,6 @@ from numpy import ndarray
 from scipy.sparse import coo_matrix, csc_matrix
 
 from six import iteritems
-from six.moves import range
 
 from collections import OrderedDict
 

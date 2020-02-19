@@ -17,7 +17,6 @@ from fnmatch import fnmatchcase
 import copy
 
 from six import iteritems, string_types, itervalues
-from six.moves import range
 
 import numpy as np
 import networkx as nx

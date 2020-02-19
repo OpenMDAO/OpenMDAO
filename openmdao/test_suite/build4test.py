@@ -5,7 +5,6 @@ from __future__ import print_function
 
 import time
 import numpy
-from six.moves import range
 
 from openmdao.core.group import Group
 from openmdao.core.parallel_group import ParallelGroup

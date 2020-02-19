@@ -7,7 +7,6 @@ import itertools
 import unittest
 
 from six import assertRaisesRegex, iteritems
-from six.moves import range
 
 import numpy as np
 

@@ -19,7 +19,6 @@ from pprint import pprint
 from itertools import groupby
 
 from six import iteritems, string_types
-from six.moves import range
 
 import numpy as np
 from scipy.sparse.compressed import get_index_dtype

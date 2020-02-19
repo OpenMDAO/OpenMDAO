@@ -4,7 +4,6 @@ from __future__ import division
 import numpy as np
 import unittest
 
-from six.moves import range
 from six import assertRaisesRegex
 
 from openmdao.api import Problem, ExplicitComponent, Group, IndepVarComp

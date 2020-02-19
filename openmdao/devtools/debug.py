@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from six import iteritems, iterkeys, itervalues
 from collections import Counter
 
-from six.moves import zip_longest
 from openmdao.core.problem import Problem
 from openmdao.core.group import Group, System
 from openmdao.core.implicitcomponent import ImplicitComponent

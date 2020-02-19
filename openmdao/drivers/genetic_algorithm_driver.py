@@ -24,7 +24,6 @@ import os
 import copy
 
 from six import iteritems, itervalues, next
-from six.moves import range, zip
 
 import numpy as np
 from pyDOE2 import lhs

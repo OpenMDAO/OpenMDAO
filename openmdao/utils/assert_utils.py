@@ -4,7 +4,6 @@ Functions for making assertions about OpenMDAO Systems.
 import numpy as np
 from math import isnan
 from six import raise_from, iteritems
-from six.moves import zip
 
 import warnings
 import unittest

@@ -27,7 +27,6 @@ depend on particular values of 'theta' (or 'x_i'/'y_i' values) without taking th
 """
 
 from __future__ import print_function, division
-from six.moves import range
 
 import numpy as np
 

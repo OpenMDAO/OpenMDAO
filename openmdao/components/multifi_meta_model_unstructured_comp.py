@@ -1,5 +1,4 @@
 """Define the MultiFiMetaModel class."""
-from six.moves import range
 from itertools import chain
 
 import numpy as np

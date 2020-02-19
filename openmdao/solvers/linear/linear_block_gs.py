@@ -2,7 +2,6 @@
 from __future__ import print_function
 
 from six import iteritems
-from six.moves import range
 
 
 from openmdao.solvers.solver import BlockLinearSolver

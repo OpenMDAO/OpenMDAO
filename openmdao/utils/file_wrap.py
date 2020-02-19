@@ -7,7 +7,6 @@ Note: This is a work in progress.
 from __future__ import print_function
 
 import re
-from six.moves import range
 
 from pyparsing import CaselessLiteral, Combine, OneOrMore, Optional, \
     TokenConverter, Word, nums, oneOf, printables, ParserElement, alphanums

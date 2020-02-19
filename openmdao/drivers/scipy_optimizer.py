@@ -12,7 +12,6 @@ import numpy as np
 from scipy import __version__ as scipy_version
 from scipy.optimize import minimize
 from six import itervalues, iteritems, reraise
-from six.moves import range
 
 import openmdao
 import openmdao.utils.coloring as coloring_mod

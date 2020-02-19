@@ -5,7 +5,6 @@ import sys
 import unittest
 
 from six import assertRaisesRegex, StringIO
-from six.moves import range
 
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix

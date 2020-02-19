@@ -12,7 +12,7 @@ from fnmatch import fnmatchcase
 from itertools import product
 
 from six import iteritems, iterkeys, itervalues
-from six.moves import range, cStringIO
+from six.moves import cStringIO
 
 import numpy as np
 import scipy.sparse as sparse

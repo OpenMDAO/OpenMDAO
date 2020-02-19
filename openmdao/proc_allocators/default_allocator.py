@@ -4,7 +4,6 @@ from __future__ import division, print_function
 import warnings
 
 import numpy as np
-from six.moves import range
 
 from openmdao.proc_allocators.proc_allocator import ProcAllocator, ProcAllocationError
 from openmdao.utils.mpi import MPI

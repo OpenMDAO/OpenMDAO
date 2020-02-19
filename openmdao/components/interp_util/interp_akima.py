@@ -4,7 +4,6 @@ Interpolate using am Akima spline.
 Based on NPSS implementation, with improvements from Andrew Ning (BYU).
 """
 from __future__ import division, print_function, absolute_import
-from six.moves import range
 
 import numpy as np
 

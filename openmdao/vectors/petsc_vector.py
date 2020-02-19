@@ -6,7 +6,6 @@ import numpy as np
 from petsc4py import PETSc
 
 from six import iteritems, itervalues
-from six.moves import range
 
 from openmdao.vectors.default_vector import DefaultVector, INT_DTYPE
 from openmdao.vectors.petsc_transfer import PETScTransfer

@@ -1,8 +1,6 @@
 """Grid interpolation using scipy splines."""
 from __future__ import division, print_function, absolute_import
 
-from six.moves import range
-
 from scipy import __version__ as scipy_version
 try:
     from scipy.interpolate._bsplines import make_interp_spline as _make_interp_spline

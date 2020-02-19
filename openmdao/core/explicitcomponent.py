@@ -4,7 +4,6 @@ from __future__ import division
 
 import numpy as np
 from six import itervalues, iteritems
-from six.moves import range
 
 from openmdao.core.component import Component, _full_slice
 from openmdao.utils.class_util import overrides_method

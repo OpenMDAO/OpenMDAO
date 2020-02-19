@@ -5,7 +5,6 @@ import unittest
 from math import atan
 
 from six.moves import cStringIO as StringIO
-from six.moves import range
 
 import numpy as np
 

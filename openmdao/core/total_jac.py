@@ -7,7 +7,6 @@ from collections import OrderedDict, defaultdict
 from copy import deepcopy
 import pprint
 from six import iteritems, itervalues
-from six.moves import zip
 import sys
 import time
 import traceback
