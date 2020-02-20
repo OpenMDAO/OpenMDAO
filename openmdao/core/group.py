@@ -881,15 +881,29 @@ class Group(System):
             # (not traceable to a connect statement, so provide context)
             if (prom_out not in allprocs_prom2abs_list_out and
                     prom_out not in self._var_allprocs_discrete['output']):
-                raise NameError(
-                    "%s: Output '%s' does not exist for connection in '%s' from '%s' to '%s'." %
-                    (self.msginfo, prom_out, self.pathname, prom_out, prom_in))
+                if (prom_out in allprocs_prom2abs_list_in or
+                        prom_out in self._var_allprocs_discrete['input']):
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' is an input. "
+                        "All connections must be from an output to an input." %
+                        (self.msginfo, prom_out, prom_in, prom_out))
+                else:
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' doesn't exist." %
+                        (self.msginfo, prom_out, prom_in, prom_out))
 
             if (prom_in not in allprocs_prom2abs_list_in and
                     prom_in not in self._var_allprocs_discrete['input']):
-                raise NameError(
-                    "%s: Input '%s' does not exist for connection from '%s' to '%s'." %
-                    (self.msginfo, prom_in, prom_out, prom_in))
+                if (prom_in in allprocs_prom2abs_list_out or
+                        prom_in in self._var_allprocs_discrete['output']):
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' is an output. "
+                        "All connections must be from an output to an input." %
+                        (self.msginfo, prom_out, prom_in, prom_in))
+                else:
+                    raise NameError(
+                        "%s: Attempted to connect from '%s' to '%s', but '%s' doesn't exist." %
+                        (self.msginfo, prom_out, prom_in, prom_in))
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
