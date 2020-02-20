@@ -7,7 +7,7 @@ from collections import OrderedDict
 from itertools import chain
 
 import networkx as nx
-from six import iteritems, itervalues
+from six import itervalues
 
 try:
     import h5py
@@ -178,7 +178,7 @@ def _get_declare_partials(system):
 
         if isinstance(system, Component):
             subjacs = system._subjacs_info
-            for abs_key, meta in iteritems(subjacs):
+            for abs_key, meta in subjacs.items():
                 dpl.append("{} > {}".format(abs_key[0], abs_key[1]))
         elif isinstance(system, Group):
             for s in system._subsystems_myproc:
@@ -283,12 +283,12 @@ def _get_viewer_data(data_source):
                     exe_low <= orders[t] <= exe_high and
                     not (s == src and t == tgt) and t in sys_pathnames_dict
                 ]
-                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt,
                                                  'cycle_arrows': edges_list})
             else:  # edge is out of the SCC
-                for vsrc, vtgtlist in iteritems(G.get_edge_data(src, tgt)['conns']):
+                for vsrc, vtgtlist in G.get_edge_data(src, tgt)['conns'].items():
                     for vtgt in vtgtlist:
                         connections_list.append({'src': vsrc, 'tgt': vtgt})
 
@@ -427,10 +427,10 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     # put all style and JS into index
     h.insert('{{fontello}}', encoded_font)
 
-    for k, v in iteritems(lib_dct):
+    for k, v in lib_dct.items():
         h.insert('{{{}_lib}}'.format(k), write_script(libs[v], indent=_IND))
 
-    for name, code in iteritems(srcs):
+    for name, code in srcs.items():
         h.insert('{{{}_lib}}'.format(name.lower()),
                  write_script(code, indent=_IND))
 

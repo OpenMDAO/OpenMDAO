@@ -4,7 +4,7 @@ from __future__ import division
 from copy import deepcopy
 import numbers
 
-from six import iteritems, itervalues
+from six import itervalues
 
 import numpy as np
 

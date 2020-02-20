@@ -1,8 +1,6 @@
 """Definition of the Mux Component."""
 
 
-from six import iteritems
-
 import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent

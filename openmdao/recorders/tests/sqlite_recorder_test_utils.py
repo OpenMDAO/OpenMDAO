@@ -1,4 +1,4 @@
-from six import iteritems, PY2, PY3
+from six import PY2, PY3
 
 import sqlite3
 import numpy as np
@@ -94,7 +94,7 @@ def assertProblemDataRecorded(test, expected, tolerance):
                     actual = actual[0]
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual), len(expected))
-                    for key, value in iteritems(expected):
+                    for key, value in expected.items():
                         # Check to see if the keys in the actual and expected match
                         test.assertTrue(key in actual.dtype.names,
                                         '{} variable not found in actual data'
@@ -153,7 +153,7 @@ def assertDriverIterDataRecorded(test, expected, tolerance, prefix=None):
                     actual = actual[0]
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual), len(expected))
-                    for key, value in iteritems(expected):
+                    for key, value in expected.items():
                         # Check to see if the keys in the actual and expected match
                         test.assertTrue(key in actual.dtype.names,
                                         '{} variable not found in actual data'
@@ -205,7 +205,7 @@ def assertDriverDerivDataRecorded(test, expected, tolerance, prefix=None):
                 actual = totals_actual[0]
                 # Check to see if the number of values in actual and expected match
                 test.assertEqual(len(actual), len(totals_expected))
-                for key, value in iteritems(totals_expected):
+                for key, value in totals_expected.items():
                     # Check to see if the keys in the actual and expected match
                     test.assertTrue(key in actual.dtype.names,
                                     '{} variable not found in actual data'
@@ -265,7 +265,7 @@ def assertSystemIterDataRecorded(test, expected, tolerance, prefix=None):
                 else:
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual[0]), len(expected))
-                    for key, value in iteritems(expected):
+                    for key, value in expected.items():
                         # Check to see if the keys in the actual and expected match
                         test.assertTrue(key in actual[0].dtype.names,
                                         '{} variable not found in actual data '
@@ -331,7 +331,7 @@ def assertSolverIterDataRecorded(test, expected, tolerance, prefix=None):
                 else:
                     # Check to see if the number of values in actual and expected match
                     test.assertEqual(len(actual[0]), len(expected))
-                    for key, value in iteritems(expected):
+                    for key, value in expected.items():
                         # Check to see if the keys in the actual and expected match
                         test.assertTrue(key in actual[0].dtype.names,
                                         '{} variable not found in actual data '

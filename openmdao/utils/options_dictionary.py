@@ -1,7 +1,7 @@
 """Define the OptionsDictionary class."""
 from __future__ import division, print_function
 
-from six import iteritems, string_types
+from six import string_types
 
 from openmdao.utils.general_utils import warn_deprecation
 
@@ -85,7 +85,7 @@ class OptionsDictionary(object):
             A rendition of the options as an rST table.
         """
         outputs = []
-        for option_name, option_data in sorted(iteritems(self._dict)):
+        for option_name, option_data in sorted(self._dict.items()):
             name = option_name
             default = option_data['value'] if option_data['value'] is not _undefined \
                 else '**Required**'
@@ -136,7 +136,7 @@ class OptionsDictionary(object):
 
         header = ""
         titles = ""
-        for key, val in iteritems(max_sizes):
+        for key, val in max_sizes.items():
             header += '=' * val + ' '
 
         for j, head in enumerate(col_heads):

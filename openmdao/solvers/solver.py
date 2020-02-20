@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-from six import iteritems, reraise
+from six import reraise
 from collections import OrderedDict
 import os
 import pprint
@@ -668,7 +668,7 @@ class NonlinearSolver(Solver):
         coord = self._recording_iter.get_formatted_iteration_coordinate()
 
         out_strs = ["\n# Inputs and outputs at start of iteration '%s':\n" % coord]
-        for vec_type, views in iteritems(self._err_cache):
+        for vec_type, views in self._err_cache.items():
             out_strs.append('\n# nonlinear %s\n' % vec_type)
             out_strs.append(pprint.pformat(views))
             out_strs.append('\n')

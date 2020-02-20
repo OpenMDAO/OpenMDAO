@@ -7,7 +7,7 @@ import sys
 import os
 import weakref
 
-from six import iteritems, itervalues, string_types
+from six import itervalues, string_types
 
 import numpy as np
 

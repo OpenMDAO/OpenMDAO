@@ -1,6 +1,4 @@
 """Define the SplineComp class."""
-from six import iteritems
-
 import numpy as np
 
 from openmdao.components.interp_util.interp import InterpND
@@ -190,7 +188,7 @@ class SplineComp(ExplicitComponent):
         partials : Jacobian
             sub-jac components written to partials[output_name, input_name]
         """
-        for out_name, interp in iteritems(self.interps):
+        for out_name, interp in self.interps.items():
             cp_name = self.interp_to_cp[out_name]
 
             dy_ddata = interp.spline_gradient()

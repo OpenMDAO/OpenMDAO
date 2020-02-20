@@ -19,7 +19,7 @@ import time
 from numbers import Integral
 import itertools
 
-from six import iteritems, itervalues, string_types
+from six import itervalues, string_types
 
 import numpy as np
 import networkx as nx
@@ -3210,7 +3210,7 @@ class System(object):
         if self._inputs is not None and self._discrete_inputs:
             disc_meta = self._discrete_inputs._dict
 
-            for var_name, val in self._discrete_inputs.items()):
+            for var_name, val in self._discrete_inputs.items():
                 # Filter based on tags
                 if tags and not (make_set(tags) & disc_meta[var_name]['tags']):
                     continue

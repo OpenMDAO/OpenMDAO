@@ -3,7 +3,6 @@ from __future__ import print_function, division, absolute_import
 import itertools
 import unittest
 import math
-from six import iteritems
 
 import numpy as np
 from numpy.testing import assert_almost_equal

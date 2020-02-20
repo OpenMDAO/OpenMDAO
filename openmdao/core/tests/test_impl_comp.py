@@ -3,7 +3,6 @@ from __future__ import division
 
 import unittest
 
-from six import iteritems
 from io import StringIO
 
 import numpy as np
@@ -500,7 +499,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-9)
 
     def test_guess_nonlinear_transfer(self):

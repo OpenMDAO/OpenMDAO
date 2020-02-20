@@ -21,7 +21,7 @@ import os
 from distutils.version import LooseVersion
 
 from numpy.distutils.exec_command import find_executable
-from six import iteritems, string_types
+from six import string_types
 
 from openmdao.core.problem import Problem
 from openmdao.utils.general_utils import simple_warning
@@ -1461,8 +1461,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             x.add_solver(name=solver_name, label=solver_label)
 
             # Add the connections
-            for src, dct in iteritems(conns2):
-                for tgt, conn_vars in iteritems(dct):
+            for src, dct in conns2.items():
+                for tgt, conn_vars in dct.items():
                     formatted_conns = format_block(conn_vars)
                     if (src in comp_names) and (tgt in comp_names):
                         formatted_targets = format_block([x.format_var_str(c, 'target')
@@ -1484,7 +1484,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         responses2 = _collect_connections(responses, recurse=recurse, model_path=model_path)
 
         # Design variables
-        for comp, conn_vars in iteritems(design_vars2):
+        for comp, conn_vars in design_vars2.items():
             # Format var names
             conn_vars = [_replace_chars(var, subs) for var in conn_vars]
             # Optimal var names
@@ -1500,7 +1500,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             x.add_input(driver_name, format_block(init_con_vars))
 
         # Responses
-        for comp, conn_vars in iteritems(responses2):
+        for comp, conn_vars in responses2.items():
             # Optimal var names
             conn_vars = [_replace_chars(var, subs) for var in conn_vars]
             opt_con_vars = [x.format_var_str(var, 'optimal') for var in conn_vars]
@@ -1566,8 +1566,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
             x.add_workflow(s)  # Solver workflows
 
     # Add the connections
-    for src, dct in iteritems(conns2):
-        for tgt, conn_vars in iteritems(dct):
+    for src, dct in conns2.items():
+        for tgt, conn_vars in dct.items():
             if src and tgt:
                 stack = show_parallel and \
                     (comps_dct[src]['is_parallel'] or comps_dct[tgt]['is_parallel'])
@@ -1577,8 +1577,8 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                 simple_warning(msg.format(src=src, tgt=tgt, conn=conn_vars))
 
     # Add the externally sourced inputs
-    for src, tgts in iteritems(external_inputs2):
-        for tgt, conn_vars in iteritems(tgts):
+    for src, tgts in external_inputs2.items():
+        for tgt, conn_vars in tgts.items():
             formatted_conn_vars = [_replace_chars(o, substitutes=subs) for o in conn_vars]
             if tgt:
                 stack = comps_dct[tgt]['is_parallel'] and show_parallel
@@ -1589,9 +1589,9 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     # Add the externally connected outputs
     if include_external_outputs:
-        for src, tgts in iteritems(external_outputs2):
+        for src, tgts in external_outputs2.items():
             output_vars = set()
-            for tgt, conn_vars in iteritems(tgts):
+            for tgt, conn_vars in tgts.items():
                 output_vars |= set(conn_vars)
             formatted_outputs = [_replace_chars(o, subs) for o in output_vars]
             if src:
@@ -1631,7 +1631,7 @@ def _process_connections(conns, recurse=True, subs=None):
         return _convert_name(x, recurse=recurse, subs=subs)
 
     conns_new = [
-        {k: convert(v) for k, v in iteritems(conn) if k in ('src', 'tgt')} for conn in conns
+        {k: convert(v) for k, v in conn.items() if k in ('src', 'tgt')} for conn in conns
     ]
     return _accumulate_connections(conns_new)
 
@@ -1844,7 +1844,7 @@ def _get_comps(tree, model_path=None, recurse=True, include_solver=False):
                 if include_solver:
                     solver_names = []
                     solver_dct = {}
-                    for solver_typ, default_solver in iteritems(_DEFAULT_SOLVER_NAMES):
+                    for solver_typ, default_solver in _DEFAULT_SOLVER_NAMES.items():
                         k = '{}_solver'.format(solver_typ)
                         if ch[k] != default_solver:
                             solver_names.append(ch[k])

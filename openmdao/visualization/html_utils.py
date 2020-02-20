@@ -3,7 +3,7 @@ Functions to write HTML elements.
 """
 import os
 
-from six import iteritems, itervalues
+from six import itervalues
 
 _IND = 4  # indentation (spaces)
 
@@ -78,7 +78,7 @@ def write_tags(tag, content='', attrs=None, cls_attr=None, uid=None, new_lines=F
         attrs['class'] = cls_attr
     if uid is not None:
         attrs['id'] = uid
-    attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in iteritems(attrs)])
+    attrs = ' '.join(['{}="{}"'.format(k, v) for k, v in attrs.items()])
     if isinstance(content, list):  # Convert iterable to string
         content = '\n'.join(content)
     return template.format(tag=tag, content=content, attributes=attrs, ls=line_sep, spaces=spaces)

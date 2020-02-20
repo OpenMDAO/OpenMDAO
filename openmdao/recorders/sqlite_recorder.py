@@ -14,7 +14,6 @@ import json
 import numpy as np
 
 from six.moves import cPickle as pickle
-from six import iteritems
 
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI
@@ -288,7 +287,7 @@ class SqliteRecorder(CaseRecorder):
                 responses = system.get_responses(True, get_sizes=False)
                 objectives = OrderedDict()
                 constraints = OrderedDict()
-                for name, data in iteritems(responses):
+                for name, data in responses.items():
                     if data['type'] == 'con':
                         constraints[name] = data
                     else:
@@ -314,7 +313,7 @@ class SqliteRecorder(CaseRecorder):
             # merge current abs2prom and prom2abs with this system's version
             self._abs2prom['input'].update(system._var_abs2prom['input'])
             self._abs2prom['output'].update(system._var_abs2prom['output'])
-            for v, abs_names in iteritems(system._var_allprocs_prom2abs_list['input']):
+            for v, abs_names in system._var_allprocs_prom2abs_list['input'].items():
                 if v not in self._prom2abs['input']:
                     self._prom2abs['input'][v] = abs_names
                 else:
@@ -322,7 +321,7 @@ class SqliteRecorder(CaseRecorder):
                                                                 abs_names)))
 
             # for outputs, there can be only one abs name per promoted name
-            for v, abs_names in iteritems(system._var_allprocs_prom2abs_list['output']):
+            for v, abs_names in system._var_allprocs_prom2abs_list['output'].items():
                 self._prom2abs['output'][v] = abs_names
 
             # absolute pathname to metadata mappings for continuous & discrete variables
@@ -352,7 +351,7 @@ class SqliteRecorder(CaseRecorder):
                 self._abs2meta[name]['explicit'] = True
 
             # merge current abs2meta with this system's version
-            for name, meta in iteritems(self._abs2meta):
+            for name, meta in self._abs2meta.items():
                 if name in system._var_abs2meta:
                     meta.update(system._var_abs2meta[name])
 

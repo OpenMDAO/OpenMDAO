@@ -3,7 +3,6 @@ A contrived example for issuing connections during configure rather than setup.
 """
 import itertools
 import unittest
-from six import iteritems
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_rel_error
 
@@ -20,7 +19,7 @@ class Squarer(om.ExplicitComponent):
         self._vars[name] = {'units': units}
 
     def setup(self):
-        for var, options in iteritems(self._vars):
+        for var, options in self._vars.items():
 
             self.add_input(var,
                            units=options['units'])
@@ -50,7 +49,7 @@ class Cuber(om.ExplicitComponent):
         self._vars[name] = {'units': units}
 
     def setup(self):
-        for var, options in iteritems(self._vars):
+        for var, options in self._vars.items():
             self.add_input(var, units=options['units'])
 
             self.add_output('{0}_cubed'.format(var), units='{0}**3'.format(options['units']))
@@ -82,7 +81,7 @@ class HostConnectInSetup(om.Group):
         for var in all_vars:
             ivc.add_output(var, shape=(1,), units='m')
 
-        for name, options in iteritems(self._operations):
+        for name, options in self._operations.items():
             for var in options['vars']:
                 options['subsys'].add_var(var)
                 self.connect(var, '{0}.{1}'.format(name, var))
@@ -106,13 +105,13 @@ class HostConnectInConfigure(om.Group):
         for var in all_vars:
             ivc.add_output(var, shape=(1,), units='m')
 
-        for name, options in iteritems(self._operations):
+        for name, options in self._operations.items():
             for var in options['vars']:
                 options['subsys'].add_var(var)
             self.add_subsystem(name, options['subsys'])
 
     def configure(self):
-        for name, options in iteritems(self._operations):
+        for name, options in self._operations.items():
             for var in options['vars']:
                 print('connecting {0} to {1}.{0}'.format(var, name))
                 self.connect(var, '{0}.{1}'.format(name, var))

@@ -16,7 +16,7 @@ import inspect
 from fnmatch import fnmatchcase
 import copy
 
-from six import iteritems, string_types, itervalues
+from six import string_types, itervalues
 
 import numpy as np
 import networkx as nx

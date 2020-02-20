@@ -2,7 +2,6 @@
 from __future__ import print_function
 
 import os
-from six import iteritems
 import unittest
 
 import numpy as np
@@ -589,7 +588,7 @@ class TestBryoden(unittest.TestCase):
 
         totals = prob.check_totals(method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
 
     def test_cs_around_broyden_compute_jac(self):
@@ -631,7 +630,7 @@ class TestBryoden(unittest.TestCase):
 
         totals = prob.check_totals(method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
 
     def test_cs_around_broyden_compute_jac_dense(self):
@@ -673,7 +672,7 @@ class TestBryoden(unittest.TestCase):
 
         totals = prob.check_totals(method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
 
     def test_complex_step(self):
@@ -713,7 +712,7 @@ class TestBryoden(unittest.TestCase):
 
         totals = prob.check_totals(method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-7)
 
     def test_linsearch_3_deprecation(self):

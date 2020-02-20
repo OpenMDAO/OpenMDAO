@@ -5,7 +5,7 @@ import sys
 import numpy as np
 from petsc4py import PETSc
 
-from six import iteritems, itervalues
+from six import itervalues
 
 from openmdao.vectors.default_vector import DefaultVector, INT_DTYPE
 from openmdao.vectors.petsc_transfer import PETScTransfer
@@ -133,7 +133,7 @@ class PETScVector(DefaultVector):
                 # temporarilly zero them out for the norm calculation.
                 dup_inds = []
                 abs2meta = system._var_allprocs_abs2meta
-                for name, idx_slice in iteritems(self.get_slice_dict()):
+                for name, idx_slice in self.get_slice_dict().items():
                     owning_rank = system._owning_rank[name]
                     if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
                         dup_inds.extend(range(idx_slice.start, idx_slice.stop))

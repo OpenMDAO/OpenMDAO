@@ -3,7 +3,6 @@ Utility functions related to recording or execution metadata.
 """
 from fnmatch import fnmatchcase
 from six.moves import map, zip
-from six import iteritems
 import os
 import re
 import json
@@ -191,7 +190,7 @@ def deserialize(json_data, abs2meta):
 
     all_array = True
 
-    for name, value in iteritems(values):
+    for name, value in values.items():
         if isinstance(value, list) and 'shape' in abs2meta[name]:
             values[name] = np.asarray(value)  # array will be proper shape based on list structure
         else:
@@ -219,13 +218,13 @@ def dict_to_structured_array(values):
     """
     if values:
         dtype_tuples = []
-        for name, value in iteritems(values):
+        for name, value in values.items():
             tple = (str(name), '{}f8'.format(value.shape))
             dtype_tuples.append(tple)
 
         array = np.zeros((1,), dtype=dtype_tuples)
 
-        for name, value in iteritems(values):
+        for name, value in values.items():
             array[name] = value
 
         return array

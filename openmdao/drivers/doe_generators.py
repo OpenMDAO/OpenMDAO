@@ -4,8 +4,6 @@ Case generators for Design-of-Experiments Driver.
 
 import numpy as np
 
-from six import iteritems
-
 import os.path
 import csv
 import re
@@ -259,7 +257,7 @@ class UniformGenerator(DOEGenerator):
         for _ in range(self._num_samples):
             sample = []
 
-            for name, meta in iteritems(design_vars):
+            for name, meta in design_vars.items():
                 size = meta['size']
 
                 lower = meta['lower']
@@ -317,7 +315,7 @@ class _pyDOE_Generator(DOEGenerator):
         list
             list of name, value tuples for the design variables.
         """
-        size = sum([meta['size'] for name, meta in iteritems(design_vars)])
+        size = sum([meta['size'] for name, meta in design_vars.items()])
 
         doe = self._generate_design(size)
 
@@ -328,7 +326,7 @@ class _pyDOE_Generator(DOEGenerator):
         values = np.empty((size, self._levels))
 
         row = 0
-        for name, meta in iteritems(design_vars):
+        for name, meta in design_vars.items():
             size = meta['size']
 
             for k in range(size):
@@ -347,7 +345,7 @@ class _pyDOE_Generator(DOEGenerator):
         for idxs in doe.astype('int'):
             retval = []
             row = 0
-            for name, meta in iteritems(design_vars):
+            for name, meta in design_vars.items():
                 size = meta['size']
                 val = np.empty(size)
                 for k in range(size):
@@ -568,7 +566,7 @@ class LatinHypercubeGenerator(DOEGenerator):
         for row in doe:
             retval = []
             col = 0
-            for name, meta in iteritems(design_vars):
+            for name, meta in design_vars.items():
                 size = meta['size']
                 sample = row[col:col + size]
 

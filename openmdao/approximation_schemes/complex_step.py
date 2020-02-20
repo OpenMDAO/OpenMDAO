@@ -1,7 +1,7 @@
 """Complex Step derivative approximations."""
 from __future__ import division, print_function
 
-from six import iteritems, itervalues
+from six import itervalues
 from collections import defaultdict
 
 import numpy as np

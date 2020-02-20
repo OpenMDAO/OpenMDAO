@@ -9,7 +9,7 @@ from __future__ import print_function
 
 import sys
 import numpy as np
-from six import iteritems, reraise
+from six import reraise
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
@@ -29,7 +29,7 @@ def _print_violations(unknowns, lower, upper):
     upper : <Vector>
         Vector containing the upper bounds.
     """
-    for name, val in iteritems(unknowns._views_flat):
+    for name, val in unknowns._views_flat.items():
         if any(val > upper._views_flat[name]):
             print("'%s' exceeds upper bounds" % name)
             print("  Val:", val)

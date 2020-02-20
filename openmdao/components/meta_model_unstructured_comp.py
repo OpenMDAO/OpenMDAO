@@ -1,5 +1,4 @@
 """MetaModel provides basic meta modeling capability."""
-from six import iteritems
 from copy import deepcopy
 from itertools import chain, product
 

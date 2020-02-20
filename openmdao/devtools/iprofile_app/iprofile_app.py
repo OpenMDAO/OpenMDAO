@@ -6,7 +6,7 @@ import time
 import webbrowser
 import threading
 import json
-from six import iteritems, itervalues
+from six import itervalues
 
 try:
     import tornado
@@ -75,7 +75,7 @@ def _stratify(call_data, sortby='time'):
         y0 = delta_y * depth
         y1 = y0 + delta_y
 
-        for parent, children in iteritems(pardict):
+        for parent, children in pardict.items():
             if not parent:
                 end_x = 0
             else:
@@ -136,7 +136,7 @@ else:
             # entry contains that node's call data and a dict containing each
             # child keyed by call path.
             self.call_tree = tree = defaultdict(lambda : [None, {}])
-            for path, data in iteritems(self.call_data):
+            for path, data in self.call_data.items():
                 data['id'] = path
                 parts = path.rsplit('|', 1)
                 # add our node to our parent

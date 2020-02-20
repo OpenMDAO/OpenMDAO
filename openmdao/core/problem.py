@@ -11,7 +11,7 @@ from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 
-from six import iteritems, iterkeys, itervalues
+from six import iterkeys, itervalues
 from io import StringIO
 
 import numpy as np

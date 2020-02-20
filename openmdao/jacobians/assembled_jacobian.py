@@ -4,7 +4,7 @@ from __future__ import division, print_function
 import sys
 from collections import defaultdict, OrderedDict
 
-from six import iteritems, itervalues
+from six import itervalues
 
 import numpy as np
 
@@ -129,7 +129,7 @@ class AssembledJacobian(Jacobian):
         abs_key2shape = self._abs_key2shape
 
         # create the matrix subjacs
-        for abs_key, info in iteritems(self._subjacs_info):
+        for abs_key, info in self._subjacs_info.items():
             res_abs_name, wrt_abs_name = abs_key
             # because self._subjacs_info is shared among all 'related' assembled jacs,
             # we use out_ranges (and later in_ranges) to weed out keys outside of this jac
@@ -303,7 +303,7 @@ class AssembledJacobian(Jacobian):
                               if iscomp or owned[n] == irank or meta[n]['distributed'])
 
             rev_conns = defaultdict(list)
-            for tgt, src in iteritems(global_conns):
+            for tgt, src in global_conns.items():
                 rev_conns[src].append(tgt)
 
             # This is the level where the AssembledJacobian is slotted.

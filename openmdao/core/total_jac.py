@@ -6,7 +6,7 @@ from __future__ import print_function, division
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 import pprint
-from six import iteritems, itervalues
+from six import itervalues
 import sys
 import time
 import traceback

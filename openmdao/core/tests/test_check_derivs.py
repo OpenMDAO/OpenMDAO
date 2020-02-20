@@ -1,6 +1,5 @@
 """ Testing for Problem.check_partials and check_totals."""
 
-from six import iteritems
 from io import StringIO
 
 
@@ -311,8 +310,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         data = p.check_partials(out_stream=None)
 
-        for comp_name, comp in iteritems(data):
-            for partial_name, partial in iteritems(comp):
+        for comp_name, comp in data.items():
+            for partial_name, partial in comp.items():
                 forward = partial['J_fwd']
                 reverse = partial['J_rev']
                 fd = partial['J_fd']
@@ -356,8 +355,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         p.setup()
         data = p.check_partials(out_stream=None)
 
-        for comp_name, comp in iteritems(data):
-            for partial_name, partial in iteritems(comp):
+        for comp_name, comp in data.items():
+            for partial_name, partial in comp.items():
                 abs_error = partial['abs error']
                 self.assertAlmostEqual(abs_error.forward, 0.)
                 self.assertAlmostEqual(abs_error.reverse, 0.)
@@ -449,8 +448,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        for comp_name, comp in iteritems(data):
-            for partial_name, partial in iteritems(comp):
+        for comp_name, comp in data.items():
+            for partial_name, partial in comp.items():
                 abs_error = partial['abs error']
                 rel_error = partial['rel error']
                 assert_rel_error(self, abs_error.forward, 0., 1e-5)
@@ -480,8 +479,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
 
-        for comp_name, comp in iteritems(data):
-            for partial_name, partial in iteritems(comp):
+        for comp_name, comp in data.items():
+            for partial_name, partial in comp.items():
                 abs_error = partial['abs error']
                 rel_error = partial['rel error']
                 assert_rel_error(self, abs_error.forward, 0., 1e-5)
@@ -1451,11 +1450,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(method='cs', out_stream=None)
 
         # Comp1 and Comp3 are complex step, so have tighter tolerances.
-        for key, val in iteritems(data['comp1']):
+        for key, val in data['comp1'].items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
-        for key, val in iteritems(data['comp2']):
+        for key, val in data['comp2'].items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
-        for key, val in iteritems(data['comp3']):
+        for key, val in data['comp3'].items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-15)
 
     def test_rel_error_fd_zero(self):
@@ -2324,7 +2323,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-10)
 
     def test_cs_around_broyden(self):
@@ -2366,7 +2365,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         totals = prob.check_totals(method='cs', out_stream=None)
 
-        for key, val in iteritems(totals):
+        for key, val in totals.items():
             assert_rel_error(self, val['rel error'][0], 0.0, 1e-6)
 
     def test_cs_error_allocate(self):

@@ -9,7 +9,7 @@ import ast
 import textwrap
 import importlib
 from collections import defaultdict, OrderedDict
-from six import iteritems, next
+from six import next
 
 import networkx as nx
 
@@ -138,7 +138,7 @@ def _get_nested_calls(starting_class, class_, func_name, parent, graph, seen):
     seen.add('.'.join((class_.__name__, func_name)))
 
     # now find the actual owning class for each call
-    for klass, funcset in iteritems(visitor.self_calls):
+    for klass, funcset in visitor.self_calls.items():
         mro = inspect.getmro(klass)
         for f in funcset:
             full, c = _find_owning_class(mro, f)
