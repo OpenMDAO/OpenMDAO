@@ -652,7 +652,22 @@ class DiscreteTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.setup()
 
-        msg = "Group (<model>): Attempted to connect to output 'C2.y' from output 'C1.y'."
+        msg = "Group (<model>): Attempted to connect from 'C1.y' to 'C2.y', but 'C2.y' is an output. All connections must be from an output to an input."
+        self.assertEqual(str(cm.exception), msg)
+
+    def test_connection_from_input(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', ModCompEx(modval=2))
+        model.add_subsystem('C2', ModCompEx(modval=2))
+
+        model.connect('C1.x', 'C2.x')
+
+        with self.assertRaises(Exception) as cm:
+            prob.setup()
+
+        msg = "Group (<model>): Attempted to connect from 'C1.x' to 'C2.x', but 'C1.x' is an input. All connections must be from an output to an input."
         self.assertEqual(str(cm.exception), msg)
 
 

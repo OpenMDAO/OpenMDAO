@@ -1264,8 +1264,7 @@ class TestConnect(unittest.TestCase):
             self.sub.connect('cmp.x', 'tgt.x', src_indices=[1])
 
     def test_invalid_source(self):
-        msg = "Output 'src.z' does not exist for connection " + \
-              "in 'sub' from 'src.z' to 'tgt.x'."
+        msg = "Attempted to connect from 'src.z' to 'tgt.x', but 'src.z' doesn't exist."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
@@ -1274,7 +1273,7 @@ class TestConnect(unittest.TestCase):
             self.prob.setup()
 
     def test_connect_to_output(self):
-        msg = "Attempted to connect to output 'cmp.z' from output 'tgt.y'."
+        msg = "Attempted to connect from 'tgt.y' to 'cmp.z', but 'cmp.z' is an output. All connections must be from an output to an input."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
@@ -1282,16 +1281,23 @@ class TestConnect(unittest.TestCase):
         with assertRaisesRegex(self, NameError, msg):
             self.prob.setup()
 
+    def test_connect_from_input(self):
+        msg = "Attempted to connect from 'tgt.x' to 'cmp.x', but 'tgt.x' is an input. All connections must be from an output to an input."
+
+        # source and target names can't be checked until setup
+        # because setup is not called until then
+        self.sub.connect('tgt.x', 'cmp.x')
+        with assertRaisesRegex(self, NameError, msg):
+            self.prob.setup()
+
     def test_invalid_target(self):
-        msg = "Group (sub): Input 'tgt.z' does not exist for connection from 'src.x' to 'tgt.z'."
+        msg = "Attempted to connect from 'src.x' to 'tgt.z', but 'tgt.z' doesn't exist."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
         self.sub.connect('src.x', 'tgt.z', src_indices=[1])
-        with self.assertRaises(NameError) as ctx:
+        with assertRaisesRegex(self, NameError, msg):
             self.prob.setup()
-
-        self.assertEqual(str(ctx.exception), msg)
 
     def test_connect_within_system(self):
         msg = "Output and input are in the same System for connection " + \
