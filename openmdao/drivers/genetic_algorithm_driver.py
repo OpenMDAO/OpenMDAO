@@ -423,7 +423,7 @@ class SimpleGADriver(Driver):
                 obj = next(itervalues(obj_values))  # First and only key in the dict
             else:  # Multi-objective optimization with weighted sums
                 weighted_objectives = np.array([])
-                for name, val in obj_values:
+                for name, val in obj_values.items():
                     # element-wise multiplication with scalar
                     # takes the average, if an objective is a vector
                     try:

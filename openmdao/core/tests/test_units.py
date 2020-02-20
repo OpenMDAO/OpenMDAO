@@ -255,8 +255,8 @@ class TestUnitConversion(unittest.TestCase):
         # Make sure check partials handles conversion
         data = prob.check_partials()
 
-        for key1, val1 in data:
-            for key2, val2 in val1:
+        for key1, val1 in data.items():
+            for key2, val2 in val1.items():
                 assert_rel_error(self, val2['abs error'][0], 0.0, 1e-6)
                 assert_rel_error(self, val2['abs error'][1], 0.0, 1e-6)
                 assert_rel_error(self, val2['abs error'][2], 0.0, 1e-6)
