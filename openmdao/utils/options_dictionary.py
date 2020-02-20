@@ -1,8 +1,6 @@
 """Define the OptionsDictionary class."""
 from __future__ import division, print_function
 
-from six import string_types
-
 from openmdao.utils.general_utils import warn_deprecation
 
 # unique object to check if default is given
@@ -246,7 +244,7 @@ class OptionsDictionary(object):
             # If only values is declared
             if values is not None:
                 if value not in values:
-                    if isinstance(value, string_types):
+                    if isinstance(value, str):
                         value = "'{}'".format(value)
                     self._raise("Value ({}) of option '{}' is not one of {}.".format(value, name,
                                                                                      values),
@@ -256,7 +254,7 @@ class OptionsDictionary(object):
                 if not isinstance(value, types):
                     vtype = type(value).__name__
 
-                    if isinstance(value, string_types):
+                    if isinstance(value, str):
                         value = "'{}'".format(value)
 
                     if isinstance(types, (set, tuple, list)):

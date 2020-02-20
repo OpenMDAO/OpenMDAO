@@ -5,8 +5,6 @@ import sys
 import numpy as np
 from petsc4py import PETSc
 
-from six import itervalues
-
 from openmdao.vectors.default_vector import DefaultVector, INT_DTYPE
 from openmdao.vectors.petsc_transfer import PETScTransfer
 from openmdao.utils.mpi import MPI

@@ -4,7 +4,6 @@ from __future__ import division
 
 from itertools import product, chain
 from collections import defaultdict
-from six import itervalues
 
 import numpy as np
 

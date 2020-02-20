@@ -6,7 +6,6 @@ import time
 import webbrowser
 import threading
 import json
-from six import itervalues
 
 try:
     import tornado
@@ -177,7 +176,7 @@ else:
                 if not stop_adding:
                     callcount += len(children)
                     if callcount <= maxcalls:
-                        for child in itervalues(children):
+                        for child in children.values():
                             stack.appendleft(self.call_tree[child['id']])
                     else:
                         stop_adding = True

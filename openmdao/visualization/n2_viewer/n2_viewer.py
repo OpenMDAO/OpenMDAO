@@ -7,7 +7,6 @@ from collections import OrderedDict
 from itertools import chain
 
 import networkx as nx
-from six import itervalues
 
 try:
     import h5py
@@ -391,7 +390,7 @@ def n2(data_source, outfile='n2.html', show_browser=True, embeddable=False,
     # grab the libraries, src and style
     lib_dct = {'d3': 'd3.v5.min', 'awesomplete': 'awesomplete',
                'vk_beautify': 'vkBeautify'}
-    libs = read_files(itervalues(lib_dct), libs_dir, 'js')
+    libs = read_files(lib_dct.values(), libs_dir, 'js')
     src_names = \
         'modal', \
         'utils', \

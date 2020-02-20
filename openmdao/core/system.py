@@ -19,8 +19,6 @@ import time
 from numbers import Integral
 import itertools
 
-from six import itervalues, string_types
-
 import numpy as np
 import networkx as nx
 
@@ -1017,7 +1015,7 @@ class System(object):
             options['dynamic'] = False
             options['static'] = self._coloring_info['static']
 
-        options['wrt_patterns'] = [wrt] if isinstance(wrt, string_types) else wrt
+        options['wrt_patterns'] = [wrt] if isinstance(wrt, str) else wrt
         options['method'] = method
         options['per_instance'] = per_instance
         options['repeat'] = num_full_jacs
@@ -1076,7 +1074,7 @@ class System(object):
         info = self._coloring_info
 
         info.update(**overrides)
-        if isinstance(info['wrt_patterns'], string_types):
+        if isinstance(info['wrt_patterns'], str):
             info['wrt_patterns'] = [info['wrt_patterns']]
 
         if info['method'] is None and self._approx_schemes:
@@ -1337,7 +1335,7 @@ class System(object):
             return coloring
 
         static = info['static']
-        if static is _STD_COLORING_FNAME or isinstance(static, string_types):
+        if static is _STD_COLORING_FNAME or isinstance(static, str):
             if static is _STD_COLORING_FNAME:
                 fname = self.get_approx_coloring_fname()
             else:
@@ -1958,7 +1956,7 @@ class System(object):
             patterns = []
             renames = {}
             for entry in lst:
-                if isinstance(entry, string_types):
+                if isinstance(entry, str):
                     if '*' in entry or '?' in entry or '[' in entry:
                         patterns.append(entry)
                     else:
@@ -2523,7 +2521,7 @@ class System(object):
             raise RuntimeError(msg.format(self.msginfo, name))
 
         # Name must be a string
-        if not isinstance(name, string_types):
+        if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, got {}'.format(self.msginfo,
                                                                                       name))
 
@@ -2654,12 +2652,12 @@ class System(object):
             solution from the previous linear solve.
         """
         # Name must be a string
-        if not isinstance(name, string_types):
+        if not isinstance(name, str):
             raise TypeError('{}: The name argument should be a string, '
                             'got {}'.format(self.msginfo, name))
 
         # Type must be a string and one of 'con' or 'obj'
-        if not isinstance(type_, string_types):
+        if not isinstance(type_, str):
             raise TypeError('{}: The type argument should be a string'.format(self.msginfo))
         elif type_ not in ('con', 'obj'):
             raise ValueError('{}: The type must be one of \'con\' or \'obj\': '

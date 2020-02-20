@@ -6,7 +6,6 @@ from __future__ import print_function, division
 from collections import OrderedDict, defaultdict
 from copy import deepcopy
 import pprint
-from six import itervalues
 import sys
 import time
 import traceback
@@ -1648,7 +1647,7 @@ def _fix_pdc_lengths(idx_iter_dict):
     idx_iter_dict : dict
         Dict of a name/color mapped to indexing information.
     """
-    for imeta, _ in itervalues(idx_iter_dict):
+    for imeta, _ in idx_iter_dict.values():
         par_deriv_color = imeta['par_deriv_color']
         matmat = imeta['matmat']
         range_list = imeta['idx_list']

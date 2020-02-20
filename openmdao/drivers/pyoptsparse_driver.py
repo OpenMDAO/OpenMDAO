@@ -13,7 +13,7 @@ import signal
 import sys
 import traceback
 
-from six import itervalues, string_types, reraise
+from six import reraise
 
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -234,7 +234,7 @@ class pyOptSparseDriver(Driver):
         # doesn't perform one initially.
         con_meta = self._cons
         model_ran = False
-        if optimizer in run_required or np.any([con['linear'] for con in itervalues(self._cons)]):
+        if optimizer in run_required or np.any([con['linear'] for con in self._cons.values()]):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 # Initial Run
                 model.run_solve_nonlinear()
@@ -300,7 +300,7 @@ class pyOptSparseDriver(Driver):
             # do it for us and we'll end up with a fully dense COO matrix and very slow evaluation
             # of linear constraints!
             to_remove = []
-            for jacdct in itervalues(_lin_jacs):
+            for jacdct in _lin_jacs.values():
                 for n, subjac in jacdct.items():
                     if isinstance(subjac, np.ndarray):
                         # we can safely use coo_matrix to automatically convert the ndarray
@@ -674,7 +674,7 @@ class pyOptSparseDriver(Driver):
                 raise RuntimeError("Total jac sparsity was set in both _total_coloring"
                                    " and _total_jac_sparsity.")
         elif self._total_jac_sparsity is not None:
-            if isinstance(self._total_jac_sparsity, string_types):
+            if isinstance(self._total_jac_sparsity, str):
                 with open(self._total_jac_sparsity, 'r') as f:
                     self._total_jac_sparsity = json.load(f)
             total_sparsity = self._total_jac_sparsity

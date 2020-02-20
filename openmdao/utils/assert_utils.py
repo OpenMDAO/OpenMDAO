@@ -3,7 +3,6 @@ Functions for making assertions about OpenMDAO Systems.
 """
 import numpy as np
 from math import isnan
-from six import raise_from, iteritems
 
 import warnings
 import unittest
@@ -214,7 +213,7 @@ def assert_no_approx_partials(system, include_self=True, recurse=True):
         if isinstance(s, Component):
             if s._approx_schemes:
                 has_approx_partials = True
-                approx_partials = [(k, v['method']) for k, v in iteritems(s._declared_partials)
+                approx_partials = [(k, v['method']) for k, v in s._declared_partials.items()
                                    if 'method' in v and v['method']]
                 msg += '    ' + s.pathname + '\n'
                 for key, method in approx_partials:
@@ -293,7 +292,7 @@ def assert_rel_error(test_case, actual, desired, tolerance=1e-15):
                 error = max(error, new_error)
             except test_case.failureException as exception:
                 msg = '{}: '.format(key) + str(exception)
-                raise_from(test_case.failureException(msg), None)
+                raise test_case.failureException(msg) from None
 
     elif isinstance(actual, float) and isinstance(desired, float):
         if isnan(actual) and not isnan(desired):

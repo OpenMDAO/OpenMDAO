@@ -4,8 +4,6 @@ from __future__ import division, print_function
 import sys
 from collections import defaultdict, OrderedDict
 
-from six import itervalues
-
 import numpy as np
 
 from openmdao.jacobians.jacobian import Jacobian
@@ -446,7 +444,7 @@ class AssembledJacobian(Jacobian):
 
         if self._int_mtx is not None:
             self._int_mtx.set_complex_step_mode(active)
-            for mtx in itervalues(self._ext_mtx):
+            for mtx in self._ext_mtx.values():
                 if mtx:
                     mtx.set_complex_step_mode(active)
 

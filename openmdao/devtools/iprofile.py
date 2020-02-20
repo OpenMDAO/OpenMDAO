@@ -9,8 +9,6 @@ import atexit
 from collections import defaultdict
 from itertools import chain
 
-from six import string_types
-
 from openmdao.utils.mpi import MPI
 
 from openmdao.utils.webview import webview

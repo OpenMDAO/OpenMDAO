@@ -6,7 +6,7 @@ from __future__ import print_function, absolute_import
 import sqlite3
 from collections import OrderedDict
 
-from six import PY2, PY3, iteritems, string_types
+from six import PY2, PY3
 
 import numpy as np
 
@@ -184,7 +184,7 @@ class SqliteCaseReader(BaseCaseReader):
             self._abs2meta = json_loads(row['abs2meta'])
 
             # need to convert bounds to numpy arrays
-            for name, meta in iteritems(self._abs2meta):
+            for name, meta in self._abs2meta.items():
                 if 'lower' in meta and meta['lower'] is not None:
                     meta['lower'] = np.resize(np.array(meta['lower']), meta['shape'])
                 if 'upper' in meta and meta['upper'] is not None:
@@ -424,7 +424,7 @@ class SqliteCaseReader(BaseCaseReader):
                                        "specify another source (system or solver) for the cases "
                                        "you want to see.")
 
-        if not isinstance(source, string_types):
+        if not isinstance(source, str):
             raise TypeError("Source parameter must be a string, %s is type %s." %
                             (source, type(source).__name__))
 

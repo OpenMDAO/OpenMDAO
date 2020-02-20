@@ -8,8 +8,6 @@ try:
 except ImportError:
     from collections import Iterable
 
-from six import string_types
-
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.general_utils import warn_deprecation, make_set
 
@@ -58,7 +56,7 @@ class IndepVarComp(ExplicitComponent):
             kwargs['tags'] = make_set(kwargs['tags'], name='tags') | {'indep_var'}
 
         # A single variable is declared during instantiation
-        if isinstance(name, string_types):
+        if isinstance(name, str):
             self._indep.append((name, val, kwargs))
         # Mutiple variables are declared during instantiation (deprecated)
         elif isinstance(name, Iterable):

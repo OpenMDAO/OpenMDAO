@@ -9,7 +9,7 @@ import warnings
 from contextlib import contextmanager
 from collections import defaultdict, OrderedDict
 
-from six import string_types, PY2
+from six import PY2
 from io import StringIO
 from numpy import ndarray
 try:

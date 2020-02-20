@@ -3,8 +3,6 @@ from __future__ import print_function
 from collections import OrderedDict
 import warnings
 
-from six import itervalues
-
 import numpy as np
 
 from openmdao.recorders.recording_manager import RecordingManager
@@ -182,7 +180,7 @@ class ExperimentalDriver(object):
 
         # Gather up the information for design vars.
         self._designvars = model.get_design_vars(recurse=True)
-        desvar_size = np.sum(data['size'] for data in itervalues(self._designvars))
+        desvar_size = np.sum(data['size'] for data in self._designvars.values())
 
         if ((problem._mode == 'fwd' and desvar_size > response_size) or
                 (problem._mode == 'rev' and response_size > desvar_size)):

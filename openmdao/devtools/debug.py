@@ -8,7 +8,6 @@ from itertools import product, chain
 
 import numpy as np
 from contextlib import contextmanager
-from six import iterkeys, itervalues
 from collections import Counter
 
 from openmdao.core.problem import Problem

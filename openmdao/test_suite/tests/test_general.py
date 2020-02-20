@@ -30,7 +30,6 @@ CycleGroup ('group_type': 'cycle')
 """
 
 import unittest
-from six import iterkeys
 
 from openmdao.test_suite.parametric_suite import parametric_suite
 from openmdao.utils.assert_utils import assert_rel_error
@@ -48,7 +47,7 @@ class ParameterizedTestCases(unittest.TestCase):
 
         expected_values = root.expected_values
         if expected_values:
-            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            actual = {key: problem[key] for key in expected_values}
             assert_rel_error(self, actual, expected_values, 1e-8)
 
         error_bound = 1e-4 if root.options['partial_method'] != 'exact' else 1e-8
@@ -78,7 +77,7 @@ class ParameterizedTestCasesSubset(unittest.TestCase):
 
         expected_values = model.expected_values
         if expected_values:
-            actual = {key: problem[key] for key in iterkeys(expected_values)}
+            actual = {key: problem[key] for key in expected_values}
             assert_rel_error(self, actual, expected_values, 1e-8)
 
         expected_totals = model.expected_totals

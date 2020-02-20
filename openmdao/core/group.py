@@ -16,8 +16,6 @@ import inspect
 from fnmatch import fnmatchcase
 import copy
 
-from six import string_types, itervalues
-
 import numpy as np
 import networkx as nx
 
@@ -1455,9 +1453,9 @@ class Group(System):
 
         subsys.name = subsys.pathname = name
 
-        if isinstance(promotes, string_types) or \
-           isinstance(promotes_inputs, string_types) or \
-           isinstance(promotes_outputs, string_types):
+        if isinstance(promotes, str) or \
+           isinstance(promotes_inputs, str) or \
+           isinstance(promotes_outputs, str):
             raise RuntimeError("%s: promotes must be an iterator of strings and/or tuples."
                                % self.msginfo)
         if promotes:
@@ -1510,8 +1508,8 @@ class Group(System):
             to the number of dimensions of the source.
         """
         # if src_indices argument is given, it should be valid
-        if isinstance(src_indices, string_types):
-            if isinstance(tgt_name, string_types):
+        if isinstance(src_indices, str):
+            if isinstance(tgt_name, str):
                 tgt_name = [tgt_name]
             tgt_name.append(src_indices)
             raise TypeError("%s: src_indices must be an index array, did you mean"
@@ -1527,7 +1525,7 @@ class Group(System):
                                 (self.msginfo, src_name, tgt_name, src_indices.dtype.type))
 
         # if multiple targets are given, recursively connect to each
-        if not isinstance(tgt_name, string_types) and isinstance(tgt_name, Iterable):
+        if not isinstance(tgt_name, str) and isinstance(tgt_name, Iterable):
             for name in tgt_name:
                 self.connect(src_name, name, src_indices, flat_src_indices=flat_src_indices)
             return
@@ -1805,13 +1803,13 @@ class Group(System):
 
             jac = self._jacobian
             if self.pathname == "":
-                for approximation in itervalues(self._approx_schemes):
+                for approximation in self._approx_schemes.values():
                     approximation.compute_approximations(self, jac=jac, total=True)
             else:
                 # When an approximation exists in a submodel (instead of in root), the model is
                 # in a scaled state.
                 with self._unscaled_context(outputs=[self._outputs]):
-                    for approximation in itervalues(self._approx_schemes):
+                    for approximation in self._approx_schemes.values():
                         approximation.compute_approximations(self, jac=jac, total=True)
 
         else:

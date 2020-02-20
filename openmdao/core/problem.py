@@ -11,7 +11,6 @@ from collections import defaultdict, namedtuple
 from fnmatch import fnmatchcase
 from itertools import product
 
-from six import iterkeys, itervalues
 from io import StringIO
 
 import numpy as np
@@ -1222,7 +1221,7 @@ class Problem(object):
                                                                        fd_options)
 
             approx_jac = {}
-            for approximation in itervalues(approximations):
+            for approximation in approximations.values():
                 # Perform the FD here.
                 approximation.compute_approximations(comp, jac=approx_jac)
 
@@ -1736,7 +1735,7 @@ def _assemble_derivative_data(derivative_data, rel_error_tol, abs_error_tol, out
             sys_name = 'Full Model'
 
         # Sorted keys ensures deterministic ordering
-        sorted_keys = sorted(iterkeys(derivatives))
+        sorted_keys = sorted(derivatives.keys())
 
         if not suppress_output:
             # Need to capture the output of a component's derivative

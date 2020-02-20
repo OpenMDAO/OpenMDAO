@@ -3,8 +3,6 @@ Functions to write HTML elements.
 """
 import os
 
-from six import itervalues
-
 _IND = 4  # indentation (spaces)
 
 
@@ -523,7 +521,7 @@ class TemplateWriter(object):
             self.template = template = f.read()
 
         if styles is not None:
-            style_elems = '\n\n'.join([write_style(content=s) for s in itervalues(styles)])
+            style_elems = '\n\n'.join([write_style(content=s) for s in styles.values()])
 
             if embeddable:
                 self.template = '\n\n'.join([style_elems, template])

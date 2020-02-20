@@ -18,8 +18,6 @@ from contextlib import contextmanager
 from pprint import pprint
 from itertools import groupby
 
-from six import string_types
-
 import numpy as np
 from scipy.sparse.compressed import get_index_dtype
 
@@ -373,7 +371,7 @@ class Coloring(object):
         fname : str
             File to save to.
         """
-        if isinstance(fname, string_types):
+        if isinstance(fname, str):
             color_dir = os.path.dirname(os.path.abspath(fname))
             if not os.path.exists(color_dir):
                 os.makedirs(color_dir)

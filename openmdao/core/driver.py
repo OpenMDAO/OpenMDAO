@@ -7,8 +7,6 @@ import sys
 import os
 import weakref
 
-from six import itervalues, string_types
-
 import numpy as np
 
 from openmdao.core.total_jac import _TotalJacInfo
@@ -252,8 +250,8 @@ class Driver(object):
         self._total_jac = None
 
         self._has_scaling = (
-            np.any([r['scaler'] is not None for r in itervalues(self._responses)]) or
-            np.any([dv['scaler'] is not None for dv in itervalues(self._designvars)])
+            np.any([r['scaler'] is not None for r in self._responses.values()]) or
+            np.any([dv['scaler'] is not None for dv in self._designvars.values()])
         )
 
         # Determine if any design variables are discrete.
@@ -648,7 +646,7 @@ class Driver(object):
 
         # Gather up the information for design vars.
         self._designvars = designvars = model.get_design_vars(recurse=True)
-        desvar_size = sum(data['size'] for data in itervalues(designvars))
+        desvar_size = sum(data['size'] for data in designvars.values())
 
         return response_size, desvar_size
 
@@ -892,7 +890,7 @@ class Driver(object):
         if coloring is not None:
             return coloring
 
-        if static is coloring_mod._STD_COLORING_FNAME or isinstance(static, string_types):
+        if static is coloring_mod._STD_COLORING_FNAME or isinstance(static, str):
             if static is coloring_mod._STD_COLORING_FNAME:
                 fname = self._get_total_coloring_fname()
             else:

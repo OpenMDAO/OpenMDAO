@@ -4,8 +4,6 @@ from __future__ import division
 from copy import deepcopy
 import numbers
 
-from six import itervalues
-
 import numpy as np
 
 from openmdao.vectors.vector import Vector, INT_DTYPE

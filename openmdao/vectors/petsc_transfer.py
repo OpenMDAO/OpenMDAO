@@ -3,7 +3,6 @@ from __future__ import division
 
 import numpy as np
 from petsc4py import PETSc
-from six import itervalues
 from itertools import product, chain
 from collections import defaultdict
 

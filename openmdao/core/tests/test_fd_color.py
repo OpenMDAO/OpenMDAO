@@ -3,7 +3,6 @@ import tempfile
 import shutil
 import unittest
 import itertools
-from six import iterkeys
 
 try:
     from parameterized import parameterized

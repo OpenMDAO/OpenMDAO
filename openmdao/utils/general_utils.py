@@ -9,7 +9,7 @@ import math
 import warnings
 import unittest
 from fnmatch import fnmatchcase
-from six import string_types, PY2, reraise
+from six import PY2, reraise
 from io import StringIO
 
 # note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
@@ -397,7 +397,7 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     if isinstance(values, np.ndarray):
         if flatten:
             values = values.flatten()
-    elif not isinstance(values, string_types) \
+    elif not isinstance(values, str) \
             and isinstance(values, Iterable):
         values = np.asarray(values, dtype=float)
         if flatten:

@@ -21,7 +21,6 @@ import os
 from distutils.version import LooseVersion
 
 from numpy.distutils.exec_command import find_executable
-from six import string_types
 
 from openmdao.core.problem import Problem
 from openmdao.utils.general_utils import simple_warning
@@ -793,7 +792,7 @@ else:
                                             class_name=comp['class'])
 
                 # Convert from math mode to regular text, if it is a one liner wrapped in math mode
-                if isinstance(label, string_types):
+                if isinstance(label, str):
                     label = _textify(label)
                 comp['label'] = label  # Now the label is finished.
                 # Now really add the system with the XDSM class' method
@@ -1056,7 +1055,7 @@ else:
             str or list(str)
                 Label to be used for this item. List, if it is multiline.
             """
-            if isinstance(txt, string_types):
+            if isinstance(txt, str):
                 txt = [txt]  # Make iterable, it will be converted back if there is only 1 line.
 
             if self.class_names and (class_name is not None):
@@ -1386,7 +1385,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
 
     error_msg = ('Undefined XDSM writer "{}". '
                  'Provide  a valid name or a BaseXDSMWriter instance.')
-    if isinstance(writer, string_types):  # Standard writers (XDSMjs or pyXDSM)
+    if isinstance(writer, str):  # Standard writers (XDSMjs or pyXDSM)
         if writer.lower() == 'pyxdsm':  # pyXDSM
             x = XDSMWriter(box_stacking=box_stacking,
                            number_alignment=number_alignment,
@@ -1409,7 +1408,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
                               box_stacking=box_stacking, **kwargs)
 
     def get_output_side(component_name):
-        if isinstance(output_side, string_types):
+        if isinstance(output_side, str):
             return output_side
         elif isinstance(output_side, dict):
             # Gets the specified key, or the default in the dictionary, or the global default
@@ -1449,7 +1448,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         comp_names = [_format_name(c['abs_name']) for c in solver_dct['comps']]
         solver_label = _format_solver_str(solver_dct, stacking=box_stacking)
 
-        if isinstance(solver_label, string_types):
+        if isinstance(solver_label, str):
             solver_label = _replace_chars(solver_label, subs)
         else:
             solver_label = [_replace_chars(i, subs) for i in solver_label]
@@ -1607,7 +1606,7 @@ def _write_xdsm(filename, viewer_data, driver=None, include_solver=False, cleanu
         # path will be specified based on the "out_format", if all required inputs where
         # provided for showing the results.
         ext = x.extension
-        if not isinstance(ext, string_types):
+        if not isinstance(ext, str):
             err_msg = '"{}" is an invalid extension.'
             raise ValueError(err_msg.format(writer))
         path = '.'.join([filename, ext])
@@ -1726,7 +1725,7 @@ def _convert_name(name, recurse=True, subs=None):
 def _format_name(name):
     # Replaces illegal characters in names for pyXDSM component and connection names
     # This does not effect the labels, only reference names TikZ
-    if isinstance(name, string_types):  # from an SQL reader the name will be in unicode
+    if isinstance(name, str):  # from an SQL reader the name will be in unicode
         for char in ('.', ' ', '-', '_', ':'):
             name = name.replace(char, '@')
     return name

@@ -11,7 +11,7 @@ from distutils.version import LooseVersion
 import numpy as np
 from scipy import __version__ as scipy_version
 from scipy.optimize import minimize
-from six import itervalues, iteritems, reraise
+from six import iteritems, reraise
 
 import openmdao
 import openmdao.utils.coloring as coloring_mod
@@ -256,7 +256,7 @@ class ScipyOptimizeDriver(Driver):
 
         # Size Problem
         nparam = 0
-        for param in itervalues(self._designvars):
+        for param in self._designvars.values():
             nparam += param['size']
         x_init = np.empty(nparam)
 
@@ -582,7 +582,7 @@ class ScipyOptimizeDriver(Driver):
                 model.run_solve_nonlinear()
 
             # Get the objective function evaluations
-            for obj in itervalues(self.get_objective_values()):
+            for obj in self.get_objective_values().values():
                 f_new = obj
                 break
 
