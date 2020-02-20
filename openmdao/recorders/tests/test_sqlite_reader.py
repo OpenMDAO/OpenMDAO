@@ -10,7 +10,7 @@ from tempfile import mkdtemp, mkstemp
 from collections import OrderedDict
 
 import numpy as np
-from six import assertRaisesRegex, StringIO
+from io import StringIO
 
 
 import openmdao.api as om
@@ -161,20 +161,20 @@ class TestSqliteCaseReader(unittest.TestCase):
         self.assertEqual(sorted(source_vars['inputs']), [])
         self.assertEqual(sorted(source_vars['outputs']), [])
 
-        with assertRaisesRegex(self, RuntimeError, "No cases recorded for problem"):
+        with self.assertRaisesRegex(RuntimeError, "No cases recorded for problem"):
             cr.list_source_vars('problem')
 
-        with assertRaisesRegex(self, RuntimeError, "Source not found: root"):
+        with self.assertRaisesRegex(RuntimeError, "Source not found: root"):
             cr.list_source_vars('root')
 
-        with assertRaisesRegex(self, RuntimeError, "Source not found: root.nonlinear_solver"):
+        with self.assertRaisesRegex(RuntimeError, "Source not found: root.nonlinear_solver"):
             cr.list_source_vars('root.nonlinear_solver')
 
         # check list cases
-        with assertRaisesRegex(self, RuntimeError, "Source not found: foo"):
+        with self.assertRaisesRegex(RuntimeError, "Source not found: foo"):
             cr.list_cases('foo')
 
-        with assertRaisesRegex(self, TypeError, "Source parameter must be a string, 999 is type int"):
+        with self.assertRaisesRegex(TypeError, "Source parameter must be a string, 999 is type int"):
             cr.list_cases(999)
 
     def test_reading_driver_cases(self):
@@ -1707,7 +1707,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob.setup()
 
         error_msg = "Input variable, '[^']+', recorded in the case is not found in the model"
-        with assertRaisesRegex(self, KeyError, error_msg):
+        with self.assertRaisesRegex(KeyError, error_msg):
             prob.load_case(case)
 
     def test_subsystem_load_system_cases(self):

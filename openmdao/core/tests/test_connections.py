@@ -4,7 +4,6 @@ import unittest
 import numpy as np
 
 from io import StringIO
-from six import assertRaisesRegex
 
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_rel_error
@@ -438,7 +437,7 @@ class TestConnectionsIndices(unittest.TestCase):
                     r"connection 'idvp.blammo' to 'arraycomp.inp'."
                     r" The source shape is \(1.*,\) but the target shape is \(2.*,\).")
 
-        with assertRaisesRegex(self, ValueError, expected):
+        with self.assertRaisesRegex(ValueError, expected):
             self.prob.setup()
 
     def test_bad_length(self):
@@ -450,7 +449,7 @@ class TestConnectionsIndices(unittest.TestCase):
                     r"for the connection 'idvp.blammo' to 'arraycomp.inp'. "
                     r"The target shape is \(2.*,\) but indices are \(3.*,\).")
 
-        with assertRaisesRegex(self, ValueError, expected):
+        with self.assertRaisesRegex(ValueError, expected):
             self.prob.setup()
 
     def test_bad_value(self):

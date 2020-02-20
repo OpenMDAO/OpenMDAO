@@ -1,8 +1,6 @@
 """Simple example demonstrating how to implement an explicit component."""
 from __future__ import division
 
-from six import assertRaisesRegex
-
 from io import StringIO
 import unittest
 
@@ -166,7 +164,7 @@ class ExplCompTestCase(unittest.TestCase):
         # list excluding both explicit and implicit components raises error
         msg = "You have excluded both Explicit and Implicit components."
 
-        with assertRaisesRegex(self, RuntimeError, msg):
+        with self.assertRaisesRegex(RuntimeError, msg):
             prob.model.list_outputs(explicit=False, implicit=False)
 
     def test_simple_list_vars_options(self):
