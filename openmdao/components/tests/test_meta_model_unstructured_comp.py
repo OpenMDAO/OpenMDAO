@@ -4,7 +4,7 @@ Unit tests for the unstructured metamodel component.
 import sys
 import unittest
 from math import sin
-from six import StringIO
+from io import StringIO
 
 import numpy as np
 

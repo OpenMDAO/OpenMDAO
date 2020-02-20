@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 from distutils.version import LooseVersion
-from six import StringIO
+from io import StringIO
 import sys
 import unittest
 

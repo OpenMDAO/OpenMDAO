@@ -2,7 +2,7 @@
 
 from __future__ import division, print_function
 
-from six import StringIO
+from io import StringIO
 
 import os
 import re
