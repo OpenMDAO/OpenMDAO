@@ -931,12 +931,16 @@ class Group(System):
 
         # Recursion
         if recurse:
-            for subsys in self._subgroups_myproc:
-                if subsys.name in new_conns:
-                    subsys._setup_global_connections(recurse=recurse,
-                                                     conns=new_conns[subsys.name])
-                else:
-                    subsys._setup_global_connections(recurse=recurse)
+            distcomps = []
+            for subsys in self._subsystems_myproc:
+                if isinstance(subsys, Group):
+                    if subsys.name in new_conns:
+                        subsys._setup_global_connections(recurse=recurse,
+                                                        conns=new_conns[subsys.name])
+                    else:
+                        subsys._setup_global_connections(recurse=recurse)
+                elif subsys.options['distributed']:
+                    distcomps.append(subsys)
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
@@ -971,6 +975,10 @@ class Group(System):
 
             for myproc_global_abs_in2out in gathered:
                 global_abs_in2out.update(myproc_global_abs_in2out)
+
+            if recurse:
+                for comp in distcomps:
+                    comp._update_dist_src_indices(global_abs_in2out)
 
     def _setup_connections(self, recurse=True):
         """
