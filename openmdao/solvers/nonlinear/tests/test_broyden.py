@@ -167,15 +167,15 @@ class TestBryoden(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.nonlinear_solver = om.BroydenSolver()
-        model.linear_solver = om.ScipyKrylov(assemble_jac=True)
+        model.nonlinear_solver = om.BroydenSolver(compute_jacobian=False)
+        model.linear_solver = om.DirectSolver()
         model.nonlinear_solver.options['err_on_non_converge'] = True
 
         prob.setup()
 
         msg = "Deprecation warning: In V 3.x, reraise_child_analysiserror will default to False."
         with assert_warning(DeprecationWarning, msg):
-            prob.run_model()
+            prob.final_setup()
 
     def test_error_badname(self):
         # Test top level Sellar (i.e., not grouped).
