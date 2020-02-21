@@ -16,10 +16,8 @@ environment:
       PYTHON: 2
 
     # - APPVEYOR_BUILD_WORKER_IMAGE: Ubuntu
-    #   # test with the latest version of Python 3.x; due to issues with PETSc 3.12, stay with 3.11 and
-    #   # install from maint-3.11 to get this fix: https://bitbucket.org/petsc/petsc4py/commits/a013d13
     #   PYTHON: 3
-    #   PETSc: git+https://bitbucket.org/petsc/petsc4py.git@maint-3.11
+    #   PETSc: 3.12
 
   encrypted_74d70a284b7d_key:
     secure: 7u/kPupG0BmwqAJOLeyGMPakwj3lqukKHXsxEP4+6aX+Huu8VH2ZkDNq6GYlaw6HGJHi2JTAal9VDgOpZc9RMlweOrXJiNFWS3Iu0chy+L4=
@@ -73,6 +71,7 @@ install:
     echo "  > Cloning pyOptSparse from mdolab";
     git clone https://github.com/mdolab/pyoptsparse.git;
     cd pyoptsparse;
+    git checkout tags/v1.2;
 
     if [ "$SNOPT_LOCATION" ] && [ "${PYTHON:0:1}" = "3" ]; then
       cd pyoptsparse/pySNOPT;
@@ -82,8 +81,12 @@ install:
     fi
 
     echo "  > Install pyOptSparse";
+    pip install -r requirements.txt;
     pip install .;
     cd ..;
+
+    echo " >> Installing optional packages for test coverage";
+    pip install psutil objgraph git+https://github.com/mdolab/pyxdsm;
 
     if [ "$PETSc" ]; then
       echo " >> Installing parallel processing dependencies";
