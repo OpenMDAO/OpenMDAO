@@ -9,7 +9,6 @@ import ast
 import textwrap
 import importlib
 from collections import defaultdict, OrderedDict
-from six import next
 
 import networkx as nx
 

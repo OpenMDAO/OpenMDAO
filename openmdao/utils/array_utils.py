@@ -4,7 +4,6 @@ Utils for dealing with arrays.
 from __future__ import print_function, division
 
 import sys
-import six
 from itertools import product
 from copy import copy
 
@@ -70,12 +69,12 @@ def take_nth(rank, size, seq):
         for proc in range(size):
             if rank == proc:
                 try:
-                    yield six.next(it)
+                    yield next(it)
                 except StopIteration:
                     return
             else:
                 try:
-                    six.next(it)
+                    next(it)
                 except StopIteration:
                     return
 

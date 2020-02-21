@@ -13,7 +13,7 @@ from itertools import chain
 import json
 import numpy as np
 
-from six.moves import cPickle as pickle
+import pickle
 
 from openmdao.recorders.case_recorder import CaseRecorder
 from openmdao.utils.mpi import MPI

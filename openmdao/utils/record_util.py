@@ -2,7 +2,6 @@
 Utility functions related to recording or execution metadata.
 """
 from fnmatch import fnmatchcase
-from six.moves import map, zip
 import os
 import re
 import json
