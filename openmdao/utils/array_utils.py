@@ -383,7 +383,7 @@ def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
         return convert_neg(src_indices.flatten(), size_out)
 
     entries = [list(range(x)) for x in shape_in]
-    cols = np.vstack(src_indices[i] for i in product(*entries))
+    cols = np.vstack([src_indices[i] for i in product(*entries)])
     dimidxs = [convert_neg(cols[:, i], shape_out[i]) for i in range(cols.shape[1])]
     return np.ravel_multi_index(dimidxs, shape_out)
 
