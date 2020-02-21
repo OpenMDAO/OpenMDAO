@@ -114,8 +114,6 @@ install:
     cd pyoptsparse;
     git checkout tags/v1.2;
 
-    echo "${SNOPT_LOCATION:30}";
-    echo "${PY:0:1}";
     if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
       cd pyoptsparse/pySNOPT;
       echo "  > Secure copying SNOPT over SSH";
