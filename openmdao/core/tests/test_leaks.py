@@ -2,12 +2,13 @@
 import unittest
 import gc
 from contextlib import contextmanager
-from six import PY2, StringIO
+from six import PY2
 if PY2:
     from types import FunctionType, MethodType
 else:
     from types import FunctionType, MethodType, CoroutineType, GeneratorType, FrameType
 from collections import defaultdict
+from io import StringIO
 
 import openmdao.api as om
 from openmdao.core.tests.test_coloring import run_opt

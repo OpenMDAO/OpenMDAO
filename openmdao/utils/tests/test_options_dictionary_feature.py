@@ -1,5 +1,5 @@
 import unittest
-from six import PY3, assertRegex
+from six import PY3
 
 import numpy as np
 

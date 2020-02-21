@@ -4,7 +4,7 @@ from __future__ import division, print_function
 
 import sys
 import warnings
-from six import reraise, PY2
+from six import PY2
 
 import numpy as np
 import scipy.linalg
@@ -286,7 +286,7 @@ class DirectSolver(LinearSolver):
                     if 'exactly singular' in str(err):
                         raise RuntimeError(format_singular_csc_error(system, matrix))
                     else:
-                        reraise(*sys.exc_info())
+                        raise sys.exc_info()
 
             elif isinstance(matrix, np.ndarray):  # dense
                 # During LU decomposition, detect singularities and warn user.
@@ -378,7 +378,7 @@ class DirectSolver(LinearSolver):
                     if 'exactly singular' in str(err):
                         raise RuntimeError(format_singular_csc_error(system, matrix))
                     else:
-                        reraise(*sys.exc_info())
+                        raise sys.exc_info()
 
                 # to prevent broadcasting errors later, make sure inv_jac is 2D
                 # scipy.sparse.linalg.inv returns a shape (1,) array if matrix is shape (1,1)

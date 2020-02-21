@@ -2,7 +2,6 @@
 
 from __future__ import division, print_function
 
-from six import reraise
 from collections import OrderedDict
 import os
 import pprint
@@ -604,11 +603,11 @@ class NonlinearSolver(Solver):
         """
         try:
             self._solve()
-        except Exception:
+        except Exception as err:
             exc = sys.exc_info()
             if self.options['debug_print']:
                 self._print_exc_debug_info()
-            reraise(*exc)
+            raise err
 
     def _iter_initialize(self):
         """

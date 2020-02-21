@@ -13,8 +13,6 @@ import signal
 import sys
 import traceback
 
-from six import reraise
-
 import numpy as np
 from scipy.sparse import coo_matrix
 
@@ -375,7 +373,7 @@ class pyOptSparseDriver(Driver):
             # Change whatever pyopt gives us to an ImportError, give it a readable message,
             # but raise with the original traceback.
             msg = "Optimizer %s is not available in this installation." % optimizer
-            reraise(ImportError, ImportError(msg), sys.exc_info()[2])
+            raise ImportError(msg)
 
         # Set optimization options
         for option, value in self.opt_settings.items():

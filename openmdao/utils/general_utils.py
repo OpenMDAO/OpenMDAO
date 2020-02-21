@@ -9,7 +9,7 @@ import math
 import warnings
 import unittest
 from fnmatch import fnmatchcase
-from six import PY2, reraise
+from six import PY2
 from io import StringIO
 
 # note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
@@ -538,8 +538,7 @@ def run_model(prob, ignore_exception=False):
         prob.run_model()
     except Exception:
         if not ignore_exception:
-            exc = sys.exc_info()
-            reraise(*exc)
+            raise sys.exc_info()
     finally:
         sys.stdout = stdout
 

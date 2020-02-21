@@ -9,7 +9,6 @@ from __future__ import print_function
 
 import sys
 import numpy as np
-from six import reraise
 
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.solvers.solver import NonlinearSolver
@@ -249,8 +248,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
             if self.options['retry_on_analysis_error']:
                 self._analysis_error_raised = True
             else:
-                exc = sys.exc_info()
-                reraise(*exc)
+                raise err
 
             phi = np.nan
 
@@ -297,7 +295,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
 
                 else:
                     exc = sys.exc_info()
-                    reraise(*exc)
+                    raise exc
 
             finally:
                 self._solver_info.pop()
@@ -397,8 +395,7 @@ class ArmijoGoldsteinLS(LinesearchSolver):
                         rec.rel = np.nan
 
                     else:
-                        exc = sys.exc_info()
-                        reraise(*exc)
+                        raise sys.exc_info()
 
             # self._mpi_print(self._iter_count, norm, norm / norm0)
             self._mpi_print(self._iter_count, phi, self.alpha)
