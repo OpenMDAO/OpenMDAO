@@ -338,6 +338,8 @@ class Problem(object):
                         # raises the same error as vector access.
                         abs_name = prom_name2abs_name(self.model, name, 'input')
                         val = meta[abs_name]['value']
+            else:
+                raise KeyError('{}: Variable name "{}" not found.'.format(self.msginfo, name))
 
             if val is not _undefined:
                 # Need to cache the "get" in case the user calls in-place numpy operations.
