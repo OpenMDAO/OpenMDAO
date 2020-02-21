@@ -24,10 +24,6 @@ class KrigingSurrogate(SurrogateModel):
         Reduced likelihood parameter: alpha
     L : ndarray
         Reduced likelihood parameter: L
-    lapack_driver : str, optional
-        Which lapack driver should be used for scipy's linalg.svd. Options are
-        'gesdd' which is faster but not as robust, or 'gesvd' which is slower but
-        more reliable
     n_dims : int
         Number of independents in the surrogate
     n_samples : int
@@ -50,23 +46,16 @@ class KrigingSurrogate(SurrogateModel):
         Standard deviation of training model response values, normalized.
     """
 
-    def __init__(self, lapack_driver='gesvd', **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize all attributes.
 
         Parameters
         ----------
-        lapack_driver : str, optional
-            Which lapack driver should be used for scipy's linalg.svd. Options are
-            'gesdd' which is faster but not as robust, or 'gesvd' which is slower but
-            more reliable. 'gesvd' is the default.
-
         **kwargs : dict
             options dictionary.
         """
         super(KrigingSurrogate, self).__init__(**kwargs)
-
-        self.lapack_driver = lapack_driver
 
         self.n_dims = 0                 # number of independent
         self.n_samples = 0              # number of training points
@@ -98,6 +87,12 @@ class KrigingSurrogate(SurrogateModel):
                                   "the variance of the input values. If nugget is an ndarray, it "
                                   "must be of the same length as the number of training points. "
                                   "Default: 10. * Machine Epsilon")
+
+        self.options.declare('lapack_driver', types=str, default='gesvd',
+                             desc="Which lapack driver should be used for scipy's linalg.svd."
+                                  "Options are 'gesdd' which is faster but not as robust,"
+                                  "or 'gesvd' which is slower but more reliable."
+                                  "'gesvd' is the default.")
 
     def train(self, x, y):
         """
@@ -193,7 +188,7 @@ class KrigingSurrogate(SurrogateModel):
         R = np.exp(-thetas.dot(np.square(distances)))
         R[np.diag_indices_from(R)] = 1. + self.options['nugget']
 
-        [U, S, Vh] = linalg.svd(R, lapack_driver=self.lapack_driver)
+        [U, S, Vh] = linalg.svd(R, lapack_driver=self.options['lapack_driver'])
 
         # Penrose-Moore Pseudo-Inverse:
         # Given A = USV^* and Ax=b, the least-squares solution is
