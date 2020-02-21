@@ -114,6 +114,8 @@ install:
     cd pyoptsparse;
     git checkout tags/v1.2;
 
+    echo "${SNOPT_LOCATION:30}";
+    echo "${PY:0:1}";
     if [ "$SNOPT_LOCATION" ] && [ "${PY:0:1}" = "3" ]; then
       cd pyoptsparse/pySNOPT;
       echo "  > Secure copying SNOPT over SSH";
@@ -170,9 +172,11 @@ script:
 
 after_success:
 # again, only run coverage operations on the upload machine after success.
+# strip the site-package path so that links works on coveralls.io
 - if [ "$UPLOAD_DOCS" ]; then
     coveralls --rcfile=../../.coveragerc --output=coveralls.json;
-    sed 's/\/home\/travis\/miniconda\/envs\/PY$PY\/lib\/python'"$PY"'\/site-packages\///g' < coveralls.json > coveralls-upd.json;
+    SITE=`python -c 'import site; print(site.getsitepackages()[0])'`;
+    sed "s/${SITE//\//\\/}\///g" < coveralls.json > coveralls-upd.json;
     coveralls --upload=coveralls-upd.json;
   fi
 
