@@ -217,7 +217,7 @@ def _get_viewer_data(data_source):
             driver, DOEDriver) else 'optimization'
         driver_options = {k: driver.options[k] for k in driver.options}
         driver_opt_settings = None
-        if driver_type is 'optimization' and 'opt_settings' in dir(driver):
+        if driver_type == 'optimization' and 'opt_settings' in dir(driver):
             driver_opt_settings = driver.opt_settings
 
     elif isinstance(data_source, Group):

@@ -38,7 +38,7 @@ def check_option(option, value):
     ------
     ValueError
     """
-    if option is 'units' and value is not None and not valid_units(value):
+    if option == 'units' and value is not None and not valid_units(value):
         raise ValueError("The units '%s' are invalid." % value)
 
 

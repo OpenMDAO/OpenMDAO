@@ -73,3 +73,17 @@ Promote with an alias to connect an input to a source
 .. embed-code::
     openmdao.core.tests.test_group.TestGroup.test_group_rename_connect
     :layout: interleave
+
+
+Promote the input and output from the configure function
+---------------------------------------------------------
+
+.. embed-code::
+    openmdao.core.tests.test_group.TestGroup.test_promotes_any
+    :layout: interleave
+
+This functionality can also be achieved by calling `inputs` and `outputs` individually.
+
+.. embed-code::
+    openmdao.core.tests.test_group.TestGroup.test_promotes_inputs_and_outputs
+    :layout: interleave

@@ -2017,9 +2017,27 @@ class System(object):
                     call = 'promotes'
                 else:
                     call = 'promotes_%ss' % io_types[0]
-                raise RuntimeError("%s: '%s' failed to find any matches for the following "
-                                   "names or patterns: %s.%s" %
-                                   (self.msginfo, call, sorted(not_found), empty_group_msg))
+
+                for p in patterns:
+                    for name, alias in renames.items():
+                        if fnmatchcase(name, p):
+                            raise RuntimeError("%s: %s '%s' matched '%s' but '%s' has been aliased "
+                                               "to '%s'." % (self.msginfo, call, p, name,
+                                                             name, alias))
+
+                    for i in names:
+                        if fnmatchcase(i, p):
+                            break
+                    else:
+                        raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                           "pattern: '%s'.%s" %
+                                           (self.msginfo, call, p, empty_group_msg))
+                    if p == patterns[-1]:
+                        break
+                else:
+                    raise RuntimeError("%s: '%s' failed to find any matches for the following "
+                                       "names or patterns: %s.%s" %
+                                       (self.msginfo, call, sorted(not_found), empty_group_msg))
 
         maps = {'input': {}, 'output': {}}
 
