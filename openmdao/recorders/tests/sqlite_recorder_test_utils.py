@@ -1,5 +1,3 @@
-from six import PY2, PY3
-
 import sqlite3
 import numpy as np
 import json
@@ -10,10 +8,7 @@ from openmdao.utils.record_util import format_iteration_coordinate, deserialize
 from openmdao.utils.assert_utils import assert_rel_error
 from openmdao.recorders.sqlite_recorder import blob_to_array, format_version
 
-if PY2:
-    import cPickle as pickle
-else:
-    import pickle
+import pickle
 
 
 @contextmanager
@@ -42,15 +37,11 @@ def get_format_version_abs2meta(db_cur):
     if f_version >= 3:
         abs2meta = json.loads(row[1])
     elif f_version in (1, 2):
-        if PY2:
-            abs2meta = pickle.loads(str(row[1])) if row[1] is not None else None
-
-        if PY3:
-            try:
-                abs2meta = pickle.loads(row[1]) if row[1] is not None else None
-            except TypeError:
-                # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
-                abs2meta = pickle.loads(row[1].encode()) if row[1] is not None else None
+        try:
+            abs2meta = pickle.loads(row[1]) if row[1] is not None else None
+        except TypeError:
+            # Reading in a python 2 pickle recorded pre-OpenMDAO 2.4.
+            abs2meta = pickle.loads(row[1].encode()) if row[1] is not None else None
 
     return f_version, abs2meta
 

@@ -23,8 +23,6 @@ John Wiley & Sons, Ltd.
 import os
 import copy
 
-from six import itervalues, next
-
 import numpy as np
 from pyDOE2 import lhs
 

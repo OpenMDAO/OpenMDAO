@@ -9,7 +9,6 @@ import math
 import warnings
 import unittest
 from fnmatch import fnmatchcase
-from six import PY2
 from io import StringIO
 
 # note: this is a Python 3.3 change, clean this up for OpenMDAO 3.x
@@ -689,10 +688,7 @@ def json_load_byteified(file_handle):
     data item or structure
         data item or structure with unicode converted to bytes
     """
-    if PY2:
-        return _byteify(json.load(file_handle, object_hook=_byteify), ignore_dicts=True)
-    else:
-        return json.load(file_handle)
+    return json.load(file_handle)
 
 
 def json_loads_byteified(json_str):
@@ -711,10 +707,7 @@ def json_loads_byteified(json_str):
     data item or structure
         data item or structure with unicode converted to bytes
     """
-    if PY2:
-        return _byteify(json.loads(json_str, object_hook=_byteify), ignore_dicts=True)
-    else:
-        return json.loads(json_str)
+    return json.loads(json_str)
 
 
 def remove_whitespace(s, right=False, left=False):
@@ -749,11 +742,7 @@ def remove_whitespace(s, right=False, left=False):
 
 
 _badtab = r'`~@#$%^&*()[]{}-+=|\/?<>,.:;'
-if PY2:
-    import string
-    _transtab = string.maketrans(_badtab, '_' * len(_badtab))
-else:
-    _transtab = str.maketrans(_badtab, '_' * len(_badtab))
+_transtab = str.maketrans(_badtab, '_' * len(_badtab))
 
 
 def str2valid_python_name(s):

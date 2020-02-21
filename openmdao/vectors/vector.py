@@ -1,7 +1,6 @@
 """Define the base Vector and Transfer classes."""
 from __future__ import division, print_function
 
-from six import PY3
 from copy import deepcopy
 import os
 import weakref
@@ -237,7 +236,7 @@ class Vector(object):
         listiterator (Python 3.x) or list (Python 2.x)
             the variable names.
         """
-        return self.__iter__() if PY3 else list(self.__iter__())
+        return self.__iter__()
 
     def values(self):
         """

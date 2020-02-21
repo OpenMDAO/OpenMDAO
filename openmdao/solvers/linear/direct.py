@@ -4,7 +4,6 @@ from __future__ import division, print_function
 
 import sys
 import warnings
-from six import PY2
 
 import numpy as np
 import scipy.linalg
@@ -75,10 +74,7 @@ def format_singular_error(err, system, mtx):
     str
         New error string.
     """
-    if PY2:
-        err_msg = err.message
-    else:
-        err_msg = err.args[0]
+    err_msg = err.args[0]
 
     loc = int(err_msg.split('number ')[1].split(' is exactly')[0])
 
