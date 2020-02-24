@@ -1,4 +1,98 @@
 ################################################################################################
+Release Notes for OpenMDAO 2.10.0
+
+February 25, 2020
+
+Note: This is the last release of OpenMDAO 2.X. Updating to this release will be a 
+critical step in preparing for the OpenMDAO 3.X releases
+
+
+Backwards Incompatible API Changes: 
+-----------------------------------
+- <POEM 001> updated definition of light year to correct IAU definition 
+  (very minor change to unit conversions associated with this update)
+
+- <POEM 004> AkimaSplineComp and BsplineComp have been deprecated, replaced with SplineComp
+
+- <POEM 008>
+  - The user is not requires to set a value for the solver option `solve_subsystems` 
+    on Newton and Broyden solvers. Previously the default was `False`, but you will now get 
+    a deprecation warning if this value is not explicitely set. 
+  - The default for linesearch for Newton and Broyden has been changed from `None` to `BoundsEnforceLS`
+
+
+
+- Specification of `includes` and `excludes` for solver case recording options 
+  has been changed to use promoted names relative to the location of that solver in the model. 
+
+Backwards Incompatible NON-API Changes: 
+----------------------------------------
+Note: These changes are not technically API related, but 
+still may cause your results to differ when upgrading. 
+
+- <POEM 012>The old implementation was hard coded to the `gesdd` method for inverses. 
+  Its now an option, but we've changed to `gesvd`, which might introduce slight 
+  numerical changes to the kriging fits. 
+
+- Refactor of how reverse mode derivative solves work for parallel components 
+  that may require the removal of reduce calls in some components that were 
+  needed previously 
+
+- Change to the way SimpleGA does crossover to be more correct (was basically just mutuation before)
+
+
+New Features: 
+-------------
+
+- <POEM 001> astronmical unit (au) and parsec (pc) added to the standard unit definitions. 
+
+- <POEM 002> users can now manually terminate an optimization using operating system signals 
+
+- <POEM 003> 
+  - users can now issue I/O, connections, and promotions in configure 
+  - there was a new API method added to groups to allow promotions after a subsystem has already been added
+
+- <POEM 004> SplineComp was added to the standard component library, 
+  and you can also import the spline utilities to use in your own components
+
+- <POEM 005> OpenMDAO plugin system has been defined, so users can now publish their own plugins on github. 
+  several utilities added to openmdao command line tools related to plugins
+
+- <POEM 007> ExternalCodeComp and ExternalCodeImplicitComp can now accept strings 
+  (previously a lists of strings was required) for `command`, `command_apply`, and `command_solve`. 
+
+- <POEM 010> User can now mark some options as `recordable=False` as an alternative to 
+  using `system.options['options_exclude']`
+
+- <POEM 012> KrigingSurrogate now has a new option `lapack_driver` to determine how an inverse is computed
+  The original implementation used a default `gesdd` method, but we've changed to `gesvd`.
+
+- Slight improvements to the metamodel viewer output
+
+- Improvement to the bidirectional Jacobian coloring so it will fall back to 
+  pure forward or reverse if thats faster
+
+- Users can now set the shape for outputs of `BalanceComp` and `EqConstraintsComp`
+
+- Improvements to `debug_print` for driver related to reporting which derivatives 
+  are being computed when coloring is active
+
+- The N2 viewer now works, even for models that are run in parallel (i.e. if your using mpi to call python)
+
+- `list_inputs` and `list_outputs` both have arguments for including local_size and 
+  global_size of distributed outputs in their reports
+
+
+Bug Fixes: 
+----------
+- Fixed a hang in SimpleGA driver related to mpi calls 
+- Fixed a bug in SimpleGA related to setting a vector of constraints
+- Various bug-fixes to allow running with Python 3.8
+- Fixed a bug in ScipyOptimizer/Cobyla related to objective and dv scaling
+- Corrected bug prenting the user from passing a list to `set_val` when the variable is an array
+
+
+################################################################################################
 Release Notes for OpenMDAO 2.9.1
 
 October 8, 2019
